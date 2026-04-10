@@ -1,0 +1,20 @@
+[project]
+name = "origenerator"
+version = "0.1.0"
+description = "Local ComfyUI frontend with metadata tracking and gallery browser"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6",
+    "Pillow",
+    "opencv-python>=4.8",
+    "websockets",
+]
+
+[project.scripts]
+origenerator = "origenerator.app:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-qt", "vulture"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

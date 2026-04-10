@@ -59,10 +59,15 @@ class ParamForm(QWidget):
             w = QLineEdit()
             w.setText(str(pd.default))
             return w
-        if pd.type in ("int", "seed"):
+        if pd.type == "seed":
+            w = QLineEdit()
+            w.setText(str(pd.default))
+            w.setPlaceholderText("64-bit integer seed")
+            return w
+        if pd.type == "int":
             w = QSpinBox()
             w.setMinimum(int(pd.min_val or 0))
-            w.setMaximum(int(pd.max_val or _SEED_MAX) if pd.type == "seed" else int(pd.max_val or 999999))
+            w.setMaximum(int(pd.max_val or 999999))
             w.setSingleStep(int(pd.step or 1))
             w.setValue(int(pd.default))
             return w
@@ -99,7 +104,10 @@ class ParamForm(QWidget):
                 if cb and cb.isChecked():
                     result[pd.key] = random.randint(0, _SEED_MAX)
                 else:
-                    result[pd.key] = w.value()
+                    try:
+                        result[pd.key] = int(w.text())
+                    except ValueError:
+                        result[pd.key] = 0
             elif pd.type == "str" and pd.multiline:
                 result[pd.key] = w.toPlainText()
             elif pd.type == "str" or pd.type == "image":
@@ -119,7 +127,7 @@ class ParamForm(QWidget):
             val = params[pd.key]
             w = self._widgets[pd.key]
             if pd.type == "seed":
-                w.setValue(int(val))
+                w.setText(str(int(val)))
                 cb = self._randomize_checks.get(pd.key)
                 if cb:
                     cb.setChecked(False)

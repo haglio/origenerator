@@ -33,3 +33,13 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
     assert vals["steps"] == 20
     assert vals["cfg"] == 3.0
     assert vals["sampler"] == "dpm"
+
+
+def test_param_form_seed_handles_64bit_values(qtbot):
+    defs = [ParamDef("seed", "Seed", "seed", 0)]
+    form = ParamForm(defs)
+    qtbot.addWidget(form)
+    big_seed = 680387713615965
+    form.set_values({"seed": big_seed})
+    vals = form.get_values()
+    assert vals["seed"] == big_seed

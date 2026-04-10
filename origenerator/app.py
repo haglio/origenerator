@@ -16,6 +16,45 @@ def _set_windows_app_user_model_id() -> None:
         pass
 
 
+def _ensure_comfyui_server(logger, host, port, comfyui_dir):
+    import importlib.util
+    import socket
+    from pathlib import Path
+
+    def port_open():
+        try:
+            with socket.create_connection((host, port), timeout=0.4):
+                return True
+        except OSError:
+            return False
+
+    if port_open():
+        logger.info("ComfyUI server already running on %s:%d", host, port)
+        return
+
+    # Try to use ComfyUIApp's server launcher
+    comfyuiapp_dir = comfyui_dir.parents[0]  # ComfyUIApp dir
+    server_script = comfyuiapp_dir / "scripts" / "comfyui_server.py"
+    if not server_script.exists():
+        logger.warning("ComfyUI not running and launcher not found at %s", server_script)
+        return
+
+    try:
+        spec = importlib.util.spec_from_file_location("comfyui_server", server_script)
+        server = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(server)
+        logger.info("Starting ComfyUI server via %s...", server_script)
+        result = server.start(base_dir=comfyuiapp_dir)
+        if result.started:
+            logger.info("ComfyUI server started (PID %s)", result.pid)
+        elif result.error:
+            logger.warning("ComfyUI server failed to start: %s", result.error)
+        else:
+            logger.info("ComfyUI server was already running")
+    except Exception as e:
+        logger.warning("Failed to start ComfyUI server: %s", e)
+
+
 def main():
     _set_windows_app_user_model_id()
 
@@ -23,8 +62,14 @@ def main():
 
     import logging
 
+    import logging
+    from pathlib import Path
+
     from origenerator.comfyui_client import ComfyUIClient
-    from origenerator.config import DB_PATH, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_OUTPUT_DIR, THUMB_DIR
+    from origenerator.config import (
+        DB_PATH, COMFYUI_HOST, COMFYUI_PORT,
+        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, THUMB_DIR,
+    )
     from origenerator.db import Database
     from origenerator.gui.main_window import OrigeneratorWindow
     from origenerator.importer import import_comfyui_output
@@ -33,6 +78,9 @@ def main():
     logger = logging.getLogger(__name__)
 
     app = QApplication.instance() or QApplication(sys.argv)
+
+    # Ensure ComfyUI server is running
+    _ensure_comfyui_server(logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR)
 
     db = Database(DB_PATH)
 

@@ -68,7 +68,8 @@ def test_wan22_default_params_has_required_keys():
     wf = Wan22Flf2vLoopWorkflow()
     params = wf.default_params()
     required = {
-        "positive_prompt", "negative_prompt", "input_image", "seed",
+        "positive_prompt", "negative_prompt", "input_image",
+        "noise_seed", "seed",
         "width", "height", "frame_count", "frame_rate",
         "lora_strength_high", "lora_strength_low",
     }
@@ -80,6 +81,7 @@ def test_wan22_build_api_payload_structure():
     params = wf.default_params()
     params["positive_prompt"] = "video prompt"
     params["negative_prompt"] = ""
+    params["noise_seed"] = 42
     params["seed"] = 99
     params["input_image"] = "test.png"
     payload = wf.build_api_payload(params)
@@ -89,9 +91,11 @@ def test_wan22_build_api_payload_structure():
     # Node 11 is LoadImage
     assert payload["11"]["class_type"] == "LoadImage"
     assert payload["11"]["inputs"]["image"] == "test.png"
-    # Node 13 is KSamplerAdvanced (stage 1)
+    # Node 13 is KSamplerAdvanced (stage 1) - uses noise_seed
     assert payload["13"]["class_type"] == "KSamplerAdvanced"
-    assert payload["13"]["inputs"]["noise_seed"] == 99
+    assert payload["13"]["inputs"]["noise_seed"] == 42
+    # Node 14 is KSamplerAdvanced (stage 2) - uses seed
+    assert payload["14"]["inputs"]["noise_seed"] == 99
     # Node 16 is VHS_VideoCombine
     assert payload["16"]["class_type"] == "VHS_VideoCombine"
     # Node 12 is WanFirstLastFrameToVideo

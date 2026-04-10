@@ -50,7 +50,7 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
                 positive_prompt=metadata.get("positive_prompt"),
                 negative_prompt=metadata.get("negative_prompt"),
                 seed=metadata.get("seed"),
-                params_json=json.dumps(metadata.get("params", {})),
+                params_json=json.dumps(_build_params_json(metadata)),
                 workflow_json=json.dumps(metadata.get("prompt_data", {})),
                 source="imported",
             )
@@ -130,6 +130,11 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
                 elif result["positive_prompt"] is None:
                     result["positive_prompt"] = text
 
+        if class_type == "CheckpointLoaderSimple":
+            ckpt = inputs.get("ckpt_name")
+            if isinstance(ckpt, str):
+                result["params"]["checkpoint"] = ckpt
+
         if class_type == "KSampler":
             seed = inputs.get("seed")
             if isinstance(seed, int):
@@ -156,3 +161,14 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         result["workflow_name"] = "sdxl_t2i"
 
     return result
+
+
+def _build_params_json(metadata: dict) -> dict:
+    params = dict(metadata.get("params", {}))
+    if metadata.get("positive_prompt") is not None:
+        params["positive_prompt"] = metadata["positive_prompt"]
+    if metadata.get("negative_prompt") is not None:
+        params["negative_prompt"] = metadata["negative_prompt"]
+    if metadata.get("seed") is not None:
+        params["seed"] = metadata["seed"]
+    return params

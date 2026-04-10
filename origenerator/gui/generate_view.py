@@ -171,6 +171,11 @@ class GenerateView(QWidget):
         self._generate_btn.setEnabled(True)
         self._current_prompt_id = None
 
-    def prefill_params(self, params: dict):
+    def prefill_params(self, workflow_name: str, params: dict):
+        # Switch to the matching workflow if found
+        for i in range(self._workflow_combo.count()):
+            if self._workflow_combo.itemData(i) == workflow_name:
+                self._workflow_combo.setCurrentIndex(i)
+                break
         if self._param_form:
             self._param_form.set_values(params)

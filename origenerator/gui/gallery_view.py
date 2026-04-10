@@ -12,7 +12,7 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
 class GalleryView(QWidget):
-    reuse_requested = pyqtSignal(dict)  # params dict
+    reuse_requested = pyqtSignal(str, dict)  # workflow_name, params dict
 
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
@@ -120,9 +120,16 @@ class GalleryView(QWidget):
         params_json = self._selected.get("params_json")
         if params_json:
             try:
-                self.reuse_requested.emit(json.loads(params_json))
+                params = json.loads(params_json)
             except json.JSONDecodeError:
-                pass
+                return
+            # Merge denormalized columns into params
+            for key in ("positive_prompt", "negative_prompt", "seed"):
+                val = self._selected.get(key)
+                if val is not None and key not in params:
+                    params[key] = val
+            workflow_name = self._selected.get("workflow_name", "")
+            self.reuse_requested.emit(workflow_name, params)
 
 
 class _FlowLayout(QVBoxLayout):

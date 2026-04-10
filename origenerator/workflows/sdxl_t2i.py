@@ -1,4 +1,15 @@
+from origenerator.config import COMFYUI_DIR
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
+
+
+def _list_checkpoints() -> list[str]:
+    ckpt_dir = COMFYUI_DIR / "models" / "checkpoints"
+    if not ckpt_dir.exists():
+        return ["reapony_v80.safetensors"]
+    return sorted(
+        f.name for f in ckpt_dir.iterdir()
+        if f.suffix in (".safetensors", ".ckpt") and f.is_file()
+    ) or ["reapony_v80.safetensors"]
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
@@ -28,9 +39,12 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
+        checkpoints = _list_checkpoints()
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
+            ParamDef("checkpoint", "Model", "combo", "reapony_v80.safetensors",
+                     options=checkpoints),
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("width", "Width", "int", 1280, min_val=64, max_val=4096, step=64),
             ParamDef("height", "Height", "int", 720, min_val=64, max_val=4096, step=64),

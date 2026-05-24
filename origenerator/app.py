@@ -19,7 +19,8 @@ def _set_windows_app_user_model_id() -> None:
 def _ensure_comfyui_server(logger, host, port, comfyui_dir):
     import importlib.util
     import socket
-    from pathlib import Path
+
+    from origenerator.comfyui_client import comfyui_responding
 
     def port_open():
         try:
@@ -28,8 +29,16 @@ def _ensure_comfyui_server(logger, host, port, comfyui_dir):
         except OSError:
             return False
 
-    if port_open():
+    if comfyui_responding(host, port):
         logger.info("ComfyUI server already running on %s:%d", host, port)
+        return
+
+    if port_open():
+        logger.warning(
+            "Port %d is occupied by a non-ComfyUI server; ComfyUI cannot start there. "
+            "Stop that process (or change COMFYUI_PORT) and relaunch Origenerator.",
+            port,
+        )
         return
 
     # Try to use ComfyUIApp's server launcher

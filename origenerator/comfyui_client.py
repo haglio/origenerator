@@ -10,6 +10,22 @@ from PyQt6.QtCore import QThread, pyqtSignal
 logger = logging.getLogger(__name__)
 
 
+def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
+    """True only if the server at host:port is actually ComfyUI.
+
+    A bare port check is not enough: another app can occupy the port and
+    answer HTTP without being ComfyUI. ComfyUI's /system_stats returns a
+    JSON object with a "system" key; anything else means "not ComfyUI".
+    """
+    url = f"http://{host}:{port}/system_stats"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except Exception:
+        return False
+    return isinstance(data, dict) and "system" in data
+
+
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()

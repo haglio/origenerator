@@ -1,7 +1,17 @@
 import json
+import urllib.error
 from unittest.mock import patch, MagicMock
 
-from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_client import ComfyUIClient, comfyui_responding
+
+
+def _mock_response(status: int, body: bytes):
+    resp = MagicMock()
+    resp.status = status
+    resp.read.return_value = body
+    resp.__enter__ = lambda s: s
+    resp.__exit__ = MagicMock(return_value=False)
+    return resp
 
 
 def test_submit_job_posts_correct_payload():
@@ -43,3 +53,23 @@ def test_parse_ws_executing_none_signals_completion():
     }))
 
     assert messages == [("exec", "p1", "5"), ("finished", "p1")]
+
+
+def test_comfyui_responding_true_for_comfyui_system_stats():
+    body = json.dumps({"system": {"os": "nt"}, "devices": []}).encode()
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
+        assert comfyui_responding("127.0.0.1", 8188) is True
+
+
+def test_comfyui_responding_false_when_endpoint_404s():
+    # Another app (e.g. a NiceGUI server) occupies the port and 404s.
+    err = urllib.error.HTTPError("http://x/system_stats", 404, "Not Found", {}, None)
+    with patch("urllib.request.urlopen", side_effect=err):
+        assert comfyui_responding("127.0.0.1", 8188) is False
+
+
+def test_comfyui_responding_false_for_200_that_is_not_comfyui():
+    # A different JSON server answering 200 must not be mistaken for ComfyUI.
+    body = json.dumps({"message": "hello"}).encode()
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
+        assert comfyui_responding("127.0.0.1", 8188) is False

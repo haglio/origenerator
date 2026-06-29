@@ -186,7 +186,7 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
     """
     headline = _prompt_headline(settings_only(params))
     model = workflow_label(workflow_name)
-    return f"{model}: {headline}" if headline else model
+    return f"{model} › {headline}" if headline else model
 
 
 def _short_value(value) -> str:

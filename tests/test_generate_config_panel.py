@@ -232,14 +232,14 @@ def test_title_is_workflow_name_for_blank_config(panel):
 
 def test_title_leads_with_model_then_prompt(panel):
     panel.prefill("sdxl_t2i", {"positive_prompt": "a cat in a hat"})
-    assert panel.title() == "SDXL Text-to-Image: a cat in a hat"
+    assert panel.title() == "SDXL Text-to-Image › a cat in a hat"
 
 
 def test_title_changed_emitted_when_prompt_edited(panel):
     titles = []
     panel.title_changed.connect(titles.append)
     panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert titles and titles[-1] == "SDXL Text-to-Image: a fox"
+    assert titles and titles[-1] == "SDXL Text-to-Image › a fox"
 
 
 def test_custom_title_overrides_and_sticks(panel):

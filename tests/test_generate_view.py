@@ -89,3 +89,30 @@ def test_strip_click_does_nothing_when_settings_match(view):
     count = view._subtabs.count()
     view._on_strip_activated("g1")
     assert view._subtabs.count() == count
+
+
+def test_tab_text_follows_gallery_folder_name(view):
+    view.open_config("sdxl_t2i", {"positive_prompt": "a dragon"})
+    idx = view._subtabs.currentIndex()
+    assert view._subtabs.tabText(idx) == "a dragon"
+
+
+def test_double_click_renames_tab(view, monkeypatch):
+    from PyQt6.QtWidgets import QInputDialog
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("Renamed", True))
+    idx = view._subtabs.currentIndex()
+    panel = view._subtabs.widget(idx)
+    view._rename_subtab(idx)
+    assert panel._custom_title == "Renamed"
+    assert view._subtabs.tabText(idx) == "Renamed"
+
+
+def test_rename_cancelled_leaves_title(view, monkeypatch):
+    from PyQt6.QtWidgets import QInputDialog
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("", False))
+    idx = view._subtabs.currentIndex()
+    panel = view._subtabs.widget(idx)
+    before = panel.title()
+    view._rename_subtab(idx)
+    assert panel._custom_title is None
+    assert view._subtabs.tabText(idx) == before

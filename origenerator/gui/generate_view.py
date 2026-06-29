@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QTabWidget, QToolButton
+from PyQt6.QtWidgets import (
+    QWidget, QHBoxLayout, QTabWidget, QToolButton, QInputDialog,
+)
 from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
@@ -25,6 +27,7 @@ class GenerateView(QWidget):
         self._subtabs.setTabsClosable(True)
         self._subtabs.setMovable(True)
         self._subtabs.tabCloseRequested.connect(self._close_subtab)
+        self._subtabs.tabBarDoubleClicked.connect(self._rename_subtab)
         add_btn = QToolButton()
         add_btn.setText("+")
         add_btn.setToolTip("New configuration")
@@ -50,6 +53,16 @@ class GenerateView(QWidget):
         index = self._subtabs.indexOf(panel)
         if index >= 0:
             self._subtabs.setTabText(index, text)
+
+    def _rename_subtab(self, index: int):
+        panel = self._subtabs.widget(index)
+        if panel is None:
+            return
+        name, ok = QInputDialog.getText(
+            self, "Rename tab", "Tab name:", text=panel.title()
+        )
+        if ok and name.strip():
+            panel.set_custom_title(name.strip())
 
     def _close_subtab(self, index: int):
         panel = self._subtabs.widget(index)

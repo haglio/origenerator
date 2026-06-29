@@ -65,6 +65,17 @@ def build_stylesheet() -> str:
         font-weight: bold;
         padding: 10px 24px;
     }}
+    QToolButton {{
+        background-color: {_h(BG_BUTTON)};
+        color: {_h(TEXT_PRIMARY)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 4px;
+        padding: 2px 10px;
+        font-weight: bold;
+    }}
+    QToolButton:hover {{
+        background-color: {_h(BG_TERTIARY)};
+    }}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};

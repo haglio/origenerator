@@ -4,7 +4,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
     QScrollArea, QPlainTextEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QMenu, QInputDialog, QAbstractItemView,
+    QMenu, QInputDialog, QAbstractItemView, QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 
@@ -81,6 +81,14 @@ class GalleryView(QWidget):
         self._scroll.setWidgetResizable(True)
         middle.addWidget(self._scroll, 1)
         layout.addLayout(middle, 5)
+
+        # A thin divider sets the metadata sidebar apart from the main pane.
+        # A plain 1px frame (not QFrame.VLine) renders the theme colour exactly;
+        # VLine's etched, palette-driven line ignores a stylesheet fill.
+        separator = QFrame()
+        separator.setObjectName("paneSeparator")
+        separator.setFixedWidth(1)
+        layout.addWidget(separator)
 
         # Right: preview + metadata sidebar
         right = QVBoxLayout()

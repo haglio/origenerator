@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
@@ -84,6 +85,17 @@ def _image(prompt_id, prompt, steps, seed):
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed},
                 f"sdxl_t2i_{prompt_id}.png")
+
+
+def _hbox_index_of(layout, widget):
+    """Index in the top-level row layout of the sub-layout holding ``widget``."""
+    for i in range(layout.count()):
+        sub = layout.itemAt(i).layout()
+        if sub is not None and any(
+            sub.itemAt(j).widget() is widget for j in range(sub.count())
+        ):
+            return i
+    return -1
 
 
 def _top_level(tree):
@@ -328,6 +340,21 @@ def test_gallery_creates_a_preview_widget(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     assert isinstance(view._preview, PreviewWidget)
+
+
+def test_a_vertical_line_separates_the_sidebar_from_the_main_pane(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    layout = view.layout()
+
+    main_idx = _hbox_index_of(layout, view._scroll)      # main pane (contents)
+    right_idx = _hbox_index_of(layout, view._preview)    # right sidebar (preview)
+
+    # A thin vertical divider sits between the main pane and the sidebar.
+    separator = layout.itemAt(main_idx + 1).widget()
+    assert isinstance(separator, QFrame)
+    assert separator.maximumWidth() == 1                 # a line, not a panel
+    assert main_idx < main_idx + 1 < right_idx
 
 
 def test_selected_folder_returns_current_folder_key(qtbot):

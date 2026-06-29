@@ -190,9 +190,3 @@ class GenerateView(QWidget):
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self._subtabs.count():
             self._subtabs.setCurrentIndex(current)
-
-    def submit_replay(self, row: dict, overrides: dict) -> GenerateConfigPanel:
-        """Open a fresh subtab and re-run a captured generation in it."""
-        panel = self._add_subtab()
-        panel.submit_replay(row, overrides)
-        return panel

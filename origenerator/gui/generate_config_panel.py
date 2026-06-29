@@ -14,8 +14,6 @@ from origenerator.db import Database
 from origenerator.gallery import config_tab_title
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
-from origenerator.media import media_type_from_filename
-from origenerator.replay import apply_overrides, extract_output_files, missing_inputs
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import (
     estimate_label,
@@ -23,7 +21,7 @@ from origenerator.timing import (
     format_duration,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +224,8 @@ class GenerateConfigPanel(QWidget):
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
         """Stage a built job, then hand it to the queue (or run it now if unqueued).
 
-        ``workflow`` is the captured WorkflowTemplate, or None for a replay —
-        which routes completion through the generic output extractor.
+        ``workflow`` is the WorkflowTemplate this job was built from, captured so
+        its output node is used when the job completes.
         """
         self._prepared = {"payload": payload, "workflow": workflow, "record": record}
         self._generate_btn.setEnabled(False)
@@ -293,15 +291,10 @@ class GenerateConfigPanel(QWidget):
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
             return
-        # A registered workflow knows its own output node; a replay (no captured
-        # template) reads outputs generically from the history.
         wf = self._submitted_workflow
-        if wf is not None:
-            files = wf.extract_output_info(history_data)
-            output_type = wf.output_type
-        else:
-            files = extract_output_files(history_data)
-            output_type = media_type_from_filename(files[0]["filename"]) if files else None
+        if not wf:
+            return
+        files = wf.extract_output_info(history_data)
 
         thumb_path = None
         if files:
@@ -310,7 +303,7 @@ class GenerateConfigPanel(QWidget):
             source = COMFYUI_OUTPUT_DIR / subfolder / first["filename"]
             if source.exists():
                 THUMB_DIR.mkdir(parents=True, exist_ok=True)
-                thumb_path = str(generate_thumbnail(source, output_type or "image", THUMB_DIR))
+                thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
 
         now = datetime.now(timezone.utc).isoformat()
         duration = execution_duration_seconds(history_data)
@@ -406,43 +399,3 @@ class GenerateConfigPanel(QWidget):
         self.prefill(snapshot.workflow_name, snapshot.params)
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
-
-    def submit_replay(self, row: dict, overrides: dict):
-        """Re-run a past generation's captured graph with overridden fields.
-
-        Works for any row that stored its API graph — including workflows the
-        app has no registered template for. Completion is handled by the generic
-        path in ``_on_completed`` (no captured workflow template).
-        """
-        try:
-            graph = json.loads(row.get("workflow_json") or "{}")
-        except json.JSONDecodeError:
-            graph = {}
-        if not graph:
-            self._show_ready("This generation has no stored workflow to re-run.")
-            return
-
-        patched = apply_overrides(graph, **overrides)
-        missing = missing_inputs(patched, COMFYUI_INPUT_DIR)
-        if missing:
-            self._show_ready(f"Missing source file(s): {', '.join(missing[:3])}")
-            return
-
-        name = row.get("workflow_name") or "replay"
-        self.set_custom_title(f"Re-run: {name}")
-        # workflow=None routes completion through the generic output extractor.
-        self._prepare_job(
-            payload=patched,
-            workflow=None,
-            queue_name=name,
-            record=dict(
-                prompt_id=str(uuid.uuid4()),
-                workflow_name=name,
-                workflow_version=row.get("workflow_version") or "replay",
-                positive_prompt=overrides.get("positive", ""),
-                negative_prompt=overrides.get("negative", ""),
-                seed=overrides.get("seed"),
-                params_json=json.dumps(overrides),
-                workflow_json=json.dumps(patched),
-            ),
-        )

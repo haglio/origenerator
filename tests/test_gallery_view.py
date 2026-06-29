@@ -514,24 +514,28 @@ def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
     assert view._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
 
 
-def test_selecting_generation_shows_its_actual_duration(qtbot):
-    rows = [_image("i1", "a cat", 50, 1)]
-    rows[0]["duration_seconds"] = 905.0
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._on_thumbnail_clicked("i1")
-    assert "Duration: 15 min 5 sec" in view._meta_text.toPlainText()
-
-
-def test_generation_without_duration_omits_the_line(qtbot):
+def test_clicking_thumbnail_routes_the_row_into_the_metadata_panel(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
+    view._meta_panel.show_row = MagicMock()
 
     view._on_thumbnail_clicked("i1")
-    assert "Duration:" not in view._meta_text.toPlainText()
+
+    view._meta_panel.show_row.assert_called_once()
+    (row,) = view._meta_panel.show_row.call_args.args
+    assert row["prompt_id"] == "i1"
+
+
+def test_refresh_clears_the_metadata_panel(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._meta_panel.clear = MagicMock()
+
+    view.refresh()
+
+    view._meta_panel.clear.assert_called()
 
 
 def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):

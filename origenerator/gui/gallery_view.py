@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
-    QScrollArea, QPlainTextEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
+    QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
     QMenu, QInputDialog, QAbstractItemView, QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
@@ -14,6 +14,7 @@ from origenerator.db import Database
 from origenerator.generation_config import merge_denormalized
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.rerun_dialog import ReRunDialog
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
@@ -109,9 +110,8 @@ class GalleryView(QWidget):
         right.addWidget(self._source_link)
         self._preview = PreviewWidget()
         right.addWidget(self._preview, 3)
-        self._meta_text = QPlainTextEdit()
-        self._meta_text.setReadOnly(True)
-        right.addWidget(self._meta_text, 2)
+        self._meta_panel = MetadataPanel()
+        right.addWidget(self._meta_panel, 2)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
@@ -468,41 +468,7 @@ class GalleryView(QWidget):
             f"Typical time: {timing.estimate_label(self._db.recent_durations(row['workflow_name']))}"
         )
         self._update_source_link(row)
-        lines = []
-        lines.append(f"Status: {row['status']}")
-        lines.append(f"Source: {row.get('source', 'generated')}")
-        lines.append(f"Seed: {row.get('seed', 'N/A')}")
-        lines.append(f"Created: {row.get('created_at', '')}")
-        duration = row.get("duration_seconds")
-        if duration is not None:
-            lines.append(f"Duration: {timing.format_duration(duration)}")
-        lines.append("")
-        lines.append("--- Positive Prompt ---")
-        lines.append(row.get("positive_prompt") or "(empty)")
-        lines.append("")
-        lines.append("--- Negative Prompt ---")
-        lines.append(row.get("negative_prompt") or "(empty)")
-        lines.append("")
-        params = row.get("params_json")
-        if params:
-            lines.append("--- Parameters ---")
-            try:
-                d = json.loads(params)
-                for k, v in d.items():
-                    if k not in ("positive_prompt", "negative_prompt"):
-                        lines.append(f"  {k}: {v}")
-            except json.JSONDecodeError:
-                lines.append(params)
-        lines.append("")
-        out = row.get("output_files")
-        if out:
-            lines.append("--- Output Files ---")
-            try:
-                for f in json.loads(out):
-                    lines.append(f"  {f.get('subfolder', '')}/{f['filename']}")
-            except (json.JSONDecodeError, KeyError):
-                lines.append(out)
-        self._meta_text.setPlainText("\n".join(lines))
+        self._meta_panel.show_row(row)
 
     def _update_source_link(self, row: dict):
         self._source_image_id = gallery.find_source_image_id(row, self._image_rows)
@@ -540,7 +506,7 @@ class GalleryView(QWidget):
         self._rerun_btn.setEnabled(False)
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
-        self._meta_text.clear()
+        self._meta_panel.clear()
         self._source_link.hide()
         self._source_link.clear()
         self._source_image_id = None

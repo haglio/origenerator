@@ -7,12 +7,18 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.reroll_tile import RerollTile
 from origenerator.trash import Trash
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+_SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
+_REROLL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -966,3 +972,186 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
     view._undo()
     assert db.get_generation("i1") is not None
     assert file_path.exists()
+
+
+# --- re-roll ("+") tile -----------------------------------------------------
+
+
+def _reroll_client():
+    client = ComfyUIClient()
+    client.submit_job = MagicMock(return_value="comfy-X")
+    client.interrupt = MagicMock()
+    client.cancel_prompt = MagicMock()
+    return client
+
+
+def _reroll_tile(view):
+    tiles = view._scroll.widget().findChildren(RerollTile)
+    return tiles[0] if tiles else None
+
+
+def _select_first_leaf(view):
+    # media -> workflow -> model -> settings (the thumbnail leaf)
+    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+    return leaf.data(0, _GROUP_ROLE).key
+
+
+def _seeded_db(tmp_path, seed=7):
+    """A DB holding one completed SDXL image with full, re-rollable params."""
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="orig",
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        positive_prompt="a cat",
+        negative_prompt="",
+        seed=seed,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "orig", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_orig.png", "subfolder": ""}]),
+    )
+    return db
+
+
+def test_leaf_shows_add_tile_when_client_present(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is not None
+
+
+def test_leaf_has_no_add_tile_without_a_client(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
+def test_no_add_tile_for_unknown_workflow(qtbot):
+    rows = [_row("x1", "unknown", {"seed": 1}, "x1.png")]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
+def test_no_add_tile_for_imported_generations(qtbot):
+    # We can only re-roll what we generated; imports lack our full params.
+    rows = [_row("imp", "sdxl_t2i", {"seed": 1}, "imp.png", source="imported")]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
+def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert key in view._reroll_jobs
+    job = view._reroll_jobs[key]
+    assert job.workflow.name == "sdxl_t2i"
+    assert job.params["seed"] != 7  # same settings, fresh seed
+    client.submit_job.assert_called_once_with(job.payload)
+
+
+def test_starting_a_reroll_swaps_the_tile_to_active(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert not _reroll_tile(view)._cancel.isHidden()  # now the live, cancelable tile
+
+
+def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._start_reroll(key)
+    view._start_reroll(key)
+
+    client.submit_job.assert_called_once()
+
+
+def test_reroll_completion_persists_a_new_generation(qtbot, tmp_path):
+    client = _reroll_client()
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    client.job_completed.emit("comfy-X", _REROLL_HISTORY)
+
+    rows = db.list_generations()
+    assert len(rows) == 2
+    new = next(r for r in rows if r["prompt_id"] != "orig")
+    assert new["status"] == "completed"
+    assert "a.png" in new["output_files"]
+    assert new["seed"] != 7
+    assert view._reroll_jobs == {}
+
+
+def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    client.node_executing.emit("comfy-X", "5")  # job is now executing
+    _reroll_tile(view).cancel_requested.emit()
+
+    client.interrupt.assert_called_once()
+    client.cancel_prompt.assert_not_called()
+    assert key not in view._reroll_jobs
+    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + box
+
+
+def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    _reroll_tile(view).cancel_requested.emit()  # still queued, not executing
+
+    client.cancel_prompt.assert_called_once_with("comfy-X")
+    client.interrupt.assert_not_called()
+    assert key not in view._reroll_jobs
+
+
+def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    view.refresh()  # a poll-driven rebuild must not drop the running job
+
+    assert key in view._reroll_jobs
+    assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile

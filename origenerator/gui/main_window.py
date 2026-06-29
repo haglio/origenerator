@@ -38,7 +38,7 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._tabs)
 
         self._generate_view = GenerateView(client, db)
-        self._gallery_view = GalleryView(db)
+        self._gallery_view = GalleryView(db, client=client)
         self._tabs.addTab(self._generate_view, "Generate")
         self._tabs.addTab(self._gallery_view, "Gallery")
 

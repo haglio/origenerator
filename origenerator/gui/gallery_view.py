@@ -1,4 +1,6 @@
 import json
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -10,17 +12,23 @@ from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt6.QtGui import QShortcut, QKeySequence
 
 from origenerator import gallery, timing
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.generation_config import merge_denormalized
+from origenerator.generation_config import merge_denormalized, randomize_seeds
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.rerun_dialog import ReRunDialog
+from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.trash import Trash
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+logger = logging.getLogger(__name__)
 
 _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 _GRID_COLUMNS = 4
@@ -43,9 +51,13 @@ class GalleryView(QWidget):
     reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
     replay_requested = pyqtSignal(dict, dict)  # selected row, overrides dict
 
-    def __init__(self, db: Database, parent=None, *, actions: GalleryActions | None = None):
+    def __init__(self, db: Database, parent=None, *,
+                 client: ComfyUIClient | None = None,
+                 actions: GalleryActions | None = None):
         super().__init__(parent)
         self._db = db
+        self._client = client
+        self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
@@ -268,7 +280,7 @@ class GalleryView(QWidget):
         self._title.set_display(self._breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
-            self._show_thumbnails(group.rows)
+            self._show_thumbnails(group)
         else:
             self._show_folder_tiles(gallery.child_groups(group))
         self._select_first_item(group)
@@ -334,14 +346,14 @@ class GalleryView(QWidget):
             self._visible_keys.append(group.key)
         self._show_widget(container)
 
-    def _show_thumbnails(self, rows):
+    def _show_thumbnails(self, group):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
-        for idx, row in enumerate(rows):
+        for idx, row in enumerate(group.rows):
             seed = row.get("seed")
             label = f"seed {seed}" if seed is not None else (
                 (row.get("positive_prompt") or "")[:40] or "(no prompt)"
@@ -351,7 +363,104 @@ class GalleryView(QWidget):
             grid.addWidget(tw, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
+        if self._can_reroll(group):
+            self._add_reroll_tile(grid, group, len(group.rows))
         self._show_widget(container)
+
+    # --- re-roll: a new variation of a folder's settings, here in the gallery
+
+    def _can_reroll(self, group) -> bool:
+        """True when this folder's settings can be re-run as a new variation.
+
+        Needs a live client and a generation of ours (imports lack our full
+        params) made with a workflow we still know how to build.
+        """
+        if self._client is None or not group.rows:
+            return False
+        row = group.rows[0]
+        if row.get("source", "generated") != "generated":
+            return False
+        return WORKFLOW_REGISTRY.get(row.get("workflow_name") or "") is not None
+
+    def _add_reroll_tile(self, grid, group, index):
+        tile = RerollTile(self._reroll_jobs.get(group.key))
+        tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
+        tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
+        grid.addWidget(tile, index // _GRID_COLUMNS, index % _GRID_COLUMNS)
+
+    def _start_reroll(self, key: str):
+        if self._client is None or key in self._reroll_jobs:
+            return  # no client, or this folder already has one running
+        item = self._item_by_key.get(key)
+        group = item.data(0, _GROUP_ROLE) if item else None
+        if not isinstance(group, gallery.SettingsGroup) or not group.rows:
+            return
+        workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
+        if workflow is None:
+            return
+        seed_keys = [pd.key for pd in workflow.param_definitions() if pd.type == "seed"]
+        params = randomize_seeds(merge_denormalized(group.rows[0]), seed_keys)
+        try:
+            job = GenerationJob(self._client, workflow, params)
+        except Exception as e:
+            logger.warning("Could not build a re-roll for %s: %s", key, e)
+            return
+        self._reroll_jobs[key] = job
+        job.finished.connect(
+            lambda files, thumb, dur, k=key, j=job: self._on_reroll_finished(k, j, files, thumb, dur)
+        )
+        job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+        try:
+            job.start()
+        except Exception as e:
+            logger.warning("Re-roll submission failed for %s: %s", key, e)
+            self._reroll_jobs.pop(key, None)
+        self._rerender_current_leaf()
+
+    def _cancel_reroll(self, key: str):
+        job = self._reroll_jobs.pop(key, None)
+        if job is not None:
+            job.cancel()
+        self._rerender_current_leaf()
+
+    def _on_reroll_finished(self, key, job, files, thumb_path, duration):
+        self._reroll_jobs.pop(key, None)
+        self._persist_generation(job, files, thumb_path, duration)
+        self.refresh()  # the finished generation now shows as a normal thumbnail
+
+    def _on_reroll_failed(self, key, message):
+        self._reroll_jobs.pop(key, None)
+        logger.warning("Re-roll failed for %s: %s", key, message)
+        self._rerender_current_leaf()
+
+    def _persist_generation(self, job, files, thumb_path, duration):
+        workflow, params = job.workflow, job.params
+        self._db.insert_generation(
+            prompt_id=job.prompt_id,
+            workflow_name=workflow.name,
+            workflow_version=workflow.version,
+            positive_prompt=params.get("positive_prompt", ""),
+            negative_prompt=params.get("negative_prompt", ""),
+            seed=params.get("seed"),
+            params_json=json.dumps(params),
+            workflow_json=json.dumps(job.payload),
+        )
+        fields = dict(
+            status="completed",
+            output_files=json.dumps(files),
+            thumbnail_path=thumb_path,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+        )
+        if duration is not None:
+            fields["duration_seconds"] = duration
+        self._db.update_generation(job.prompt_id, **fields)
+
+    def _rerender_current_leaf(self):
+        """Redraw the open settings folder so its re-roll tile reflects the job."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item else None
+        if isinstance(group, gallery.SettingsGroup):
+            self._show_thumbnails(group)
 
     @staticmethod
     def _preview_paths(group) -> list[str]:

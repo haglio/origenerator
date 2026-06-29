@@ -37,5 +37,5 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.reuse_requested.connect(self._on_reuse)
 
     def _on_reuse(self, workflow_name: str, params: dict):
-        self._generate_view.prefill_params(workflow_name, params)
+        self._generate_view.open_config(workflow_name, params)
         self._tabs.setCurrentWidget(self._generate_view)

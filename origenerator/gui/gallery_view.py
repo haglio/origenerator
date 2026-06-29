@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
+from origenerator.generation_config import merge_denormalized
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
@@ -238,18 +239,9 @@ class GalleryView(QWidget):
     def _on_reuse(self):
         if not self._selected:
             return
-        params_json = self._selected.get("params_json")
-        if not params_json:
+        params = merge_denormalized(self._selected)
+        if not params:
             return
-        try:
-            params = json.loads(params_json)
-        except json.JSONDecodeError:
-            return
-        # Merge denormalized columns into params
-        for key in ("positive_prompt", "negative_prompt", "seed"):
-            val = self._selected.get(key)
-            if val is not None and key not in params:
-                params[key] = val
         workflow_name = self._selected.get("workflow_name", "")
         self.reuse_requested.emit(workflow_name, params)
 

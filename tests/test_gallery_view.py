@@ -6,6 +6,7 @@ import pytest
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.db import Database
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.preview_widget import PreviewWidget
 
@@ -165,3 +166,37 @@ def test_gallery_creates_a_preview_widget(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     assert isinstance(view._preview, PreviewWidget)
+
+
+def _make_db(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="p1",
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        positive_prompt="a cat",
+        negative_prompt="blurry",
+        seed=7,
+        params_json=json.dumps({"steps": 20}),
+        workflow_json="{}",
+    )
+    return db
+
+
+def test_reuse_emits_merged_params(qtbot, tmp_path):
+    db = _make_db(tmp_path)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    view._on_thumbnail_clicked("p1")
+    with qtbot.waitSignal(view.reuse_requested) as blocker:
+        view._on_reuse()
+
+    workflow_name, params = blocker.args
+    assert workflow_name == "sdxl_t2i"
+    assert params == {
+        "steps": 20,
+        "positive_prompt": "a cat",
+        "negative_prompt": "blurry",
+        "seed": 7,
+    }

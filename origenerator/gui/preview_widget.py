@@ -83,8 +83,26 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._video)
         self._player.play()
 
+    def show_frame(self, data: bytes) -> None:
+        """Display one in-progress preview frame from raw encoded image bytes.
+
+        ComfyUI streams live previews as encoded images over the websocket
+        rather than writing a file, so this loads straight from memory. Bytes
+        that don't decode (a truncated frame) are ignored, leaving the current
+        view untouched.
+        """
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(data) or pixmap.isNull():
+            return
+        self._player.stop()
+        self._set_movie(None)
+        self._pixmap = pixmap
+        self._rescale()
+        self._stack.setCurrentWidget(self._image_label)
+
     def clear(self) -> None:
         self._player.stop()
+        self._player.setSource(QUrl())  # release any held video file so it can be deleted
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(_PLACEHOLDER)

@@ -222,3 +222,42 @@ def test_delete_generation_removes_row(tmp_path):
     db.delete_generation("del-001")
     assert db.get_generation("del-001") is None
     assert db.get_generation("del-002") is not None
+
+
+def test_restore_generation_brings_back_a_deleted_row_intact(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="r-001", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", negative_prompt="ugly", seed=7,
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    db.update_generation(
+        "r-001", status="completed",
+        output_files=json.dumps([{"filename": "out.png", "subfolder": ""}]),
+        thumbnail_path="thumbs/out.jpg", duration_seconds=12.5,
+    )
+    original = db.get_generation("r-001")
+    db.delete_generation("r-001")
+    assert db.get_generation("r-001") is None
+
+    db.restore_generation(original)
+
+    restored = db.get_generation("r-001")
+    # Every column survives the round-trip, id and created_at included, so the
+    # restored row sorts back into its original gallery position.
+    assert restored == original
+
+
+def test_restore_generation_preserves_newest_first_order(tmp_path):
+    db = Database(tmp_path / "test.db")
+    for i in range(3):
+        db.insert_generation(
+            prompt_id=f"o-{i}", workflow_name="sdxl_t2i", workflow_version="v002",
+            params_json="{}", workflow_json="{}",
+        )
+    middle = db.get_generation("o-1")
+    db.delete_generation("o-1")
+    db.restore_generation(middle)
+
+    # Restored by its original id, the row lands back in the middle, not on top.
+    assert [r["prompt_id"] for r in db.list_generations()] == ["o-2", "o-1", "o-0"]

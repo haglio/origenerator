@@ -3,13 +3,54 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
+from origenerator.gallery_actions import GalleryActions
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.reroll_tile import RerollTile
+from origenerator.trash import Trash
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+_SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
+_REROLL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
+
+_NO_MOD = Qt.KeyboardModifier.NoModifier
+_CTRL = Qt.KeyboardModifier.ControlModifier
+_SHIFT = Qt.KeyboardModifier.ShiftModifier
+
+
+class FakeActions:
+    """Records what the view asks of its action controller."""
+
+    def __init__(self):
+        self.deleted = []   # each entry is one delete batch (list of rows)
+        self.renamed = []   # (key, name) pairs
+        self.undo_count = 0
+        self._label = None
+
+    def delete_rows(self, rows):
+        self.deleted.append(list(rows))
+        self._label = f"Delete {len(rows)} items"
+
+    def rename_folder(self, key, name):
+        self.renamed.append((key, name))
+        self._label = "Rename folder"
+
+    def undo(self):
+        self.undo_count += 1
+        self._label = None
+
+    def can_undo(self):
+        return self._label is not None
+
+    def undo_label(self):
+        return self._label
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +97,14 @@ class FakeDB:
     def set_folder_starred(self, key, starred):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(starred)
+
+    def delete_generation(self, prompt_id):
+        self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
+        self._by_id.pop(prompt_id, None)
+
+    def restore_generation(self, row):
+        self._rows.insert(0, row)
+        self._by_id[row["prompt_id"]] = row
 
     def add(self, row):  # test helper: simulate a new generation landing
         self._rows.insert(0, row)
@@ -500,6 +549,29 @@ def test_reuse_emits_merged_params(qtbot, tmp_path):
     }
 
 
+def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", params_json=json.dumps({"steps": 20}),
+        workflow_json="{}",
+    )
+    db.insert_generation(
+        prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    view._on_thumbnail_clicked("reg")  # a built-in workflow → reusable
+    assert view._reuse_btn.isEnabled() is True
+
+    view._on_thumbnail_clicked("unreg")  # no template for it → greyed out
+    assert view._reuse_btn.isEnabled() is False
+    # The hint rides on the wrapper, since a disabled button shows no tooltip.
+    assert "claude" in view._reuse_wrap.toolTip().lower()
+
+
 def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
     rows = [
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
@@ -640,43 +712,611 @@ def test_emptying_the_gallery_clears_a_stale_estimate(qtbot):
     assert view._estimate_label.text() == ""
 
 
-def test_rerun_button_disabled_without_stored_graph(qtbot, tmp_path):
-    db = Database(tmp_path / "t.db")
-    db.insert_generation(
-        prompt_id="p1", workflow_name="x", workflow_version="imported",
-        params_json="{}", workflow_json="{}",
-    )
-    view = GalleryView(db)
+# --- deletion & undo ------------------------------------------------------
+
+def _open_leaf(view):
+    """Select the first settings-group leaf so its thumbnails are showing."""
+    workflow = _top_level(view._tree)["Images"].child(0)
+    leaf = workflow.child(0).child(0)  # workflow -> model -> settings
+    view._tree.setCurrentItem(leaf)
+    return leaf
+
+
+def test_delete_key_deletes_the_selected_thumbnail(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
-    view._on_thumbnail_clicked("p1")
-    assert view._rerun_btn.isEnabled() is False  # nothing to replay
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+
+    assert len(actions.deleted) == 1
+    assert [r["prompt_id"] for r in actions.deleted[0]] == ["i1"]
 
 
-def test_rerun_emits_replay_request_with_overrides(qtbot, tmp_path, monkeypatch):
-    db = Database(tmp_path / "t.db")
-    db.insert_generation(
-        prompt_id="p1", workflow_name="hunyuan_t2v", workflow_version="imported",
-        positive_prompt="hi", negative_prompt="", seed=3,
-        params_json=json.dumps({"input_image": "x.png"}),
-        workflow_json=json.dumps({"1": {"class_type": "KSampler", "inputs": {"seed": 3}}}),
-    )
-    view = GalleryView(db)
+def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
-    view._on_thumbnail_clicked("p1")
-    assert view._rerun_btn.isEnabled() is True
+    view.refresh()
+    _open_leaf(view)
 
-    import origenerator.gui.gallery_view as gv
-    fake = MagicMock()
-    fake.exec.return_value = 1  # accepted
-    fake.overrides.return_value = {
-        "positive": "new", "negative": "", "seed": 9, "input_image": None,
-    }
-    monkeypatch.setattr(gv, "ReRunDialog", lambda row, parent: fake)
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)
+    assert set(view.selected_prompt_ids()) == {"i1", "i3"}
 
-    with qtbot.waitSignal(view.replay_requested) as blocker:
-        view._on_rerun()
+    view._delete_selection()
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
 
-    row, overrides = blocker.args
-    assert row["prompt_id"] == "p1"
-    assert overrides["positive"] == "new"
-    assert overrides["seed"] == 9
+
+def test_ctrl_click_again_deselects_a_tile(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i2", _CTRL)
+    view._apply_selection("i2", _CTRL)  # toggle i2 back off
+    assert view.selected_prompt_ids() == ["i1"]
+
+
+def test_shift_click_selects_the_contiguous_range(qtbot):
+    rows = [_image(f"i{i}", "a cat", 50, i) for i in range(1, 5)]  # i1..i4
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    order = view.visible_prompt_ids()  # newest-first display order
+
+    view._apply_selection(order[0], _NO_MOD)
+    view._apply_selection(order[2], _SHIFT)
+    assert view.selected_prompt_ids() == order[:3]
+
+
+def test_plain_click_replaces_the_whole_selection(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i2", _CTRL)     # now both selected
+    view._apply_selection("i2", _NO_MOD)   # plain click collapses to one
+    assert view.selected_prompt_ids() == ["i2"]
+
+
+def test_changing_folders_clears_the_selection(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    cat_leaf = _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    assert view.selected_prompt_ids() == ["i1"]
+
+    # Drilling to the sibling settings folder must not carry the pick over.
+    dog_leaf = cat_leaf.parent().child(1)
+    view._tree.setCurrentItem(dog_leaf)
+    assert view.selected_prompt_ids() == []
+
+
+def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)  # leaf selected, nothing picked
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._confirm = lambda text: False  # user says no
+
+    view._delete_selection()
+
+    assert actions.deleted == []
+
+
+def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)  # a whole-workflow folder
+    view._confirm = lambda text: True    # even if it asked, it must not
+
+    view._delete_selection()
+
+    assert actions.deleted == []  # workflow folders are off-limits
+
+
+def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
+    class BoomActions(FakeActions):
+        def delete_rows(self, rows):
+            raise OSError("the file is held by another process")
+
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=BoomActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    warned = []
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMessageBox.warning",
+        lambda *a, **k: warned.append(a),
+    )
+
+    view._delete_selection()  # must not raise
+
+    assert warned  # the user is told the delete failed instead of nothing happening
+
+
+def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
+
+    view._thumbnail_context_menu("i2", QPoint(0, 0))
+
+    assert view.selected_prompt_ids() == ["i2"]
+
+
+def test_right_click_delete_removes_the_picked_thumbnails(qtbot, monkeypatch):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    # Choosing the menu's only entry ("Delete").
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    )
+
+    view._thumbnail_context_menu("i1", QPoint(0, 0))
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+
+
+def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)  # i1 + i3 selected
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    )
+
+    # Right-clicking a tile already in the selection keeps the whole set.
+    view._thumbnail_context_menu("i3", QPoint(0, 0))
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
+
+
+def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    images = _top_level(view._tree)["Images"]
+    view._confirm = lambda text: True
+
+    view._delete_folder(images.data(0, _GROUP_ROLE))       # the Images media group
+    view._delete_folder(images.child(0).data(0, _GROUP_ROLE))  # the workflow group
+
+    assert actions.deleted == []  # only folders inside a workflow may go
+
+
+def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
+    actions = FakeActions()
+    # Two settings groups (cat, dog) share one model -> a single model folder.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    view._tree.setCurrentItem(model)  # a model folder, nested in the workflow
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    assert not view._undo_btn.isEnabled()  # nothing to undo at rest
+
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+    assert view._undo_btn.isEnabled()
+    assert "Delete" in view._undo_btn.toolTip()
+
+    view._undo_btn.click()
+    assert actions.undo_count == 1
+    assert not view._undo_btn.isEnabled()
+
+
+def test_renaming_goes_through_the_undoable_actions(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _key(_top_level(view._tree)["Images"].child(0))
+
+    view._apply_rename(key, "Best Models")
+
+    assert actions.renamed == [(key, "Best Models")]
+    assert view._undo_btn.isEnabled()  # the rename is now undoable
+
+
+def test_inline_rename_is_undoable(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _top_level(view._tree)["Images"].child(0)
+    key = _key(workflow)
+
+    view._editing_key = key            # an in-place edit is underway
+    workflow.setText(0, "Renamed")     # committing it routes through actions
+
+    assert actions.renamed == [(key, "Renamed")]
+    assert view._undo_btn.isEnabled()
+
+
+def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    output_dir = tmp_path / "output"
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"steps": 50}), workflow_json="{}",
+    )
+    file_path = output_dir / "sdxl_t2i_i1.png"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"img")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+    assert db.get_generation("i1") is None
+    assert not file_path.exists()
+
+    view._undo()
+    assert db.get_generation("i1") is not None
+    assert file_path.exists()
+
+
+# --- re-roll ("+") tile -----------------------------------------------------
+
+
+def _reroll_client():
+    client = ComfyUIClient()
+    client.submit_job = MagicMock(return_value="comfy-X")
+    client.interrupt = MagicMock()
+    client.cancel_prompt = MagicMock()
+    return client
+
+
+def _reroll_tile(view):
+    tiles = view._scroll.widget().findChildren(RerollTile)
+    return tiles[0] if tiles else None
+
+
+def _select_first_leaf(view):
+    # media -> workflow -> model -> settings (the thumbnail leaf)
+    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+    return leaf.data(0, _GROUP_ROLE).key
+
+
+def _seeded_db(tmp_path, seed=7):
+    """A DB holding one completed SDXL image with full, re-rollable params."""
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="orig",
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        positive_prompt="a cat",
+        negative_prompt="",
+        seed=seed,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "orig", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_orig.png", "subfolder": ""}]),
+    )
+    return db
+
+
+def test_leaf_shows_add_tile_when_client_present(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is not None
+
+
+def test_add_tile_sits_first_beside_the_newest(qtbot):
+    # Thumbnails are newest-first, so the "new variation" box belongs at the
+    # front of the grid, not trailing the oldest.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    grid = view._scroll.widget().layout()
+    assert isinstance(grid.itemAtPosition(0, 0).widget(), RerollTile)
+
+
+def test_leaf_has_no_add_tile_without_a_client(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
+def test_no_add_tile_for_unknown_workflow(qtbot):
+    rows = [_row("x1", "unknown", {"seed": 1}, "x1.png")]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
+def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
+    # Re-roll works anywhere Reuse Parameters does, imports included — the
+    # workflow's defaults fill in whatever sparse metadata an import lacks.
+    rows = [_row("imp", "sdxl_t2i", {"seed": 1}, "imp.png", source="imported")]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is not None
+
+
+def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
+    # An import keeps only sparse metadata (no checkpoint/vae); re-roll must
+    # still build a valid payload by borrowing the workflow's defaults.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="imported",
+        positive_prompt="a cat", seed=1,
+        params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),  # sparse
+        workflow_json="{}", source="imported",
+    )
+    db.update_generation("imp", status="completed",
+                         output_files=json.dumps([{"filename": "imp.png", "subfolder": ""}]))
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    job = view._reroll_jobs[key]
+    assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
+    assert job.params["seed"] != 1  # re-rolled
+    client.submit_job.assert_called_once_with(job.payload)  # built without error
+
+
+def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert key in view._reroll_jobs
+    job = view._reroll_jobs[key]
+    assert job.workflow.name == "sdxl_t2i"
+    assert job.params["seed"] != 7  # same settings, fresh seed
+    client.submit_job.assert_called_once_with(job.payload)
+
+
+def test_starting_a_reroll_swaps_the_tile_to_active(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert not _reroll_tile(view)._cancel.isHidden()  # now the live, cancelable tile
+
+
+def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._start_reroll(key)
+    view._start_reroll(key)
+
+    client.submit_job.assert_called_once()
+
+
+def test_reroll_completion_persists_a_new_generation(qtbot, tmp_path):
+    client = _reroll_client()
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    client.job_completed.emit("comfy-X", _REROLL_HISTORY)
+
+    rows = db.list_generations()
+    assert len(rows) == 2
+    new = next(r for r in rows if r["prompt_id"] != "orig")
+    assert new["status"] == "completed"
+    assert "a.png" in new["output_files"]
+    assert new["seed"] != 7
+    assert view._reroll_jobs == {}
+
+
+def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    client.node_executing.emit("comfy-X", "5")  # job is now executing
+    _reroll_tile(view).cancel_requested.emit()
+
+    client.interrupt.assert_called_once()
+    client.cancel_prompt.assert_not_called()
+    assert key not in view._reroll_jobs
+    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + box
+
+
+def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    _reroll_tile(view).cancel_requested.emit()  # still queued, not executing
+
+    client.cancel_prompt.assert_called_once_with("comfy-X")
+    client.interrupt.assert_not_called()
+    assert key not in view._reroll_jobs
+
+
+def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+
+    view.refresh()  # a poll-driven rebuild must not drop the running job
+
+    assert key in view._reroll_jobs
+    assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
+
+
+def _shown_view_with_one_image(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    output_dir = tmp_path / "output"
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"steps": 50}), workflow_json="{}",
+    )
+    file_path = output_dir / "sdxl_t2i_i1.png"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"img")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    return view, db, file_path
+
+
+def test_clicking_a_thumbnail_moves_focus_into_the_gallery(qtbot, tmp_path):
+    # The Delete shortcut only fires while a gallery widget holds focus, and
+    # thumbnails are reached without ever touching the tree — so the click must
+    # move focus into the gallery itself. focusWidget() reports this without
+    # depending on the test window winning OS activation.
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
+
+    assert view.focusWidget() is thumb
+
+
+def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
+    view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)  # select, the way a user does
+    qtbot.keyClick(thumb, Qt.Key.Key_Delete)            # Delete propagates up to the view
+
+    assert db.get_generation("i1") is None
+    assert not file_path.exists()
+
+
+def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
+    view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
+    qtbot.keyClick(thumb, Qt.Key.Key_Delete)
+    assert db.get_generation("i1") is None
+
+    qtbot.keyClick(view, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert db.get_generation("i1") is not None
+    assert file_path.exists()
+
+
+def test_delete_on_a_tree_folder_removes_it_via_the_keyboard(qtbot, tmp_path):
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)  # the settings folder is the current tree item
+    view._confirm = lambda text: True
+    view._tree.setFocus()
+
+    qtbot.keyClick(view._tree, Qt.Key.Key_Delete)  # propagates from tree to the view
+
+    assert db.get_generation("i1") is None

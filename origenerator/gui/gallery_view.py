@@ -1,23 +1,33 @@
 import json
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
     QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QMenu, QInputDialog, QAbstractItemView, QFrame,
+    QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
+from PyQt6.QtGui import QKeySequence
 
 from origenerator import gallery, timing
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.comfyui_client import ComfyUIClient
+from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR
 from origenerator.db import Database
-from origenerator.generation_config import merge_denormalized
+from origenerator.gallery_actions import GalleryActions
+from origenerator.generation_config import merge_denormalized, randomize_seeds
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.rerun_dialog import ReRunDialog
+from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.trash import Trash
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+logger = logging.getLogger(__name__)
 
 _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 _GRID_COLUMNS = 4
@@ -26,13 +36,39 @@ _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 
 
+def _is_deletable_folder(group) -> bool:
+    """Whether a folder may be deleted: anything nested inside a workflow.
+
+    Model and settings folders live within a workflow folder and are fair game;
+    a whole workflow or media folder is off-limits, so a workflow's entire
+    history can never be wiped in one action.
+    """
+    return isinstance(group, (gallery.ModelGroup, gallery.SettingsGroup))
+
+
+def _is_reusable_workflow(workflow_name) -> bool:
+    """Whether the app can rebuild this workflow from its template.
+
+    The single gate for both Reuse Parameters and the gallery re-roll, so the
+    re-roll '+' appears exactly where Reuse works (a re-roll is just Reuse with
+    a random seed).
+    """
+    return (workflow_name or "") in WORKFLOW_REGISTRY
+
+
 class GalleryView(QWidget):
     reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
-    replay_requested = pyqtSignal(dict, dict)  # selected row, overrides dict
 
-    def __init__(self, db: Database, parent=None):
+    def __init__(self, db: Database, parent=None, *,
+                 client: ComfyUIClient | None = None,
+                 actions: GalleryActions | None = None):
         super().__init__(parent)
         self._db = db
+        self._client = client
+        self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
+        self._actions = actions or GalleryActions(
+            db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
+        )
         self._selected: dict | None = None
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
@@ -40,16 +76,36 @@ class GalleryView(QWidget):
         self._source_image_id: str | None = None
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
+        self._selected_ids: set[str] = set()
+        self._selection_anchor: str | None = None
+        self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
+        self._sync_undo_button()
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
+
+    def keyPressEvent(self, event):
+        """Delete removes the picked items/folder; Ctrl+Z undoes the last action.
+
+        These propagate up from whatever gallery widget holds focus (a clicked
+        thumbnail, the folder tree), so they work no matter how the user got
+        there — including reaching a tile entirely through the main pane.
+        """
+        if event.matches(QKeySequence.StandardKey.Delete):
+            self._delete_selection()
+            event.accept()
+        elif event.matches(QKeySequence.StandardKey.Undo):
+            self._undo()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
@@ -68,13 +124,18 @@ class GalleryView(QWidget):
         self._tree.itemChanged.connect(self._commit_inline_rename)
         layout.addWidget(self._tree, 2)
 
-        # Middle: folder title over the contents (folder tiles or thumbnails).
+        # Middle: a header (folder title + Undo) over the contents.
         # Double-clicking the title renames the selected folder in place.
         middle = QVBoxLayout()
+        header = QHBoxLayout()
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
-        middle.addWidget(self._title)
+        header.addWidget(self._title, 1)
+        self._undo_btn = QPushButton("Undo")
+        self._undo_btn.clicked.connect(self._undo)
+        header.addWidget(self._undo_btn, 0, Qt.AlignmentFlag.AlignTop)
+        middle.addLayout(header)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
@@ -115,15 +176,13 @@ class GalleryView(QWidget):
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
-        right.addWidget(self._reuse_btn)
-        self._rerun_btn = QPushButton("Re-run…")
-        self._rerun_btn.setToolTip(
-            "Re-run this generation's exact workflow with an editable "
-            "prompt, seed and input image — even for unregistered workflows."
-        )
-        self._rerun_btn.clicked.connect(self._on_rerun)
-        self._rerun_btn.setEnabled(False)
-        right.addWidget(self._rerun_btn)
+        # A disabled QPushButton receives no hover events, so its own tooltip
+        # never shows; carry the "ask Claude" hint on an enabled wrapper instead.
+        self._reuse_wrap = QWidget()
+        reuse_box = QVBoxLayout(self._reuse_wrap)
+        reuse_box.setContentsMargins(0, 0, 0, 0)
+        reuse_box.addWidget(self._reuse_btn)
+        right.addWidget(self._reuse_wrap)
         layout.addLayout(right, 3)
 
     def showEvent(self, event):
@@ -234,7 +293,7 @@ class GalleryView(QWidget):
         self._title.set_display(self._breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
-            self._show_thumbnails(group.rows)
+            self._show_thumbnails(group)
         else:
             self._show_folder_tiles(gallery.child_groups(group))
         self._select_first_item(group)
@@ -283,6 +342,7 @@ class GalleryView(QWidget):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
         for idx, group in enumerate(groups):
@@ -299,22 +359,130 @@ class GalleryView(QWidget):
             self._visible_keys.append(group.key)
         self._show_widget(container)
 
-    def _show_thumbnails(self, rows):
+    def _show_thumbnails(self, group):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
-        for idx, row in enumerate(rows):
+        # The re-roll tile leads the grid so it sits beside the newest item
+        # (thumbnails are sorted newest-first).
+        offset = 1 if self._can_reroll(group) else 0
+        if offset:
+            self._add_reroll_tile(grid, group, 0)
+        for idx, row in enumerate(group.rows):
             seed = row.get("seed")
             label = f"seed {seed}" if seed is not None else (
                 (row.get("positive_prompt") or "")[:40] or "(no prompt)"
             )
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
-            tw.clicked.connect(self._on_thumbnail_clicked)
-            grid.addWidget(tw, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
+            tw.clicked.connect(self._thumbnail_clicked)
+            tw.context_requested.connect(self._thumbnail_context_menu)
+            pos = idx + offset
+            grid.addWidget(tw, pos // _GRID_COLUMNS, pos % _GRID_COLUMNS)
             self._visible_ids.append(row["prompt_id"])
+            self._thumb_widgets[row["prompt_id"]] = tw
         self._show_widget(container)
+
+    # --- re-roll: a new variation of a folder's settings, here in the gallery
+
+    def _can_reroll(self, group) -> bool:
+        """True when this folder's settings can be re-run as a new variation.
+
+        Mirrors the Reuse Parameters gate — any folder whose workflow the app
+        knows how to build, imported or not — since a re-roll is exactly Reuse +
+        a random seed + Generate (with missing params filled from the workflow's
+        defaults, just as the Generate tab does).
+        """
+        if self._client is None or not group.rows:
+            return False
+        return _is_reusable_workflow(group.rows[0].get("workflow_name"))
+
+    def _add_reroll_tile(self, grid, group, index):
+        tile = RerollTile(self._reroll_jobs.get(group.key))
+        tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
+        tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
+        grid.addWidget(tile, index // _GRID_COLUMNS, index % _GRID_COLUMNS)
+
+    def _start_reroll(self, key: str):
+        if self._client is None or key in self._reroll_jobs:
+            return  # no client, or this folder already has one running
+        item = self._item_by_key.get(key)
+        group = item.data(0, _GROUP_ROLE) if item else None
+        if not isinstance(group, gallery.SettingsGroup) or not group.rows:
+            return
+        workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
+        if workflow is None:
+            return
+        # Reuse the row's params, filling any the row didn't carry (imports keep
+        # only sparse metadata) from the workflow's defaults — the same merge the
+        # Generate tab does — then re-roll the seed.
+        params = merge_denormalized(group.rows[0])
+        for param_key, value in workflow.default_params().items():
+            params.setdefault(param_key, value)
+        params = randomize_seeds(params, workflow.seed_keys())
+        try:
+            job = GenerationJob(self._client, workflow, params)
+        except Exception as e:
+            logger.warning("Could not build a re-roll for %s: %s", key, e)
+            return
+        self._reroll_jobs[key] = job
+        job.finished.connect(
+            lambda files, thumb, dur, k=key, j=job: self._on_reroll_finished(k, j, files, thumb, dur)
+        )
+        job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+        try:
+            job.start()
+        except Exception as e:
+            logger.warning("Re-roll submission failed for %s: %s", key, e)
+            self._reroll_jobs.pop(key, None)
+        self._rerender_current_leaf()
+
+    def _cancel_reroll(self, key: str):
+        job = self._reroll_jobs.pop(key, None)
+        if job is not None:
+            job.cancel()
+        self._rerender_current_leaf()
+
+    def _on_reroll_finished(self, key, job, files, thumb_path, duration):
+        self._reroll_jobs.pop(key, None)
+        self._persist_generation(job, files, thumb_path, duration)
+        self.refresh()  # the finished generation now shows as a normal thumbnail
+
+    def _on_reroll_failed(self, key, message):
+        self._reroll_jobs.pop(key, None)
+        logger.warning("Re-roll failed for %s: %s", key, message)
+        self._rerender_current_leaf()
+
+    def _persist_generation(self, job, files, thumb_path, duration):
+        workflow, params = job.workflow, job.params
+        self._db.insert_generation(
+            prompt_id=job.prompt_id,
+            workflow_name=workflow.name,
+            workflow_version=workflow.version,
+            positive_prompt=params.get("positive_prompt", ""),
+            negative_prompt=params.get("negative_prompt", ""),
+            seed=params.get("seed"),
+            params_json=json.dumps(params),
+            workflow_json=json.dumps(job.payload),
+        )
+        fields = dict(
+            status="completed",
+            output_files=json.dumps(files),
+            thumbnail_path=thumb_path,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+        )
+        if duration is not None:
+            fields["duration_seconds"] = duration
+        self._db.update_generation(job.prompt_id, **fields)
+
+    def _rerender_current_leaf(self):
+        """Redraw the open settings folder so its re-roll tile reflects the job."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item else None
+        if isinstance(group, gallery.SettingsGroup):
+            self._show_thumbnails(group)
 
     @staticmethod
     def _preview_paths(group) -> list[str]:
@@ -375,6 +543,132 @@ class GalleryView(QWidget):
         """
         self._pending_selection = prompt_id or None
 
+    # --- selection ---------------------------------------------------------
+
+    def _thumbnail_clicked(self, prompt_id: str):
+        self._apply_selection(prompt_id, QApplication.keyboardModifiers())
+        self._on_thumbnail_clicked(prompt_id)
+
+    def _apply_selection(self, prompt_id: str, modifiers):
+        """Update the multi-select set the way the held modifiers dictate.
+
+        Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
+        a plain click resets to just this tile. Mirrors a typical file browser.
+        """
+        ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        if ctrl:
+            self._selected_ids ^= {prompt_id}
+            self._selection_anchor = prompt_id
+        elif shift and self._selection_anchor in self._visible_ids \
+                and prompt_id in self._visible_ids:
+            a = self._visible_ids.index(self._selection_anchor)
+            b = self._visible_ids.index(prompt_id)
+            lo, hi = sorted((a, b))
+            self._selected_ids = set(self._visible_ids[lo:hi + 1])
+        else:
+            self._selected_ids = {prompt_id}
+            self._selection_anchor = prompt_id
+        self._refresh_selection_highlights()
+
+    def _refresh_selection_highlights(self):
+        for pid, widget in self._thumb_widgets.items():
+            widget.set_selected(pid in self._selected_ids)
+
+    def _clear_selection(self):
+        self._selected_ids = set()
+        self._selection_anchor = None
+        self._thumb_widgets = {}
+
+    def selected_prompt_ids(self) -> list[str]:
+        return [pid for pid in self._visible_ids if pid in self._selected_ids]
+
+    # --- deletion & undo ---------------------------------------------------
+
+    def _thumbnail_context_menu(self, prompt_id: str, global_pos):
+        """Right-click menu for a thumbnail: delete the picked item(s).
+
+        Right-clicking a tile that isn't part of the current selection first
+        selects just it, so the menu always acts on something visible.
+        """
+        if prompt_id not in self._selected_ids:
+            self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+            self._on_thumbnail_clicked(prompt_id)
+        count = len(self._selected_ids)
+        menu = QMenu(self)
+        delete_action = menu.addAction(f"Delete {count} item{'s' if count != 1 else ''}")
+        if menu.exec(global_pos) is delete_action:
+            self._delete_selection()
+
+    def _delete_selection(self):
+        """Delete picked thumbnails, or the current folder if none are picked."""
+        if self._selected_ids:
+            rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
+            self._delete_rows([r for r in rows if r])
+            return
+        group = self._current_deletable_folder()
+        if group is not None:
+            self._delete_folder(group)
+
+    def _current_deletable_folder(self):
+        """The selected tree folder if it may be deleted, else ``None``."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item else None
+        return group if _is_deletable_folder(group) else None
+
+    def _delete_folder(self, group):
+        if not _is_deletable_folder(group):
+            return
+        rows = gallery.rows_under(group)
+        if not rows:
+            return
+        plural = "s" if len(rows) != 1 else ""
+        if not self._confirm(f"Delete “{group.label}” and its {len(rows)} item{plural}?"):
+            return
+        self._delete_rows(rows)
+
+    def _delete_rows(self, rows):
+        if not rows:
+            return
+        deleted_ids = {r["prompt_id"] for r in rows}
+        if self._selected and self._selected.get("prompt_id") in deleted_ids:
+            self._preview.clear()  # release any file handle before the files move
+        try:
+            self._actions.delete_rows(rows)
+        except Exception as e:
+            # A delete that throws (a locked file, a vanished path) must not fail
+            # silently — show what went wrong rather than appearing to do nothing.
+            logger.exception("Failed to delete %d generation(s)", len(rows))
+            QMessageBox.warning(
+                self, "Delete failed",
+                f"Could not delete the selected item(s):\n\n{e}",
+            )
+            return
+        self._clear_selection()
+        self.refresh()
+        self._sync_undo_button()
+
+    def _undo(self):
+        if not self._actions.can_undo():
+            return
+        self._preview.clear()
+        self._actions.undo()
+        self._clear_selection()
+        self.refresh()
+        self._sync_undo_button()
+
+    def _sync_undo_button(self):
+        label = self._actions.undo_label()
+        self._undo_btn.setEnabled(self._actions.can_undo())
+        self._undo_btn.setToolTip(f"Undo: {label}" if label else "Nothing to undo")
+
+    def _confirm(self, text: str) -> bool:
+        reply = QMessageBox.question(
+            self, "Delete", text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     # --- rename & star -----------------------------------------------------
 
     def _on_tree_context_menu(self, pos: QPoint):
@@ -393,11 +687,17 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         rename_action = menu.addAction("Rename…")
         star_action = menu.addAction("Unstar" if group.starred else "Star")
+        delete_action = None
+        if _is_deletable_folder(group):
+            menu.addSeparator()
+            delete_action = menu.addAction("Delete folder…")
         chosen = menu.exec(global_pos)
         if chosen == rename_action:
             self._rename_folder(key)
         elif chosen == star_action:
             self._toggle_star(key)
+        elif delete_action is not None and chosen == delete_action:
+            self._delete_folder(group)
 
     def _rename_folder(self, key: str):
         item = self._item_by_key.get(key)
@@ -409,8 +709,9 @@ class GalleryView(QWidget):
             self._apply_rename(key, text)
 
     def _apply_rename(self, key: str, name: str):
-        self._db.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(key, name.strip() or None)
         self.refresh()
+        self._sync_undo_button()
 
     def _begin_inline_rename(self, item, _column):
         """Double-clicking a tree folder edits its name in place."""
@@ -428,7 +729,8 @@ class GalleryView(QWidget):
         name = item.text(0)
         if name.startswith(_STAR_PREFIX):
             name = name[len(_STAR_PREFIX):]
-        self._db.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(key, name.strip() or None)
+        self._sync_undo_button()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
         QTimer.singleShot(0, self.refresh)
 
@@ -442,8 +744,9 @@ class GalleryView(QWidget):
     def _commit_title_rename(self, name: str):
         key = self._selected_folder_key()
         if key is not None:
-            self._db.rename_folder(key, name.strip() or None)
+            self._actions.rename_folder(key, name.strip() or None)
             self.refresh()
+            self._sync_undo_button()
 
     def _toggle_star(self, key: str):
         item = self._item_by_key.get(key)
@@ -458,8 +761,13 @@ class GalleryView(QWidget):
         if not row:
             return
         self._selected = row
-        self._reuse_btn.setEnabled(True)
-        self._rerun_btn.setEnabled(_has_graph(row))
+        reusable = _is_reusable_workflow(row.get("workflow_name"))
+        self._reuse_btn.setEnabled(reusable)
+        self._reuse_wrap.setToolTip(
+            "" if reusable else
+            "This workflow isn't built into the app yet — ask Claude to "
+            "implement it if you want to reuse its parameters."
+        )
         self._show_preview(row)
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
@@ -503,7 +811,7 @@ class GalleryView(QWidget):
     def _clear_metadata(self):
         self._selected = None
         self._reuse_btn.setEnabled(False)
-        self._rerun_btn.setEnabled(False)
+        self._reuse_wrap.setToolTip("")
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_panel.clear()
@@ -520,24 +828,6 @@ class GalleryView(QWidget):
             return
         workflow_name = self._selected.get("workflow_name", "")
         self.reuse_requested.emit(workflow_name, params)
-
-    def _on_rerun(self):
-        if not self._selected or not _has_graph(self._selected):
-            return
-        dialog = ReRunDialog(self._selected, self)
-        if dialog.exec():
-            self.replay_requested.emit(self._selected, dialog.overrides())
-
-
-def _has_graph(row: dict) -> bool:
-    """True if a row stored a re-runnable ComfyUI graph in workflow_json."""
-    raw = row.get("workflow_json")
-    if not raw:
-        return False
-    try:
-        return bool(json.loads(raw))
-    except json.JSONDecodeError:
-        return False
 
 
 def _group_workflow(group) -> str | None:

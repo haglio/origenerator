@@ -3,10 +3,11 @@ import random
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
-    QComboBox, QCheckBox, QPushButton,
+    QComboBox, QPushButton,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from origenerator.gui.check_box import CheckBox
 from origenerator.gui.image_picker import ImagePickerDialog
 from origenerator.workflows.base import ParamDef
 
@@ -19,7 +20,7 @@ class ParamForm(QWidget):
     def __init__(self, param_defs: list[ParamDef], parent=None):
         super().__init__(parent)
         self._widgets: dict[str, QWidget] = {}
-        self._randomize_checks: dict[str, QCheckBox] = {}
+        self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         self._param_defs = param_defs
         self._build(param_defs)
@@ -42,7 +43,7 @@ class ParamForm(QWidget):
             row.addWidget(widget, 1)
 
             if pd.type == "seed":
-                cb = QCheckBox("Random")
+                cb = CheckBox("Random")
                 cb.setChecked(True)
                 cb.toggled.connect(self.changed)
                 self._randomize_checks[pd.key] = cb

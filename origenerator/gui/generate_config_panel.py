@@ -5,17 +5,18 @@ from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QComboBox, QPushButton, QProgressBar, QScrollArea,
+    QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import config_tab_title, settings_signature
-from origenerator.generation_config import ConfigSnapshot
+from origenerator.gallery import config_tab_title
+from origenerator.generation_config import (
+    ConfigSnapshot, find_duplicate_generation, randomize_seeds,
+)
 from origenerator.gui.param_form import ParamForm
-from origenerator.media import media_type_from_filename
-from origenerator.replay import apply_overrides, extract_output_files, missing_inputs
+from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import (
     estimate_label,
@@ -23,7 +24,7 @@ from origenerator.timing import (
     format_duration,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,8 @@ class GenerateConfigPanel(QWidget):
         self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
+        self._generated_ids: list[str] = []           # generations this tab produced, newest first
+        self._executing = False                        # has ComfyUI started our prompt yet?
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -71,9 +74,15 @@ class GenerateConfigPanel(QWidget):
         self._estimate_label.setObjectName("estimateLabel")
         layout.addWidget(self._estimate_label)
 
+        # The settings form sits beside a live preview that mirrors the job in
+        # progress (ComfyUI's preview frames) and then the finished output.
+        body = QHBoxLayout()
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        layout.addWidget(self._scroll, 1)
+        body.addWidget(self._scroll, 3)
+        self._preview = PreviewWidget()
+        body.addWidget(self._preview, 2)
+        layout.addLayout(body, 1)
 
         bottom = QVBoxLayout()
         self._progress = QProgressBar()
@@ -84,7 +93,11 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.setObjectName("generateBtn")
         self._generate_btn.clicked.connect(self._on_generate)
+        self._cancel_btn = QPushButton("Cancel")
+        self._cancel_btn.clicked.connect(self._on_cancel)
+        self._cancel_btn.setEnabled(False)
         btn_row.addStretch()
+        btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         bottom.addLayout(btn_row)
         layout.addLayout(bottom)
@@ -93,6 +106,8 @@ class GenerateConfigPanel(QWidget):
 
     def _connect_signals(self):
         self._client.progress.connect(self._on_progress)
+        self._client.node_executing.connect(self._on_node_executing)
+        self._client.preview_image.connect(self._on_preview)
         self._client.job_completed.connect(self._on_completed)
         self._client.job_error.connect(self._on_error)
         self._client.connected.connect(self._on_connected)
@@ -102,6 +117,8 @@ class GenerateConfigPanel(QWidget):
         """Disconnect from the shared client before the panel is destroyed."""
         for signal, slot in (
             (self._client.progress, self._on_progress),
+            (self._client.node_executing, self._on_node_executing),
+            (self._client.preview_image, self._on_preview),
             (self._client.job_completed, self._on_completed),
             (self._client.job_error, self._on_error),
             (self._client.connected, self._on_connected),
@@ -181,6 +198,12 @@ class GenerateConfigPanel(QWidget):
         self._progress.setValue(1)
         self._progress.setFormat(text)
 
+    def _show_canceled(self, text: str = "Canceled"):
+        self._apply_bar_state("canceled")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+        self._progress.setFormat(text)
+
     def _on_generate(self):
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
@@ -203,6 +226,15 @@ class GenerateConfigPanel(QWidget):
             )
             return
 
+        # Guard against silently re-running an identical job: a pinned (non-random)
+        # seed that matches a past generation would just re-create it byte-for-byte.
+        snapshot = ConfigSnapshot(key, params, self._param_form.seed_is_random())
+        if find_duplicate_generation(self._db.list_generations(), snapshot):
+            if not self._offer_reroll(wf):
+                return  # let the user change something rather than duplicate it
+            params = randomize_seeds(params, wf.seed_keys())
+            self._param_form.set_seed_random(True)
+
         # Build the job now (fixing the seed), but let the queue decide when it runs.
         prompt_id = str(uuid.uuid4())
         payload = wf.build_api_payload(params)
@@ -222,14 +254,39 @@ class GenerateConfigPanel(QWidget):
             ),
         )
 
+    def _offer_reroll(self, wf) -> bool:
+        """Warn that this exact config was already generated; ask whether to re-roll.
+
+        Re-running it would just re-create an identical output, so the only
+        useful choices are a fresh random seed or backing out to change a
+        setting. Returns ``True`` to re-roll with a new random seed, ``False`` to
+        cancel (also the dialog's close box).
+        """
+        media = wf.output_type if wf.output_type in ("image", "video") else "output"
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Already generated")
+        box.setText(
+            f"You've already generated this exact {media} — same settings and "
+            f"the same seed.\nRunning it again will just re-create an identical "
+            f"{media}."
+        )
+        box.setInformativeText("Generate a new random seed instead, or cancel to change a setting?")
+        reroll = box.addButton("New Random Seed", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(reroll)
+        box.exec()
+        return box.clickedButton() is reroll
+
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
         """Stage a built job, then hand it to the queue (or run it now if unqueued).
 
-        ``workflow`` is the captured WorkflowTemplate, or None for a replay —
-        which routes completion through the generic output extractor.
+        ``workflow`` is the WorkflowTemplate this job was built from, captured so
+        its output node is used when the job completes.
         """
         self._prepared = {"payload": payload, "workflow": workflow, "record": record}
         self._generate_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(True)
         if self._queue is not None:
             self._show_waiting()
             self._queue.submit(self, queue_name)
@@ -255,12 +312,14 @@ class GenerateConfigPanel(QWidget):
             self._comfy_prompt_id = actual_pid
             self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
+            self._preview.clear()  # a fresh job: drop the previous result
             self._show_running()
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))
             self._show_error(f"Error: {e}")
             self._generate_btn.setEnabled(True)
+            self._cancel_btn.setEnabled(False)
             self._release_queue_slot()
 
     def set_queue_status(self, position: int, eta_seconds: float):
@@ -289,18 +348,25 @@ class GenerateConfigPanel(QWidget):
             self._progress.setRange(0, max_val)
             self._progress.setValue(value)
 
+    def _on_node_executing(self, prompt_id: str, _node_id: str):
+        # ComfyUI has begun running our prompt (vs. it merely sitting in the
+        # server queue, behind e.g. a gallery re-roll). This decides whether
+        # Cancel interrupts the run or just dequeues it. ``executing`` precedes
+        # any ``progress`` for the prompt, so it's the earliest signal we get.
+        if self._is_mine(prompt_id):
+            self._executing = True
+
+    def _on_preview(self, prompt_id: str, data: bytes):
+        if self._is_mine(prompt_id):
+            self._preview.show_frame(data)
+
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
             return
-        # A registered workflow knows its own output node; a replay (no captured
-        # template) reads outputs generically from the history.
         wf = self._submitted_workflow
-        if wf is not None:
-            files = wf.extract_output_info(history_data)
-            output_type = wf.output_type
-        else:
-            files = extract_output_files(history_data)
-            output_type = media_type_from_filename(files[0]["filename"]) if files else None
+        if not wf:
+            return
+        files = wf.extract_output_info(history_data)
 
         thumb_path = None
         if files:
@@ -309,7 +375,8 @@ class GenerateConfigPanel(QWidget):
             source = COMFYUI_OUTPUT_DIR / subfolder / first["filename"]
             if source.exists():
                 THUMB_DIR.mkdir(parents=True, exist_ok=True)
-                thumb_path = str(generate_thumbnail(source, output_type or "image", THUMB_DIR))
+                thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
+                self._preview.show_media(source, wf.output_type)
 
         now = datetime.now(timezone.utc).isoformat()
         duration = execution_duration_seconds(history_data)
@@ -327,7 +394,9 @@ class GenerateConfigPanel(QWidget):
         else:
             self._show_done("Done!")
         self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
         completed_id = self._client_prompt_id
+        self._generated_ids.insert(0, completed_id)  # this tab's own history, newest first
         self._reset_job()
         self.generation_completed.emit(completed_id)
         self._refresh_estimate()
@@ -343,30 +412,44 @@ class GenerateConfigPanel(QWidget):
         )
         self._show_error(f"Error: {error_msg[:100]}")
         self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
         self._reset_job()
         self._release_queue_slot()
+
+    def _on_cancel(self):
+        """Stop this tab's generation: a queued slot, a server-queued prompt, or
+        a running one — whichever stage it's at — leaving no half-done row."""
+        staged = self._prepared is not None
+        comfy_id = self._comfy_prompt_id
+        if self._queue is not None and (staged or comfy_id is not None):
+            self._queue.cancel(self)  # drop our slot (pending or the running head)
+        if comfy_id is not None:
+            try:
+                if self._executing:
+                    self._client.interrupt()
+                else:
+                    self._client.cancel_prompt(comfy_id)
+            except Exception as e:
+                logger.warning("Cancel failed for %s: %s", comfy_id, e)
+            if self._client_prompt_id:
+                self._db.delete_generation(self._client_prompt_id)
+        elif not staged:
+            return  # nothing in flight to cancel
+        self._prepared = None
+        self._reset_job()
+        self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
+        self._show_canceled()
 
     def _reset_job(self):
         self._client_prompt_id = None
         self._comfy_prompt_id = None
         self._submitted_workflow = None
+        self._executing = False
 
-    def settings_key(self) -> tuple[str, str] | None:
-        """The gallery settings-folder this config maps to: (workflow, signature).
-
-        The signature mirrors how a generation is stored — the form values plus
-        the workflow's non-form defaults, minus seeds — so it matches the folder
-        this tab's outputs land in, and groups reruns that differ only by seed.
-        ``None`` when no workflow is selected.
-        """
-        key = self._workflow_combo.currentData()
-        wf = WORKFLOW_REGISTRY.get(key)
-        if wf is None or self._param_form is None:
-            return None
-        params = self._param_form.get_values_static()
-        for name, value in wf.default_params().items():
-            params.setdefault(name, value)
-        return key, settings_signature(json.dumps(params))
+    def generated_ids(self) -> list[str]:
+        """Prompt ids of the generations this tab has produced, newest first."""
+        return list(self._generated_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""
@@ -417,43 +500,3 @@ class GenerateConfigPanel(QWidget):
         self.prefill(snapshot.workflow_name, snapshot.params)
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
-
-    def submit_replay(self, row: dict, overrides: dict):
-        """Re-run a past generation's captured graph with overridden fields.
-
-        Works for any row that stored its API graph — including workflows the
-        app has no registered template for. Completion is handled by the generic
-        path in ``_on_completed`` (no captured workflow template).
-        """
-        try:
-            graph = json.loads(row.get("workflow_json") or "{}")
-        except json.JSONDecodeError:
-            graph = {}
-        if not graph:
-            self._show_ready("This generation has no stored workflow to re-run.")
-            return
-
-        patched = apply_overrides(graph, **overrides)
-        missing = missing_inputs(patched, COMFYUI_INPUT_DIR)
-        if missing:
-            self._show_ready(f"Missing source file(s): {', '.join(missing[:3])}")
-            return
-
-        name = row.get("workflow_name") or "replay"
-        self.set_custom_title(f"Re-run: {name}")
-        # workflow=None routes completion through the generic output extractor.
-        self._prepare_job(
-            payload=patched,
-            workflow=None,
-            queue_name=name,
-            record=dict(
-                prompt_id=str(uuid.uuid4()),
-                workflow_name=name,
-                workflow_version=row.get("workflow_version") or "replay",
-                positive_prompt=overrides.get("positive", ""),
-                negative_prompt=overrides.get("negative", ""),
-                seed=overrides.get("seed"),
-                params_json=json.dumps(overrides),
-                workflow_json=json.dumps(patched),
-            ),
-        )

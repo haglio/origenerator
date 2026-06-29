@@ -1,9 +1,8 @@
 """Traversal helpers for ComfyUI API-format prompt graphs.
 
 A prompt graph is ``{node_id: {"class_type": str, "inputs": {...}}}`` where an
-input can be a link ``[source_node_id, slot]``. The importer reads prompts out
-of these graphs; replay writes new prompts into them — both need to locate the
-same nodes, so that logic lives here once.
+input can be a link ``[source_node_id, slot]``. The importer uses these helpers
+to locate the prompt and conditioning nodes when reading a graph's metadata.
 """
 
 _COND_NODES = ("WanImageToVideo", "WanFirstLastFrameToVideo")

@@ -8,6 +8,7 @@ from origenerator.gallery import (
     media_type_of_row,
     model_label,
     model_signature,
+    output_disk_files,
     resolve_preview,
     rows_under,
     settings_signature,
@@ -16,7 +17,7 @@ from origenerator.gallery import (
 
 def test_config_tab_title_leads_with_model_then_prompt():
     title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert title == "SDXL Text-to-Image › a cat in a hat"
+    assert title == "SDXL Text-to-Image: a cat in a hat"
 
 
 def test_config_tab_title_is_just_the_model_without_a_prompt():
@@ -368,3 +369,34 @@ def test_resolve_preview_handles_missing_output_files(tmp_path):
     thumb.write_bytes(b"x")
     row = _row(output_files=None, thumbnail_path=str(thumb))
     assert resolve_preview(row, tmp_path) == (thumb, "image")
+
+
+def test_output_disk_files_returns_the_referenced_file(tmp_path):
+    out = tmp_path / "output"
+    (out / "image").mkdir(parents=True)
+    png = out / "image" / "sdxl_t2i_1_.png"
+    png.write_bytes(b"x")
+    row = _row(output_files=json.dumps([{"filename": "sdxl_t2i_1_.png",
+                                         "subfolder": "image"}]))
+    assert output_disk_files(row, out) == [png]
+
+
+def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
+    out = tmp_path / "output"
+    (out / "video").mkdir(parents=True)
+    mp4 = out / "video" / "wan22_i2v_1_.mp4"
+    mp4.write_bytes(b"v")
+    sidecar = out / "video" / "wan22_i2v_1_.png"  # VHS_VideoCombine writes this
+    sidecar.write_bytes(b"p")
+    # The consolidated row points at the video; deleting it must also take the
+    # PNG, or the next import would resurrect the orphaned still as an image.
+    row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
+                                         "subfolder": "video"}]))
+    assert output_disk_files(row, out) == [mp4, sidecar]
+
+
+def test_output_disk_files_omits_files_not_on_disk(tmp_path):
+    out = tmp_path / "output"
+    out.mkdir()
+    row = _row(output_files=json.dumps([{"filename": "gone.png", "subfolder": ""}]))
+    assert output_disk_files(row, out) == []

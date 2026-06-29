@@ -1,0 +1,160 @@
+import json
+
+from origenerator.db import Database
+from origenerator.gallery_actions import GalleryActions
+from origenerator.trash import Trash
+
+
+def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=None):
+    """Insert a completed generation with its output (and thumbnail) on disk."""
+    db.insert_generation(
+        prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}",
+    )
+    file_path = output_dir / subfolder / filename
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_bytes(b"data")
+
+    thumb_path = None
+    if thumb_dir is not None:
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        thumb_path = thumb_dir / f"{pid}.jpg"
+        thumb_path.write_bytes(b"thumb")
+
+    db.update_generation(
+        pid, status="completed",
+        output_files=json.dumps([{"filename": filename, "subfolder": subfolder}]),
+        thumbnail_path=str(thumb_path) if thumb_path else None,
+    )
+    return db.get_generation(pid)
+
+
+def _actions(tmp_path, limit=50):
+    db = Database(tmp_path / "test.db")
+    output_dir = tmp_path / "output"
+    trash = Trash(tmp_path / "trash")
+    return GalleryActions(db, output_dir, trash, limit=limit), db, output_dir
+
+
+def test_delete_removes_the_row_and_its_file(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    file_path = output_dir / "a.png"
+
+    actions.delete_rows([row])
+
+    assert db.get_generation("p1") is None
+    assert not file_path.exists()
+    assert actions.can_undo()
+
+
+def test_undo_restores_the_row_and_its_file(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    file_path = output_dir / "a.png"
+    actions.delete_rows([row])
+
+    actions.undo()
+
+    restored = db.get_generation("p1")
+    assert restored == row  # whole row back, verbatim
+    assert file_path.exists() and file_path.read_bytes() == b"data"
+    assert not actions.can_undo()
+
+
+def test_delete_also_takes_the_video_metadata_sidecar(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "v1", "clip.mp4", subfolder="video")
+    sidecar = output_dir / "video" / "clip.png"
+    sidecar.write_bytes(b"png")
+
+    actions.delete_rows([row])
+    assert not (output_dir / "video" / "clip.mp4").exists()
+    assert not sidecar.exists()
+
+    actions.undo()
+    assert (output_dir / "video" / "clip.mp4").exists()
+    assert sidecar.exists()
+
+
+def test_delete_trashes_the_thumbnail_and_undo_brings_it_back(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    thumb_dir = tmp_path / "thumbs"
+    row = _completed_row(db, output_dir, "p1", "a.png", thumb_dir=thumb_dir)
+    thumb = thumb_dir / "p1.jpg"
+
+    actions.delete_rows([row])
+    assert not thumb.exists()
+
+    actions.undo()
+    assert thumb.exists() and thumb.read_bytes() == b"thumb"
+
+
+def test_delete_of_a_pending_row_without_files_is_still_undoable(tmp_path):
+    actions, db, _ = _actions(tmp_path)
+    db.insert_generation(
+        prompt_id="pend", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}",
+    )
+    row = db.get_generation("pend")
+
+    actions.delete_rows([row])
+    assert db.get_generation("pend") is None
+
+    actions.undo()
+    assert db.get_generation("pend") == row
+
+
+def test_deleting_many_rows_undoes_as_one_step(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    rows = [
+        _completed_row(db, output_dir, "p1", "a.png"),
+        _completed_row(db, output_dir, "p2", "b.png"),
+    ]
+    actions.delete_rows(rows)
+    assert db.get_generation("p1") is None and db.get_generation("p2") is None
+
+    actions.undo()  # a single undo brings the whole batch back
+    assert db.get_generation("p1") is not None
+    assert db.get_generation("p2") is not None
+    assert not actions.can_undo()
+
+
+def test_rename_folder_is_undoable_back_to_the_previous_name(tmp_path):
+    actions, db, _ = _actions(tmp_path)
+    db.rename_folder("image/sdxl_t2i", "First Name")
+
+    actions.rename_folder("image/sdxl_t2i", "Second Name")
+    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "Second Name"
+
+    actions.undo()
+    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "First Name"
+
+
+def test_undo_label_describes_the_most_recent_action(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    assert actions.undo_label() is None
+
+    actions.rename_folder("image/sdxl_t2i", "Name")
+    assert "rename" in actions.undo_label().lower()
+
+    rows = [_completed_row(db, output_dir, "p1", "a.png"),
+            _completed_row(db, output_dir, "p2", "b.png")]
+    actions.delete_rows(rows)
+    assert "2" in actions.undo_label()
+
+
+def test_eviction_past_the_limit_purges_the_oldest_trash(tmp_path):
+    actions, db, output_dir = _actions(tmp_path, limit=1)
+    first = _completed_row(db, output_dir, "p1", "a.png")
+    second = _completed_row(db, output_dir, "p2", "b.png")
+
+    actions.delete_rows([first])   # batch 1 on the stack
+    actions.delete_rows([second])  # pushes batch 1 off the (size-1) stack
+
+    # Only the newest deletion remains undoable; the evicted one is gone for good.
+    assert actions.undo_label() is not None
+    actions.undo()
+    assert db.get_generation("p2") is not None
+    assert db.get_generation("p1") is None  # batch 1 was committed, not recoverable
+    assert not actions.can_undo()

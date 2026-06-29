@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
@@ -38,6 +37,66 @@ def test_generate_inserts_row_and_submits(panel):
     assert rows[0]["status"] == "running"
     assert panel._client_prompt_id == rows[0]["prompt_id"]
     assert panel._comfy_prompt_id == "comfy-A"
+
+
+def _complete_one(panel, seed=12345, prompt="a cat"):
+    """Run one generation to completion so a real prior row exists in the DB."""
+    panel._param_form.set_values({"seed": seed, "positive_prompt": prompt})
+    panel._on_generate()
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+
+
+def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkeypatch):
+    _complete_one(panel)
+    asked = []
+    monkeypatch.setattr(
+        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+    )
+
+    panel._on_generate()  # identical config, seed not random
+
+    assert asked, "the user should have been warned about the duplicate"
+    assert len(panel._db.list_generations()) == 1  # declined: nothing new submitted
+    assert panel._generate_btn.isEnabled() is True  # button re-enabled, not stuck
+
+
+def test_generate_duplicate_reroll_randomizes_seed_and_checks_random(panel, monkeypatch):
+    _complete_one(panel, seed=12345)
+    monkeypatch.setattr(panel, "_offer_reroll", lambda wf: True)
+
+    panel._on_generate()
+
+    rows = panel._db.list_generations()  # newest first
+    assert len(rows) == 2                 # a new job was submitted
+    assert rows[0]["seed"] != 12345       # with a fresh seed, not the duplicate
+    assert panel._param_form.seed_is_random() is True  # Random box now checked
+
+
+def test_generate_with_random_seed_never_warns(panel, monkeypatch):
+    _complete_one(panel, seed=12345)         # an identical prior run exists
+    panel._param_form.set_seed_random(True)  # but the user re-checks Random
+    asked = []
+    monkeypatch.setattr(
+        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+    )
+
+    panel._on_generate()
+
+    assert asked == []  # a random seed can't reproduce a past run
+    assert len(panel._db.list_generations()) == 2
+
+
+def test_generate_does_not_warn_when_no_prior_match(panel, monkeypatch):
+    asked = []
+    monkeypatch.setattr(
+        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+    )
+    panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
+
+    panel._on_generate()
+
+    assert asked == []  # nothing matches: generate without nagging
+    assert len(panel._db.list_generations()) == 1
 
 
 def test_completion_only_handled_for_own_prompt_id(panel):
@@ -233,14 +292,14 @@ def test_title_is_workflow_name_for_blank_config(panel):
 
 def test_title_leads_with_model_then_prompt(panel):
     panel.prefill("sdxl_t2i", {"positive_prompt": "a cat in a hat"})
-    assert panel.title() == "SDXL Text-to-Image › a cat in a hat"
+    assert panel.title() == "SDXL Text-to-Image: a cat in a hat"
 
 
 def test_title_changed_emitted_when_prompt_edited(panel):
     titles = []
     panel.title_changed.connect(titles.append)
     panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert titles and titles[-1] == "SDXL Text-to-Image › a fox"
+    assert titles and titles[-1] == "SDXL Text-to-Image: a fox"
 
 
 def test_custom_title_overrides_and_sticks(panel):
@@ -256,12 +315,16 @@ class FakeQueue:
     def __init__(self):
         self.submitted = []
         self.released = []
+        self.canceled = []
 
     def submit(self, panel, workflow_name):
         self.submitted.append((panel, workflow_name))
 
     def release(self, panel):
         self.released.append(panel)
+
+    def cancel(self, panel):
+        self.canceled.append(panel)
 
 
 def _queued_panel(qtbot, tmp_path):
@@ -327,77 +390,87 @@ def test_queue_status_colors_the_bar_grey(panel):
     assert panel._progress.property("barState") == "queued"
 
 
-def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel, tmp_path):
-    # A generation stored the way _on_generate does (form values + defaults).
-    full = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
-    full["positive_prompt"] = "a cat"
-    panel.prefill("sdxl_t2i", full)
-    workflow, signature = panel.settings_key()
-    assert workflow == "sdxl_t2i"
-    # The same params (any seed) share the signature; a different setting splits it.
-    assert signature == gallery.settings_signature(json.dumps({**full, "seed": 999}))
-    assert signature != gallery.settings_signature(json.dumps({**full, "steps": 7}))
-
-
-# ---- generic captured-graph replay ----
-
-def test_submit_replay_patches_graph_and_submits(panel):
-    sent = {}
-    panel._client.submit_job = lambda payload: (sent.update(payload), "comfy-R")[1]
-    graph = {
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "old"},
-              "_meta": {"title": "Positive"}},
-        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "oldneg"},
-              "_meta": {"title": "Negative"}},
-        "4": {"class_type": "KSampler", "inputs": {"seed": 1}},
-    }
-    row = {"workflow_name": "hunyuan_t2v", "workflow_version": "imported",
-           "workflow_json": json.dumps(graph), "params_json": "{}",
-           "positive_prompt": "old", "negative_prompt": "oldneg", "seed": 1}
-
-    panel.submit_replay(row, {"positive": "new pos", "negative": "new neg",
-                              "seed": 999, "input_image": None})
-
-    assert sent["2"]["inputs"]["text"] == "new pos"
-    assert sent["3"]["inputs"]["text"] == "new neg"
-    assert sent["4"]["inputs"]["seed"] == 999
-    rows = panel._db.list_generations()
-    assert len(rows) == 1
-    assert rows[0]["workflow_name"] == "hunyuan_t2v"
-    assert rows[0]["status"] == "running"
-    assert panel._submitted_workflow is None   # routes completion through generic path
-
-
-def test_submit_replay_blocks_on_missing_source(panel):
-    graph = {"1": {"class_type": "LoadImage",
-                   "inputs": {"image": "definitely_absent_zzz.png"}}}
-    row = {"workflow_name": "x", "workflow_version": "imported",
-           "workflow_json": json.dumps(graph), "params_json": "{}"}
-    called = []
-    panel._client.submit_job = lambda payload: called.append(payload) or "c"
-
-    panel.submit_replay(row, {"positive": "p", "negative": "",
-                              "seed": None, "input_image": None})
-
-    assert called == []
-    assert "missing" in panel._progress.format().lower()
-    assert panel._db.list_generations() == []
-
-
-def test_replay_completion_uses_generic_extractor(panel):
-    panel._db.insert_generation(
-        prompt_id="p1", workflow_name="x", workflow_version="replay",
-        params_json="{}", workflow_json="{}",
-    )
-    panel._db.update_generation("p1", status="running")
+def test_completion_records_generated_id(panel):
     panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfy-R"
-    panel._submitted_workflow = None  # replay: no captured template
+    panel._comfy_prompt_id = "comfy-A"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    panel._on_completed("comfy-A", SDXL_HISTORY)
+    assert panel.generated_ids() == ["p1"]
+# ---- live preview ----
 
-    # VHS_VideoCombine reports under "gifs"; the generic extractor must find it.
-    history = {"outputs": {"9": {"gifs": [{"filename": "out.mp4", "subfolder": "video"}]}}}
-    panel._client.job_completed.emit("comfy-R", history)
+def test_preview_frame_shown_only_for_own_job(panel):
+    panel._on_generate()
+    panel._preview.show_frame = MagicMock()
 
-    row = panel._db.get_generation("p1")
-    assert row["status"] == "completed"
-    assert "out.mp4" in row["output_files"]
+    panel._client.preview_image.emit("comfy-OTHER", b"x")
+    panel._preview.show_frame.assert_not_called()
+
+    panel._client.preview_image.emit("comfy-A", b"img-bytes")
+    panel._preview.show_frame.assert_called_once_with(b"img-bytes")
+
+
+# ---- cancel ----
+
+def test_cancel_disabled_until_a_job_starts(panel):
+    assert panel._cancel_btn.isEnabled() is False
+    panel._on_generate()
+    assert panel._cancel_btn.isEnabled() is True
+
+
+def test_cancel_running_job_interrupts_and_removes_row(panel):
+    panel._client.interrupt = MagicMock()
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()
+    our_id = panel._client_prompt_id
+    panel._client.node_executing.emit("comfy-A", "5")  # our job is now executing
+
+    panel._on_cancel()
+
+    panel._client.interrupt.assert_called_once()
+    panel._client.cancel_prompt.assert_not_called()
+    assert panel._db.get_generation(our_id) is None  # a canceled run leaves no trace
+    assert panel._generate_btn.isEnabled() is True
+    assert panel._cancel_btn.isEnabled() is False
+
+
+def test_cancel_submitted_but_unstarted_job_dequeues(panel):
+    panel._client.interrupt = MagicMock()
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()  # submitted to ComfyUI but no executing signal yet
+    our_id = panel._client_prompt_id
+
+    panel._on_cancel()
+
+    panel._client.cancel_prompt.assert_called_once_with("comfy-A")
+    panel._client.interrupt.assert_not_called()
+    assert panel._db.get_generation(our_id) is None
+
+
+def test_cancel_while_queued_drops_the_queue_slot(qtbot, tmp_path):
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    panel._on_generate()  # queued in the JobQueue, not yet submitted
+
+    panel._on_cancel()
+
+    assert queue.canceled == [panel]
+    client.submit_job.assert_not_called()
+    assert panel._db.list_generations() == []  # nothing was ever recorded
+    assert panel._cancel_btn.isEnabled() is False
+
+
+def test_completed_job_cannot_be_canceled(panel):
+    panel._client.interrupt = MagicMock()
+    panel._on_generate()
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+
+    panel._on_cancel()  # no in-flight job remains
+
+    panel._client.interrupt.assert_not_called()
+    assert panel._cancel_btn.isEnabled() is False
+
+
+def test_cancel_colors_the_bar_yellow(panel):
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()
+    panel._on_cancel()
+    assert panel._progress.property("barState") == "canceled"

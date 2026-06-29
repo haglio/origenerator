@@ -63,20 +63,6 @@ def test_close_event_persists_session(qtbot, tmp_path):
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
 
 
-def test_replay_requested_submits_and_switches_tab(qtbot, tmp_path):
-    win = _window(qtbot, tmp_path)
-
-    row = {"workflow_name": "x", "workflow_json": "{}"}
-    overrides = {"positive": "p", "negative": "", "seed": None, "input_image": None}
-    with patch.object(
-        win._generate_view, "submit_replay", wraps=win._generate_view.submit_replay
-    ) as spy:
-        win._gallery_view.replay_requested.emit(row, overrides)
-
-    spy.assert_called_once_with(row, overrides)
-    assert win._tabs.currentWidget() is win._generate_view
-
-
 def test_restores_active_tab_from_app_state(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("active_tab", 1)  # Gallery

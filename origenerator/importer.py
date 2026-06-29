@@ -12,7 +12,7 @@ from PIL import Image
 from origenerator.comfy_graph import clip_prompt_nodes, conditioning_node
 from origenerator.db import Database
 from origenerator.gallery import row_output_files
-from origenerator.media import IMAGE_EXTS, VIDEO_EXTS, media_type_from_filename
+from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -62,14 +62,14 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
                 continue
             # A video with a metadata image beside it is represented (and made
             # playable) by that image's entry, so skip the bare video file.
-            if output_type == "video" and _sibling_of_type(fpath, "image") is not None:
+            if output_type == "video" and sibling_of_type(fpath, "image") is not None:
                 continue
             # An image beside a video is that video's metadata/preview sidecar
             # (VHS_VideoCombine writes one per clip): its entry should play the
             # video, not show the still frame.
             play_path = fpath
             if output_type == "image":
-                sibling_video = _sibling_of_type(fpath, "video")
+                sibling_video = sibling_of_type(fpath, "video")
                 if sibling_video is not None:
                     play_path = sibling_video
 
@@ -110,16 +110,6 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             imported += 1
 
     return imported
-
-
-def _sibling_of_type(path: Path, media: str) -> Path | None:
-    """A file beside ``path`` with the same stem but a ``media``-type extension."""
-    exts = IMAGE_EXTS if media == "image" else VIDEO_EXTS
-    for ext in sorted(exts):
-        sibling = path.with_suffix(ext)
-        if sibling != path and sibling.exists():
-            return sibling
-    return None
 
 
 def _output_entry(path: Path, output_dir: Path) -> dict:

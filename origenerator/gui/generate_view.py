@@ -6,8 +6,9 @@ from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import settings_signature
-from origenerator.generation_config import ConfigSnapshot, merge_denormalized
+from origenerator.generation_config import (
+    ConfigSnapshot, configs_match, merge_denormalized,
+)
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.job_queue import JobQueue
@@ -76,7 +77,7 @@ class GenerateView(QWidget):
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self._subtabs.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
-        panel.generation_completed.connect(self._on_generation_completed)
+        panel.generation_completed.connect(lambda pid, p=panel: self._on_panel_completed(p, pid))
         self._subtabs.setCurrentIndex(index)
         self._update_empty_state()
         return panel
@@ -111,50 +112,33 @@ class GenerateView(QWidget):
     def _on_active_tab_changed(self, _index: int):
         self._refresh_strip()
 
-    def _on_generation_completed(self, _prompt_id: str):
-        # A new generation may belong to the active tab's settings folder.
-        self._refresh_strip()
-
     def _refresh_strip(self):
-        """Show every generation matching the active tab's settings, newest first.
-
-        Refreshed on tab open, switch, and completion — not on every keystroke —
-        so editing a tab's settings leaves its strip on the folder it last
-        generated in, which is what makes an older item there clickable into a
-        new tab once the settings have moved on.
-        """
+        """Show the active tab's own generations (newest first), or nothing."""
         panel = self._subtabs.currentWidget()
-        key = panel.settings_key() if panel is not None else None
-        self._strip.show_generations(self._ids_for_settings(key))
+        self._strip.show_generations(panel.generated_ids() if panel is not None else [])
 
-    def _ids_for_settings(self, key) -> list[str]:
-        if key is None:
-            return []
-        workflow_name, signature = key
-        return [
-            row["prompt_id"]
-            for row in self._db.list_generations()  # newest first
-            if (row.get("workflow_name") or "") == workflow_name
-            and settings_signature(row.get("params_json")) == signature
-        ]
+    def _on_panel_completed(self, panel: GenerateConfigPanel, _prompt_id: str):
+        if panel is self._subtabs.currentWidget():
+            self._refresh_strip()
 
     def _on_strip_activated(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)
         if not row:
             return
-        workflow_name = row.get("workflow_name", "")
-        row_key = (workflow_name, settings_signature(row.get("params_json")))
-        active = self._subtabs.currentWidget()
-        if active is not None and active.settings_key() == row_key:
-            return  # same settings folder as the active tab — don't spawn a duplicate
         params = merge_denormalized(row)
-        if params:
-            self.open_config(workflow_name, params)
+        if not params:
+            return
+        workflow_name = row.get("workflow_name", "")
+        active = self._subtabs.currentWidget()
+        if active is not None and configs_match(
+            active.current_config(), workflow_name, params
+        ):
+            return  # already editing these settings — don't spawn a duplicate
+        self.open_config(workflow_name, params)
 
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel:
         panel = self._add_subtab()
         panel.prefill(workflow_name, params)
-        self._refresh_strip()  # populate the new tab's strip with its settings folder
         return panel
 
     def capture_state(self) -> dict:
@@ -206,9 +190,3 @@ class GenerateView(QWidget):
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self._subtabs.count():
             self._subtabs.setCurrentIndex(current)
-
-    def submit_replay(self, row: dict, overrides: dict) -> GenerateConfigPanel:
-        """Open a fresh subtab and re-run a captured generation in it."""
-        panel = self._add_subtab()
-        panel.submit_replay(row, overrides)
-        return panel

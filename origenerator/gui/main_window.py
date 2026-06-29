@@ -38,20 +38,15 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._tabs)
 
         self._generate_view = GenerateView(client, db)
-        self._gallery_view = GalleryView(db)
+        self._gallery_view = GalleryView(db, client=client)
         self._tabs.addTab(self._generate_view, "Generate")
         self._tabs.addTab(self._gallery_view, "Gallery")
 
         self._gallery_view.reuse_requested.connect(self._on_reuse)
-        self._gallery_view.replay_requested.connect(self._on_replay)
         self._restore_session()
 
     def _on_reuse(self, workflow_name: str, params: dict):
         self._generate_view.open_config(workflow_name, params)
-        self._tabs.setCurrentWidget(self._generate_view)
-
-    def _on_replay(self, row: dict, overrides: dict):
-        self._generate_view.submit_replay(row, overrides)
         self._tabs.setCurrentWidget(self._generate_view)
 
     def _restore_session(self):

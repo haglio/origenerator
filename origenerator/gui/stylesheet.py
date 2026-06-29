@@ -5,7 +5,7 @@ ensure_shared_ui_on_path()
 from shared_ui.colors import (
     BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
-    BORDER_SUBTLE, BORDER_PANEL, BLUE, GREEN, RED, STATUS_SKIP,
+    BORDER_SUBTLE, BORDER_PANEL, BLUE, GREEN, RED, STATUS_SKIP, AMBER,
 )
 
 
@@ -60,6 +60,11 @@ def build_stylesheet() -> str:
     QPushButton:pressed {{
         background-color: {_h(BLUE)};
     }}
+    QPushButton:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+        color: {_h(TEXT_MUTED)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+    }}
     QPushButton#generateBtn {{
         background-color: {_h(BLUE)};
         font-weight: bold;
@@ -94,6 +99,9 @@ def build_stylesheet() -> str:
     }}
     QProgressBar[barState="error"]::chunk {{
         background-color: {_h(RED)};
+    }}
+    QProgressBar[barState="canceled"]::chunk {{
+        background-color: {_h(AMBER)};
     }}
     QScrollArea {{
         border: none;

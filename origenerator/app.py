@@ -78,7 +78,7 @@ def main():
     from PyQt6.QtWidgets import QApplication
 
     from origenerator.config import (
-        DB_PATH, COMFYUI_HOST, COMFYUI_PORT,
+        DB_PATH, STATE_DIR, COMFYUI_HOST, COMFYUI_PORT,
         COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
     )
     from origenerator.gui.loading_screen import LoadingScreen
@@ -108,6 +108,15 @@ def main():
     status("Opening the image library...")
     from origenerator.db import Database
     db = Database(DB_PATH)
+
+    # Reclaim any trash left by deletes from a previous session: the in-memory
+    # undo stack is empty now, so those held files are unreachable and safe to
+    # clear (see GalleryActions / Trash).
+    from origenerator.trash import Trash
+    try:
+        Trash(STATE_DIR / "trash").sweep()
+    except Exception as e:
+        logger.warning("Trash sweep failed: %s", e)
 
     status("Scanning for new images...")
     from origenerator.importer import (

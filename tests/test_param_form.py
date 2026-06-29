@@ -60,6 +60,17 @@ def test_seed_is_random_reflects_checkbox(qtbot):
     assert form.seed_is_random() is False  # set_values unchecks it
 
 
+def test_set_seed_random_re_checks_the_box(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 42})       # unchecks Random, pins the seed
+    assert form.seed_is_random() is False
+    form.set_seed_random(True)
+    assert form.seed_is_random() is True
+    form.set_seed_random(False)
+    assert form.seed_is_random() is False
+
+
 def test_param_form_seed_handles_64bit_values(qtbot):
     defs = [ParamDef("seed", "Seed", "seed", 0)]
     form = ParamForm(defs)

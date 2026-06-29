@@ -5,6 +5,7 @@ import pytest
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -107,6 +108,22 @@ def test_prefill_selects_workflow_and_sets_values(panel):
     panel.prefill("wan22_i2v", {"positive_prompt": "a fox"})
     assert panel._workflow_combo.currentData() == "wan22_i2v"
     assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+
+
+def test_restore_config_reapplies_workflow_params_and_random_seed(panel):
+    snap = ConfigSnapshot("wan22_i2v", {"positive_prompt": "a fox"}, seed_is_random=True)
+    panel.restore_config(snap)
+    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+    # A tab that was on Random comes back random, not frozen on a stale seed.
+    assert panel._param_form.seed_is_random() is True
+
+
+def test_restore_config_pins_concrete_seed_when_not_random(panel):
+    panel.restore_config(ConfigSnapshot("sdxl_t2i", {"seed": 99}, seed_is_random=False))
+    snap = panel.current_config()
+    assert snap.seed_is_random is False
+    assert snap.params["seed"] == 99
 
 
 def test_teardown_stops_handling_signals(panel):

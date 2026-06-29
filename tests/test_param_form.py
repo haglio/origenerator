@@ -35,6 +35,22 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
     assert vals["sampler"] == "dpm"
 
 
+def test_get_values_static_does_not_randomize_seed(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
+    qtbot.addWidget(form)
+    # Random box defaults to checked; the static read must ignore it.
+    assert form.get_values_static()["seed"] == 12345
+    assert form.get_values_static()["seed"] == 12345
+
+
+def test_seed_is_random_reflects_checkbox(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    assert form.seed_is_random() is True  # Random box defaults to checked
+    form.set_values({"seed": 42})
+    assert form.seed_is_random() is False  # set_values unchecks it
+
+
 def test_param_form_seed_handles_64bit_values(qtbot):
     defs = [ParamDef("seed", "Seed", "seed", 0)]
     form = ParamForm(defs)

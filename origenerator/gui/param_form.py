@@ -107,12 +107,28 @@ class ParamForm(QWidget):
         return w
 
     def get_values(self) -> dict:
+        """Read current values; a seed with its Random box checked is randomized."""
+        return self._collect(randomize_seed=True)
+
+    def get_values_static(self) -> dict:
+        """Read current values without randomizing; a seed is read from its field.
+
+        Used to snapshot a panel's settings for comparison, where a fresh random
+        seed each call would make equality checks meaningless.
+        """
+        return self._collect(randomize_seed=False)
+
+    def seed_is_random(self) -> bool:
+        """True if any seed param's Random box is checked."""
+        return any(cb.isChecked() for cb in self._randomize_checks.values())
+
+    def _collect(self, randomize_seed: bool) -> dict:
         result = {}
         for pd in self._param_defs:
             w = self._widgets[pd.key]
             if pd.type == "seed":
                 cb = self._randomize_checks.get(pd.key)
-                if cb and cb.isChecked():
+                if randomize_seed and cb and cb.isChecked():
                     result[pd.key] = random.randint(0, _SEED_MAX)
                 else:
                     try:

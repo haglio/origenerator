@@ -30,9 +30,6 @@ class ThumbnailWidget(QWidget):
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Take focus on click so the gallery's Delete/Ctrl+Z keys reach it even
-        # when the user works entirely in the main pane, never touching the tree.
-        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         # Right-click anywhere on the tile asks the gallery for a context menu.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
@@ -86,7 +83,6 @@ class ThumbnailWidget(QWidget):
         )
 
     def mousePressEvent(self, event):
-        self.setFocus(Qt.FocusReason.MouseFocusReason)
         # Only a left click (re)selects. A right click opens the context menu via
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:

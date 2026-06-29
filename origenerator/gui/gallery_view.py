@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
     QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
     QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
+    QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
-from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, pyqtSignal
 
 from origenerator import gallery, timing
 from origenerator.comfyui_client import ComfyUIClient
@@ -84,41 +84,46 @@ class GalleryView(QWidget):
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
-        self._install_shortcuts()
         self._sync_undo_button()
+        # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
+        # Neither keyPressEvent nor a shortcut delivered the key in the running
+        # app — a clicked thumbnail's key press never reached the view through
+        # the scroll area — so intercept it before delivery, independent of which
+        # widget holds focus. Auto-removed when this view is destroyed.
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
 
-    def _install_shortcuts(self):
-        """Delete/Ctrl+Z, scoped to the gallery and any focused child of it.
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.KeyPress and self._gallery_owns_keys():
+            if event.key() == Qt.Key.Key_Delete:
+                self._delete_selection()
+                return True
+            if (event.key() == Qt.Key.Key_Z
+                    and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+                self._undo()
+                return True
+        return super().eventFilter(obj, event)
 
-        A shortcut (not just keyPressEvent) is what actually delivers the key in
-        the running app: a focused thumbnail's key press doesn't reliably bubble
-        up through the scroll area to the view, but a WidgetWithChildren shortcut
-        fires off the focus widget directly. Qt routes a matched shortcut instead
-        of the key event, so this never double-fires with keyPressEvent below.
+    def _gallery_owns_keys(self) -> bool:
+        """True when a gallery key (Delete/Undo) should act, not pass through.
+
+        Only while the Gallery tab is on screen, no dialog/menu is up, and the
+        focus isn't in a text field (so renaming and any editor keep their keys).
         """
-        for std, slot in (
-            (QKeySequence.StandardKey.Delete, self._delete_selection),
-            (QKeySequence.StandardKey.Undo, self._undo),
-        ):
-            shortcut = QShortcut(QKeySequence(std), self)
-            shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-            shortcut.activated.connect(slot)
-
-    def keyPressEvent(self, event):
-        """Backstop for the Delete/Ctrl+Z shortcuts when a key does bubble up."""
-        if event.matches(QKeySequence.StandardKey.Delete):
-            self._delete_selection()
-            event.accept()
-        elif event.matches(QKeySequence.StandardKey.Undo):
-            self._undo()
-            event.accept()
-        else:
-            super().keyPressEvent(event)
+        if not self.isVisible():
+            return False
+        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+            return False
+        focus = QApplication.focusWidget()
+        return not isinstance(
+            focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
+        )
 
     def _build_ui(self):
         layout = QHBoxLayout(self)

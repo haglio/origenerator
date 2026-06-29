@@ -1,7 +1,16 @@
 import pytest
 
 from origenerator.workflows.base import ParamDef
+from origenerator.gui.check_box import CheckBox
 from origenerator.gui.param_form import ParamForm
+
+
+def test_seed_random_control_is_the_ticked_checkbox(qtbot):
+    # The Random control must be our CheckBox, not a plain QCheckBox whose
+    # native dark-style tick renders as a bare down-caret.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    assert isinstance(form._randomize_checks["seed"], CheckBox)
 
 
 @pytest.fixture

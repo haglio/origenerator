@@ -4,14 +4,16 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-# The image border doubles as the selection cue: a faint, lighter grey when the
-# thumbnail is selected, the usual dark frame otherwise. Both are 2px so the
-# picture never shifts as selection toggles. The border lives on the image
-# QLabel, not the tile QWidget — a plain QWidget subclass won't paint a
-# stylesheet border without WA_StyledBackground, so a tile-level border would
-# silently render nothing.
-_BORDER_UNSELECTED = "2px solid #3f3f3f"
-_BORDER_SELECTED = "2px solid #8a8a8a"
+# A selected thumbnail fills its whole tile — behind both the image and the
+# caption — with a lighter grey, the way a file browser highlights a picked
+# item. The fill is an object-name rule on the tile and needs
+# WA_StyledBackground: a plain QWidget subclass won't paint a stylesheet
+# background otherwise (which is why an earlier tile-border attempt was
+# invisible). The image keeps a fixed resting frame; the fill is the cue.
+_SELECTED_BG = "#4a4a4a"
+_SELECTED_TILE_CSS = (
+    f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
+)
 
 
 class ThumbnailWidget(QWidget):
@@ -21,6 +23,8 @@ class ThumbnailWidget(QWidget):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
+        self.setObjectName("thumbnailTile")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Take focus on click so the gallery's Delete/Ctrl+Z keys reach it even
         # when the user works entirely in the main pane, never touching the tree.
@@ -34,7 +38,7 @@ class ThumbnailWidget(QWidget):
         self._image_label = QLabel()
         self._image_label.setFixedSize(172, 160)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._apply_border()
+        self._image_label.setStyleSheet("border: 1px solid #3f3f3f; border-radius: 3px;")
 
         if thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
@@ -56,15 +60,11 @@ class ThumbnailWidget(QWidget):
         return self._selected
 
     def set_selected(self, selected: bool):
-        """Toggle the selection highlight on this thumbnail's image border."""
+        """Fill the whole tile when selected; clear the fill when not."""
         if selected == self._selected:
             return  # idempotent: skip restyling thumbnails a click didn't move
         self._selected = selected
-        self._apply_border()
-
-    def _apply_border(self):
-        border = _BORDER_SELECTED if self._selected else _BORDER_UNSELECTED
-        self._image_label.setStyleSheet(f"border: {border}; border-radius: 3px;")
+        self.setStyleSheet(_SELECTED_TILE_CSS if selected else "")
 
     def mousePressEvent(self, event):
         self.setFocus(Qt.FocusReason.MouseFocusReason)

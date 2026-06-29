@@ -224,12 +224,10 @@ class GenerateConfigPanel(QWidget):
         # seed that matches a past generation would just re-create it byte-for-byte.
         snapshot = ConfigSnapshot(key, params, self._param_form.seed_is_random())
         if find_duplicate_generation(self._db.list_generations(), snapshot):
-            choice = self._ask_about_duplicate(wf)
-            if choice == "cancel":
-                return
-            if choice == "reroll":
-                params = randomize_seeds(params, wf.seed_keys())
-                self._param_form.set_seed_random(True)
+            if not self._offer_reroll(wf):
+                return  # let the user change something rather than duplicate it
+            params = randomize_seeds(params, wf.seed_keys())
+            self._param_form.set_seed_random(True)
 
         # Build the job now (fixing the seed), but let the queue decide when it runs.
         prompt_id = str(uuid.uuid4())
@@ -250,12 +248,13 @@ class GenerateConfigPanel(QWidget):
             ),
         )
 
-    def _ask_about_duplicate(self, wf) -> str:
-        """Warn that this exact config was already generated; return the choice.
+    def _offer_reroll(self, wf) -> bool:
+        """Warn that this exact config was already generated; ask whether to re-roll.
 
-        ``"reroll"`` re-runs with a fresh random seed (the offered default),
-        ``"anyway"`` re-runs the identical job, ``"cancel"`` (also the dialog's
-        close box) does nothing.
+        Re-running it would just re-create an identical output, so the only
+        useful choices are a fresh random seed or backing out to change a
+        setting. Returns ``True`` to re-roll with a new random seed, ``False`` to
+        cancel (also the dialog's close box).
         """
         media = wf.output_type if wf.output_type in ("image", "video") else "output"
         box = QMessageBox(self)
@@ -266,18 +265,12 @@ class GenerateConfigPanel(QWidget):
             f"the same seed.\nRunning it again will just re-create an identical "
             f"{media}."
         )
-        box.setInformativeText("Generate a new random seed instead?")
+        box.setInformativeText("Generate a new random seed instead, or cancel to change a setting?")
         reroll = box.addButton("New Random Seed", QMessageBox.ButtonRole.AcceptRole)
-        anyway = box.addButton("Regenerate Anyway", QMessageBox.ButtonRole.ActionRole)
         box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(reroll)
         box.exec()
-        clicked = box.clickedButton()
-        if clicked is reroll:
-            return "reroll"
-        if clicked is anyway:
-            return "anyway"
-        return "cancel"
+        return box.clickedButton() is reroll
 
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
         """Stage a built job, then hand it to the queue (or run it now if unqueued).

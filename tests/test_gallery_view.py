@@ -568,7 +568,8 @@ def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
 
     view._on_thumbnail_clicked("unreg")  # no template for it → greyed out
     assert view._reuse_btn.isEnabled() is False
-    assert "claude" in view._reuse_btn.toolTip().lower()
+    # The hint rides on the wrapper, since a disabled button shows no tooltip.
+    assert "claude" in view._reuse_wrap.toolTip().lower()
 
 
 def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):

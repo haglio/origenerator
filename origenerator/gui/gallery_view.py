@@ -166,7 +166,13 @@ class GalleryView(QWidget):
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
-        right.addWidget(self._reuse_btn)
+        # A disabled QPushButton receives no hover events, so its own tooltip
+        # never shows; carry the "ask Claude" hint on an enabled wrapper instead.
+        self._reuse_wrap = QWidget()
+        reuse_box = QVBoxLayout(self._reuse_wrap)
+        reuse_box.setContentsMargins(0, 0, 0, 0)
+        reuse_box.addWidget(self._reuse_btn)
+        right.addWidget(self._reuse_wrap)
         layout.addLayout(right, 3)
 
     def showEvent(self, event):
@@ -717,7 +723,7 @@ class GalleryView(QWidget):
         self._selected = row
         reusable = row.get("workflow_name") in WORKFLOW_REGISTRY
         self._reuse_btn.setEnabled(reusable)
-        self._reuse_btn.setToolTip(
+        self._reuse_wrap.setToolTip(
             "" if reusable else
             "This workflow isn't built into the app yet — ask Claude to "
             "implement it if you want to reuse its parameters."
@@ -765,7 +771,7 @@ class GalleryView(QWidget):
     def _clear_metadata(self):
         self._selected = None
         self._reuse_btn.setEnabled(False)
-        self._reuse_btn.setToolTip("")
+        self._reuse_wrap.setToolTip("")
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_panel.clear()

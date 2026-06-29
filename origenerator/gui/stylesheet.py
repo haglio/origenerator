@@ -60,6 +60,11 @@ def build_stylesheet() -> str:
     QPushButton:pressed {{
         background-color: {_h(BLUE)};
     }}
+    QPushButton:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+        color: {_h(TEXT_MUTED)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+    }}
     QPushButton#generateBtn {{
         background-color: {_h(BLUE)};
         font-weight: bold;

@@ -112,22 +112,16 @@ class GenerateView(QWidget):
         self._refresh_strip()
 
     def _on_generation_completed(self, _prompt_id: str):
-        # A new generation may belong to the active tab's settings folder.
+        # The active tab just appended a run to its own strip history.
         self._refresh_strip()
 
     def _refresh_strip(self):
-        """Show every generation matching the active tab's settings, newest first.
-
-        Refreshed on tab open, switch, and completion — not on every keystroke —
-        so editing a tab's settings leaves its strip on the folder it last
-        generated in, which is what makes an older item there clickable into a
-        new tab once the settings have moved on.
-        """
+        """Show the active tab's accumulated strip (its seeded folder + its runs)."""
         panel = self._subtabs.currentWidget()
-        key = panel.settings_key() if panel is not None else None
-        self._strip.show_generations(self._ids_for_settings(key))
+        self._strip.show_generations(panel.strip_ids() if panel is not None else [])
 
     def _ids_for_settings(self, key) -> list[str]:
+        """Every generation in a settings folder (workflow + signature), newest first."""
         if key is None:
             return []
         workflow_name, signature = key
@@ -154,7 +148,9 @@ class GenerateView(QWidget):
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel:
         panel = self._add_subtab()
         panel.prefill(workflow_name, params)
-        self._refresh_strip()  # populate the new tab's strip with its settings folder
+        # Seed the new tab's strip with its settings folder; it accumulates from there.
+        panel.seed_strip(self._ids_for_settings(panel.settings_key()))
+        self._refresh_strip()
         return panel
 
     def capture_state(self) -> dict:
@@ -201,6 +197,7 @@ class GenerateView(QWidget):
         for snapshot, title in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
+            panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
         current = state.get("current", 0)

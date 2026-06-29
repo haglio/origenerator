@@ -44,6 +44,9 @@ def _strip_ids(view):
     return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
 
 
+SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "x.png", "subfolder": ""}]}}}
+
+
 def test_starts_with_one_subtab(view):
     assert view._subtabs.count() == 1
 
@@ -68,10 +71,11 @@ def test_empty_state_new_tab_button_adds_a_subtab(view):
 
 
 def test_closing_last_subtab_empties_the_strip(view):
-    _insert_gen(view._db, "x1", _sdxl_full())  # matches the blank tab's default settings
-    view._refresh_strip()
+    _insert_gen(view._db, "x1", _sdxl_full(positive_prompt="cat"))
+    view.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))  # seeds the strip with x1
     assert _strip_ids(view) == ["x1"]
-    view._close_subtab(0)
+    while view._subtabs.count():
+        view._close_subtab(0)
     assert _strip_ids(view) == []
 
 
@@ -93,13 +97,23 @@ def test_active_panel_completion_refreshes_strip(view):
     spy.assert_called()
 
 
-def test_strip_shows_generations_matching_the_active_tabs_settings(view):
-    _insert_gen(view._db, "def1", _sdxl_full())                       # default-settings folder
-    _insert_gen(view._db, "cat1", _sdxl_full(positive_prompt="cat"))  # a different folder
-    view._refresh_strip()  # the blank tab is on default settings
-    assert _strip_ids(view) == ["def1"]
-    view.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))   # move to the cat folder
-    assert _strip_ids(view) == ["cat1"]
+def test_strip_keeps_earlier_runs_after_a_settings_change(view):
+    # The reported bug: changing params and regenerating must NOT wipe the strip.
+    panel = view._subtabs.currentWidget()
+    panel._client.submit_job = MagicMock(return_value="comfy-A")
+
+    panel._param_form.set_values({"positive_prompt": "cat", "seed": 1})
+    panel._on_generate()
+    first = panel._client_prompt_id
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    assert _strip_ids(view) == [first]
+
+    panel._param_form.set_values({"positive_prompt": "dog", "seed": 2})  # a mod
+    panel._on_generate()
+    second = panel._client_prompt_id
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    # Both runs stay, newest first — the earlier (now-mismatched) one isn't dropped.
+    assert _strip_ids(view) == [second, first]
 
 
 def test_open_config_adds_and_prefills_subtab(view):

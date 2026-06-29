@@ -52,6 +52,7 @@ class GenerateConfigPanel(QWidget):
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
         self._executing = False                        # has ComfyUI started our prompt yet?
+        self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -395,6 +396,8 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
         completed_id = self._client_prompt_id
+        if completed_id not in self._strip_ids:
+            self._strip_ids.insert(0, completed_id)  # accumulate; never drops earlier runs
         self._reset_job()
         self.generation_completed.emit(completed_id)
         self._refresh_estimate()
@@ -461,6 +464,19 @@ class GenerateConfigPanel(QWidget):
         for name, value in wf.default_params().items():
             params.setdefault(name, value)
         return key, settings_signature(json.dumps(params))
+
+    def strip_ids(self) -> list[str]:
+        """The generations to show in this tab's strip, newest first.
+
+        An accumulating history: whatever folder the tab was seeded with plus
+        every generation it has produced since — including ones whose settings no
+        longer match the current form, so tweaks-and-regenerate stays visible.
+        """
+        return list(self._strip_ids)
+
+    def seed_strip(self, prompt_ids):
+        """Seed the strip with a settings folder when the tab opens from one."""
+        self._strip_ids = list(prompt_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

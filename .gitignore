@@ -7,3 +7,6 @@ build/
 .pytest_cache/
 state/
 .claude/
+
+# Local launcher shortcuts — machine-specific absolute paths, not portable
+*.lnk

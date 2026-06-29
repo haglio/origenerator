@@ -17,6 +17,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 
 _GENERATE_TABS_KEY = "generate_tabs"
 _GALLERY_FOLDER_KEY = "gallery_folder"
+_ACTIVE_TAB_KEY = "active_tab"
 
 
 class OrigeneratorWindow(QMainWindow):
@@ -53,15 +54,19 @@ class OrigeneratorWindow(QMainWindow):
         self._tabs.setCurrentWidget(self._generate_view)
 
     def _restore_session(self):
-        """Reopen the Generate subtabs and Gallery folder from the last session."""
+        """Reopen the Generate subtabs, Gallery folder, and active tab."""
         tabs = self._app_state.get(_GENERATE_TABS_KEY)
         if tabs:
             self._generate_view.restore_state(tabs)
         self._gallery_view.select_folder(self._app_state.get(_GALLERY_FOLDER_KEY))
+        active = self._app_state.get(_ACTIVE_TAB_KEY)
+        if isinstance(active, int) and 0 <= active < self._tabs.count():
+            self._tabs.setCurrentIndex(active)
 
     def closeEvent(self, event):
-        """Persist the open Generate subtabs and Gallery folder on the way out."""
+        """Persist the open Generate subtabs, Gallery folder, and active tab."""
         self._app_state.set(_GENERATE_TABS_KEY, self._generate_view.capture_state())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
+        self._app_state.set(_ACTIVE_TAB_KEY, self._tabs.currentIndex())
         self._app_state.save()
         super().closeEvent(event)

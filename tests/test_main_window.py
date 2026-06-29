@@ -75,3 +75,20 @@ def test_replay_requested_submits_and_switches_tab(qtbot, tmp_path):
 
     spy.assert_called_once_with(row, overrides)
     assert win._tabs.currentWidget() is win._generate_view
+
+
+def test_restores_active_tab_from_app_state(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("active_tab", 1)  # Gallery
+    win = _window(qtbot, tmp_path, state)
+    assert win._tabs.currentWidget() is win._gallery_view
+
+
+def test_close_event_persists_active_tab(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win._tabs.setCurrentWidget(win._gallery_view)
+
+    win.close()  # fires closeEvent
+
+    assert AppState(path).get("active_tab") == 1

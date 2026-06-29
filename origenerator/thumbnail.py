@@ -5,9 +5,18 @@ from PIL import Image
 _THUMB_MAX = 256
 
 
-def generate_thumbnail(source_path: Path, output_type: str, thumb_dir: Path) -> Path:
+def generate_thumbnail(
+    source_path: Path, output_type: str, thumb_dir: Path, *, name: str
+) -> Path:
+    """Render a thumbnail for ``source_path`` into ``thumb_dir / f"{name}.jpg"``.
+
+    ``name`` is the caller's unique key for this generation (its ``prompt_id``),
+    not the source filename: two outputs that share a stem — ComfyUI's default
+    ``ComfyUI_00001_.png`` beside ``video/ComfyUI_00001_.mp4`` — would otherwise
+    collapse onto one thumbnail, leaving one row showing the other's frame.
+    """
     thumb_dir.mkdir(parents=True, exist_ok=True)
-    dest = thumb_dir / (source_path.stem + ".jpg")
+    dest = thumb_dir / f"{name}.jpg"
 
     if output_type == "video":
         img = _first_frame_from_video(source_path)

@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -82,7 +83,9 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
 
             thumb_path = None
             try:
-                thumb_path = str(generate_thumbnail(fpath, output_type, thumb_dir))
+                thumb_path = str(
+                    generate_thumbnail(fpath, output_type, thumb_dir, name=prompt_id)
+                )
             except Exception as e:
                 logger.warning("Thumbnail failed for %s: %s", fpath, e)
 
@@ -150,6 +153,58 @@ def merge_video_sidecar_rows(db: Database) -> int:
 
 def _sidecar_key(file_entry: dict) -> tuple[str, str]:
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
+
+
+def backfill_shared_thumbnails(db: Database, output_dir: Path, thumb_dir: Path) -> int:
+    """Re-render thumbnails an old naming collision left wrong or missing.
+
+    Thumbnails were once named after the source file's stem, so two outputs that
+    shared a stem — ComfyUI's default ``ComfyUI_00001_.png`` beside
+    ``video/ComfyUI_00001_.mp4`` — wrote to one file, the later import
+    overwriting the earlier; the losing row then displayed the winner's frame.
+    Each row whose thumbnail file is shared by another row, or has since gone
+    missing (e.g. trashed when its stem-twin was deleted), is re-rendered from
+    its own output under a name keyed by its unique ``prompt_id``. Returns how
+    many rows were repaired. Idempotent: once every thumbnail is uniquely owned
+    and present, a re-run touches nothing.
+    """
+    rows = db.list_generations()
+    owners = Counter(r["thumbnail_path"] for r in rows if r.get("thumbnail_path"))
+    repaired = 0
+    for row in rows:
+        thumb = row.get("thumbnail_path")
+        if not thumb:
+            continue
+        if owners[thumb] == 1 and Path(thumb).exists():
+            continue  # uniquely owned and present — already correct
+        fresh = _render_row_thumbnail(row, output_dir, thumb_dir)
+        if fresh is not None:
+            db.update_generation(row["prompt_id"], thumbnail_path=str(fresh))
+            repaired += 1
+    return repaired
+
+
+def _render_row_thumbnail(row: dict, output_dir: Path, thumb_dir: Path) -> Path | None:
+    """A fresh thumbnail for ``row`` from its own output, keyed by its prompt_id.
+
+    Returns the new path, or ``None`` when the row has no renderable output file
+    on disk to draw from (so the caller leaves the existing reference alone).
+    """
+    files = row_output_files(row)
+    if not files:
+        return None
+    first = files[0]
+    media = media_type_from_filename(first.get("filename", ""))
+    if media is None:
+        return None
+    source = output_dir / first.get("subfolder", "") / first.get("filename", "")
+    if not source.exists():
+        return None
+    try:
+        return generate_thumbnail(source, media, thumb_dir, name=row["prompt_id"])
+    except Exception as e:
+        logger.warning("Thumbnail repair failed for %s: %s", source, e)
+        return None
 
 
 def backfill_unknown_workflows(db: Database) -> int:

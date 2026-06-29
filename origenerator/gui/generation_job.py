@@ -165,7 +165,10 @@ class GenerationJob(QObject):
             return None
         try:
             self._thumb_dir.mkdir(parents=True, exist_ok=True)
-            return str(generate_thumbnail(source, self.workflow.output_type, self._thumb_dir))
+            return str(generate_thumbnail(
+                source, self.workflow.output_type, self._thumb_dir,
+                name=self.prompt_id,
+            ))
         except Exception as e:
             logger.warning("Thumbnail generation failed for %s: %s", source, e)
             return None

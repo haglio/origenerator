@@ -120,6 +120,7 @@ def main():
 
     status("Scanning for new images...")
     from origenerator.importer import (
+        backfill_shared_thumbnails,
         backfill_unknown_workflows,
         import_comfyui_output,
         merge_video_sidecar_rows,
@@ -148,6 +149,16 @@ def main():
             logger.info("Relabelled %d previously-unknown imports", relabeled)
     except Exception as e:
         logger.warning("Workflow backfill failed: %s", e)
+
+    status("Repairing thumbnails...")
+    # Re-render any thumbnail an old filename-stem collision left wrong or
+    # missing, so each generation's thumbnail matches its own preview again.
+    try:
+        fixed = backfill_shared_thumbnails(db, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+        if fixed:
+            logger.info("Repaired %d colliding thumbnails", fixed)
+    except Exception as e:
+        logger.warning("Thumbnail repair failed: %s", e)
 
     status("Recovering generation times...")
     # Recover how long past generations took from ComfyUI's console logs, so

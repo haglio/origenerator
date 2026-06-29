@@ -375,7 +375,9 @@ class GenerateConfigPanel(QWidget):
             source = COMFYUI_OUTPUT_DIR / subfolder / first["filename"]
             if source.exists():
                 THUMB_DIR.mkdir(parents=True, exist_ok=True)
-                thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
+                thumb_path = str(generate_thumbnail(
+                    source, wf.output_type, THUMB_DIR, name=self._client_prompt_id
+                ))
                 self._preview.show_media(source, wf.output_type)
 
         now = datetime.now(timezone.utc).isoformat()

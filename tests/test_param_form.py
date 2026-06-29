@@ -43,6 +43,15 @@ def test_get_values_static_does_not_randomize_seed(qtbot):
     assert form.get_values_static()["seed"] == 12345
 
 
+def test_param_form_emits_changed_on_edit(qtbot):
+    form = ParamForm([ParamDef("steps", "Steps", "int", 10, min_val=1, max_val=100)])
+    qtbot.addWidget(form)
+    fired = []
+    form.changed.connect(lambda: fired.append(True))
+    form.set_values({"steps": 42})
+    assert fired
+
+
 def test_seed_is_random_reflects_checkbox(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)

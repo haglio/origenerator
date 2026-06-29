@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
     QComboBox, QCheckBox, QPushButton,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.gui.image_picker import ImagePickerDialog
 from origenerator.workflows.base import ParamDef
@@ -14,6 +14,8 @@ _SEED_MAX = (1 << 63) - 1
 
 
 class ParamForm(QWidget):
+    changed = pyqtSignal()  # any field's value changed
+
     def __init__(self, param_defs: list[ParamDef], parent=None):
         super().__init__(parent)
         self._widgets: dict[str, QWidget] = {}
@@ -36,11 +38,13 @@ class ParamForm(QWidget):
 
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
+            self._wire_changed(widget)
             row.addWidget(widget, 1)
 
             if pd.type == "seed":
                 cb = QCheckBox("Random")
                 cb.setChecked(True)
+                cb.toggled.connect(self.changed)
                 self._randomize_checks[pd.key] = cb
                 row.addWidget(cb)
 
@@ -59,6 +63,15 @@ class ParamForm(QWidget):
         dialog = ImagePickerDialog(self)
         if dialog.exec() and dialog.selected_image():
             self._widgets[key].setText(dialog.selected_image())
+
+    def _wire_changed(self, widget: QWidget):
+        """Re-emit ``changed`` whenever this input's value changes."""
+        if isinstance(widget, (QPlainTextEdit, QLineEdit)):
+            widget.textChanged.connect(self.changed)
+        elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+            widget.valueChanged.connect(self.changed)
+        elif isinstance(widget, QComboBox):
+            widget.currentIndexChanged.connect(self.changed)
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if pd.type == "str" and pd.multiline:

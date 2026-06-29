@@ -39,6 +39,78 @@ def test_generate_inserts_row_and_submits(panel):
     assert panel._comfy_prompt_id == "comfy-A"
 
 
+def _complete_one(panel, seed=12345, prompt="a cat"):
+    """Run one generation to completion so a real prior row exists in the DB."""
+    panel._param_form.set_values({"seed": seed, "positive_prompt": prompt})
+    panel._on_generate()
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+
+
+def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkeypatch):
+    _complete_one(panel)
+    asked = []
+    monkeypatch.setattr(
+        panel, "_ask_about_duplicate", lambda wf: asked.append(wf) or "cancel"
+    )
+
+    panel._on_generate()  # identical config, seed not random
+
+    assert asked, "the user should have been warned about the duplicate"
+    assert len(panel._db.list_generations()) == 1  # cancel: nothing new submitted
+    assert panel._generate_btn.isEnabled() is True  # button re-enabled, not stuck
+
+
+def test_generate_duplicate_reroll_randomizes_seed_and_checks_random(panel, monkeypatch):
+    _complete_one(panel, seed=12345)
+    monkeypatch.setattr(panel, "_ask_about_duplicate", lambda wf: "reroll")
+
+    panel._on_generate()
+
+    rows = panel._db.list_generations()  # newest first
+    assert len(rows) == 2                 # a new job was submitted
+    assert rows[0]["seed"] != 12345       # with a fresh seed, not the duplicate
+    assert panel._param_form.seed_is_random() is True  # Random box now checked
+
+
+def test_generate_duplicate_regenerate_anyway_reruns_identical(panel, monkeypatch):
+    _complete_one(panel, seed=12345)
+    monkeypatch.setattr(panel, "_ask_about_duplicate", lambda wf: "anyway")
+
+    panel._on_generate()
+
+    rows = panel._db.list_generations()
+    assert len(rows) == 2
+    assert rows[0]["seed"] == 12345       # the exact same seed, by explicit choice
+    assert panel._param_form.seed_is_random() is False  # Random left unchecked
+
+
+def test_generate_with_random_seed_never_warns(panel, monkeypatch):
+    _complete_one(panel, seed=12345)         # an identical prior run exists
+    panel._param_form.set_seed_random(True)  # but the user re-checks Random
+    asked = []
+    monkeypatch.setattr(
+        panel, "_ask_about_duplicate", lambda wf: asked.append(wf) or "cancel"
+    )
+
+    panel._on_generate()
+
+    assert asked == []  # a random seed can't reproduce a past run
+    assert len(panel._db.list_generations()) == 2
+
+
+def test_generate_does_not_warn_when_no_prior_match(panel, monkeypatch):
+    asked = []
+    monkeypatch.setattr(
+        panel, "_ask_about_duplicate", lambda wf: asked.append(wf) or "cancel"
+    )
+    panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
+
+    panel._on_generate()
+
+    assert asked == []  # nothing matches: generate without nagging
+    assert len(panel._db.list_generations()) == 1
+
+
 def test_completion_only_handled_for_own_prompt_id(panel):
     completed = []
     panel.generation_completed.connect(completed.append)

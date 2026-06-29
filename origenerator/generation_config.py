@@ -101,6 +101,25 @@ def merge_denormalized(row: dict) -> dict:
     return params
 
 
+def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
+    """Return the first already-completed generation ``snapshot`` would reproduce.
+
+    Re-running a config whose seed isn't randomized re-creates a byte-identical
+    output, so this lets the caller warn before wasting a slot. Only ``completed``
+    rows count: a failed or canceled attempt is a legitimate retry, not a
+    duplicate. Returns ``None`` when the seed is random (every run differs) or
+    nothing matches.
+    """
+    if snapshot.seed_is_random:
+        return None
+    for row in rows:
+        if row.get("status") != "completed":
+            continue
+        if configs_match(snapshot, row.get("workflow_name", ""), merge_denormalized(row)):
+            return row
+    return None
+
+
 def randomize_seeds(params: dict, seed_keys) -> dict:
     """Return a copy of ``params`` with every key in ``seed_keys`` re-rolled.
 

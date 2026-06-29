@@ -5,14 +5,16 @@ from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QComboBox, QPushButton, QProgressBar, QScrollArea,
+    QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import config_tab_title
-from origenerator.generation_config import ConfigSnapshot
+from origenerator.generation_config import (
+    ConfigSnapshot, find_duplicate_generation, randomize_seeds,
+)
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.thumbnail import generate_thumbnail
@@ -218,6 +220,17 @@ class GenerateConfigPanel(QWidget):
             )
             return
 
+        # Guard against silently re-running an identical job: a pinned (non-random)
+        # seed that matches a past generation would just re-create it byte-for-byte.
+        snapshot = ConfigSnapshot(key, params, self._param_form.seed_is_random())
+        if find_duplicate_generation(self._db.list_generations(), snapshot):
+            choice = self._ask_about_duplicate(wf)
+            if choice == "cancel":
+                return
+            if choice == "reroll":
+                params = randomize_seeds(params, wf.seed_keys())
+                self._param_form.set_seed_random(True)
+
         # Build the job now (fixing the seed), but let the queue decide when it runs.
         prompt_id = str(uuid.uuid4())
         payload = wf.build_api_payload(params)
@@ -236,6 +249,35 @@ class GenerateConfigPanel(QWidget):
                 workflow_json=json.dumps(payload),
             ),
         )
+
+    def _ask_about_duplicate(self, wf) -> str:
+        """Warn that this exact config was already generated; return the choice.
+
+        ``"reroll"`` re-runs with a fresh random seed (the offered default),
+        ``"anyway"`` re-runs the identical job, ``"cancel"`` (also the dialog's
+        close box) does nothing.
+        """
+        media = wf.output_type if wf.output_type in ("image", "video") else "output"
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Already generated")
+        box.setText(
+            f"You've already generated this exact {media} — same settings and "
+            f"the same seed.\nRunning it again will just re-create an identical "
+            f"{media}."
+        )
+        box.setInformativeText("Generate a new random seed instead?")
+        reroll = box.addButton("New Random Seed", QMessageBox.ButtonRole.AcceptRole)
+        anyway = box.addButton("Regenerate Anyway", QMessageBox.ButtonRole.ActionRole)
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(reroll)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is reroll:
+            return "reroll"
+        if clicked is anyway:
+            return "anyway"
+        return "cancel"
 
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
         """Stage a built job, then hand it to the queue (or run it now if unqueued).

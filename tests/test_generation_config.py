@@ -3,6 +3,7 @@ import json
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
+    find_duplicate_generation,
     merge_denormalized,
     randomize_seeds,
 )
@@ -10,6 +11,16 @@ from origenerator.generation_config import (
 
 def _snapshot(workflow="sdxl_t2i", params=None, seed_is_random=False):
     return ConfigSnapshot(workflow, params or {}, seed_is_random)
+
+
+def _row(workflow="sdxl_t2i", params=None, status="completed", **extra):
+    row = {
+        "workflow_name": workflow,
+        "status": status,
+        "params_json": json.dumps(params or {}),
+    }
+    row.update(extra)
+    return row
 
 
 def test_configs_match_true_for_identical_workflow_and_params():
@@ -118,3 +129,41 @@ def test_randomize_seeds_sets_missing_seed_keys():
     # the rebuilt payload has a seed to use.
     out = randomize_seeds({"steps": 20}, ["seed"])
     assert "seed" in out and isinstance(out["seed"], int)
+
+
+def test_find_duplicate_returns_matching_completed_generation():
+    rows = [_row(params={"steps": 20, "seed": 7})]
+    snap = _snapshot(params={"steps": 20, "seed": 7})
+    assert find_duplicate_generation(rows, snap) is rows[0]
+
+
+def test_find_duplicate_none_when_seed_is_random():
+    # A randomized seed never reproduces a past run, so never a duplicate.
+    rows = [_row(params={"steps": 20, "seed": 7})]
+    snap = _snapshot(params={"steps": 20, "seed": 7}, seed_is_random=True)
+    assert find_duplicate_generation(rows, snap) is None
+
+
+def test_find_duplicate_none_when_no_row_matches():
+    rows = [_row(params={"steps": 20, "seed": 7})]
+    snap = _snapshot(params={"steps": 20, "seed": 8})  # different seed
+    assert find_duplicate_generation(rows, snap) is None
+
+
+def test_find_duplicate_ignores_non_completed_rows():
+    # A failed/running attempt with the same config is a retry, not a duplicate.
+    params = {"steps": 20, "seed": 7}
+    rows = [
+        _row(params=params, status="error"),
+        _row(params=params, status="running"),
+    ]
+    snap = _snapshot(params=params)
+    assert find_duplicate_generation(rows, snap) is None
+
+
+def test_find_duplicate_picks_the_matching_row_among_several():
+    other = _row(params={"steps": 20, "seed": 1})
+    different_workflow = _row(workflow="wan22_i2v", params={"steps": 20, "seed": 7})
+    match = _row(params={"steps": 20, "seed": 7})
+    snap = _snapshot(params={"steps": 20, "seed": 7})
+    assert find_duplicate_generation([other, different_workflow, match], snap) is match

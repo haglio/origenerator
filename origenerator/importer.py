@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import shutil
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -148,6 +150,67 @@ def _get_existing_filenames(db: Database) -> set[str]:
     return result
 
 
+def _as_graph(text: str) -> dict:
+    """Decode a ComfyUI prompt graph, tolerating double-JSON-encoding.
+
+    Native ``SaveVideo`` and PNG chunks store the graph as a JSON object;
+    ``VHS_VideoCombine`` stores it as a JSON *string* of that object. Decode
+    until we reach the dict (or give up).
+    """
+    try:
+        data = json.loads(text)
+        if isinstance(data, str):
+            data = json.loads(data)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _video_prompt_graph(fpath: Path) -> dict:
+    """Read ComfyUI's embedded prompt graph from a video container via ffprobe.
+
+    Returns {} when ffprobe is unavailable, the ``prompt`` tag is absent, or
+    anything goes wrong — callers fall back to filename inference.
+    """
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return {}
+    try:
+        proc = subprocess.run(
+            [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", str(fpath)],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    tags = (_as_graph(proc.stdout).get("format", {}) or {}).get("tags", {})
+    prompt = tags.get("prompt")
+    return _as_graph(prompt) if prompt else {}
+
+
+def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
+    """Return the embedded ComfyUI prompt graph for an output file, or {}.
+
+    Images carry it in the PNG ``prompt`` text chunk; videos carry it in the
+    container metadata.
+    """
+    if suffix == ".png":
+        try:
+            prompt_str = Image.open(fpath).info.get("prompt")
+        except Exception:
+            return {}
+        return _as_graph(prompt_str) if prompt_str else {}
+    if media_type_from_filename(fpath.name) == "video":
+        return _video_prompt_graph(fpath)
+    return {}
+
+
+def _follow(graph: dict, ref) -> dict | None:
+    """Resolve a ComfyUI input link ``[node_id, slot]`` to its source node."""
+    if isinstance(ref, list) and ref:
+        return graph.get(str(ref[0]))
+    return None
+
+
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
     result: dict = {
         "workflow_name": infer_workflow_name(fpath.name) or "unknown",
@@ -159,32 +222,48 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         "prompt_data": {},
     }
 
-    if suffix != ".png":
+    prompt_data = _read_prompt_graph(fpath, suffix)
+    if not prompt_data:
         return result
+    result["prompt_data"] = prompt_data
 
-    try:
-        img = Image.open(fpath)
-        prompt_str = img.info.get("prompt")
-        if not prompt_str:
-            return result
-        prompt_data = json.loads(prompt_str)
-        result["prompt_data"] = prompt_data
-    except Exception:
-        return result
+    # Wan video workflows route prompts through a conditioning node; follow its
+    # links structurally so we don't depend on CLIPTextEncode node titles.
+    cond = next(
+        (n for n in prompt_data.values()
+         if n.get("class_type") in ("WanImageToVideo", "WanFirstLastFrameToVideo")),
+        None,
+    )
+    if cond:
+        ci = cond.get("inputs", {})
+        pos = _follow(prompt_data, ci.get("positive"))
+        neg = _follow(prompt_data, ci.get("negative"))
+        if pos and pos.get("class_type") == "CLIPTextEncode":
+            result["positive_prompt"] = pos["inputs"].get("text")
+        if neg and neg.get("class_type") == "CLIPTextEncode":
+            result["negative_prompt"] = neg["inputs"].get("text")
+        for src, dst in (("width", "width"), ("height", "height"), ("length", "frame_count")):
+            if isinstance(ci.get(src), int):
+                result["params"][dst] = ci[src]
 
-    # Extract prompts and seed from nodes
-    for node_id, node in prompt_data.items():
+    for node in prompt_data.values():
         class_type = node.get("class_type", "")
         inputs = node.get("inputs", {})
         meta_title = node.get("_meta", {}).get("title", "")
 
-        if class_type == "CLIPTextEncode":
+        # Title-based prompts only when there's no structural source above.
+        if class_type == "CLIPTextEncode" and cond is None:
             text = inputs.get("text")
             if isinstance(text, str):
                 if "Negative" in meta_title:
                     result["negative_prompt"] = text
                 elif result["positive_prompt"] is None:
                     result["positive_prompt"] = text
+
+        if class_type == "LoadImage":
+            image = inputs.get("image")
+            if isinstance(image, str):
+                result["params"]["input_image"] = image
 
         if class_type == "CheckpointLoaderSimple":
             ckpt = inputs.get("ckpt_name")
@@ -202,17 +281,20 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
 
         if class_type == "KSamplerAdvanced":
             seed = inputs.get("noise_seed")
-            if isinstance(seed, int) and result["seed"] is None:
+            # Prefer the noise-adding (stage-1) sampler's seed.
+            if isinstance(seed, int) and (result["seed"] is None or inputs.get("add_noise") == "enable"):
                 result["seed"] = seed
             result["params"].update({
                 k: v for k, v in inputs.items()
                 if isinstance(v, (int, float, str, bool))
             })
 
-    # The embedded graph is authoritative for PNGs; refine the filename guess.
+    # The embedded graph is authoritative; refine the filename guess.
     node_types = {n.get("class_type") for n in prompt_data.values()}
     if "WanFirstLastFrameToVideo" in node_types:
         result["workflow_name"] = "wan22_flf2v_loop"
+    elif "WanImageToVideo" in node_types:
+        result["workflow_name"] = "wan22_i2v"
     elif "CheckpointLoaderSimple" in node_types:
         result["workflow_name"] = "sdxl_t2i"
 

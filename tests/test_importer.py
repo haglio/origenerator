@@ -104,6 +104,48 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
     assert db.get_generation("bf-known")["workflow_name"] == "wan22_flf2v_loop"
 
 
+def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
+    import origenerator.importer as imp
+    # No _meta titles: prompts must be found structurally via the Wan node's links.
+    graph = {
+        "1": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "a serene lake"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"}},
+        "4": {"class_type": "KSamplerAdvanced", "inputs": {"noise_seed": 555, "add_noise": "enable"}},
+        "5": {"class_type": "WanImageToVideo", "inputs": {
+            "positive": ["2", 0], "negative": ["3", 0], "start_image": ["1", 0],
+            "width": 768, "height": 512, "length": 81}},
+    }
+    monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
+    meta = imp._extract_metadata(tmp_path / "wan22_i2v_555_00001_.mp4", ".mp4")
+    assert meta["positive_prompt"] == "a serene lake"
+    assert meta["negative_prompt"] == "blurry"
+    assert meta["seed"] == 555
+    assert meta["params"]["input_image"] == "start.png"
+    assert meta["params"]["width"] == 768
+    assert meta["params"]["frame_count"] == 81
+    assert meta["workflow_name"] == "wan22_i2v"
+
+
+def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):
+    import subprocess as sp
+    import origenerator.importer as imp
+    graph = {"1": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
+    double = json.dumps(json.dumps(graph))  # VHS_VideoCombine double-encodes
+    out = json.dumps({"format": {"tags": {"prompt": double}}})
+    monkeypatch.setattr(imp.shutil, "which", lambda n: "ffprobe")
+    monkeypatch.setattr(imp.subprocess, "run",
+                        lambda *a, **k: sp.CompletedProcess(a, 0, stdout=out, stderr=""))
+    g = imp._video_prompt_graph(tmp_path / "v.mp4")
+    assert g["1"]["class_type"] == "LoadImage"
+
+
+def test_video_prompt_graph_empty_without_ffprobe(tmp_path, monkeypatch):
+    import origenerator.importer as imp
+    monkeypatch.setattr(imp.shutil, "which", lambda n: None)
+    assert imp._video_prompt_graph(tmp_path / "v.mp4") == {}
+
+
 def test_import_skips_already_imported(tmp_path):
     output_dir = tmp_path / "output" / "image"
     output_dir.mkdir(parents=True)

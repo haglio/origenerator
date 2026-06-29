@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from origenerator.gui.image_picker import ImagePickerDialog
 from origenerator.workflows.base import ParamDef
 
 _SEED_MAX = (1 << 63) - 1
@@ -17,6 +18,7 @@ class ParamForm(QWidget):
         super().__init__(parent)
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, QCheckBox] = {}
+        self._browse_buttons: dict[str, QPushButton] = {}
         self._param_defs = param_defs
         self._build(param_defs)
 
@@ -45,9 +47,18 @@ class ParamForm(QWidget):
             if pd.type == "image":
                 browse = QPushButton("Browse...")
                 browse.setFixedWidth(80)
+                browse.clicked.connect(
+                    lambda _checked=False, key=pd.key: self._browse_image(key)
+                )
+                self._browse_buttons[pd.key] = browse
                 row.addWidget(browse)
 
             layout.addLayout(row)
+
+    def _browse_image(self, key: str):
+        dialog = ImagePickerDialog(self)
+        if dialog.exec() and dialog.selected_image():
+            self._widgets[key].setText(dialog.selected_image())
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if pd.type == "str" and pd.multiline:

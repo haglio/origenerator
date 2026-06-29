@@ -90,6 +90,16 @@ class GenerateView(QWidget):
             if k not in params:
                 params[k] = v
 
+        missing_images = [
+            pd.label for pd in wf.param_definitions()
+            if pd.type == "image" and not str(params.get(pd.key, "")).strip()
+        ]
+        if missing_images:
+            self._status_label.setText(
+                f"Select an input image ({', '.join(missing_images)}) before generating."
+            )
+            return
+
         payload = wf.build_api_payload(params)
         prompt_id = str(uuid.uuid4())
 

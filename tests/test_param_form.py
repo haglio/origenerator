@@ -43,3 +43,47 @@ def test_param_form_seed_handles_64bit_values(qtbot):
     form.set_values({"seed": big_seed})
     vals = form.get_values()
     assert vals["seed"] == big_seed
+
+
+def test_param_form_browse_button_picks_image(qtbot, monkeypatch):
+    import origenerator.gui.param_form as pf
+
+    class _FakePicker:
+        def __init__(self, parent=None):
+            pass
+
+        def exec(self):
+            return 1  # QDialog.Accepted
+
+        def selected_image(self):
+            return "cat.png"
+
+    monkeypatch.setattr(pf, "ImagePickerDialog", _FakePicker)
+
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert form.get_values()["input_image"] == "cat.png"
+
+
+def test_param_form_browse_cancel_keeps_existing_image(qtbot, monkeypatch):
+    import origenerator.gui.param_form as pf
+
+    class _CancelPicker:
+        def __init__(self, parent=None):
+            pass
+
+        def exec(self):
+            return 0  # QDialog.Rejected
+
+        def selected_image(self):
+            return None
+
+    monkeypatch.setattr(pf, "ImagePickerDialog", _CancelPicker)
+
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "preset.png")])
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert form.get_values()["input_image"] == "preset.png"

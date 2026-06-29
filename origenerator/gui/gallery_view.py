@@ -229,11 +229,21 @@ class GalleryView(QWidget):
             self._on_thumbnail_clicked(rows[0]["prompt_id"])
 
     def _update_folder_average(self, group):
-        """Show the mean generation time across every item beneath this folder."""
+        """Show the mean generation time for this folder.
+
+        Prefers the folder's own timed items; when it has none — common for a
+        single video prompt, which is rarely re-run — it falls back to the
+        parent workflow's timed runs so a figure still appears at the prompt
+        level the way it does at the workflow level.
+        """
         durations = [
             row["duration_seconds"] for row in gallery.rows_under(group)
             if row.get("duration_seconds") is not None
         ]
+        if not durations:
+            workflow = _group_workflow(group)
+            if workflow:
+                durations = self._db.recent_durations(workflow)
         label = timing.average_label(durations)
         self._avg_label.setText(f"Average time: {label}" if label else "")
 
@@ -527,6 +537,17 @@ def _has_graph(row: dict) -> bool:
         return bool(json.loads(raw))
     except json.JSONDecodeError:
         return False
+
+
+def _group_workflow(group) -> str | None:
+    """The single workflow a folder belongs to, or ``None`` if it spans several
+    (a media-type folder) and so has no one workflow time to fall back on."""
+    if isinstance(group, gallery.MediaGroup):
+        return None
+    if isinstance(group, gallery.WorkflowGroup):
+        return group.workflow_name
+    rows = gallery.rows_under(group)  # model or settings folder: ask its rows
+    return rows[0]["workflow_name"] if rows else None
 
 
 def _fingerprint(rows, meta) -> int:

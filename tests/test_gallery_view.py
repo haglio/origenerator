@@ -470,6 +470,67 @@ def test_folder_without_timed_items_shows_no_average(qtbot):
     assert view._avg_label.text() == ""
 
 
+def _find_settings_node(view, predicate):
+    """First settings-group tree node (at any depth) whose group matches."""
+    def walk(item):
+        group = item.data(0, _GROUP_ROLE)
+        if isinstance(group, gallery.SettingsGroup) and predicate(group):
+            return item
+        for i in range(item.childCount()):
+            hit = walk(item.child(i))
+            if hit is not None:
+                return hit
+        return None
+    root = view._tree.invisibleRootItem()
+    for i in range(root.childCount()):
+        hit = walk(root.child(i))
+        if hit is not None:
+            return hit
+    return None
+
+
+def test_untimed_prompt_folder_falls_back_to_workflow_time(qtbot):
+    rows = [
+        # A video prompt nobody has timed yet (its own settings group).
+        _row("v_untimed", "wan22_i2v", {"steps": 30, "seed": 2}, "wan22_i2v_2.mp4"),
+        # A different, timed prompt in the same workflow.
+        _row("v_timed", "wan22_i2v", {"steps": 20, "seed": 1}, "wan22_i2v_1.mp4",
+             duration_seconds=1390.0),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    node = _find_settings_node(
+        view, lambda g: all(r.get("duration_seconds") is None for r in g.rows)
+    )
+    assert node is not None
+    view._tree.setCurrentItem(node)
+    # No timed items of its own → it falls back to the workflow's typical time.
+    assert view._avg_label.text() == "Average time: ~23 min (across 1 run)"
+
+
+def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
+    rows = [
+        _row("v_slow", "wan22_i2v", {"steps": 30, "seed": 9}, "wan22_i2v_9.mp4",
+             duration_seconds=1390.0),  # a different, slower prompt in the workflow
+        _row("v1", "wan22_i2v", {"steps": 20, "seed": 1}, "wan22_i2v_1.mp4",
+             duration_seconds=60.0),
+        _row("v2", "wan22_i2v", {"steps": 20, "seed": 2}, "wan22_i2v_2.mp4",
+             duration_seconds=80.0),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    node = _find_settings_node(view, lambda g: {r["prompt_id"] for r in g.rows} == {"v1", "v2"})
+    assert node is not None
+    view._tree.setCurrentItem(node)
+    # Its own two runs average 70s (a coarse "~1 min") — the workflow's slow
+    # outlier doesn't leak in.
+    assert view._avg_label.text() == "Average time: ~1 min (across 2 runs)"
+
+
 def test_emptying_the_gallery_clears_a_stale_estimate(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
     rows[0]["duration_seconds"] = 6.0

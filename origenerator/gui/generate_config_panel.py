@@ -37,13 +37,15 @@ class GenerateConfigPanel(QWidget):
     generation_completed = pyqtSignal(str)  # our (client-side) prompt_id
     title_changed = pyqtSignal(str)         # current tab title
 
-    def __init__(self, client: ComfyUIClient, db: Database, parent=None):
+    def __init__(self, client: ComfyUIClient, db: Database, queue=None, parent=None):
         super().__init__(parent)
         self._client = client
         self._db = db
+        self._queue = queue                          # serializes jobs across panels; None = run at once
         self._client_prompt_id: str | None = None   # our uuid; the DB row key
         self._comfy_prompt_id: str | None = None     # ComfyUI's id; keys its signals
         self._submitted_workflow = None              # workflow captured at submit time
+        self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._param_form: ParamForm | None = None
         self._build_ui()
@@ -157,8 +159,31 @@ class GenerateConfigPanel(QWidget):
             )
             return
 
-        payload = wf.build_api_payload(params)
-        prompt_id = str(uuid.uuid4())
+        # Build the job now (fixing the seed), but let the queue decide when it runs.
+        self._prepared = {
+            "workflow": wf,
+            "params": params,
+            "payload": wf.build_api_payload(params),
+            "prompt_id": str(uuid.uuid4()),
+        }
+        self._generate_btn.setEnabled(False)
+        if self._queue is not None:
+            self._status_label.setText("Queued…")
+            self._queue.submit(self, wf.name)
+        else:
+            self._begin_job()
+
+    def run_now(self):
+        """Start the prepared job — called by the queue when it reaches the head."""
+        self._begin_job()
+
+    def _begin_job(self):
+        job = self._prepared
+        if job is None:
+            return
+        wf, params = job["workflow"], job["params"]
+        prompt_id, payload = job["prompt_id"], job["payload"]
+        self._prepared = None
 
         self._db.insert_generation(
             prompt_id=prompt_id,
@@ -179,11 +204,23 @@ class GenerateConfigPanel(QWidget):
             self._db.update_generation(prompt_id, status="running")
             self._status_label.setText(f"Generating... (job {actual_pid[:8]})")
             self._progress.setValue(0)
-            self._generate_btn.setEnabled(False)
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))
             self._status_label.setText(f"Error: {e}")
+            self._generate_btn.setEnabled(True)
+            self._release_queue_slot()
+
+    def set_queue_status(self, position: int, eta_seconds: float):
+        """Show this panel's place in line and a countdown to its turn."""
+        text = f"Queued (#{position})"
+        if eta_seconds and eta_seconds > 0:
+            text += f" — starts in ~{format_duration(eta_seconds)}"
+        self._status_label.setText(text)
+
+    def _release_queue_slot(self):
+        if self._queue is not None:
+            self._queue.release(self)
 
     def _is_mine(self, prompt_id: str) -> bool:
         """True if a client signal's prompt_id belongs to this panel's job.
@@ -238,6 +275,7 @@ class GenerateConfigPanel(QWidget):
         self._reset_job()
         self.generation_completed.emit(completed_id)
         self._refresh_estimate()
+        self._release_queue_slot()
 
     def _on_error(self, prompt_id: str, error_msg: str):
         if not self._is_mine(prompt_id):
@@ -250,6 +288,7 @@ class GenerateConfigPanel(QWidget):
         self._status_label.setText(f"Error: {error_msg[:100]}")
         self._generate_btn.setEnabled(True)
         self._reset_job()
+        self._release_queue_slot()
 
     def _reset_job(self):
         self._client_prompt_id = None

@@ -230,3 +230,59 @@ def test_custom_title_overrides_and_sticks(panel):
     assert panel.title() == "My experiments"
     panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
     assert panel.title() == "My experiments"  # rename survives config changes
+
+
+class FakeQueue:
+    """A queue that records calls but never auto-starts the next job."""
+
+    def __init__(self):
+        self.submitted = []
+        self.released = []
+
+    def submit(self, panel, workflow_name):
+        self.submitted.append((panel, workflow_name))
+
+    def release(self, panel):
+        self.released.append(panel)
+
+
+def _queued_panel(qtbot, tmp_path):
+    client = MagicMock()
+    client.submit_job.return_value = "comfy-A"
+    queue = FakeQueue()
+    panel = GenerateConfigPanel(client, Database(tmp_path / "t.db"), queue=queue)
+    qtbot.addWidget(panel)
+    return panel, client, queue
+
+
+def test_generate_with_queue_defers_submission(qtbot, tmp_path):
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    panel._on_generate()
+    assert queue.submitted == [(panel, "sdxl_t2i")]
+    client.submit_job.assert_not_called()       # nothing reaches ComfyUI yet
+    assert panel._db.list_generations() == []    # and nothing is recorded yet
+    assert "queued" in panel._status_label.text().lower()
+    assert panel._generate_btn.isEnabled() is False
+
+
+def test_run_now_begins_the_prepared_job(qtbot, tmp_path):
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    panel._on_generate()
+    panel.run_now()
+    client.submit_job.assert_called_once()
+    rows = panel._db.list_generations()
+    assert len(rows) == 1 and rows[0]["status"] == "running"
+
+
+def test_completion_releases_queue_slot(qtbot, tmp_path):
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    panel._on_generate()
+    panel.run_now()
+    panel._on_completed("comfy-A", SDXL_HISTORY)
+    assert queue.released == [panel]
+
+
+def test_set_queue_status_shows_position_and_eta(panel):
+    panel.set_queue_status(2, 905.0)
+    text = panel._status_label.text()
+    assert "#2" in text and "15 min" in text

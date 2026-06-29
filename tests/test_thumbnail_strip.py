@@ -21,40 +21,37 @@ def _seed_db(tmp_path, n):
     return db
 
 
-def _widgets(strip):
-    return [strip._list.itemAt(i).widget() for i in range(strip._list.count())]
+def _ids(strip):
+    return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
 
 
-def test_refresh_builds_one_widget_per_generation_newest_first(qtbot, tmp_path):
-    db = _seed_db(tmp_path, 3)
-    strip = ThumbnailStrip(db)
+def test_strip_starts_empty(qtbot, tmp_path):
+    strip = ThumbnailStrip(_seed_db(tmp_path, 3))
     qtbot.addWidget(strip)
-    widgets = _widgets(strip)
+    assert _ids(strip) == []
+
+
+def test_show_generations_lists_given_ids_in_order(qtbot, tmp_path):
+    strip = ThumbnailStrip(_seed_db(tmp_path, 3))
+    qtbot.addWidget(strip)
+    strip.show_generations(["p2", "p0"])
+    widgets = [strip._list.itemAt(i).widget() for i in range(strip._list.count())]
     assert all(isinstance(w, ThumbnailWidget) for w in widgets)
-    assert [w.prompt_id for w in widgets] == ["p2", "p1", "p0"]
+    assert _ids(strip) == ["p2", "p0"]
+
+
+def test_show_generations_skips_unknown_ids(qtbot, tmp_path):
+    strip = ThumbnailStrip(_seed_db(tmp_path, 1))
+    qtbot.addWidget(strip)
+    strip.show_generations(["p0", "missing"])
+    assert _ids(strip) == ["p0"]
 
 
 def test_clicking_thumbnail_emits_activated_with_prompt_id(qtbot, tmp_path):
-    db = _seed_db(tmp_path, 2)
-    strip = ThumbnailStrip(db)
+    strip = ThumbnailStrip(_seed_db(tmp_path, 2))
     qtbot.addWidget(strip)
-    first = _widgets(strip)[0]
+    strip.show_generations(["p1", "p0"])
+    first = strip._list.itemAt(0).widget()
     with qtbot.waitSignal(strip.thumbnail_activated) as blocker:
         first.clicked.emit(first.prompt_id)
-    assert blocker.args == [first.prompt_id]
-
-
-def test_refresh_picks_up_new_generations(qtbot, tmp_path):
-    db = _seed_db(tmp_path, 1)
-    strip = ThumbnailStrip(db)
-    qtbot.addWidget(strip)
-    assert len(_widgets(strip)) == 1
-    db.insert_generation(
-        prompt_id="p-new",
-        workflow_name="sdxl_t2i",
-        workflow_version="v002",
-        params_json="{}",
-        workflow_json="{}",
-    )
-    strip.refresh()
-    assert [w.prompt_id for w in _widgets(strip)] == ["p-new", "p0"]
+    assert blocker.args == ["p1"]

@@ -33,6 +33,11 @@ def _insert(db, prompt_id, **over):
     db.insert_generation(**fields)
 
 
+def _strip_ids(view):
+    strip = view._strip
+    return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
+
+
 def test_starts_with_one_subtab(view):
     assert view._subtabs.count() == 1
 
@@ -57,11 +62,26 @@ def test_close_subtab_removes_and_tears_down_when_multiple(view):
     assert view._subtabs.count() == 1
 
 
-def test_panel_completion_refreshes_strip(view):
+def test_active_panel_completion_refreshes_strip(view):
     panel = view._subtabs.currentWidget()
-    with patch.object(view._strip, "refresh", wraps=view._strip.refresh) as spy:
+    with patch.object(
+        view._strip, "show_generations", wraps=view._strip.show_generations
+    ) as spy:
         panel.generation_completed.emit("anything")
-    spy.assert_called_once()
+    spy.assert_called()
+
+
+def test_strip_shows_only_the_active_tabs_generations(view):
+    p1 = view._subtabs.widget(0)
+    p2 = view._add_subtab()
+    _insert(view._db, "a1")
+    _insert(view._db, "b1")
+    p1._generated_ids = ["a1"]
+    p2._generated_ids = ["b1"]
+    view._refresh_strip()  # p2 is active
+    assert _strip_ids(view) == ["b1"]
+    view._subtabs.setCurrentIndex(0)  # switching tabs swaps the strip
+    assert _strip_ids(view) == ["a1"]
 
 
 def test_open_config_adds_and_prefills_subtab(view):

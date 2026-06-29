@@ -307,3 +307,11 @@ def test_error_colors_the_bar_red(panel):
 def test_queue_status_colors_the_bar_grey(panel):
     panel.set_queue_status(1, 0)
     assert panel._progress.property("barState") == "queued"
+
+
+def test_completion_records_generated_id(panel):
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfy-A"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    panel._on_completed("comfy-A", SDXL_HISTORY)
+    assert panel.generated_ids() == ["p1"]

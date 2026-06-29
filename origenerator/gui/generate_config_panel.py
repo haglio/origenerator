@@ -48,6 +48,7 @@ class GenerateConfigPanel(QWidget):
         self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
+        self._generated_ids: list[str] = []           # generations this tab produced, newest first
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -312,6 +313,7 @@ class GenerateConfigPanel(QWidget):
             self._show_done("Done!")
         self._generate_btn.setEnabled(True)
         completed_id = self._client_prompt_id
+        self._generated_ids.insert(0, completed_id)  # this tab's own history, newest first
         self._reset_job()
         self.generation_completed.emit(completed_id)
         self._refresh_estimate()
@@ -334,6 +336,10 @@ class GenerateConfigPanel(QWidget):
         self._client_prompt_id = None
         self._comfy_prompt_id = None
         self._submitted_workflow = None
+
+    def generated_ids(self) -> list[str]:
+        """Prompt ids of the generations this tab has produced, newest first."""
+        return list(self._generated_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

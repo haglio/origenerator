@@ -6,11 +6,11 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
 class ThumbnailStrip(QWidget):
-    """A vertical, scrollable list of every generation's thumbnail.
+    """A vertical, scrollable list of thumbnails for a set of generations.
 
-    Lives beside the generate subtabs; clicking a thumbnail re-emits its
-    prompt_id via ``thumbnail_activated`` so the container can decide whether to
-    reuse the active subtab or open a new one.
+    Lives beside the generate subtabs and shows the active tab's own history;
+    clicking a thumbnail re-emits its prompt_id via ``thumbnail_activated`` so
+    the container can decide whether to reuse the active subtab or open a new one.
     """
 
     thumbnail_activated = pyqtSignal(str)  # prompt_id
@@ -30,16 +30,20 @@ class ThumbnailStrip(QWidget):
         self._scroll.setWidget(self._container)
         outer.addWidget(self._scroll)
 
-        self.refresh()
+        self.show_generations([])
 
-    def refresh(self):
+    def show_generations(self, prompt_ids: list[str]):
+        """Replace the strip with thumbnails for ``prompt_ids``, in that order."""
         while self._list.count():
             item = self._list.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        for row in self._db.list_generations():
+        for prompt_id in prompt_ids:
+            row = self._db.get_generation(prompt_id)
+            if not row:
+                continue
             tw = ThumbnailWidget(
-                row["prompt_id"],
+                prompt_id,
                 row.get("thumbnail_path"),
                 self._label_for(row),
             )

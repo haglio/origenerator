@@ -12,9 +12,9 @@ from origenerator.job_queue import JobQueue
 
 
 class GenerateView(QWidget):
-    """The Generate tab: closable per-configuration subtabs plus a live strip
-    of every past generation. Clicking a strip thumbnail opens (or reuses) a
-    subtab carrying that generation's settings."""
+    """The Generate tab: closable per-configuration subtabs, each beside a strip
+    of the generations that tab produced. Clicking a strip thumbnail opens (or
+    reuses) a subtab carrying that generation's settings."""
 
     def __init__(self, client: ComfyUIClient, db: Database, parent=None):
         super().__init__(parent)
@@ -29,6 +29,7 @@ class GenerateView(QWidget):
         self._subtabs.setMovable(True)
         self._subtabs.tabCloseRequested.connect(self._close_subtab)
         self._subtabs.tabBarDoubleClicked.connect(self._rename_subtab)
+        self._subtabs.currentChanged.connect(self._on_active_tab_changed)
         add_btn = QToolButton()
         add_btn.setText("+")
         add_btn.setToolTip("New configuration")
@@ -47,7 +48,7 @@ class GenerateView(QWidget):
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self._subtabs.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
-        panel.generation_completed.connect(self._on_panel_completed)
+        panel.generation_completed.connect(lambda pid, p=panel: self._on_panel_completed(p, pid))
         self._subtabs.setCurrentIndex(index)
         return panel
 
@@ -76,8 +77,17 @@ class GenerateView(QWidget):
             # Never leave the tab strip empty: closing the last config resets it.
             self._add_subtab()
 
-    def _on_panel_completed(self, _prompt_id: str):
-        self._strip.refresh()
+    def _on_active_tab_changed(self, _index: int):
+        self._refresh_strip()
+
+    def _refresh_strip(self):
+        """Show the active tab's own generations (newest first), or nothing."""
+        panel = self._subtabs.currentWidget()
+        self._strip.show_generations(panel.generated_ids() if panel is not None else [])
+
+    def _on_panel_completed(self, panel: GenerateConfigPanel, _prompt_id: str):
+        if panel is self._subtabs.currentWidget():
+            self._refresh_strip()
 
     def _on_strip_activated(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)

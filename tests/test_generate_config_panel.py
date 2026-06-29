@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
@@ -390,12 +391,17 @@ def test_queue_status_colors_the_bar_grey(panel):
     assert panel._progress.property("barState") == "queued"
 
 
-def test_completion_records_generated_id(panel):
-    panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfy-A"
-    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
-    panel._on_completed("comfy-A", SDXL_HISTORY)
-    assert panel.generated_ids() == ["p1"]
+def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel):
+    full = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
+    full["positive_prompt"] = "a cat"
+    panel.prefill("sdxl_t2i", full)
+    workflow, signature = panel.settings_key()
+    assert workflow == "sdxl_t2i"
+    # The same params at any seed share the signature; a different setting splits it.
+    assert signature == gallery.settings_signature(json.dumps({**full, "seed": 999}))
+    assert signature != gallery.settings_signature(json.dumps({**full, "steps": 7}))
+
+
 # ---- live preview ----
 
 def test_preview_frame_shown_only_for_own_job(panel):

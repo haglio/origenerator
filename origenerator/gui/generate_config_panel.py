@@ -317,6 +317,14 @@ class GenerateConfigPanel(QWidget):
         self._custom_title = name
         self._emit_title()
 
+    def custom_title(self) -> str | None:
+        """The user-set tab name, or ``None`` when the title is auto-derived.
+
+        Distinct from :meth:`title`, which always returns a displayable string;
+        this reports only an explicit rename, for session persistence.
+        """
+        return self._custom_title
+
     def prefill(self, workflow_name: str, params: dict):
         # Switch to the matching workflow if found
         for i in range(self._workflow_combo.count()):

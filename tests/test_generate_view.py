@@ -137,3 +137,78 @@ def test_closing_running_subtab_advances_the_queue(view):
     p2._on_generate()  # queued
     view._close_subtab(view._subtabs.indexOf(p1))
     assert p2._comfy_prompt_id == "comfy-1"           # p2 promoted and started
+
+
+# --- session capture / restore ---------------------------------------------
+
+def _config_tab(workflow_name, params=None, seed_is_random=True, title=None):
+    return {
+        "config": {"workflow_name": workflow_name,
+                   "params": params or {}, "seed_is_random": seed_is_random},
+        "title": title,
+    }
+
+
+def test_capture_state_lists_every_open_tab_and_current(view):
+    view.open_config("wan22_i2v", {"positive_prompt": "a fox"})  # now current
+    state = view.capture_state()
+    workflows = [tab["config"]["workflow_name"] for tab in state["tabs"]]
+    assert workflows == ["sdxl_t2i", "wan22_i2v"]
+    assert state["current"] == 1
+
+
+def test_restore_state_rebuilds_tabs_replacing_default(view):
+    state = {"tabs": [
+        _config_tab("wan22_i2v", {"positive_prompt": "a fox"}),
+        _config_tab("sdxl_t2i", {"seed": 99}, seed_is_random=False),
+    ], "current": 1}
+    view.restore_state(state)
+    assert view._subtabs.count() == 2  # the lone default tab was replaced
+    p0, p1 = view._subtabs.widget(0), view._subtabs.widget(1)
+    assert p0._workflow_combo.currentData() == "wan22_i2v"
+    assert p0._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert p1._workflow_combo.currentData() == "sdxl_t2i"
+    assert p1._param_form.get_values_static()["seed"] == 99
+    assert view._subtabs.currentIndex() == 1
+
+
+def test_restore_state_skips_unknown_workflows(view):
+    view.restore_state({"tabs": [
+        _config_tab("deleted_wf"), _config_tab("wan22_i2v"),
+    ]})
+    assert view._subtabs.count() == 1
+    assert view._subtabs.widget(0)._workflow_combo.currentData() == "wan22_i2v"
+
+
+def test_restore_state_keeps_default_when_nothing_restorable(view):
+    view.restore_state({})
+    view.restore_state({"tabs": [_config_tab("gone")]})
+    assert view._subtabs.count() == 1
+    assert view._subtabs.widget(0)._workflow_combo.currentData() == "sdxl_t2i"
+
+
+def test_restore_state_tolerates_malformed_blobs(view):
+    # A corrupt/cross-version state value must not brick startup.
+    view.restore_state("not a dict")
+    view.restore_state({"tabs": "not a list"})
+    view.restore_state({"tabs": ["not a dict", {"config": {"workflow_name": "wan22_i2v"}}]})
+    assert view._subtabs.count() == 1  # only the one valid entry survived
+    assert view._subtabs.widget(0)._workflow_combo.currentData() == "wan22_i2v"
+
+
+def test_capture_restore_round_trips_config_and_custom_title(view, qtbot):
+    view.open_config("wan22_i2v", {"positive_prompt": "a fox", "seed": 7})
+    view._subtabs.widget(1).set_custom_title("My Fox")
+    captured = view.capture_state()
+
+    fresh = GenerateView(view._client, view._db)
+    qtbot.addWidget(fresh)
+    fresh.restore_state(captured)
+
+    assert [fresh._subtabs.widget(i)._workflow_combo.currentData()
+            for i in range(fresh._subtabs.count())] == ["sdxl_t2i", "wan22_i2v"]
+    assert fresh._subtabs.widget(1)._param_form.get_values_static()["seed"] == 7
+    # A renamed tab comes back named, not reset to its auto gallery-folder label.
+    assert fresh._subtabs.widget(1).custom_title() == "My Fox"
+    assert fresh._subtabs.tabText(1) == "My Fox"
+    assert fresh._subtabs.currentIndex() == captured["current"]

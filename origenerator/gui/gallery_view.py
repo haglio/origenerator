@@ -36,6 +36,7 @@ class GalleryView(QWidget):
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
         self._fingerprint = None
+        self._pending_key: str | None = None  # a folder to open once the tree exists
         self._build_ui()
 
         self._poll_timer = QTimer(self)
@@ -120,7 +121,9 @@ class GalleryView(QWidget):
 
     def _rebuild(self, rows, meta):
         expanded = self._expanded_keys()
-        selected_key = self._selected_folder_key()
+        # A pending restore target stands in until the user makes a live choice.
+        selected_key = self._selected_folder_key() or self._pending_key
+        self._pending_key = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
         self._populate_tree(gallery.build_gallery_tree(rows, meta), expanded)
         self._clear_metadata()
@@ -264,6 +267,25 @@ class GalleryView(QWidget):
 
     def visible_folder_keys(self) -> list[str]:
         return list(self._visible_keys)
+
+    # --- session persistence ----------------------------------------------
+
+    def selected_folder(self) -> str | None:
+        """The key of the folder currently in view, for saving the session.
+
+        Falls back to a not-yet-applied restore target, so a saved folder
+        survives even a session where the Gallery tab was never opened.
+        """
+        return self._selected_folder_key() or self._pending_key
+
+    def select_folder(self, key: str | None):
+        """Open ``key`` on the next rebuild — used to restore the last session.
+
+        The tree is built lazily on first show, so this only records the target;
+        the next refresh/poll resolves it, falling back to the default folder
+        when the key no longer exists.
+        """
+        self._pending_key = key or None
 
     # --- rename & star -----------------------------------------------------
 

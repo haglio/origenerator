@@ -267,6 +267,52 @@ def test_gallery_creates_a_preview_widget(qtbot):
     assert isinstance(view._preview, PreviewWidget)
 
 
+def test_selected_folder_returns_current_folder_key(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)
+    assert view.selected_folder() == _key(workflow)
+
+
+def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    db = FakeDB(rows)
+    saved = GalleryView(db)
+    qtbot.addWidget(saved)
+    saved.refresh()
+    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(1)
+    saved._tree.setCurrentItem(dog_leaf)
+    saved_key = saved.selected_folder()
+    chosen = set(saved.visible_prompt_ids())
+
+    # A brand-new view told to restore that key lands on the same folder.
+    restored = GalleryView(db)
+    qtbot.addWidget(restored)
+    restored.select_folder(saved_key)
+    restored.refresh()
+    assert restored.selected_folder() == saved_key
+    assert set(restored.visible_prompt_ids()) == chosen
+
+
+def test_select_folder_falls_back_to_default_when_key_gone(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_folder("video/ghost")  # nothing in the tree matches
+    view.refresh()
+    assert view.selected_folder() is not None  # default folder, not a crash
+
+
+def test_selected_folder_reports_pending_target_before_first_show(qtbot):
+    # The window restores a folder, but the user never opens the Gallery tab;
+    # selected_folder must still report it so closeEvent can persist it again.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_folder("image/sdxl_t2i")
+    assert view.selected_folder() == "image/sdxl_t2i"
+
+
 def _make_db(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

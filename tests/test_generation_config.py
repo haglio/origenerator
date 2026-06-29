@@ -4,6 +4,7 @@ from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
     merge_denormalized,
+    randomize_seeds,
 )
 
 
@@ -92,3 +93,28 @@ def test_snapshot_from_dict_tolerates_partial_and_corrupt_data():
     assert ConfigSnapshot.from_dict({}) == _snapshot(workflow="", params={})
     # A non-dict params payload degrades to empty rather than exploding.
     assert ConfigSnapshot.from_dict({"params": [1, 2]}).params == {}
+
+
+def test_randomize_seeds_replaces_only_named_keys():
+    params = {"seed": 7, "noise_seed": 8, "steps": 20, "positive_prompt": "a cat"}
+    out = randomize_seeds(params, ["seed", "noise_seed"])
+    assert out["steps"] == 20
+    assert out["positive_prompt"] == "a cat"
+    assert out["seed"] != 7
+    assert out["noise_seed"] != 8
+    assert 0 <= out["seed"] <= (1 << 63) - 1
+    assert 0 <= out["noise_seed"] <= (1 << 63) - 1
+
+
+def test_randomize_seeds_does_not_mutate_input():
+    params = {"seed": 7, "steps": 20}
+    out = randomize_seeds(params, ["seed"])
+    assert params["seed"] == 7  # original untouched
+    assert out is not params
+
+
+def test_randomize_seeds_sets_missing_seed_keys():
+    # A workflow's seed key absent from a sparse row is still given a value so
+    # the rebuilt payload has a seed to use.
+    out = randomize_seeds({"steps": 20}, ["seed"])
+    assert "seed" in out and isinstance(out["seed"], int)

@@ -5,9 +5,12 @@ the gallery (reuse) and the generate view (subtab prefill + strip-click compare)
 """
 
 import json
+import random
 from dataclasses import dataclass
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
+
+_SEED_MAX = (1 << 63) - 1
 
 
 @dataclass
@@ -96,3 +99,16 @@ def merge_denormalized(row: dict) -> dict:
         if val is not None and key not in params:
             params[key] = val
     return params
+
+
+def randomize_seeds(params: dict, seed_keys) -> dict:
+    """Return a copy of ``params`` with every key in ``seed_keys`` re-rolled.
+
+    Used to re-run a generation as a fresh variation: same settings, new seed.
+    Each named key is set (even if absent) so the rebuilt payload always has a
+    seed to use; a workflow with two seeds (e.g. dual-noise video) re-rolls both.
+    """
+    out = dict(params)
+    for key in seed_keys:
+        out[key] = random.randint(0, _SEED_MAX)
+    return out

@@ -8,6 +8,7 @@ dependency so it can be unit-tested directly.
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from origenerator.media import media_type_from_filename
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -72,6 +73,31 @@ def media_type_of_row(row: dict) -> str:
         if inferred:
             return inferred
     return "image"
+
+
+def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
+    """Locate the file to preview for ``row`` and how to render it.
+
+    Prefers the full-resolution output under ``output_dir`` (so videos play and
+    images show at full quality), classifying it by extension. Falls back to the
+    stored thumbnail — always a still image — when the output is missing. Returns
+    ``None`` when nothing displayable can be found.
+    """
+    for f in row_output_files(row):
+        filename = f.get("filename")
+        if not filename:
+            continue
+        full = output_dir / f.get("subfolder", "") / filename
+        rendered_as = media_type_from_filename(filename)
+        if rendered_as is not None and full.exists():
+            return full, rendered_as
+        break
+
+    thumb = row.get("thumbnail_path")
+    if thumb and Path(thumb).exists():
+        return Path(thumb), "image"
+
+    return None
 
 
 def _basename(path: str) -> str:

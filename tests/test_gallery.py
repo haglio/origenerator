@@ -4,6 +4,7 @@ from origenerator.gallery import (
     build_gallery_tree,
     find_source_image_id,
     media_type_of_row,
+    resolve_preview,
     settings_signature,
 )
 
@@ -140,3 +141,49 @@ def test_settings_group_label_omits_params_when_only_one_group():
                                _img("i2", "a cat", 50, 2)])
     (only,) = tree[0].workflow_groups[0].settings_groups
     assert only.label == "a cat"
+
+
+def test_resolve_preview_returns_full_image_file(tmp_path):
+    out = tmp_path / "output"
+    (out / "image").mkdir(parents=True)
+    full = out / "image" / "sdxl_t2i_1_.png"
+    full.write_bytes(b"x")
+    row = _row(output_files=json.dumps([{"filename": "sdxl_t2i_1_.png",
+                                         "subfolder": "image"}]))
+    assert resolve_preview(row, out) == (full, "image")
+
+
+def test_resolve_preview_returns_full_video_file(tmp_path):
+    out = tmp_path / "output"
+    (out / "video").mkdir(parents=True)
+    full = out / "video" / "wan22_i2v_1_.mp4"
+    full.write_bytes(b"x")
+    row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
+                                         "subfolder": "video"}]))
+    assert resolve_preview(row, out) == (full, "video")
+
+
+def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
+    out = tmp_path / "output"
+    out.mkdir()
+    thumb = tmp_path / "thumb.jpg"
+    thumb.write_bytes(b"x")
+    # Output references a video that is not on disk; the thumbnail still previews.
+    row = _row(output_files=json.dumps([{"filename": "gone_1_.mp4", "subfolder": "video"}]),
+               thumbnail_path=str(thumb))
+    assert resolve_preview(row, out) == (thumb, "image")
+
+
+def test_resolve_preview_returns_none_when_nothing_exists(tmp_path):
+    out = tmp_path / "output"
+    out.mkdir()
+    row = _row(output_files=json.dumps([{"filename": "gone.png"}]),
+               thumbnail_path=str(tmp_path / "missing.jpg"))
+    assert resolve_preview(row, out) is None
+
+
+def test_resolve_preview_handles_missing_output_files(tmp_path):
+    thumb = tmp_path / "thumb.jpg"
+    thumb.write_bytes(b"x")
+    row = _row(output_files=None, thumbnail_path=str(thumb))
+    assert resolve_preview(row, tmp_path) == (thumb, "image")

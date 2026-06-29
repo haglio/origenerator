@@ -123,8 +123,8 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     workflow = _top_level(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     # The title carries the full breadcrumb, which the narrow tree truncates.
-    assert "SDXL Text-to-Image" in view._title.text()
-    assert "Images" in view._title.text()
+    assert "SDXL Text-to-Image" in view._title.display_text()
+    assert "Images" in view._title.display_text()
 
 
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
@@ -207,6 +207,67 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
                 "wan22_i2v_00001_.mp4"))
     view._poll()
     assert set(_top_level(view._tree)) == {"Images", "Videos"}
+
+
+def test_folders_start_collapsed(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    top = view._tree.topLevelItem(0)
+    assert top.isExpanded() is False
+    assert top.child(0).isExpanded() is False
+
+
+def test_selecting_a_folder_auto_selects_its_first_item(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    # Selecting a branch folder immediately previews its first item...
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)
+    assert view._selected["prompt_id"] == "i1"
+
+    # ...and so does selecting a leaf folder.
+    view._tree.setCurrentItem(workflow.child(0))
+    assert view._selected["prompt_id"] == "i1"
+
+
+def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    workflow = _top_level(view._tree)["Images"].child(0)
+    key = _key(workflow)
+
+    view._begin_inline_rename(workflow, 0)   # double-click opens the editor
+    workflow.setText(0, "Models")            # committing fires itemChanged
+
+    assert db.folder_meta_map()[key]["custom_name"] == "Models"
+    view.refresh()
+    assert _top_level(view._tree)["Images"].child(0).text(0) == "Models"
+
+
+def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)
+    key = _key(workflow)
+
+    view._title.edit_requested.emit()  # double-clicking the header starts editing
+    assert view._title._edit.text() == "SDXL Text-to-Image"  # prefilled with the name
+    view._title.edited.emit("Favorites")  # commit
+
+    assert db.folder_meta_map()[key]["custom_name"] == "Favorites"
+    assert _top_level(view._tree)["Images"].child(0).text(0) == "Favorites"
 
 
 def test_i2v_thumbnail_links_to_source_image_and_navigates(qtbot):
@@ -406,16 +467,19 @@ def test_folder_without_timed_items_shows_no_average(qtbot):
     assert view._avg_label.text() == ""
 
 
-def test_resetting_selection_clears_a_stale_estimate(qtbot):
+def test_emptying_the_gallery_clears_a_stale_estimate(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
     rows[0]["duration_seconds"] = 6.0
-    view = GalleryView(FakeDB(rows))
+    db = FakeDB(rows)
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("i1")
     assert view._estimate_label.text()  # estimate is showing
 
-    view.refresh()  # nothing selected afterwards
+    db._rows.clear()
+    db._by_id.clear()
+    view.refresh()  # no folders, so nothing to preview
     assert view._estimate_label.text() == ""
 
 

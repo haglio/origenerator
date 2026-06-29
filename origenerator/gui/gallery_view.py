@@ -4,7 +4,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
     QScrollArea, QPlainTextEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QMenu, QInputDialog,
+    QMenu, QInputDialog, QAbstractItemView,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 
@@ -12,6 +12,7 @@ from origenerator import gallery, timing
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
 from origenerator.generation_config import merge_denormalized
+from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.rerun_dialog import ReRunDialog
@@ -21,6 +22,7 @@ _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represen
 _GRID_COLUMNS = 4
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
+_STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 
 
 class GalleryView(QWidget):
@@ -39,6 +41,7 @@ class GalleryView(QWidget):
         self._visible_keys: list[str] = []
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
+        self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
 
         self._poll_timer = QTimer(self)
@@ -50,19 +53,25 @@ class GalleryView(QWidget):
         layout = QHBoxLayout(self)
         layout.setSpacing(8)
 
-        # Far left: folder tree (media -> workflow -> settings)
+        # Far left: folder tree (media -> workflow -> settings). Folders start
+        # collapsed and only expand on the disclosure arrow; double-click renames.
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
+        self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._tree.setExpandsOnDoubleClick(False)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
+        self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
+        self._tree.itemChanged.connect(self._commit_inline_rename)
         layout.addWidget(self._tree, 2)
 
-        # Middle: folder title over the contents (folder tiles or thumbnails)
+        # Middle: folder title over the contents (folder tiles or thumbnails).
+        # Double-clicking the title renames the selected folder in place.
         middle = QVBoxLayout()
-        self._title = QLabel("")
-        self._title.setWordWrap(True)
-        self._title.setStyleSheet("font-size: 15px; font-weight: 600; padding: 2px;")
+        self._title = EditableHeader()
+        self._title.edit_requested.connect(self._begin_title_rename)
+        self._title.edited.connect(self._commit_title_rename)
         middle.addWidget(self._title)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
@@ -145,7 +154,8 @@ class GalleryView(QWidget):
         if target is not None:
             self._tree.setCurrentItem(target)
         else:
-            self._title.setText("")
+            self._title.set_display("")
+            self._avg_label.setText("")
             self._show_widget(QWidget())
 
     # --- folder tree -------------------------------------------------------
@@ -157,16 +167,17 @@ class GalleryView(QWidget):
         self._leaf_by_id = {}
         for media in tree_model:
             self._add_node(media, self._tree.invisibleRootItem())
+        # Folders default to collapsed; only restore folders the user had open.
+        for key in expanded_keys:
+            item = self._item_by_key.get(key)
+            if item is not None:
+                item.setExpanded(True)
         self._tree.blockSignals(False)
-        if expanded_keys:
-            for key, item in self._item_by_key.items():
-                item.setExpanded(key in expanded_keys)
-        else:
-            self._tree.expandAll()
 
     def _add_node(self, group, parent_item) -> QTreeWidgetItem:
-        prefix = "★ " if group.starred else ""
+        prefix = _STAR_PREFIX if group.starred else ""
         item = QTreeWidgetItem([prefix + group.label])
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, _GROUP_ROLE, group)
         item.setToolTip(0, group.label)
         self._item_by_key[group.key] = item
@@ -196,19 +207,26 @@ class GalleryView(QWidget):
 
     def _on_folder_selected(self, current, _previous):
         if current is None:
-            self._title.setText("")
+            self._title.set_display("")
             self._avg_label.setText("")
             self._show_widget(QWidget())
             self._visible_ids = []
             self._visible_keys = []
             return
         group = current.data(0, _GROUP_ROLE)
-        self._title.setText(self._breadcrumb(current))
+        self._title.set_display(self._breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
             self._show_thumbnails(group.rows)
         else:
             self._show_folder_tiles(gallery.child_groups(group))
+        self._select_first_item(group)
+
+    def _select_first_item(self, group):
+        """Immediately preview the first generation under the chosen folder."""
+        rows = gallery.rows_under(group)
+        if rows:
+            self._on_thumbnail_clicked(rows[0]["prompt_id"])
 
     def _update_folder_average(self, group):
         """Show the mean generation time across every item beneath this folder."""
@@ -348,6 +366,39 @@ class GalleryView(QWidget):
     def _apply_rename(self, key: str, name: str):
         self._db.rename_folder(key, name.strip() or None)
         self.refresh()
+
+    def _begin_inline_rename(self, item, _column):
+        """Double-clicking a tree folder edits its name in place."""
+        group = item.data(0, _GROUP_ROLE)
+        if group is None:
+            return
+        self._editing_key = group.key
+        self._tree.editItem(item, 0)
+
+    def _commit_inline_rename(self, item, _column):
+        if self._editing_key is None:
+            return
+        key = self._editing_key
+        self._editing_key = None
+        name = item.text(0)
+        if name.startswith(_STAR_PREFIX):
+            name = name[len(_STAR_PREFIX):]
+        self._db.rename_folder(key, name.strip() or None)
+        # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
+        QTimer.singleShot(0, self.refresh)
+
+    def _begin_title_rename(self):
+        """Double-clicking the title bar edits the selected folder's name."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item is not None else None
+        if group is not None:
+            self._title.begin_edit(group.label)
+
+    def _commit_title_rename(self, name: str):
+        key = self._selected_folder_key()
+        if key is not None:
+            self._db.rename_folder(key, name.strip() or None)
+            self.refresh()
 
     def _toggle_star(self, key: str):
         item = self._item_by_key.get(key)

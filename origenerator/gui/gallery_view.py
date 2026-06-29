@@ -41,6 +41,7 @@ class GalleryView(QWidget):
         self._visible_keys: list[str] = []
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
+        self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
 
@@ -152,19 +153,27 @@ class GalleryView(QWidget):
 
     def _rebuild(self, rows, meta):
         expanded = self._expanded_keys()
-        # A pending restore target stands in until the user makes a live choice.
+        # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._selected_folder_key() or self._pending_key
+        selected_gen = self.selected_generation()
         self._pending_key = None
+        self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
         self._populate_tree(gallery.build_gallery_tree(rows, meta), expanded)
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._default_item()
         if target is not None:
-            self._tree.setCurrentItem(target)
+            self._tree.setCurrentItem(target)  # shows the folder's thumbnails
+            self._reselect_generation(selected_gen)
         else:
             self._title.set_display("")
             self._avg_label.setText("")
             self._show_widget(QWidget())
+
+    def _reselect_generation(self, prompt_id: str | None):
+        """Re-highlight a generation after a rebuild, if it's still on screen."""
+        if prompt_id and prompt_id in self._visible_ids:
+            self._on_thumbnail_clicked(prompt_id)
 
     # --- folder tree -------------------------------------------------------
 
@@ -347,6 +356,24 @@ class GalleryView(QWidget):
         when the key no longer exists.
         """
         self._pending_key = key or None
+
+    def selected_generation(self) -> str | None:
+        """The prompt_id of the highlighted generation, for saving the session.
+
+        Falls back to a not-yet-applied restore target, mirroring
+        :meth:`selected_folder`, so it survives a session that never showed it.
+        """
+        if self._selected:
+            return self._selected.get("prompt_id")
+        return self._pending_selection
+
+    def select_generation(self, prompt_id: str | None):
+        """Re-highlight ``prompt_id`` once its folder's thumbnails are shown.
+
+        Resolved by the next rebuild (after :meth:`select_folder` reopens the
+        folder), and quietly dropped if that generation is no longer present.
+        """
+        self._pending_selection = prompt_id or None
 
     # --- rename & star -----------------------------------------------------
 

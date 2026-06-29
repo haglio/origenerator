@@ -404,6 +404,68 @@ def test_selected_folder_reports_pending_target_before_first_show(qtbot):
     assert view.selected_folder() == "image/sdxl_t2i"
 
 
+def test_selected_generation_tracks_thumbnail_click(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # folder holding i1 and i2
+    view._on_thumbnail_clicked("i2")
+    assert view.selected_generation() == "i2"
+
+
+def test_select_generation_restored_with_folder_after_refresh(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    probe = GalleryView(db)
+    qtbot.addWidget(probe)
+    probe.refresh()
+    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    folder_key = probe.selected_folder()
+
+    # A fresh view restoring that folder + selection lands on the same image.
+    fresh = GalleryView(db)
+    qtbot.addWidget(fresh)
+    fresh.select_folder(folder_key)
+    fresh.select_generation("i2")
+    fresh.refresh()
+    assert fresh.selected_generation() == "i2"
+    assert fresh._selected["prompt_id"] == "i2"
+
+
+def test_selected_generation_survives_a_rebuild(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._on_thumbnail_clicked("i2")
+
+    db.add(_image("i3", "a dog", 50, 9))  # new generation → a poll rebuild
+    view._poll()
+
+    assert view.selected_generation() == "i2"  # not cleared by the rebuild
+    assert view._selected["prompt_id"] == "i2"
+
+
+def test_selected_generation_reports_pending_before_show(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_generation("i1")
+    assert view.selected_generation() == "i1"
+
+
+def test_select_generation_missing_id_is_dropped(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_generation("ghost")  # no such generation
+    view.refresh()
+    # Quietly dropped (not restored) without crashing; the view falls back to
+    # the folder's own default selection rather than the stale id.
+    assert view.selected_generation() != "ghost"
+
+
 def _make_db(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

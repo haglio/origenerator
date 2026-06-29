@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS generations (
     output_files    TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
+    duration_seconds REAL,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     completed_at    TEXT
 );
@@ -36,6 +37,18 @@ class Database:
     def _init_schema(self):
         with sqlite3.connect(self.path) as conn:
             conn.executescript(_SCHEMA)
+            self._migrate(conn)
+
+    def _migrate(self, conn):
+        """Bring an older database up to the current schema.
+
+        ``CREATE TABLE IF NOT EXISTS`` leaves a pre-existing table untouched, so
+        columns added after a user's table was first created must be patched in
+        here. Each step is guarded to stay idempotent.
+        """
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(generations)")}
+        if "duration_seconds" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
 
     def _connect(self):
         conn = sqlite3.connect(self.path)
@@ -70,7 +83,7 @@ class Database:
     def update_generation(self, prompt_id: str, **fields):
         allowed = {
             "status", "output_files", "thumbnail_path",
-            "error_message", "completed_at",
+            "error_message", "completed_at", "duration_seconds",
         }
         to_set = {k: v for k, v in fields.items() if k in allowed}
         if not to_set:
@@ -94,6 +107,24 @@ class Database:
                 "UPDATE generations SET workflow_name = ? WHERE prompt_id = ?",
                 (workflow_name, prompt_id),
             )
+
+    def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
+        """Most-recent measured generation times for a workflow, newest first.
+
+        Only completed rows with a recorded ``duration_seconds`` count, so the
+        result feeds duration estimates directly.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT duration_seconds FROM generations
+                   WHERE workflow_name = ?
+                     AND status = 'completed'
+                     AND duration_seconds IS NOT NULL
+                   ORDER BY id DESC
+                   LIMIT ?""",
+                (workflow_name, limit),
+            ).fetchall()
+            return [r[0] for r in rows]
 
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:

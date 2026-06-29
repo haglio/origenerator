@@ -1,4 +1,5 @@
 import json
+import struct
 import urllib.error
 from unittest.mock import patch, MagicMock
 
@@ -71,6 +72,71 @@ def test_parse_ws_executing_none_signals_completion():
     }))
 
     assert messages == [("exec", "p1", "5"), ("finished", "p1")]
+
+
+def test_executing_message_tracks_then_clears_current_prompt():
+    # Preview frames arrive without a prompt_id, so the client tags them with
+    # whichever prompt is currently executing.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client._executing_prompt_id = None
+    client._on_job_finished = lambda pid: None
+    client._on_node_executing = lambda pid, nid: None
+
+    client._handle_ws_message(json.dumps({
+        "type": "executing", "data": {"node": "5", "prompt_id": "p1"},
+    }))
+    assert client._executing_prompt_id == "p1"
+
+    client._handle_ws_message(json.dumps({
+        "type": "executing", "data": {"node": None, "prompt_id": "p1"},
+    }))
+    assert client._executing_prompt_id is None
+
+
+def test_binary_preview_emits_image_tagged_with_current_prompt(qtbot):
+    client = ComfyUIClient()
+    client._executing_prompt_id = "p1"
+    received = []
+    client.preview_image.connect(lambda pid, data: received.append((pid, data)))
+
+    # ComfyUI frames: 4-byte event type (1 = preview), 4-byte image format, image.
+    msg = struct.pack(">I", 1) + struct.pack(">I", 2) + b"PNG-BYTES"
+    client._handle_ws_binary(msg)
+
+    assert received == [("p1", b"PNG-BYTES")]
+
+
+def test_binary_non_preview_event_is_ignored(qtbot):
+    client = ComfyUIClient()
+    client._executing_prompt_id = "p1"
+    received = []
+    client.preview_image.connect(lambda pid, data: received.append((pid, data)))
+
+    client._handle_ws_binary(struct.pack(">I", 3) + b"not-an-image")
+
+    assert received == []
+
+
+def test_interrupt_posts_to_interrupt_endpoint():
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
+        client.interrupt()
+    req = m.call_args[0][0]
+    assert req.full_url == "http://127.0.0.1:8188/interrupt"
+    assert req.data == b""  # a body forces a POST
+
+
+def test_cancel_prompt_deletes_from_queue():
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
+        client.cancel_prompt("comfy-X")
+    req = m.call_args[0][0]
+    assert req.full_url == "http://127.0.0.1:8188/queue"
+    assert json.loads(req.data) == {"delete": ["comfy-X"]}
 
 
 def test_comfyui_responding_true_for_comfyui_system_stats():

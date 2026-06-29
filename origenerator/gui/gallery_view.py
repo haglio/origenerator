@@ -1,14 +1,17 @@
 import json
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPlainTextEdit, QPushButton,
+    QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
+    QScrollArea, QPlainTextEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from origenerator.config import THUMB_DIR
+from origenerator import gallery
 from origenerator.db import Database
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+
+_ROWS_ROLE = Qt.ItemDataRole.UserRole  # rows represented by a folder node
+_GRID_COLUMNS = 4
 
 
 class GalleryView(QWidget):
@@ -18,30 +21,45 @@ class GalleryView(QWidget):
         super().__init__(parent)
         self._db = db
         self._selected: dict | None = None
+        self._image_rows: list[dict] = []
+        self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
+        self._source_image_id: str | None = None
+        self._visible_ids: list[str] = []
         self._build_ui()
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
         layout.setSpacing(8)
 
-        # Left: thumbnail grid in scroll area
+        # Far left: folder tree (media -> workflow -> settings)
         left = QVBoxLayout()
         self._refresh_btn = QPushButton("Refresh")
         self._refresh_btn.clicked.connect(self.refresh)
         left.addWidget(self._refresh_btn)
+        self._tree = QTreeWidget()
+        self._tree.setHeaderHidden(True)
+        self._tree.currentItemChanged.connect(self._on_folder_selected)
+        left.addWidget(self._tree, 1)
+        layout.addLayout(left, 2)
+
+        # Middle: thumbnail grid for the selected folder
         self._grid_scroll = QScrollArea()
         self._grid_scroll.setWidgetResizable(True)
-        self._grid_container = QWidget()
-        self._grid_layout = _FlowLayout(self._grid_container)
-        self._grid_scroll.setWidget(self._grid_container)
-        left.addWidget(self._grid_scroll, 1)
-        layout.addLayout(left, 2)
+        self._show_rows([])
+        layout.addWidget(self._grid_scroll, 5)
 
         # Right: metadata sidebar
         right = QVBoxLayout()
         self._meta_title = QLabel("Select a generation")
         self._meta_title.setWordWrap(True)
         right.addWidget(self._meta_title)
+        self._source_link = QLabel()
+        self._source_link.setWordWrap(True)
+        self._source_link.setTextFormat(Qt.TextFormat.RichText)
+        self._source_link.setOpenExternalLinks(False)
+        self._source_link.linkActivated.connect(self._on_source_link)
+        self._source_link.hide()
+        right.addWidget(self._source_link)
         self._meta_text = QPlainTextEdit()
         self._meta_text.setReadOnly(True)
         right.addWidget(self._meta_text, 1)
@@ -49,28 +67,85 @@ class GalleryView(QWidget):
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
         right.addWidget(self._reuse_btn)
-        layout.addLayout(right, 1)
+        layout.addLayout(right, 3)
 
     def showEvent(self, event):
         super().showEvent(event)
         self.refresh()
 
     def refresh(self):
-        # Clear existing thumbnails
-        while self._grid_layout.count():
-            item = self._grid_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
         rows = self._db.list_generations()
-        for row in rows:
-            thumb_path = row.get("thumbnail_path")
-            wf_name = row.get("workflow_name", "?")
-            prompt_preview = (row.get("positive_prompt") or "")[:40]
-            label = f"{wf_name}\n{prompt_preview}"
-            tw = ThumbnailWidget(row["prompt_id"], thumb_path, label)
+        self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
+        self._populate_tree(gallery.build_gallery_tree(rows))
+        self._clear_metadata()
+        first_leaf = self._first_leaf()
+        if first_leaf is not None:
+            self._tree.setCurrentItem(first_leaf)
+        else:
+            self._show_rows([])
+
+    # --- folder tree -------------------------------------------------------
+
+    def _populate_tree(self, tree_model: list[gallery.MediaGroup]):
+        self._tree.clear()
+        self._leaf_by_id = {}
+        for media in tree_model:
+            media_rows = _flatten(media)
+            media_item = self._make_node(media.label, media_rows)
+            for wf in media.workflow_groups:
+                wf_rows = [r for sg in wf.settings_groups for r in sg.rows]
+                wf_item = self._make_node(wf.label, wf_rows)
+                for sg in wf.settings_groups:
+                    sg_item = self._make_node(sg.label, sg.rows)
+                    for row in sg.rows:
+                        self._leaf_by_id[row["prompt_id"]] = sg_item
+                    wf_item.addChild(sg_item)
+                media_item.addChild(wf_item)
+            self._tree.addTopLevelItem(media_item)
+        self._tree.expandAll()
+
+    @staticmethod
+    def _make_node(label: str, rows: list[dict]) -> QTreeWidgetItem:
+        item = QTreeWidgetItem([label])
+        item.setData(0, _ROWS_ROLE, rows)
+        item.setToolTip(0, f"{len(rows)} item{'s' if len(rows) != 1 else ''}")
+        return item
+
+    def _first_leaf(self) -> QTreeWidgetItem | None:
+        for i in range(self._tree.topLevelItemCount()):
+            media = self._tree.topLevelItem(i)
+            for j in range(media.childCount()):
+                wf = media.child(j)
+                if wf.childCount():
+                    return wf.child(0)
+        return None
+
+    def _on_folder_selected(self, current, _previous):
+        rows = current.data(0, _ROWS_ROLE) if current is not None else None
+        self._show_rows(rows or [])
+
+    # --- thumbnail grid ----------------------------------------------------
+
+    def _show_rows(self, rows: list[dict]):
+        container = QWidget()
+        grid = QGridLayout(container)
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._visible_ids = []
+        for idx, row in enumerate(rows):
+            seed = row.get("seed")
+            label = f"seed {seed}" if seed is not None else (
+                (row.get("positive_prompt") or "")[:40] or "(no prompt)"
+            )
+            tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._on_thumbnail_clicked)
-            self._grid_layout.addWidget(tw)
+            grid.addWidget(tw, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
+            self._visible_ids.append(row["prompt_id"])
+        self._grid_scroll.setWidget(container)  # replaces & deletes the old grid
+
+    def visible_prompt_ids(self) -> list[str]:
+        return list(self._visible_ids)
+
+    # --- metadata sidebar --------------------------------------------------
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)
@@ -81,6 +156,7 @@ class GalleryView(QWidget):
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
         )
+        self._update_source_link(row)
         lines = []
         lines.append(f"Status: {row['status']}")
         lines.append(f"Source: {row.get('source', 'generated')}")
@@ -114,41 +190,61 @@ class GalleryView(QWidget):
                 lines.append(out)
         self._meta_text.setPlainText("\n".join(lines))
 
+    def _update_source_link(self, row: dict):
+        self._source_image_id = gallery.find_source_image_id(row, self._image_rows)
+        if not self._source_image_id:
+            self._source_link.hide()
+            self._source_link.clear()
+            return
+        src = self._db.get_generation(self._source_image_id)
+        files = gallery.row_output_files(src) if src else []
+        name = files[0]["filename"] if files else "source image"
+        self._source_link.setText(
+            f'Input image: <a href="{self._source_image_id}">{name}</a>'
+        )
+        self._source_link.show()
+
+    def current_source_image_id(self) -> str | None:
+        return self._source_image_id
+
+    def _on_source_link(self, prompt_id: str):
+        leaf = self._leaf_by_id.get(prompt_id)
+        if leaf is not None:
+            self._tree.setCurrentItem(leaf)  # repopulates the grid
+        self._on_thumbnail_clicked(prompt_id)
+
+    def _clear_metadata(self):
+        self._selected = None
+        self._reuse_btn.setEnabled(False)
+        self._meta_title.setText("Select a generation")
+        self._meta_text.clear()
+        self._source_link.hide()
+        self._source_link.clear()
+        self._source_image_id = None
+
     def _on_reuse(self):
         if not self._selected:
             return
         params_json = self._selected.get("params_json")
-        if params_json:
-            try:
-                params = json.loads(params_json)
-            except json.JSONDecodeError:
-                return
-            # Merge denormalized columns into params
-            for key in ("positive_prompt", "negative_prompt", "seed"):
-                val = self._selected.get(key)
-                if val is not None and key not in params:
-                    params[key] = val
-            workflow_name = self._selected.get("workflow_name", "")
-            self.reuse_requested.emit(workflow_name, params)
+        if not params_json:
+            return
+        try:
+            params = json.loads(params_json)
+        except json.JSONDecodeError:
+            return
+        # Merge denormalized columns into params
+        for key in ("positive_prompt", "negative_prompt", "seed"):
+            val = self._selected.get(key)
+            if val is not None and key not in params:
+                params[key] = val
+        workflow_name = self._selected.get("workflow_name", "")
+        self.reuse_requested.emit(workflow_name, params)
 
 
-class _FlowLayout(QVBoxLayout):
-    """Simple vertical layout used as placeholder; a proper flow layout
-    can be added later for wrapping thumbnails in a grid."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._rows: list[QHBoxLayout] = []
-        self._current_row: QHBoxLayout | None = None
-        self._count_in_row = 0
-        self._cols = 4
-
-    def addWidget(self, widget, *args, **kwargs):
-        if self._current_row is None or self._count_in_row >= self._cols:
-            self._current_row = QHBoxLayout()
-            self._current_row.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            self._rows.append(self._current_row)
-            super().addLayout(self._current_row)
-            self._count_in_row = 0
-        self._current_row.addWidget(widget, *args, **kwargs)
-        self._count_in_row += 1
+def _flatten(media: gallery.MediaGroup) -> list[dict]:
+    return [
+        row
+        for wf in media.workflow_groups
+        for sg in wf.settings_groups
+        for row in sg.rows
+    ]

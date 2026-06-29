@@ -94,6 +94,7 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):

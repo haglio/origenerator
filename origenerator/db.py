@@ -148,6 +148,12 @@ class Database:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def delete_generation(self, prompt_id: str):
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM generations WHERE prompt_id = ?", (prompt_id,)
+            )
+
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(

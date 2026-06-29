@@ -110,13 +110,26 @@ def main():
     db = Database(DB_PATH)
 
     status("Scanning for new images...")
-    from origenerator.importer import backfill_unknown_workflows, import_comfyui_output
+    from origenerator.importer import (
+        backfill_unknown_workflows,
+        import_comfyui_output,
+        merge_video_sidecar_rows,
+    )
     try:
         count = import_comfyui_output(COMFYUI_OUTPUT_DIR, db, THUMB_DIR)
         if count:
             logger.info("Imported %d existing files from ComfyUI output", count)
     except Exception as e:
         logger.warning("Import failed: %s", e)
+
+    status("Tidying up video previews...")
+    # Fold each video's metadata-PNG sidecar into one playable gallery entry.
+    try:
+        consolidated = merge_video_sidecar_rows(db)
+        if consolidated:
+            logger.info("Consolidated %d video sidecar previews", consolidated)
+    except Exception as e:
+        logger.warning("Sidecar consolidation failed: %s", e)
 
     status("Updating workflow labels...")
     # Relabel any imports that predate filename-based workflow inference.

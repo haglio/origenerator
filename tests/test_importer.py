@@ -4,7 +4,11 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
-from origenerator.importer import backfill_unknown_workflows, import_comfyui_output
+from origenerator.importer import (
+    backfill_unknown_workflows,
+    import_comfyui_output,
+    merge_video_sidecar_rows,
+)
 
 
 def _make_png_with_metadata(path, prompt_data):
@@ -156,3 +160,88 @@ def test_import_skips_already_imported(tmp_path):
     db = Database(tmp_path / "test.db")
     assert import_comfyui_output(output_dir.parent, db, thumb_dir) == 1
     assert import_comfyui_output(output_dir.parent, db, thumb_dir) == 0
+
+
+def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
+    output_dir = tmp_path / "output" / "video"
+    output_dir.mkdir(parents=True)
+    thumb_dir = tmp_path / "thumbs"
+
+    # VHS_VideoCombine writes a metadata PNG beside the MP4; the PNG carries the
+    # prompt/seed, the MP4 is the playable output. The Wan conditioning node
+    # links to the prompts, the way the embedded graph really does.
+    prompt_data = {
+        "9": {"class_type": "CLIPTextEncode", "inputs": {"text": "a dancing cat"}},
+        "10": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"}},
+        "12": {"class_type": "WanFirstLastFrameToVideo",
+               "inputs": {"positive": ["9", 0], "negative": ["10", 0]}},
+        "13": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 777, "add_noise": "enable"}},
+    }
+    _make_png_with_metadata(output_dir / "flf2v_loop_00001.png", prompt_data)
+    (output_dir / "flf2v_loop_00001.mp4").write_bytes(b"")
+
+    db = Database(tmp_path / "test.db")
+    count = import_comfyui_output(output_dir.parent, db, thumb_dir)
+
+    assert count == 1  # one entry, not one-per-file
+    rows = db.list_generations()
+    assert len(rows) == 1
+    row = rows[0]
+    files = json.loads(row["output_files"])
+    assert files[0]["filename"] == "flf2v_loop_00001.mp4"   # plays the video
+    assert row["positive_prompt"] == "a dancing cat"        # keeps the PNG metadata
+    assert row["seed"] == 777
+    assert row["workflow_name"] == "wan22_flf2v_loop"
+
+
+def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
+    output_dir = tmp_path / "output" / "video"
+    output_dir.mkdir(parents=True)
+    (output_dir / "wan22_i2v_00001_.mp4").write_bytes(b"")
+
+    db = Database(tmp_path / "test.db")
+    assert import_comfyui_output(output_dir.parent, db, tmp_path / "thumbs") == 1
+    files = json.loads(db.list_generations()[0]["output_files"])
+    assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
+
+
+def _completed(db, prompt_id, filename, subfolder, **fields):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name=fields.get("workflow_name", "wan22_flf2v_loop"),
+        workflow_version="imported", positive_prompt=fields.get("positive_prompt"),
+        seed=fields.get("seed"), params_json=fields.get("params_json", "{}"),
+        workflow_json="{}", source="imported",
+    )
+    db.update_generation(
+        prompt_id, status="completed",
+        output_files=json.dumps([{"filename": filename, "subfolder": subfolder}]),
+        thumbnail_path=fields.get("thumbnail_path"),
+    )
+
+
+def test_merge_repoints_image_sidecar_to_video_and_drops_video_row(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _completed(db, "img", "flf2v_loop_00001.png", "video",
+               positive_prompt="a dancing cat", seed=777,
+               params_json=json.dumps({"steps": 4, "seed": 777}),
+               thumbnail_path="thumbs/flf2v_loop_00001.jpg")
+    _completed(db, "vid", "flf2v_loop_00001.mp4", "video")
+
+    assert merge_video_sidecar_rows(db) == 1
+    assert db.get_generation("vid") is None              # redundant video row gone
+    survivor = db.get_generation("img")
+    files = json.loads(survivor["output_files"])
+    assert files[0]["filename"] == "flf2v_loop_00001.mp4"   # now plays the video
+    assert survivor["positive_prompt"] == "a dancing cat"   # metadata preserved
+    assert survivor["thumbnail_path"] == "thumbs/flf2v_loop_00001.jpg"
+
+
+def test_merge_leaves_standalone_rows_untouched(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _completed(db, "solo-img", "sdxl_t2i_1_.png", "image", workflow_name="sdxl_t2i")
+    _completed(db, "solo-vid", "wan22_i2v_1_.mp4", "video", workflow_name="wan22_i2v")
+
+    assert merge_video_sidecar_rows(db) == 0
+    assert db.get_generation("solo-img") is not None
+    assert db.get_generation("solo-vid") is not None

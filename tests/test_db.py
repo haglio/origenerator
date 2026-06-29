@@ -207,3 +207,18 @@ def test_list_generations_ordered_newest_first(tmp_path):
     assert len(rows) == 3
     assert rows[0]["prompt_id"] == "list-002"
     assert rows[2]["prompt_id"] == "list-000"
+
+
+def test_delete_generation_removes_row(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="del-001", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}",
+    )
+    db.insert_generation(
+        prompt_id="del-002", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}",
+    )
+    db.delete_generation("del-001")
+    assert db.get_generation("del-001") is None
+    assert db.get_generation("del-002") is not None

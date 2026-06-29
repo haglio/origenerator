@@ -10,7 +10,8 @@ from pathlib import Path
 from PIL import Image
 
 from origenerator.db import Database
-from origenerator.media import media_type_from_filename
+from origenerator.gallery import row_output_files
+from origenerator.media import IMAGE_EXTS, VIDEO_EXTS, media_type_from_filename
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -58,8 +59,20 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             output_type = media_type_from_filename(fname)
             if output_type is None:
                 continue
+            # A video with a metadata image beside it is represented (and made
+            # playable) by that image's entry, so skip the bare video file.
+            if output_type == "video" and _sibling_of_type(fpath, "image") is not None:
+                continue
+            # An image beside a video is that video's metadata/preview sidecar
+            # (VHS_VideoCombine writes one per clip): its entry should play the
+            # video, not show the still frame.
+            play_path = fpath
+            if output_type == "image":
+                sibling_video = _sibling_of_type(fpath, "video")
+                if sibling_video is not None:
+                    play_path = sibling_video
 
-            rel_path = fpath.relative_to(output_dir).as_posix()
+            rel_path = play_path.relative_to(output_dir).as_posix()
             if rel_path in existing:
                 continue
 
@@ -85,17 +98,10 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
                 workflow_json=json.dumps(metadata.get("prompt_data", {})),
                 source="imported",
             )
-            subfolder = Path(dirpath).relative_to(output_dir).as_posix()
-            if subfolder == ".":
-                subfolder = ""
             db.update_generation(
                 prompt_id,
                 status="completed",
-                output_files=json.dumps([{
-                    "filename": fname,
-                    "subfolder": subfolder,
-                    "type": "output",
-                }]),
+                output_files=json.dumps([_output_entry(play_path, output_dir)]),
                 thumbnail_path=thumb_path,
                 completed_at=mtime.isoformat(),
             )
@@ -103,6 +109,56 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             imported += 1
 
     return imported
+
+
+def _sibling_of_type(path: Path, media: str) -> Path | None:
+    """A file beside ``path`` with the same stem but a ``media``-type extension."""
+    exts = IMAGE_EXTS if media == "image" else VIDEO_EXTS
+    for ext in sorted(exts):
+        sibling = path.with_suffix(ext)
+        if sibling != path and sibling.exists():
+            return sibling
+    return None
+
+
+def _output_entry(path: Path, output_dir: Path) -> dict:
+    subfolder = path.parent.relative_to(output_dir).as_posix()
+    if subfolder == ".":
+        subfolder = ""
+    return {"filename": path.name, "subfolder": subfolder, "type": "output"}
+
+
+def merge_video_sidecar_rows(db: Database) -> int:
+    """Consolidate already-imported image sidecars with the video they preview.
+
+    Older imports created a separate gallery row for the metadata PNG that
+    VHS_VideoCombine saves beside each video. This repoints each such image row
+    at its sibling video — so it plays, keeping the prompt/seed it carries — and
+    deletes the now-redundant bare video row. Returns the number consolidated.
+    """
+    rows = db.list_generations()
+    video_by_key: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        files = row_output_files(row)
+        if files and media_type_from_filename(files[0].get("filename", "")) == "video":
+            video_by_key[_sidecar_key(files[0])] = row
+
+    merged = 0
+    for row in rows:
+        files = row_output_files(row)
+        if not files or media_type_from_filename(files[0].get("filename", "")) != "image":
+            continue
+        video = video_by_key.pop(_sidecar_key(files[0]), None)
+        if video is None:
+            continue
+        db.update_generation(row["prompt_id"], output_files=video["output_files"])
+        db.delete_generation(video["prompt_id"])
+        merged += 1
+    return merged
+
+
+def _sidecar_key(file_entry: dict) -> tuple[str, str]:
+    return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
 
 
 def backfill_unknown_workflows(db: Database) -> int:

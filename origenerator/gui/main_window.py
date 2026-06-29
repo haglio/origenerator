@@ -1,10 +1,9 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 from PyQt6.QtGui import QIcon
+
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
 
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 

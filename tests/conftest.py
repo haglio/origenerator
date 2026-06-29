@@ -1,5 +1,4 @@
-import sys
-from pathlib import Path
+from origenerator.paths import ensure_shared_ui_on_path
 
-# Make shared_ui importable
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# Make shared_ui importable for tests regardless of checkout depth.
+ensure_shared_ui_on_path()

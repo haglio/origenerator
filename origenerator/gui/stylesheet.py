@@ -1,7 +1,6 @@
-import sys
-from pathlib import Path
+from origenerator.paths import ensure_shared_ui_on_path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
     BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON,

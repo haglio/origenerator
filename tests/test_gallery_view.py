@@ -1005,6 +1005,18 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
     assert _reroll_tile(view) is not None
 
 
+def test_add_tile_sits_first_beside_the_newest(qtbot):
+    # Thumbnails are newest-first, so the "new variation" box belongs at the
+    # front of the grid, not trailing the oldest.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    grid = view._scroll.widget().layout()
+    assert isinstance(grid.itemAtPosition(0, 0).widget(), RerollTile)
+
+
 def test_leaf_has_no_add_tile_without_a_client(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

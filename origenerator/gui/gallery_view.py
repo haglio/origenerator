@@ -343,6 +343,11 @@ class GalleryView(QWidget):
         self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
+        # The re-roll tile leads the grid so it sits beside the newest item
+        # (thumbnails are sorted newest-first).
+        offset = 1 if self._can_reroll(group) else 0
+        if offset:
+            self._add_reroll_tile(grid, group, 0)
         for idx, row in enumerate(group.rows):
             seed = row.get("seed")
             label = f"seed {seed}" if seed is not None else (
@@ -350,11 +355,10 @@ class GalleryView(QWidget):
             )
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._thumbnail_clicked)
-            grid.addWidget(tw, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
+            pos = idx + offset
+            grid.addWidget(tw, pos // _GRID_COLUMNS, pos % _GRID_COLUMNS)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
-        if self._can_reroll(group):
-            self._add_reroll_tile(grid, group, len(group.rows))
         self._show_widget(container)
 
     # --- re-roll: a new variation of a folder's settings, here in the gallery

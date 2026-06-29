@@ -135,6 +135,15 @@ class ParamForm(QWidget):
         """True if any seed param's Random box is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
+    def set_seed_random(self, is_random: bool):
+        """Set every seed's Random box, e.g. when restoring a saved tab.
+
+        ``set_values`` always unchecks Random (it pins a concrete seed); this
+        lets a caller put the box back the way the user had it.
+        """
+        for cb in self._randomize_checks.values():
+            cb.setChecked(is_random)
+
     def _collect(self, randomize_seed: bool) -> dict:
         result = {}
         for pd in self._param_defs:

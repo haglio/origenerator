@@ -15,6 +15,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     version = "v001"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
+    model_keys = ("unet_high", "unet_low")
 
     _OUTPUT_NODE_ID = "19"
 

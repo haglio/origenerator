@@ -40,6 +40,13 @@ def estimate_seconds(durations: list[float]) -> float | None:
     return statistics.median(durations)
 
 
+def average_seconds(durations: list[float]) -> float | None:
+    """The mean generation time, or ``None`` when there's nothing to average."""
+    if not durations:
+        return None
+    return statistics.fmean(durations)
+
+
 def format_duration(seconds: float) -> str:
     """Render a duration as a compact human string, e.g. ``"15 min 5 sec"``.
 
@@ -79,5 +86,20 @@ def estimate_label(durations: list[float]) -> str:
     estimate = estimate_seconds(durations)
     if estimate is None:
         return "No timing data yet"
-    runs = "run" if len(durations) == 1 else "runs"
-    return f"~{_coarse_duration(estimate)} (based on {len(durations)} {runs})"
+    return f"~{_coarse_duration(estimate)} (based on {_runs(len(durations))})"
+
+
+def average_label(durations: list[float]) -> str:
+    """Folder-wide average for the UI: ``"~12 min (across 3 runs)"``.
+
+    Returns ``""`` when nothing in the folder is timed, so the caller can hide
+    the line entirely rather than show a placeholder.
+    """
+    average = average_seconds(durations)
+    if average is None:
+        return ""
+    return f"~{_coarse_duration(average)} (across {_runs(len(durations))})"
+
+
+def _runs(count: int) -> str:
+    return f"{count} run" if count == 1 else f"{count} runs"

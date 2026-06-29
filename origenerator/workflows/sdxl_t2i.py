@@ -17,6 +17,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     version = "v002"
     display_name = "SDXL Text-to-Image"
     output_type = "image"
+    model_keys = ("checkpoint",)
 
     _OUTPUT_NODE_ID = "7"
 

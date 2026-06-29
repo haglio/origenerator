@@ -6,10 +6,13 @@ from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.generation_config import configs_match, merge_denormalized
+from origenerator.generation_config import (
+    ConfigSnapshot, configs_match, merge_denormalized,
+)
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.job_queue import JobQueue
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 class GenerateView(QWidget):
@@ -94,12 +97,16 @@ class GenerateView(QWidget):
         if ok and name.strip():
             panel.set_custom_title(name.strip())
 
-    def _close_subtab(self, index: int):
+    def _discard_subtab(self, index: int):
+        """Remove and tear down one subtab, without the empty-strip backfill."""
         panel = self._subtabs.widget(index)
         self._queue.cancel(panel)  # drop its slot, advancing the queue if it was running
         self._subtabs.removeTab(index)
         panel.teardown()
         panel.deleteLater()
+
+    def _close_subtab(self, index: int):
+        self._discard_subtab(index)
         self._update_empty_state()  # closing the last tab reveals the empty state
 
     def _on_active_tab_changed(self, _index: int):
@@ -132,4 +139,60 @@ class GenerateView(QWidget):
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel:
         panel = self._add_subtab()
         panel.prefill(workflow_name, params)
+        return panel
+
+    def capture_state(self) -> dict:
+        """Snapshot every open subtab so the session can be restored next launch.
+
+        Each tab carries its configuration plus any user-set custom title, since
+        a renamed tab is part of "which tabs I had open".
+        """
+        tabs = []
+        for i in range(self._subtabs.count()):
+            panel = self._subtabs.widget(i)
+            tabs.append({
+                "config": panel.current_config().to_dict(),
+                "title": panel.custom_title(),
+            })
+        return {"tabs": tabs, "current": self._subtabs.currentIndex()}
+
+    def restore_state(self, state: dict):
+        """Rebuild the subtabs from a :meth:`capture_state` snapshot.
+
+        Entries for workflows no longer in the registry are skipped, as is any
+        malformed data, so a corrupt or cross-version state file degrades to the
+        default tab rather than failing to launch. If nothing restorable remains,
+        the default tab created at construction is left as-is.
+        """
+        if not isinstance(state, dict):
+            return
+        raw_tabs = state.get("tabs")
+        restored = []
+        for entry in raw_tabs if isinstance(raw_tabs, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            snapshot = ConfigSnapshot.from_dict(entry.get("config") or {})
+            if snapshot.workflow_name not in WORKFLOW_REGISTRY:
+                continue
+            title = entry.get("title")
+            restored.append(
+                (snapshot, title if isinstance(title, str) and title.strip() else None)
+            )
+        if not restored:
+            return
+        while self._subtabs.count():
+            self._discard_subtab(0)
+        for snapshot, title in restored:
+            panel = self._add_subtab()
+            panel.restore_config(snapshot)
+            if title:
+                panel.set_custom_title(title)
+        current = state.get("current", 0)
+        if isinstance(current, int) and 0 <= current < self._subtabs.count():
+            self._subtabs.setCurrentIndex(current)
+
+    def submit_replay(self, row: dict, overrides: dict) -> GenerateConfigPanel:
+        """Open a fresh subtab and re-run a captured generation in it."""
+        panel = self._add_subtab()
+        panel.submit_replay(row, overrides)
         return panel

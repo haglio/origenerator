@@ -14,6 +14,8 @@ from origenerator.db import Database
 from origenerator.gallery import config_tab_title
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
+from origenerator.media import media_type_from_filename
+from origenerator.replay import apply_overrides, extract_output_files, missing_inputs
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import (
     estimate_label,
@@ -21,7 +23,7 @@ from origenerator.timing import (
     format_duration,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, THUMB_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -203,16 +205,35 @@ class GenerateConfigPanel(QWidget):
             return
 
         # Build the job now (fixing the seed), but let the queue decide when it runs.
-        self._prepared = {
-            "workflow": wf,
-            "params": params,
-            "payload": wf.build_api_payload(params),
-            "prompt_id": str(uuid.uuid4()),
-        }
+        prompt_id = str(uuid.uuid4())
+        payload = wf.build_api_payload(params)
+        self._prepare_job(
+            payload=payload,
+            workflow=wf,
+            queue_name=wf.name,
+            record=dict(
+                prompt_id=prompt_id,
+                workflow_name=wf.name,
+                workflow_version=wf.version,
+                positive_prompt=params.get("positive_prompt", ""),
+                negative_prompt=params.get("negative_prompt", ""),
+                seed=params.get("seed"),
+                params_json=json.dumps(params),
+                workflow_json=json.dumps(payload),
+            ),
+        )
+
+    def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
+        """Stage a built job, then hand it to the queue (or run it now if unqueued).
+
+        ``workflow`` is the captured WorkflowTemplate, or None for a replay —
+        which routes completion through the generic output extractor.
+        """
+        self._prepared = {"payload": payload, "workflow": workflow, "record": record}
         self._generate_btn.setEnabled(False)
         if self._queue is not None:
             self._show_waiting()
-            self._queue.submit(self, wf.name)
+            self._queue.submit(self, queue_name)
         else:
             self._begin_job()
 
@@ -224,26 +245,16 @@ class GenerateConfigPanel(QWidget):
         job = self._prepared
         if job is None:
             return
-        wf, params = job["workflow"], job["params"]
-        prompt_id, payload = job["prompt_id"], job["payload"]
         self._prepared = None
-
-        self._db.insert_generation(
-            prompt_id=prompt_id,
-            workflow_name=wf.name,
-            workflow_version=wf.version,
-            positive_prompt=params.get("positive_prompt", ""),
-            negative_prompt=params.get("negative_prompt", ""),
-            seed=params.get("seed"),
-            params_json=json.dumps(params),
-            workflow_json=json.dumps(payload),
-        )
+        record = job["record"]
+        prompt_id = record["prompt_id"]
+        self._db.insert_generation(**record)
 
         try:
-            actual_pid = self._client.submit_job(payload)
+            actual_pid = self._client.submit_job(job["payload"])
             self._client_prompt_id = prompt_id
             self._comfy_prompt_id = actual_pid
-            self._submitted_workflow = wf
+            self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
             self._show_running()
         except Exception as e:
@@ -282,11 +293,16 @@ class GenerateConfigPanel(QWidget):
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
             return
+        # A registered workflow knows its own output node; a replay (no captured
+        # template) reads outputs generically from the history.
         wf = self._submitted_workflow
-        if not wf:
-            return
+        if wf is not None:
+            files = wf.extract_output_info(history_data)
+            output_type = wf.output_type
+        else:
+            files = extract_output_files(history_data)
+            output_type = media_type_from_filename(files[0]["filename"]) if files else None
 
-        files = wf.extract_output_info(history_data)
         thumb_path = None
         if files:
             first = files[0]
@@ -294,7 +310,7 @@ class GenerateConfigPanel(QWidget):
             source = COMFYUI_OUTPUT_DIR / subfolder / first["filename"]
             if source.exists():
                 THUMB_DIR.mkdir(parents=True, exist_ok=True)
-                thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
+                thumb_path = str(generate_thumbnail(source, output_type or "image", THUMB_DIR))
 
         now = datetime.now(timezone.utc).isoformat()
         duration = execution_duration_seconds(history_data)
@@ -363,6 +379,14 @@ class GenerateConfigPanel(QWidget):
         self._custom_title = name
         self._emit_title()
 
+    def custom_title(self) -> str | None:
+        """The user-set tab name, or ``None`` when the title is auto-derived.
+
+        Distinct from :meth:`title`, which always returns a displayable string;
+        this reports only an explicit rename, for session persistence.
+        """
+        return self._custom_title
+
     def prefill(self, workflow_name: str, params: dict):
         # Switch to the matching workflow if found
         for i in range(self._workflow_combo.count()):
@@ -371,3 +395,54 @@ class GenerateConfigPanel(QWidget):
                 break
         if self._param_form:
             self._param_form.set_values(params)
+
+    def restore_config(self, snapshot: ConfigSnapshot):
+        """Reapply a snapshot captured by :meth:`current_config`.
+
+        Like :meth:`prefill`, but also restores the seed's Random state so a tab
+        the user left on Random comes back random instead of pinned to the stale
+        seed that was in the field at save time.
+        """
+        self.prefill(snapshot.workflow_name, snapshot.params)
+        if self._param_form:
+            self._param_form.set_seed_random(snapshot.seed_is_random)
+
+    def submit_replay(self, row: dict, overrides: dict):
+        """Re-run a past generation's captured graph with overridden fields.
+
+        Works for any row that stored its API graph — including workflows the
+        app has no registered template for. Completion is handled by the generic
+        path in ``_on_completed`` (no captured workflow template).
+        """
+        try:
+            graph = json.loads(row.get("workflow_json") or "{}")
+        except json.JSONDecodeError:
+            graph = {}
+        if not graph:
+            self._show_ready("This generation has no stored workflow to re-run.")
+            return
+
+        patched = apply_overrides(graph, **overrides)
+        missing = missing_inputs(patched, COMFYUI_INPUT_DIR)
+        if missing:
+            self._show_ready(f"Missing source file(s): {', '.join(missing[:3])}")
+            return
+
+        name = row.get("workflow_name") or "replay"
+        self.set_custom_title(f"Re-run: {name}")
+        # workflow=None routes completion through the generic output extractor.
+        self._prepare_job(
+            payload=patched,
+            workflow=None,
+            queue_name=name,
+            record=dict(
+                prompt_id=str(uuid.uuid4()),
+                workflow_name=name,
+                workflow_version=row.get("workflow_version") or "replay",
+                positive_prompt=overrides.get("positive", ""),
+                negative_prompt=overrides.get("negative", ""),
+                seed=overrides.get("seed"),
+                params_json=json.dumps(overrides),
+                workflow_json=json.dumps(patched),
+            ),
+        )

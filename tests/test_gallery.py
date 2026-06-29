@@ -6,6 +6,8 @@ from origenerator.gallery import (
     config_tab_title,
     find_source_image_id,
     media_type_of_row,
+    model_label,
+    model_signature,
     resolve_preview,
     rows_under,
     settings_signature,
@@ -79,6 +81,43 @@ def test_settings_signature_tolerates_missing_or_invalid_params():
     assert settings_signature("not json") == settings_signature("{}")
 
 
+def test_model_signature_groups_by_model_params_only():
+    a = json.dumps({"checkpoint": "reapony_v80.safetensors", "steps": 50, "seed": 1})
+    b = json.dumps({"checkpoint": "reapony_v80.safetensors", "steps": 40, "seed": 2})
+    c = json.dumps({"checkpoint": "dreamshaper.safetensors", "steps": 50})
+    # Same model, different settings/seed -> identical model signature.
+    assert model_signature("sdxl_t2i", a) == model_signature("sdxl_t2i", b)
+    # A different checkpoint -> different model signature.
+    assert model_signature("sdxl_t2i", a) != model_signature("sdxl_t2i", c)
+
+
+def test_model_signature_spans_every_model_key():
+    base = {"unet_high": "h1.safetensors", "unet_low": "l1.safetensors"}
+    same = model_signature("wan22_i2v", json.dumps(base))
+    diff_low = model_signature("wan22_i2v", json.dumps({**base, "unet_low": "l2.safetensors"}))
+    # The low-noise UNET is part of the model identity, so changing it splits.
+    assert same != diff_low
+
+
+def test_model_label_strips_directory_and_extension():
+    assert model_label("sdxl_t2i", {"checkpoint": "reapony_v80.safetensors"}) == "reapony_v80"
+
+
+def test_model_label_joins_multiple_model_keys():
+    label = model_label("wan22_i2v", {
+        "unet_high": "split_files\\diffusion_models\\wan_high_14B.safetensors",
+        "unet_low": "split_files\\diffusion_models\\wan_low_14B.safetensors",
+    })
+    assert label == "wan_high_14B / wan_low_14B"
+
+
+def test_model_label_falls_back_when_model_is_unknown():
+    # No model param recorded (e.g. an imported file that didn't carry it)...
+    assert model_label("sdxl_t2i", {}) == "(unknown model)"
+    # ...or a workflow that declares no model keys at all.
+    assert model_label("nope", {"checkpoint": "x.safetensors"}) == "(unknown model)"
+
+
 def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
     image = _row(
         prompt_id="img-1",
@@ -119,6 +158,66 @@ def _img(prompt_id, prompt, steps, seed):
     )
 
 
+def _img_model(prompt_id, prompt, checkpoint, steps, seed):
+    return _row(
+        prompt_id=prompt_id,
+        workflow_name="sdxl_t2i",
+        params_json=json.dumps({
+            "positive_prompt": prompt, "checkpoint": checkpoint,
+            "steps": steps, "seed": seed,
+        }),
+        output_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png"}]),
+    )
+
+
+def test_build_gallery_tree_nests_workflow_then_model_then_settings():
+    rows = [
+        _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
+        _img_model("i2", "a cat", "reapony_v80.safetensors", 50, 2),  # same model+settings
+        _img_model("i3", "a cat", "dreamshaper.safetensors", 50, 1),  # same prompt, other model
+    ]
+    workflow = build_gallery_tree(rows)[0].workflow_groups[0]
+
+    models = {m.label: m for m in workflow.model_groups}
+    assert set(models) == {"reapony_v80", "dreamshaper"}
+
+    reapony = models["reapony_v80"]
+    assert len(reapony.settings_groups) == 1  # the two seeds collapse
+    assert {r["prompt_id"] for r in reapony.settings_groups[0].rows} == {"i1", "i2"}
+    assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
+
+
+def test_model_folders_get_stable_keys_and_apply_custom_names_and_stars():
+    rows = [
+        _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
+        _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
+    ]
+    reapony, dream = build_gallery_tree(rows)[0].workflow_groups[0].model_groups
+    assert reapony.key.startswith("image/sdxl_t2i/")
+    assert reapony.key != dream.key
+
+    meta = {dream.key: {"custom_name": "Dreamy", "starred": True}}
+    models = build_gallery_tree(rows, meta)[0].workflow_groups[0].model_groups
+    assert models[0].label == "Dreamy"     # custom name applied
+    assert models[0].starred is True
+    assert models[0].key == dream.key       # and the star floated it to the top
+    assert models[1].starred is False
+
+
+def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
+    # Two checkpoints, identical prompt/settings otherwise: the split is at the
+    # model level, so neither settings leaf needs the checkpoint in its name.
+    rows = [
+        _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
+        _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
+    ]
+    workflow = build_gallery_tree(rows)[0].workflow_groups[0]
+    for model in workflow.model_groups:
+        (settings,) = model.settings_groups
+        assert settings.label == "a cat"
+        assert "safetensors" not in settings.label
+
+
 def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     rows = [
         _img("i1", "a cat", 50, 1),   # same settings as i2, different seed
@@ -135,14 +234,16 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
 
     sdxl_groups = media["image"].workflow_groups
     assert [w.workflow_name for w in sdxl_groups] == ["sdxl_t2i"]
-    settings = sdxl_groups[0].settings_groups
+    (model,) = sdxl_groups[0].model_groups  # no checkpoint recorded -> one model
+    settings = model.settings_groups
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
 
     video = media["video"]
     assert [w.workflow_name for w in video.workflow_groups] == ["wan22_i2v"]
-    assert len(video.workflow_groups[0].settings_groups) == 1
+    (video_model,) = video.workflow_groups[0].model_groups
+    assert len(video_model.settings_groups) == 1
 
 
 def test_build_gallery_tree_assigns_stable_folder_keys():
@@ -151,23 +252,27 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert media.key == "image"
     workflow = media.workflow_groups[0]
     assert workflow.key == "image/sdxl_t2i"
-    settings = workflow.settings_groups[0]
+    model = workflow.model_groups[0]
+    assert model.key.startswith("image/sdxl_t2i/")
+    settings = model.settings_groups[0]
     assert settings.key.startswith("image/sdxl_t2i/")
 
-    # The settings key is derived from the signature, so it is stable across
-    # rebuilds (what lets a rename/star stick to the same folder).
-    again = build_gallery_tree([_img("i9", "a cat", 50, 7)])
-    assert again[0].workflow_groups[0].settings_groups[0].key == settings.key
+    # The model and settings keys are derived from signatures, so they are
+    # stable across rebuilds (what lets a rename/star stick to the same folder).
+    again_model = build_gallery_tree([_img("i9", "a cat", 50, 7)])[0] \
+        .workflow_groups[0].model_groups[0]
+    assert again_model.key == model.key
+    assert again_model.settings_groups[0].key == settings.key
 
 
 def test_build_gallery_tree_applies_custom_names_and_floats_stars_first():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
-    plain = build_gallery_tree(rows)
-    cat, dog = plain[0].workflow_groups[0].settings_groups  # newest-first: cat, dog
+    plain_model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
+    cat, dog = plain_model.settings_groups  # newest-first: cat, dog
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
-    starred_tree = build_gallery_tree(rows, meta)
-    settings = starred_tree[0].workflow_groups[0].settings_groups
+    settings = build_gallery_tree(rows, meta)[0] \
+        .workflow_groups[0].model_groups[0].settings_groups
 
     assert settings[0].label == "Doggos"      # custom name applied
     assert settings[0].starred is True
@@ -182,7 +287,8 @@ def test_child_groups_and_rows_under_walk_the_tree():
 
     workflows = child_groups(media)
     assert [w.workflow_name for w in workflows] == ["sdxl_t2i"]
-    settings = child_groups(workflows[0])
+    (model,) = child_groups(workflows[0])  # no checkpoint recorded -> one model
+    settings = child_groups(model)
     assert len(settings) == 2
     assert child_groups(settings[0]) == []  # a leaf has no child folders
 
@@ -201,7 +307,8 @@ def test_settings_group_labels_disambiguate_same_prompt_different_params():
     # Same prompt, different steps -> two folders that must not share a label.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 40, 2)])
-    labels = [sg.label for sg in tree[0].workflow_groups[0].settings_groups]
+    labels = [sg.label for sg in
+              tree[0].workflow_groups[0].model_groups[0].settings_groups]
     assert len(labels) == 2
     assert labels[0] != labels[1]
     assert all("a cat" in label for label in labels)
@@ -213,7 +320,7 @@ def test_settings_group_label_omits_params_when_only_one_group():
     # A lone settings folder needs no disambiguating suffix.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 50, 2)])
-    (only,) = tree[0].workflow_groups[0].settings_groups
+    (only,) = tree[0].workflow_groups[0].model_groups[0].settings_groups
     assert only.label == "a cat"
 
 

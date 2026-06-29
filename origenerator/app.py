@@ -79,7 +79,7 @@ def main():
 
     from origenerator.config import (
         DB_PATH, COMFYUI_HOST, COMFYUI_PORT,
-        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR,
+        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
     )
     from origenerator.gui.loading_screen import LoadingScreen
 
@@ -158,8 +158,9 @@ def main():
     client.start()
 
     status("Building the interface...")
+    from origenerator.app_state import AppState
     from origenerator.gui.main_window import OrigeneratorWindow
-    window = OrigeneratorWindow(client, db)
+    window = OrigeneratorWindow(client, db, AppState(UI_STATE_PATH))
     window.show()
 
     loading.close()

@@ -1,6 +1,8 @@
 import pytest
 
 from origenerator.timing import (
+    average_label,
+    average_seconds,
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
@@ -65,3 +67,25 @@ def test_estimate_label_seconds_one_run():
 def test_estimate_label_rounds_to_minutes_and_counts_runs():
     # Median 724s reads as a coarse "~12 min", not a false-precise "12 min 4 sec".
     assert estimate_label([700.0, 724.0, 800.0]) == "~12 min (based on 3 runs)"
+
+
+def test_average_is_the_mean():
+    assert average_seconds([10.0, 20.0, 30.0]) == 20.0
+
+
+def test_average_none_when_empty():
+    assert average_seconds([]) is None
+
+
+def test_average_label_empty_when_no_data():
+    # A folder with nothing timed shows no average line at all.
+    assert average_label([]) == ""
+
+
+def test_average_label_is_coarse_with_a_count():
+    # Mean of these is ~741s -> a coarse "~12 min".
+    assert average_label([700.0, 724.0, 800.0]) == "~12 min (across 3 runs)"
+
+
+def test_average_label_singular_run():
+    assert average_label([6.0]) == "~6 sec (across 1 run)"

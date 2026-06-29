@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
@@ -84,6 +85,17 @@ def _image(prompt_id, prompt, steps, seed):
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed},
                 f"sdxl_t2i_{prompt_id}.png")
+
+
+def _hbox_index_of(layout, widget):
+    """Index in the top-level row layout of the sub-layout holding ``widget``."""
+    for i in range(layout.count()):
+        sub = layout.itemAt(i).layout()
+        if sub is not None and any(
+            sub.itemAt(j).widget() is widget for j in range(sub.count())
+        ):
+            return i
+    return -1
 
 
 def _top_level(tree):
@@ -330,6 +342,21 @@ def test_gallery_creates_a_preview_widget(qtbot):
     assert isinstance(view._preview, PreviewWidget)
 
 
+def test_a_vertical_line_separates_the_sidebar_from_the_main_pane(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    layout = view.layout()
+
+    main_idx = _hbox_index_of(layout, view._scroll)      # main pane (contents)
+    right_idx = _hbox_index_of(layout, view._preview)    # right sidebar (preview)
+
+    # A thin vertical divider sits between the main pane and the sidebar.
+    separator = layout.itemAt(main_idx + 1).widget()
+    assert isinstance(separator, QFrame)
+    assert separator.maximumWidth() == 1                 # a line, not a panel
+    assert main_idx < main_idx + 1 < right_idx
+
+
 def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -375,6 +402,68 @@ def test_selected_folder_reports_pending_target_before_first_show(qtbot):
     qtbot.addWidget(view)
     view.select_folder("image/sdxl_t2i")
     assert view.selected_folder() == "image/sdxl_t2i"
+
+
+def test_selected_generation_tracks_thumbnail_click(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # folder holding i1 and i2
+    view._on_thumbnail_clicked("i2")
+    assert view.selected_generation() == "i2"
+
+
+def test_select_generation_restored_with_folder_after_refresh(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    probe = GalleryView(db)
+    qtbot.addWidget(probe)
+    probe.refresh()
+    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    folder_key = probe.selected_folder()
+
+    # A fresh view restoring that folder + selection lands on the same image.
+    fresh = GalleryView(db)
+    qtbot.addWidget(fresh)
+    fresh.select_folder(folder_key)
+    fresh.select_generation("i2")
+    fresh.refresh()
+    assert fresh.selected_generation() == "i2"
+    assert fresh._selected["prompt_id"] == "i2"
+
+
+def test_selected_generation_survives_a_rebuild(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._on_thumbnail_clicked("i2")
+
+    db.add(_image("i3", "a dog", 50, 9))  # new generation → a poll rebuild
+    view._poll()
+
+    assert view.selected_generation() == "i2"  # not cleared by the rebuild
+    assert view._selected["prompt_id"] == "i2"
+
+
+def test_selected_generation_reports_pending_before_show(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_generation("i1")
+    assert view.selected_generation() == "i1"
+
+
+def test_select_generation_missing_id_is_dropped(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.select_generation("ghost")  # no such generation
+    view.refresh()
+    # Quietly dropped (not restored) without crashing; the view falls back to
+    # the folder's own default selection rather than the stale id.
+    assert view.selected_generation() != "ghost"
 
 
 def _make_db(tmp_path):
@@ -425,24 +514,28 @@ def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
     assert view._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
 
 
-def test_selecting_generation_shows_its_actual_duration(qtbot):
-    rows = [_image("i1", "a cat", 50, 1)]
-    rows[0]["duration_seconds"] = 905.0
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._on_thumbnail_clicked("i1")
-    assert "Duration: 15 min 5 sec" in view._meta_text.toPlainText()
-
-
-def test_generation_without_duration_omits_the_line(qtbot):
+def test_clicking_thumbnail_routes_the_row_into_the_metadata_panel(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
+    view._meta_panel.show_row = MagicMock()
 
     view._on_thumbnail_clicked("i1")
-    assert "Duration:" not in view._meta_text.toPlainText()
+
+    view._meta_panel.show_row.assert_called_once()
+    (row,) = view._meta_panel.show_row.call_args.args
+    assert row["prompt_id"] == "i1"
+
+
+def test_refresh_clears_the_metadata_panel(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._meta_panel.clear = MagicMock()
+
+    view.refresh()
+
+    view._meta_panel.clear.assert_called()
 
 
 def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):

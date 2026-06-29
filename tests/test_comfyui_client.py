@@ -5,6 +5,24 @@ from unittest.mock import patch, MagicMock
 from origenerator.comfyui_client import ComfyUIClient, comfyui_responding
 
 
+def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
+    """stop() must interrupt the reconnect backoff, not wait it out.
+
+    The websocket loop parks in ``await asyncio.sleep(3)`` between reconnect
+    attempts. If stop() only flips a flag, the thread (and the whole process)
+    lingers for the rest of that sleep after the window has already closed, so
+    a quick relaunch is swallowed by Windows while the dying instance still
+    owns the taskbar identity. stop() must cancel the sleep so the thread ends
+    at once.
+    """
+    client = ComfyUIClient(host="127.0.0.1", port=59999)  # nothing listening
+    # Wait for the refused connect to drop the loop into its 3s reconnect sleep.
+    with qtbot.waitSignal(client.disconnected, timeout=3000):
+        client.start()
+    client.stop()
+    assert client.wait(1000), "stop() did not end the thread within 1s"
+
+
 def _mock_response(status: int, body: bytes):
     resp = MagicMock()
     resp.status = status

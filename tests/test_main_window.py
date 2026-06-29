@@ -84,6 +84,13 @@ def test_restores_active_tab_from_app_state(qtbot, tmp_path):
     assert win._tabs.currentWidget() is win._gallery_view
 
 
+def test_restores_gallery_selection_from_app_state(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("gallery_selection", "abc123")
+    win = _window(qtbot, tmp_path, state)
+    assert win._gallery_view.selected_generation() == "abc123"
+
+
 def test_close_event_persists_active_tab(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
@@ -92,3 +99,13 @@ def test_close_event_persists_active_tab(qtbot, tmp_path):
     win.close()  # fires closeEvent
 
     assert AppState(path).get("active_tab") == 1
+
+
+def test_close_event_persists_gallery_selection(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win._gallery_view.select_generation("xyz")
+
+    win.close()  # fires closeEvent
+
+    assert AppState(path).get("gallery_selection") == "xyz"

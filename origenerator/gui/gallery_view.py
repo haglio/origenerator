@@ -3,8 +3,8 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
-    QScrollArea, QPlainTextEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QMenu, QInputDialog, QAbstractItemView,
+    QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
+    QMenu, QInputDialog, QAbstractItemView, QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 
@@ -14,6 +14,7 @@ from origenerator.db import Database
 from origenerator.generation_config import merge_denormalized
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.rerun_dialog import ReRunDialog
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
@@ -41,6 +42,7 @@ class GalleryView(QWidget):
         self._visible_keys: list[str] = []
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
+        self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
 
@@ -82,6 +84,14 @@ class GalleryView(QWidget):
         middle.addWidget(self._scroll, 1)
         layout.addLayout(middle, 5)
 
+        # A thin divider sets the metadata sidebar apart from the main pane.
+        # A plain 1px frame (not QFrame.VLine) renders the theme colour exactly;
+        # VLine's etched, palette-driven line ignores a stylesheet fill.
+        separator = QFrame()
+        separator.setObjectName("paneSeparator")
+        separator.setFixedWidth(1)
+        layout.addWidget(separator)
+
         # Right: preview + metadata sidebar
         right = QVBoxLayout()
         self._meta_title = QLabel("Select a generation")
@@ -100,9 +110,8 @@ class GalleryView(QWidget):
         right.addWidget(self._source_link)
         self._preview = PreviewWidget()
         right.addWidget(self._preview, 3)
-        self._meta_text = QPlainTextEdit()
-        self._meta_text.setReadOnly(True)
-        right.addWidget(self._meta_text, 2)
+        self._meta_panel = MetadataPanel()
+        right.addWidget(self._meta_panel, 2)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
@@ -144,19 +153,27 @@ class GalleryView(QWidget):
 
     def _rebuild(self, rows, meta):
         expanded = self._expanded_keys()
-        # A pending restore target stands in until the user makes a live choice.
+        # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._selected_folder_key() or self._pending_key
+        selected_gen = self.selected_generation()
         self._pending_key = None
+        self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
         self._populate_tree(gallery.build_gallery_tree(rows, meta), expanded)
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._default_item()
         if target is not None:
-            self._tree.setCurrentItem(target)
+            self._tree.setCurrentItem(target)  # shows the folder's thumbnails
+            self._reselect_generation(selected_gen)
         else:
             self._title.set_display("")
             self._avg_label.setText("")
             self._show_widget(QWidget())
+
+    def _reselect_generation(self, prompt_id: str | None):
+        """Re-highlight a generation after a rebuild, if it's still on screen."""
+        if prompt_id and prompt_id in self._visible_ids:
+            self._on_thumbnail_clicked(prompt_id)
 
     # --- folder tree -------------------------------------------------------
 
@@ -340,6 +357,24 @@ class GalleryView(QWidget):
         """
         self._pending_key = key or None
 
+    def selected_generation(self) -> str | None:
+        """The prompt_id of the highlighted generation, for saving the session.
+
+        Falls back to a not-yet-applied restore target, mirroring
+        :meth:`selected_folder`, so it survives a session that never showed it.
+        """
+        if self._selected:
+            return self._selected.get("prompt_id")
+        return self._pending_selection
+
+    def select_generation(self, prompt_id: str | None):
+        """Re-highlight ``prompt_id`` once its folder's thumbnails are shown.
+
+        Resolved by the next rebuild (after :meth:`select_folder` reopens the
+        folder), and quietly dropped if that generation is no longer present.
+        """
+        self._pending_selection = prompt_id or None
+
     # --- rename & star -----------------------------------------------------
 
     def _on_tree_context_menu(self, pos: QPoint):
@@ -433,41 +468,7 @@ class GalleryView(QWidget):
             f"Typical time: {timing.estimate_label(self._db.recent_durations(row['workflow_name']))}"
         )
         self._update_source_link(row)
-        lines = []
-        lines.append(f"Status: {row['status']}")
-        lines.append(f"Source: {row.get('source', 'generated')}")
-        lines.append(f"Seed: {row.get('seed', 'N/A')}")
-        lines.append(f"Created: {row.get('created_at', '')}")
-        duration = row.get("duration_seconds")
-        if duration is not None:
-            lines.append(f"Duration: {timing.format_duration(duration)}")
-        lines.append("")
-        lines.append("--- Positive Prompt ---")
-        lines.append(row.get("positive_prompt") or "(empty)")
-        lines.append("")
-        lines.append("--- Negative Prompt ---")
-        lines.append(row.get("negative_prompt") or "(empty)")
-        lines.append("")
-        params = row.get("params_json")
-        if params:
-            lines.append("--- Parameters ---")
-            try:
-                d = json.loads(params)
-                for k, v in d.items():
-                    if k not in ("positive_prompt", "negative_prompt"):
-                        lines.append(f"  {k}: {v}")
-            except json.JSONDecodeError:
-                lines.append(params)
-        lines.append("")
-        out = row.get("output_files")
-        if out:
-            lines.append("--- Output Files ---")
-            try:
-                for f in json.loads(out):
-                    lines.append(f"  {f.get('subfolder', '')}/{f['filename']}")
-            except (json.JSONDecodeError, KeyError):
-                lines.append(out)
-        self._meta_text.setPlainText("\n".join(lines))
+        self._meta_panel.show_row(row)
 
     def _update_source_link(self, row: dict):
         self._source_image_id = gallery.find_source_image_id(row, self._image_rows)
@@ -505,7 +506,7 @@ class GalleryView(QWidget):
         self._rerun_btn.setEnabled(False)
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
-        self._meta_text.clear()
+        self._meta_panel.clear()
         self._source_link.hide()
         self._source_link.clear()
         self._source_image_id = None

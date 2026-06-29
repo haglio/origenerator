@@ -98,6 +98,9 @@ def build_stylesheet() -> str:
     QScrollArea {{
         border: none;
     }}
+    QFrame#paneSeparator {{
+        background-color: {_h(BORDER_PANEL)};
+    }}
     QGroupBox {{
         color: {_h(TEXT_PRIMARY)};
         border: 1px solid {_h(BORDER_PANEL)};

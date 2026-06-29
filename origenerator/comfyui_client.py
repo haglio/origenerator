@@ -42,6 +42,8 @@ class ComfyUIClient(QThread):
         self.port = port
         self.client_id = str(uuid.uuid4())
         self._running = False
+        self._loop = None  # the thread's asyncio loop, for cross-thread wakeups
+        self._task = None  # the running _ws_loop task, so stop() can cancel it
 
     @property
     def base_url(self) -> str:
@@ -54,29 +56,54 @@ class ComfyUIClient(QThread):
     def run(self):
         self._running = True
         loop = asyncio.new_event_loop()
+        self._loop = loop
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._ws_loop())
+        try:
+            loop.run_until_complete(self._ws_loop())
+        finally:
+            loop.close()
+            self._loop = None
+            self._task = None
 
     async def _ws_loop(self):
         import websockets
-        while self._running:
-            try:
-                async with websockets.connect(self.ws_url) as ws:
-                    self.connected.emit()
-                    logger.info("WebSocket connected to %s", self.ws_url)
-                    async for message in ws:
-                        if not self._running:
-                            break
-                        if isinstance(message, str):
-                            self._handle_ws_message(message)
-            except Exception as e:
-                logger.warning("WebSocket error: %s, reconnecting in 3s", e)
-                self.disconnected.emit()
-                if self._running:
-                    await asyncio.sleep(3)
+        self._task = asyncio.current_task()
+        try:
+            while self._running:
+                try:
+                    async with websockets.connect(self.ws_url) as ws:
+                        self.connected.emit()
+                        logger.info("WebSocket connected to %s", self.ws_url)
+                        async for message in ws:
+                            if not self._running:
+                                break
+                            if isinstance(message, str):
+                                self._handle_ws_message(message)
+                except Exception as e:
+                    logger.warning("WebSocket error: %s, reconnecting in 3s", e)
+                    self.disconnected.emit()
+                    if self._running:
+                        await asyncio.sleep(3)
+        except asyncio.CancelledError:
+            pass  # stop() cancelled the loop; unwind quietly so the thread ends
 
     def stop(self):
+        """Stop the websocket loop and end the thread without delay.
+
+        Flipping ``_running`` alone is not enough: the loop spends most of its
+        time awaiting a websocket message or parked in the reconnect sleep, and
+        would only notice the flag once that await returns (up to 3s later).
+        Cancelling the task interrupts whatever it is awaiting right now, so the
+        thread — and the process closing behind it — exits at once.
+        """
         self._running = False
+        loop, task = self._loop, self._task
+        if loop is None or task is None:
+            return
+        try:
+            loop.call_soon_threadsafe(task.cancel)
+        except RuntimeError:
+            pass  # loop already finished and closed — nothing left to interrupt
 
     def _handle_ws_message(self, raw: str):
         msg = json.loads(raw)

@@ -11,7 +11,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import config_tab_title
+from origenerator.gallery import config_tab_title, settings_signature
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
 from origenerator.media import media_type_from_filename
@@ -50,7 +50,6 @@ class GenerateConfigPanel(QWidget):
         self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
-        self._generated_ids: list[str] = []           # generations this tab produced, newest first
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -329,7 +328,6 @@ class GenerateConfigPanel(QWidget):
             self._show_done("Done!")
         self._generate_btn.setEnabled(True)
         completed_id = self._client_prompt_id
-        self._generated_ids.insert(0, completed_id)  # this tab's own history, newest first
         self._reset_job()
         self.generation_completed.emit(completed_id)
         self._refresh_estimate()
@@ -353,9 +351,22 @@ class GenerateConfigPanel(QWidget):
         self._comfy_prompt_id = None
         self._submitted_workflow = None
 
-    def generated_ids(self) -> list[str]:
-        """Prompt ids of the generations this tab has produced, newest first."""
-        return list(self._generated_ids)
+    def settings_key(self) -> tuple[str, str] | None:
+        """The gallery settings-folder this config maps to: (workflow, signature).
+
+        The signature mirrors how a generation is stored — the form values plus
+        the workflow's non-form defaults, minus seeds — so it matches the folder
+        this tab's outputs land in, and groups reruns that differ only by seed.
+        ``None`` when no workflow is selected.
+        """
+        key = self._workflow_combo.currentData()
+        wf = WORKFLOW_REGISTRY.get(key)
+        if wf is None or self._param_form is None:
+            return None
+        params = self._param_form.get_values_static()
+        for name, value in wf.default_params().items():
+            params.setdefault(name, value)
+        return key, settings_signature(json.dumps(params))
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

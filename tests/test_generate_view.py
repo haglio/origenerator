@@ -5,8 +5,8 @@ import pytest
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.generation_config import merge_denormalized
 from origenerator.gui.generate_view import GenerateView
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 @pytest.fixture
@@ -18,24 +18,30 @@ def view(qtbot, tmp_path):
     return v
 
 
-def _insert(db, prompt_id, **over):
-    fields = dict(
-        prompt_id=prompt_id,
-        workflow_name="sdxl_t2i",
-        workflow_version="v002",
-        positive_prompt="",
-        negative_prompt="",
-        seed=5,
-        params_json=json.dumps({"seed": 5}),
-        workflow_json="{}",
-    )
-    fields.update(over)
-    db.insert_generation(**fields)
-
-
 def _strip_ids(view):
     strip = view._strip
     return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
+
+
+def _sdxl_full(**over):
+    """A full sdxl param set, as a real generation would store it."""
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
+    params.update(over)
+    return params
+
+
+def _insert_gen(db, prompt_id, params):
+    """Insert a generation whose params_json reflects its real settings."""
+    db.insert_generation(
+        prompt_id=prompt_id,
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        positive_prompt=params.get("positive_prompt", ""),
+        negative_prompt=params.get("negative_prompt", ""),
+        seed=params.get("seed"),
+        params_json=json.dumps(params),
+        workflow_json="{}",
+    )
 
 
 def test_starts_with_one_subtab(view):
@@ -62,8 +68,7 @@ def test_empty_state_new_tab_button_adds_a_subtab(view):
 
 
 def test_closing_last_subtab_empties_the_strip(view):
-    _insert(view._db, "x1")
-    view._subtabs.widget(0)._generated_ids = ["x1"]
+    _insert_gen(view._db, "x1", _sdxl_full())  # matches the blank tab's default settings
     view._refresh_strip()
     assert _strip_ids(view) == ["x1"]
     view._close_subtab(0)
@@ -88,17 +93,13 @@ def test_active_panel_completion_refreshes_strip(view):
     spy.assert_called()
 
 
-def test_strip_shows_only_the_active_tabs_generations(view):
-    p1 = view._subtabs.widget(0)
-    p2 = view._add_subtab()
-    _insert(view._db, "a1")
-    _insert(view._db, "b1")
-    p1._generated_ids = ["a1"]
-    p2._generated_ids = ["b1"]
-    view._refresh_strip()  # p2 is active
-    assert _strip_ids(view) == ["b1"]
-    view._subtabs.setCurrentIndex(0)  # switching tabs swaps the strip
-    assert _strip_ids(view) == ["a1"]
+def test_strip_shows_generations_matching_the_active_tabs_settings(view):
+    _insert_gen(view._db, "def1", _sdxl_full())                       # default-settings folder
+    _insert_gen(view._db, "cat1", _sdxl_full(positive_prompt="cat"))  # a different folder
+    view._refresh_strip()  # the blank tab is on default settings
+    assert _strip_ids(view) == ["def1"]
+    view.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))   # move to the cat folder
+    assert _strip_ids(view) == ["cat1"]
 
 
 def test_open_config_adds_and_prefills_subtab(view):
@@ -110,8 +111,8 @@ def test_open_config_adds_and_prefills_subtab(view):
 
 
 def test_strip_click_opens_new_subtab_when_settings_differ(view):
-    _insert(view._db, "g1", positive_prompt="cat", seed=5)
-    # The lone subtab is blank with a random seed, so it never matches g1.
+    _insert_gen(view._db, "g1", _sdxl_full(positive_prompt="cat", seed=5))
+    # The lone blank subtab (no prompt) is a different settings folder than g1.
     view._on_strip_activated("g1")
     assert view._subtabs.count() == 2
     panel = view._subtabs.currentWidget()
@@ -120,12 +121,32 @@ def test_strip_click_opens_new_subtab_when_settings_differ(view):
 
 
 def test_strip_click_does_nothing_when_settings_match(view):
-    _insert(view._db, "g1", positive_prompt="cat", seed=5)
-    params = merge_denormalized(view._db.get_generation("g1"))
-    view.open_config("sdxl_t2i", params)  # active subtab now mirrors g1
+    params = _sdxl_full(positive_prompt="cat", seed=5)
+    _insert_gen(view._db, "g1", params)
+    view.open_config("sdxl_t2i", params)  # active subtab now has g1's settings
     count = view._subtabs.count()
     view._on_strip_activated("g1")
     assert view._subtabs.count() == count
+
+
+def test_strip_click_matching_settings_ignores_random_seed(view):
+    # The reported bug: a tab generated g1 and still has its seed on Random.
+    panel = view._subtabs.currentWidget()
+    panel._param_form.set_values({"positive_prompt": "cat"})  # leaves Random checked
+    assert panel._param_form.seed_is_random() is True
+    _insert_gen(view._db, "g1", _sdxl_full(positive_prompt="cat", seed=777))
+    count = view._subtabs.count()
+    view._on_strip_activated("g1")
+    assert view._subtabs.count() == count  # same settings folder -> no duplicate
+
+
+def test_opening_tab_from_a_thumbnail_populates_strip_with_its_folder(view):
+    _insert_gen(view._db, "cat1", _sdxl_full(positive_prompt="cat", seed=1))
+    _insert_gen(view._db, "cat2", _sdxl_full(positive_prompt="cat", seed=2))
+    _insert_gen(view._db, "dog1", _sdxl_full(positive_prompt="dog", seed=1))
+    view._on_strip_activated("cat1")  # different folder than the blank tab -> new tab
+    assert view._subtabs.count() == 2
+    assert _strip_ids(view) == ["cat2", "cat1"]  # the whole cat folder, newest first
 
 
 def test_tab_text_follows_gallery_folder_name(view):

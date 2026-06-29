@@ -1,49 +1,10 @@
 import json
 
-from origenerator.generation_config import (
-    ConfigSnapshot,
-    configs_match,
-    merge_denormalized,
-)
+from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 
 
 def _snapshot(workflow="sdxl_t2i", params=None, seed_is_random=False):
     return ConfigSnapshot(workflow, params or {}, seed_is_random)
-
-
-def test_configs_match_true_for_identical_workflow_and_params():
-    snap = _snapshot(params={"steps": 20, "seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is True
-
-
-def test_configs_match_false_when_seed_is_random():
-    snap = _snapshot(params={"steps": 20, "seed": 7}, seed_is_random=True)
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is False
-
-
-def test_configs_match_false_for_different_workflow():
-    snap = _snapshot(workflow="wan22_i2v", params={"seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"seed": 7}) is False
-
-
-def test_configs_match_false_for_differing_param():
-    snap = _snapshot(params={"steps": 20, "seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 30, "seed": 7}) is False
-
-
-def test_configs_match_ignores_keys_absent_from_stored():
-    snap = _snapshot(params={"steps": 20, "seed": 7, "extra": "live-only"})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is True
-
-
-def test_configs_match_false_when_stored_key_missing_from_snapshot():
-    snap = _snapshot(params={"steps": 20})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is False
-
-
-def test_configs_match_tolerates_float_round_tripping():
-    snap = _snapshot(params={"cfg": 0.3})
-    assert configs_match(snap, "sdxl_t2i", {"cfg": 0.1 + 0.2}) is True
 
 
 def test_merge_denormalized_folds_in_columns():

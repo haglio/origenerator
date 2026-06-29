@@ -5,8 +5,55 @@ the gallery (reuse) and the generate view (subtab prefill + strip-click compare)
 """
 
 import json
+from dataclasses import dataclass
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
+
+
+@dataclass
+class ConfigSnapshot:
+    """A generate panel's live settings, captured for comparison.
+
+    ``params`` is read without randomizing the seed; ``seed_is_random`` records
+    whether the seed's "Random" box is checked (in which case the panel can
+    never match a concrete past generation).
+    """
+
+    workflow_name: str
+    params: dict
+    seed_is_random: bool
+
+
+def configs_match(
+    snapshot: ConfigSnapshot, stored_workflow: str, stored_params: dict
+) -> bool:
+    """True when ``snapshot`` already represents ``stored_workflow``/``stored_params``.
+
+    Compared only over the keys the stored params carry (a panel may expose
+    extra keys a future workflow added). Numeric values compare with a small
+    tolerance so float round-tripping through JSON doesn't spuriously differ.
+    """
+    if snapshot.workflow_name != stored_workflow:
+        return False
+    if snapshot.seed_is_random:
+        return False
+    for key, stored_val in stored_params.items():
+        if key not in snapshot.params:
+            return False
+        if not _values_equal(snapshot.params[key], stored_val):
+            return False
+    return True
+
+
+_FLOAT_TOL = 1e-9
+
+
+def _values_equal(a, b) -> bool:
+    a_num = isinstance(a, (int, float)) and not isinstance(a, bool)
+    b_num = isinstance(b, (int, float)) and not isinstance(b, bool)
+    if a_num and b_num:
+        return abs(a - b) < _FLOAT_TOL
+    return a == b
 
 
 def merge_denormalized(row: dict) -> dict:

@@ -8,6 +8,7 @@ from origenerator.db import Database
 from origenerator.generation_config import configs_match, merge_denormalized
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
+from origenerator.job_queue import JobQueue
 
 
 class GenerateView(QWidget):
@@ -39,10 +40,11 @@ class GenerateView(QWidget):
         self._strip.thumbnail_activated.connect(self._on_strip_activated)
         layout.addWidget(self._strip)
 
+        self._queue = JobQueue(db)  # one generation at a time across subtabs
         self._add_subtab()
 
     def _add_subtab(self) -> GenerateConfigPanel:
-        panel = GenerateConfigPanel(self._client, self._db)
+        panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self._subtabs.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
         panel.generation_completed.connect(self._on_panel_completed)
@@ -66,6 +68,7 @@ class GenerateView(QWidget):
 
     def _close_subtab(self, index: int):
         panel = self._subtabs.widget(index)
+        self._queue.cancel(panel)  # drop its slot, advancing the queue if it was running
         self._subtabs.removeTab(index)
         panel.teardown()
         panel.deleteLater()

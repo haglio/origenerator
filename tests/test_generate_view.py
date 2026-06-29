@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -116,3 +116,24 @@ def test_rename_cancelled_leaves_title(view, monkeypatch):
     view._rename_subtab(idx)
     assert panel._custom_title is None
     assert view._subtabs.tabText(idx) == before
+
+
+def test_second_generate_is_queued_behind_the_first(view):
+    view._client.submit_job = MagicMock(return_value="comfy-1")
+    p1 = view._subtabs.widget(0)
+    p2 = view._add_subtab()
+    p1._on_generate()
+    p2._on_generate()
+    assert view._client.submit_job.call_count == 1   # only the first reaches ComfyUI
+    assert p1._comfy_prompt_id == "comfy-1"           # first is running
+    assert "queued" in p2._status_label.text().lower()
+
+
+def test_closing_running_subtab_advances_the_queue(view):
+    view._client.submit_job = MagicMock(return_value="comfy-1")
+    p1 = view._subtabs.widget(0)
+    p2 = view._add_subtab()
+    p1._on_generate()  # running
+    p2._on_generate()  # queued
+    view._close_subtab(view._subtabs.indexOf(p1))
+    assert p2._comfy_prompt_id == "comfy-1"           # p2 promoted and started

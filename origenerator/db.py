@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 );
 """
 
+# Every column of the generations table, in declaration order. Used to restore a
+# previously-captured row verbatim (see ``restore_generation``).
+_GENERATION_COLUMNS = (
+    "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
+    "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
+    "output_files", "thumbnail_path", "error_message", "duration_seconds",
+    "created_at", "completed_at",
+)
+
 
 class Database:
     def __init__(self, path: Path):
@@ -152,6 +161,21 @@ class Database:
         with self._connect() as conn:
             conn.execute(
                 "DELETE FROM generations WHERE prompt_id = ?", (prompt_id,)
+            )
+
+    def restore_generation(self, row: dict):
+        """Re-insert a row captured by ``get_generation``, exactly as it was.
+
+        Unlike ``insert_generation``, this writes every column present in
+        ``row`` — including the original ``id`` and ``created_at`` — so an undone
+        deletion reappears in its former gallery position rather than on top.
+        """
+        cols = [c for c in _GENERATION_COLUMNS if c in row]
+        placeholders = ", ".join("?" for _ in cols)
+        with self._connect() as conn:
+            conn.execute(
+                f"INSERT INTO generations ({', '.join(cols)}) VALUES ({placeholders})",
+                [row[c] for c in cols],
             )
 
     def get_generation(self, prompt_id: str) -> dict | None:

@@ -18,3 +18,18 @@ def media_type_from_filename(filename: str) -> str | None:
     if ext in VIDEO_EXTS:
         return "video"
     return None
+
+
+def sibling_of_type(path: Path, media: str) -> Path | None:
+    """A file beside ``path`` with the same stem but a ``media``-type extension.
+
+    This is how a video and its VHS_VideoCombine metadata-PNG sidecar find each
+    other — shared by import (which folds them into one entry) and deletion
+    (which removes both so a re-import can't resurrect the orphan).
+    """
+    exts = IMAGE_EXTS if media == "image" else VIDEO_EXTS
+    for ext in sorted(exts):
+        sibling = path.with_suffix(ext)
+        if sibling != path and sibling.exists():
+            return sibling
+    return None

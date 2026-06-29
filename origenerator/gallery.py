@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator.media import media_type_from_filename
+from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 # Params that vary the output without changing its "settings" — collapsed so
@@ -116,6 +116,30 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
         return Path(thumb), "image"
 
     return None
+
+
+def output_disk_files(row: dict, output_dir: Path) -> list[Path]:
+    """Every on-disk output file a row owns, for deletion.
+
+    The referenced output file plus any same-stem sidecar of the other media
+    type — a video's VHS_VideoCombine metadata PNG, say. Removing the sidecar
+    too is what stops a later import from resurrecting the orphan as its own
+    entry. Files already absent are skipped.
+    """
+    paths: list[Path] = []
+    for f in row_output_files(row):
+        filename = f.get("filename")
+        if not filename:
+            continue
+        full = output_dir / f.get("subfolder", "") / filename
+        if not full.exists():
+            continue
+        paths.append(full)
+        other = "video" if media_type_from_filename(filename) == "image" else "image"
+        sidecar = sibling_of_type(full, other)
+        if sidecar is not None:
+            paths.append(sidecar)
+    return paths
 
 
 def _basename(path: str) -> str:

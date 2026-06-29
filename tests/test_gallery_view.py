@@ -37,6 +37,14 @@ class FakeDB:
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
 
+    def recent_durations(self, workflow_name, limit=10):
+        return [
+            r["duration_seconds"] for r in self._rows
+            if r.get("workflow_name") == workflow_name
+            and r.get("status") == "completed"
+            and r.get("duration_seconds") is not None
+        ][:limit]
+
     def folder_meta_map(self):
         return {k: dict(v) for k, v in self._meta.items()}
 
@@ -291,3 +299,50 @@ def test_reuse_emits_merged_params(qtbot, tmp_path):
         "negative_prompt": "blurry",
         "seed": 7,
     }
+
+
+def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
+    rows = [
+        _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
+        _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
+        _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("v1")
+    assert view._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
+
+
+def test_selecting_generation_shows_its_actual_duration(qtbot):
+    rows = [_image("i1", "a cat", 50, 1)]
+    rows[0]["duration_seconds"] = 905.0
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("i1")
+    assert "Duration: 15 min 5 sec" in view._meta_text.toPlainText()
+
+
+def test_generation_without_duration_omits_the_line(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("i1")
+    assert "Duration:" not in view._meta_text.toPlainText()
+
+
+def test_resetting_selection_clears_a_stale_estimate(qtbot):
+    rows = [_image("i1", "a cat", 50, 1)]
+    rows[0]["duration_seconds"] = 6.0
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("i1")
+    assert view._estimate_label.text()  # estimate is showing
+
+    view.refresh()  # nothing selected afterwards
+    assert view._estimate_label.text() == ""

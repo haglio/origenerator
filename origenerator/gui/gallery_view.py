@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
 
-from origenerator import gallery
+from origenerator import gallery, timing
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
 from origenerator.generation_config import merge_denormalized
@@ -71,6 +71,10 @@ class GalleryView(QWidget):
         self._meta_title = QLabel("Select a generation")
         self._meta_title.setWordWrap(True)
         right.addWidget(self._meta_title)
+        self._estimate_label = QLabel()
+        self._estimate_label.setObjectName("estimateLabel")
+        self._estimate_label.setWordWrap(True)
+        right.addWidget(self._estimate_label)
         self._source_link = QLabel()
         self._source_link.setWordWrap(True)
         self._source_link.setTextFormat(Qt.TextFormat.RichText)
@@ -316,12 +320,18 @@ class GalleryView(QWidget):
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
         )
+        self._estimate_label.setText(
+            f"Typical time: {timing.estimate_label(self._db.recent_durations(row['workflow_name']))}"
+        )
         self._update_source_link(row)
         lines = []
         lines.append(f"Status: {row['status']}")
         lines.append(f"Source: {row.get('source', 'generated')}")
         lines.append(f"Seed: {row.get('seed', 'N/A')}")
         lines.append(f"Created: {row.get('created_at', '')}")
+        duration = row.get("duration_seconds")
+        if duration is not None:
+            lines.append(f"Duration: {timing.format_duration(duration)}")
         lines.append("")
         lines.append("--- Positive Prompt ---")
         lines.append(row.get("positive_prompt") or "(empty)")
@@ -384,6 +394,7 @@ class GalleryView(QWidget):
         self._selected = None
         self._reuse_btn.setEnabled(False)
         self._meta_title.setText("Select a generation")
+        self._estimate_label.clear()
         self._meta_text.clear()
         self._source_link.hide()
         self._source_link.clear()

@@ -11,6 +11,14 @@ def _find_node(payload: dict, class_type: str) -> dict | None:
     return None
 
 
+def test_workflows_declare_the_params_that_identify_their_model():
+    # The gallery groups a workflow's generations by these param values, so each
+    # workflow names the param(s) that pick its model.
+    assert SdxlT2iWorkflow().model_keys == ("checkpoint",)
+    assert Wan22I2vWorkflow().model_keys == ("unet_high", "unet_low")
+    assert Wan22Flf2vLoopWorkflow().model_keys == ("unet_high", "unet_low")
+
+
 def test_sdxl_t2i_default_params_has_required_keys():
     wf = SdxlT2iWorkflow()
     params = wf.default_params()

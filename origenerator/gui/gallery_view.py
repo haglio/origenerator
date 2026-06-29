@@ -53,8 +53,8 @@ class GalleryView(QWidget):
         layout = QHBoxLayout(self)
         layout.setSpacing(8)
 
-        # Far left: folder tree (media -> workflow -> settings). Folders start
-        # collapsed and only expand on the disclosure arrow; double-click renames.
+        # Far left: folder tree (media -> workflow -> model -> settings). Folders
+        # start collapsed and only expand on the disclosure arrow; double-click renames.
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)

@@ -1,9 +1,11 @@
 """Pure gallery model: classify and group generations into a folder tree.
 
-The gallery view organizes generations as folders nested three levels deep:
-media type (Images/Videos) -> workflow -> settings group (rows sharing every
-setting except the seed). This module owns that grouping logic with no Qt
-dependency so it can be unit-tested directly.
+The gallery view organizes generations as folders nested four levels deep:
+media type (Images/Videos) -> workflow -> model -> settings group (rows sharing
+every setting except the seed). A workflow's runs split by which model produced
+them, since the same workflow can yield dramatically different output per model.
+This module owns that grouping logic with no Qt dependency so it can be
+unit-tested directly.
 """
 
 import hashlib
@@ -19,6 +21,9 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 SEED_KEYS = frozenset({"seed", "noise_seed"})
 
 MEDIA_LABELS = {"image": "Images", "video": "Videos"}
+
+# File extensions stripped from a model filename to make a tidy folder label.
+MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
 
 
 def parse_params(params_json: str | None) -> dict:
@@ -46,6 +51,19 @@ def workflow_output_type(workflow_name: str | None) -> str | None:
     """Return the registered workflow's ``output_type``, or ``None`` if unknown."""
     wf = WORKFLOW_REGISTRY.get(workflow_name or "")
     return wf.output_type if wf else None
+
+
+def workflow_model_keys(workflow_name: str | None) -> tuple[str, ...]:
+    """The param keys whose values name the model a workflow's row ran with."""
+    wf = WORKFLOW_REGISTRY.get(workflow_name or "")
+    return tuple(wf.model_keys) if wf else ()
+
+
+def model_signature(workflow_name: str | None, params_json: str | None) -> str:
+    """Canonical key for grouping a workflow's rows by the model they used."""
+    params = parse_params(params_json)
+    values = [params.get(key) for key in workflow_model_keys(workflow_name)]
+    return json.dumps(values, default=str)
 
 
 def row_output_files(row: dict) -> list[dict]:
@@ -129,6 +147,30 @@ def workflow_label(workflow_name: str | None) -> str:
     return wf.display_name if wf else (workflow_name or "unknown")
 
 
+def _model_name(value) -> str:
+    """A model file's display form: final path segment, model extension stripped."""
+    base = _basename(str(value))
+    for ext in MODEL_EXTS:
+        if base.lower().endswith(ext):
+            return base[: -len(ext)]
+    return base
+
+
+def model_label(workflow_name: str | None, params: dict) -> str:
+    """Human-facing folder name for the model a row used.
+
+    Joins each model param's cleaned filename. Falls back to ``"(unknown
+    model)"`` when the workflow declares no model keys or the row recorded none
+    of their values (e.g. an imported file whose graph didn't carry the model).
+    """
+    parts = [
+        _model_name(params[key])
+        for key in workflow_model_keys(workflow_name)
+        if params.get(key)
+    ]
+    return " / ".join(parts) or "(unknown model)"
+
+
 def _prompt_headline(params: dict) -> str:
     """The positive prompt as a single trimmed line, or ``""`` if empty."""
     prompt = " ".join((params.get("positive_prompt") or "").split())
@@ -192,9 +234,16 @@ def settings_label(params: dict, distinguishing_keys=()) -> str:
 @dataclass
 class SettingsGroup:
     key: str
-    signature: str
     label: str
     rows: list[dict]
+    starred: bool = False
+
+
+@dataclass
+class ModelGroup:
+    key: str
+    label: str
+    settings_groups: list[SettingsGroup]
     starred: bool = False
 
 
@@ -203,7 +252,7 @@ class WorkflowGroup:
     key: str
     workflow_name: str
     label: str
-    settings_groups: list[SettingsGroup]
+    model_groups: list[ModelGroup]
     starred: bool = False
 
 
@@ -221,6 +270,8 @@ def child_groups(group) -> list:
     if isinstance(group, MediaGroup):
         return group.workflow_groups
     if isinstance(group, WorkflowGroup):
+        return group.model_groups
+    if isinstance(group, ModelGroup):
         return group.settings_groups
     return []
 
@@ -245,6 +296,13 @@ def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
     return f"{media_type}/{workflow_name}/{digest}"
 
 
+def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
+    # The "m" prefix keeps a model folder's key clear of a settings folder's
+    # pure-hex digest segment, so the two never collide in folder_meta.
+    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
+    return f"{media_type}/{workflow_name}/m{digest}"
+
+
 def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
     """Apply a folder's saved custom name and star, returning (label, starred)."""
     meta = folder_meta.get(key, {})
@@ -256,10 +314,56 @@ def _starred_first(groups: list) -> list:
     return sorted(groups, key=lambda g: not g.starred)
 
 
+def _build_settings_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
+) -> list[SettingsGroup]:
+    """The settings-group leaves under one model folder.
+
+    Rows collapse by settings signature (all non-seed params), and each leaf's
+    label is disambiguated only against its siblings under the same model — so
+    the model, constant here, never re-appears in a settings name.
+    """
+    grouped = _group_ordered(
+        rows, lambda r: settings_signature(r.get("params_json"))
+    )
+    settings_dicts = [
+        settings_only(parse_params(sig_rows[0].get("params_json")))
+        for _sig, sig_rows in grouped
+    ]
+    distinguishing = _distinguishing_keys(settings_dicts)
+    groups = []
+    for i, (sig, sig_rows) in enumerate(grouped):
+        key = _settings_key(media_type, wf_name, sig)
+        label, starred = _overlay(
+            settings_label(settings_dicts[i], distinguishing), key, folder_meta
+        )
+        groups.append(SettingsGroup(key, label, sig_rows, starred))
+    return _starred_first(groups)
+
+
+def _build_model_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
+) -> list[ModelGroup]:
+    """The model folders under one workflow, each holding its settings leaves."""
+    groups = []
+    for sig, model_rows in _group_ordered(
+        rows, lambda r: model_signature(wf_name, r.get("params_json"))
+    ):
+        key = _model_key(media_type, wf_name, sig)
+        params = parse_params(model_rows[0].get("params_json"))
+        label, starred = _overlay(model_label(wf_name, params), key, folder_meta)
+        groups.append(ModelGroup(
+            key, label,
+            _build_settings_groups(media_type, wf_name, model_rows, folder_meta),
+            starred,
+        ))
+    return _starred_first(groups)
+
+
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None
 ) -> list[MediaGroup]:
-    """Nest rows into media -> workflow -> settings-group folders.
+    """Nest rows into media -> workflow -> model -> settings-group folders.
 
     Folders appear in the order their first member appears in ``rows`` (the
     caller orders rows newest-first), except that starred folders float to the
@@ -273,40 +377,19 @@ def build_gallery_tree(
         for wf_name, wf_rows in _group_ordered(
             media_rows, lambda r: r.get("workflow_name") or "unknown"
         ):
-            grouped = _group_ordered(
-                wf_rows, lambda r: settings_signature(r.get("params_json"))
-            )
-            settings_dicts = [
-                settings_only(parse_params(sig_rows[0].get("params_json")))
-                for _sig, sig_rows in grouped
-            ]
-            distinguishing = _distinguishing_keys(settings_dicts)
-            settings_groups = []
-            for i, (sig, sig_rows) in enumerate(grouped):
-                key = _settings_key(media_type, wf_name, sig)
-                label, starred = _overlay(
-                    settings_label(settings_dicts[i], distinguishing), key, folder_meta
-                )
-                settings_groups.append(
-                    SettingsGroup(key, sig, label, sig_rows, starred)
-                )
-
             wf_key = f"{media_type}/{wf_name}"
             wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
-            workflow_groups.append(
-                WorkflowGroup(
-                    wf_key, wf_name, wf_label,
-                    _starred_first(settings_groups), wf_starred,
-                )
-            )
+            workflow_groups.append(WorkflowGroup(
+                wf_key, wf_name, wf_label,
+                _build_model_groups(media_type, wf_name, wf_rows, folder_meta),
+                wf_starred,
+            ))
 
         media_label, media_starred = _overlay(
             MEDIA_LABELS.get(media_type, media_type.title()), media_type, folder_meta
         )
-        tree.append(
-            MediaGroup(
-                media_type, media_type, media_label,
-                _starred_first(workflow_groups), media_starred,
-            )
-        )
+        tree.append(MediaGroup(
+            media_type, media_type, media_label,
+            _starred_first(workflow_groups), media_starred,
+        ))
     return _starred_first(tree)

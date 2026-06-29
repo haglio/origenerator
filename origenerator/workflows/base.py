@@ -21,6 +21,9 @@ class WorkflowTemplate(ABC):
     version: str
     display_name: str
     output_type: str  # "image" or "video"
+    # The param key(s) whose values identify which model produced an output.
+    # The gallery groups a workflow's generations into model folders by these.
+    model_keys: tuple[str, ...] = ()
 
     @abstractmethod
     def default_params(self) -> dict:

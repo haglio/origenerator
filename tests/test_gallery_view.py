@@ -95,7 +95,7 @@ def _key(item):
     return item.data(0, _GROUP_ROLE).key
 
 
-def test_refresh_builds_media_workflow_settings_tree(qtbot):
+def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
         _image("i2", "a cat", 50, 2),  # same settings, different seed
@@ -111,8 +111,10 @@ def test_refresh_builds_media_workflow_settings_tree(qtbot):
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
-    # The two seed variants collapse into a single settings folder.
+    # A model folder sits under the workflow; beneath it the two seed variants
+    # collapse into a single settings folder.
     assert workflow_node.childCount() == 1
+    assert workflow_node.child(0).childCount() == 1
 
 
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
@@ -137,14 +139,14 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    model = _top_level(view._tree)["Images"].child(0).child(0)
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
-    view._tree.setCurrentItem(workflow)
+    view._tree.setCurrentItem(model)
     assert len(view.visible_folder_keys()) == 2
     assert view.visible_prompt_ids() == []
 
     # A leaf (settings) folder shows the actual item thumbnails.
-    cat_leaf = workflow.child(0)
+    cat_leaf = model.child(0)
     view._tree.setCurrentItem(cat_leaf)
     assert set(view.visible_prompt_ids()) == {"i1", "i2"}
     assert view.visible_folder_keys() == []
@@ -156,9 +158,9 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
-    view._tree.setCurrentItem(workflow)
-    a_tile_key = view.visible_folder_keys()[0]
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    view._tree.setCurrentItem(model)
+    a_tile_key = view.visible_folder_keys()[0]  # a settings tile under the model
 
     view._drill_into(a_tile_key)  # same path the tile's clicked signal triggers
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
@@ -185,14 +187,14 @@ def test_starring_a_folder_persists_and_floats_it_to_top(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
-    dog_key = _key(workflow.child(1))  # cat is first, dog second
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    dog_key = _key(model.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
-    workflow = _top_level(view._tree)["Images"].child(0)
-    assert _key(workflow.child(0)) == dog_key          # floated above the cat
-    assert workflow.child(0).text(0).startswith("★")
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    assert _key(model.child(0)) == dog_key          # floated above the cat
+    assert model.child(0).text(0).startswith("★")
 
 
 def test_new_generations_appear_without_manual_refresh(qtbot):
@@ -230,8 +232,8 @@ def test_selecting_a_folder_auto_selects_its_first_item(qtbot):
     view._tree.setCurrentItem(workflow)
     assert view._selected["prompt_id"] == "i1"
 
-    # ...and so does selecting a leaf folder.
-    view._tree.setCurrentItem(workflow.child(0))
+    # ...and so does selecting a leaf folder (workflow -> model -> settings).
+    view._tree.setCurrentItem(workflow.child(0).child(0))
     assert view._selected["prompt_id"] == "i1"
 
 
@@ -343,7 +345,8 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(1)
+    # Images -> SDXL workflow -> model -> dog settings leaf (cat is sibling 0).
+    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(0).child(1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
     chosen = set(saved.visible_prompt_ids())

@@ -1,19 +1,25 @@
 import sys
 
-ORIGENERATOR_APP_USER_MODEL_ID = "FunTime.Origenerator"
 
+def _init_windows_taskbar_identity() -> None:
+    """Give Origenerator its own taskbar identity so the pinned launcher icon
+    activates this window instead of spawning a second taskbar button.
 
-def _set_windows_app_user_model_id() -> None:
+    Sets the process AppUserModelID and stamps the matching ID onto the pinned
+    shortcut, which is what lets Windows group them as one app. No-op off Windows.
+    """
     if sys.platform != "win32":
         return
+    from origenerator.win32 import (
+        APP_USER_MODEL_ID,
+        set_app_user_model_id,
+        stamp_pinned_shortcuts,
+    )
     try:
-        import ctypes
-        set_app_id = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
-        set_app_id.argtypes = [ctypes.c_wchar_p]
-        set_app_id.restype = ctypes.c_long
-        set_app_id(ORIGENERATOR_APP_USER_MODEL_ID)
-    except Exception:
-        pass
+        set_app_user_model_id(APP_USER_MODEL_ID)
+    except OSError:
+        pass  # Non-fatal — still try to stamp the shortcut below.
+    stamp_pinned_shortcuts(APP_USER_MODEL_ID, include="origenerator")
 
 
 def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
@@ -65,7 +71,7 @@ def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump
 
 
 def main():
-    _set_windows_app_user_model_id()
+    _init_windows_taskbar_identity()
 
     import logging
 

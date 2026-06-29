@@ -3,9 +3,33 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from origenerator.app import _ensure_comfyui_server, main
+from origenerator.app import (
+    _ensure_comfyui_server,
+    _init_windows_taskbar_identity,
+    main,
+)
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+
+
+def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
+    with patch("origenerator.app.sys.platform", "win32"), \
+         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+        _init_windows_taskbar_identity()
+
+    mock_set_id.assert_called_once_with("FunTime.Origenerator")
+    mock_stamp.assert_called_once_with("FunTime.Origenerator", include="origenerator")
+
+
+def test_init_windows_taskbar_identity_noop_off_windows():
+    with patch("origenerator.app.sys.platform", "linux"), \
+         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+        _init_windows_taskbar_identity()
+
+    mock_set_id.assert_not_called()
+    mock_stamp.assert_not_called()
 
 
 def test_ensure_server_warns_when_port_held_by_non_comfyui():
@@ -64,7 +88,8 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
     window = MagicMock()
     window.show.side_effect = lambda: events.append("window.show")
 
-    with patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.db.Database"), \

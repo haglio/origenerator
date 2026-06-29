@@ -704,7 +704,13 @@ class GalleryView(QWidget):
         if not row:
             return
         self._selected = row
-        self._reuse_btn.setEnabled(True)
+        reusable = row.get("workflow_name") in WORKFLOW_REGISTRY
+        self._reuse_btn.setEnabled(reusable)
+        self._reuse_btn.setToolTip(
+            "" if reusable else
+            "This workflow isn't built into the app yet — ask Claude to "
+            "implement it if you want to reuse its parameters."
+        )
         self._show_preview(row)
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
@@ -748,6 +754,7 @@ class GalleryView(QWidget):
     def _clear_metadata(self):
         self._selected = None
         self._reuse_btn.setEnabled(False)
+        self._reuse_btn.setToolTip("")
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_panel.clear()

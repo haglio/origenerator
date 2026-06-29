@@ -549,6 +549,28 @@ def test_reuse_emits_merged_params(qtbot, tmp_path):
     }
 
 
+def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", params_json=json.dumps({"steps": 20}),
+        workflow_json="{}",
+    )
+    db.insert_generation(
+        prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    view._on_thumbnail_clicked("reg")  # a built-in workflow → reusable
+    assert view._reuse_btn.isEnabled() is True
+
+    view._on_thumbnail_clicked("unreg")  # no template for it → greyed out
+    assert view._reuse_btn.isEnabled() is False
+    assert "claude" in view._reuse_btn.toolTip().lower()
+
+
 def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
     rows = [
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),

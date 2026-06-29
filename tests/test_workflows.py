@@ -19,6 +19,13 @@ def test_workflows_declare_the_params_that_identify_their_model():
     assert Wan22Flf2vLoopWorkflow().model_keys == ("unet_high", "unet_low")
 
 
+def test_workflows_expose_their_seed_param_keys():
+    # A variation re-rolls exactly these; dual-noise video workflows have two.
+    assert SdxlT2iWorkflow().seed_keys() == ("seed",)
+    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed")
+    assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed")
+
+
 def test_sdxl_t2i_default_params_has_required_keys():
     wf = SdxlT2iWorkflow()
     params = wf.default_params()

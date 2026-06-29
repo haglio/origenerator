@@ -33,6 +33,14 @@ class WorkflowTemplate(ABC):
     def param_definitions(self) -> list[ParamDef]:
         """Return ordered list of ParamDef for the UI form builder."""
 
+    def seed_keys(self) -> tuple[str, ...]:
+        """Param keys whose type is ``seed`` — the seed(s) a variation re-rolls.
+
+        A workflow with two seeds (e.g. dual-noise video) reports both, in form
+        order. Derived from ``param_definitions`` so it stays in sync with the UI.
+        """
+        return tuple(pd.key for pd in self.param_definitions() if pd.type == "seed")
+
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""

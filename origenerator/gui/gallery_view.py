@@ -405,8 +405,7 @@ class GalleryView(QWidget):
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
         if workflow is None:
             return
-        seed_keys = [pd.key for pd in workflow.param_definitions() if pd.type == "seed"]
-        params = randomize_seeds(merge_denormalized(group.rows[0]), seed_keys)
+        params = randomize_seeds(merge_denormalized(group.rows[0]), workflow.seed_keys())
         try:
             job = GenerationJob(self._client, workflow, params)
         except Exception as e:

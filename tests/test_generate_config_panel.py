@@ -6,6 +6,7 @@ import pytest
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
 
@@ -137,3 +138,72 @@ def test_generate_submits_when_input_image_present(qtbot, tmp_path):
     panel._param_form.set_values({"input_image": "start.png"})
     panel._on_generate()
     client.submit_job.assert_called_once()
+
+
+class SpyDB:
+    """Records the calls a panel makes, returning canned recent durations."""
+
+    def __init__(self, durations=None):
+        self._durations = durations or []
+        self.updates = []
+        self.inserts = []
+
+    def recent_durations(self, workflow_name, limit=10):
+        return list(self._durations)
+
+    def insert_generation(self, **kwargs):
+        self.inserts.append(kwargs)
+
+    def update_generation(self, prompt_id, **fields):
+        self.updates.append((prompt_id, fields))
+
+
+def _history_with_duration(seconds):
+    ms = int(seconds * 1000)
+    return {"status": {"messages": [
+        ["execution_start", {"timestamp": 1_000}],
+        ["execution_success", {"timestamp": 1_000 + ms}],
+    ]}}
+
+
+def _spy_panel(qtbot, db):
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    return panel
+
+
+def test_on_completed_records_execution_duration(qtbot):
+    db = SpyDB()
+    panel = _spy_panel(qtbot, db)
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfyui-xyz"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+
+    panel._on_completed("comfyui-xyz", _history_with_duration(15.26))
+
+    prompt_id, fields = db.updates[-1]
+    assert prompt_id == "p1"
+    assert fields["status"] == "completed"
+    assert fields["duration_seconds"] == 15.26
+
+
+def test_estimate_label_reflects_recent_durations(qtbot):
+    panel = _spy_panel(qtbot, SpyDB(durations=[700.0, 724.0, 800.0]))
+    assert panel._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
+
+
+def test_estimate_label_when_no_history(qtbot):
+    panel = _spy_panel(qtbot, SpyDB(durations=[]))
+    assert panel._estimate_label.text() == "Typical time: No timing data yet"
+
+
+def test_on_completed_status_shows_actual_time(qtbot):
+    db = SpyDB()
+    panel = _spy_panel(qtbot, db)
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfyui-xyz"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+
+    panel._on_completed("comfyui-xyz", _history_with_duration(905))
+
+    assert panel._status_label.text() == "Done in 15 min 5 sec"

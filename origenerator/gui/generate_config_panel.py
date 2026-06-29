@@ -14,6 +14,11 @@ from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
 from origenerator.thumbnail import generate_thumbnail
+from origenerator.timing import (
+    estimate_label,
+    execution_duration_seconds,
+    format_duration,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 
@@ -54,6 +59,10 @@ class GenerateConfigPanel(QWidget):
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
         header.addWidget(self._workflow_combo, 1)
         layout.addLayout(header)
+
+        self._estimate_label = QLabel()
+        self._estimate_label.setObjectName("estimateLabel")
+        layout.addWidget(self._estimate_label)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -110,7 +119,15 @@ class GenerateConfigPanel(QWidget):
             wf = WORKFLOW_REGISTRY[key]
             self._param_form = ParamForm(wf.param_definitions())
             self._scroll.setWidget(self._param_form)
+        self._refresh_estimate()
         self.title_changed.emit(self._workflow_combo.currentText())
+
+    def _refresh_estimate(self):
+        """Show how long this workflow typically takes, from its recent runs."""
+        key = self._workflow_combo.currentData()
+        wf = WORKFLOW_REGISTRY.get(key)
+        durations = self._db.recent_durations(wf.name) if wf else []
+        self._estimate_label.setText(f"Typical time: {estimate_label(durations)}")
 
     def _on_generate(self):
         key = self._workflow_combo.currentData()
@@ -195,19 +212,26 @@ class GenerateConfigPanel(QWidget):
                 thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
 
         now = datetime.now(timezone.utc).isoformat()
-        self._db.update_generation(
-            self._client_prompt_id,
+        duration = execution_duration_seconds(history_data)
+        fields = dict(
             status="completed",
             output_files=json.dumps(files),
             thumbnail_path=thumb_path,
             completed_at=now,
         )
-        self._status_label.setText("Done!")
+        if duration is not None:
+            fields["duration_seconds"] = duration
+        self._db.update_generation(self._client_prompt_id, **fields)
+        if duration is not None:
+            self._status_label.setText(f"Done in {format_duration(duration)}")
+        else:
+            self._status_label.setText("Done!")
         self._progress.setValue(self._progress.maximum())
         self._generate_btn.setEnabled(True)
         completed_id = self._client_prompt_id
         self._reset_job()
         self.generation_completed.emit(completed_id)
+        self._refresh_estimate()
 
     def _on_error(self, prompt_id: str, error_msg: str):
         if not self._is_mine(prompt_id):

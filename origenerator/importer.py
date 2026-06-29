@@ -8,13 +8,11 @@ from pathlib import Path
 from PIL import Image
 
 from origenerator.db import Database
+from origenerator.media import media_type_from_filename
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
-
-_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
-_VIDEO_EXTS = {".mp4", ".webm"}
 
 
 def _workflow_name_by_filename_prefix() -> dict[str, str]:
@@ -55,16 +53,15 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
     for dirpath, _, filenames in os.walk(output_dir):
         for fname in sorted(filenames):
             fpath = Path(dirpath) / fname
-            suffix = fpath.suffix.lower()
-            if suffix not in _IMAGE_EXTS and suffix not in _VIDEO_EXTS:
+            output_type = media_type_from_filename(fname)
+            if output_type is None:
                 continue
 
             rel_path = fpath.relative_to(output_dir).as_posix()
             if rel_path in existing:
                 continue
 
-            output_type = "image" if suffix in _IMAGE_EXTS else "video"
-            metadata = _extract_metadata(fpath, suffix)
+            metadata = _extract_metadata(fpath, fpath.suffix.lower())
             prompt_id = str(uuid.uuid4())
 
             thumb_path = None

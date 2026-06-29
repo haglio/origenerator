@@ -255,12 +255,16 @@ class FakeQueue:
     def __init__(self):
         self.submitted = []
         self.released = []
+        self.canceled = []
 
     def submit(self, panel, workflow_name):
         self.submitted.append((panel, workflow_name))
 
     def release(self, panel):
         self.released.append(panel)
+
+    def cancel(self, panel):
+        self.canceled.append(panel)
 
 
 def _queued_panel(qtbot, tmp_path):
@@ -332,3 +336,74 @@ def test_completion_records_generated_id(panel):
     panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     panel._on_completed("comfy-A", SDXL_HISTORY)
     assert panel.generated_ids() == ["p1"]
+# ---- live preview ----
+
+def test_preview_frame_shown_only_for_own_job(panel):
+    panel._on_generate()
+    panel._preview.show_frame = MagicMock()
+
+    panel._client.preview_image.emit("comfy-OTHER", b"x")
+    panel._preview.show_frame.assert_not_called()
+
+    panel._client.preview_image.emit("comfy-A", b"img-bytes")
+    panel._preview.show_frame.assert_called_once_with(b"img-bytes")
+
+
+# ---- cancel ----
+
+def test_cancel_disabled_until_a_job_starts(panel):
+    assert panel._cancel_btn.isEnabled() is False
+    panel._on_generate()
+    assert panel._cancel_btn.isEnabled() is True
+
+
+def test_cancel_running_job_interrupts_and_removes_row(panel):
+    panel._client.interrupt = MagicMock()
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()
+    our_id = panel._client_prompt_id
+    panel._client.node_executing.emit("comfy-A", "5")  # our job is now executing
+
+    panel._on_cancel()
+
+    panel._client.interrupt.assert_called_once()
+    panel._client.cancel_prompt.assert_not_called()
+    assert panel._db.get_generation(our_id) is None  # a canceled run leaves no trace
+    assert panel._generate_btn.isEnabled() is True
+    assert panel._cancel_btn.isEnabled() is False
+
+
+def test_cancel_submitted_but_unstarted_job_dequeues(panel):
+    panel._client.interrupt = MagicMock()
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()  # submitted to ComfyUI but no executing signal yet
+    our_id = panel._client_prompt_id
+
+    panel._on_cancel()
+
+    panel._client.cancel_prompt.assert_called_once_with("comfy-A")
+    panel._client.interrupt.assert_not_called()
+    assert panel._db.get_generation(our_id) is None
+
+
+def test_cancel_while_queued_drops_the_queue_slot(qtbot, tmp_path):
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    panel._on_generate()  # queued in the JobQueue, not yet submitted
+
+    panel._on_cancel()
+
+    assert queue.canceled == [panel]
+    client.submit_job.assert_not_called()
+    assert panel._db.list_generations() == []  # nothing was ever recorded
+    assert panel._cancel_btn.isEnabled() is False
+
+
+def test_completed_job_cannot_be_canceled(panel):
+    panel._client.interrupt = MagicMock()
+    panel._on_generate()
+    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+
+    panel._on_cancel()  # no in-flight job remains
+
+    panel._client.interrupt.assert_not_called()
+    assert panel._cancel_btn.isEnabled() is False

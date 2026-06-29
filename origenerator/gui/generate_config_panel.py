@@ -14,6 +14,7 @@ from origenerator.db import Database
 from origenerator.gallery import config_tab_title
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import (
     estimate_label,
@@ -49,6 +50,7 @@ class GenerateConfigPanel(QWidget):
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
         self._generated_ids: list[str] = []           # generations this tab produced, newest first
+        self._executing = False                        # has ComfyUI started our prompt yet?
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -70,9 +72,15 @@ class GenerateConfigPanel(QWidget):
         self._estimate_label.setObjectName("estimateLabel")
         layout.addWidget(self._estimate_label)
 
+        # The settings form sits beside a live preview that mirrors the job in
+        # progress (ComfyUI's preview frames) and then the finished output.
+        body = QHBoxLayout()
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        layout.addWidget(self._scroll, 1)
+        body.addWidget(self._scroll, 3)
+        self._preview = PreviewWidget()
+        body.addWidget(self._preview, 2)
+        layout.addLayout(body, 1)
 
         bottom = QVBoxLayout()
         self._progress = QProgressBar()
@@ -83,7 +91,11 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.setObjectName("generateBtn")
         self._generate_btn.clicked.connect(self._on_generate)
+        self._cancel_btn = QPushButton("Cancel")
+        self._cancel_btn.clicked.connect(self._on_cancel)
+        self._cancel_btn.setEnabled(False)
         btn_row.addStretch()
+        btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         bottom.addLayout(btn_row)
         layout.addLayout(bottom)
@@ -92,6 +104,8 @@ class GenerateConfigPanel(QWidget):
 
     def _connect_signals(self):
         self._client.progress.connect(self._on_progress)
+        self._client.node_executing.connect(self._on_node_executing)
+        self._client.preview_image.connect(self._on_preview)
         self._client.job_completed.connect(self._on_completed)
         self._client.job_error.connect(self._on_error)
         self._client.connected.connect(self._on_connected)
@@ -101,6 +115,8 @@ class GenerateConfigPanel(QWidget):
         """Disconnect from the shared client before the panel is destroyed."""
         for signal, slot in (
             (self._client.progress, self._on_progress),
+            (self._client.node_executing, self._on_node_executing),
+            (self._client.preview_image, self._on_preview),
             (self._client.job_completed, self._on_completed),
             (self._client.job_error, self._on_error),
             (self._client.connected, self._on_connected),
@@ -229,6 +245,7 @@ class GenerateConfigPanel(QWidget):
         """
         self._prepared = {"payload": payload, "workflow": workflow, "record": record}
         self._generate_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(True)
         if self._queue is not None:
             self._show_waiting()
             self._queue.submit(self, queue_name)
@@ -254,12 +271,14 @@ class GenerateConfigPanel(QWidget):
             self._comfy_prompt_id = actual_pid
             self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
+            self._preview.clear()  # a fresh job: drop the previous result
             self._show_running()
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))
             self._show_error(f"Error: {e}")
             self._generate_btn.setEnabled(True)
+            self._cancel_btn.setEnabled(False)
             self._release_queue_slot()
 
     def set_queue_status(self, position: int, eta_seconds: float):
@@ -288,6 +307,18 @@ class GenerateConfigPanel(QWidget):
             self._progress.setRange(0, max_val)
             self._progress.setValue(value)
 
+    def _on_node_executing(self, prompt_id: str, _node_id: str):
+        # ComfyUI has begun running our prompt (vs. it merely sitting in the
+        # server queue, behind e.g. a gallery re-roll). This decides whether
+        # Cancel interrupts the run or just dequeues it. ``executing`` precedes
+        # any ``progress`` for the prompt, so it's the earliest signal we get.
+        if self._is_mine(prompt_id):
+            self._executing = True
+
+    def _on_preview(self, prompt_id: str, data: bytes):
+        if self._is_mine(prompt_id):
+            self._preview.show_frame(data)
+
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
             return
@@ -304,6 +335,7 @@ class GenerateConfigPanel(QWidget):
             if source.exists():
                 THUMB_DIR.mkdir(parents=True, exist_ok=True)
                 thumb_path = str(generate_thumbnail(source, wf.output_type, THUMB_DIR))
+                self._preview.show_media(source, wf.output_type)
 
         now = datetime.now(timezone.utc).isoformat()
         duration = execution_duration_seconds(history_data)
@@ -321,6 +353,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._show_done("Done!")
         self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
         completed_id = self._client_prompt_id
         self._generated_ids.insert(0, completed_id)  # this tab's own history, newest first
         self._reset_job()
@@ -338,13 +371,40 @@ class GenerateConfigPanel(QWidget):
         )
         self._show_error(f"Error: {error_msg[:100]}")
         self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
         self._reset_job()
         self._release_queue_slot()
+
+    def _on_cancel(self):
+        """Stop this tab's generation: a queued slot, a server-queued prompt, or
+        a running one — whichever stage it's at — leaving no half-done row."""
+        staged = self._prepared is not None
+        comfy_id = self._comfy_prompt_id
+        if self._queue is not None and (staged or comfy_id is not None):
+            self._queue.cancel(self)  # drop our slot (pending or the running head)
+        if comfy_id is not None:
+            try:
+                if self._executing:
+                    self._client.interrupt()
+                else:
+                    self._client.cancel_prompt(comfy_id)
+            except Exception as e:
+                logger.warning("Cancel failed for %s: %s", comfy_id, e)
+            if self._client_prompt_id:
+                self._db.delete_generation(self._client_prompt_id)
+        elif not staged:
+            return  # nothing in flight to cancel
+        self._prepared = None
+        self._reset_job()
+        self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
+        self._show_ready("Canceled")
 
     def _reset_job(self):
         self._client_prompt_id = None
         self._comfy_prompt_id = None
         self._submitted_workflow = None
+        self._executing = False
 
     def generated_ids(self) -> list[str]:
         """Prompt ids of the generations this tab has produced, newest first."""

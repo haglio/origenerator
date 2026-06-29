@@ -303,3 +303,67 @@ def test_set_queue_status_shows_position_and_eta(panel):
     panel.set_queue_status(2, 905.0)
     text = panel._status_label.text()
     assert "#2" in text and "15 min" in text
+
+
+# ---- generic captured-graph replay ----
+
+def test_submit_replay_patches_graph_and_submits(panel):
+    sent = {}
+    panel._client.submit_job = lambda payload: (sent.update(payload), "comfy-R")[1]
+    graph = {
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "old"},
+              "_meta": {"title": "Positive"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "oldneg"},
+              "_meta": {"title": "Negative"}},
+        "4": {"class_type": "KSampler", "inputs": {"seed": 1}},
+    }
+    row = {"workflow_name": "hunyuan_t2v", "workflow_version": "imported",
+           "workflow_json": json.dumps(graph), "params_json": "{}",
+           "positive_prompt": "old", "negative_prompt": "oldneg", "seed": 1}
+
+    panel.submit_replay(row, {"positive": "new pos", "negative": "new neg",
+                              "seed": 999, "input_image": None})
+
+    assert sent["2"]["inputs"]["text"] == "new pos"
+    assert sent["3"]["inputs"]["text"] == "new neg"
+    assert sent["4"]["inputs"]["seed"] == 999
+    rows = panel._db.list_generations()
+    assert len(rows) == 1
+    assert rows[0]["workflow_name"] == "hunyuan_t2v"
+    assert rows[0]["status"] == "running"
+    assert panel._submitted_workflow is None   # routes completion through generic path
+
+
+def test_submit_replay_blocks_on_missing_source(panel):
+    graph = {"1": {"class_type": "LoadImage",
+                   "inputs": {"image": "definitely_absent_zzz.png"}}}
+    row = {"workflow_name": "x", "workflow_version": "imported",
+           "workflow_json": json.dumps(graph), "params_json": "{}"}
+    called = []
+    panel._client.submit_job = lambda payload: called.append(payload) or "c"
+
+    panel.submit_replay(row, {"positive": "p", "negative": "",
+                              "seed": None, "input_image": None})
+
+    assert called == []
+    assert "missing" in panel._status_label.text().lower()
+    assert panel._db.list_generations() == []
+
+
+def test_replay_completion_uses_generic_extractor(panel):
+    panel._db.insert_generation(
+        prompt_id="p1", workflow_name="x", workflow_version="replay",
+        params_json="{}", workflow_json="{}",
+    )
+    panel._db.update_generation("p1", status="running")
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfy-R"
+    panel._submitted_workflow = None  # replay: no captured template
+
+    # VHS_VideoCombine reports under "gifs"; the generic extractor must find it.
+    history = {"outputs": {"9": {"gifs": [{"filename": "out.mp4", "subfolder": "video"}]}}}
+    panel._client.job_completed.emit("comfy-R", history)
+
+    row = panel._db.get_generation("p1")
+    assert row["status"] == "completed"
+    assert "out.mp4" in row["output_files"]

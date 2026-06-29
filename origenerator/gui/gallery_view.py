@@ -14,6 +14,7 @@ from origenerator.db import Database
 from origenerator.generation_config import merge_denormalized
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.rerun_dialog import ReRunDialog
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
@@ -23,7 +24,8 @@ _PREVIEW_COUNT = 4
 
 
 class GalleryView(QWidget):
-    reuse_requested = pyqtSignal(str, dict)  # workflow_name, params dict
+    reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
+    replay_requested = pyqtSignal(dict, dict)  # selected row, overrides dict
 
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
@@ -96,6 +98,14 @@ class GalleryView(QWidget):
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
         right.addWidget(self._reuse_btn)
+        self._rerun_btn = QPushButton("Re-run…")
+        self._rerun_btn.setToolTip(
+            "Re-run this generation's exact workflow with an editable "
+            "prompt, seed and input image — even for unregistered workflows."
+        )
+        self._rerun_btn.clicked.connect(self._on_rerun)
+        self._rerun_btn.setEnabled(False)
+        right.addWidget(self._rerun_btn)
         layout.addLayout(right, 3)
 
     def showEvent(self, event):
@@ -353,6 +363,7 @@ class GalleryView(QWidget):
             return
         self._selected = row
         self._reuse_btn.setEnabled(True)
+        self._rerun_btn.setEnabled(_has_graph(row))
         self._show_preview(row)
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
@@ -430,6 +441,7 @@ class GalleryView(QWidget):
     def _clear_metadata(self):
         self._selected = None
         self._reuse_btn.setEnabled(False)
+        self._rerun_btn.setEnabled(False)
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_text.clear()
@@ -446,6 +458,24 @@ class GalleryView(QWidget):
             return
         workflow_name = self._selected.get("workflow_name", "")
         self.reuse_requested.emit(workflow_name, params)
+
+    def _on_rerun(self):
+        if not self._selected or not _has_graph(self._selected):
+            return
+        dialog = ReRunDialog(self._selected, self)
+        if dialog.exec():
+            self.replay_requested.emit(self._selected, dialog.overrides())
+
+
+def _has_graph(row: dict) -> bool:
+    """True if a row stored a re-runnable ComfyUI graph in workflow_json."""
+    raw = row.get("workflow_json")
+    if not raw:
+        return False
+    try:
+        return bool(json.loads(raw))
+    except json.JSONDecodeError:
+        return False
 
 
 def _fingerprint(rows, meta) -> int:

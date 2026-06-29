@@ -9,6 +9,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from origenerator.comfy_graph import clip_prompt_nodes, conditioning_node
 from origenerator.db import Database
 from origenerator.gallery import row_output_files
 from origenerator.media import IMAGE_EXTS, VIDEO_EXTS, media_type_from_filename
@@ -260,13 +261,6 @@ def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
     return {}
 
 
-def _follow(graph: dict, ref) -> dict | None:
-    """Resolve a ComfyUI input link ``[node_id, slot]`` to its source node."""
-    if isinstance(ref, list) and ref:
-        return graph.get(str(ref[0]))
-    return None
-
-
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
     result: dict = {
         "workflow_name": infer_workflow_name(fpath.name) or "unknown",
@@ -283,21 +277,16 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         return result
     result["prompt_data"] = prompt_data
 
-    # Wan video workflows route prompts through a conditioning node; follow its
-    # links structurally so we don't depend on CLIPTextEncode node titles.
-    cond = next(
-        (n for n in prompt_data.values()
-         if n.get("class_type") in ("WanImageToVideo", "WanFirstLastFrameToVideo")),
-        None,
-    )
+    # Locate the prompt nodes (structurally for Wan workflows, else by title).
+    pos_node, neg_node = clip_prompt_nodes(prompt_data)
+    if pos_node and isinstance(pos_node.get("inputs", {}).get("text"), str):
+        result["positive_prompt"] = pos_node["inputs"]["text"]
+    if neg_node and isinstance(neg_node.get("inputs", {}).get("text"), str):
+        result["negative_prompt"] = neg_node["inputs"]["text"]
+
+    cond = conditioning_node(prompt_data)
     if cond:
         ci = cond.get("inputs", {})
-        pos = _follow(prompt_data, ci.get("positive"))
-        neg = _follow(prompt_data, ci.get("negative"))
-        if pos and pos.get("class_type") == "CLIPTextEncode":
-            result["positive_prompt"] = pos["inputs"].get("text")
-        if neg and neg.get("class_type") == "CLIPTextEncode":
-            result["negative_prompt"] = neg["inputs"].get("text")
         for src, dst in (("width", "width"), ("height", "height"), ("length", "frame_count")):
             if isinstance(ci.get(src), int):
                 result["params"][dst] = ci[src]
@@ -305,16 +294,6 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     for node in prompt_data.values():
         class_type = node.get("class_type", "")
         inputs = node.get("inputs", {})
-        meta_title = node.get("_meta", {}).get("title", "")
-
-        # Title-based prompts only when there's no structural source above.
-        if class_type == "CLIPTextEncode" and cond is None:
-            text = inputs.get("text")
-            if isinstance(text, str):
-                if "Negative" in meta_title:
-                    result["negative_prompt"] = text
-                elif result["positive_prompt"] is None:
-                    result["positive_prompt"] = text
 
         if class_type == "LoadImage":
             image = inputs.get("image")

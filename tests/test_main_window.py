@@ -61,3 +61,17 @@ def test_close_event_persists_session(qtbot, tmp_path):
     tabs = reloaded.get("generate_tabs")["tabs"]
     assert [t["config"]["workflow_name"] for t in tabs] == ["sdxl_t2i", "wan22_i2v"]
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
+
+
+def test_replay_requested_submits_and_switches_tab(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    row = {"workflow_name": "x", "workflow_json": "{}"}
+    overrides = {"positive": "p", "negative": "", "seed": None, "input_image": None}
+    with patch.object(
+        win._generate_view, "submit_replay", wraps=win._generate_view.submit_replay
+    ) as spy:
+        win._gallery_view.replay_requested.emit(row, overrides)
+
+    spy.assert_called_once_with(row, overrides)
+    assert win._tabs.currentWidget() is win._generate_view

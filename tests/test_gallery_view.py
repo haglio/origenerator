@@ -417,3 +417,45 @@ def test_resetting_selection_clears_a_stale_estimate(qtbot):
 
     view.refresh()  # nothing selected afterwards
     assert view._estimate_label.text() == ""
+
+
+def test_rerun_button_disabled_without_stored_graph(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="p1", workflow_name="x", workflow_version="imported",
+        params_json="{}", workflow_json="{}",
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._on_thumbnail_clicked("p1")
+    assert view._rerun_btn.isEnabled() is False  # nothing to replay
+
+
+def test_rerun_emits_replay_request_with_overrides(qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="p1", workflow_name="hunyuan_t2v", workflow_version="imported",
+        positive_prompt="hi", negative_prompt="", seed=3,
+        params_json=json.dumps({"input_image": "x.png"}),
+        workflow_json=json.dumps({"1": {"class_type": "KSampler", "inputs": {"seed": 3}}}),
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._on_thumbnail_clicked("p1")
+    assert view._rerun_btn.isEnabled() is True
+
+    import origenerator.gui.gallery_view as gv
+    fake = MagicMock()
+    fake.exec.return_value = 1  # accepted
+    fake.overrides.return_value = {
+        "positive": "new", "negative": "", "seed": 9, "input_image": None,
+    }
+    monkeypatch.setattr(gv, "ReRunDialog", lambda row, parent: fake)
+
+    with qtbot.waitSignal(view.replay_requested) as blocker:
+        view._on_rerun()
+
+    row, overrides = blocker.args
+    assert row["prompt_id"] == "p1"
+    assert overrides["positive"] == "new"
+    assert overrides["seed"] == 9

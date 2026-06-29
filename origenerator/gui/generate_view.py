@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QTabWidget, QToolButton, QInputDialog,
+    QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QToolButton,
+    QInputDialog, QStackedWidget, QLabel, QPushButton,
 )
 from PyQt6.QtCore import Qt
 
@@ -35,7 +36,12 @@ class GenerateView(QWidget):
         add_btn.setToolTip("New configuration")
         add_btn.clicked.connect(lambda: self._add_subtab())
         self._subtabs.setCornerWidget(add_btn, Qt.Corner.TopRightCorner)
-        layout.addWidget(self._subtabs, 1)
+
+        # Stack the tabs over an empty-state placeholder shown when none are open.
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._subtabs)
+        self._stack.addWidget(self._build_empty_state())
+        layout.addWidget(self._stack, 1)
 
         self._strip = ThumbnailStrip(db)
         self._strip.thumbnail_activated.connect(self._on_strip_activated)
@@ -44,12 +50,33 @@ class GenerateView(QWidget):
         self._queue = JobQueue(db)  # one generation at a time across subtabs
         self._add_subtab()
 
+    def _build_empty_state(self) -> QWidget:
+        self._empty_state = QWidget()
+        box = QVBoxLayout(self._empty_state)
+        box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        message = QLabel(
+            "No generation tabs open.\n\n"
+            "Open one from the Gallery — select a generation and choose\n"
+            "“Reuse Parameters” — or start a blank one:"
+        )
+        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        box.addWidget(message)
+        self._new_tab_btn = QPushButton("New configuration")
+        self._new_tab_btn.clicked.connect(lambda: self._add_subtab())
+        box.addWidget(self._new_tab_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        return self._empty_state
+
+    def _update_empty_state(self):
+        empty = self._subtabs.count() == 0
+        self._stack.setCurrentWidget(self._empty_state if empty else self._subtabs)
+
     def _add_subtab(self) -> GenerateConfigPanel:
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self._subtabs.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
         panel.generation_completed.connect(lambda pid, p=panel: self._on_panel_completed(p, pid))
         self._subtabs.setCurrentIndex(index)
+        self._update_empty_state()
         return panel
 
     def _update_title(self, panel: GenerateConfigPanel, text: str):
@@ -73,9 +100,7 @@ class GenerateView(QWidget):
         self._subtabs.removeTab(index)
         panel.teardown()
         panel.deleteLater()
-        if self._subtabs.count() == 0:
-            # Never leave the tab strip empty: closing the last config resets it.
-            self._add_subtab()
+        self._update_empty_state()  # closing the last tab reveals the empty state
 
     def _on_active_tab_changed(self, _index: int):
         self._refresh_strip()

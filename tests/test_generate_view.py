@@ -48,9 +48,26 @@ def test_add_subtab_increases_count_and_focuses_new(view):
     assert view._subtabs.currentIndex() == 1
 
 
-def test_close_last_subtab_keeps_one(view):
+def test_closing_last_subtab_shows_empty_state(view):
     view._close_subtab(0)
+    assert view._subtabs.count() == 0
+    assert view._stack.currentWidget() is view._empty_state
+
+
+def test_empty_state_new_tab_button_adds_a_subtab(view):
+    view._close_subtab(0)  # now empty
+    view._new_tab_btn.click()
     assert view._subtabs.count() == 1
+    assert view._stack.currentWidget() is view._subtabs
+
+
+def test_closing_last_subtab_empties_the_strip(view):
+    _insert(view._db, "x1")
+    view._subtabs.widget(0)._generated_ids = ["x1"]
+    view._refresh_strip()
+    assert _strip_ids(view) == ["x1"]
+    view._close_subtab(0)
+    assert _strip_ids(view) == []
 
 
 def test_close_subtab_removes_and_tears_down_when_multiple(view):

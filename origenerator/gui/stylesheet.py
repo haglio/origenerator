@@ -22,6 +22,9 @@ def build_stylesheet() -> str:
     QLabel {{
         color: {_h(TEXT_SECONDARY)};
     }}
+    QLabel#estimateLabel {{
+        color: {_h(TEXT_MUTED)};
+    }}
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_PRIMARY)};

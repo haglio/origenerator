@@ -87,4 +87,7 @@ class ThumbnailWidget(QWidget):
 
     def mousePressEvent(self, event):
         self.setFocus(Qt.FocusReason.MouseFocusReason)
-        self.clicked.emit(self.prompt_id)
+        # Only a left click (re)selects. A right click opens the context menu via
+        # the custom-context-menu signal and must NOT collapse a multi-selection.
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self.prompt_id)

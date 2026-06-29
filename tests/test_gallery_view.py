@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
@@ -918,6 +919,70 @@ def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch
     view._thumbnail_context_menu("i3", QPoint(0, 0))
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
+
+
+def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)  # i1 + i3
+    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
+
+    # A real right-press on a selected tile must not collapse the selection to one.
+    qtbot.mouseClick(view._thumb_widgets["i3"], Qt.MouseButton.RightButton)
+
+    assert set(view.selected_prompt_ids()) == {"i1", "i3"}
+
+
+def test_delete_shortcut_is_wired_to_delete_selection(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    delete_seq = QKeySequence(QKeySequence.StandardKey.Delete)
+    shortcut = next(s for s in view.findChildren(QShortcut) if s.key() == delete_seq)
+
+    # The shortcut is scoped to the gallery's focus subtree and triggers a delete.
+    assert shortcut.context() == Qt.ShortcutContext.WidgetWithChildrenShortcut
+    shortcut.activated.emit()
+    assert actions.deleted
+
+
+def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    out = tmp_path / "output"
+    out.mkdir()
+    for pid, prompt in [("i1", "a cat"), ("i2", "a dog")]:  # two settings groups, one model
+        db.insert_generation(
+            prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v1",
+            positive_prompt=prompt,
+            params_json=json.dumps({"positive_prompt": prompt, "steps": 20}),
+            workflow_json="{}",
+        )
+        (out / f"sdxl_t2i_{pid}.png").write_bytes(b"x")
+        db.update_generation(
+            pid, status="completed",
+            output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
+        )
+    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    view._tree.setCurrentItem(model.child(0))  # one of the two settings leaves
+    view._confirm = lambda text: True
+
+    view._delete_selection()  # deletes that settings folder
+
+    # The model (parent) survives via its sibling; the tree stays on it.
+    current = view._tree.currentItem().data(0, _GROUP_ROLE)
+    assert isinstance(current, gallery.ModelGroup)
 
 
 def test_delete_folder_refuses_workflow_and_media_groups(qtbot):

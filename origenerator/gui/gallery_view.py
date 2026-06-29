@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
-from PyQt6.QtGui import QKeySequence
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from origenerator import gallery, timing
 from origenerator.comfyui_client import ComfyUIClient
@@ -84,6 +84,7 @@ class GalleryView(QWidget):
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
+        self._install_shortcuts()
         self._sync_undo_button()
 
         self._poll_timer = QTimer(self)
@@ -91,13 +92,25 @@ class GalleryView(QWidget):
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
 
-    def keyPressEvent(self, event):
-        """Delete removes the picked items/folder; Ctrl+Z undoes the last action.
+    def _install_shortcuts(self):
+        """Delete/Ctrl+Z, scoped to the gallery and any focused child of it.
 
-        These propagate up from whatever gallery widget holds focus (a clicked
-        thumbnail, the folder tree), so they work no matter how the user got
-        there — including reaching a tile entirely through the main pane.
+        A shortcut (not just keyPressEvent) is what actually delivers the key in
+        the running app: a focused thumbnail's key press doesn't reliably bubble
+        up through the scroll area to the view, but a WidgetWithChildren shortcut
+        fires off the focus widget directly. Qt routes a matched shortcut instead
+        of the key event, so this never double-fires with keyPressEvent below.
         """
+        for std, slot in (
+            (QKeySequence.StandardKey.Delete, self._delete_selection),
+            (QKeySequence.StandardKey.Undo, self._undo),
+        ):
+            shortcut = QShortcut(QKeySequence(std), self)
+            shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            shortcut.activated.connect(slot)
+
+    def keyPressEvent(self, event):
+        """Backstop for the Delete/Ctrl+Z shortcuts when a key does bubble up."""
         if event.matches(QKeySequence.StandardKey.Delete):
             self._delete_selection()
             event.accept()
@@ -625,6 +638,12 @@ class GalleryView(QWidget):
         plural = "s" if len(rows) != 1 else ""
         if not self._confirm(f"Delete “{group.label}” and its {len(rows)} item{plural}?"):
             return
+        # Land on the parent folder after the rebuild rather than jumping to the
+        # top of the tree, so the view stays where the user was working.
+        item = self._item_by_key.get(group.key)
+        parent = item.parent() if item is not None else None
+        if parent is not None:
+            self._tree.setCurrentItem(parent)
         self._delete_rows(rows)
 
     def _delete_rows(self, rows):

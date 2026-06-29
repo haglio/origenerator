@@ -7,9 +7,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from origenerator.gui.check_box import CheckBox
+from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.gui.image_picker import ImagePickerDialog
 from origenerator.workflows.base import ParamDef
+
+ensure_shared_ui_on_path()
+from shared_ui.check_box import CheckBox
 
 _SEED_MAX = (1 << 63) - 1
 

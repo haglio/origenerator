@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 #     paints them opaque and the fill only peeks through the 4px margin as a
 #     frame (which is what an earlier attempt did).
 # The image also lightens its resting border a touch when selected.
-_SELECTED_BG = "#4a4a4a"
+_SELECTED_BG = "#3a3a3a"
 _SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
 _BORDER_UNSELECTED = "2px solid #3f3f3f"
 _BORDER_SELECTED = "2px solid #8a8a8a"

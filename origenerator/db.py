@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS generations (
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
 CREATE INDEX IF NOT EXISTS idx_generations_workflow ON generations(workflow_name);
 CREATE INDEX IF NOT EXISTS idx_generations_created ON generations(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS folder_meta (
+    folder_key  TEXT PRIMARY KEY,
+    custom_name TEXT,
+    starred     INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -156,3 +162,40 @@ class Database:
                 "SELECT * FROM generations ORDER BY id DESC"
             ).fetchall()
             return [dict(r) for r in rows]
+
+    # --- folder metadata (custom names + stars for gallery folders) --------
+
+    def folder_meta_map(self) -> dict[str, dict]:
+        """Return ``{folder_key: {"custom_name": str|None, "starred": bool}}``."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT folder_key, custom_name, starred FROM folder_meta"
+            ).fetchall()
+        return {
+            r["folder_key"]: {
+                "custom_name": r["custom_name"],
+                "starred": bool(r["starred"]),
+            }
+            for r in rows
+        }
+
+    def rename_folder(self, folder_key: str, custom_name: str | None):
+        """Set (or clear, when ``None``) a folder's custom display name."""
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO folder_meta (folder_key, custom_name)
+                   VALUES (?, ?)
+                   ON CONFLICT(folder_key)
+                   DO UPDATE SET custom_name = excluded.custom_name""",
+                (folder_key, custom_name),
+            )
+
+    def set_folder_starred(self, folder_key: str, starred: bool):
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO folder_meta (folder_key, starred)
+                   VALUES (?, ?)
+                   ON CONFLICT(folder_key)
+                   DO UPDATE SET starred = excluded.starred""",
+                (folder_key, 1 if starred else 0),
+            )

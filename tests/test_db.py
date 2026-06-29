@@ -169,6 +169,30 @@ def test_completed_without_duration_selects_backfill_candidates(tmp_path):
     assert rows[0]["completed_at"] == "2026-06-29T12:00:00+00:00"
 
 
+def test_folder_meta_starts_empty(tmp_path):
+    db = Database(tmp_path / "test.db")
+    assert db.folder_meta_map() == {}
+
+
+def test_rename_folder_round_trips(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.rename_folder("video/wan22_i2v", "Dance clips")
+    assert db.folder_meta_map()["video/wan22_i2v"]["custom_name"] == "Dance clips"
+
+
+def test_star_folder_round_trips_and_preserves_custom_name(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.rename_folder("image/sdxl_t2i", "Portraits")
+    db.set_folder_starred("image/sdxl_t2i", True)
+
+    meta = db.folder_meta_map()["image/sdxl_t2i"]
+    assert meta["starred"] is True
+    assert meta["custom_name"] == "Portraits"  # starring must not wipe the name
+
+    db.set_folder_starred("image/sdxl_t2i", False)
+    assert db.folder_meta_map()["image/sdxl_t2i"]["starred"] is False
+
+
 def test_list_generations_ordered_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):

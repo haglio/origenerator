@@ -8,9 +8,13 @@ from PyQt6.QtCore import Qt, pyqtSignal
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
 
+    _SELECTED_CSS = "#thumbnailTile { border: 2px solid #3d7eff; border-radius: 4px; }"
+
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str, parent=None):
         super().__init__(parent)
         self.prompt_id = prompt_id
+        self._selected = False
+        self.setObjectName("thumbnailTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedSize(180, 200)
 
@@ -38,6 +42,14 @@ class ThumbnailWidget(QWidget):
 
         layout.addWidget(self._image_label)
         layout.addWidget(self._text_label)
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool):
+        """Toggle the selection highlight drawn around this tile."""
+        self._selected = selected
+        self.setStyleSheet(self._SELECTED_CSS if selected else "")
 
     def mousePressEvent(self, event):
         self.clicked.emit(self.prompt_id)

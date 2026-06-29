@@ -4,13 +4,15 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
     QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QMenu, QInputDialog, QAbstractItemView, QFrame,
+    QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
+from PyQt6.QtGui import QShortcut, QKeySequence
 
 from origenerator import gallery, timing
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR
 from origenerator.db import Database
+from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import merge_denormalized
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tile import FolderTile
@@ -18,6 +20,7 @@ from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.rerun_dialog import ReRunDialog
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.trash import Trash
 
 _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 _GRID_COLUMNS = 4
@@ -26,13 +29,26 @@ _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 
 
+def _is_deletable_folder(group) -> bool:
+    """Whether a folder may be deleted: anything nested inside a workflow.
+
+    Model and settings folders live within a workflow folder and are fair game;
+    a whole workflow or media folder is off-limits, so a workflow's entire
+    history can never be wiped in one action.
+    """
+    return isinstance(group, (gallery.ModelGroup, gallery.SettingsGroup))
+
+
 class GalleryView(QWidget):
     reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
     replay_requested = pyqtSignal(dict, dict)  # selected row, overrides dict
 
-    def __init__(self, db: Database, parent=None):
+    def __init__(self, db: Database, parent=None, *, actions: GalleryActions | None = None):
         super().__init__(parent)
         self._db = db
+        self._actions = actions or GalleryActions(
+            db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
+        )
         self._selected: dict | None = None
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
@@ -40,16 +56,29 @@ class GalleryView(QWidget):
         self._source_image_id: str | None = None
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
+        self._selected_ids: set[str] = set()
+        self._selection_anchor: str | None = None
+        self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
+        self._install_shortcuts()
+        self._sync_undo_button()
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
+
+    def _install_shortcuts(self):
+        delete = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self)
+        delete.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        delete.activated.connect(self._delete_selection)
+        undo = QShortcut(QKeySequence(QKeySequence.StandardKey.Undo), self)
+        undo.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        undo.activated.connect(self._undo)
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
@@ -68,13 +97,18 @@ class GalleryView(QWidget):
         self._tree.itemChanged.connect(self._commit_inline_rename)
         layout.addWidget(self._tree, 2)
 
-        # Middle: folder title over the contents (folder tiles or thumbnails).
+        # Middle: a header (folder title + Undo) over the contents.
         # Double-clicking the title renames the selected folder in place.
         middle = QVBoxLayout()
+        header = QHBoxLayout()
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
-        middle.addWidget(self._title)
+        header.addWidget(self._title, 1)
+        self._undo_btn = QPushButton("Undo")
+        self._undo_btn.clicked.connect(self._undo)
+        header.addWidget(self._undo_btn, 0, Qt.AlignmentFlag.AlignTop)
+        middle.addLayout(header)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
@@ -283,6 +317,7 @@ class GalleryView(QWidget):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
         for idx, group in enumerate(groups):
@@ -303,6 +338,7 @@ class GalleryView(QWidget):
         container = QWidget()
         grid = QGridLayout(container)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
         for idx, row in enumerate(rows):
@@ -311,9 +347,10 @@ class GalleryView(QWidget):
                 (row.get("positive_prompt") or "")[:40] or "(no prompt)"
             )
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
-            tw.clicked.connect(self._on_thumbnail_clicked)
+            tw.clicked.connect(self._thumbnail_clicked)
             grid.addWidget(tw, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
             self._visible_ids.append(row["prompt_id"])
+            self._thumb_widgets[row["prompt_id"]] = tw
         self._show_widget(container)
 
     @staticmethod
@@ -375,6 +412,107 @@ class GalleryView(QWidget):
         """
         self._pending_selection = prompt_id or None
 
+    # --- selection ---------------------------------------------------------
+
+    def _thumbnail_clicked(self, prompt_id: str):
+        self._apply_selection(prompt_id, QApplication.keyboardModifiers())
+        self._on_thumbnail_clicked(prompt_id)
+
+    def _apply_selection(self, prompt_id: str, modifiers):
+        """Update the multi-select set the way the held modifiers dictate.
+
+        Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
+        a plain click resets to just this tile. Mirrors a typical file browser.
+        """
+        ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        if ctrl:
+            self._selected_ids ^= {prompt_id}
+            self._selection_anchor = prompt_id
+        elif shift and self._selection_anchor in self._visible_ids \
+                and prompt_id in self._visible_ids:
+            a = self._visible_ids.index(self._selection_anchor)
+            b = self._visible_ids.index(prompt_id)
+            lo, hi = sorted((a, b))
+            self._selected_ids = set(self._visible_ids[lo:hi + 1])
+        else:
+            self._selected_ids = {prompt_id}
+            self._selection_anchor = prompt_id
+        self._refresh_selection_highlights()
+
+    def _refresh_selection_highlights(self):
+        for pid, widget in self._thumb_widgets.items():
+            widget.set_selected(pid in self._selected_ids)
+
+    def _clear_selection(self):
+        self._selected_ids = set()
+        self._selection_anchor = None
+        self._thumb_widgets = {}
+
+    def selected_prompt_ids(self) -> list[str]:
+        return [pid for pid in self._visible_ids if pid in self._selected_ids]
+
+    # --- deletion & undo ---------------------------------------------------
+
+    def _delete_selection(self):
+        """Delete picked thumbnails, or the current folder if none are picked."""
+        if self._selected_ids:
+            rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
+            self._delete_rows([r for r in rows if r])
+            return
+        group = self._current_deletable_folder()
+        if group is not None:
+            self._delete_folder(group)
+
+    def _current_deletable_folder(self):
+        """The selected tree folder if it may be deleted, else ``None``."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item else None
+        return group if _is_deletable_folder(group) else None
+
+    def _delete_folder(self, group):
+        if not _is_deletable_folder(group):
+            return
+        rows = gallery.rows_under(group)
+        if not rows:
+            return
+        plural = "s" if len(rows) != 1 else ""
+        if not self._confirm(f"Delete “{group.label}” and its {len(rows)} item{plural}?"):
+            return
+        self._delete_rows(rows)
+
+    def _delete_rows(self, rows):
+        if not rows:
+            return
+        deleted_ids = {r["prompt_id"] for r in rows}
+        if self._selected and self._selected.get("prompt_id") in deleted_ids:
+            self._preview.clear()  # release any file handle before the files move
+        self._actions.delete_rows(rows)
+        self._clear_selection()
+        self.refresh()
+        self._sync_undo_button()
+
+    def _undo(self):
+        if not self._actions.can_undo():
+            return
+        self._preview.clear()
+        self._actions.undo()
+        self._clear_selection()
+        self.refresh()
+        self._sync_undo_button()
+
+    def _sync_undo_button(self):
+        label = self._actions.undo_label()
+        self._undo_btn.setEnabled(self._actions.can_undo())
+        self._undo_btn.setToolTip(f"Undo: {label}" if label else "Nothing to undo")
+
+    def _confirm(self, text: str) -> bool:
+        reply = QMessageBox.question(
+            self, "Delete", text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
     # --- rename & star -----------------------------------------------------
 
     def _on_tree_context_menu(self, pos: QPoint):
@@ -393,11 +531,17 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         rename_action = menu.addAction("Rename…")
         star_action = menu.addAction("Unstar" if group.starred else "Star")
+        delete_action = None
+        if _is_deletable_folder(group):
+            menu.addSeparator()
+            delete_action = menu.addAction("Delete folder…")
         chosen = menu.exec(global_pos)
         if chosen == rename_action:
             self._rename_folder(key)
         elif chosen == star_action:
             self._toggle_star(key)
+        elif delete_action is not None and chosen == delete_action:
+            self._delete_folder(group)
 
     def _rename_folder(self, key: str):
         item = self._item_by_key.get(key)
@@ -409,8 +553,9 @@ class GalleryView(QWidget):
             self._apply_rename(key, text)
 
     def _apply_rename(self, key: str, name: str):
-        self._db.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(key, name.strip() or None)
         self.refresh()
+        self._sync_undo_button()
 
     def _begin_inline_rename(self, item, _column):
         """Double-clicking a tree folder edits its name in place."""
@@ -428,7 +573,8 @@ class GalleryView(QWidget):
         name = item.text(0)
         if name.startswith(_STAR_PREFIX):
             name = name[len(_STAR_PREFIX):]
-        self._db.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(key, name.strip() or None)
+        self._sync_undo_button()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
         QTimer.singleShot(0, self.refresh)
 
@@ -442,8 +588,9 @@ class GalleryView(QWidget):
     def _commit_title_rename(self, name: str):
         key = self._selected_folder_key()
         if key is not None:
-            self._db.rename_folder(key, name.strip() or None)
+            self._actions.rename_folder(key, name.strip() or None)
             self.refresh()
+            self._sync_undo_button()
 
     def _toggle_star(self, key: str):
         item = self._item_by_key.get(key)

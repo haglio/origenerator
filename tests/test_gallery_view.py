@@ -3,13 +3,48 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
+from origenerator.gallery_actions import GalleryActions
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.trash import Trash
+
+_NO_MOD = Qt.KeyboardModifier.NoModifier
+_CTRL = Qt.KeyboardModifier.ControlModifier
+_SHIFT = Qt.KeyboardModifier.ShiftModifier
+
+
+class FakeActions:
+    """Records what the view asks of its action controller."""
+
+    def __init__(self):
+        self.deleted = []   # each entry is one delete batch (list of rows)
+        self.renamed = []   # (key, name) pairs
+        self.undo_count = 0
+        self._label = None
+
+    def delete_rows(self, rows):
+        self.deleted.append(list(rows))
+        self._label = f"Delete {len(rows)} items"
+
+    def rename_folder(self, key, name):
+        self.renamed.append((key, name))
+        self._label = "Rename folder"
+
+    def undo(self):
+        self.undo_count += 1
+        self._label = None
+
+    def can_undo(self):
+        return self._label is not None
+
+    def undo_label(self):
+        return self._label
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +91,14 @@ class FakeDB:
     def set_folder_starred(self, key, starred):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(starred)
+
+    def delete_generation(self, prompt_id):
+        self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
+        self._by_id.pop(prompt_id, None)
+
+    def restore_generation(self, row):
+        self._rows.insert(0, row)
+        self._by_id[row["prompt_id"]] = row
 
     def add(self, row):  # test helper: simulate a new generation landing
         self._rows.insert(0, row)
@@ -680,3 +723,246 @@ def test_rerun_emits_replay_request_with_overrides(qtbot, tmp_path, monkeypatch)
     assert row["prompt_id"] == "p1"
     assert overrides["positive"] == "new"
     assert overrides["seed"] == 9
+
+
+# --- deletion & undo ------------------------------------------------------
+
+def _open_leaf(view):
+    """Select the first settings-group leaf so its thumbnails are showing."""
+    workflow = _top_level(view._tree)["Images"].child(0)
+    leaf = workflow.child(0).child(0)  # workflow -> model -> settings
+    view._tree.setCurrentItem(leaf)
+    return leaf
+
+
+def test_delete_key_deletes_the_selected_thumbnail(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+
+    assert len(actions.deleted) == 1
+    assert [r["prompt_id"] for r in actions.deleted[0]] == ["i1"]
+
+
+def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)
+    assert set(view.selected_prompt_ids()) == {"i1", "i3"}
+
+    view._delete_selection()
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
+
+
+def test_ctrl_click_again_deselects_a_tile(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i2", _CTRL)
+    view._apply_selection("i2", _CTRL)  # toggle i2 back off
+    assert view.selected_prompt_ids() == ["i1"]
+
+
+def test_shift_click_selects_the_contiguous_range(qtbot):
+    rows = [_image(f"i{i}", "a cat", 50, i) for i in range(1, 5)]  # i1..i4
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    order = view.visible_prompt_ids()  # newest-first display order
+
+    view._apply_selection(order[0], _NO_MOD)
+    view._apply_selection(order[2], _SHIFT)
+    assert view.selected_prompt_ids() == order[:3]
+
+
+def test_plain_click_replaces_the_whole_selection(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i2", _CTRL)     # now both selected
+    view._apply_selection("i2", _NO_MOD)   # plain click collapses to one
+    assert view.selected_prompt_ids() == ["i2"]
+
+
+def test_changing_folders_clears_the_selection(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    cat_leaf = _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    assert view.selected_prompt_ids() == ["i1"]
+
+    # Drilling to the sibling settings folder must not carry the pick over.
+    dog_leaf = cat_leaf.parent().child(1)
+    view._tree.setCurrentItem(dog_leaf)
+    assert view.selected_prompt_ids() == []
+
+
+def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)  # leaf selected, nothing picked
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._confirm = lambda text: False  # user says no
+
+    view._delete_selection()
+
+    assert actions.deleted == []
+
+
+def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)  # a whole-workflow folder
+    view._confirm = lambda text: True    # even if it asked, it must not
+
+    view._delete_selection()
+
+    assert actions.deleted == []  # workflow folders are off-limits
+
+
+def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    images = _top_level(view._tree)["Images"]
+    view._confirm = lambda text: True
+
+    view._delete_folder(images.data(0, _GROUP_ROLE))       # the Images media group
+    view._delete_folder(images.child(0).data(0, _GROUP_ROLE))  # the workflow group
+
+    assert actions.deleted == []  # only folders inside a workflow may go
+
+
+def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
+    actions = FakeActions()
+    # Two settings groups (cat, dog) share one model -> a single model folder.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    view._tree.setCurrentItem(model)  # a model folder, nested in the workflow
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    assert not view._undo_btn.isEnabled()  # nothing to undo at rest
+
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+    assert view._undo_btn.isEnabled()
+    assert "Delete" in view._undo_btn.toolTip()
+
+    view._undo_btn.click()
+    assert actions.undo_count == 1
+    assert not view._undo_btn.isEnabled()
+
+
+def test_renaming_goes_through_the_undoable_actions(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _key(_top_level(view._tree)["Images"].child(0))
+
+    view._apply_rename(key, "Best Models")
+
+    assert actions.renamed == [(key, "Best Models")]
+    assert view._undo_btn.isEnabled()  # the rename is now undoable
+
+
+def test_inline_rename_is_undoable(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _top_level(view._tree)["Images"].child(0)
+    key = _key(workflow)
+
+    view._editing_key = key            # an in-place edit is underway
+    workflow.setText(0, "Renamed")     # committing it routes through actions
+
+    assert actions.renamed == [(key, "Renamed")]
+    assert view._undo_btn.isEnabled()
+
+
+def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    output_dir = tmp_path / "output"
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"steps": 50}), workflow_json="{}",
+    )
+    file_path = output_dir / "sdxl_t2i_i1.png"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"img")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+    assert db.get_generation("i1") is None
+    assert not file_path.exists()
+
+    view._undo()
+    assert db.get_generation("i1") is not None
+    assert file_path.exists()

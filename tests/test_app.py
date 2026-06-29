@@ -93,6 +93,7 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
@@ -106,3 +107,23 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
     # The boot phases drive the splash status text.
     statuses = " ".join(str(c.args[0]) for c in loading.set_status.call_args_list)
     assert "ComfyUI server" in statuses
+
+
+def test_main_sweeps_stale_trash_on_startup(qapp):
+    """Leftover trash from a prior session is reclaimed before the window opens."""
+    trash = MagicMock()
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash", return_value=trash), \
+         patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main()
+
+    trash.sweep.assert_called_once()

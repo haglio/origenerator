@@ -57,6 +57,21 @@ def test_update_generation(tmp_path):
     assert row["thumbnail_path"] == "thumbs/out.jpg"
 
 
+def test_set_workflow_name_relabels_row(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="relabel-001",
+        workflow_name="unknown",
+        workflow_version="imported",
+        params_json="{}",
+        workflow_json="{}",
+        source="imported",
+    )
+    db.set_workflow_name("relabel-001", "wan22_i2v")
+    row = db.get_generation("relabel-001")
+    assert row["workflow_name"] == "wan22_i2v"
+
+
 def test_list_generations_ordered_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):

@@ -83,6 +83,18 @@ class Database:
                 values,
             )
 
+    def set_workflow_name(self, prompt_id: str, workflow_name: str):
+        """Correct a row's workflow_name (e.g. backfilling 'unknown' imports).
+
+        Deliberately separate from update_generation, whose allowlist excludes
+        provenance fields like workflow_name.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET workflow_name = ? WHERE prompt_id = ?",
+                (workflow_name, prompt_id),
+            )
+
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(

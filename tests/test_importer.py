@@ -4,7 +4,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
-from origenerator.importer import import_comfyui_output
+from origenerator.importer import backfill_unknown_workflows, import_comfyui_output
 
 
 def _make_png_with_metadata(path, prompt_data):
@@ -73,6 +73,35 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     assert name_by_file["wan22_i2v_842719365028413_00001_.mp4"] == "wan22_i2v"
     assert name_by_file["flf2v_loop_00001.mp4"] == "wan22_flf2v_loop"
     assert name_by_file["mystery_clip_00001.mp4"] == "unknown"
+
+
+def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
+    db = Database(tmp_path / "test.db")
+
+    def add_unknown(prompt_id, filename):
+        db.insert_generation(
+            prompt_id=prompt_id, workflow_name="unknown",
+            workflow_version="imported", params_json="{}",
+            workflow_json="{}", source="imported",
+        )
+        db.update_generation(prompt_id, output_files=json.dumps(
+            [{"filename": filename, "subfolder": "video", "type": "output"}]
+        ))
+
+    add_unknown("bf-i2v", "wan22_i2v_842719365028413_00001_.mp4")
+    add_unknown("bf-mystery", "mystery_00001.mp4")
+    # An already-identified row must be left untouched.
+    db.insert_generation(
+        prompt_id="bf-known", workflow_name="wan22_flf2v_loop",
+        workflow_version="v004", params_json="{}", workflow_json="{}",
+    )
+
+    updated = backfill_unknown_workflows(db)
+
+    assert updated == 1
+    assert db.get_generation("bf-i2v")["workflow_name"] == "wan22_i2v"
+    assert db.get_generation("bf-mystery")["workflow_name"] == "unknown"
+    assert db.get_generation("bf-known")["workflow_name"] == "wan22_flf2v_loop"
 
 
 def test_import_skips_already_imported(tmp_path):

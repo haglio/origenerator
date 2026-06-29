@@ -81,7 +81,7 @@ def main():
     )
     from origenerator.db import Database
     from origenerator.gui.main_window import OrigeneratorWindow
-    from origenerator.importer import import_comfyui_output
+    from origenerator.importer import backfill_unknown_workflows, import_comfyui_output
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logger = logging.getLogger(__name__)
@@ -100,6 +100,14 @@ def main():
             logger.info("Imported %d existing files from ComfyUI output", count)
     except Exception as e:
         logger.warning("Import failed: %s", e)
+
+    # Relabel any imports that predate filename-based workflow inference
+    try:
+        relabeled = backfill_unknown_workflows(db)
+        if relabeled:
+            logger.info("Relabelled %d previously-unknown imports", relabeled)
+    except Exception as e:
+        logger.warning("Workflow backfill failed: %s", e)
 
     client = ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT)
     client.start()

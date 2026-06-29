@@ -106,6 +106,33 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
     return imported
 
 
+def backfill_unknown_workflows(db: Database) -> int:
+    """Relabel rows imported as workflow 'unknown' (before filename inference
+    existed) whose output filename matches a known workflow's prefix.
+
+    Returns the number of rows updated. Rows that match nothing are left as
+    'unknown', and already-identified rows are never touched.
+    """
+    updated = 0
+    for row in db.list_generations():
+        if row.get("workflow_name") != "unknown":
+            continue
+        files_json = row.get("output_files")
+        if not files_json:
+            continue
+        try:
+            files = json.loads(files_json)
+        except json.JSONDecodeError:
+            continue
+        if not files:
+            continue
+        name = infer_workflow_name(files[0].get("filename", ""))
+        if name:
+            db.set_workflow_name(row["prompt_id"], name)
+            updated += 1
+    return updated
+
+
 def _get_existing_filenames(db: Database) -> set[str]:
     result = set()
     for row in db.list_generations():

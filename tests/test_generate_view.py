@@ -94,7 +94,7 @@ def test_strip_click_does_nothing_when_settings_match(view):
 def test_tab_text_follows_gallery_folder_name(view):
     view.open_config("sdxl_t2i", {"positive_prompt": "a dragon"})
     idx = view._subtabs.currentIndex()
-    assert view._subtabs.tabText(idx) == "a dragon"
+    assert view._subtabs.tabText(idx) == "SDXL Text-to-Image: a dragon"
 
 
 def test_double_click_renames_tab(view, monkeypatch):

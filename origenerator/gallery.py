@@ -135,14 +135,16 @@ def _prompt_headline(params: dict) -> str:
     return prompt[:60] + ("…" if len(prompt) > 60 else "")
 
 
-def config_folder_label(workflow_name: str | None, params: dict) -> str:
-    """The gallery folder name a config's output would land in.
+def config_tab_title(workflow_name: str | None, params: dict) -> str:
+    """A Generate tab's default name: the model (workflow) it runs, followed by
+    the gallery folder (the prompt) its output would land in when there is one.
 
-    Leads with the positive prompt (the most specific, ``settings``-level folder),
-    falling back to the workflow's name when there's no prompt to lead with — so a
-    blank, freshly-opened config still reads sensibly.
+    Leads with the model so tabs stay grouped by pipeline; the prompt distinguishes
+    same-model tabs. A blank config is named by its model alone.
     """
-    return _prompt_headline(settings_only(params)) or workflow_label(workflow_name)
+    headline = _prompt_headline(settings_only(params))
+    model = workflow_label(workflow_name)
+    return f"{model}: {headline}" if headline else model
 
 
 def _short_value(value) -> str:

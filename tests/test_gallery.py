@@ -3,7 +3,7 @@ import json
 from origenerator.gallery import (
     build_gallery_tree,
     child_groups,
-    config_folder_label,
+    config_tab_title,
     find_source_image_id,
     media_type_of_row,
     resolve_preview,
@@ -12,17 +12,17 @@ from origenerator.gallery import (
 )
 
 
-def test_config_folder_label_uses_prompt_headline():
-    label = config_folder_label("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert label == "a cat in a hat"
+def test_config_tab_title_leads_with_model_then_prompt():
+    title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
+    assert title == "SDXL Text-to-Image: a cat in a hat"
 
 
-def test_config_folder_label_falls_back_to_workflow_name_without_prompt():
-    assert config_folder_label("sdxl_t2i", {"seed": 5}) == "SDXL Text-to-Image"
+def test_config_tab_title_is_just_the_model_without_a_prompt():
+    assert config_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL Text-to-Image"
 
 
-def test_config_folder_label_handles_unknown_workflow():
-    assert config_folder_label("nope", {}) == "nope"
+def test_config_tab_title_handles_unknown_workflow():
+    assert config_tab_title("nope", {}) == "nope"
 
 
 def _row(**kw):

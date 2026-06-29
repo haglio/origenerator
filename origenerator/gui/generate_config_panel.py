@@ -11,7 +11,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import config_folder_label
+from origenerator.gallery import config_tab_title
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
 from origenerator.thumbnail import generate_thumbnail
@@ -306,11 +306,11 @@ class GenerateConfigPanel(QWidget):
         )
 
     def title(self) -> str:
-        """The tab title: the user's custom name, else the config's gallery folder."""
+        """The tab title: the user's custom name, else the model + gallery folder."""
         if self._custom_title:
             return self._custom_title
         params = self._param_form.get_values_static() if self._param_form else {}
-        return config_folder_label(self._workflow_combo.currentData(), params)
+        return config_tab_title(self._workflow_combo.currentData(), params)
 
     def set_custom_title(self, name: str):
         """Pin a user-chosen tab name that overrides the auto gallery-folder name."""

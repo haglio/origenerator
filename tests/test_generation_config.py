@@ -2,7 +2,6 @@ import json
 
 from origenerator.generation_config import (
     ConfigSnapshot,
-    configs_match,
     find_duplicate_generation,
     merge_denormalized,
     randomize_seeds,
@@ -21,41 +20,6 @@ def _row(workflow="sdxl_t2i", params=None, status="completed", **extra):
     }
     row.update(extra)
     return row
-
-
-def test_configs_match_true_for_identical_workflow_and_params():
-    snap = _snapshot(params={"steps": 20, "seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is True
-
-
-def test_configs_match_false_when_seed_is_random():
-    snap = _snapshot(params={"steps": 20, "seed": 7}, seed_is_random=True)
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is False
-
-
-def test_configs_match_false_for_different_workflow():
-    snap = _snapshot(workflow="wan22_i2v", params={"seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"seed": 7}) is False
-
-
-def test_configs_match_false_for_differing_param():
-    snap = _snapshot(params={"steps": 20, "seed": 7})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 30, "seed": 7}) is False
-
-
-def test_configs_match_ignores_keys_absent_from_stored():
-    snap = _snapshot(params={"steps": 20, "seed": 7, "extra": "live-only"})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is True
-
-
-def test_configs_match_false_when_stored_key_missing_from_snapshot():
-    snap = _snapshot(params={"steps": 20})
-    assert configs_match(snap, "sdxl_t2i", {"steps": 20, "seed": 7}) is False
-
-
-def test_configs_match_tolerates_float_round_tripping():
-    snap = _snapshot(params={"cfg": 0.3})
-    assert configs_match(snap, "sdxl_t2i", {"cfg": 0.1 + 0.2}) is True
 
 
 def test_merge_denormalized_folds_in_columns():
@@ -167,3 +131,20 @@ def test_find_duplicate_picks_the_matching_row_among_several():
     match = _row(params={"steps": 20, "seed": 7})
     snap = _snapshot(params={"steps": 20, "seed": 7})
     assert find_duplicate_generation([other, different_workflow, match], snap) is match
+
+
+def test_find_duplicate_none_when_stored_params_are_a_subset():
+    # A sparse stored row (e.g. a reused import that recorded only a few fields)
+    # must not count as a duplicate of a fuller live config just because the keys
+    # it does carry agree — the user changed a field the stored row never had.
+    rows = [_row(params={"seed": 7})]
+    snap = _snapshot(params={"seed": 7, "steps": 20})
+    assert find_duplicate_generation(rows, snap) is None
+
+
+def test_find_duplicate_ignores_imported_rows():
+    # Imports lack our full graph/params and aren't reproducible, so re-running
+    # never re-creates one — never a duplicate, even if every recorded field matches.
+    rows = [_row(params={"seed": 7, "steps": 20}, source="imported")]
+    snap = _snapshot(params={"seed": 7, "steps": 20})
+    assert find_duplicate_generation(rows, snap) is None

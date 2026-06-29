@@ -47,27 +47,6 @@ class ConfigSnapshot:
         )
 
 
-def configs_match(
-    snapshot: ConfigSnapshot, stored_workflow: str, stored_params: dict
-) -> bool:
-    """True when ``snapshot`` already represents ``stored_workflow``/``stored_params``.
-
-    Compared only over the keys the stored params carry (a panel may expose
-    extra keys a future workflow added). Numeric values compare with a small
-    tolerance so float round-tripping through JSON doesn't spuriously differ.
-    """
-    if snapshot.workflow_name != stored_workflow:
-        return False
-    if snapshot.seed_is_random:
-        return False
-    for key, stored_val in stored_params.items():
-        if key not in snapshot.params:
-            return False
-        if not _values_equal(snapshot.params[key], stored_val):
-            return False
-    return True
-
-
 _FLOAT_TOL = 1e-9
 
 
@@ -101,21 +80,37 @@ def merge_denormalized(row: dict) -> dict:
     return params
 
 
+def _params_identical(a: dict, b: dict) -> bool:
+    """True when two param dicts carry the same keys and equal values."""
+    return a.keys() == b.keys() and all(_values_equal(a[k], b[k]) for k in a)
+
+
 def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     """Return the first already-completed generation ``snapshot`` would reproduce.
 
     Re-running a config whose seed isn't randomized re-creates a byte-identical
-    output, so this lets the caller warn before wasting a slot. Only ``completed``
-    rows count: a failed or canceled attempt is a legitimate retry, not a
-    duplicate. Returns ``None`` when the seed is random (every run differs) or
-    nothing matches.
+    output, so this lets the caller warn before wasting a slot. A row counts only
+    when it is a reproducible generation of ours whose full parameters match:
+
+    * ``completed`` -- a failed or canceled attempt is a legitimate retry.
+    * ``source == "generated"`` -- imports lack our full graph/params and aren't
+      reproducible, so re-running never re-creates one.
+    * every parameter equal -- matching only the keys a stored row happens to
+      carry would wrongly flag a sparsely recorded row (e.g. a reused import)
+      when the user changed a field it never stored.
+
+    Returns ``None`` when the seed is random (every run differs) or nothing matches.
     """
     if snapshot.seed_is_random:
         return None
     for row in rows:
         if row.get("status") != "completed":
             continue
-        if configs_match(snapshot, row.get("workflow_name", ""), merge_denormalized(row)):
+        if row.get("source", "generated") != "generated":
+            continue
+        if row.get("workflow_name", "") != snapshot.workflow_name:
+            continue
+        if _params_identical(snapshot.params, merge_denormalized(row)):
             return row
     return None
 

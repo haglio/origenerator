@@ -1,7 +1,7 @@
 import pytest
 
 from origenerator.workflows.base import ParamDef
-from origenerator.gui.check_box import CheckBox
+from shared_ui.check_box import CheckBox
 from origenerator.gui.param_form import ParamForm
 
 

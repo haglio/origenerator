@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton, QProgressBar, QScrollArea,
 )
-from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database

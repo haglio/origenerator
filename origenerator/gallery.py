@@ -135,6 +135,16 @@ def _prompt_headline(params: dict) -> str:
     return prompt[:60] + ("…" if len(prompt) > 60 else "")
 
 
+def config_folder_label(workflow_name: str | None, params: dict) -> str:
+    """The gallery folder name a config's output would land in.
+
+    Leads with the positive prompt (the most specific, ``settings``-level folder),
+    falling back to the workflow's name when there's no prompt to lead with — so a
+    blank, freshly-opened config still reads sensibly.
+    """
+    return _prompt_headline(settings_only(params)) or workflow_label(workflow_name)
+
+
 def _short_value(value) -> str:
     text = str(value)
     return text[:24] + ("…" if len(text) > 24 else "")

@@ -2,9 +2,11 @@ import json
 
 from origenerator.gallery import (
     build_gallery_tree,
+    child_groups,
     find_source_image_id,
     media_type_of_row,
     resolve_preview,
+    rows_under,
     settings_signature,
 )
 
@@ -20,10 +22,23 @@ def _row(**kw):
     return base
 
 
-def test_media_type_of_row_prefers_workflow_registry():
+def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
+    # A row tagged with a video workflow whose real output is an image is an
+    # image — many imported stills land under video prefixes and must not show
+    # up in the Videos folder.
+    mislabeled = _row(workflow_name="wan22_flf2v_loop",
+                      output_files=json.dumps([{"filename": "flf2v_loop_00001_.png"}]))
+    assert media_type_of_row(mislabeled) == "image"
+
+    real_video = _row(workflow_name="wan22_i2v",
+                      output_files=json.dumps([{"filename": "wan22_i2v_00001_.mp4"}]))
+    assert media_type_of_row(real_video) == "video"
+
+
+def test_media_type_of_row_falls_back_to_registry_without_output_files():
+    # Pending rows have no file yet; the workflow's declared type stands in.
     assert media_type_of_row(_row(workflow_name="sdxl_t2i")) == "image"
     assert media_type_of_row(_row(workflow_name="wan22_i2v")) == "video"
-    assert media_type_of_row(_row(workflow_name="wan22_flf2v_loop")) == "video"
 
 
 def test_media_type_of_row_falls_back_to_output_filename_for_unknown_workflow():
@@ -114,6 +129,51 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     video = media["video"]
     assert [w.workflow_name for w in video.workflow_groups] == ["wan22_i2v"]
     assert len(video.workflow_groups[0].settings_groups) == 1
+
+
+def test_build_gallery_tree_assigns_stable_folder_keys():
+    tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
+    media = tree[0]
+    assert media.key == "image"
+    workflow = media.workflow_groups[0]
+    assert workflow.key == "image/sdxl_t2i"
+    settings = workflow.settings_groups[0]
+    assert settings.key.startswith("image/sdxl_t2i/")
+
+    # The settings key is derived from the signature, so it is stable across
+    # rebuilds (what lets a rename/star stick to the same folder).
+    again = build_gallery_tree([_img("i9", "a cat", 50, 7)])
+    assert again[0].workflow_groups[0].settings_groups[0].key == settings.key
+
+
+def test_build_gallery_tree_applies_custom_names_and_floats_stars_first():
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
+    plain = build_gallery_tree(rows)
+    cat, dog = plain[0].workflow_groups[0].settings_groups  # newest-first: cat, dog
+
+    meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
+    starred_tree = build_gallery_tree(rows, meta)
+    settings = starred_tree[0].workflow_groups[0].settings_groups
+
+    assert settings[0].label == "Doggos"      # custom name applied
+    assert settings[0].starred is True
+    assert settings[0].key == dog.key         # and it floated above the cat
+    assert settings[1].starred is False
+
+
+def test_child_groups_and_rows_under_walk_the_tree():
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a cat", 50, 2),
+            _img("i3", "a dog", 50, 1)]
+    media = build_gallery_tree(rows)[0]
+
+    workflows = child_groups(media)
+    assert [w.workflow_name for w in workflows] == ["sdxl_t2i"]
+    settings = child_groups(workflows[0])
+    assert len(settings) == 2
+    assert child_groups(settings[0]) == []  # a leaf has no child folders
+
+    assert {r["prompt_id"] for r in rows_under(media)} == {"i1", "i2", "i3"}
+    assert {r["prompt_id"] for r in rows_under(settings[0])} == {"i1", "i2"}
 
 
 def test_build_gallery_tree_labels_workflow_with_display_name():

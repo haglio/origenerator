@@ -6,6 +6,7 @@ setting except the seed). This module owns that grouping logic with no Qt
 dependency so it can be unit-tested directly.
 """
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,17 +63,16 @@ def row_output_files(row: dict) -> list[dict]:
 def media_type_of_row(row: dict) -> str:
     """Classify a row as ``"image"`` or ``"video"``.
 
-    The workflow registry is authoritative; rows from unknown workflows fall
-    back to their output filename's extension, defaulting to ``"image"``.
+    The actual output file is authoritative — a still saved under a video
+    workflow's prefix is an image and must not surface in the Videos folder.
+    Rows with no file yet (pending) fall back to the workflow's declared type,
+    then to ``"image"``.
     """
-    registered = workflow_output_type(row.get("workflow_name"))
-    if registered:
-        return registered
     for f in row_output_files(row):
         inferred = media_type_from_filename(f.get("filename", ""))
         if inferred:
             return inferred
-    return "image"
+    return workflow_output_type(row.get("workflow_name")) or "image"
 
 
 def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
@@ -181,23 +181,45 @@ def settings_label(params: dict, distinguishing_keys=()) -> str:
 
 @dataclass
 class SettingsGroup:
+    key: str
     signature: str
     label: str
     rows: list[dict]
+    starred: bool = False
 
 
 @dataclass
 class WorkflowGroup:
+    key: str
     workflow_name: str
     label: str
     settings_groups: list[SettingsGroup]
+    starred: bool = False
 
 
 @dataclass
 class MediaGroup:
+    key: str
     media_type: str
     label: str
     workflow_groups: list[WorkflowGroup]
+    starred: bool = False
+
+
+def child_groups(group) -> list:
+    """The sub-folders directly under a folder (empty for a settings leaf)."""
+    if isinstance(group, MediaGroup):
+        return group.workflow_groups
+    if isinstance(group, WorkflowGroup):
+        return group.settings_groups
+    return []
+
+
+def rows_under(group) -> list[dict]:
+    """Every generation beneath a folder, at any depth."""
+    if isinstance(group, SettingsGroup):
+        return list(group.rows)
+    return [row for child in child_groups(group) for row in rows_under(child)]
 
 
 def _group_ordered(rows, key):
@@ -208,13 +230,33 @@ def _group_ordered(rows, key):
     return list(grouped.items())
 
 
-def build_gallery_tree(rows: list[dict]) -> list[MediaGroup]:
+def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
+    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
+    return f"{media_type}/{workflow_name}/{digest}"
+
+
+def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
+    """Apply a folder's saved custom name and star, returning (label, starred)."""
+    meta = folder_meta.get(key, {})
+    return (meta.get("custom_name") or label, bool(meta.get("starred")))
+
+
+def _starred_first(groups: list) -> list:
+    """Stable-sort starred folders to the top, leaving order otherwise intact."""
+    return sorted(groups, key=lambda g: not g.starred)
+
+
+def build_gallery_tree(
+    rows: list[dict], folder_meta: dict[str, dict] | None = None
+) -> list[MediaGroup]:
     """Nest rows into media -> workflow -> settings-group folders.
 
-    Within every level, folders appear in the order their first member appears
-    in ``rows`` (the caller orders rows newest-first), so the freshest work
-    surfaces first.
+    Folders appear in the order their first member appears in ``rows`` (the
+    caller orders rows newest-first), except that starred folders float to the
+    top of their level. ``folder_meta`` (keyed by each folder's stable ``key``)
+    overrides the default label and supplies the star state.
     """
+    folder_meta = folder_meta or {}
     tree = []
     for media_type, media_rows in _group_ordered(rows, media_type_of_row):
         workflow_groups = []
@@ -229,22 +271,32 @@ def build_gallery_tree(rows: list[dict]) -> list[MediaGroup]:
                 for _sig, sig_rows in grouped
             ]
             distinguishing = _distinguishing_keys(settings_dicts)
-            settings_groups = [
-                SettingsGroup(
-                    signature=sig,
-                    label=settings_label(settings_dicts[i], distinguishing),
-                    rows=sig_rows,
+            settings_groups = []
+            for i, (sig, sig_rows) in enumerate(grouped):
+                key = _settings_key(media_type, wf_name, sig)
+                label, starred = _overlay(
+                    settings_label(settings_dicts[i], distinguishing), key, folder_meta
                 )
-                for i, (sig, sig_rows) in enumerate(grouped)
-            ]
+                settings_groups.append(
+                    SettingsGroup(key, sig, label, sig_rows, starred)
+                )
+
+            wf_key = f"{media_type}/{wf_name}"
+            wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
             workflow_groups.append(
-                WorkflowGroup(wf_name, workflow_label(wf_name), settings_groups)
+                WorkflowGroup(
+                    wf_key, wf_name, wf_label,
+                    _starred_first(settings_groups), wf_starred,
+                )
             )
+
+        media_label, media_starred = _overlay(
+            MEDIA_LABELS.get(media_type, media_type.title()), media_type, folder_meta
+        )
         tree.append(
             MediaGroup(
-                media_type,
-                MEDIA_LABELS.get(media_type, media_type.title()),
-                workflow_groups,
+                media_type, media_type, media_label,
+                _starred_first(workflow_groups), media_starred,
             )
         )
-    return tree
+    return _starred_first(tree)

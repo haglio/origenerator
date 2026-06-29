@@ -4,16 +4,19 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-# A selected thumbnail fills its whole tile — behind both the image and the
-# caption — with a lighter grey, the way a file browser highlights a picked
-# item. The fill is an object-name rule on the tile and needs
-# WA_StyledBackground: a plain QWidget subclass won't paint a stylesheet
-# background otherwise (which is why an earlier tile-border attempt was
-# invisible). The image keeps a fixed resting frame; the fill is the cue.
+# A selected thumbnail lightens its whole tile — behind both the image and the
+# caption — the way a file browser highlights a picked item. Two things make
+# the fill actually show:
+#   * WA_StyledBackground, or a plain QWidget subclass paints no stylesheet
+#     background at all; and
+#   * transparent child labels, or the app's global `QWidget { background-color }`
+#     paints them opaque and the fill only peeks through the 4px margin as a
+#     frame (which is what an earlier attempt did).
+# The image also lightens its resting border a touch when selected.
 _SELECTED_BG = "#4a4a4a"
-_SELECTED_TILE_CSS = (
-    f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
-)
+_SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
+_BORDER_UNSELECTED = "2px solid #3f3f3f"
+_BORDER_SELECTED = "2px solid #8a8a8a"
 
 
 class ThumbnailWidget(QWidget):
@@ -38,7 +41,6 @@ class ThumbnailWidget(QWidget):
         self._image_label = QLabel()
         self._image_label.setFixedSize(172, 160)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._image_label.setStyleSheet("border: 1px solid #3f3f3f; border-radius: 3px;")
 
         if thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
@@ -52,19 +54,30 @@ class ThumbnailWidget(QWidget):
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
         self._text_label.setMaximumHeight(30)
+        # Transparent so the tile's fill shows through behind the caption.
+        self._text_label.setStyleSheet("background-color: transparent;")
 
         layout.addWidget(self._image_label)
         layout.addWidget(self._text_label)
+        self._apply_styles()
 
     def is_selected(self) -> bool:
         return self._selected
 
     def set_selected(self, selected: bool):
-        """Fill the whole tile when selected; clear the fill when not."""
+        """Lighten the whole tile when selected; restore the resting look when not."""
         if selected == self._selected:
             return  # idempotent: skip restyling thumbnails a click didn't move
         self._selected = selected
-        self.setStyleSheet(_SELECTED_TILE_CSS if selected else "")
+        self._apply_styles()
+
+    def _apply_styles(self):
+        self.setStyleSheet(_SELECTED_TILE_CSS if self._selected else "")
+        border = _BORDER_SELECTED if self._selected else _BORDER_UNSELECTED
+        # Transparent background so the tile fill shows behind any letterboxing.
+        self._image_label.setStyleSheet(
+            f"background-color: transparent; border: {border}; border-radius: 3px;"
+        )
 
     def mousePressEvent(self, event):
         self.setFocus(Qt.FocusReason.MouseFocusReason)

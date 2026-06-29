@@ -52,6 +52,29 @@ def test_import_png_extracts_metadata(tmp_path):
     assert row["seed"] == 12345
 
 
+def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
+    output_dir = tmp_path / "output" / "video"
+    output_dir.mkdir(parents=True)
+    thumb_dir = tmp_path / "thumbs"
+
+    # ComfyUI names outputs "<prefix>_NNNNN_.mp4"; the prefix identifies the workflow.
+    (output_dir / "wan22_i2v_842719365028413_00001_.mp4").write_bytes(b"")
+    (output_dir / "flf2v_loop_00001.mp4").write_bytes(b"")
+    (output_dir / "mystery_clip_00001.mp4").write_bytes(b"")
+
+    db = Database(tmp_path / "test.db")
+    import_comfyui_output(output_dir.parent, db, thumb_dir)
+
+    name_by_file = {}
+    for row in db.list_generations():
+        files = json.loads(row["output_files"])
+        name_by_file[files[0]["filename"]] = row["workflow_name"]
+
+    assert name_by_file["wan22_i2v_842719365028413_00001_.mp4"] == "wan22_i2v"
+    assert name_by_file["flf2v_loop_00001.mp4"] == "wan22_flf2v_loop"
+    assert name_by_file["mystery_clip_00001.mp4"] == "unknown"
+
+
 def test_import_skips_already_imported(tmp_path):
     output_dir = tmp_path / "output" / "image"
     output_dir.mkdir(parents=True)

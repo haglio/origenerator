@@ -9,11 +9,43 @@ from PIL import Image
 
 from origenerator.db import Database
 from origenerator.thumbnail import generate_thumbnail
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 _VIDEO_EXTS = {".mp4", ".webm"}
+
+
+def _workflow_name_by_filename_prefix() -> dict[str, str]:
+    """Map each workflow's output-filename prefix to its name, from the registry.
+
+    ComfyUI names outputs ``<prefix>_NNNNN_.<ext>`` where ``<prefix>`` is the
+    last path segment of the workflow's ``filename_prefix`` (e.g. the
+    ``video/wan22_i2v`` prefix yields files named ``wan22_i2v_00001_.mp4``).
+    """
+    mapping: dict[str, str] = {}
+    for name, wf in WORKFLOW_REGISTRY.items():
+        prefix = wf.default_params().get("filename_prefix", "")
+        base = prefix.rsplit("/", 1)[-1]
+        if base:
+            mapping[base] = name
+    return mapping
+
+
+def infer_workflow_name(filename: str) -> str | None:
+    """Infer a workflow name from a ComfyUI output filename by its prefix.
+
+    Returns the registered workflow whose output prefix the filename starts
+    with (longest match wins), or ``None`` when nothing matches.
+    """
+    best_prefix = ""
+    best_name = None
+    for prefix, name in _workflow_name_by_filename_prefix().items():
+        if filename.startswith(prefix) and len(prefix) > len(best_prefix):
+            best_prefix = prefix
+            best_name = name
+    return best_name
 
 
 def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> int:
@@ -94,7 +126,7 @@ def _get_existing_filenames(db: Database) -> set[str]:
 
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
     result: dict = {
-        "workflow_name": "unknown",
+        "workflow_name": infer_workflow_name(fpath.name) or "unknown",
         "workflow_version": "imported",
         "positive_prompt": None,
         "negative_prompt": None,
@@ -153,7 +185,7 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
                 if isinstance(v, (int, float, str, bool))
             })
 
-    # Try to infer workflow name from filename prefix or node types
+    # The embedded graph is authoritative for PNGs; refine the filename guess.
     node_types = {n.get("class_type") for n in prompt_data.values()}
     if "WanFirstLastFrameToVideo" in node_types:
         result["workflow_name"] = "wan22_flf2v_loop"

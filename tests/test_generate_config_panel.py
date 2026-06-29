@@ -125,7 +125,7 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     panel._on_generate()
     client.submit_job.assert_not_called()
-    assert "image" in panel._status_label.text().lower()
+    assert "image" in panel._progress.format().lower()
     assert panel._db.list_generations() == []  # nothing recorded
 
 
@@ -206,7 +206,7 @@ def test_on_completed_status_shows_actual_time(qtbot):
 
     panel._on_completed("comfyui-xyz", _history_with_duration(905))
 
-    assert panel._status_label.text() == "Done in 15 min 5 sec"
+    assert panel._progress.format() == "Done in 15 min 5 sec"
 
 
 def test_title_is_workflow_name_for_blank_config(panel):
@@ -261,7 +261,7 @@ def test_generate_with_queue_defers_submission(qtbot, tmp_path):
     assert queue.submitted == [(panel, "sdxl_t2i")]
     client.submit_job.assert_not_called()       # nothing reaches ComfyUI yet
     assert panel._db.list_generations() == []    # and nothing is recorded yet
-    assert "queued" in panel._status_label.text().lower()
+    assert "queued" in panel._progress.format().lower()
     assert panel._generate_btn.isEnabled() is False
 
 
@@ -284,5 +284,26 @@ def test_completion_releases_queue_slot(qtbot, tmp_path):
 
 def test_set_queue_status_shows_position_and_eta(panel):
     panel.set_queue_status(2, 905.0)
-    text = panel._status_label.text()
+    text = panel._progress.format()
     assert "#2" in text and "15 min" in text
+
+
+def test_completion_colors_the_bar_done(panel):
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfy-A"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    panel._on_completed("comfy-A", SDXL_HISTORY)
+    assert panel._progress.property("barState") == "done"
+
+
+def test_error_colors_the_bar_red(panel):
+    panel._client_prompt_id = "p1"
+    panel._comfy_prompt_id = "comfy-A"
+    panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    panel._on_error("comfy-A", "boom")
+    assert panel._progress.property("barState") == "error"
+
+
+def test_queue_status_colors_the_bar_grey(panel):
+    panel.set_queue_status(1, 0)
+    assert panel._progress.property("barState") == "queued"

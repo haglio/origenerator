@@ -12,3 +12,9 @@ def test_build_stylesheet_resolves_shared_ui_and_returns_qss():
 def test_stylesheet_styles_the_subtab_add_button():
     # The Generate tab's "+" corner button is a QToolButton; keep it themed.
     assert "QToolButton" in build_stylesheet()
+
+
+def test_stylesheet_colors_progress_bar_states():
+    qss = build_stylesheet()
+    for state in ("queued", "done", "error"):
+        assert f'QProgressBar[barState="{state}"]::chunk' in qss

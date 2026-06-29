@@ -47,6 +47,7 @@ class GenerateConfigPanel(QWidget):
         self._submitted_workflow = None              # workflow captured at submit time
         self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
+        self._bar_state = "ready"                     # drives the progress bar's text + color
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -73,12 +74,10 @@ class GenerateConfigPanel(QWidget):
         layout.addWidget(self._scroll, 1)
 
         bottom = QVBoxLayout()
-        self._status_label = QLabel("Ready")
-        bottom.addWidget(self._status_label)
         self._progress = QProgressBar()
-        self._progress.setRange(0, 100)
-        self._progress.setValue(0)
+        self._progress.setTextVisible(True)
         bottom.addWidget(self._progress)
+        self._show_ready()
         btn_row = QHBoxLayout()
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.setObjectName("generateBtn")
@@ -112,10 +111,12 @@ class GenerateConfigPanel(QWidget):
                 pass
 
     def _on_connected(self):
-        self._status_label.setText("Connected to ComfyUI")
+        if self._bar_state == "ready":  # don't clobber a job's status
+            self._show_ready("Connected to ComfyUI")
 
     def _on_disconnected(self):
-        self._status_label.setText("Disconnected")
+        if self._bar_state == "ready":
+            self._show_ready("Disconnected")
 
     def _on_workflow_changed(self):
         key = self._workflow_combo.currentData()
@@ -137,6 +138,47 @@ class GenerateConfigPanel(QWidget):
         durations = self._db.recent_durations(wf.name) if wf else []
         self._estimate_label.setText(f"Typical time: {estimate_label(durations)}")
 
+    # --- progress bar: the panel's single status display -------------------
+    # Text and color both live in the bar: grey while queued, blue (default)
+    # while running, green when done, red on error. The barState property
+    # drives the chunk color via the stylesheet.
+
+    def _apply_bar_state(self, state: str):
+        self._bar_state = state
+        self._progress.setProperty("barState", state)
+        self._progress.style().unpolish(self._progress)
+        self._progress.style().polish(self._progress)
+
+    def _show_ready(self, text: str = "Ready"):
+        self._apply_bar_state("ready")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(0)
+        self._progress.setFormat(text)
+
+    def _show_waiting(self, text: str = "Queued…"):
+        self._apply_bar_state("queued")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+        self._progress.setFormat(text)
+
+    def _show_running(self):
+        self._apply_bar_state("running")
+        self._progress.setRange(0, 100)
+        self._progress.setValue(0)
+        self._progress.setFormat("Generating… %p%")
+
+    def _show_done(self, text: str):
+        self._apply_bar_state("done")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+        self._progress.setFormat(text)
+
+    def _show_error(self, text: str):
+        self._apply_bar_state("error")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+        self._progress.setFormat(text)
+
     def _on_generate(self):
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
@@ -154,7 +196,7 @@ class GenerateConfigPanel(QWidget):
             if pd.type == "image" and not str(params.get(pd.key, "")).strip()
         ]
         if missing_images:
-            self._status_label.setText(
+            self._show_ready(
                 f"Select an input image ({', '.join(missing_images)}) before generating."
             )
             return
@@ -168,7 +210,7 @@ class GenerateConfigPanel(QWidget):
         }
         self._generate_btn.setEnabled(False)
         if self._queue is not None:
-            self._status_label.setText("Queued…")
+            self._show_waiting()
             self._queue.submit(self, wf.name)
         else:
             self._begin_job()
@@ -202,12 +244,11 @@ class GenerateConfigPanel(QWidget):
             self._comfy_prompt_id = actual_pid
             self._submitted_workflow = wf
             self._db.update_generation(prompt_id, status="running")
-            self._status_label.setText(f"Generating... (job {actual_pid[:8]})")
-            self._progress.setValue(0)
+            self._show_running()
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))
-            self._status_label.setText(f"Error: {e}")
+            self._show_error(f"Error: {e}")
             self._generate_btn.setEnabled(True)
             self._release_queue_slot()
 
@@ -216,7 +257,7 @@ class GenerateConfigPanel(QWidget):
         text = f"Queued (#{position})"
         if eta_seconds and eta_seconds > 0:
             text += f" — starts in ~{format_duration(eta_seconds)}"
-        self._status_label.setText(text)
+        self._show_waiting(text)
 
     def _release_queue_slot(self):
         if self._queue is not None:
@@ -266,10 +307,9 @@ class GenerateConfigPanel(QWidget):
             fields["duration_seconds"] = duration
         self._db.update_generation(self._client_prompt_id, **fields)
         if duration is not None:
-            self._status_label.setText(f"Done in {format_duration(duration)}")
+            self._show_done(f"Done in {format_duration(duration)}")
         else:
-            self._status_label.setText("Done!")
-        self._progress.setValue(self._progress.maximum())
+            self._show_done("Done!")
         self._generate_btn.setEnabled(True)
         completed_id = self._client_prompt_id
         self._reset_job()
@@ -285,7 +325,7 @@ class GenerateConfigPanel(QWidget):
             status="error",
             error_message=error_msg,
         )
-        self._status_label.setText(f"Error: {error_msg[:100]}")
+        self._show_error(f"Error: {error_msg[:100]}")
         self._generate_btn.setEnabled(True)
         self._reset_job()
         self._release_queue_slot()

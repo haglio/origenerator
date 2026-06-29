@@ -126,7 +126,7 @@ def test_second_generate_is_queued_behind_the_first(view):
     p2._on_generate()
     assert view._client.submit_job.call_count == 1   # only the first reaches ComfyUI
     assert p1._comfy_prompt_id == "comfy-1"           # first is running
-    assert "queued" in p2._status_label.text().lower()
+    assert "queued" in p2._progress.format().lower()
 
 
 def test_closing_running_subtab_advances_the_queue(view):

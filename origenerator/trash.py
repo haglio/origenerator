@@ -8,9 +8,13 @@ tread on one another and purging one is a single ``rmtree``.
 """
 
 import shutil
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+_MOVE_ATTEMPTS = 5      # a freshly-closed media file can stay locked for a beat
+_MOVE_RETRY_DELAY = 0.1
 
 
 @dataclass
@@ -52,10 +56,27 @@ class Trash:
         for i, path in enumerate(paths):
             # The index prefix keeps same-named files from distinct folders apart.
             dest = subdir / f"{i}_{path.name}"
-            shutil.move(str(path), str(dest))
+            _move(path, dest)
             moves.append((path, dest))
         return TrashedBatch(moves=moves, subdir=subdir)
 
     def sweep(self) -> None:
         """Permanently clear all batches — leftovers from a prior session."""
         shutil.rmtree(self.root, ignore_errors=True)
+
+
+def _move(src: Path, dest: Path) -> None:
+    """Move a file into the trash, retrying briefly past a transient lock.
+
+    A video the preview only just stopped can stay open for a moment (and AV
+    scanners or the indexer can grab any file), so a one-shot move would fail
+    where a couple of retries succeed.
+    """
+    for attempt in range(_MOVE_ATTEMPTS):
+        try:
+            shutil.move(str(src), str(dest))
+            return
+        except PermissionError:
+            if attempt == _MOVE_ATTEMPTS - 1:
+                raise
+            time.sleep(_MOVE_RETRY_DELAY)

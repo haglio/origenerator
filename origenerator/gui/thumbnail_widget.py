@@ -22,6 +22,9 @@ class ThumbnailWidget(QWidget):
         self.prompt_id = prompt_id
         self._selected = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Take focus on click so the gallery's Delete/Ctrl+Z keys reach it even
+        # when the user works entirely in the main pane, never touching the tree.
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setFixedSize(180, 200)
 
         layout = QVBoxLayout(self)
@@ -64,4 +67,5 @@ class ThumbnailWidget(QWidget):
         self._image_label.setStyleSheet(f"border: {border}; border-radius: 3px;")
 
     def mousePressEvent(self, event):
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
         self.clicked.emit(self.prompt_id)

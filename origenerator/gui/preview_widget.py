@@ -102,6 +102,7 @@ class PreviewWidget(QWidget):
 
     def clear(self) -> None:
         self._player.stop()
+        self._player.setSource(QUrl())  # release any held video file so it can be deleted
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(_PLACEHOLDER)

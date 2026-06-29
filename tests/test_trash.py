@@ -74,6 +74,30 @@ def test_store_with_no_files_is_a_harmless_noop(tmp_path):
     batch.purge()    # must not raise
 
 
+def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
+    import origenerator.trash as trash_mod
+
+    src = _file(tmp_path / "out" / "clip.mp4")
+    trash = Trash(tmp_path / "trash")
+    real_move = trash_mod.shutil.move
+    attempts = {"n": 0}
+
+    def flaky_move(s, d):
+        attempts["n"] += 1
+        if attempts["n"] == 1:  # the media backend hasn't let go of the file yet
+            raise PermissionError("file is open in another process")
+        return real_move(s, d)
+
+    monkeypatch.setattr(trash_mod.shutil, "move", flaky_move)
+    monkeypatch.setattr(trash_mod.time, "sleep", lambda _s: None)
+
+    batch = trash.store([src])
+
+    assert attempts["n"] == 2  # retried once, then succeeded
+    assert not src.exists()
+    assert batch.moves[0][1].exists()
+
+
 def test_sweep_clears_everything_left_in_the_trash(tmp_path):
     src = _file(tmp_path / "out" / "a.png")
     trash = Trash(tmp_path / "trash")

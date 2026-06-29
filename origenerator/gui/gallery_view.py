@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QKeySequence
 
 from origenerator import gallery, timing
 from origenerator.comfyui_client import ComfyUIClient
@@ -74,7 +74,6 @@ class GalleryView(QWidget):
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._build_ui()
-        self._install_shortcuts()
         self._sync_undo_button()
 
         self._poll_timer = QTimer(self)
@@ -82,13 +81,21 @@ class GalleryView(QWidget):
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
 
-    def _install_shortcuts(self):
-        delete = QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self)
-        delete.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        delete.activated.connect(self._delete_selection)
-        undo = QShortcut(QKeySequence(QKeySequence.StandardKey.Undo), self)
-        undo.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        undo.activated.connect(self._undo)
+    def keyPressEvent(self, event):
+        """Delete removes the picked items/folder; Ctrl+Z undoes the last action.
+
+        These propagate up from whatever gallery widget holds focus (a clicked
+        thumbnail, the folder tree), so they work no matter how the user got
+        there — including reaching a tile entirely through the main pane.
+        """
+        if event.matches(QKeySequence.StandardKey.Delete):
+            self._delete_selection()
+            event.accept()
+        elif event.matches(QKeySequence.StandardKey.Undo):
+            self._undo()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
     def _build_ui(self):
         layout = QHBoxLayout(self)

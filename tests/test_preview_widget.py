@@ -81,6 +81,15 @@ def test_clear_resets_to_placeholder(make_preview, tmp_path):
     w._player.stop.assert_called()
 
 
+def test_clear_releases_the_video_file(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")
+    w.clear()
+    # Dropping the source unlocks the file, so a previewed clip can be deleted
+    # (a held media handle blocks the move-to-trash on Windows).
+    w._player.setSource.assert_called_with(QUrl())
+
+
 def test_video_preview_is_muted(make_preview):
     w = make_preview()
     assert w._audio.isMuted() is True

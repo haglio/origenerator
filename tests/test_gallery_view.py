@@ -1147,3 +1147,77 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 
     assert key in view._reroll_jobs
     assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
+
+
+def _shown_view_with_one_image(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    output_dir = tmp_path / "output"
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"steps": 50}), workflow_json="{}",
+    )
+    file_path = output_dir / "sdxl_t2i_i1.png"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_bytes(b"img")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, output_dir, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    return view, db, file_path
+
+
+def test_clicking_a_thumbnail_moves_focus_into_the_gallery(qtbot, tmp_path):
+    # The Delete shortcut only fires while a gallery widget holds focus, and
+    # thumbnails are reached without ever touching the tree — so the click must
+    # move focus into the gallery itself. focusWidget() reports this without
+    # depending on the test window winning OS activation.
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
+
+    assert view.focusWidget() is thumb
+
+
+def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
+    view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)  # select, the way a user does
+    qtbot.keyClick(thumb, Qt.Key.Key_Delete)            # Delete propagates up to the view
+
+    assert db.get_generation("i1") is None
+    assert not file_path.exists()
+
+
+def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
+    view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    thumb = view._thumb_widgets["i1"]
+    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
+    qtbot.keyClick(thumb, Qt.Key.Key_Delete)
+    assert db.get_generation("i1") is None
+
+    qtbot.keyClick(view, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+
+    assert db.get_generation("i1") is not None
+    assert file_path.exists()
+
+
+def test_delete_on_a_tree_folder_removes_it_via_the_keyboard(qtbot, tmp_path):
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)  # the settings folder is the current tree item
+    view._confirm = lambda text: True
+    view._tree.setFocus()
+
+    qtbot.keyClick(view._tree, Qt.Key.Key_Delete)  # propagates from tree to the view
+
+    assert db.get_generation("i1") is None

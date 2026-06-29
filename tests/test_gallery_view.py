@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import QFrame
 
 from origenerator import gallery
@@ -847,6 +847,77 @@ def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     view._delete_selection()
 
     assert actions.deleted == []  # workflow folders are off-limits
+
+
+def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
+    class BoomActions(FakeActions):
+        def delete_rows(self, rows):
+            raise OSError("the file is held by another process")
+
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=BoomActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    warned = []
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMessageBox.warning",
+        lambda *a, **k: warned.append(a),
+    )
+
+    view._delete_selection()  # must not raise
+
+    assert warned  # the user is told the delete failed instead of nothing happening
+
+
+def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
+
+    view._thumbnail_context_menu("i2", QPoint(0, 0))
+
+    assert view.selected_prompt_ids() == ["i2"]
+
+
+def test_right_click_delete_removes_the_picked_thumbnails(qtbot, monkeypatch):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    # Choosing the menu's only entry ("Delete").
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    )
+
+    view._thumbnail_context_menu("i1", QPoint(0, 0))
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+
+
+def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)  # i1 + i3 selected
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    )
+
+    # Right-clicking a tile already in the selection keeps the whole set.
+    view._thumbnail_context_menu("i3", QPoint(0, 0))
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i3"}
 
 
 def test_delete_folder_refuses_workflow_and_media_groups(qtbot):

@@ -368,6 +368,7 @@ class GalleryView(QWidget):
             )
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._thumbnail_clicked)
+            tw.context_requested.connect(self._thumbnail_context_menu)
             pos = idx + offset
             grid.addWidget(tw, pos // _GRID_COLUMNS, pos % _GRID_COLUMNS)
             self._visible_ids.append(row["prompt_id"])
@@ -569,6 +570,21 @@ class GalleryView(QWidget):
 
     # --- deletion & undo ---------------------------------------------------
 
+    def _thumbnail_context_menu(self, prompt_id: str, global_pos):
+        """Right-click menu for a thumbnail: delete the picked item(s).
+
+        Right-clicking a tile that isn't part of the current selection first
+        selects just it, so the menu always acts on something visible.
+        """
+        if prompt_id not in self._selected_ids:
+            self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+            self._on_thumbnail_clicked(prompt_id)
+        count = len(self._selected_ids)
+        menu = QMenu(self)
+        delete_action = menu.addAction(f"Delete {count} item{'s' if count != 1 else ''}")
+        if menu.exec(global_pos) is delete_action:
+            self._delete_selection()
+
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked."""
         if self._selected_ids:
@@ -602,7 +618,17 @@ class GalleryView(QWidget):
         deleted_ids = {r["prompt_id"] for r in rows}
         if self._selected and self._selected.get("prompt_id") in deleted_ids:
             self._preview.clear()  # release any file handle before the files move
-        self._actions.delete_rows(rows)
+        try:
+            self._actions.delete_rows(rows)
+        except Exception as e:
+            # A delete that throws (a locked file, a vanished path) must not fail
+            # silently — show what went wrong rather than appearing to do nothing.
+            logger.exception("Failed to delete %d generation(s)", len(rows))
+            QMessageBox.warning(
+                self, "Delete failed",
+                f"Could not delete the selected item(s):\n\n{e}",
+            )
+            return
         self._clear_selection()
         self.refresh()
         self._sync_undo_button()

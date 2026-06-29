@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 
 # A selected thumbnail lightens its whole tile — behind both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
@@ -21,6 +21,7 @@ _BORDER_SELECTED = "2px solid #8a8a8a"
 
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
+    context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str, parent=None):
         super().__init__(parent)
@@ -32,6 +33,11 @@ class ThumbnailWidget(QWidget):
         # Take focus on click so the gallery's Delete/Ctrl+Z keys reach it even
         # when the user works entirely in the main pane, never touching the tree.
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        # Right-click anywhere on the tile asks the gallery for a context menu.
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(
+            lambda pos: self.context_requested.emit(self.prompt_id, self.mapToGlobal(pos))
+        )
         self.setFixedSize(180, 200)
 
         layout = QVBoxLayout(self)

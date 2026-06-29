@@ -1,8 +1,21 @@
+from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
+
+
+def test_right_click_requests_a_context_menu_for_this_thumbnail(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    received = []
+    tw.context_requested.connect(lambda pid, pos: received.append(pid))
+
+    # What a right-click on the tile triggers (custom context-menu policy).
+    tw.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert received == ["p1"]
 
 
 def test_thumbnail_starts_unselected(qtbot):

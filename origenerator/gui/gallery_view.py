@@ -46,6 +46,16 @@ def _is_deletable_folder(group) -> bool:
     return isinstance(group, (gallery.ModelGroup, gallery.SettingsGroup))
 
 
+def _is_reusable_workflow(workflow_name) -> bool:
+    """Whether the app can rebuild this workflow from its template.
+
+    The single gate for both Reuse Parameters and the gallery re-roll, so the
+    re-roll '+' appears exactly where Reuse works (a re-roll is just Reuse with
+    a random seed).
+    """
+    return (workflow_name or "") in WORKFLOW_REGISTRY
+
+
 class GalleryView(QWidget):
     reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
 
@@ -380,15 +390,14 @@ class GalleryView(QWidget):
     def _can_reroll(self, group) -> bool:
         """True when this folder's settings can be re-run as a new variation.
 
-        Needs a live client and a generation of ours (imports lack our full
-        params) made with a workflow we still know how to build.
+        Mirrors the Reuse Parameters gate — any folder whose workflow the app
+        knows how to build, imported or not — since a re-roll is exactly Reuse +
+        a random seed + Generate (with missing params filled from the workflow's
+        defaults, just as the Generate tab does).
         """
         if self._client is None or not group.rows:
             return False
-        row = group.rows[0]
-        if row.get("source", "generated") != "generated":
-            return False
-        return WORKFLOW_REGISTRY.get(row.get("workflow_name") or "") is not None
+        return _is_reusable_workflow(group.rows[0].get("workflow_name"))
 
     def _add_reroll_tile(self, grid, group, index):
         tile = RerollTile(self._reroll_jobs.get(group.key))
@@ -406,7 +415,13 @@ class GalleryView(QWidget):
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
         if workflow is None:
             return
-        params = randomize_seeds(merge_denormalized(group.rows[0]), workflow.seed_keys())
+        # Reuse the row's params, filling any the row didn't carry (imports keep
+        # only sparse metadata) from the workflow's defaults — the same merge the
+        # Generate tab does — then re-roll the seed.
+        params = merge_denormalized(group.rows[0])
+        for param_key, value in workflow.default_params().items():
+            params.setdefault(param_key, value)
+        params = randomize_seeds(params, workflow.seed_keys())
         try:
             job = GenerationJob(self._client, workflow, params)
         except Exception as e:
@@ -746,7 +761,7 @@ class GalleryView(QWidget):
         if not row:
             return
         self._selected = row
-        reusable = row.get("workflow_name") in WORKFLOW_REGISTRY
+        reusable = _is_reusable_workflow(row.get("workflow_name"))
         self._reuse_btn.setEnabled(reusable)
         self._reuse_wrap.setToolTip(
             "" if reusable else

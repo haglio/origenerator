@@ -1106,14 +1106,41 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
     assert _reroll_tile(view) is None
 
 
-def test_no_add_tile_for_imported_generations(qtbot):
-    # We can only re-roll what we generated; imports lack our full params.
+def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
+    # Re-roll works anywhere Reuse Parameters does, imports included — the
+    # workflow's defaults fill in whatever sparse metadata an import lacks.
     rows = [_row("imp", "sdxl_t2i", {"seed": 1}, "imp.png", source="imported")]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert _reroll_tile(view) is None
+    assert _reroll_tile(view) is not None
+
+
+def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
+    # An import keeps only sparse metadata (no checkpoint/vae); re-roll must
+    # still build a valid payload by borrowing the workflow's defaults.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="imported",
+        positive_prompt="a cat", seed=1,
+        params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),  # sparse
+        workflow_json="{}", source="imported",
+    )
+    db.update_generation("imp", status="completed",
+                         output_files=json.dumps([{"filename": "imp.png", "subfolder": ""}]))
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    job = view._reroll_jobs[key]
+    assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
+    assert job.params["seed"] != 1  # re-rolled
+    client.submit_job.assert_called_once_with(job.payload)  # built without error
 
 
 def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):

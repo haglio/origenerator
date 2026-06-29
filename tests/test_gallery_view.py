@@ -381,6 +381,31 @@ def test_generation_without_duration_omits_the_line(qtbot):
     assert "Duration:" not in view._meta_text.toPlainText()
 
 
+def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
+    rows = [
+        _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
+        _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
+        _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    workflow = _top_level(view._tree)["Videos"].child(0)
+    view._tree.setCurrentItem(workflow)
+    assert view._avg_label.text() == "Average time: ~12 min (across 3 runs)"
+
+
+def test_folder_without_timed_items_shows_no_average(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))  # no duration
+    qtbot.addWidget(view)
+    view.refresh()
+
+    workflow = _top_level(view._tree)["Images"].child(0)
+    view._tree.setCurrentItem(workflow)
+    assert view._avg_label.text() == ""
+
+
 def test_resetting_selection_clears_a_stale_estimate(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
     rows[0]["duration_seconds"] = 6.0

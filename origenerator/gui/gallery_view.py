@@ -62,6 +62,10 @@ class GalleryView(QWidget):
         self._title.setWordWrap(True)
         self._title.setStyleSheet("font-size: 15px; font-weight: 600; padding: 2px;")
         middle.addWidget(self._title)
+        self._avg_label = QLabel("")
+        self._avg_label.setObjectName("estimateLabel")
+        self._avg_label.setWordWrap(True)
+        middle.addWidget(self._avg_label)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         middle.addWidget(self._scroll, 1)
@@ -183,16 +187,27 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         if current is None:
             self._title.setText("")
+            self._avg_label.setText("")
             self._show_widget(QWidget())
             self._visible_ids = []
             self._visible_keys = []
             return
         group = current.data(0, _GROUP_ROLE)
         self._title.setText(self._breadcrumb(current))
+        self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
             self._show_thumbnails(group.rows)
         else:
             self._show_folder_tiles(gallery.child_groups(group))
+
+    def _update_folder_average(self, group):
+        """Show the mean generation time across every item beneath this folder."""
+        durations = [
+            row["duration_seconds"] for row in gallery.rows_under(group)
+            if row.get("duration_seconds") is not None
+        ]
+        label = timing.average_label(durations)
+        self._avg_label.setText(f"Average time: {label}" if label else "")
 
     def _breadcrumb(self, item) -> str:
         parts = []

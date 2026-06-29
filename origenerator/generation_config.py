@@ -23,6 +23,26 @@ class ConfigSnapshot:
     params: dict
     seed_is_random: bool
 
+    def to_dict(self) -> dict:
+        """A JSON-serializable view, for persisting an open generate tab."""
+        return {
+            "workflow_name": self.workflow_name,
+            "params": self.params,
+            "seed_is_random": self.seed_is_random,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ConfigSnapshot":
+        """Rebuild from :meth:`to_dict` output, tolerating partial/corrupt data."""
+        params = data.get("params")
+        if not isinstance(params, dict):
+            params = {}
+        return cls(
+            workflow_name=str(data.get("workflow_name", "")),
+            params=params,
+            seed_is_random=bool(data.get("seed_is_random", False)),
+        )
+
 
 def configs_match(
     snapshot: ConfigSnapshot, stored_workflow: str, stored_params: dict

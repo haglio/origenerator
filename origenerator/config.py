@@ -4,6 +4,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_DIR / "state"
 DB_PATH = STATE_DIR / "origenerator.db"
 THUMB_DIR = STATE_DIR / "thumbnails"
+UI_STATE_PATH = STATE_DIR / "ui_state.json"
 
 COMFYUI_DIR = Path("C:/path/to/suite-root/projects/ComfyUIApp/ComfyUI")
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"

@@ -1,3 +1,4 @@
+from io import BytesIO
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,6 +11,12 @@ from origenerator.gui.preview_widget import PreviewWidget
 def _make_png(path):
     Image.new("RGB", (32, 24), (10, 120, 200)).save(path, "PNG")
     return path
+
+
+def _png_bytes():
+    buf = BytesIO()
+    Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
+    return buf.getvalue()
 
 
 def _make_animated_gif(path):
@@ -121,3 +128,25 @@ def test_clear_stops_animation(make_preview, tmp_path):
     w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
     w.clear()
     assert w._image_label.movie() is None
+
+
+def test_show_frame_displays_image_from_bytes(make_preview):
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_frame(_png_bytes())
+    assert not w._image_label.pixmap().isNull()
+    assert w.is_showing_video() is False
+
+
+def test_show_frame_stops_any_playing_video(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")
+    w.show_frame(_png_bytes())
+    assert w.is_showing_video() is False
+    w._player.stop.assert_called()
+
+
+def test_show_frame_ignores_undecodable_bytes(make_preview):
+    w = make_preview()
+    w.show_frame(b"not an image")
+    assert w._image_label.pixmap().isNull()

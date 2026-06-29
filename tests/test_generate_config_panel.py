@@ -207,3 +207,26 @@ def test_on_completed_status_shows_actual_time(qtbot):
     panel._on_completed("comfyui-xyz", _history_with_duration(905))
 
     assert panel._status_label.text() == "Done in 15 min 5 sec"
+
+
+def test_title_is_workflow_name_for_blank_config(panel):
+    assert panel.title() == "SDXL Text-to-Image"
+
+
+def test_title_uses_prompt_as_gallery_folder(panel):
+    panel.prefill("sdxl_t2i", {"positive_prompt": "a cat in a hat"})
+    assert panel.title() == "a cat in a hat"
+
+
+def test_title_changed_emitted_when_prompt_edited(panel):
+    titles = []
+    panel.title_changed.connect(titles.append)
+    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
+    assert titles and titles[-1] == "a fox"
+
+
+def test_custom_title_overrides_and_sticks(panel):
+    panel.set_custom_title("My experiments")
+    assert panel.title() == "My experiments"
+    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
+    assert panel.title() == "My experiments"  # rename survives config changes

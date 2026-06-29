@@ -11,6 +11,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gallery import config_folder_label
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.param_form import ParamForm
 from origenerator.thumbnail import generate_thumbnail
@@ -34,7 +35,7 @@ class GenerateConfigPanel(QWidget):
     """
 
     generation_completed = pyqtSignal(str)  # our (client-side) prompt_id
-    title_changed = pyqtSignal(str)         # workflow display name
+    title_changed = pyqtSignal(str)         # current tab title
 
     def __init__(self, client: ComfyUIClient, db: Database, parent=None):
         super().__init__(parent)
@@ -43,6 +44,7 @@ class GenerateConfigPanel(QWidget):
         self._client_prompt_id: str | None = None   # our uuid; the DB row key
         self._comfy_prompt_id: str | None = None     # ComfyUI's id; keys its signals
         self._submitted_workflow = None              # workflow captured at submit time
+        self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._param_form: ParamForm | None = None
         self._build_ui()
         self._connect_signals()
@@ -118,9 +120,13 @@ class GenerateConfigPanel(QWidget):
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
             self._param_form = ParamForm(wf.param_definitions())
+            self._param_form.changed.connect(self._emit_title)
             self._scroll.setWidget(self._param_form)
         self._refresh_estimate()
-        self.title_changed.emit(self._workflow_combo.currentText())
+        self._emit_title()
+
+    def _emit_title(self):
+        self.title_changed.emit(self.title())
 
     def _refresh_estimate(self):
         """Show how long this workflow typically takes, from its recent runs."""
@@ -261,7 +267,16 @@ class GenerateConfigPanel(QWidget):
         )
 
     def title(self) -> str:
-        return self._workflow_combo.currentText()
+        """The tab title: the user's custom name, else the config's gallery folder."""
+        if self._custom_title:
+            return self._custom_title
+        params = self._param_form.get_values_static() if self._param_form else {}
+        return config_folder_label(self._workflow_combo.currentData(), params)
+
+    def set_custom_title(self, name: str):
+        """Pin a user-chosen tab name that overrides the auto gallery-folder name."""
+        self._custom_title = name
+        self._emit_title()
 
     def prefill(self, workflow_name: str, params: dict):
         # Switch to the matching workflow if found

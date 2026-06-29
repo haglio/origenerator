@@ -17,7 +17,7 @@ from origenerator.gallery import (
 
 def test_config_tab_title_leads_with_model_then_prompt():
     title = config_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert title == "SDXL Text-to-Image: a cat in a hat"
+    assert title == "SDXL Text-to-Image › a cat in a hat"
 
 
 def test_config_tab_title_is_just_the_model_without_a_prompt():

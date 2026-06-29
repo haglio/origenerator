@@ -198,6 +198,12 @@ class GenerateConfigPanel(QWidget):
         self._progress.setValue(1)
         self._progress.setFormat(text)
 
+    def _show_canceled(self, text: str = "Canceled"):
+        self._apply_bar_state("canceled")
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+        self._progress.setFormat(text)
+
     def _on_generate(self):
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
@@ -433,7 +439,7 @@ class GenerateConfigPanel(QWidget):
         self._reset_job()
         self._generate_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
-        self._show_ready("Canceled")
+        self._show_canceled()
 
     def _reset_job(self):
         self._client_prompt_id = None

@@ -467,3 +467,10 @@ def test_completed_job_cannot_be_canceled(panel):
 
     panel._client.interrupt.assert_not_called()
     assert panel._cancel_btn.isEnabled() is False
+
+
+def test_cancel_colors_the_bar_yellow(panel):
+    panel._client.cancel_prompt = MagicMock()
+    panel._on_generate()
+    panel._on_cancel()
+    assert panel._progress.property("barState") == "canceled"

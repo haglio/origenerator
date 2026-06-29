@@ -7,7 +7,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator import gallery
+from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.db import Database
+from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 _ROWS_ROLE = Qt.ItemDataRole.UserRole  # rows represented by a folder node
@@ -48,7 +50,7 @@ class GalleryView(QWidget):
         self._show_rows([])
         layout.addWidget(self._grid_scroll, 5)
 
-        # Right: metadata sidebar
+        # Right: preview + metadata sidebar
         right = QVBoxLayout()
         self._meta_title = QLabel("Select a generation")
         self._meta_title.setWordWrap(True)
@@ -60,9 +62,11 @@ class GalleryView(QWidget):
         self._source_link.linkActivated.connect(self._on_source_link)
         self._source_link.hide()
         right.addWidget(self._source_link)
+        self._preview = PreviewWidget()
+        right.addWidget(self._preview, 3)
         self._meta_text = QPlainTextEdit()
         self._meta_text.setReadOnly(True)
-        right.addWidget(self._meta_text, 1)
+        right.addWidget(self._meta_text, 2)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
@@ -153,6 +157,7 @@ class GalleryView(QWidget):
             return
         self._selected = row
         self._reuse_btn.setEnabled(True)
+        self._show_preview(row)
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
         )
@@ -204,6 +209,13 @@ class GalleryView(QWidget):
         )
         self._source_link.show()
 
+    def _show_preview(self, row: dict):
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is None:
+            self._preview.clear()
+        else:
+            self._preview.show_media(*preview)
+
     def current_source_image_id(self) -> str | None:
         return self._source_image_id
 
@@ -221,6 +233,7 @@ class GalleryView(QWidget):
         self._source_link.hide()
         self._source_link.clear()
         self._source_image_id = None
+        self._preview.clear()
 
     def _on_reuse(self):
         if not self._selected:

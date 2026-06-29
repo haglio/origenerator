@@ -1,6 +1,25 @@
 import json
+from pathlib import Path
+from unittest.mock import MagicMock
 
+import pytest
+
+from origenerator import gallery
+from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.preview_widget import PreviewWidget
+
+
+@pytest.fixture(autouse=True)
+def _stub_preview_resolution(monkeypatch):
+    """Keep gallery_view unit tests off the real filesystem and media backend.
+
+    Preview resolution is exercised in test_gallery.py and rendering in
+    test_preview_widget.py; here it defaults to "nothing to show" so a real
+    PreviewWidget never starts WMF playback (which deadlocks at teardown).
+    Tests that assert routing override this with their own return value.
+    """
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
 
 
 class FakeDB:
@@ -111,3 +130,38 @@ def test_i2v_thumbnail_links_to_source_image_and_navigates(qtbot):
     assert view._selected["prompt_id"] == "img1"
     # The image itself has no input image, so the link disappears.
     assert view.current_source_image_id() is None
+
+
+def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()
+    resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
+    resolve = MagicMock(return_value=resolved)
+    monkeypatch.setattr(gallery, "resolve_preview", resolve)
+
+    view._on_thumbnail_clicked("i1")
+
+    resolve.assert_called_once_with(view._selected, COMFYUI_OUTPUT_DIR)
+    view._preview.show_media.assert_called_once_with(resolved[0], "image")
+
+
+def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.clear = MagicMock()
+    view._preview.show_media = MagicMock()
+    monkeypatch.setattr(gallery, "resolve_preview", MagicMock(return_value=None))
+
+    view._on_thumbnail_clicked("i1")
+
+    view._preview.clear.assert_called_once()
+    view._preview.show_media.assert_not_called()
+
+
+def test_gallery_creates_a_preview_widget(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    assert isinstance(view._preview, PreviewWidget)

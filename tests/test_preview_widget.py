@@ -12,6 +12,12 @@ def _make_png(path):
     return path
 
 
+def _make_animated_gif(path):
+    frames = [Image.new("RGB", (16, 12), (i * 60, 0, 0)) for i in range(3)]
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=80, loop=0)
+    return path
+
+
 @pytest.fixture
 def make_preview(qtbot):
     """Build PreviewWidgets backed by a mock player.
@@ -85,3 +91,33 @@ def test_show_media_routes_to_image(make_preview, tmp_path):
     w.show_media(_make_png(tmp_path / "p.png"), "image")
     assert w.is_showing_video() is False
     w._player.play.assert_not_called()
+
+
+def test_show_image_animates_animated_file(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+    assert w._image_label.movie() is not None
+    assert w.is_showing_video() is False  # animated images use the image page
+
+
+def test_show_static_image_uses_no_movie(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w._image_label.movie() is None
+    assert not w._image_label.pixmap().isNull()
+
+
+def test_switching_from_animation_to_static_stops_movie(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+    movie = w._image_label.movie()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w._image_label.movie() is None
+    assert movie.state().name == "NotRunning"
+
+
+def test_clear_stops_animation(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+    w.clear()
+    assert w._image_label.movie() is None

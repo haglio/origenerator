@@ -1,8 +1,9 @@
-"""A preview pane that shows a full-resolution image or a looping video.
+"""A preview pane that shows an image or video for the selected generation.
 
 The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
-images are scaled to fit (and rescaled on resize), videos auto-play muted on a
-loop so selecting one gives an immediate moving preview without stealing audio.
+static images are scaled to fit (and rescaled on resize), animated images
+(animated WebP/GIF) loop via ``QMovie``, and videos auto-play muted on a loop so
+selecting one gives an immediate moving preview without stealing audio.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QStackedLayout, QLabel, QSizePolicy, QApplication
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QMovie, QImageReader
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -22,6 +23,8 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
+        self._movie: QMovie | None = None
+        self._movie_native = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self._stack = QStackedLayout(self)
@@ -62,18 +65,27 @@ class PreviewWidget(QWidget):
 
     def show_image(self, path) -> None:
         self._player.stop()
-        self._pixmap = QPixmap(str(path))
+        reader = QImageReader(str(path))
+        if reader.supportsAnimation() and reader.imageCount() > 1:
+            self._pixmap = None
+            self._set_movie(QMovie(str(path)), reader.size())
+        else:
+            self._set_movie(None)
+            self._pixmap = QPixmap(str(path))
+            self._rescale()
         self._stack.setCurrentWidget(self._image_label)
-        self._rescale()
 
     def show_video(self, path) -> None:
+        self._set_movie(None)
         self._pixmap = None
+        self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
         self._player.play()
 
     def clear(self) -> None:
         self._player.stop()
+        self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(_PLACEHOLDER)
         self._stack.setCurrentWidget(self._image_label)
@@ -86,7 +98,35 @@ class PreviewWidget(QWidget):
         self._player.stop()
         self._player.setSource(QUrl())
 
+    def _set_movie(self, movie: QMovie | None, native_size=None) -> None:
+        """Attach (or clear) an animated movie, retiring any previous one.
+
+        The movie is parented to this widget so the label's pointer can't dangle
+        if Python drops the wrapper before the next paint.
+        """
+        if self._movie is not None:
+            self._movie.stop()
+            self._movie.deleteLater()
+        self._movie = movie
+        self._movie_native = native_size
+        if movie is not None:
+            movie.setParent(self)
+            self._image_label.setMovie(movie)
+            self._scale_movie()
+            movie.start()
+
+    def _scale_movie(self) -> None:
+        if self._movie is None or self._movie_native is None or not self._movie_native.isValid():
+            return
+        target = self._movie_native.scaled(
+            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio
+        )
+        if not target.isEmpty():
+            self._movie.setScaledSize(target)
+
     def _rescale(self) -> None:
+        if self._movie is not None:
+            return
         if self._pixmap is None or self._pixmap.isNull():
             self._image_label.setText("No preview available")
             return
@@ -100,5 +140,7 @@ class PreviewWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self._pixmap is not None:
+        if self._movie is not None:
+            self._scale_movie()
+        elif self._pixmap is not None:
             self._rescale()

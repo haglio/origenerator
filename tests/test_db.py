@@ -151,6 +151,24 @@ def test_recent_durations_respects_limit(tmp_path):
     assert db.recent_durations("sdxl_t2i", limit=2) == [4.0, 3.0]
 
 
+def test_completed_without_duration_selects_backfill_candidates(tmp_path):
+    db = Database(tmp_path / "test.db")
+    # Needs a duration: completed, has a completed_at, duration still NULL.
+    db.insert_generation(prompt_id="needs", workflow_name="sdxl_t2i",
+                         workflow_version="imported", params_json="{}",
+                         workflow_json="{}", source="imported")
+    db.update_generation("needs", status="completed", completed_at="2026-06-29T12:00:00+00:00")
+    # Already timed — excluded.
+    _add_completed(db, "timed", "sdxl_t2i", 5.0)
+    # Still running — excluded.
+    db.insert_generation(prompt_id="running", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}")
+
+    rows = db.completed_without_duration()
+    assert [r["prompt_id"] for r in rows] == ["needs"]
+    assert rows[0]["completed_at"] == "2026-06-29T12:00:00+00:00"
+
+
 def test_list_generations_ordered_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):

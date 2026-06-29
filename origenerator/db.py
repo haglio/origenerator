@@ -126,6 +126,22 @@ class Database:
             ).fetchall()
             return [r[0] for r in rows]
 
+    def completed_without_duration(self) -> list[dict]:
+        """Completed rows that have a finish time but no recorded duration.
+
+        These are the candidates for log-based backfill: their ``completed_at``
+        (the output file's mtime) is what a log line gets matched against.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT * FROM generations
+                   WHERE status = 'completed'
+                     AND duration_seconds IS NULL
+                     AND completed_at IS NOT NULL
+                   ORDER BY id"""
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     def get_generation(self, prompt_id: str) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(

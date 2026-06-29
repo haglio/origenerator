@@ -79,7 +79,7 @@ def main():
 
     from origenerator.config import (
         DB_PATH, COMFYUI_HOST, COMFYUI_PORT,
-        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, THUMB_DIR,
+        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR,
     )
     from origenerator.gui.loading_screen import LoadingScreen
 
@@ -126,6 +126,18 @@ def main():
             logger.info("Relabelled %d previously-unknown imports", relabeled)
     except Exception as e:
         logger.warning("Workflow backfill failed: %s", e)
+
+    status("Recovering generation times...")
+    # Recover how long past generations took from ComfyUI's console logs, so
+    # estimates have history to draw on before any new run is timed live.
+    from origenerator.log_backfill import backfill_durations_from_logs
+    try:
+        log_paths = sorted(COMFYUI_LOG_DIR.glob("comfyui*.log"))
+        timed = backfill_durations_from_logs(db, log_paths)
+        if timed:
+            logger.info("Backfilled generation time for %d imports from logs", timed)
+    except Exception as e:
+        logger.warning("Duration backfill failed: %s", e)
 
     status("Connecting to ComfyUI...")
     from origenerator.comfyui_client import ComfyUIClient

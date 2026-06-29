@@ -8,6 +8,9 @@ THUMB_DIR = STATE_DIR / "thumbnails"
 COMFYUI_DIR = Path("C:/path/to/suite-root/projects/ComfyUIApp/ComfyUI")
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
+# ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
+# the "Prompt executed in N seconds" lines feed duration backfill.
+COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
 
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188

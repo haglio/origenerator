@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QLabel,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem,
     QMenu, QInputDialog, QAbstractItemView, QFrame, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
@@ -18,6 +18,7 @@ from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import merge_denormalized, randomize_seeds
 from origenerator.gui.editable_header import EditableHeader
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.metadata_panel import MetadataPanel
@@ -30,7 +31,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 logger = logging.getLogger(__name__)
 
 _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
-_GRID_COLUMNS = 4
+_TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
@@ -359,14 +360,18 @@ class GalleryView(QWidget):
     def _show_widget(self, widget: QWidget):
         self._scroll.setWidget(widget)  # replaces & deletes the previous widget
 
-    def _show_folder_tiles(self, groups):
+    def _new_tile_pane(self) -> tuple[QWidget, FlowLayout]:
+        """A fresh container whose tiles flow to fill the pane's width."""
         container = QWidget()
-        grid = QGridLayout(container)
-        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        flow = FlowLayout(container, spacing=_TILE_SPACING)
         self._clear_selection()
         self._visible_ids = []
         self._visible_keys = []
-        for idx, group in enumerate(groups):
+        return container, flow
+
+    def _show_folder_tiles(self, groups):
+        container, flow = self._new_tile_pane()
+        for group in groups:
             tile = FolderTile(
                 group.key,
                 group.label,
@@ -376,23 +381,17 @@ class GalleryView(QWidget):
             )
             tile.clicked.connect(self._drill_into)
             tile.context_requested.connect(self._folder_context_menu)
-            grid.addWidget(tile, idx // _GRID_COLUMNS, idx % _GRID_COLUMNS)
+            flow.addWidget(tile)
             self._visible_keys.append(group.key)
         self._show_widget(container)
 
     def _show_thumbnails(self, group):
-        container = QWidget()
-        grid = QGridLayout(container)
-        grid.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._clear_selection()
-        self._visible_ids = []
-        self._visible_keys = []
-        # The re-roll tile leads the grid so it sits beside the newest item
+        container, flow = self._new_tile_pane()
+        # The re-roll tile leads the flow so it sits beside the newest item
         # (thumbnails are sorted newest-first).
-        offset = 1 if self._can_reroll(group) else 0
-        if offset:
-            self._add_reroll_tile(grid, group, 0)
-        for idx, row in enumerate(group.rows):
+        if self._can_reroll(group):
+            self._add_reroll_tile(flow, group)
+        for row in group.rows:
             seed = row.get("seed")
             label = f"seed {seed}" if seed is not None else (
                 (row.get("positive_prompt") or "")[:40] or "(no prompt)"
@@ -400,8 +399,7 @@ class GalleryView(QWidget):
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._thumbnail_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
-            pos = idx + offset
-            grid.addWidget(tw, pos // _GRID_COLUMNS, pos % _GRID_COLUMNS)
+            flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         self._show_widget(container)
@@ -420,11 +418,11 @@ class GalleryView(QWidget):
             return False
         return _is_reusable_workflow(group.rows[0].get("workflow_name"))
 
-    def _add_reroll_tile(self, grid, group, index):
+    def _add_reroll_tile(self, flow, group):
         tile = RerollTile(self._reroll_jobs.get(group.key))
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
-        grid.addWidget(tile, index // _GRID_COLUMNS, index % _GRID_COLUMNS)
+        flow.addWidget(tile)
 
     def _start_reroll(self, key: str):
         if self._client is None or key in self._reroll_jobs:

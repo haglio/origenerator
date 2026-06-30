@@ -1125,16 +1125,30 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
     assert _reroll_tile(view) is not None
 
 
+def test_main_view_reflows_to_fill_extra_width(qtbot):
+    # The main view flows tiles to fill the pane: a wide pane packs more per row
+    # and so is shorter than a narrow one. The old fixed 4-column grid ignored
+    # the available width, so its height never changed.
+    rows = [_image(f"i{n}", "a cat", 50, n) for n in range(1, 9)]  # eight tiles
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    layout = view._scroll.widget().layout()
+    assert layout.heightForWidth(2000) < layout.heightForWidth(300)
+
+
 def test_add_tile_sits_first_beside_the_newest(qtbot):
-    # Thumbnails are newest-first, so the "new variation" box belongs at the
-    # front of the grid, not trailing the oldest.
+    # Thumbnails are newest-first, so the "new variation" box leads the flow,
+    # beside the newest item, not trailing the oldest.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    grid = view._scroll.widget().layout()
-    assert isinstance(grid.itemAtPosition(0, 0).widget(), RerollTile)
+    layout = view._scroll.widget().layout()
+    assert isinstance(layout.itemAt(0).widget(), RerollTile)
 
 
 def test_leaf_has_no_add_tile_without_a_client(qtbot):

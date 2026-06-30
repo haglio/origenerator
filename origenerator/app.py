@@ -83,7 +83,21 @@ def main():
     )
     from origenerator.gui.loading_screen import LoadingScreen
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from logging.handlers import RotatingFileHandler
+    log_handlers = [logging.StreamHandler()]
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        log_handlers.append(RotatingFileHandler(
+            STATE_DIR / "origenerator.log", maxBytes=1_000_000, backupCount=2,
+            encoding="utf-8",
+        ))
+    except OSError:
+        pass  # console logging still works if the file can't be opened
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=log_handlers,
+    )
     logger = logging.getLogger(__name__)
 
     app = QApplication.instance() or QApplication(sys.argv)
@@ -120,6 +134,7 @@ def main():
 
     status("Scanning for new images...")
     from origenerator.importer import (
+        backfill_shared_thumbnails,
         backfill_unknown_workflows,
         import_comfyui_output,
         merge_video_sidecar_rows,
@@ -148,6 +163,16 @@ def main():
             logger.info("Relabelled %d previously-unknown imports", relabeled)
     except Exception as e:
         logger.warning("Workflow backfill failed: %s", e)
+
+    status("Repairing thumbnails...")
+    # Re-render any thumbnail an old filename-stem collision left wrong or
+    # missing, so each generation's thumbnail matches its own preview again.
+    try:
+        fixed = backfill_shared_thumbnails(db, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+        if fixed:
+            logger.info("Repaired %d colliding thumbnails", fixed)
+    except Exception as e:
+        logger.warning("Thumbnail repair failed: %s", e)
 
     status("Recovering generation times...")
     # Recover how long past generations took from ComfyUI's console logs, so

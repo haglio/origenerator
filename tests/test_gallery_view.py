@@ -4,8 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QFrame
+from PyQt6.QtWidgets import QFrame, QLineEdit
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -938,22 +937,6 @@ def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, mon
     assert set(view.selected_prompt_ids()) == {"i1", "i3"}
 
 
-def test_delete_shortcut_is_wired_to_delete_selection(qtbot):
-    actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_leaf(view)
-    view._apply_selection("i1", _NO_MOD)
-    delete_seq = QKeySequence(QKeySequence.StandardKey.Delete)
-    shortcut = next(s for s in view.findChildren(QShortcut) if s.key() == delete_seq)
-
-    # The shortcut is scoped to the gallery's focus subtree and triggers a delete.
-    assert shortcut.context() == Qt.ShortcutContext.WidgetWithChildrenShortcut
-    shortcut.activated.emit()
-    assert actions.deleted
-
-
 def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     out = tmp_path / "output"
@@ -1336,38 +1319,73 @@ def _shown_view_with_one_image(qtbot, tmp_path):
     return view, db, file_path
 
 
-def test_clicking_a_thumbnail_moves_focus_into_the_gallery(qtbot, tmp_path):
-    # The Delete shortcut only fires while a gallery widget holds focus, and
-    # thumbnails are reached without ever touching the tree — so the click must
-    # move focus into the gallery itself. focusWidget() reports this without
-    # depending on the test window winning OS activation.
-    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    _open_leaf(view)
-    thumb = view._thumb_widgets["i1"]
-
-    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
-
-    assert view.focusWidget() is thumb
-
-
 def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     thumb = view._thumb_widgets["i1"]
 
     qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)  # select, the way a user does
-    qtbot.keyClick(thumb, Qt.Key.Key_Delete)            # Delete propagates up to the view
+    qtbot.keyClick(thumb, Qt.Key.Key_Delete)            # the event filter catches it
 
     assert db.get_generation("i1") is None
     assert not file_path.exists()
 
 
+def test_delete_works_with_gallery_embedded_in_tabs(qtbot, tmp_path):
+    # Mirror the real app: the gallery lives in a QTabWidget inside a QMainWindow.
+    from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
+    db = Database(tmp_path / "g.db")
+    out = tmp_path / "output"
+    out.mkdir()
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v1",
+        positive_prompt="a cat",
+        params_json=json.dumps({"positive_prompt": "a cat", "steps": 20}),
+        workflow_json="{}",
+    )
+    (out / "sdxl_t2i_i1.png").write_bytes(b"x")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    win = QMainWindow()
+    tabs = QTabWidget()
+    tabs.addTab(QWidget(), "Generate")
+    tabs.addTab(view, "Gallery")
+    win.setCentralWidget(tabs)
+    tabs.setCurrentWidget(view)
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    view._apply_selection("i1", _NO_MOD)
+
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
+
+    assert db.get_generation("i1") is None
+
+
+def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
+    # The real-app failure: a selected item, but focus is on the tree (or nowhere
+    # in the gallery), so a focus-scoped handler never fired. The app-wide filter
+    # must still delete because the Gallery tab is the one on screen.
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
+
+    assert db.get_generation("i1") is None
+
+
 def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    thumb = view._thumb_widgets["i1"]
-    qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
-    qtbot.keyClick(thumb, Qt.Key.Key_Delete)
+    view._apply_selection("i1", _NO_MOD)
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
     assert db.get_generation("i1") is None
 
     qtbot.keyClick(view, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
@@ -1380,8 +1398,33 @@ def test_delete_on_a_tree_folder_removes_it_via_the_keyboard(qtbot, tmp_path):
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)  # the settings folder is the current tree item
     view._confirm = lambda text: True
-    view._tree.setFocus()
 
-    qtbot.keyClick(view._tree, Qt.Key.Key_Delete)  # propagates from tree to the view
+    qtbot.keyClick(view._tree, Qt.Key.Key_Delete)
 
     assert db.get_generation("i1") is None
+
+
+def test_delete_is_ignored_when_the_gallery_tab_is_not_showing(qtbot, tmp_path):
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view.hide()  # another tab is active
+
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
+
+    assert db.get_generation("i1") is not None  # the gallery doesn't grab the key
+
+
+def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypatch):
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    # A text editor (e.g. an inline rename box) has focus: Delete edits text.
+    editor = QLineEdit()
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QApplication.focusWidget", lambda: editor
+    )
+
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
+
+    assert db.get_generation("i1") is not None

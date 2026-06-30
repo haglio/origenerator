@@ -1,10 +1,12 @@
 import json
+from pathlib import Path
 
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
 from origenerator.importer import (
+    backfill_shared_thumbnails,
     backfill_unknown_workflows,
     import_comfyui_output,
     merge_video_sidecar_rows,
@@ -195,6 +197,29 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     assert row["workflow_name"] == "wan22_flf2v_loop"
 
 
+def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
+    """A still and a clip that share a filename stem must not share a thumbnail.
+
+    ComfyUI's default ``SaveImage`` prefix yields ``ComfyUI_00001_.png`` while a
+    video lands at ``video/ComfyUI_00001_.mp4``; both import as separate rows.
+    Naming the thumbnail by the source stem collapsed them onto one file, so the
+    image row's thumbnail showed the video's frame even though its preview was
+    the still. Each row must own a distinct, existing thumbnail.
+    """
+    output_dir = tmp_path / "output"
+    (output_dir / "video").mkdir(parents=True)
+    thumb_dir = tmp_path / "thumbs"
+    _make_png_with_metadata(output_dir / "ComfyUI_00001_.png", {"2": {}})
+    (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
+
+    db = Database(tmp_path / "test.db")
+    assert import_comfyui_output(output_dir, db, thumb_dir) == 2
+
+    thumbs = [r["thumbnail_path"] for r in db.list_generations()]
+    assert all(thumbs) and len(set(thumbs)) == 2          # two distinct thumbnails
+    assert all(Path(t).exists() for t in thumbs)          # neither overwritten away
+
+
 def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
     output_dir = tmp_path / "output" / "video"
     output_dir.mkdir(parents=True)
@@ -245,3 +270,74 @@ def test_merge_leaves_standalone_rows_untouched(tmp_path):
     assert merge_video_sidecar_rows(db) == 0
     assert db.get_generation("solo-img") is not None
     assert db.get_generation("solo-vid") is not None
+
+
+def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
+    """Repair the old collision: two rows pointing at one stem-named thumbnail.
+
+    Before the per-prompt naming fix, ``ComfyUI_00001_.png`` and
+    ``video/ComfyUI_00001_.mp4`` both wrote ``ComfyUI_00001_.jpg`` — the later
+    import winning — so the image row's thumbnail showed the clip's frame. The
+    backfill re-renders each sharer from its own output under its prompt_id.
+    """
+    output_dir = tmp_path / "output"
+    (output_dir / "video").mkdir(parents=True)
+    thumb_dir = tmp_path / "thumbs"
+    thumb_dir.mkdir()
+    Image.new("RGB", (512, 768), (255, 0, 0)).save(output_dir / "ComfyUI_00001_.png")
+    (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
+    shared = thumb_dir / "ComfyUI_00001_.jpg"  # the single file both rows share
+    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)  # currently the clip's frame
+
+    db = Database(tmp_path / "test.db")
+    _completed(db, "img", "ComfyUI_00001_.png", "", thumbnail_path=str(shared))
+    _completed(db, "vid", "ComfyUI_00001_.mp4", "video", thumbnail_path=str(shared))
+
+    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 2
+
+    img_thumb = db.get_generation("img")["thumbnail_path"]
+    vid_thumb = db.get_generation("vid")["thumbnail_path"]
+    assert img_thumb != vid_thumb
+    assert Path(img_thumb).name == "img.jpg"   # named by prompt_id now
+    assert Path(img_thumb).exists() and Path(vid_thumb).exists()
+    # The image row's thumbnail reflects its own portrait still, not the clip.
+    assert Image.open(img_thumb).size[0] < Image.open(img_thumb).size[1]
+
+
+def test_backfill_leaves_a_uniquely_owned_thumbnail_untouched(tmp_path):
+    """A thumbnail no other row shares (and that exists) is left exactly as is."""
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    thumb_dir = tmp_path / "thumbs"
+    thumb_dir.mkdir()
+    Image.new("RGB", (64, 64), (1, 2, 3)).save(output_dir / "sdxl_t2i_1_.png")
+    thumb = thumb_dir / "sdxl_t2i_1_.jpg"
+    Image.new("RGB", (64, 64), (0, 0, 0)).save(thumb)
+
+    db = Database(tmp_path / "test.db")
+    _completed(db, "solo", "sdxl_t2i_1_.png", "", thumbnail_path=str(thumb))
+
+    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 0
+    assert db.get_generation("solo")["thumbnail_path"] == str(thumb)
+
+
+def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
+    """A completed row whose thumbnail file has vanished gets a fresh one.
+
+    This is the tail of the same bug: deleting one stem-twin trashed the shared
+    thumbnail, leaving the survivor pointing at a file that no longer exists.
+    """
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    thumb_dir = tmp_path / "thumbs"
+    thumb_dir.mkdir()
+    Image.new("RGB", (64, 64), (9, 9, 9)).save(output_dir / "sdxl_t2i_5_.png")
+
+    db = Database(tmp_path / "test.db")
+    _completed(db, "gone", "sdxl_t2i_5_.png", "",
+               thumbnail_path=str(thumb_dir / "sdxl_t2i_5_.jpg"))  # never on disk
+
+    assert backfill_shared_thumbnails(db, output_dir, thumb_dir) == 1
+    new = db.get_generation("gone")["thumbnail_path"]
+    assert Path(new).name == "gone.jpg"
+    assert Path(new).exists()

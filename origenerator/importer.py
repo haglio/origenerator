@@ -375,6 +375,9 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         result["workflow_name"] = "wan22_flf2v_loop"
     elif "WanImageToVideo" in node_types:
         result["workflow_name"] = "wan22_i2v"
+    elif {"EmptyHunyuanLatentVideo", "SaveImage"} <= node_types:
+        # A Wan/Hunyuan video latent saved as a still image: text-to-image.
+        result["workflow_name"] = "wan22_t2i"
     elif "CheckpointLoaderSimple" in node_types:
         result["workflow_name"] = "sdxl_t2i"
 

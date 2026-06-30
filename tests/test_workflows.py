@@ -1,7 +1,9 @@
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
+from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
 
 
 def _find_node(payload: dict, class_type: str) -> dict | None:
@@ -227,3 +229,101 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
     files = wf.extract_output_info(history)
     assert len(files) == 1
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
+
+
+# ---- WAN 2.2 T2I (dual-noise text-to-image) ----
+
+def test_wan22_t2i_is_registered_as_an_image_workflow():
+    assert WORKFLOW_REGISTRY["wan22_t2i"].__class__ is Wan22T2iWorkflow
+    wf = Wan22T2iWorkflow()
+    assert wf.name == "wan22_t2i"
+    assert wf.output_type == "image"
+    # Two diffusion models (high/low noise) identify the output, like the video
+    # Wan workflows; a variation re-rolls both stage seeds.
+    assert wf.model_keys == ("unet_high", "unet_low")
+    assert wf.seed_keys() == ("noise_seed", "seed")
+
+
+def test_wan22_t2i_default_params_has_required_keys():
+    wf = Wan22T2iWorkflow()
+    params = wf.default_params()
+    required = {
+        "positive_prompt", "negative_prompt", "noise_seed", "seed",
+        "width", "height", "steps", "cfg", "shift_high", "shift_low",
+        "unet_high", "unet_low",
+    }
+    assert required.issubset(params.keys())
+
+
+def test_wan22_t2i_build_api_payload_structure():
+    wf = Wan22T2iWorkflow()
+    params = wf.default_params()
+    params["positive_prompt"] = "a cat"
+    params["negative_prompt"] = "blurry"
+    params["noise_seed"] = 42
+    params["seed"] = 99
+    payload = wf.build_api_payload(params)
+
+    def src(ref):  # resolve a [node_id, slot] link to its source node
+        return payload[ref[0]]
+
+    # A bare video latent is the canvas — text-to-image, so no input image and
+    # none of the video conditioning the i2v/flf2v workflows use.
+    latent = _find_node(payload, "EmptyHunyuanLatentVideo")
+    assert latent["inputs"]["width"] == params["width"]
+    assert latent["inputs"]["height"] == params["height"]
+    assert _find_node(payload, "WanImageToVideo") is None
+    assert _find_node(payload, "WanFirstLastFrameToVideo") is None
+    assert _find_node(payload, "LoadImage") is None
+    assert _find_node(payload, "CLIPVisionEncode") is None
+
+    # Two KSamplerAdvanced passes split at steps // 2; stage 1 adds noise and
+    # uses noise_seed, stage 2 refines from it and uses seed.
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    assert len(samplers) == 2
+    high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+    low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+    assert high["inputs"]["noise_seed"] == 42
+    assert high["inputs"]["end_at_step"] == params["steps"] // 2
+    assert low["inputs"]["noise_seed"] == 99
+    assert low["inputs"]["start_at_step"] == params["steps"] // 2
+    # Stage 2 refines stage 1's latent, not the empty one.
+    high_id = next(k for k, v in payload.items() if v is high)
+    assert low["inputs"]["latent_image"] == [high_id, 0]
+
+    # Stage 1 runs the high-noise model, stage 2 the low-noise model — each via
+    # its own ModelSamplingSD3 shift. Getting this backwards ruins the output.
+    high_unet = src(src(high["inputs"]["model"])["inputs"]["model"])
+    low_unet = src(src(low["inputs"]["model"])["inputs"]["model"])
+    assert high_unet["inputs"]["unet_name"] == params["unet_high"]
+    assert low_unet["inputs"]["unet_name"] == params["unet_low"]
+
+    # One frame is pulled from the batch and saved as a still, not a video.
+    assert _find_node(payload, "ImageFromBatch") is not None
+    save = _find_node(payload, "SaveImage")
+    assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
+    assert _find_node(payload, "SaveVideo") is None
+    assert _find_node(payload, "VHS_VideoCombine") is None
+
+    # The positive prompt is encoded and feeds both samplers.
+    assert any(
+        n["class_type"] == "CLIPTextEncode" and n["inputs"]["text"] == "a cat"
+        for n in payload.values()
+    )
+    assert high["inputs"]["positive"] == low["inputs"]["positive"]
+
+
+def test_wan22_t2i_extract_output_info():
+    wf = Wan22T2iWorkflow()
+    history = {
+        "outputs": {
+            "14": {
+                "images": [
+                    {"filename": "wan22_t2i_00026_.png", "subfolder": "image", "type": "output"}
+                ]
+            }
+        }
+    }
+    files = wf.extract_output_info(history)
+    assert len(files) == 1
+    assert files[0]["filename"] == "wan22_t2i_00026_.png"

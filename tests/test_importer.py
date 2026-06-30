@@ -341,3 +341,33 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
     new = db.get_generation("gone")["thumbnail_path"]
     assert Path(new).name == "gone.jpg"
     assert Path(new).exists()
+
+
+def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
+    import origenerator.importer as imp
+    # WAN 2.2 text-to-image embeds no Wan conditioning node and no checkpoint, so
+    # its EmptyHunyuanLatentVideo + ImageFromBatch + SaveImage signature is what
+    # names it. The filename matches no workflow prefix, proving the graph alone
+    # suffices. Prompts come from the CLIPTextEncode titles, the seed from the
+    # noise-adding (stage 1) sampler.
+    graph = {
+        "99": {"class_type": "CLIPTextEncode", "inputs": {"text": "a kitten"},
+               "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}},
+        "91": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"},
+               "_meta": {"title": "CLIP Text Encode (Negative Prompt)"}},
+        "95": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 674502243979425, "add_noise": "disable"}},
+        "96": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 746703007625838, "add_noise": "enable"}},
+        "104": {"class_type": "EmptyHunyuanLatentVideo",
+                "inputs": {"width": 1088, "height": 1920, "length": 5}},
+        "117": {"class_type": "ImageFromBatch", "inputs": {"batch_index": 0, "length": 1}},
+        "116": {"class_type": "SaveImage", "inputs": {"filename_prefix": "image/wan22_t2i"}},
+    }
+    _make_png_with_metadata(tmp_path / "renamed_99.png", graph)
+    meta = imp._extract_metadata(tmp_path / "renamed_99.png", ".png")
+
+    assert meta["workflow_name"] == "wan22_t2i"
+    assert meta["positive_prompt"] == "a kitten"
+    assert meta["negative_prompt"] == "blurry"
+    assert meta["seed"] == 746703007625838   # stage-1 (add_noise enable) seed

@@ -17,16 +17,24 @@ _SELECTED_BG = "#3a3a3a"
 _SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
 _BORDER_UNSELECTED = "2px solid #3f3f3f"
 _BORDER_SELECTED = "2px solid #8a8a8a"
+# Hover highlight: a blue accent marking every thumbnail that shares the hovered
+# one's settings — a preview of the folder a click would carry into a new tab.
+_HIGHLIGHT_BG = "#24405e"
+_HIGHLIGHT_TILE_CSS = f"#thumbnailTile {{ background-color: {_HIGHLIGHT_BG}; border-radius: 4px; }}"
+_BORDER_HIGHLIGHT = "2px solid #3080e0"
 
 
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
+    hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
+    unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str, parent=None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
+        self._highlighted = False
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -63,6 +71,11 @@ class ThumbnailWidget(QWidget):
         # Transparent so the tile's fill shows through behind the caption.
         self._text_label.setStyleSheet("background-color: transparent;")
 
+        # Let mouse events (clicks, hover) fall through to the tile, so enter/leave
+        # track the whole tile instead of flickering as the cursor crosses a child.
+        self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._text_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
         layout.addWidget(self._image_label)
         layout.addWidget(self._text_label)
         self._apply_styles()
@@ -77,13 +90,39 @@ class ThumbnailWidget(QWidget):
         self._selected = selected
         self._apply_styles()
 
+    def is_highlighted(self) -> bool:
+        return self._highlighted
+
+    def set_highlighted(self, highlighted: bool):
+        """Mark the tile as part of the hovered settings group (blue accent)."""
+        if highlighted == self._highlighted:
+            return
+        self._highlighted = highlighted
+        self._apply_styles()
+
     def _apply_styles(self):
-        self.setStyleSheet(_SELECTED_TILE_CSS if self._selected else "")
-        border = _BORDER_SELECTED if self._selected else _BORDER_UNSELECTED
+        # Hover-highlight takes visual priority over a resting selection.
+        if self._highlighted:
+            self.setStyleSheet(_HIGHLIGHT_TILE_CSS)
+            border = _BORDER_HIGHLIGHT
+        elif self._selected:
+            self.setStyleSheet(_SELECTED_TILE_CSS)
+            border = _BORDER_SELECTED
+        else:
+            self.setStyleSheet("")
+            border = _BORDER_UNSELECTED
         # Transparent background so the tile fill shows behind any letterboxing.
         self._image_label.setStyleSheet(
             f"background-color: transparent; border: {border}; border-radius: 3px;"
         )
+
+    def enterEvent(self, event):
+        self.hovered.emit(self.prompt_id)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.unhovered.emit(self.prompt_id)
+        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
         self.setFocus(Qt.FocusReason.MouseFocusReason)

@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.db import Database
+from origenerator.gallery import settings_signature
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
@@ -11,6 +12,8 @@ class ThumbnailStrip(QWidget):
     Lives beside the generate subtabs and shows the active tab's own history;
     clicking a thumbnail re-emits its prompt_id via ``thumbnail_activated`` so
     the container can decide whether to reuse the active subtab or open a new one.
+    Hovering a thumbnail highlights every other one sharing its settings — a
+    preview of the folder a click would carry into a new tab.
     """
 
     thumbnail_activated = pyqtSignal(str)  # prompt_id
@@ -18,6 +21,8 @@ class ThumbnailStrip(QWidget):
     def __init__(self, db: Database, parent=None):
         super().__init__(parent)
         self._db = db
+        self._widgets: list[ThumbnailWidget] = []
+        self._sig_by_id: dict[str, str] = {}  # prompt_id -> settings signature
         self.setFixedWidth(200)
 
         outer = QVBoxLayout(self)
@@ -38,6 +43,8 @@ class ThumbnailStrip(QWidget):
             item = self._list.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        self._widgets = []
+        self._sig_by_id = {}
         for prompt_id in prompt_ids:
             row = self._db.get_generation(prompt_id)
             if not row:
@@ -48,7 +55,21 @@ class ThumbnailStrip(QWidget):
                 self._label_for(row),
             )
             tw.clicked.connect(self.thumbnail_activated)
+            tw.hovered.connect(self._highlight_matching)
+            tw.unhovered.connect(self._clear_highlight)
+            self._sig_by_id[prompt_id] = settings_signature(row.get("params_json"))
+            self._widgets.append(tw)
             self._list.addWidget(tw)
+
+    def _highlight_matching(self, prompt_id: str):
+        """Highlight every thumbnail in the same settings folder as the hovered one."""
+        target = self._sig_by_id.get(prompt_id)
+        for widget in self._widgets:
+            widget.set_highlighted(self._sig_by_id.get(widget.prompt_id) == target)
+
+    def _clear_highlight(self, _prompt_id: str):
+        for widget in self._widgets:
+            widget.set_highlighted(False)
 
     @staticmethod
     def _label_for(row: dict) -> str:

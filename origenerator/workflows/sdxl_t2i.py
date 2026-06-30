@@ -18,8 +18,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     display_name = "SDXL Text-to-Image"
     output_type = "image"
     model_keys = ("checkpoint",)
-
-    _OUTPUT_NODE_ID = "7"
+    output_node_id = "7"
 
     def default_params(self) -> dict:
         return {
@@ -121,8 +120,3 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"vae_name": params["vae"]},
             },
         }
-
-    def extract_output_info(self, history_data: dict) -> list[dict]:
-        outputs = history_data.get("outputs", {})
-        node_output = outputs.get(self._OUTPUT_NODE_ID, {})
-        return node_output.get("images", [])

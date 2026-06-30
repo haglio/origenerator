@@ -16,8 +16,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
-
-    _OUTPUT_NODE_ID = "19"
+    output_node_id = "19"
 
     def default_params(self) -> dict:
         return {
@@ -208,8 +207,3 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 },
             },
         }
-
-    def extract_output_info(self, history_data: dict) -> list[dict]:
-        outputs = history_data.get("outputs", {})
-        node_output = outputs.get(self._OUTPUT_NODE_ID, {})
-        return node_output.get("images", [])

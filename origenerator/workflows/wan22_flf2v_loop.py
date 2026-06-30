@@ -7,8 +7,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
-
-    _OUTPUT_NODE_ID = "16"
+    output_node_id = "16"
+    output_key = "gifs"
 
     def default_params(self) -> dict:
         return {
@@ -196,8 +196,3 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                 },
             },
         }
-
-    def extract_output_info(self, history_data: dict) -> list[dict]:
-        outputs = history_data.get("outputs", {})
-        node_output = outputs.get(self._OUTPUT_NODE_ID, {})
-        return node_output.get("gifs", [])

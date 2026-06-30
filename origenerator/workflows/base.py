@@ -24,6 +24,11 @@ class WorkflowTemplate(ABC):
     # The param key(s) whose values identify which model produced an output.
     # The gallery groups a workflow's generations into model folders by these.
     model_keys: tuple[str, ...] = ()
+    # The output node whose /history entry lists the saved files, and the key it
+    # lists them under: "images" for SaveImage / native SaveVideo, "gifs" for
+    # VHS_VideoCombine.
+    output_node_id: str
+    output_key: str = "images"
 
     @abstractmethod
     def default_params(self) -> dict:
@@ -45,6 +50,11 @@ class WorkflowTemplate(ABC):
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
 
-    @abstractmethod
     def extract_output_info(self, history_data: dict) -> list[dict]:
-        """Parse ComfyUI /history response to find output files."""
+        """Find this workflow's saved files in a ComfyUI /history response.
+
+        The output node lists them under ``output_key`` — ``images`` for
+        SaveImage and native SaveVideo, ``gifs`` for VHS_VideoCombine.
+        """
+        node = history_data.get("outputs", {}).get(self.output_node_id, {})
+        return node.get(self.output_key, [])

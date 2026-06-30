@@ -219,6 +219,23 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
         assert "safetensors" not in settings.label
 
 
+def test_build_gallery_tree_excludes_rows_that_produced_no_output():
+    # A failed generation never wrote a file. The gallery shows results, so a
+    # file-less row must not surface as an empty, output-less entry — not even
+    # the media-type folder it would otherwise create.
+    rows = [
+        _img("i1", "a cat", 50, 1),                          # real result: has a file
+        _row(prompt_id="boom", workflow_name="wan22_i2v",
+             status="error",
+             params_json=json.dumps({"positive_prompt": "dance", "seed": 5}),
+             output_files=None),                             # failed: no file
+    ]
+    tree = build_gallery_tree(rows)
+    surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
+    assert surfaced == {"i1"}
+    assert [m.media_type for m in tree] == ["image"]  # no Videos folder for the dead row
+
+
 def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     rows = [
         _img("i1", "a cat", 50, 1),   # same settings as i2, different seed

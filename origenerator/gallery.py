@@ -78,6 +78,16 @@ def row_output_files(row: dict) -> list[dict]:
     return files if isinstance(files, list) else []
 
 
+def produced_output(row: dict) -> bool:
+    """True when a row recorded at least one output file.
+
+    The gallery is a gallery of results: a generation that failed (or hasn't
+    finished) wrote no file, so it has nothing to show and is left out of the
+    tree entirely rather than surfacing as an empty, file-less entry.
+    """
+    return bool(row_output_files(row))
+
+
 def media_type_of_row(row: dict) -> str:
     """Classify a row as ``"image"`` or ``"video"``.
 
@@ -391,12 +401,15 @@ def build_gallery_tree(
 ) -> list[MediaGroup]:
     """Nest rows into media -> workflow -> model -> settings-group folders.
 
-    Folders appear in the order their first member appears in ``rows`` (the
-    caller orders rows newest-first), except that starred folders float to the
-    top of their level. ``folder_meta`` (keyed by each folder's stable ``key``)
-    overrides the default label and supplies the star state.
+    Rows that produced no output file (failed or unfinished generations) are
+    dropped first, so the tree holds only results worth showing. Folders appear
+    in the order their first member appears in ``rows`` (the caller orders rows
+    newest-first), except that starred folders float to the top of their level.
+    ``folder_meta`` (keyed by each folder's stable ``key``) overrides the
+    default label and supplies the star state.
     """
     folder_meta = folder_meta or {}
+    rows = [row for row in rows if produced_output(row)]
     tree = []
     for media_type, media_rows in _group_ordered(rows, media_type_of_row):
         workflow_groups = []

@@ -93,7 +93,6 @@ class GalleryView(QWidget):
         app = QApplication.instance()
         if app is not None:
             app.installEventFilter(self)
-        logger.info("DIAG GalleryView key filter installed: app=%s", app is not None)
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
@@ -101,24 +100,17 @@ class GalleryView(QWidget):
         self._poll_timer.start()
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.KeyPress:
-            owns = self._gallery_owns_keys()
-            logger.info(  # DIAG: trace every key press the filter sees
-                "DIAG key filter: key=%s text=%r mods=%r visible=%s owns=%s focus=%s obj=%s",
-                event.key(), event.text(), event.modifiers(),
-                self.isVisible(), owns, type(QApplication.focusWidget()).__name__,
-                type(obj).__name__,
-            )
-            if owns:
-                if event.key() == Qt.Key.Key_Delete:
-                    logger.info("DIAG key filter: handling Delete, selected=%d",
-                                len(self._selected_ids))
-                    self._delete_selection()
-                    return True
-                if (event.key() == Qt.Key.Key_Z
-                        and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                    self._undo()
-                    return True
+        if event.type() == QEvent.Type.KeyPress and self._gallery_owns_keys():
+            # Delete removes the selection. Insert does too: some keyboards send
+            # Insert where Delete is expected, and the gallery has no other use
+            # for it (diagnosed from a real Delete press arriving as Key_Insert).
+            if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
+                self._delete_selection()
+                return True
+            if (event.key() == Qt.Key.Key_Z
+                    and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+                self._undo()
+                return True
         return super().eventFilter(obj, event)
 
     def _gallery_owns_keys(self) -> bool:

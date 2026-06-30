@@ -1381,6 +1381,18 @@ def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
     assert db.get_generation("i1") is None
 
 
+def test_insert_key_also_deletes(qtbot, tmp_path):
+    # Some keyboards send Insert where Delete is expected; the gallery treats
+    # both the same (see the event filter).
+    view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+
+    qtbot.keyClick(view, Qt.Key.Key_Insert)
+
+    assert db.get_generation("i1") is None
+
+
 def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)

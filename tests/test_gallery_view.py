@@ -1331,6 +1331,43 @@ def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
     assert not file_path.exists()
 
 
+def test_delete_works_with_gallery_embedded_in_tabs(qtbot, tmp_path):
+    # Mirror the real app: the gallery lives in a QTabWidget inside a QMainWindow.
+    from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
+    db = Database(tmp_path / "g.db")
+    out = tmp_path / "output"
+    out.mkdir()
+    db.insert_generation(
+        prompt_id="i1", workflow_name="sdxl_t2i", workflow_version="v1",
+        positive_prompt="a cat",
+        params_json=json.dumps({"positive_prompt": "a cat", "steps": 20}),
+        workflow_json="{}",
+    )
+    (out / "sdxl_t2i_i1.png").write_bytes(b"x")
+    db.update_generation(
+        "i1", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_i1.png", "subfolder": ""}]),
+    )
+    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    win = QMainWindow()
+    tabs = QTabWidget()
+    tabs.addTab(QWidget(), "Generate")
+    tabs.addTab(view, "Gallery")
+    win.setCentralWidget(tabs)
+    tabs.setCurrentWidget(view)
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    view._apply_selection("i1", _NO_MOD)
+
+    qtbot.keyClick(view, Qt.Key.Key_Delete)
+
+    assert db.get_generation("i1") is None
+
+
 def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
     # The real-app failure: a selected item, but focus is on the tree (or nowhere
     # in the gallery), so a focus-scoped handler never fired. The app-wide filter

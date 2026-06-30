@@ -83,7 +83,21 @@ def main():
     )
     from origenerator.gui.loading_screen import LoadingScreen
 
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from logging.handlers import RotatingFileHandler
+    log_handlers = [logging.StreamHandler()]
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        log_handlers.append(RotatingFileHandler(
+            STATE_DIR / "origenerator.log", maxBytes=1_000_000, backupCount=2,
+            encoding="utf-8",
+        ))
+    except OSError:
+        pass  # console logging still works if the file can't be opened
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=log_handlers,
+    )
     logger = logging.getLogger(__name__)
 
     app = QApplication.instance() or QApplication(sys.argv)

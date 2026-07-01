@@ -1,3 +1,5 @@
+import os
+
 from origenerator import config
 from origenerator.workflows.model_files import list_model_files
 
@@ -9,9 +11,22 @@ def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
     (loras / "b.safetensors").touch()
     (loras / "a.safetensors").touch()
     (loras / "notes.txt").touch()   # not a model file — skipped
-    (loras / "nested").mkdir()      # a subfolder — skipped
     assert list_model_files("loras", ["fallback.safetensors"]) == [
         "a.safetensors", "b.safetensors",
+    ]
+
+
+def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
+    # ComfyUI's loaders list models in subfolders too, naming them by the path
+    # relative to the category dir (e.g. WAN's split_files/…). The picker must
+    # match, so a nested model is selectable and its stored value round-trips.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    diffusion = tmp_path / "models" / "diffusion_models"
+    (diffusion / "split_files").mkdir(parents=True)
+    (diffusion / "top.safetensors").touch()
+    (diffusion / "split_files" / "deep.safetensors").touch()
+    assert list_model_files("diffusion_models", ["fb.safetensors"]) == [
+        os.path.join("split_files", "deep.safetensors"), "top.safetensors",
     ]
 
 

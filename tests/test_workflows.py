@@ -62,6 +62,34 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
             assert keys.index(f"lora_{level}") < keys.index(f"lora_strength_{level}")
 
 
+def test_wan_video_workflows_expose_model_pickers(monkeypatch):
+    # The base diffusion model (high/low UNET) is a combo too, drawn from the
+    # installed diffusion_models and sitting above its stage's LoRA — selectable,
+    # not a hidden default the form silently reset.
+    import origenerator.workflows.wan22_flf2v_loop as flf
+    import origenerator.workflows.wan22_i2v as i2v
+
+    installed = {
+        "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
+        "loras": ["l.safetensors"],
+    }
+    picker = lambda category, fallback: installed[category]
+    monkeypatch.setattr(i2v, "list_model_files", picker)
+    monkeypatch.setattr(flf, "list_model_files", picker)
+
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        defs = wf.param_definitions()
+        by_key = {pd.key: pd for pd in defs}
+        keys = [pd.key for pd in defs]
+        for level in ("high", "low"):
+            model = by_key[f"unet_{level}"]
+            assert model.type == "combo"
+            assert model.options == installed["diffusion_models"]
+            assert model.default == wf.default_params()[f"unet_{level}"]
+            assert keys.index(f"unet_{level}") < keys.index(f"lora_{level}")
+        assert keys.index("unet_high") < keys.index("unet_low")
+
+
 def test_workflows_expose_their_seed_param_keys():
     # A variation re-rolls exactly these; dual-noise video workflows have two.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)

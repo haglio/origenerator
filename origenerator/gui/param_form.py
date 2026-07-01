@@ -40,9 +40,9 @@ class ParamForm(QWidget):
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         # Params a config carries but this form has no widget for — the workflow's
-        # hidden settings (base model, VAE, CLIP…). The form has no field to edit
-        # them, but must round-trip whatever value it was given so reusing a
-        # generation reproduces its exact model rather than the defaults.
+        # remaining hidden settings (VAE, CLIP, batch size…). The form has no field
+        # to edit them, but must round-trip whatever value it was given so reusing
+        # a generation reproduces them exactly rather than falling back to defaults.
         self._passthrough: dict = {}
         self._param_defs = param_defs
         self._build(param_defs)

@@ -102,26 +102,26 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
 
 def test_set_values_preserves_params_without_a_field(qtbot, sample_defs):
     # A reused config carries params this form has no widget for — a workflow's
-    # hidden base-model/VAE settings. The form must echo them back unchanged (in
-    # both reads) rather than dropping them, so reuse reproduces the exact model.
+    # hidden VAE/CLIP settings. The form must echo them back unchanged (in both
+    # reads) rather than dropping them, so reuse reproduces them exactly.
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
-    form.set_values({"steps": 30, "unet_high": "custom.safetensors"})
-    assert form.get_values()["unet_high"] == "custom.safetensors"
-    assert form.get_values_static()["unet_high"] == "custom.safetensors"
+    form.set_values({"steps": 30, "vae_name": "custom.safetensors"})
+    assert form.get_values()["vae_name"] == "custom.safetensors"
+    assert form.get_values_static()["vae_name"] == "custom.safetensors"
     assert form.get_values()["steps"] == 30  # real fields still applied
 
 
 def test_set_values_replaces_stale_passthrough(qtbot, sample_defs):
     # Reapplying a config drops hidden params the previous config carried, so an
-    # earlier reuse's model never lingers into a later one on the same form.
+    # earlier reuse's VAE never lingers into a later one on the same form.
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
-    form.set_values({"unet_high": "first.safetensors"})
-    form.set_values({"unet_low": "second.safetensors"})
+    form.set_values({"vae_name": "first.safetensors"})
+    form.set_values({"clip_name": "second.safetensors"})
     values = form.get_values()
-    assert values["unet_low"] == "second.safetensors"
-    assert "unet_high" not in values
+    assert values["clip_name"] == "second.safetensors"
+    assert "vae_name" not in values
 
 
 def test_set_values_keeps_a_combo_value_absent_from_the_options(qtbot):

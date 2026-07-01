@@ -119,6 +119,21 @@ def test_set_workflow_name_relabels_row(tmp_path):
     assert row["workflow_name"] == "wan22_i2v"
 
 
+def test_set_params_json_rewrites_row_params(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="fill-001",
+        workflow_name="wan22_i2v",
+        workflow_version="imported",
+        params_json='{"seed": 1}',
+        workflow_json="{}",
+        source="imported",
+    )
+    db.set_params_json("fill-001", '{"seed": 1, "lora_high": "x.safetensors"}')
+    row = db.get_generation("fill-001")
+    assert json.loads(row["params_json"])["lora_high"] == "x.safetensors"
+
+
 def _add_completed(db, prompt_id, workflow_name, duration):
     db.insert_generation(
         prompt_id=prompt_id,

@@ -123,6 +123,18 @@ class Database:
                 (workflow_name, prompt_id),
             )
 
+    def set_params_json(self, prompt_id: str, params_json: str):
+        """Rewrite a row's params_json (e.g. backfilling model/LoRA onto imports).
+
+        Deliberately separate from update_generation, whose allowlist excludes
+        params_json since it is normally fixed at insert time.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
+                (params_json, prompt_id),
+            )
+
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         """Most-recent measured generation times for a workflow, newest first.
 

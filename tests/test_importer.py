@@ -6,6 +6,7 @@ from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
 from origenerator.importer import (
+    backfill_model_and_lora_params,
     backfill_shared_thumbnails,
     backfill_unknown_workflows,
     import_comfyui_output,
@@ -81,6 +82,51 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     assert name_by_file["mystery_clip_00001.mp4"] == "unknown"
 
 
+def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
+    db = Database(tmp_path / "test.db")
+    # An early import: the graph is on the row, but its UNET/LoRA were never
+    # pulled into params, so it can't nest by model or LoRA yet.
+    graph = {
+        "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
+        "5": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
+        "6": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["4", 0], "lora_name": "styleB_high.safetensors"}},
+        "7": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["5", 0], "lora_name": "styleB_low.safetensors"}},
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["6", 0], "add_noise": "enable"}},
+        "16": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["7", 0], "add_noise": "disable"}},
+    }
+    db.insert_generation(
+        prompt_id="old", workflow_name="wan22_i2v", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+    # A row that already carries its model + LoRA is left alone.
+    db.insert_generation(
+        prompt_id="fresh", workflow_name="wan22_i2v", workflow_version="v001",
+        params_json=json.dumps({
+            "unet_high": "u_h.safetensors", "unet_low": "u_l.safetensors",
+            "lora_high": "l_h.safetensors", "lora_low": "l_l.safetensors",
+        }),
+        workflow_json=json.dumps(graph),
+    )
+
+    updated = backfill_model_and_lora_params(db)
+
+    assert updated == 1
+    old = json.loads(db.get_generation("old")["params_json"])
+    assert old["unet_high"] == "wan_high.safetensors"
+    assert old["lora_high"] == "styleB_high.safetensors"
+    assert old["lora_low"] == "styleB_low.safetensors"
+    assert old["positive_prompt"] == "a fox"  # existing params kept
+    # The already-complete row's LoRA is not overwritten by the graph's.
+    assert json.loads(db.get_generation("fresh")["params_json"])["lora_high"] == "l_h.safetensors"
+    # Idempotent: a second pass finds nothing left to fill.
+    assert backfill_model_and_lora_params(db) == 0
+
+
 def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
     db = Database(tmp_path / "test.db")
 
@@ -131,6 +177,40 @@ def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monke
     assert meta["params"]["width"] == 768
     assert meta["params"]["frame_count"] == 81
     assert meta["workflow_name"] == "wan22_i2v"
+
+
+def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monkeypatch):
+    import origenerator.importer as imp
+    # An i2v variant differs from its siblings only by LoRA. The LoRA (and base
+    # model) live in the two samplers' model chains; extracting them is what lets
+    # the gallery nest the import under its model -> LoRA folders.
+    graph = {
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "a fox"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "blurry"}},
+        "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_high.safetensors"}},
+        "5": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan_low.safetensors"}},
+        "6": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["4", 0], "lora_name": "styleB_high.safetensors"}},
+        "7": {"class_type": "LoraLoaderModelOnly",
+              "inputs": {"model": ["5", 0], "lora_name": "styleB_low.safetensors"}},
+        "8": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["6", 0]}},
+        "9": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["7", 0]}},
+        "14": {"class_type": "WanImageToVideo",
+               "inputs": {"positive": ["2", 0], "negative": ["3", 0],
+                          "width": 720, "height": 544, "length": 121}},
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["8", 0], "noise_seed": 7, "add_noise": "enable"}},
+        "16": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["9", 0], "add_noise": "disable"}},
+    }
+    monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
+    meta = imp._extract_metadata(tmp_path / "wan22_i2v_00001_.mp4", ".mp4")
+
+    assert meta["workflow_name"] == "wan22_i2v"
+    assert meta["params"]["unet_high"] == "wan_high.safetensors"
+    assert meta["params"]["unet_low"] == "wan_low.safetensors"
+    assert meta["params"]["lora_high"] == "styleB_high.safetensors"
+    assert meta["params"]["lora_low"] == "styleB_low.safetensors"
 
 
 def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):

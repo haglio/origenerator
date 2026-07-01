@@ -10,9 +10,13 @@ from pathlib import Path
 
 from PIL import Image
 
-from origenerator.comfy_graph import clip_prompt_nodes, conditioning_node
+from origenerator.comfy_graph import (
+    clip_prompt_nodes,
+    conditioning_node,
+    dual_sampler_model_files,
+)
 from origenerator.db import Database
-from origenerator.gallery import row_output_files
+from origenerator.gallery import parse_params, row_output_files
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -234,6 +238,31 @@ def backfill_unknown_workflows(db: Database) -> int:
     return updated
 
 
+def backfill_model_and_lora_params(db: Database) -> int:
+    """Record the base model and LoRA on imports that predate reading them.
+
+    Early imports stored the embedded graph but not the UNET/LoRA filenames it
+    loads, so those rows lack the params the gallery's model and LoRA folders
+    group by — they collapse under "(unknown model)" / "(no LoRA)". This re-reads
+    each row's stored graph and folds any high/low UNET and LoRA it finds into
+    ``params_json``, filling only keys the row is missing so a row that already
+    carries them (or whose graph has none) is left untouched. Returns how many
+    rows were filled. Idempotent.
+    """
+    updated = 0
+    for row in db.list_generations():
+        graph = _as_graph(row.get("workflow_json") or "")
+        found = dual_sampler_model_files(graph) if graph else {}
+        params = parse_params(row.get("params_json"))
+        missing = {k: v for k, v in found.items() if k not in params}
+        if not missing:
+            continue
+        params.update(missing)
+        db.set_params_json(row["prompt_id"], json.dumps(params))
+        updated += 1
+    return updated
+
+
 def _get_existing_filenames(db: Database) -> set[str]:
     result = set()
     for row in db.list_generations():
@@ -368,6 +397,11 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
                 k: v for k, v in inputs.items()
                 if isinstance(v, (int, float, str, bool))
             })
+
+    # A WAN dual-noise graph carries its base model and LoRA in the two samplers'
+    # model chains; record them so the gallery can nest the import by model and
+    # LoRA the same way it does a run generated here.
+    result["params"].update(dual_sampler_model_files(prompt_data))
 
     # The embedded graph is authoritative; refine the filename guess.
     node_types = {n.get("class_type") for n in prompt_data.values()}

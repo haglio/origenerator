@@ -134,6 +134,7 @@ def main():
 
     status("Scanning for new images...")
     from origenerator.importer import (
+        backfill_model_and_lora_params,
         backfill_shared_thumbnails,
         backfill_unknown_workflows,
         import_comfyui_output,
@@ -163,6 +164,16 @@ def main():
             logger.info("Relabelled %d previously-unknown imports", relabeled)
     except Exception as e:
         logger.warning("Workflow backfill failed: %s", e)
+
+    status("Sorting by model and LoRA...")
+    # Fill the base model and LoRA onto imports that predate reading them from
+    # the embedded graph, so they nest into the gallery's model/LoRA folders.
+    try:
+        sorted_ = backfill_model_and_lora_params(db)
+        if sorted_:
+            logger.info("Backfilled model/LoRA for %d imports", sorted_)
+    except Exception as e:
+        logger.warning("Model/LoRA backfill failed: %s", e)
 
     status("Repairing thumbnails...")
     # Re-render any thumbnail an old filename-stem collision left wrong or

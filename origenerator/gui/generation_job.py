@@ -94,6 +94,27 @@ class GenerationJob(QObject):
         """Stop reacting to the client without touching the server-side job."""
         self._detach()
 
+    def reconcile(self):
+        """Finish this job from /history if its live completion was missed.
+
+        The websocket ``job_completed`` is a one-shot: a dropped frame or a
+        reconnect at the wrong moment loses it, and the job would then hang and
+        its output stay out of the gallery until a restart re-imports it. A caller
+        that polls invokes this as a backstop — it pulls the prompt's /history and,
+        once ComfyUI has finished it (its outputs are present), completes the job
+        exactly as the signal would have. A no-op while the prompt is still queued
+        or running (absent from /history) or once the job is already terminal.
+        """
+        if self._state not in ("queued", "running") or self._comfy_id is None:
+            return
+        try:
+            history = self._client.fetch_history(self._comfy_id)
+        except Exception as e:
+            logger.debug("Reconcile fetch failed for %s: %s", self._comfy_id, e)
+            return
+        if self.workflow.extract_output_info(history):
+            self._complete(history)
+
     # --- client signal plumbing -------------------------------------------
 
     def _attach(self):
@@ -146,10 +167,31 @@ class GenerationJob(QObject):
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
             return
+        self._complete(history_data)
+
+    def _complete(self, history_data: dict):
+        """Finalize a finished prompt: extract its files and emit ``finished``.
+
+        Shared by the live completion signal and :meth:`reconcile`, and guarded by
+        state so whichever reaches a given job first wins and the other is a no-op.
+        Thumbnailing and duration parsing are best-effort — a failure there must
+        never strand a real completion, so the job still finishes with no thumbnail
+        rather than hanging and losing its output.
+        """
+        if self._state not in ("queued", "running"):
+            return
         self._detach()
         files = self.workflow.extract_output_info(history_data)
-        thumb = self._make_thumbnail(files)
-        duration = execution_duration_seconds(history_data)
+        try:
+            thumb = self._make_thumbnail(files)
+        except Exception as e:
+            logger.warning("Thumbnail step failed for %s: %s", self.prompt_id, e)
+            thumb = None
+        try:
+            duration = execution_duration_seconds(history_data)
+        except Exception as e:
+            logger.warning("Duration parse failed for %s: %s", self.prompt_id, e)
+            duration = None
         self._state = "finished"
         self.finished.emit(files, thumb, duration)
 

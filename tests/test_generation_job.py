@@ -145,6 +145,49 @@ def test_completion_detaches_so_later_signals_are_ignored(qtbot, tmp_path):
     assert len(finished) == 1
 
 
+def test_reconcile_finishes_a_job_whose_live_completion_was_missed(qtbot, tmp_path):
+    # The websocket completion is a one-shot; if it never arrives, reconcile()
+    # pulls /history as a backstop and finishes the job just as the signal would.
+    job, client = _started_job(tmp_path)
+    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
+    finished = []
+    job.finished.connect(lambda files, thumb, dur: finished.append(files))
+
+    job.reconcile()  # no job_completed was ever emitted
+
+    client.fetch_history.assert_called_once_with("comfy-A")
+    assert finished == [[{"filename": "a.png", "subfolder": ""}]]
+    assert job.state == "finished"
+
+
+def test_reconcile_is_a_noop_while_the_prompt_is_still_running(qtbot, tmp_path):
+    # A queued/running prompt isn't in /history yet, so reconcile leaves it be.
+    job, client = _started_job(tmp_path)
+    client.fetch_history = MagicMock(return_value={})
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+
+    job.reconcile()
+
+    assert finished == []
+    assert job.state == "queued"
+
+
+def test_reconcile_does_nothing_once_the_job_has_finished(qtbot, tmp_path):
+    # After the live signal completed it, the backstop must not re-fire or re-fetch.
+    job, client = _started_job(tmp_path)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    assert len(finished) == 1
+
+    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
+    job.reconcile()
+
+    assert len(finished) == 1
+    client.fetch_history.assert_not_called()
+
+
 def test_error_for_our_id_emits_failed(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     failed = []

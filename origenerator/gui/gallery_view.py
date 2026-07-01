@@ -244,6 +244,11 @@ class GalleryView(QWidget):
         self._rebuild(rows, meta)
 
     def _poll(self):
+        # Backstop for a missed completion frame: finish any re-roll ComfyUI has
+        # already completed so it lands here without a restart. Reconcile fires
+        # each job's own finished/failed handler, which persists and refreshes.
+        for job in list(self._reroll_jobs.values()):
+            job.reconcile()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)

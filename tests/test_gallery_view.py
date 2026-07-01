@@ -1417,6 +1417,28 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     assert gallery.find_source_image_id(new_video, image_rows) == new_image["prompt_id"]
 
 
+def test_poll_reconciles_a_reroll_whose_completion_signal_was_missed(qtbot, tmp_path):
+    # If ComfyUI's one-shot completion frame is missed, the periodic poll pulls
+    # /history as a backstop so the finished generation still lands in the gallery
+    # without a restart.
+    client = _reroll_client()
+    client.fetch_history = MagicMock(return_value=_REROLL_HISTORY)
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    # The live job_completed is never delivered — only the poll runs.
+
+    view._poll()
+
+    rows = db.list_generations()
+    assert len(rows) == 2  # the re-roll persisted without a restart
+    assert view._reroll_jobs == {}
+    assert key not in view._reroll_jobs
+
+
 def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_path):
     # No image generation matches the video's input, so the re-roll can't rebuild
     # a fresh frame — it re-rolls the video alone, keeping the same input image.

@@ -100,6 +100,30 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
     assert vals["sampler"] == "dpm"
 
 
+def test_set_values_preserves_params_without_a_field(qtbot, sample_defs):
+    # A reused config carries params this form has no widget for — a workflow's
+    # hidden LoRA/model settings. The form must echo them back unchanged (in both
+    # reads) rather than dropping them, so reuse reproduces the exact LoRA.
+    form = ParamForm(sample_defs)
+    qtbot.addWidget(form)
+    form.set_values({"steps": 30, "lora_high": "custom.safetensors"})
+    assert form.get_values()["lora_high"] == "custom.safetensors"
+    assert form.get_values_static()["lora_high"] == "custom.safetensors"
+    assert form.get_values()["steps"] == 30  # real fields still applied
+
+
+def test_set_values_replaces_stale_passthrough(qtbot, sample_defs):
+    # Reapplying a config drops hidden params the previous config carried, so an
+    # earlier reuse's LoRA never lingers into a later one on the same form.
+    form = ParamForm(sample_defs)
+    qtbot.addWidget(form)
+    form.set_values({"lora_high": "first.safetensors"})
+    form.set_values({"lora_low": "second.safetensors"})
+    values = form.get_values()
+    assert values["lora_low"] == "second.safetensors"
+    assert "lora_high" not in values
+
+
 def test_get_values_static_does_not_randomize_seed(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
     qtbot.addWidget(form)

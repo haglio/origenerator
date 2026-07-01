@@ -264,6 +264,36 @@ def test_i2v_generate_derives_size_in_payload_and_stores_none(qtbot, tmp_path):
     assert "width" not in stored and "height" not in stored
 
 
+def test_reused_lora_survives_to_the_generated_payload(qtbot, tmp_path):
+    # "Reuse Parameters" prefills a past generation's config, LoRA included. The
+    # WAN LoRA has no form widget (it lives only in default_params), so a naive
+    # form round-trip would drop the reused choice and the payload would fall back
+    # to the workflow's default LoRA. The reused LoRA must reach the graph instead.
+    client = MagicMock()
+    client.submit_job.return_value = "comfy-A"
+    panel = GenerateConfigPanel(client, Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+
+    panel.prefill("wan22_i2v", {
+        "input_image": "start.png",
+        "lora_high": "custom-high.safetensors",
+        "lora_low": "custom-low.safetensors",
+    })
+    panel._on_generate()
+
+    payload = client.submit_job.call_args[0][0]
+    loras = {
+        node["inputs"]["lora_name"]
+        for node in payload.values()
+        if node["class_type"] == "LoraLoaderModelOnly"
+    }
+    assert loras == {"custom-high.safetensors", "custom-low.safetensors"}
+    # And it's persisted, so the row remains reusable (and folders by this LoRA).
+    stored = json.loads(panel._db.list_generations()[0]["params_json"])
+    assert stored["lora_high"] == "custom-high.safetensors"
+    assert stored["lora_low"] == "custom-low.safetensors"
+
+
 class SpyDB:
     """Records the calls a panel makes, returning canned recent durations."""
 

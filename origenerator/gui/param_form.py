@@ -25,6 +25,11 @@ class ParamForm(QWidget):
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
+        # Params a config carries but this form has no widget for — the workflow's
+        # hidden settings (model, LoRA, VAE, sampler…). The form has no field to
+        # edit them, but must round-trip whatever value it was given so reusing a
+        # generation reproduces its exact LoRA/model rather than the defaults.
+        self._passthrough: dict = {}
         self._param_defs = param_defs
         self._build(param_defs)
 
@@ -165,7 +170,9 @@ class ParamForm(QWidget):
             cb.setChecked(is_random)
 
     def _collect(self, randomize_seed: bool) -> dict:
-        result = {}
+        # Start from the hidden params (disjoint from the widget keys), then lay
+        # the live field values on top.
+        result = dict(self._passthrough)
         for pd in self._param_defs:
             w = self._widgets[pd.key]
             if pd.type == "seed":
@@ -190,6 +197,9 @@ class ParamForm(QWidget):
         return result
 
     def set_values(self, params: dict):
+        # Retain any params without a field so they survive the read-back; the
+        # rest are applied to their widgets below.
+        self._passthrough = {k: v for k, v in params.items() if k not in self._widgets}
         for pd in self._param_defs:
             if pd.key not in params:
                 continue

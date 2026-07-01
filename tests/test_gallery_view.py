@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtWidgets import QFrame, QLineEdit
+from PyQt6.QtWidgets import QSplitter, QLineEdit
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -151,17 +151,6 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                  "lora_high": f"{lora}_high.safetensors", "lora_low": f"{lora}_low.safetensors",
                  "seed": seed},
                 f"wan22_i2v_{prompt_id}.mp4")
-
-
-def _hbox_index_of(layout, widget):
-    """Index in the top-level row layout of the sub-layout holding ``widget``."""
-    for i in range(layout.count()):
-        sub = layout.itemAt(i).layout()
-        if sub is not None and any(
-            sub.itemAt(j).widget() is widget for j in range(sub.count())
-        ):
-            return i
-    return -1
 
 
 def _top_level(tree):
@@ -408,19 +397,26 @@ def test_gallery_creates_a_preview_widget(qtbot):
     assert isinstance(view._preview, PreviewWidget)
 
 
-def test_a_vertical_line_separates_the_sidebar_from_the_main_pane(qtbot):
+def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    layout = view.layout()
+    splitter = view._panes
 
-    main_idx = _hbox_index_of(layout, view._scroll)      # main pane (contents)
-    right_idx = _hbox_index_of(layout, view._preview)    # right sidebar (preview)
+    # The three panes share one horizontal splitter, so the dividers drag-resize.
+    assert isinstance(splitter, QSplitter)
+    assert splitter.count() == 3                            # TOC, browser, info pane
+    assert not splitter.childrenCollapsible()               # none can be dragged shut
+    assert splitter.widget(0) is view._tree                 # the folder tree (TOC)
+    assert splitter.widget(1).isAncestorOf(view._scroll)    # browser holds the contents
+    assert splitter.widget(2).isAncestorOf(view._preview)   # info pane holds the preview
 
-    # A thin vertical divider sits between the main pane and the sidebar.
-    separator = layout.itemAt(main_idx + 1).widget()
-    assert isinstance(separator, QFrame)
-    assert separator.maximumWidth() == 1                 # a line, not a panel
-    assert main_idx < main_idx + 1 < right_idx
+
+def test_info_pane_starts_wide_enough_to_avoid_a_horizontal_scrollbar(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    # Its floor clears the metadata's widest rows (~315px of content) plus a
+    # vertical scrollbar, so the copy buttons never hide behind an h-scroll.
+    assert view._panes.widget(2).minimumWidth() >= 340
 
 
 def test_selected_folder_returns_current_folder_key(qtbot):

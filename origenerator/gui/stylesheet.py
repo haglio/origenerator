@@ -106,8 +106,11 @@ def build_stylesheet() -> str:
     QScrollArea {{
         border: none;
     }}
-    QFrame#paneSeparator {{
-        background-color: {_h(BORDER_PANEL)};
+    QSplitter::handle {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    QSplitter::handle:hover {{
+        background-color: {_h(BLUE)};
     }}
     QGroupBox {{
         color: {_h(TEXT_PRIMARY)};

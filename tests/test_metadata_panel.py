@@ -1,5 +1,6 @@
 import json
 
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 from origenerator.gui.metadata_panel import MetadataPanel
@@ -121,6 +122,17 @@ def test_only_copyable_items_get_a_button(qtbot):
     # do, but disabled.
     assert len(_copy_buttons(panel)) == 2
     assert _enabled_copy_buttons(panel) == []
+
+
+def test_long_parameter_key_is_not_clipped(qtbot):
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.show_row(_minimal(params_json=json.dumps({"lora_strength_high": 1.0})))
+
+    label = next(l for l in panel.findChildren(QLabel) if l.text() == "lora_strength_high")
+    # The label's column is at least as wide as the key it must show, so no
+    # "lora_strength_hi…" truncation regardless of the (14pt) UI font.
+    assert label.minimumWidth() >= QFontMetrics(label.font()).horizontalAdvance("lora_strength_high")
 
 
 def test_clear_removes_all_rendered_content(qtbot):

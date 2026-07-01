@@ -1,8 +1,8 @@
 """Render a generation's metadata as formatted sections instead of raw text.
 
 Each section is a titled block; its items are either ``label: value`` rows
-(details, parameters) or bare values shown as quoted blocks (prompts, files).
-The section/item model lives in ``origenerator.generation_metadata``.
+(the file, parameters, details) or bare values shown as quoted blocks (the
+prompts). The section/item model lives in ``origenerator.generation_metadata``.
 """
 
 from PyQt6.QtWidgets import (
@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 from PyQt6.QtCore import Qt, QSize, QRectF
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QFontMetrics
 
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.paths import ensure_shared_ui_on_path
@@ -21,7 +21,6 @@ from shared_ui.colors import (
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BORDER_SUBTLE,
 )
 
-_LABEL_WIDTH = 84
 _SELECTABLE = Qt.TextInteractionFlag.TextSelectableByMouse
 
 
@@ -70,17 +69,30 @@ def _build_section(section: MetaSection) -> QWidget:
     )
     layout.addWidget(title)
 
+    label_width = _label_column_width(section)
     for item in section.items:
-        layout.addWidget(_build_item(item))
+        layout.addWidget(_build_item(item, label_width))
     return box
 
 
-def _build_item(item: MetaItem) -> QWidget:
+def _label_column_width(section: MetaSection) -> int:
+    """Pixels wide enough for this section's longest key, so a Parameters block
+    (``lora_strength_high``) gets the room a short Details block never wastes.
+    Applied as a minimum, not a cap, so an under-measured label grows to fit
+    rather than clipping."""
+    labels = [item.label for item in section.items if item.label]
+    if not labels:
+        return 0
+    metrics = QFontMetrics(QApplication.font())
+    return max(metrics.horizontalAdvance(text) for text in labels) + 12
+
+
+def _build_item(item: MetaItem, label_width: int) -> QWidget:
     """A row of ``[label?] value [copy?]``.
 
-    A labeled item reads ``label: value``; a bare one (prompt, filename) shows
-    the value alone as a quoted block. Either gains a copy-to-clipboard button
-    when the item declares copyable text.
+    A labeled item reads ``label: value``; a bare one (a prompt) shows the value
+    alone as a quoted block. Either gains a copy-to-clipboard button when the
+    item declares copyable text. ``label_width`` aligns keys within the section.
     """
     row = QWidget()
     layout = QHBoxLayout(row)
@@ -88,16 +100,16 @@ def _build_item(item: MetaItem) -> QWidget:
     layout.setSpacing(8)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
     if item.label:
-        layout.addWidget(_label_widget(item.label))
+        layout.addWidget(_label_widget(item.label, label_width))
     layout.addWidget(_value_widget(item), 1)
     if item.copy is not None:
         layout.addWidget(_copy_button(item.copy), 0, Qt.AlignmentFlag.AlignTop)
     return row
 
 
-def _label_widget(text: str) -> QLabel:
+def _label_widget(text: str, width: int) -> QLabel:
     label = QLabel(text)
-    label.setFixedWidth(_LABEL_WIDTH)
+    label.setMinimumWidth(width)
     label.setStyleSheet(f"color: {_h(TEXT_MUTED)};")
     label.setAlignment(Qt.AlignmentFlag.AlignTop)
     return label
@@ -132,17 +144,27 @@ def _copy_button(text: str) -> QPushButton:
 
 
 def _copy_icon() -> QIcon:
-    """The familiar two-overlapping-sheets copy glyph, drawn to a pixmap.
+    """The familiar two-overlapping-sheets copy glyph.
 
-    Both sheets are stroked outlines; a gap is cleared around the front sheet so
-    it reads as sitting in front of the back one where they overlap. Qt greys the
-    icon automatically when the button is disabled.
+    Carries its own disabled rendering — the same glyph in the muted colour —
+    rather than leaning on Qt's automatic greying, which barely dimmed a light
+    icon on a dark button. Qt swaps to it when the button is disabled.
     """
+    icon = QIcon()
+    icon.addPixmap(_draw_copy_sheets(TEXT_SECONDARY), QIcon.Mode.Normal)
+    icon.addPixmap(_draw_copy_sheets(TEXT_MUTED), QIcon.Mode.Disabled)
+    return icon
+
+
+def _draw_copy_sheets(color) -> QPixmap:
+    """Stroke the two sheets in ``color``. Both are outlines; a gap is cleared
+    around the front sheet so it reads as sitting in front of the back one where
+    they overlap."""
     pixmap = QPixmap(64, 64)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    pen = QPen(TEXT_SECONDARY)
+    pen = QPen(color)
     pen.setWidthF(6)
     pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
 
@@ -164,4 +186,4 @@ def _copy_icon() -> QIcon:
     painter.setBrush(Qt.BrushStyle.NoBrush)
     painter.drawRoundedRect(front, radius, radius)
     painter.end()
-    return QIcon(pixmap)
+    return pixmap

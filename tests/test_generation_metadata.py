@@ -39,9 +39,11 @@ def test_sections_run_basic_first_and_details_last():
 
 
 def test_basic_leads_with_the_output_file_and_the_date():
-    basic = _items(build_sections(_row(created_at="2026-07-01")), "Basic")
-    assert basic["Created"] == "2026-07-01"
-    assert "out.png" in basic.values()  # the output file, a bare (unlabeled) value
+    items = _section(build_sections(_row(created_at="2026-07-01")), "Basic").items
+    assert items[0].label == "File"       # the output file leads, and carries a key
+    assert items[0].value == "out.png"
+    assert items[1].label == "Created"
+    assert items[1].value == "2026-07-01"
 
 
 def test_details_holds_only_status_and_source():
@@ -120,13 +122,12 @@ def test_empty_prompt_shows_no_text_and_a_disabled_copy():
 
 def test_output_file_copies_only_the_filename_not_the_subfolder():
     files = [{"filename": "wan_00001_.mp4", "subfolder": "video"}]
-    basic = _section(build_sections(_row(output_files=json.dumps(files))), "Basic")
-    [file_item] = [i for i in basic.items if i.label == ""]
+    file_item = _item(build_sections(_row(output_files=json.dumps(files))), "Basic", "File")
     assert file_item.value == "video/wan_00001_.mp4"  # shown with its subfolder
     assert file_item.copy == "wan_00001_.mp4"          # copied without it
 
 
 def test_basic_has_no_file_rows_when_there_are_no_outputs():
-    basic = _section(build_sections(_row(output_files=None)), "Basic")
-    assert [i for i in basic.items if i.label == ""] == []  # no bare file rows
-    assert "Created" in {i.label for i in basic.items}       # still shows the date
+    labels = {i.label for i in _section(build_sections(_row(output_files=None)), "Basic").items}
+    assert "File" not in labels   # no file row
+    assert "Created" in labels     # but the date still shows

@@ -45,10 +45,10 @@ def _output_path(file: dict) -> str:
 
 
 def _output_items(row: dict) -> list[MetaItem]:
-    """One bare item per output file; each copies just its filename, dropping the
-    image/ or video/ subfolder the displayed path carries."""
+    """One labeled item per output file; each copies just its filename, dropping
+    the image/ or video/ subfolder the displayed path carries."""
     return [
-        MetaItem("", _output_path(f), copy=f["filename"])
+        MetaItem("File", _output_path(f), copy=f["filename"])
         for f in gallery.row_output_files(row)
         if f.get("filename")
     ]

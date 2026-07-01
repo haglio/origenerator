@@ -229,6 +229,67 @@ def test_capture_state_lists_every_open_tab_and_current(view):
     assert state["current"] == 1
 
 
+def test_capture_state_records_each_tab_active_prompt_id(view):
+    panel = view._subtabs.currentWidget()
+    panel._client.submit_job = MagicMock(return_value="x")
+    panel._on_generate()
+    state = view.capture_state()
+    assert state["tabs"][0]["active_prompt_id"] == panel._client_prompt_id
+
+
+def test_capture_state_active_prompt_id_is_none_when_idle(view):
+    state = view.capture_state()
+    assert state["tabs"][0]["active_prompt_id"] is None
+
+
+def _running_row(db, prompt_id="run-1"):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    payload = wf.build_api_payload(wf.default_params())
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v",
+        params_json=json.dumps(_sdxl_full()), workflow_json=json.dumps(payload),
+    )
+    db.update_generation(prompt_id, status="running")
+
+
+def _restore_tab_state(active_prompt_id):
+    return {"tabs": [{
+        "config": {"workflow_name": "sdxl_t2i", "params": _sdxl_full(),
+                   "seed_is_random": False},
+        "title": None, "active_prompt_id": active_prompt_id,
+    }], "current": 0}
+
+
+def test_restore_reconnects_a_still_running_tab(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    _running_row(db, "run-1")
+    client = ComfyUIClient()
+    view = GenerateView(client, db)
+    qtbot.addWidget(view)
+
+    view.restore_state(_restore_tab_state("run-1"))
+
+    panel = view._subtabs.widget(0)
+    assert panel.active_prompt_id() == "run-1"  # reconnected to the running job
+    assert panel._cancel_btn.isEnabled() is True
+    # its completion now flows back into the restored tab
+    client.job_completed.emit("run-1", SDXL_HISTORY)
+    assert db.get_generation("run-1")["status"] == "completed"
+
+
+def test_restore_does_not_reconnect_a_finished_job(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    _running_row(db, "done")
+    db.update_generation("done", status="completed")
+    client = ComfyUIClient()
+    view = GenerateView(client, db)
+    qtbot.addWidget(view)
+
+    view.restore_state(_restore_tab_state("done"))
+
+    assert view._subtabs.widget(0).active_prompt_id() is None
+
+
 def test_restore_state_rebuilds_tabs_replacing_default(view):
     state = {"tabs": [
         _config_tab("wan22_i2v", {"positive_prompt": "a fox"}),

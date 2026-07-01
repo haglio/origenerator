@@ -1,3 +1,5 @@
+import json
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QToolButton,
     QInputDialog, QStackedWidget, QLabel, QPushButton,
@@ -156,8 +158,9 @@ class GenerateView(QWidget):
     def capture_state(self) -> dict:
         """Snapshot every open subtab so the session can be restored next launch.
 
-        Each tab carries its configuration plus any user-set custom title, since
-        a renamed tab is part of "which tabs I had open".
+        Each tab carries its configuration, any user-set custom title, and the id
+        of its in-flight job (if any) — so a tab whose generation is still running
+        when the app closes reconnects to it, rather than coming back idle.
         """
         tabs = []
         for i in range(self._subtabs.count()):
@@ -165,6 +168,7 @@ class GenerateView(QWidget):
             tabs.append({
                 "config": panel.current_config().to_dict(),
                 "title": panel.custom_title(),
+                "active_prompt_id": panel.active_prompt_id(),
             })
         return {"tabs": tabs, "current": self._subtabs.currentIndex()}
 
@@ -187,19 +191,43 @@ class GenerateView(QWidget):
             if snapshot.workflow_name not in WORKFLOW_REGISTRY:
                 continue
             title = entry.get("title")
-            restored.append(
-                (snapshot, title if isinstance(title, str) and title.strip() else None)
-            )
+            restored.append((
+                snapshot,
+                title if isinstance(title, str) and title.strip() else None,
+                entry.get("active_prompt_id"),
+            ))
         if not restored:
             return
         while self._subtabs.count():
             self._discard_subtab(0)
-        for snapshot, title in restored:
+        for snapshot, title, active_prompt_id in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
             panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
+            self._reconnect_if_running(panel, active_prompt_id)
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self._subtabs.count():
             self._subtabs.setCurrentIndex(current)
+
+    def _reconnect_if_running(self, panel, active_prompt_id):
+        """Rebind a restored tab to its job if that job is still running.
+
+        The row's stored payload sizes the panel's progress ramp. A job that has
+        since finished or gone (reconciled at startup) is no longer 'running', so
+        the tab simply comes back idle.
+        """
+        if not active_prompt_id:
+            return
+        row = self._db.get_generation(active_prompt_id)
+        if not row or row.get("status") not in ("running", "pending"):
+            return
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+        if workflow is None:
+            return
+        try:
+            payload = json.loads(row.get("workflow_json") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            payload = {}
+        panel.reconnect(active_prompt_id, workflow, payload)

@@ -441,6 +441,56 @@ def test_on_completed_status_shows_actual_time(qtbot):
     assert panel._progress.format() == "Done in 15 min 5 sec"
 
 
+# ---- reconnect to a job left running by a previous session ----
+
+def test_active_prompt_id_reports_in_flight_then_clears(panel):
+    assert panel.active_prompt_id() is None
+    panel._on_generate()
+    assert panel.active_prompt_id() == panel._client_prompt_id
+    panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
+    assert panel.active_prompt_id() is None
+
+
+def test_reconnect_binds_panel_to_a_running_job(panel):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    payload = wf.build_api_payload(wf.default_params())
+    panel._db.insert_generation(
+        prompt_id="run-1", workflow_name="sdxl_t2i", workflow_version="v",
+        params_json="{}", workflow_json=json.dumps(payload),
+    )
+    panel._db.update_generation("run-1", status="running")
+
+    panel.reconnect("run-1", wf, payload)
+
+    assert panel.active_prompt_id() == "run-1"
+    assert panel._cancel_btn.isEnabled() is True
+    assert panel._generate_btn.isEnabled() is False
+
+    panel._client.progress.emit("run-1", 25, 50)  # ComfyUI's live progress resumes
+    assert panel._progress.property("barState") == "running"
+
+    panel._client.job_completed.emit("run-1", SDXL_HISTORY)
+    assert panel._db.get_generation("run-1")["status"] == "completed"
+    assert panel.active_prompt_id() is None
+
+
+def test_reconnected_job_is_cancelable(panel):
+    panel._client.interrupt = MagicMock()
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    panel._db.insert_generation(
+        prompt_id="run-1", workflow_name="sdxl_t2i", workflow_version="v",
+        params_json="{}", workflow_json="{}",
+    )
+    panel._db.update_generation("run-1", status="running")
+    panel.reconnect("run-1", wf, {})
+    panel._client.node_executing.emit("run-1", "5")  # it's executing
+
+    panel._on_cancel()
+
+    panel._client.interrupt.assert_called_once()
+    assert panel._db.get_generation("run-1") is None  # canceled run leaves no trace
+
+
 def test_title_is_workflow_name_for_blank_config(panel):
     assert panel.title() == "SDXL Text-to-Image"
 

@@ -375,6 +375,30 @@ class GenerateConfigPanel(QWidget):
         """Start the prepared job — called by the queue when it reaches the head."""
         self._begin_job()
 
+    def active_prompt_id(self) -> str | None:
+        """The id of this panel's in-flight job, or ``None`` when idle.
+
+        Set from submit until completion/error/cancel, so a container can persist
+        it and reconnect the panel to a job still running after a restart.
+        """
+        return self._client_prompt_id
+
+    def reconnect(self, prompt_id: str, workflow, payload: dict):
+        """Rebind to a job already running in ComfyUI, submitted by a prior session.
+
+        Restores just enough state — the id its signals carry, the workflow that
+        reads its output, and a progress ramp sized to its payload — for the
+        panel's existing handlers to resume tracking it to completion. It never
+        re-submits; the job is already on the server.
+        """
+        self._client_prompt_id = prompt_id
+        self._submitted_workflow = workflow
+        self._progress_tracker = ProgressTracker.for_payload(payload)
+        self._executing = False
+        self._generate_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(True)
+        self._show_waiting("Reconnecting…")
+
     def _begin_job(self):
         job = self._prepared
         if job is None:

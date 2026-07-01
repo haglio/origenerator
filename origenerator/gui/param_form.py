@@ -17,6 +17,20 @@ from shared_ui.check_box import CheckBox
 _SEED_MAX = (1 << 63) - 1
 
 
+def _select_combo_value(combo: QComboBox, value: str):
+    """Show ``value`` in ``combo``, offering it as a new option if it isn't one.
+
+    A workflow default or a reused choice (e.g. a LoRA whose file is gone) may
+    not be among the scanned options; adding it keeps the combo faithful to the
+    value it was given instead of snapping to whatever sorts first.
+    """
+    idx = combo.findText(value)
+    if idx < 0:
+        combo.addItem(value)
+        idx = combo.findText(value)
+    combo.setCurrentIndex(idx)
+
+
 class ParamForm(QWidget):
     changed = pyqtSignal()  # any field's value changed
 
@@ -26,9 +40,9 @@ class ParamForm(QWidget):
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         # Params a config carries but this form has no widget for — the workflow's
-        # hidden settings (model, LoRA, VAE, sampler…). The form has no field to
-        # edit them, but must round-trip whatever value it was given so reusing a
-        # generation reproduces its exact LoRA/model rather than the defaults.
+        # hidden settings (base model, VAE, CLIP…). The form has no field to edit
+        # them, but must round-trip whatever value it was given so reusing a
+        # generation reproduces its exact model rather than the defaults.
         self._passthrough: dict = {}
         self._param_defs = param_defs
         self._build(param_defs)
@@ -132,9 +146,7 @@ class ParamForm(QWidget):
             w = QComboBox()
             if pd.options:
                 w.addItems(pd.options)
-            idx = w.findText(str(pd.default))
-            if idx >= 0:
-                w.setCurrentIndex(idx)
+            _select_combo_value(w, str(pd.default))
             return w
         if pd.type == "image":
             w = QLineEdit()
@@ -219,6 +231,4 @@ class ParamForm(QWidget):
             elif pd.type == "float":
                 w.setValue(float(val))
             elif pd.type == "combo":
-                idx = w.findText(str(val))
-                if idx >= 0:
-                    w.setCurrentIndex(idx)
+                _select_combo_value(w, str(val))

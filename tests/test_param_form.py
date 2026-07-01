@@ -102,26 +102,47 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
 
 def test_set_values_preserves_params_without_a_field(qtbot, sample_defs):
     # A reused config carries params this form has no widget for — a workflow's
-    # hidden LoRA/model settings. The form must echo them back unchanged (in both
-    # reads) rather than dropping them, so reuse reproduces the exact LoRA.
+    # hidden base-model/VAE settings. The form must echo them back unchanged (in
+    # both reads) rather than dropping them, so reuse reproduces the exact model.
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
-    form.set_values({"steps": 30, "lora_high": "custom.safetensors"})
-    assert form.get_values()["lora_high"] == "custom.safetensors"
-    assert form.get_values_static()["lora_high"] == "custom.safetensors"
+    form.set_values({"steps": 30, "unet_high": "custom.safetensors"})
+    assert form.get_values()["unet_high"] == "custom.safetensors"
+    assert form.get_values_static()["unet_high"] == "custom.safetensors"
     assert form.get_values()["steps"] == 30  # real fields still applied
 
 
 def test_set_values_replaces_stale_passthrough(qtbot, sample_defs):
     # Reapplying a config drops hidden params the previous config carried, so an
-    # earlier reuse's LoRA never lingers into a later one on the same form.
+    # earlier reuse's model never lingers into a later one on the same form.
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
-    form.set_values({"lora_high": "first.safetensors"})
-    form.set_values({"lora_low": "second.safetensors"})
+    form.set_values({"unet_high": "first.safetensors"})
+    form.set_values({"unet_low": "second.safetensors"})
     values = form.get_values()
-    assert values["lora_low"] == "second.safetensors"
-    assert "lora_high" not in values
+    assert values["unet_low"] == "second.safetensors"
+    assert "unet_high" not in values
+
+
+def test_set_values_keeps_a_combo_value_absent_from_the_options(qtbot):
+    # Reusing a past generation can carry a choice (a LoRA) whose file is no
+    # longer on disk, so it isn't among the combo's scanned options. The form
+    # must still show and return it rather than snapping to a default — that
+    # would re-drop the very reused value it is meant to reproduce.
+    form = ParamForm([ParamDef("lora", "LoRA", "combo", "a", options=["a", "b"])])
+    qtbot.addWidget(form)
+    form.set_values({"lora": "gone.safetensors"})
+    assert form.get_values()["lora"] == "gone.safetensors"
+
+
+def test_combo_default_absent_from_options_is_still_selected(qtbot):
+    # A workflow's default LoRA may not be among the installed files the combo
+    # lists. A fresh tab must still start on that default (and generate with it),
+    # not silently snap to whatever file sorts first.
+    form = ParamForm([ParamDef("lora", "LoRA", "combo", "default.safetensors",
+                               options=["a.safetensors", "b.safetensors"])])
+    qtbot.addWidget(form)
+    assert form.get_values()["lora"] == "default.safetensors"
 
 
 def test_get_values_static_does_not_randomize_seed(qtbot):

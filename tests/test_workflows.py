@@ -38,6 +38,30 @@ def test_workflows_declare_the_params_that_identify_their_lora():
     assert Wan22T2iWorkflow().lora_keys == ()
 
 
+def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
+    # The WAN video workflows pick their LoRA from the installed files, like the
+    # SDXL Model dropdown: a combo per high/low LoRA (sitting above its strength
+    # slider), its options from the loras scan and its default matching the
+    # persisted default — not a hidden param the form silently reset to default.
+    import origenerator.workflows.wan22_flf2v_loop as flf
+    import origenerator.workflows.wan22_i2v as i2v
+
+    installed = ["x_high.safetensors", "y_low.safetensors"]
+    monkeypatch.setattr(i2v, "list_model_files", lambda category, fallback: installed)
+    monkeypatch.setattr(flf, "list_model_files", lambda category, fallback: installed)
+
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        defs = wf.param_definitions()
+        by_key = {pd.key: pd for pd in defs}
+        keys = [pd.key for pd in defs]
+        for level in ("high", "low"):
+            picker = by_key[f"lora_{level}"]
+            assert picker.type == "combo"
+            assert picker.options == installed
+            assert picker.default == wf.default_params()[f"lora_{level}"]
+            assert keys.index(f"lora_{level}") < keys.index(f"lora_strength_{level}")
+
+
 def test_workflows_expose_their_seed_param_keys():
     # A variation re-rolls exactly these; dual-noise video workflows have two.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)

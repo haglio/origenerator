@@ -16,6 +16,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
+    lora_keys = ("lora_high", "lora_low")
     output_node_id = "19"
 
     def default_params(self) -> dict:

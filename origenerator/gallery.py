@@ -1,11 +1,13 @@
 """Pure gallery model: classify and group generations into a folder tree.
 
-The gallery view organizes generations as folders nested four levels deep:
-media type (Images/Videos) -> workflow -> model -> settings group (rows sharing
-every setting except the seed). A workflow's runs split by which model produced
-them, since the same workflow can yield dramatically different output per model.
-This module owns that grouping logic with no Qt dependency so it can be
-unit-tested directly.
+The gallery view organizes generations as nested folders:
+media type (Images/Videos) -> workflow -> model -> [LoRA] -> settings group
+(rows sharing every setting except the seed). A workflow's runs split by which
+model produced them, since the same workflow can yield dramatically different
+output per model; a workflow that declares LoRA keys splits once more, by LoRA,
+beneath each model — so variants that share a base model but differ in LoRA land
+in sibling folders. Workflows with no LoRA skip that level. This module owns the
+grouping logic with no Qt dependency so it can be unit-tested directly.
 """
 
 import hashlib
@@ -47,23 +49,47 @@ def settings_signature(params_json: str | None) -> str:
     return json.dumps(settings_only(parse_params(params_json)), sort_keys=True)
 
 
+def _registered(workflow_name: str | None):
+    """The registered WorkflowTemplate for ``workflow_name``, or ``None``."""
+    return WORKFLOW_REGISTRY.get(workflow_name or "")
+
+
 def workflow_output_type(workflow_name: str | None) -> str | None:
     """Return the registered workflow's ``output_type``, or ``None`` if unknown."""
-    wf = WORKFLOW_REGISTRY.get(workflow_name or "")
+    wf = _registered(workflow_name)
     return wf.output_type if wf else None
 
 
 def workflow_model_keys(workflow_name: str | None) -> tuple[str, ...]:
     """The param keys whose values name the model a workflow's row ran with."""
-    wf = WORKFLOW_REGISTRY.get(workflow_name or "")
+    wf = _registered(workflow_name)
     return tuple(wf.model_keys) if wf else ()
+
+
+def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
+    """The param keys whose values name the LoRA(s) a workflow's row ran with.
+
+    Empty for a workflow with no LoRA, which the gallery reads as "draw no LoRA
+    level" (every row then shares one empty signature).
+    """
+    wf = _registered(workflow_name)
+    return tuple(wf.lora_keys) if wf else ()
+
+
+def _values_signature(keys: tuple[str, ...], params_json: str | None) -> str:
+    """Canonical, order-stable key from the values a row recorded for ``keys``."""
+    params = parse_params(params_json)
+    return json.dumps([params.get(key) for key in keys], default=str)
 
 
 def model_signature(workflow_name: str | None, params_json: str | None) -> str:
     """Canonical key for grouping a workflow's rows by the model they used."""
-    params = parse_params(params_json)
-    values = [params.get(key) for key in workflow_model_keys(workflow_name)]
-    return json.dumps(values, default=str)
+    return _values_signature(workflow_model_keys(workflow_name), params_json)
+
+
+def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
+    """Canonical key for grouping a workflow's rows by the LoRA(s) they used."""
+    return _values_signature(workflow_lora_keys(workflow_name), params_json)
 
 
 def row_output_files(row: dict) -> list[dict]:
@@ -177,7 +203,7 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
 
 def workflow_label(workflow_name: str | None) -> str:
     """Human-facing folder name for a workflow: its display name, else the key."""
-    wf = WORKFLOW_REGISTRY.get(workflow_name or "")
+    wf = _registered(workflow_name)
     return wf.display_name if wf else (workflow_name or "unknown")
 
 
@@ -190,6 +216,16 @@ def _model_name(value) -> str:
     return base
 
 
+def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> str:
+    """Join the cleaned filenames a row recorded for ``keys``, else ``fallback``.
+
+    Shared by the model and LoRA folder labels: both name a folder after one or
+    more model-file params, differing only in which keys and the empty fallback.
+    """
+    parts = [_model_name(params[key]) for key in keys if params.get(key)]
+    return " / ".join(parts) or fallback
+
+
 def model_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the model a row used.
 
@@ -197,12 +233,17 @@ def model_label(workflow_name: str | None, params: dict) -> str:
     model)"`` when the workflow declares no model keys or the row recorded none
     of their values (e.g. an imported file whose graph didn't carry the model).
     """
-    parts = [
-        _model_name(params[key])
-        for key in workflow_model_keys(workflow_name)
-        if params.get(key)
-    ]
-    return " / ".join(parts) or "(unknown model)"
+    return _joined_file_label(workflow_model_keys(workflow_name), params, "(unknown model)")
+
+
+def lora_label(workflow_name: str | None, params: dict) -> str:
+    """Human-facing folder name for the LoRA(s) a row used.
+
+    Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
+    the row recorded none of their values (e.g. an older import that didn't carry
+    the LoRA).
+    """
+    return _joined_file_label(workflow_lora_keys(workflow_name), params, "(no LoRA)")
 
 
 def _prompt_headline(params: dict) -> str:
@@ -276,10 +317,20 @@ class SettingsGroup:
 
 
 @dataclass
+class LoraGroup:
+    key: str
+    label: str
+    children: list[SettingsGroup]
+    starred: bool = False
+
+
+@dataclass
 class ModelGroup:
     key: str
     label: str
-    settings_groups: list[SettingsGroup]
+    # Either LoraGroups (when the workflow declares LoRA keys) or, when it does
+    # not, SettingsGroups directly — a model folder skips the LoRA level then.
+    children: list
     starred: bool = False
 
 
@@ -307,8 +358,8 @@ def child_groups(group) -> list:
         return group.workflow_groups
     if isinstance(group, WorkflowGroup):
         return group.model_groups
-    if isinstance(group, ModelGroup):
-        return group.settings_groups
+    if isinstance(group, (ModelGroup, LoraGroup)):
+        return group.children
     return []
 
 
@@ -327,16 +378,27 @@ def _group_ordered(rows, key):
     return list(grouped.items())
 
 
-def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
+def _sig_key(media_type: str, workflow_name: str, signature: str, prefix: str = "") -> str:
+    """A folder's stable key from its signature, tagged by level.
+
+    The one-letter ``prefix`` (``m`` model, ``l`` LoRA; none for settings) keeps
+    each level's key clear of the others' — a settings folder's segment is pure
+    hex, so no prefixed key can collide with it in ``folder_meta``.
+    """
     digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
-    return f"{media_type}/{workflow_name}/{digest}"
+    return f"{media_type}/{workflow_name}/{prefix}{digest}"
+
+
+def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature)
 
 
 def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
-    # The "m" prefix keeps a model folder's key clear of a settings folder's
-    # pure-hex digest segment, so the two never collide in folder_meta.
-    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
-    return f"{media_type}/{workflow_name}/m{digest}"
+    return _sig_key(media_type, workflow_name, signature, "m")
+
+
+def _lora_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature, "l")
 
 
 def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
@@ -353,11 +415,12 @@ def _starred_first(groups: list) -> list:
 def _build_settings_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
 ) -> list[SettingsGroup]:
-    """The settings-group leaves under one model folder.
+    """The settings-group leaves under one model or LoRA folder.
 
     Rows collapse by settings signature (all non-seed params), and each leaf's
-    label is disambiguated only against its siblings under the same model — so
-    the model, constant here, never re-appears in a settings name.
+    label is disambiguated only against its siblings under the same parent — so a
+    value the folder above already pins (the model, and the LoRA) is constant
+    here and never re-appears in a settings name.
     """
     grouped = _group_ordered(
         rows, lambda r: settings_signature(r.get("params_json"))
@@ -377,31 +440,66 @@ def _build_settings_groups(
     return _starred_first(groups)
 
 
+def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, children_for, cls):
+    """Build one folder level: order rows by ``signature``, key + label + overlay
+    each folder, recurse for its children, and float starred folders first.
+
+    The model and LoRA levels are the same folder-building contract over
+    different params, so both go through here — differing only in the callables.
+    """
+    groups = []
+    for sig, sub_rows in _group_ordered(rows, signature):
+        key = key_for(sig)
+        params = parse_params(sub_rows[0].get("params_json"))
+        label, starred = _overlay(label_for(params), key, folder_meta)
+        groups.append(cls(key, label, children_for(sub_rows), starred))
+    return _starred_first(groups)
+
+
 def _build_model_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
 ) -> list[ModelGroup]:
-    """The model folders under one workflow, each holding its settings leaves."""
-    groups = []
-    for sig, model_rows in _group_ordered(
-        rows, lambda r: model_signature(wf_name, r.get("params_json"))
-    ):
-        key = _model_key(media_type, wf_name, sig)
-        params = parse_params(model_rows[0].get("params_json"))
-        label, starred = _overlay(model_label(wf_name, params), key, folder_meta)
-        groups.append(ModelGroup(
-            key, label,
-            _build_settings_groups(media_type, wf_name, model_rows, folder_meta),
-            starred,
-        ))
-    return _starred_first(groups)
+    """The model folders under one workflow, each holding its LoRA folders — or,
+    for a LoRA-less workflow, its settings leaves directly."""
+    return _grouped_folders(
+        rows, folder_meta, cls=ModelGroup,
+        signature=lambda r: model_signature(wf_name, r.get("params_json")),
+        key_for=lambda sig: _model_key(media_type, wf_name, sig),
+        label_for=lambda params: model_label(wf_name, params),
+        children_for=lambda sub: _build_under_model(media_type, wf_name, sub, folder_meta),
+    )
+
+
+def _build_under_model(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
+) -> list:
+    """A model folder's children: LoRA folders when the workflow declares LoRA
+    keys, else settings leaves directly (LoRA-less workflows skip that level)."""
+    if workflow_lora_keys(wf_name):
+        return _build_lora_groups(media_type, wf_name, rows, folder_meta)
+    return _build_settings_groups(media_type, wf_name, rows, folder_meta)
+
+
+def _build_lora_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict
+) -> list[LoraGroup]:
+    """The LoRA folders under one model, each holding its settings leaves."""
+    return _grouped_folders(
+        rows, folder_meta, cls=LoraGroup,
+        signature=lambda r: lora_signature(wf_name, r.get("params_json")),
+        key_for=lambda sig: _lora_key(media_type, wf_name, sig),
+        label_for=lambda params: lora_label(wf_name, params),
+        children_for=lambda sub: _build_settings_groups(media_type, wf_name, sub, folder_meta),
+    )
 
 
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None
 ) -> list[MediaGroup]:
-    """Nest rows into media -> workflow -> model -> settings-group folders.
+    """Nest rows into media -> workflow -> model -> [LoRA] -> settings folders.
 
-    Rows that produced no output file (failed or unfinished generations) are
+    The LoRA level appears only under workflows that declare LoRA keys. Rows that
+    produced no output file (failed or unfinished generations) are
     dropped first, so the tree holds only results worth showing. Folders appear
     in the order their first member appears in ``rows`` (the caller orders rows
     newest-first), except that starred folders float to the top of their level.

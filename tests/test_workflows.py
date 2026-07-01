@@ -21,6 +21,16 @@ def test_workflows_declare_the_params_that_identify_their_model():
     assert Wan22Flf2vLoopWorkflow().model_keys == ("unet_high", "unet_low")
 
 
+def test_workflows_declare_the_params_that_identify_their_lora():
+    # The gallery nests a workflow's runs by LoRA under model, so the two WAN
+    # video workflows name the param(s) that pick their LoRA. Workflows with no
+    # LoRA (SDXL, WAN t2i) declare none, and so grow no LoRA folder level.
+    assert Wan22I2vWorkflow().lora_keys == ("lora_high", "lora_low")
+    assert Wan22Flf2vLoopWorkflow().lora_keys == ("lora_high", "lora_low")
+    assert SdxlT2iWorkflow().lora_keys == ()
+    assert Wan22T2iWorkflow().lora_keys == ()
+
+
 def test_workflows_expose_their_seed_param_keys():
     # A variation re-rolls exactly these; dual-noise video workflows have two.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)

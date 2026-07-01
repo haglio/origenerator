@@ -1,11 +1,14 @@
 import json
 
 from origenerator.gallery import (
+    SettingsGroup,
     build_gallery_tree,
     child_groups,
     config_tab_title,
     find_source_image_id,
     media_type_of_row,
+    lora_label,
+    lora_signature,
     model_label,
     model_signature,
     output_disk_files,
@@ -100,6 +103,25 @@ def test_model_signature_spans_every_model_key():
     assert same != diff_low
 
 
+def test_lora_signature_groups_by_lora_params_only():
+    base = {"lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors"}
+    a = json.dumps({**base, "steps": 20, "seed": 1})
+    b = json.dumps({**base, "steps": 30, "seed": 2})  # same LoRAs, other settings
+    c = json.dumps({**base, "lora_low": "styleB_low.safetensors"})  # a LoRA differs
+    # Same LoRAs, different settings/seed -> identical LoRA signature.
+    assert lora_signature("wan22_i2v", a) == lora_signature("wan22_i2v", b)
+    # A different LoRA file -> different LoRA signature.
+    assert lora_signature("wan22_i2v", a) != lora_signature("wan22_i2v", c)
+
+
+def test_lora_signature_is_empty_for_a_workflow_without_lora_keys():
+    # SDXL declares no LoRA keys, so every row shares one (empty) LoRA signature
+    # and no LoRA level is ever drawn.
+    a = json.dumps({"lora_high": "x.safetensors", "steps": 20})
+    b = json.dumps({"steps": 30})
+    assert lora_signature("sdxl_t2i", a) == lora_signature("sdxl_t2i", b)
+
+
 def test_model_label_strips_directory_and_extension():
     assert model_label("sdxl_t2i", {"checkpoint": "reapony_v80.safetensors"}) == "reapony_v80"
 
@@ -117,6 +139,20 @@ def test_model_label_falls_back_when_model_is_unknown():
     assert model_label("sdxl_t2i", {}) == "(unknown model)"
     # ...or a workflow that declares no model keys at all.
     assert model_label("nope", {"checkpoint": "x.safetensors"}) == "(unknown model)"
+
+
+def test_lora_label_joins_cleaned_lora_filenames():
+    label = lora_label("wan22_i2v", {
+        "lora_high": "loras\\styleA-high-k3nk.safetensors",
+        "lora_low": "styleA-low-k3nk.safetensors",
+    })
+    assert label == "styleA-high-k3nk / styleA-low-k3nk"
+
+
+def test_lora_label_falls_back_when_no_lora_recorded():
+    # A row that carried no LoRA value (e.g. an older import) reads as "(no LoRA)"
+    # rather than an empty name.
+    assert lora_label("wan22_i2v", {}) == "(no LoRA)"
 
 
 def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
@@ -171,6 +207,72 @@ def _img_model(prompt_id, prompt, checkpoint, steps, seed):
     )
 
 
+def _i2v(prompt_id, lora, prompt="dance", steps=20, seed=1):
+    return _row(
+        prompt_id=prompt_id,
+        workflow_name="wan22_i2v",
+        params_json=json.dumps({
+            "positive_prompt": prompt,
+            "unet_high": "wan_high.safetensors",
+            "unet_low": "wan_low.safetensors",
+            "lora_high": f"{lora}_high.safetensors",
+            "lora_low": f"{lora}_low.safetensors",
+            "steps": steps, "seed": seed,
+        }),
+        output_files=json.dumps([{"filename": f"wan22_i2v_{prompt_id}.mp4"}]),
+    )
+
+
+def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
+    rows = [
+        _i2v("v1", "styleA"),
+        _i2v("v2", "styleA", seed=2),   # same LoRA + settings, different seed
+        _i2v("v3", "styleB"),           # same base model, different LoRA
+    ]
+    workflow = build_gallery_tree(rows)[0].workflow_groups[0]
+    (model,) = workflow.model_groups                       # one shared base model
+    loras = {lg.label: lg for lg in model.children}
+    assert set(loras) == {"styleA_high / styleA_low", "styleB_high / styleB_low"}
+
+    (a_settings,) = loras["styleA_high / styleA_low"].children  # the two seeds collapse
+    assert {r["prompt_id"] for r in a_settings.rows} == {"v1", "v2"}
+    assert {r["prompt_id"] for r in rows_under(loras["styleB_high / styleB_low"])} == {"v3"}
+
+
+def test_build_gallery_tree_grows_no_lora_level_without_lora_keys():
+    # SDXL declares no LoRA keys, so a model folder holds settings leaves directly
+    # — no intervening LoRA level to click through.
+    rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
+    (model,) = build_gallery_tree(rows)[0].workflow_groups[0].model_groups
+    assert all(isinstance(child, SettingsGroup) for child in model.children)
+
+
+def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
+    rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
+    model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
+    a, b = model.children
+    assert a.key.startswith("video/wan22_i2v/l")  # the LoRA level tags its key with 'l'
+    assert a.key != b.key
+
+    meta = {b.key: {"custom_name": "Style B", "starred": True}}
+    loras = build_gallery_tree(rows, meta)[0].workflow_groups[0].model_groups[0].children
+    assert loras[0].label == "Style B"     # custom name applied
+    assert loras[0].starred is True
+    assert loras[0].key == b.key           # and the star floated it to the top
+    assert loras[1].starred is False
+
+
+def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
+    # Two LoRAs, identical prompt/settings otherwise: the split is at the LoRA
+    # level, so neither settings leaf needs the LoRA name in it.
+    rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
+    model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
+    for lora in model.children:
+        (settings,) = lora.children
+        assert settings.label == "dance"
+        assert "safetensors" not in settings.label
+
+
 def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     rows = [
         _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
@@ -183,8 +285,8 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     assert set(models) == {"reapony_v80", "dreamshaper"}
 
     reapony = models["reapony_v80"]
-    assert len(reapony.settings_groups) == 1  # the two seeds collapse
-    assert {r["prompt_id"] for r in reapony.settings_groups[0].rows} == {"i1", "i2"}
+    assert len(reapony.children) == 1  # the two seeds collapse
+    assert {r["prompt_id"] for r in reapony.children[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
 
 
@@ -214,7 +316,7 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
     ]
     workflow = build_gallery_tree(rows)[0].workflow_groups[0]
     for model in workflow.model_groups:
-        (settings,) = model.settings_groups
+        (settings,) = model.children
         assert settings.label == "a cat"
         assert "safetensors" not in settings.label
 
@@ -253,7 +355,7 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     sdxl_groups = media["image"].workflow_groups
     assert [w.workflow_name for w in sdxl_groups] == ["sdxl_t2i"]
     (model,) = sdxl_groups[0].model_groups  # no checkpoint recorded -> one model
-    settings = model.settings_groups
+    settings = model.children
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
@@ -261,7 +363,8 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     video = media["video"]
     assert [w.workflow_name for w in video.workflow_groups] == ["wan22_i2v"]
     (video_model,) = video.workflow_groups[0].model_groups
-    assert len(video_model.settings_groups) == 1
+    (video_lora,) = video_model.children  # wan22_i2v grows a LoRA level ("(no LoRA)" here)
+    assert len(video_lora.children) == 1
 
 
 def test_build_gallery_tree_assigns_stable_folder_keys():
@@ -272,7 +375,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert workflow.key == "image/sdxl_t2i"
     model = workflow.model_groups[0]
     assert model.key.startswith("image/sdxl_t2i/")
-    settings = model.settings_groups[0]
+    settings = model.children[0]
     assert settings.key.startswith("image/sdxl_t2i/")
 
     # The model and settings keys are derived from signatures, so they are
@@ -280,17 +383,17 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     again_model = build_gallery_tree([_img("i9", "a cat", 50, 7)])[0] \
         .workflow_groups[0].model_groups[0]
     assert again_model.key == model.key
-    assert again_model.settings_groups[0].key == settings.key
+    assert again_model.children[0].key == settings.key
 
 
 def test_build_gallery_tree_applies_custom_names_and_floats_stars_first():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
-    cat, dog = plain_model.settings_groups  # newest-first: cat, dog
+    cat, dog = plain_model.children  # newest-first: cat, dog
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
     settings = build_gallery_tree(rows, meta)[0] \
-        .workflow_groups[0].model_groups[0].settings_groups
+        .workflow_groups[0].model_groups[0].children
 
     assert settings[0].label == "Doggos"      # custom name applied
     assert settings[0].starred is True
@@ -326,7 +429,7 @@ def test_settings_group_labels_disambiguate_same_prompt_different_params():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 40, 2)])
     labels = [sg.label for sg in
-              tree[0].workflow_groups[0].model_groups[0].settings_groups]
+              tree[0].workflow_groups[0].model_groups[0].children]
     assert len(labels) == 2
     assert labels[0] != labels[1]
     assert all("a cat" in label for label in labels)
@@ -338,7 +441,7 @@ def test_settings_group_label_omits_params_when_only_one_group():
     # A lone settings folder needs no disambiguating suffix.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 50, 2)])
-    (only,) = tree[0].workflow_groups[0].model_groups[0].settings_groups
+    (only,) = tree[0].workflow_groups[0].model_groups[0].children
     assert only.label == "a cat"
 
 

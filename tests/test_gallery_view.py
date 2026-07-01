@@ -136,6 +136,17 @@ def _image(prompt_id, prompt, steps, seed):
                 f"sdxl_t2i_{prompt_id}.png")
 
 
+def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
+    """A WAN I2V video row that shares a base model but names its own LoRA, so the
+    tree grows Videos -> WAN I2V -> model -> LoRA -> settings."""
+    return _row(prompt_id, "wan22_i2v",
+                {"positive_prompt": prompt,
+                 "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
+                 "lora_high": f"{lora}_high.safetensors", "lora_low": f"{lora}_low.safetensors",
+                 "seed": seed},
+                f"wan22_i2v_{prompt_id}.mp4")
+
+
 def _hbox_index_of(layout, widget):
     """Index in the top-level row layout of the sub-layout holding ``widget``."""
     for i in range(layout.count()):
@@ -996,6 +1007,25 @@ def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
     view._delete_selection()
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
+
+
+def test_a_lora_folder_is_deletable_and_takes_only_its_own_rows(qtbot):
+    actions = FakeActions()
+    # One base model, two LoRA folders (styleA, styleB). Deleting the styleA LoRA
+    # folder must remove only its video, leaving the styleB sibling intact.
+    rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    # Videos -> WAN I2V -> model -> LoRA (styleA is first by appearance).
+    lora = _top_level(view._tree)["Videos"].child(0).child(0).child(0)
+    assert isinstance(lora.data(0, _GROUP_ROLE), gallery.LoraGroup)
+    view._tree.setCurrentItem(lora)
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"v1"}
 
 
 def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):

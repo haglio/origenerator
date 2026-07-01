@@ -40,11 +40,13 @@ _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
-    Model and settings folders live within a workflow folder and are fair game;
-    a whole workflow or media folder is off-limits, so a workflow's entire
+    Model, LoRA, and settings folders live within a workflow folder and are fair
+    game; a whole workflow or media folder is off-limits, so a workflow's entire
     history can never be wiped in one action.
     """
-    return isinstance(group, (gallery.ModelGroup, gallery.SettingsGroup))
+    return isinstance(
+        group, (gallery.ModelGroup, gallery.LoraGroup, gallery.SettingsGroup)
+    )
 
 
 def _is_reusable_workflow(workflow_name) -> bool:
@@ -133,8 +135,9 @@ class GalleryView(QWidget):
         layout = QHBoxLayout(self)
         layout.setSpacing(8)
 
-        # Far left: folder tree (media -> workflow -> model -> settings). Folders
-        # start collapsed and only expand on the disclosure arrow; double-click renames.
+        # Far left: folder tree (media -> workflow -> model -> [LoRA] -> settings;
+        # the LoRA level shows only for workflows that use one). Folders start
+        # collapsed and only expand on the disclosure arrow; double-click renames.
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)

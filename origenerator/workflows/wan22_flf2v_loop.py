@@ -7,6 +7,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
+    lora_keys = ("lora_high", "lora_low")
     output_node_id = "16"
     output_key = "gifs"
 

@@ -245,6 +245,37 @@ def test_generate_submits_when_input_image_present(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
+def test_i2v_generate_sizes_payload_to_image_and_stores_no_size(
+    qtbot, tmp_path, monkeypatch
+):
+    import origenerator.gui.generate_config_panel as panel_mod
+    from origenerator.workflows.image_to_video import fit_dimensions
+
+    inp = tmp_path / "input"
+    inp.mkdir()
+    from PIL import Image
+    Image.new("RGB", (1920, 1080), (0, 0, 0)).save(inp / "start.png")
+    monkeypatch.setattr(panel_mod, "COMFYUI_INPUT_DIR", inp)
+
+    client = MagicMock()
+    client.submit_job.return_value = "comfy-A"
+    panel = GenerateConfigPanel(client, Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._param_form.set_values({"input_image": "start.png"})
+
+    panel._on_generate()
+
+    payload = client.submit_job.call_args[0][0]
+    node = next(n for n in payload.values() if n["class_type"] == "WanImageToVideo")
+    assert (node["inputs"]["width"], node["inputs"]["height"]) == fit_dimensions(
+        1920, 1080, 720 * 544
+    )
+    # The output size is derived, so it never enters the persisted settings.
+    stored = json.loads(panel._db.list_generations()[0]["params_json"])
+    assert "width" not in stored and "height" not in stored
+
+
 class SpyDB:
     """Records the calls a panel makes, returning canned recent durations."""
 

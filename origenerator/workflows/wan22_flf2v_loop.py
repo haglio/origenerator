@@ -1,7 +1,14 @@
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import ParamDef
+from origenerator.workflows.image_to_video import ImageToVideoWorkflow
 
 
-class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
+class Wan22Flf2vLoopWorkflow(ImageToVideoWorkflow):
+    """WAN 2.2 first-last-frame loop: a single image drives both endpoints.
+
+    The output is sized to the input image's aspect ratio at ``native_size``'s
+    pixel budget rather than a hardcoded resolution.
+    """
+
     name = "wan22_flf2v_loop"
     version = "v004"
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
@@ -10,6 +17,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "16"
     output_key = "gifs"
+    native_size = (832, 480)
 
     def default_params(self) -> dict:
         return {
@@ -18,8 +26,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "input_image": "",
             "noise_seed": 0,
             "seed": 0,
-            "width": 832,
-            "height": 480,
             "frame_count": 21,
             "batch_size": 1,
             "steps": 4,
@@ -48,8 +54,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Input Image", "image", ""),
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
-            ParamDef("width", "Width", "int", 832, min_val=64, max_val=2048, step=16),
-            ParamDef("height", "Height", "int", 480, min_val=64, max_val=2048, step=16),
             ParamDef("frame_count", "Frames", "int", 21, min_val=5, max_val=81, step=4),
             ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),

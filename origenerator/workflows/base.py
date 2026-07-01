@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -50,6 +51,17 @@ class WorkflowTemplate(ABC):
         order. Derived from ``param_definitions`` so it stays in sync with the UI.
         """
         return tuple(pd.key for pd in self.param_definitions() if pd.type == "seed")
+
+    def finalize_params(self, params: dict, input_dir: Path) -> dict:
+        """Resolve any derived params just before building the payload.
+
+        Called by every build site with ComfyUI's input directory. The base
+        implementation returns ``params`` unchanged; workflows that compute a
+        value from their inputs (e.g. sizing the output to the input image)
+        override this. Kept separate from :meth:`build_api_payload` so the build
+        stays a pure function of its params and the filesystem read lives here.
+        """
+        return params
 
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:

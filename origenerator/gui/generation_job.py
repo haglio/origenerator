@@ -13,7 +13,7 @@ import uuid
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
@@ -28,12 +28,18 @@ class GenerationJob(QObject):
     failed = pyqtSignal(str)                     # error message
 
     def __init__(self, client, workflow, params, *,
-                 output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR, parent=None):
+                 output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR,
+                 input_dir=COMFYUI_INPUT_DIR, parent=None):
         super().__init__(parent)
         self._client = client
         self.workflow = workflow
         self.params = dict(params)
-        self.payload = workflow.build_api_payload(self.params)
+        # finalize_params resolves any input-derived values (e.g. sizing an
+        # image-to-video output to its start frame) without touching the stored
+        # params, so the persisted config stays free of derived fields.
+        self.payload = workflow.build_api_payload(
+            workflow.finalize_params(self.params, input_dir)
+        )
         self.prompt_id = str(uuid.uuid4())  # our id; the DB row key when persisted
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir

@@ -1,14 +1,16 @@
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import ParamDef
+from origenerator.workflows.image_to_video import ImageToVideoWorkflow
 
 
-class Wan22I2vWorkflow(WorkflowTemplate):
+class Wan22I2vWorkflow(ImageToVideoWorkflow):
     """WAN 2.2 14B image-to-video, dual-noise (high/low) sampling.
 
     Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
     denoised by two ``KSamplerAdvanced`` passes (high-noise model for the first
     half of the steps, low-noise model for the second) and written with the
-    native ``CreateVideo`` + ``SaveVideo`` nodes.
+    native ``CreateVideo`` + ``SaveVideo`` nodes. The output is sized to the
+    input image's aspect ratio at ``native_size``'s pixel budget.
     """
 
     name = "wan22_i2v"
@@ -18,6 +20,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "19"
+    native_size = (720, 544)
 
     def default_params(self) -> dict:
         return {
@@ -26,8 +29,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "input_image": "",
             "noise_seed": 0,
             "seed": 0,
-            "width": 720,
-            "height": 544,
             "frame_count": 121,
             "batch_size": 1,
             "steps": 20,
@@ -56,8 +57,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Input Image", "image", ""),
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
-            ParamDef("width", "Width", "int", 720, min_val=64, max_val=2048, step=16),
-            ParamDef("height", "Height", "int", 544, min_val=64, max_val=2048, step=16),
             ParamDef("frame_count", "Frames", "int", 121, min_val=5, max_val=161, step=4),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),

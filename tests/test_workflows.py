@@ -1,5 +1,8 @@
+from PIL import Image
+
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
+from origenerator.workflows.image_to_video import ImageToVideoWorkflow, fit_dimensions
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
@@ -36,6 +39,14 @@ def test_workflows_expose_their_seed_param_keys():
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
     assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed")
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed")
+
+
+def test_finalize_params_is_a_noop_for_text_to_image_workflows(tmp_path):
+    # Text-to-image workflows size the canvas from form values, so the base
+    # finalize hook leaves their params (width/height included) untouched.
+    wf = SdxlT2iWorkflow()
+    params = wf.default_params()
+    assert wf.finalize_params(params, tmp_path) == params
 
 
 def test_sdxl_t2i_default_params_has_required_keys():
@@ -105,10 +116,26 @@ def test_wan22_default_params_has_required_keys():
     required = {
         "positive_prompt", "negative_prompt", "input_image",
         "noise_seed", "seed",
-        "width", "height", "frame_count", "frame_rate",
+        "frame_count", "frame_rate",
         "lora_strength_high", "lora_strength_low",
     }
     assert required.issubset(params.keys())
+    # Output size is derived from the input image, so it isn't a stored param.
+    assert "width" not in params and "height" not in params
+
+
+def test_i2v_workflows_derive_output_size_from_a_native_budget():
+    # Both image-to-video workflows reshape the output to the input image at
+    # their model's native pixel budget rather than a hardcoded resolution.
+    i2v, flf2v = Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()
+    assert isinstance(i2v, ImageToVideoWorkflow) and i2v.native_size == (720, 544)
+    assert isinstance(flf2v, ImageToVideoWorkflow) and flf2v.native_size == (832, 480)
+
+
+def test_i2v_workflows_have_no_manual_width_height_controls():
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        keys = [d.key for d in wf.param_definitions()]
+        assert "width" not in keys and "height" not in keys
 
 
 def test_wan22_build_api_payload_structure():
@@ -119,6 +146,8 @@ def test_wan22_build_api_payload_structure():
     params["noise_seed"] = 42
     params["seed"] = 99
     params["input_image"] = "test.png"
+    # finalize_params supplies width/height at build time; stand in for it here.
+    params["width"], params["height"] = 848, 480
     payload = wf.build_api_payload(params)
     # Node 9 is positive prompt
     assert payload["9"]["class_type"] == "CLIPTextEncode"
@@ -162,11 +191,18 @@ def test_wan22_i2v_default_params_has_required_keys():
     required = {
         "positive_prompt", "negative_prompt", "input_image",
         "noise_seed", "seed",
-        "width", "height", "frame_count", "frame_rate",
+        "frame_count", "frame_rate",
         "steps", "cfg", "shift_high", "shift_low",
         "lora_strength_high", "lora_strength_low",
     }
     assert required.issubset(params.keys())
+    assert "width" not in params and "height" not in params
+
+
+def test_wan22_i2v_finalizes_output_size_from_input_image(tmp_path):
+    Image.new("RGB", (1920, 1080), (0, 0, 0)).save(tmp_path / "in.png")
+    out = Wan22I2vWorkflow().finalize_params({"input_image": "in.png"}, tmp_path)
+    assert (out["width"], out["height"]) == fit_dimensions(1920, 1080, 720 * 544)
 
 
 def test_wan22_i2v_param_definitions_returns_paramdefs():
@@ -187,6 +223,8 @@ def test_wan22_i2v_build_api_payload_structure():
     params["input_image"] = "start.png"
     params["noise_seed"] = 842719365028413
     params["seed"] = 0
+    # finalize_params supplies width/height at build time; stand in for it here.
+    params["width"], params["height"] = 720, 544
     payload = wf.build_api_payload(params)
 
     # Image-to-video conditioning (NOT first-last-frame)

@@ -315,6 +315,15 @@ def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
     assert {r["prompt_id"] for r in rows_under(loras["styleB_high / styleB_low"])} == {"v3"}
 
 
+def test_settings_folder_key_matches_the_rows_tree_leaf():
+    # A completed row's settings-folder key equals the leaf key build_gallery_tree
+    # gives it, so an in-flight sibling (absent from the tree) can be matched to it.
+    from origenerator.gallery import settings_folder_key
+    row = _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)
+    (leaf,) = build_gallery_tree([row])[0].workflow_groups[0].model_groups[0].children
+    assert settings_folder_key(row) == leaf.key
+
+
 def test_build_gallery_tree_grows_no_lora_level_without_lora_keys():
     # SDXL declares no LoRA keys, so a model folder holds settings leaves directly
     # — no intervening LoRA level to click through.

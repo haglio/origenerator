@@ -1331,6 +1331,63 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
+def _insert_running_reroll(db, prompt_id="rr", seed=99):
+    """A re-roll left running by a prior session: same settings folder as
+    _seeded_db's 'orig', no output yet, status running."""
+    params = dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", seed=seed,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="running")
+
+
+def test_reconnect_running_rerolls_rebinds_a_live_job(qtbot, tmp_path):
+    db = _seeded_db(tmp_path, seed=7)
+    _insert_running_reroll(db, "rr")
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+
+    view.reconnect_running_rerolls()
+
+    key = gallery.settings_folder_key(db.get_generation("rr"))
+    assert key in view._reroll_jobs
+    assert view._reroll_jobs[key].prompt_id == "rr"
+    client.submit_job.assert_not_called()  # reconnected, never resubmitted
+
+
+def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
+    db = _seeded_db(tmp_path, seed=7)
+    _insert_running_reroll(db, "rr")
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.reconnect_running_rerolls()
+    view.refresh()
+    _select_first_leaf(view)
+    assert not _reroll_tile(view)._cancel.isHidden()  # the live, cancelable tile
+
+    client.job_completed.emit("rr", _REROLL_HISTORY)
+
+    row = db.get_generation("rr")
+    assert row["status"] == "completed"
+    assert "a.png" in row["output_files"]
+    assert view._reroll_jobs == {}
+
+
+def test_reconnect_skips_a_reroll_claimed_by_a_generate_tab(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    _insert_running_reroll(db, "rr")
+    view = GalleryView(db, client=_reroll_client(), claimed_ids=lambda: {"rr"})
+    qtbot.addWidget(view)
+
+    view.reconnect_running_rerolls()
+
+    assert view._reroll_jobs == {}  # a Generate tab owns it; the gallery leaves it
+
+
 def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
     # A re-roll persists a running row the moment it's submitted, so a restart
     # mid-generation can find it again (reconnect) instead of losing all trace.

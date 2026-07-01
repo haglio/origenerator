@@ -106,6 +106,21 @@ class GenerationJob(QObject):
 
     # --- lifecycle ---------------------------------------------------------
 
+    @classmethod
+    def reconnect(cls, client, workflow, params, prompt_id, **kwargs):
+        """Rebind to a job already running in ComfyUI under ``prompt_id``.
+
+        Used after a restart to pick a re-roll back up from its persisted running
+        row without re-submitting it: the job attaches to the client's signals and
+        reports as running, so its progress, preview and completion flow through
+        exactly as they would for a job started this session.
+        """
+        job = cls(client, workflow, params, **kwargs)
+        job.prompt_id = prompt_id
+        job._attach()
+        job._state = "running"
+        return job
+
     def start(self):
         """Submit the job and begin tracking it. Raises if the submit fails."""
         if self._state != "idle":

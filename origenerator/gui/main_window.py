@@ -40,12 +40,19 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._tabs)
 
         self._generate_view = GenerateView(client, db)
-        self._gallery_view = GalleryView(db, client=client)
+        # The gallery skips re-roll rows a Generate tab already owns, so the two
+        # never both track one job; the tabs claim theirs during _restore_session.
+        self._gallery_view = GalleryView(
+            db, client=client, claimed_ids=self._generate_view.active_prompt_ids
+        )
         self._tabs.addTab(self._generate_view, "Generate")
         self._tabs.addTab(self._gallery_view, "Gallery")
 
         self._gallery_view.reuse_requested.connect(self._on_reuse)
         self._restore_session()
+        # After the tabs have reclaimed their own running jobs, adopt whatever
+        # in-flight re-rolls remain from the previous session.
+        self._gallery_view.reconnect_running_rerolls()
 
     def _on_reuse(self, workflow_name: str, params: dict):
         self._generate_view.open_config(workflow_name, params)

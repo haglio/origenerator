@@ -441,6 +441,18 @@ def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
     return _sig_key(media_type, workflow_name, signature)
 
 
+def settings_folder_key(row: dict) -> str:
+    """The key of the settings-folder leaf a row belongs to in the gallery tree.
+
+    Mirrors how :func:`build_gallery_tree` keys that leaf — media type, workflow
+    name, settings signature — so an in-flight row (which has no output yet and so
+    never appears in the tree itself) can still be matched to the folder it joins.
+    """
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    return _settings_key(media_type, workflow_name, settings_signature(row.get("params_json")))
+
+
 def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
     return _sig_key(media_type, workflow_name, signature, "m")
 

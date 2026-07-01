@@ -246,6 +246,23 @@ def test_cancel_detaches_from_client(qtbot, tmp_path):
     assert finished == []
 
 
+def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
+    client = _client()
+    job = GenerationJob.reconnect(
+        client, SDXL, _params(), "running-id",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    client.submit_job.assert_not_called()  # already on the server; don't resubmit
+    assert job.prompt_id == "running-id"
+    assert job.state == "running"
+
+    # Live signals for that id now flow through, ending in a normal completion.
+    finished = []
+    job.finished.connect(lambda files, thumb, dur: finished.append(files))
+    client.job_completed.emit("running-id", SDXL_HISTORY)
+    assert len(finished) == 1
+
+
 def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     job.detach()

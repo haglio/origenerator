@@ -1,9 +1,12 @@
+import json
 from unittest.mock import patch
 
+from origenerator import gallery
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def _window(qtbot, tmp_path, app_state=None):
@@ -39,6 +42,26 @@ def test_restores_generate_tabs_from_app_state(qtbot, tmp_path):
     gv = win._generate_view
     assert gv._subtabs.count() == 2
     assert gv._subtabs.widget(1)._workflow_combo.currentData() == "wan22_i2v"
+
+
+def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
+    # A re-roll left running by a prior session — owned by no restored tab — is
+    # picked back up by the gallery once the window builds. The window's own DB is
+    # the same file (tmp_path / "t.db"), so it sees the row inserted here.
+    db = Database(tmp_path / "t.db")
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                  seed=99, positive_prompt="a cat")
+    db.insert_generation(
+        prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a cat", seed=99,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("rr", status="running")
+
+    win = _window(qtbot, tmp_path)
+
+    key = gallery.settings_folder_key(db.get_generation("rr"))
+    assert key in win._gallery_view._reroll_jobs
 
 
 def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):

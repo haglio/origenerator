@@ -290,6 +290,14 @@ def test_restore_does_not_reconnect_a_finished_job(qtbot, tmp_path):
     assert view._subtabs.widget(0).active_prompt_id() is None
 
 
+def test_active_prompt_ids_collects_in_flight_tabs(view):
+    p0 = view._subtabs.widget(0)
+    p0._client.submit_job = MagicMock(return_value="x")
+    view._add_subtab()  # a second, idle tab
+    p0._on_generate()
+    assert view.active_prompt_ids() == {p0._client_prompt_id}
+
+
 def test_restore_state_rebuilds_tabs_replacing_default(view):
     state = {"tabs": [
         _config_tab("wan22_i2v", {"positive_prompt": "a fox"}),

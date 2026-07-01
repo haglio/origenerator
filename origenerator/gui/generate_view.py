@@ -172,6 +172,19 @@ class GenerateView(QWidget):
             })
         return {"tabs": tabs, "current": self._subtabs.currentIndex()}
 
+    def active_prompt_ids(self) -> set[str]:
+        """Every in-flight job id across the open tabs.
+
+        Lets the gallery know which running rows a Generate tab already owns, so
+        its re-roll reconnection doesn't adopt a job the tab is already tracking.
+        """
+        ids = set()
+        for i in range(self._subtabs.count()):
+            pid = self._subtabs.widget(i).active_prompt_id()
+            if pid:
+                ids.add(pid)
+        return ids
+
     def restore_state(self, state: dict):
         """Rebuild the subtabs from a :meth:`capture_state` snapshot.
 

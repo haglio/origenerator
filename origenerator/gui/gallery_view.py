@@ -65,10 +65,14 @@ class GalleryView(QWidget):
 
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
-                 actions: GalleryActions | None = None):
+                 actions: GalleryActions | None = None,
+                 claimed_ids=None):
         super().__init__(parent)
         self._db = db
         self._client = client
+        # In-flight ids some other view already tracks (a Generate tab owns its own
+        # jobs), so re-roll reconnection doesn't also adopt them. Queried live.
+        self._claimed_ids = claimed_ids or (lambda: set())
         self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
@@ -507,11 +511,7 @@ class GalleryView(QWidget):
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             return
-        self._reroll_jobs[key] = job
-        job.finished.connect(
-            lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
-        )
-        job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+        self._register_reroll_job(key, job, on_finished)
         insert_generation_row(self._db, job)
         try:
             job.start()
@@ -521,6 +521,45 @@ class GalleryView(QWidget):
             self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
             self._reroll_jobs.pop(key, None)
         self._rerender_current_leaf()
+
+    def _register_reroll_job(self, key, job, on_finished):
+        """Track a re-roll job for a folder and wire its completion and failure."""
+        self._reroll_jobs[key] = job
+        job.finished.connect(
+            lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
+        )
+        job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+
+    def reconnect_running_rerolls(self):
+        """Rebind live jobs to any re-rolls left running by a previous session.
+
+        Each still-in-flight row this app doesn't already own (a Generate tab owns
+        its own jobs) is picked back up so its completion is recorded and its tile
+        shows live progress again — even for a folder the user hasn't opened yet.
+        Called once at startup, after the Generate tabs have claimed their jobs.
+        """
+        if self._client is None:
+            return
+        claimed = self._claimed_ids()
+        for row in self._db.list_generations():
+            if row.get("status") in ("running", "pending") and row["prompt_id"] not in claimed:
+                self._reconnect_reroll(row)
+        self._rerender_current_leaf()
+
+    def _reconnect_reroll(self, row: dict):
+        key = gallery.settings_folder_key(row)
+        if key in self._reroll_jobs:
+            return  # a job for this folder is already tracked
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+        if workflow is None:
+            return
+        params = gallery.parse_params(row.get("params_json"))
+        try:
+            job = GenerationJob.reconnect(self._client, workflow, params, row["prompt_id"])
+        except Exception as e:
+            logger.warning("Could not reconnect re-roll for %s: %s", key, e)
+            return
+        self._register_reroll_job(key, job, self._on_reroll_finished)
 
     def _cancel_reroll(self, key: str):
         job = self._reroll_jobs.pop(key, None)

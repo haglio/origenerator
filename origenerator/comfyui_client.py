@@ -227,6 +227,23 @@ class ComfyUIClient(QThread):
             data = json.loads(resp.read())
             return data.get(prompt_id, {})
 
+    def fetch_queue(self) -> set[str]:
+        """The prompt ids ComfyUI is currently running or has pending.
+
+        ``/queue`` returns ``{queue_running: [...], queue_pending: [...]}`` where
+        each entry is a tuple whose second element (index 1) is the prompt_id.
+        Used at startup to tell a job still in flight from one that has gone.
+        """
+        url = f"{self.base_url}/queue"
+        with urllib.request.urlopen(url) as resp:
+            data = json.loads(resp.read())
+        ids: set[str] = set()
+        for key in ("queue_running", "queue_pending"):
+            for item in data.get(key, []):
+                if isinstance(item, (list, tuple)) and len(item) > 1:
+                    ids.add(item[1])
+        return ids
+
     def fetch_output_file(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
         params = urllib.parse.urlencode({
             "filename": filename,

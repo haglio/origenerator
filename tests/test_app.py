@@ -110,6 +110,31 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
     assert "ComfyUI server" in statuses
 
 
+def test_main_reconciles_in_flight_before_importing(qapp):
+    """In-flight generations are resolved against ComfyUI before the disk import,
+    so a job finalized from history isn't then re-imported as a duplicate."""
+    calls = []
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
+         patch("origenerator.reconcile.reconcile_in_flight",
+               side_effect=lambda *a, **k: calls.append("reconcile")), \
+         patch("origenerator.importer.import_comfyui_output",
+               side_effect=lambda *a, **k: calls.append("import") or 0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main()
+
+    assert calls[:2] == ["reconcile", "import"]
+
+
 def test_main_sweeps_stale_trash_on_startup(qapp):
     """Leftover trash from a prior session is reclaimed before the window opens."""
     trash = MagicMock()

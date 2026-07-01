@@ -132,6 +132,19 @@ def main():
     except Exception as e:
         logger.warning("Trash sweep failed: %s", e)
 
+    from origenerator.comfyui_client import ComfyUIClient
+    client = ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT)
+
+    status("Reconnecting to running generations...")
+    # Resolve any generation left mid-run by a previous session against ComfyUI
+    # (finished-while-away, still-running, or gone). Runs before the import below
+    # so a finalized job's output is already recorded and isn't imported twice.
+    from origenerator.reconcile import reconcile_in_flight
+    try:
+        reconcile_in_flight(db, client, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+    except Exception as e:
+        logger.warning("Reconcile of in-flight generations failed: %s", e)
+
     status("Scanning for new images...")
     from origenerator.importer import (
         backfill_model_and_lora_params,
@@ -198,8 +211,6 @@ def main():
         logger.warning("Duration backfill failed: %s", e)
 
     status("Connecting to ComfyUI...")
-    from origenerator.comfyui_client import ComfyUIClient
-    client = ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT)
     client.start()
 
     status("Building the interface...")

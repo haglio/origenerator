@@ -59,6 +59,21 @@ def test_submit_job_posts_our_prompt_id_and_returns_it():
     assert "1" in body["prompt"]
 
 
+def test_fetch_queue_returns_running_and_pending_ids():
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    body = json.dumps({
+        "queue_running": [[0, "run-1", {}, {}, []]],
+        "queue_pending": [[1, "pend-1", {}, {}, []], [2, "pend-2", {}, {}, []]],
+    }).encode()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
+        ids = client.fetch_queue()
+
+    assert ids == {"run-1", "pend-1", "pend-2"}
+
+
 def test_parse_ws_executing_none_signals_completion():
     client = ComfyUIClient.__new__(ComfyUIClient)
     messages = []

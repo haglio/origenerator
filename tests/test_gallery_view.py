@@ -411,11 +411,11 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert splitter.widget(2).isAncestorOf(view._preview)   # info pane holds the preview
 
 
-def test_info_pane_starts_wide_enough_to_avoid_a_horizontal_scrollbar(qtbot):
+def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # Its floor clears the metadata's widest rows (~315px of content) plus a
-    # vertical scrollbar, so the copy buttons never hide behind an h-scroll.
+    # Long metadata values wrap rather than scroll sideways, so this floor is
+    # about readability: the info pane never collapses to a cramped strip.
     assert view._panes.widget(2).minimumWidth() >= 340
 
 

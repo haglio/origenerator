@@ -135,13 +135,13 @@ class GalleryView(QWidget):
         layout = QHBoxLayout(self)
 
         # The three panes live in a splitter, so the divider between each doubles
-        # as a drag handle the user resizes with: the folder tree, the browsing
-        # pane, and the preview + metadata info pane.
+        # as a drag handle: the TOC pane (folder tree), the browser pane (a
+        # folder's contents), and the info pane (preview + metadata).
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
 
-        # Far left: folder tree (media -> workflow -> model -> [LoRA] -> settings;
+        # TOC pane: folder tree (media -> workflow -> model -> [LoRA] -> settings;
         # the LoRA level shows only for workflows that use one). Folders start
         # collapsed and only expand on the disclosure arrow; double-click renames.
         self._tree = QTreeWidget()
@@ -155,11 +155,11 @@ class GalleryView(QWidget):
         self._tree.itemChanged.connect(self._commit_inline_rename)
         self._panes.addWidget(self._tree)
 
-        # Middle: a header (folder title + Undo) over the contents.
+        # Browser pane: a header (folder title + Undo) over the flowing contents.
         # Double-clicking the title renames the selected folder in place.
-        middle = QWidget()
-        middle_box = QVBoxLayout(middle)
-        middle_box.setContentsMargins(0, 0, 0, 0)
+        browser = QWidget()
+        browser_box = QVBoxLayout(browser)
+        browser_box.setContentsMargins(0, 0, 0, 0)
         header = QHBoxLayout()
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
@@ -168,38 +168,38 @@ class GalleryView(QWidget):
         self._undo_btn = QPushButton("Undo")
         self._undo_btn.clicked.connect(self._undo)
         header.addWidget(self._undo_btn, 0, Qt.AlignmentFlag.AlignTop)
-        middle_box.addLayout(header)
+        browser_box.addLayout(header)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
-        middle_box.addWidget(self._avg_label)
+        browser_box.addWidget(self._avg_label)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        middle_box.addWidget(self._scroll, 1)
-        self._panes.addWidget(middle)
+        browser_box.addWidget(self._scroll, 1)
+        self._panes.addWidget(browser)
 
-        # Right: preview + metadata sidebar
-        right = QWidget()
-        right_box = QVBoxLayout(right)
-        right_box.setContentsMargins(0, 0, 0, 0)
+        # Info pane: preview + metadata sidebar
+        info = QWidget()
+        info_box = QVBoxLayout(info)
+        info_box.setContentsMargins(0, 0, 0, 0)
         self._meta_title = QLabel("Select a generation")
         self._meta_title.setWordWrap(True)
-        right_box.addWidget(self._meta_title)
+        info_box.addWidget(self._meta_title)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
         self._estimate_label.setWordWrap(True)
-        right_box.addWidget(self._estimate_label)
+        info_box.addWidget(self._estimate_label)
         self._source_link = QLabel()
         self._source_link.setWordWrap(True)
         self._source_link.setTextFormat(Qt.TextFormat.RichText)
         self._source_link.setOpenExternalLinks(False)
         self._source_link.linkActivated.connect(self._on_source_link)
         self._source_link.hide()
-        right_box.addWidget(self._source_link)
+        info_box.addWidget(self._source_link)
         self._preview = PreviewWidget()
-        right_box.addWidget(self._preview, 3)
+        info_box.addWidget(self._preview, 3)
         self._meta_panel = MetadataPanel()
-        right_box.addWidget(self._meta_panel, 2)
+        info_box.addWidget(self._meta_panel, 2)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
@@ -209,20 +209,20 @@ class GalleryView(QWidget):
         reuse_box = QVBoxLayout(self._reuse_wrap)
         reuse_box.setContentsMargins(0, 0, 0, 0)
         reuse_box.addWidget(self._reuse_btn)
-        right_box.addWidget(self._reuse_wrap)
-        self._panes.addWidget(right)
+        info_box.addWidget(self._reuse_wrap)
+        self._panes.addWidget(info)
 
-        # The tree and info pane hold their dragged widths; the browser takes up
-        # (and yields) the slack as the window resizes. The info pane's floor
-        # keeps the metadata clear of a horizontal scrollbar — its widest rows (a
-        # long filename, the seed) need ~340px — so its copy buttons stay in view.
+        # The TOC pane holds its width; the browser and info panes both grow with
+        # the window (the browser faster), so the info pane stays comfortably wide
+        # instead of a thin strip on a large screen. Long metadata values wrap
+        # rather than scroll sideways, so these floors are only for readability.
         self._tree.setMinimumWidth(150)
-        middle.setMinimumWidth(240)
-        right.setMinimumWidth(340)
+        browser.setMinimumWidth(240)
+        info.setMinimumWidth(340)
         self._panes.setStretchFactor(0, 0)
-        self._panes.setStretchFactor(1, 1)
-        self._panes.setStretchFactor(2, 0)
-        self._panes.setSizes([220, 620, 360])
+        self._panes.setStretchFactor(1, 3)
+        self._panes.setStretchFactor(2, 2)
+        self._panes.setSizes([220, 560, 440])
 
         layout.addWidget(self._panes)
 

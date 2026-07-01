@@ -116,7 +116,7 @@ def _label_widget(text: str, width: int) -> QLabel:
 
 
 def _value_widget(item: MetaItem) -> QLabel:
-    value = QLabel(item.value)
+    value = QLabel(_wrappable(item.value))
     value.setWordWrap(True)
     value.setTextInteractionFlags(_SELECTABLE)
     style = f"color: {_h(TEXT_SECONDARY)};"
@@ -124,6 +124,20 @@ def _value_widget(item: MetaItem) -> QLabel:
         style += f" border-left: 2px solid {_h(BORDER_SUBTLE)}; padding: 1px 0 1px 8px;"
     value.setStyleSheet(style)
     return value
+
+
+# Characters after which a long, space-less value (a model path, an output
+# filename) may break, so it wraps down the pane instead of forcing the whole
+# panel to scroll sideways.
+_BREAK_AFTER = "\\/_-."
+
+
+def _wrappable(text: str) -> str:
+    """Insert a zero-width space after each path/name separator, giving a
+    word-wrapping label a place to break a long unbroken value. The spaces have
+    no width so the visible text is unchanged, and copy buttons still carry the
+    original value — only on-screen wrapping is affected."""
+    return "".join(ch + "\u200b" if ch in _BREAK_AFTER else ch for ch in text)
 
 
 def _copy_button(text: str) -> QPushButton:

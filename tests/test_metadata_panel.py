@@ -130,9 +130,22 @@ def test_long_parameter_key_is_not_clipped(qtbot):
     panel.show_row(_minimal(params_json=json.dumps({"lora_strength_high": 1.0})))
 
     label = next(l for l in panel.findChildren(QLabel) if l.text() == "lora_strength_high")
-    # The label's column is at least as wide as the key it must show, so no
+    # The key column is at least as wide as the key it must show, so no
     # "lora_strength_hi…" truncation regardless of the (14pt) UI font.
     assert label.minimumWidth() >= QFontMetrics(label.font()).horizontalAdvance("lora_strength_high")
+
+
+def test_long_value_can_wrap_instead_of_forcing_a_scrollbar(qtbot):
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    path = "split_files\\diffusion_models\\wan2.2_i2v_high_noise_14B_fp16.safetensors"
+    panel.show_row(_minimal(params_json=json.dumps({"unet_high": path})))
+
+    label = next(l for l in panel.findChildren(QLabel) if "safetensors" in l.text())
+    raw = QFontMetrics(label.font()).horizontalAdvance(path)
+    # Break opportunities let the label shrink far below its one-line width, so it
+    # wraps down the pane rather than pushing a horizontal scrollbar.
+    assert label.minimumSizeHint().width() < raw / 2
 
 
 def test_clear_removes_all_rendered_content(qtbot):

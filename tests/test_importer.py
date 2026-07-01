@@ -232,6 +232,27 @@ def test_video_prompt_graph_empty_without_ffprobe(tmp_path, monkeypatch):
     assert imp._video_prompt_graph(tmp_path / "v.mp4") == {}
 
 
+def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monkeypatch):
+    """Each ffprobe child must be spawned windowless: importing a batch of videos
+    calls it once per file, and on Windows an unsuppressed child flashes a console
+    window per call. Assert the console-suppressing creationflag is passed."""
+    import subprocess as sp
+    import origenerator.importer as imp
+
+    captured: dict = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return sp.CompletedProcess(args, 0, stdout=json.dumps({"format": {}}), stderr="")
+
+    monkeypatch.setattr(imp.shutil, "which", lambda n: "ffprobe")
+    monkeypatch.setattr(imp.subprocess, "run", fake_run)
+
+    imp._video_prompt_graph(tmp_path / "v.mp4")
+
+    assert captured.get("creationflags") == getattr(sp, "CREATE_NO_WINDOW", 0)
+
+
 def test_import_skips_already_imported(tmp_path):
     output_dir = tmp_path / "output" / "image"
     output_dir.mkdir(parents=True)

@@ -23,6 +23,11 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
+# Windows spawns a visible console window for each child process unless told not
+# to, so probing a batch of imported videos would flash one window per file.
+# CREATE_NO_WINDOW suppresses it; it's absent (and this is a no-op 0) elsewhere.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _workflow_name_by_filename_prefix() -> dict[str, str]:
     """Map each workflow's output-filename prefix to its name, from the registry.
@@ -309,7 +314,7 @@ def _video_prompt_graph(fpath: Path) -> dict:
     try:
         proc = subprocess.run(
             [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", str(fpath)],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, creationflags=_NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError):
         return {}

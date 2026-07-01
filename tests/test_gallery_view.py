@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtWidgets import QSplitter, QLineEdit
+from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -339,7 +339,11 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     assert _top_level(view._tree)["Images"].child(0).text(0) == "Favorites"
 
 
-def test_i2v_thumbnail_links_to_source_image_and_navigates(qtbot):
+def _meta_link_texts(view):
+    return [l.text() for l in view._meta_panel.findChildren(QLabel)]
+
+
+def test_i2v_input_image_links_to_source_image_and_navigates(qtbot):
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -349,17 +353,18 @@ def test_i2v_thumbnail_links_to_source_image_and_navigates(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    # Viewing the video surfaces a link to the image it was built from.
+    # Viewing the video renders its input_image (among the other params) as a link
+    # to the image it was built from — not a separate line of its own.
     view._on_thumbnail_clicked("vid1")
-    assert view.current_source_image_id() == "img1"
-    assert "sdxl_t2i_img1.png" in view._source_link.text()
+    assert any('href="img1"' in t for t in _meta_link_texts(view))
 
     # Activating that link navigates the gallery to the source image.
-    view._on_source_link("img1")
+    view._meta_panel.link_activated.emit("img1")
     assert "img1" in view.visible_prompt_ids()
     assert view._selected["prompt_id"] == "img1"
-    # The image itself has no input image, so the link disappears.
-    assert view.current_source_image_id() is None
+    # The image itself has no input image, so nothing renders as a link.
+    view._on_thumbnail_clicked("img1")
+    assert not any("href=" in t for t in _meta_link_texts(view))
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
@@ -608,7 +613,7 @@ def test_clicking_thumbnail_routes_the_row_into_the_metadata_panel(qtbot):
     view._on_thumbnail_clicked("i1")
 
     view._meta_panel.show_row.assert_called_once()
-    (row,) = view._meta_panel.show_row.call_args.args
+    row = view._meta_panel.show_row.call_args.args[0]
     assert row["prompt_id"] == "i1"
 
 

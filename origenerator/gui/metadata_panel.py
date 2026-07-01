@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea,
 )
-from PyQt6.QtCore import Qt, QSize, QRectF
+from PyQt6.QtCore import Qt, QSize, QRectF, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QFontMetrics
 
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
@@ -32,15 +32,19 @@ class MetadataPanel(QScrollArea):
     """Scrollable, formatted view of one generation's metadata.
 
     ``show_row`` rebuilds the panel from the section model; ``clear`` empties it.
+    Activating a linked value (an i2v's ``input_image``) emits ``link_activated``
+    with the target generation's prompt_id, so the gallery can navigate to it.
     """
+
+    link_activated = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self.clear()
 
-    def show_row(self, row: dict):
-        self._render(build_sections(row))
+    def show_row(self, row: dict, source_image_id: str | None = None):
+        self._render(build_sections(row, source_image_id))
 
     def clear(self):
         self._render([])
@@ -52,11 +56,11 @@ class MetadataPanel(QScrollArea):
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         for section in sections:
-            layout.addWidget(_build_section(section))
+            layout.addWidget(_build_section(section, self.link_activated.emit))
         self.setWidget(container)  # replaces & deletes the previous container
 
 
-def _build_section(section: MetaSection) -> QWidget:
+def _build_section(section: MetaSection, on_link) -> QWidget:
     box = QWidget()
     layout = QVBoxLayout(box)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -71,7 +75,7 @@ def _build_section(section: MetaSection) -> QWidget:
 
     label_width = _label_column_width(section)
     for item in section.items:
-        layout.addWidget(_build_item(item, label_width))
+        layout.addWidget(_build_item(item, label_width, on_link))
     return box
 
 
@@ -87,7 +91,7 @@ def _label_column_width(section: MetaSection) -> int:
     return max(metrics.horizontalAdvance(text) for text in labels) + 12
 
 
-def _build_item(item: MetaItem, label_width: int) -> QWidget:
+def _build_item(item: MetaItem, label_width: int, on_link) -> QWidget:
     """A row of ``[label?] value [copy?]``.
 
     A labeled item reads ``label: value``; a bare one (a prompt) shows the value
@@ -101,7 +105,7 @@ def _build_item(item: MetaItem, label_width: int) -> QWidget:
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
     if item.label:
         layout.addWidget(_label_widget(item.label, label_width))
-    layout.addWidget(_value_widget(item), 1)
+    layout.addWidget(_value_widget(item, on_link), 1)
     if item.copy is not None:
         layout.addWidget(_copy_button(item.copy), 0, Qt.AlignmentFlag.AlignTop)
     return row
@@ -115,10 +119,19 @@ def _label_widget(text: str, width: int) -> QLabel:
     return label
 
 
-def _value_widget(item: MetaItem) -> QLabel:
-    value = QLabel(_wrappable(item.value))
+def _value_widget(item: MetaItem, on_link) -> QLabel:
+    """The value cell — a plain selectable label, or a clickable hyperlink to a
+    target generation when the item carries a ``link``. Either way a long,
+    space-less value (a path, a filename) may wrap rather than force a scrollbar."""
+    if item.link:
+        value = QLabel(f'<a href="{item.link}">{_wrappable(item.value)}</a>')
+        value.setTextFormat(Qt.TextFormat.RichText)
+        value.setOpenExternalLinks(False)
+        value.linkActivated.connect(on_link)
+    else:
+        value = QLabel(_wrappable(item.value))
+        value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)
-    value.setTextInteractionFlags(_SELECTABLE)
     style = f"color: {_h(TEXT_SECONDARY)};"
     if not item.label:  # a bare value reads as a quoted block, set off by a rule
         style += f" border-left: 2px solid {_h(BORDER_SUBTLE)}; padding: 1px 0 1px 8px;"

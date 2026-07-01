@@ -76,7 +76,6 @@ class GalleryView(QWidget):
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
         self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
-        self._source_image_id: str | None = None
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
         self._selected_ids: set[str] = set()
@@ -189,16 +188,11 @@ class GalleryView(QWidget):
         self._estimate_label.setObjectName("estimateLabel")
         self._estimate_label.setWordWrap(True)
         info_box.addWidget(self._estimate_label)
-        self._source_link = QLabel()
-        self._source_link.setWordWrap(True)
-        self._source_link.setTextFormat(Qt.TextFormat.RichText)
-        self._source_link.setOpenExternalLinks(False)
-        self._source_link.linkActivated.connect(self._on_source_link)
-        self._source_link.hide()
-        info_box.addWidget(self._source_link)
         self._preview = PreviewWidget()
         info_box.addWidget(self._preview, 3)
         self._meta_panel = MetadataPanel()
+        # An i2v's input_image value links to the image it came from; follow it.
+        self._meta_panel.link_activated.connect(self._on_source_link)
         info_box.addWidget(self._meta_panel, 2)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
@@ -869,22 +863,8 @@ class GalleryView(QWidget):
         self._estimate_label.setText(
             f"Typical time: {timing.estimate_label(self._db.recent_durations(row['workflow_name']))}"
         )
-        self._update_source_link(row)
-        self._meta_panel.show_row(row)
-
-    def _update_source_link(self, row: dict):
-        self._source_image_id = gallery.find_source_image_id(row, self._image_rows)
-        if not self._source_image_id:
-            self._source_link.hide()
-            self._source_link.clear()
-            return
-        src = self._db.get_generation(self._source_image_id)
-        files = gallery.row_output_files(src) if src else []
-        name = files[0]["filename"] if files else "source image"
-        self._source_link.setText(
-            f'Input image: <a href="{self._source_image_id}">{name}</a>'
-        )
-        self._source_link.show()
+        source_id = gallery.find_source_image_id(row, self._image_rows)
+        self._meta_panel.show_row(row, source_id)
 
     def _show_preview(self, row: dict):
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
@@ -892,9 +872,6 @@ class GalleryView(QWidget):
             self._preview.clear()
         else:
             self._preview.show_media(*preview)
-
-    def current_source_image_id(self) -> str | None:
-        return self._source_image_id
 
     def _on_source_link(self, prompt_id: str):
         leaf = self._leaf_by_id.get(prompt_id)
@@ -909,9 +886,6 @@ class GalleryView(QWidget):
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_panel.clear()
-        self._source_link.hide()
-        self._source_link.clear()
-        self._source_image_id = None
         self._preview.clear()
 
     def _on_reuse(self):

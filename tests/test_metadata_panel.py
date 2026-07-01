@@ -148,6 +148,32 @@ def test_long_value_can_wrap_instead_of_forcing_a_scrollbar(qtbot):
     assert label.minimumSizeHint().width() < raw / 2
 
 
+def test_input_image_renders_as_a_link_to_its_source(qtbot):
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+
+    panel.show_row(_row(params_json=json.dumps({"input_image": "src.png"})),
+                   source_image_id="img1")
+
+    # The value renders as a hyperlink to the source image (the filename it shows
+    # is checked in test_generation_metadata; here it's just that a link exists).
+    assert any('href="img1"' in t for t in _label_texts(panel))
+
+
+def test_activating_the_input_image_link_emits_its_target(qtbot):
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    got = []
+    panel.link_activated.connect(got.append)
+    panel.show_row(_row(params_json=json.dumps({"input_image": "src.png"})),
+                   source_image_id="img1")
+
+    link = next(l for l in panel.findChildren(QLabel) if 'href="img1"' in l.text())
+    link.linkActivated.emit("img1")
+
+    assert got == ["img1"]
+
+
 def test_clear_removes_all_rendered_content(qtbot):
     panel = MetadataPanel()
     qtbot.addWidget(panel)

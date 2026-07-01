@@ -94,6 +94,21 @@ def test_parameters_section_omitted_when_only_prompts_remain():
     assert all(s.title != "Parameters" for s in sections)
 
 
+def test_input_image_param_links_to_its_source_image_when_one_is_given():
+    params = {"steps": 20, "input_image": "sdxl_00007_.png [output]"}
+    sections = build_sections(_row(params_json=json.dumps(params)), source_image_id="img1")
+    item = _item(sections, "Parameters", "input_image")
+    assert item.value == "sdxl_00007_.png [output]"  # the value the user already sees
+    assert item.link == "img1"                        # now navigable to its source
+
+
+def test_params_carry_no_link_without_a_source_image():
+    params = {"steps": 20, "input_image": "hand_placed.png"}
+    sections = build_sections(_row(params_json=json.dumps(params)))
+    assert _item(sections, "Parameters", "input_image").link is None
+    assert _item(sections, "Parameters", "steps").link is None
+
+
 # --- prompts ---------------------------------------------------------------
 
 def test_prompt_sections_carry_the_prompt_as_a_bare_value():

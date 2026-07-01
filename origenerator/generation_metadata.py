@@ -25,11 +25,16 @@ class MetaItem:
     ``copy`` drives a copy-to-clipboard button: ``None`` shows no button, a
     non-empty string is what the button copies, and an empty string shows the
     button but disabled — a field that exists yet holds nothing (a blank prompt).
+
+    ``link`` makes the value a hyperlink to that target (a generation's
+    prompt_id) — used for an i2v's ``input_image``, which points at the image it
+    was built from.
     """
 
     label: str
     value: str
     copy: str | None = None
+    link: str | None = None
 
 
 @dataclass
@@ -65,17 +70,19 @@ def _prompt(title: str, text: str | None) -> MetaSection:
     return MetaSection(title, [MetaItem("", text, copy=text)])
 
 
-def _param_item(key: str, value) -> MetaItem:
+def _param_item(key: str, value, source_image_id: str | None) -> MetaItem:
     """A parameter row. Seeds carry a copy button — they're the value most often
-    lifted to reproduce a result; other params are plain."""
+    lifted to reproduce a result; other params are plain. An ``input_image`` links
+    to the image it names when that image is a generation we can navigate to."""
     copy = str(value) if key in _SEED_KEYS else None
-    return MetaItem(key, str(value), copy=copy)
+    link = source_image_id if key == "input_image" else None
+    return MetaItem(key, str(value), copy=copy, link=link)
 
 
-def _parameters(row: dict) -> MetaSection | None:
+def _parameters(row: dict, source_image_id: str | None) -> MetaSection | None:
     params = gallery.parse_params(row.get("params_json"))
     items = [
-        _param_item(key, value)
+        _param_item(key, value, source_image_id)
         for key, value in params.items()
         if key not in _PROMPT_KEYS
     ]
@@ -89,12 +96,12 @@ def _details(row: dict) -> MetaSection:
     ])
 
 
-def build_sections(row: dict) -> list[MetaSection]:
+def build_sections(row: dict, source_image_id: str | None = None) -> list[MetaSection]:
     sections = [
         _basic(row),
         _prompt("Positive Prompt", row.get("positive_prompt")),
         _prompt("Negative Prompt", row.get("negative_prompt")),
-        _parameters(row),
+        _parameters(row, source_image_id),
         _details(row),
     ]
     return [s for s in sections if s is not None]

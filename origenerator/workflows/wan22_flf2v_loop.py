@@ -1,23 +1,22 @@
-from origenerator.workflows.base import ParamDef
-from origenerator.workflows.image_to_video import ImageToVideoWorkflow
+from origenerator.workflows.base import ParamDef, WorkflowTemplate
 
 
-class Wan22Flf2vLoopWorkflow(ImageToVideoWorkflow):
+class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     """WAN 2.2 first-last-frame loop: a single image drives both endpoints.
 
-    The output is sized to the input image's aspect ratio at ``native_size``'s
+    The output resolution is derived in-graph from the input image (see
+    :meth:`build_api_payload`): it keeps the image's aspect ratio at a fixed
     pixel budget rather than a hardcoded resolution.
     """
 
     name = "wan22_flf2v_loop"
-    version = "v004"
+    version = "v005"
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "16"
     output_key = "gifs"
-    native_size = (832, 480)
 
     def default_params(self) -> dict:
         return {
@@ -130,16 +129,33 @@ class Wan22Flf2vLoopWorkflow(ImageToVideoWorkflow):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
+            # Derive the output resolution from the input image: scale it to a
+            # fixed pixel budget on WAN's /16 stride (keeping aspect), then read
+            # the resulting size back to drive the video node — so a portrait or
+            # widescreen still yields a proportional loop without a hardcoded WxH.
+            "17": {
+                "class_type": "ImageScaleToTotalPixels",
+                "inputs": {
+                    "image": ["11", 0],
+                    "upscale_method": "lanczos",
+                    "megapixels": 0.4,
+                    "resolution_steps": 16,
+                },
+            },
+            "18": {
+                "class_type": "GetImageSize",
+                "inputs": {"image": ["17", 0]},
+            },
             "12": {
                 "class_type": "WanFirstLastFrameToVideo",
                 "inputs": {
                     "positive": ["9", 0],
                     "negative": ["10", 0],
                     "vae": ["2", 0],
-                    "start_image": ["11", 0],
-                    "end_image": ["11", 0],
-                    "width": params["width"],
-                    "height": params["height"],
+                    "start_image": ["17", 0],
+                    "end_image": ["17", 0],
+                    "width": ["18", 0],
+                    "height": ["18", 1],
                     "length": params["frame_count"],
                     "batch_size": params["batch_size"],
                 },

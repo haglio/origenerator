@@ -6,7 +6,6 @@ from PIL import Image
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.image_to_video import fit_dimensions
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -32,28 +31,6 @@ def _started_job(tmp_path):
     )
     job.start()
     return job, client
-
-
-def test_i2v_job_sizes_its_payload_to_the_input_image(qtbot, tmp_path):
-    # A re-roll builds its job straight from stored params; the job must finalize
-    # the output size from the input image, just like the Generate panel does.
-    inp = tmp_path / "input"
-    inp.mkdir()
-    Image.new("RGB", (1920, 1080), (0, 0, 0)).save(inp / "start.png")
-    wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    params = dict(wf.default_params())
-    params["input_image"] = "start.png"
-
-    job = GenerationJob(
-        _client(), wf, params,
-        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs", input_dir=inp,
-    )
-
-    node = next(n for n in job.payload.values() if n["class_type"] == "WanImageToVideo")
-    assert (node["inputs"]["width"], node["inputs"]["height"]) == fit_dimensions(
-        1920, 1080, 720 * 544
-    )
-    assert "width" not in job.params  # the stored params stay size-free
 
 
 def test_start_submits_payload_and_queues(qtbot, tmp_path):

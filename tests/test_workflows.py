@@ -1,8 +1,5 @@
-from PIL import Image
-
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
-from origenerator.workflows.image_to_video import ImageToVideoWorkflow, fit_dimensions
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
@@ -13,6 +10,13 @@ def _find_node(payload: dict, class_type: str) -> dict | None:
     for node in payload.values():
         if node.get("class_type") == class_type:
             return node
+    return None
+
+
+def _node_id(payload: dict, class_type: str) -> str | None:
+    for node_id, node in payload.items():
+        if node.get("class_type") == class_type:
+            return node_id
     return None
 
 
@@ -39,14 +43,6 @@ def test_workflows_expose_their_seed_param_keys():
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
     assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed")
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed")
-
-
-def test_finalize_params_is_a_noop_for_text_to_image_workflows(tmp_path):
-    # Text-to-image workflows size the canvas from form values, so the base
-    # finalize hook leaves their params (width/height included) untouched.
-    wf = SdxlT2iWorkflow()
-    params = wf.default_params()
-    assert wf.finalize_params(params, tmp_path) == params
 
 
 def test_sdxl_t2i_default_params_has_required_keys():
@@ -124,14 +120,6 @@ def test_wan22_default_params_has_required_keys():
     assert "width" not in params and "height" not in params
 
 
-def test_i2v_workflows_derive_output_size_from_a_native_budget():
-    # Both image-to-video workflows reshape the output to the input image at
-    # their model's native pixel budget rather than a hardcoded resolution.
-    i2v, flf2v = Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()
-    assert isinstance(i2v, ImageToVideoWorkflow) and i2v.native_size == (720, 544)
-    assert isinstance(flf2v, ImageToVideoWorkflow) and flf2v.native_size == (832, 480)
-
-
 def test_i2v_workflows_have_no_manual_width_height_controls():
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         keys = [d.key for d in wf.param_definitions()]
@@ -146,8 +134,6 @@ def test_wan22_build_api_payload_structure():
     params["noise_seed"] = 42
     params["seed"] = 99
     params["input_image"] = "test.png"
-    # finalize_params supplies width/height at build time; stand in for it here.
-    params["width"], params["height"] = 848, 480
     payload = wf.build_api_payload(params)
     # Node 9 is positive prompt
     assert payload["9"]["class_type"] == "CLIPTextEncode"
@@ -162,8 +148,15 @@ def test_wan22_build_api_payload_structure():
     assert payload["14"]["inputs"]["noise_seed"] == 99
     # Node 16 is VHS_VideoCombine
     assert payload["16"]["class_type"] == "VHS_VideoCombine"
-    # Node 12 is WanFirstLastFrameToVideo
-    assert payload["12"]["inputs"]["width"] == params["width"]
+    # Node 12 (WanFirstLastFrameToVideo) takes its size from the derive nodes:
+    # LoadImage -> ImageScaleToTotalPixels -> GetImageSize -> width/height.
+    scale_id = _node_id(payload, "ImageScaleToTotalPixels")
+    getsize_id = _node_id(payload, "GetImageSize")
+    assert payload[scale_id]["inputs"]["image"] == ["11", 0]
+    assert payload[scale_id]["inputs"]["resolution_steps"] == 16
+    assert payload[getsize_id]["inputs"]["image"] == [scale_id, 0]
+    assert payload["12"]["inputs"]["width"] == [getsize_id, 0]
+    assert payload["12"]["inputs"]["height"] == [getsize_id, 1]
     assert payload["12"]["inputs"]["length"] == params["frame_count"]
 
 
@@ -199,12 +192,6 @@ def test_wan22_i2v_default_params_has_required_keys():
     assert "width" not in params and "height" not in params
 
 
-def test_wan22_i2v_finalizes_output_size_from_input_image(tmp_path):
-    Image.new("RGB", (1920, 1080), (0, 0, 0)).save(tmp_path / "in.png")
-    out = Wan22I2vWorkflow().finalize_params({"input_image": "in.png"}, tmp_path)
-    assert (out["width"], out["height"]) == fit_dimensions(1920, 1080, 720 * 544)
-
-
 def test_wan22_i2v_param_definitions_returns_paramdefs():
     wf = Wan22I2vWorkflow()
     defs = wf.param_definitions()
@@ -223,19 +210,29 @@ def test_wan22_i2v_build_api_payload_structure():
     params["input_image"] = "start.png"
     params["noise_seed"] = 842719365028413
     params["seed"] = 0
-    # finalize_params supplies width/height at build time; stand in for it here.
-    params["width"], params["height"] = 720, 544
     payload = wf.build_api_payload(params)
 
     # Image-to-video conditioning (NOT first-last-frame)
     i2v = _find_node(payload, "WanImageToVideo")
     assert i2v is not None
-    assert i2v["inputs"]["width"] == params["width"]
     assert i2v["inputs"]["length"] == params["frame_count"]
     assert _find_node(payload, "WanFirstLastFrameToVideo") is None
 
+    # Size is derived in-graph from the loaded image, nothing hardcoded:
+    # LoadImage -> ImageScaleToTotalPixels (/16, budget) -> GetImageSize -> w/h.
+    load_id = _node_id(payload, "LoadImage")
+    scale_id = _node_id(payload, "ImageScaleToTotalPixels")
+    getsize_id = _node_id(payload, "GetImageSize")
+    assert payload[scale_id]["inputs"]["image"] == [load_id, 0]
+    assert payload[scale_id]["inputs"]["resolution_steps"] == 16
+    assert payload[getsize_id]["inputs"]["image"] == [scale_id, 0]
+    assert i2v["inputs"]["width"] == [getsize_id, 0]
+    assert i2v["inputs"]["height"] == [getsize_id, 1]
+    assert i2v["inputs"]["start_image"] == [scale_id, 0]  # the correctly-sized frame
+    assert "width" not in params and "height" not in params
+
     # LoadImage feeds the start image
-    assert _find_node(payload, "LoadImage")["inputs"]["image"] == "start.png"
+    assert payload[load_id]["inputs"]["image"] == "start.png"
 
     # CLIP-vision encode is present (i2v conditions on the image embedding)
     assert _find_node(payload, "CLIPVisionEncode") is not None

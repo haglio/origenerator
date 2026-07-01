@@ -1,26 +1,26 @@
-from origenerator.workflows.base import ParamDef
-from origenerator.workflows.image_to_video import ImageToVideoWorkflow
+from origenerator.workflows.base import ParamDef, WorkflowTemplate
 
 
-class Wan22I2vWorkflow(ImageToVideoWorkflow):
+class Wan22I2vWorkflow(WorkflowTemplate):
     """WAN 2.2 14B image-to-video, dual-noise (high/low) sampling.
 
     Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
     denoised by two ``KSamplerAdvanced`` passes (high-noise model for the first
     half of the steps, low-noise model for the second) and written with the
-    native ``CreateVideo`` + ``SaveVideo`` nodes. The output is sized to the
-    input image's aspect ratio at ``native_size``'s pixel budget.
+    native ``CreateVideo`` + ``SaveVideo`` nodes. The output resolution is
+    derived in-graph from the input image (see :meth:`build_api_payload`): it
+    keeps the image's aspect ratio at a fixed pixel budget rather than a
+    hardcoded size.
     """
 
     name = "wan22_i2v"
-    version = "v001"
+    version = "v002"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "19"
-    native_size = (720, 544)
 
     def default_params(self) -> dict:
         return {
@@ -139,6 +139,23 @@ class Wan22I2vWorkflow(ImageToVideoWorkflow):
                     "crop": "center",
                 },
             },
+            # Derive the output resolution from the input image: scale it to a
+            # fixed pixel budget on WAN's /16 stride (keeping aspect), then read
+            # the resulting size back to drive WanImageToVideo — so a portrait or
+            # widescreen still yields a proportional video without a hardcoded WxH.
+            "20": {
+                "class_type": "ImageScaleToTotalPixels",
+                "inputs": {
+                    "image": ["12", 0],
+                    "upscale_method": "lanczos",
+                    "megapixels": 0.4,
+                    "resolution_steps": 16,
+                },
+            },
+            "21": {
+                "class_type": "GetImageSize",
+                "inputs": {"image": ["20", 0]},
+            },
             "14": {
                 "class_type": "WanImageToVideo",
                 "inputs": {
@@ -146,9 +163,9 @@ class Wan22I2vWorkflow(ImageToVideoWorkflow):
                     "negative": ["11", 0],
                     "vae": ["2", 0],
                     "clip_vision_output": ["13", 0],
-                    "start_image": ["12", 0],
-                    "width": params["width"],
-                    "height": params["height"],
+                    "start_image": ["20", 0],
+                    "width": ["21", 0],
+                    "height": ["21", 1],
                     "length": params["frame_count"],
                     "batch_size": params["batch_size"],
                 },

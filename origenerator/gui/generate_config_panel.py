@@ -24,7 +24,7 @@ from origenerator.timing import (
     format_duration,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -235,12 +235,9 @@ class GenerateConfigPanel(QWidget):
             params = randomize_seeds(params, wf.seed_keys())
             self._param_form.set_seed_random(True)
 
-        # Build the job now (fixing the seed), but let the queue decide when it
-        # runs. finalize_params resolves any input-derived values (e.g. sizing an
-        # image-to-video output to its start frame) into the payload only, so the
-        # stored params_json stays free of derived fields.
+        # Build the job now (fixing the seed), but let the queue decide when it runs.
         prompt_id = str(uuid.uuid4())
-        payload = wf.build_api_payload(wf.finalize_params(params, COMFYUI_INPUT_DIR))
+        payload = wf.build_api_payload(params)
         self._prepare_job(
             payload=payload,
             workflow=wf,

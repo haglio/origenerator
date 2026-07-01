@@ -50,8 +50,7 @@ class GenerateConfigPanel(QWidget):
         self._client = client
         self._db = db
         self._queue = queue                          # serializes jobs across panels; None = run at once
-        self._client_prompt_id: str | None = None   # our uuid; the DB row key
-        self._comfy_prompt_id: str | None = None     # ComfyUI's id; keys its signals
+        self._client_prompt_id: str | None = None   # our uuid: the DB row key, and the id ComfyUI keys its signals on
         self._submitted_workflow = None              # workflow captured at submit time
         self._prepared: dict | None = None           # a job built but not yet started
         self._custom_title: str | None = None        # user-set name; overrides the auto title
@@ -393,9 +392,8 @@ class GenerateConfigPanel(QWidget):
         self._progress_tracker = ProgressTracker.for_payload(job["payload"])
 
         try:
-            actual_pid = self._client.submit_job(job["payload"])
+            self._client.submit_job(job["payload"], prompt_id)
             self._client_prompt_id = prompt_id
-            self._comfy_prompt_id = actual_pid
             self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
             self._preview.clear()  # a fresh job: drop the previous result
@@ -429,7 +427,7 @@ class GenerateConfigPanel(QWidget):
         The client multiplexes every panel's jobs over one connection, so each
         panel ignores signals for ids that aren't its own in-flight job.
         """
-        return self._comfy_prompt_id is not None and prompt_id == self._comfy_prompt_id
+        return self._client_prompt_id is not None and prompt_id == self._client_prompt_id
 
     def _mark_running(self):
         """React to the first sign ComfyUI is actually working our prompt.
@@ -535,19 +533,18 @@ class GenerateConfigPanel(QWidget):
             self._show_canceled()
             return
         staged = self._prepared is not None
-        comfy_id = self._comfy_prompt_id
-        if self._queue is not None and (staged or comfy_id is not None):
+        prompt_id = self._client_prompt_id
+        if self._queue is not None and (staged or prompt_id is not None):
             self._queue.cancel(self)  # drop our slot (pending or the running head)
-        if comfy_id is not None:
+        if prompt_id is not None:
             try:
                 if self._executing:
                     self._client.interrupt()
                 else:
-                    self._client.cancel_prompt(comfy_id)
+                    self._client.cancel_prompt(prompt_id)
             except Exception as e:
-                logger.warning("Cancel failed for %s: %s", comfy_id, e)
-            if self._client_prompt_id:
-                self._db.delete_generation(self._client_prompt_id)
+                logger.warning("Cancel failed for %s: %s", prompt_id, e)
+            self._db.delete_generation(prompt_id)
         elif not staged:
             return  # nothing in flight to cancel
         self._prepared = None
@@ -558,7 +555,6 @@ class GenerateConfigPanel(QWidget):
 
     def _reset_job(self):
         self._client_prompt_id = None
-        self._comfy_prompt_id = None
         self._submitted_workflow = None
         self._executing = False
         self._progress_tracker = None

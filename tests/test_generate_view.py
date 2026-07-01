@@ -105,13 +105,13 @@ def test_strip_keeps_earlier_runs_after_a_settings_change(view):
     panel._param_form.set_values({"positive_prompt": "cat", "seed": 1})
     panel._on_generate()
     first = panel._client_prompt_id
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(first, SDXL_HISTORY)
     assert _strip_ids(view) == [first]
 
     panel._param_form.set_values({"positive_prompt": "dog", "seed": 2})  # a mod
     panel._on_generate()
     second = panel._client_prompt_id
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(second, SDXL_HISTORY)
     # Both runs stay, newest first — the earlier (now-mismatched) one isn't dropped.
     assert _strip_ids(view) == [second, first]
 
@@ -197,7 +197,7 @@ def test_second_generate_is_queued_behind_the_first(view):
     p1._on_generate()
     p2._on_generate()
     assert view._client.submit_job.call_count == 1   # only the first reaches ComfyUI
-    assert p1._comfy_prompt_id == "comfy-1"           # first is running
+    assert p1._client_prompt_id is not None           # first is running
     assert "queued" in p2._progress.format().lower()
 
 
@@ -208,7 +208,7 @@ def test_closing_running_subtab_advances_the_queue(view):
     p1._on_generate()  # running
     p2._on_generate()  # queued
     view._close_subtab(view._subtabs.indexOf(p1))
-    assert p2._comfy_prompt_id == "comfy-1"           # p2 promoted and started
+    assert p2._client_prompt_id is not None           # p2 promoted and started
 
 
 # --- session capture / restore ---------------------------------------------

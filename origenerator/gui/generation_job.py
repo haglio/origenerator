@@ -67,10 +67,9 @@ class GenerationJob(QObject):
         self.workflow = workflow
         self.params = dict(params)
         self.payload = workflow.build_api_payload(self.params)
-        self.prompt_id = str(uuid.uuid4())  # our id; the DB row key when persisted
+        self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir
-        self._comfy_id: str | None = None
         self._state = "idle"  # idle -> queued -> running -> finished/failed/canceled
         # Fold ComfyUI's per-pass sampler progress into one 0-to-total ramp, so a
         # multi-stage video job doesn't report a bar that resets between passes.
@@ -79,10 +78,6 @@ class GenerationJob(QObject):
         self._last_preview: bytes | None = None
 
     # --- state, exposed so a freshly-built tile can rebind to a running job --
-
-    @property
-    def comfy_id(self) -> str | None:
-        return self._comfy_id
 
     @property
     def state(self) -> str:
@@ -104,7 +99,7 @@ class GenerationJob(QObject):
             return
         self._attach()
         try:
-            self._comfy_id = self._client.submit_job(self.payload)
+            self._client.submit_job(self.payload, self.prompt_id)
         except Exception:
             self._detach()
             raise
@@ -116,10 +111,10 @@ class GenerationJob(QObject):
         try:
             if self._state == "running":
                 self._client.interrupt()
-            elif self._comfy_id:
-                self._client.cancel_prompt(self._comfy_id)
+            elif self._state == "queued":
+                self._client.cancel_prompt(self.prompt_id)
         except Exception as e:
-            logger.warning("Failed to cancel job %s: %s", self._comfy_id, e)
+            logger.warning("Failed to cancel job %s: %s", self.prompt_id, e)
         self._state = "canceled"
 
     def detach(self):
@@ -137,12 +132,12 @@ class GenerationJob(QObject):
         exactly as the signal would have. A no-op while the prompt is still queued
         or running (absent from /history) or once the job is already terminal.
         """
-        if self._state not in ("queued", "running") or self._comfy_id is None:
+        if self._state not in ("queued", "running"):
             return
         try:
-            history = self._client.fetch_history(self._comfy_id)
+            history = self._client.fetch_history(self.prompt_id)
         except Exception as e:
-            logger.debug("Reconcile fetch failed for %s: %s", self._comfy_id, e)
+            logger.debug("Reconcile fetch failed for %s: %s", self.prompt_id, e)
             return
         if self.workflow.extract_output_info(history):
             self._complete(history)
@@ -170,7 +165,7 @@ class GenerationJob(QObject):
                 pass
 
     def _is_mine(self, prompt_id: str) -> bool:
-        return self._comfy_id is not None and prompt_id == self._comfy_id
+        return prompt_id == self.prompt_id
 
     def _mark_running(self):
         if self._state == "queued":

@@ -33,7 +33,9 @@ def _mock_response(status: int, body: bytes):
     return resp
 
 
-def test_submit_job_posts_correct_payload():
+def test_submit_job_posts_our_prompt_id_and_returns_it():
+    # Origenerator supplies its own prompt_id so ComfyUI keys this job's signals
+    # and history on the same id the DB row uses (the basis for reconnecting).
     client = ComfyUIClient.__new__(ComfyUIClient)
     client.host = "127.0.0.1"
     client.port = 8188
@@ -41,18 +43,19 @@ def test_submit_job_posts_correct_payload():
 
     mock_response = MagicMock()
     mock_response.read.return_value = json.dumps(
-        {"prompt_id": "resp-uuid", "number": 1}
+        {"prompt_id": "our-id", "number": 1}
     ).encode()
     mock_response.__enter__ = lambda s: s
     mock_response.__exit__ = MagicMock(return_value=False)
 
     with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
-        result = client._post_prompt({"1": {"class_type": "Test", "inputs": {}}})
+        returned = client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
 
-    assert result["prompt_id"] == "resp-uuid"
+    assert returned == "our-id"
     call_args = mock_urlopen.call_args[0][0]
     body = json.loads(call_args.data)
     assert body["client_id"] == "test-client"
+    assert body["prompt_id"] == "our-id"
     assert "1" in body["prompt"]
 
 

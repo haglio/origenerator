@@ -35,7 +35,6 @@ def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
-    job_queued = pyqtSignal(str)  # prompt_id
     progress = pyqtSignal(str, int, int)  # prompt_id, value, max
     node_executing = pyqtSignal(str, str)  # prompt_id, node_id
     job_completed = pyqtSignal(str, dict)  # prompt_id, history_data
@@ -175,10 +174,16 @@ class ComfyUIClient(QThread):
         except Exception as e:
             self.job_error.emit(prompt_id, str(e))
 
-    def submit_job(self, workflow_payload: dict) -> str:
-        result = self._post_prompt(workflow_payload)
-        prompt_id = result["prompt_id"]
-        self.job_queued.emit(prompt_id)
+    def submit_job(self, workflow_payload: dict, prompt_id: str) -> str:
+        """Queue a prompt on ComfyUI under our own ``prompt_id``.
+
+        ComfyUI honors a caller-supplied ``prompt_id`` (minting its own only when
+        none is given), so passing ours makes its websocket signals and its
+        ``/history`` entry for this job key on the same id the DB row uses. That
+        one shared id is what lets a job be matched live and, after a restart,
+        reconnected to. Returns the id for symmetry; it always equals ``prompt_id``.
+        """
+        self._post_prompt(workflow_payload, prompt_id)
         return prompt_id
 
     def interrupt(self):
@@ -202,10 +207,11 @@ class ComfyUIClient(QThread):
         with urllib.request.urlopen(req) as resp:
             resp.read()
 
-    def _post_prompt(self, workflow_payload: dict) -> dict:
+    def _post_prompt(self, workflow_payload: dict, prompt_id: str) -> dict:
         body = json.dumps({
             "prompt": workflow_payload,
             "client_id": self.client_id,
+            "prompt_id": prompt_id,
         }).encode()
         req = urllib.request.Request(
             f"{self.base_url}/prompt",

@@ -1288,7 +1288,7 @@ def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     job = view._reroll_jobs[key]
     assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
     assert job.params["seed"] != 1  # re-rolled
-    client.submit_job.assert_called_once_with(job.payload)  # built without error
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)  # built without error
 
 
 def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
@@ -1304,7 +1304,7 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     job = view._reroll_jobs[key]
     assert job.workflow.name == "sdxl_t2i"
     assert job.params["seed"] != 7  # same settings, fresh seed
-    client.submit_job.assert_called_once_with(job.payload)
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
 def test_starting_a_reroll_swaps_the_tile_to_active(qtbot, tmp_path):
@@ -1337,10 +1337,10 @@ def test_reroll_completion_persists_a_new_generation(qtbot, tmp_path):
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)
+    key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
 
-    client.job_completed.emit("comfy-X", _REROLL_HISTORY)
+    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
 
     rows = db.list_generations()
     assert len(rows) == 2
@@ -1359,7 +1359,7 @@ def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
 
-    client.node_executing.emit("comfy-X", "5")  # job is now executing
+    client.node_executing.emit(view._reroll_jobs[key].prompt_id, "5")  # job is now executing
     _reroll_tile(view).cancel_requested.emit()
 
     client.interrupt.assert_called_once()
@@ -1375,10 +1375,11 @@ def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
+    prompt_id = view._reroll_jobs[key].prompt_id
 
     _reroll_tile(view).cancel_requested.emit()  # still queued, not executing
 
-    client.cancel_prompt.assert_called_once_with("comfy-X")
+    client.cancel_prompt.assert_called_once_with(prompt_id)
     client.interrupt.assert_not_called()
     assert key not in view._reroll_jobs
 
@@ -1435,7 +1436,6 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     # that image — both persisted, and the new video links back to the new image.
     db = _seeded_i2v_db(tmp_path)
     client = _reroll_client()
-    client.submit_job = MagicMock(side_effect=["comfy-img", "comfy-vid"])
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
@@ -1448,7 +1448,7 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     assert img_job.workflow.name == "sdxl_t2i"
     assert img_job.params["seed"] != 7  # fresh seed
 
-    client.job_completed.emit("comfy-img", _IMG_REROLL_HISTORY)
+    client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)
 
     # Stage 2: the video now runs on the just-generated image, its own seeds fresh.
     vid_job = view._reroll_jobs[key]
@@ -1456,7 +1456,7 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     assert vid_job.params["input_image"] == "image/sdxl_new.png [output]"
     assert vid_job.params["noise_seed"] != 9 and vid_job.params["seed"] != 3
 
-    client.job_completed.emit("comfy-vid", _VID_REROLL_HISTORY)
+    client.job_completed.emit(vid_job.prompt_id, _VID_REROLL_HISTORY)
 
     assert view._reroll_jobs == {}
     rows = db.list_generations()

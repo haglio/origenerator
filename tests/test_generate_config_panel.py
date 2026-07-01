@@ -16,7 +16,7 @@ SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": 
 @pytest.fixture
 def panel(qtbot, tmp_path):
     client = ComfyUIClient()
-    client.submit_job = lambda payload: "comfy-A"
+    client.submit_job = lambda payload, prompt_id: prompt_id
     db = Database(tmp_path / "test.db")
     p = GenerateConfigPanel(client, db)
     qtbot.addWidget(p)
@@ -36,15 +36,15 @@ def test_generate_inserts_row_and_submits(panel):
     assert len(rows) == 1
     assert rows[0]["workflow_name"] == "sdxl_t2i"
     assert rows[0]["status"] == "running"
+    # We submit under the DB row's own id, so ComfyUI's signals key on the same id.
     assert panel._client_prompt_id == rows[0]["prompt_id"]
-    assert panel._comfy_prompt_id == "comfy-A"
 
 
 def _complete_one(panel, seed=12345, prompt="a cat"):
     """Run one generation to completion so a real prior row exists in the DB."""
     panel._param_form.set_values({"seed": seed, "positive_prompt": prompt})
     panel._on_generate()
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
 
 
 def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkeypatch):
@@ -125,7 +125,7 @@ def _i2v_panel(qtbot, tmp_path, submit):
 
 
 def test_random_input_box_shows_only_for_a_reproducible_input(qtbot, tmp_path):
-    panel, _client, _db = _i2v_panel(qtbot, tmp_path, lambda p: "comfy-A")
+    panel, _client, _db = _i2v_panel(qtbot, tmp_path, lambda *a: "comfy-A")
     box = panel._param_form._image_random_checks["input_image"]
 
     panel._param_form.set_values({"input_image": "hand_placed.png"})  # not a generation
@@ -136,7 +136,7 @@ def test_random_input_box_shows_only_for_a_reproducible_input(qtbot, tmp_path):
 
 
 def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
-    submit = MagicMock(side_effect=["comfy-img", "comfy-vid"])
+    submit = MagicMock(return_value="x")
     panel, client, db = _i2v_panel(qtbot, tmp_path, submit)
     panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
     panel._param_form._image_random_checks["input_image"].setChecked(True)
@@ -147,15 +147,16 @@ def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
     assert panel._input_image_job is not None
     assert panel._input_image_job.workflow.name == "sdxl_t2i"
     assert db.get_generation("img")  # the original source is untouched
+    img_id = panel._input_image_job.prompt_id  # the pre-step's own id ComfyUI runs it under
 
-    client.job_completed.emit("comfy-img", SDXL_HISTORY)  # the image finishes
+    client.job_completed.emit(img_id, SDXL_HISTORY)  # the image finishes
 
     # Stage 2: the fresh image is saved and the video runs on it.
     assert panel._input_image_job is None
     fresh = [r for r in db.list_generations()
              if r["workflow_name"] == "sdxl_t2i" and r["prompt_id"] != "img"]
     assert len(fresh) == 1
-    assert panel._comfy_prompt_id == "comfy-vid"
+    assert panel._client_prompt_id is not None  # the video job is now running
     video = next(r for r in db.list_generations() if r["workflow_name"] == "wan22_i2v")
     params = json.loads(video["params_json"])
     assert params["input_image"] == "a.png [output]"  # the fresh image's output, annotated
@@ -175,7 +176,7 @@ def test_completion_only_handled_for_own_prompt_id(panel):
     assert completed == []
 
     # Our own job's completion is handled.
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(our_id, SDXL_HISTORY)
     row = panel._db.get_generation(our_id)
     assert row["status"] == "completed"
     assert "a.png" in row["output_files"]
@@ -187,7 +188,7 @@ def test_progress_only_moves_for_own_prompt_id(panel):
     panel._on_generate()
     panel._client.progress.emit("comfy-OTHER", 5, 10)
     assert panel._progress.property("barState") == "queued"  # foreign progress ignored
-    panel._client.progress.emit("comfy-A", 5, 10)
+    panel._client.progress.emit(panel._client_prompt_id, 5, 10)
     assert panel._progress.value() == 5
 
 
@@ -199,11 +200,12 @@ def test_progress_bar_accumulates_across_sampler_stages(panel):
     panel._param_form.set_values({"steps": 20})
     panel._on_generate()
 
-    panel._client.progress.emit("comfy-A", 10, 10)   # first pass ends (10 of 20)
+    pid = panel._client_prompt_id
+    panel._client.progress.emit(pid, 10, 10)   # first pass ends (10 of 20)
     assert panel._progress.maximum() == 20
     assert panel._progress.value() == 10
 
-    panel._client.progress.emit("comfy-A", 1, 10)    # second pass restarts at 1
+    panel._client.progress.emit(pid, 1, 10)    # second pass restarts at 1
     assert panel._progress.value() == 11             # continues, not reset to 1
 
 
@@ -221,7 +223,7 @@ def test_bar_stays_queued_until_comfyui_starts_our_prompt(panel):
 
 def test_bar_flips_to_running_when_comfyui_starts_our_prompt(panel):
     panel._on_generate()
-    panel._client.node_executing.emit("comfy-A", "5")  # ComfyUI begins our prompt
+    panel._client.node_executing.emit(panel._client_prompt_id, "5")  # ComfyUI begins our prompt
     assert panel._progress.property("barState") == "running"
     assert "generating" in panel._progress.format().lower()
 
@@ -241,7 +243,7 @@ def test_error_marks_row_for_own_id_only(panel):
     panel._client.job_error.emit("comfy-OTHER", "boom")
     assert panel._db.get_generation(our_id)["status"] == "running"
 
-    panel._client.job_error.emit("comfy-A", "boom")
+    panel._client.job_error.emit(our_id, "boom")
     assert panel._db.get_generation(our_id)["status"] == "error"
     assert panel._generate_btn.isEnabled() is True
 
@@ -251,7 +253,7 @@ def test_completion_uses_workflow_captured_at_submit(panel):
     our_id = panel._client_prompt_id
     # User switches the workflow combo while the job is still running.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(our_id, SDXL_HISTORY)
     row = panel._db.get_generation(our_id)
     # Outputs extracted via sdxl's node (7), not the now-current wan22's node (19).
     assert "a.png" in row["output_files"]
@@ -296,7 +298,7 @@ def test_teardown_stops_handling_signals(panel):
     panel._on_generate()
     our_id = panel._client_prompt_id
     panel.teardown()
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(our_id, SDXL_HISTORY)
     # After teardown the panel ignores the client entirely.
     assert panel._db.get_generation(our_id)["status"] == "running"
 
@@ -408,10 +410,9 @@ def test_on_completed_records_execution_duration(qtbot):
     db = SpyDB()
     panel = _spy_panel(qtbot, db)
     panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfyui-xyz"
     panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
 
-    panel._on_completed("comfyui-xyz", _history_with_duration(15.26))
+    panel._on_completed("p1", _history_with_duration(15.26))
 
     prompt_id, fields = db.updates[-1]
     assert prompt_id == "p1"
@@ -433,10 +434,9 @@ def test_on_completed_status_shows_actual_time(qtbot):
     db = SpyDB()
     panel = _spy_panel(qtbot, db)
     panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfyui-xyz"
     panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
 
-    panel._on_completed("comfyui-xyz", _history_with_duration(905))
+    panel._on_completed("p1", _history_with_duration(905))
 
     assert panel._progress.format() == "Done in 15 min 5 sec"
 
@@ -514,7 +514,7 @@ def test_completion_releases_queue_slot(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
     panel._on_generate()
     panel.run_now()
-    panel._on_completed("comfy-A", SDXL_HISTORY)
+    panel._on_completed(panel._client_prompt_id, SDXL_HISTORY)
     assert queue.released == [panel]
 
 
@@ -526,17 +526,15 @@ def test_set_queue_status_shows_position_and_eta(panel):
 
 def test_completion_colors_the_bar_done(panel):
     panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfy-A"
     panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
-    panel._on_completed("comfy-A", SDXL_HISTORY)
+    panel._on_completed("p1", SDXL_HISTORY)
     assert panel._progress.property("barState") == "done"
 
 
 def test_error_colors_the_bar_red(panel):
     panel._client_prompt_id = "p1"
-    panel._comfy_prompt_id = "comfy-A"
     panel._submitted_workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
-    panel._on_error("comfy-A", "boom")
+    panel._on_error("p1", "boom")
     assert panel._progress.property("barState") == "error"
 
 
@@ -565,7 +563,7 @@ def test_preview_frame_shown_only_for_own_job(panel):
     panel._client.preview_image.emit("comfy-OTHER", b"x")
     panel._preview.show_frame.assert_not_called()
 
-    panel._client.preview_image.emit("comfy-A", b"img-bytes")
+    panel._client.preview_image.emit(panel._client_prompt_id, b"img-bytes")
     panel._preview.show_frame.assert_called_once_with(b"img-bytes")
 
 
@@ -582,7 +580,7 @@ def test_cancel_running_job_interrupts_and_removes_row(panel):
     panel._client.cancel_prompt = MagicMock()
     panel._on_generate()
     our_id = panel._client_prompt_id
-    panel._client.node_executing.emit("comfy-A", "5")  # our job is now executing
+    panel._client.node_executing.emit(our_id, "5")  # our job is now executing
 
     panel._on_cancel()
 
@@ -601,7 +599,7 @@ def test_cancel_submitted_but_unstarted_job_dequeues(panel):
 
     panel._on_cancel()
 
-    panel._client.cancel_prompt.assert_called_once_with("comfy-A")
+    panel._client.cancel_prompt.assert_called_once_with(our_id)
     panel._client.interrupt.assert_not_called()
     assert panel._db.get_generation(our_id) is None
 
@@ -621,7 +619,7 @@ def test_cancel_while_queued_drops_the_queue_slot(qtbot, tmp_path):
 def test_completed_job_cannot_be_canceled(panel):
     panel._client.interrupt = MagicMock()
     panel._on_generate()
-    panel._client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
 
     panel._on_cancel()  # no in-flight job remains
 

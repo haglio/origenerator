@@ -30,6 +30,7 @@ def _started_job(tmp_path):
         client, SDXL, _params(),
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
     )
+    job.prompt_id = "comfy-A"  # pin our id so the client-signal emits below match
     job.start()
     return job, client
 
@@ -49,10 +50,10 @@ def test_persist_generation_saves_a_completed_row_with_its_outputs(qtbot, tmp_pa
     assert row["duration_seconds"] == 12.5
 
 
-def test_start_submits_payload_and_queues(qtbot, tmp_path):
+def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    client.submit_job.assert_called_once_with(job.payload)
-    assert job.comfy_id == "comfy-A"
+    # We submit under our own prompt_id, so ComfyUI's signals key on the same id.
+    client.submit_job.assert_called_once_with(job.payload, "comfy-A")
     assert job.state == "queued"
 
 
@@ -86,6 +87,7 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
         client, wf, {**wf.default_params(), "steps": 20},
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
     )
+    job.prompt_id = "comfy-A"
     job.start()
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
@@ -142,6 +144,7 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     Image.new("RGB", (10, 10), (200, 50, 50)).save(out / "a.png")
     client = _client()
     job = GenerationJob(client, SDXL, _params(), output_dir=out, thumb_dir=tmp_path / "thumbs")
+    job.prompt_id = "comfy-A"
     job.start()
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append((files, thumb, dur)))

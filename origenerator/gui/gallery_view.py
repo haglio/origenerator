@@ -18,7 +18,9 @@ from origenerator.generation_config import merge_denormalized, prepared_params
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.generation_job import GenerationJob, persist_generation
+from origenerator.gui.generation_job import (
+    GenerationJob, insert_generation_row, mark_generation_completed,
+)
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
@@ -495,7 +497,11 @@ class GalleryView(QWidget):
 
     def _launch_reroll(self, key, workflow, params, on_finished):
         """Build, register and submit one re-roll job, wiring its completion to
-        ``on_finished(key, job, files, thumb_path, duration)``."""
+        ``on_finished(key, job, files, thumb_path, duration)``.
+
+        A running row is recorded before the job is submitted so an app restart
+        mid-generation can find it and reconnect, exactly as the Generate tab does.
+        """
         try:
             job = GenerationJob(self._client, workflow, params)
         except Exception as e:
@@ -506,10 +512,13 @@ class GalleryView(QWidget):
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
         job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+        insert_generation_row(self._db, job)
         try:
             job.start()
+            self._db.update_generation(job.prompt_id, status="running")
         except Exception as e:
             logger.warning("Re-roll submission failed for %s: %s", key, e)
+            self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
             self._reroll_jobs.pop(key, None)
         self._rerender_current_leaf()
 
@@ -517,14 +526,15 @@ class GalleryView(QWidget):
         job = self._reroll_jobs.pop(key, None)
         if job is not None:
             job.cancel()
+            self._db.delete_generation(job.prompt_id)  # drop the abandoned running row
         self._rerender_current_leaf()
 
     def _on_image_reroll_finished(self, key, image_job, files, thumb_path, duration,
                                   video_workflow, video_params):
-        """First stage of a chained i2v re-roll: persist the fresh image, then run
+        """First stage of a chained i2v re-roll: finalize the fresh image, then run
         the video on it, pointing its input at the just-saved output."""
         self._reroll_jobs.pop(key, None)
-        self._persist_generation(image_job, files, thumb_path, duration)
+        mark_generation_completed(self._db, image_job.prompt_id, files, thumb_path, duration)
         input_ref = gallery.output_file_reference(files)
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}
@@ -532,16 +542,15 @@ class GalleryView(QWidget):
 
     def _on_reroll_finished(self, key, job, files, thumb_path, duration):
         self._reroll_jobs.pop(key, None)
-        self._persist_generation(job, files, thumb_path, duration)
+        mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.refresh()  # the finished generation now shows as a normal thumbnail
 
     def _on_reroll_failed(self, key, message):
-        self._reroll_jobs.pop(key, None)
+        job = self._reroll_jobs.pop(key, None)
+        if job is not None:
+            self._db.update_generation(job.prompt_id, status="error", error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self._rerender_current_leaf()
-
-    def _persist_generation(self, job, files, thumb_path, duration):
-        persist_generation(self._db, job, files, thumb_path, duration)
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

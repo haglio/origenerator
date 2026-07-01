@@ -1331,7 +1331,26 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
-def test_reroll_completion_persists_a_new_generation(qtbot, tmp_path):
+def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
+    # A re-roll persists a running row the moment it's submitted, so a restart
+    # mid-generation can find it again (reconnect) instead of losing all trace.
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    job = view._reroll_jobs[key]
+    row = db.get_generation(job.prompt_id)  # keyed by the same id ComfyUI runs it under
+    assert row is not None
+    assert row["status"] == "running"
+    assert row["workflow_name"] == "sdxl_t2i"
+    assert gallery.row_output_files(row) == []  # no output yet: stays out of the tree
+
+
+def test_reroll_completion_finalizes_the_running_row(qtbot, tmp_path):
     client = _reroll_client()
     db = _seeded_db(tmp_path, seed=7)
     view = GalleryView(db, client=client)
@@ -1339,16 +1358,47 @@ def test_reroll_completion_persists_a_new_generation(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
+    prompt_id = view._reroll_jobs[key].prompt_id
 
-    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+    client.job_completed.emit(prompt_id, _REROLL_HISTORY)
 
     rows = db.list_generations()
-    assert len(rows) == 2
-    new = next(r for r in rows if r["prompt_id"] != "orig")
+    assert len(rows) == 2  # the running row was updated in place, not duplicated
+    new = db.get_generation(prompt_id)
     assert new["status"] == "completed"
     assert "a.png" in new["output_files"]
     assert new["seed"] != 7
     assert view._reroll_jobs == {}
+
+
+def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    prompt_id = view._reroll_jobs[key].prompt_id
+    assert db.get_generation(prompt_id) is not None
+
+    _reroll_tile(view).cancel_requested.emit()
+
+    assert db.get_generation(prompt_id) is None  # the abandoned run leaves no trace
+
+
+def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    job = view._reroll_jobs[key]
+
+    view._client.job_error.emit(job.prompt_id, "boom")
+
+    assert db.get_generation(job.prompt_id)["status"] == "error"
+    assert key not in view._reroll_jobs
 
 
 def test_cancel_running_reroll_interrupts(qtbot, tmp_path):

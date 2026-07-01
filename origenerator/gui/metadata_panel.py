@@ -9,7 +9,8 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize, QRectF
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
 
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.paths import ensure_shared_ui_on_path
@@ -114,10 +115,53 @@ def _value_widget(item: MetaItem) -> QLabel:
 
 
 def _copy_button(text: str) -> QPushButton:
-    button = QPushButton("Copy")
+    """A small copy-icon button. Empty ``text`` (a field that exists but holds
+    nothing, e.g. a blank prompt) shows the button disabled rather than absent."""
+    button = QPushButton()
     button.setObjectName("copyButton")
-    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setIcon(_copy_icon())
+    button.setIconSize(QSize(14, 14))
     button.setToolTip("Copy to clipboard")
-    button.setStyleSheet("padding: 1px 8px;")
-    button.clicked.connect(lambda: QApplication.clipboard().setText(text))
+    button.setStyleSheet("padding: 2px 6px;")
+    if text:
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.clicked.connect(lambda: QApplication.clipboard().setText(text))
+    else:
+        button.setEnabled(False)
     return button
+
+
+def _copy_icon() -> QIcon:
+    """The familiar two-overlapping-sheets copy glyph, drawn to a pixmap.
+
+    Both sheets are stroked outlines; a gap is cleared around the front sheet so
+    it reads as sitting in front of the back one where they overlap. Qt greys the
+    icon automatically when the button is disabled.
+    """
+    pixmap = QPixmap(64, 64)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    pen = QPen(TEXT_SECONDARY)
+    pen.setWidthF(6)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+
+    back = QRectF(24, 8, 28, 32)    # peeks out up and to the right
+    front = QRectF(12, 24, 28, 32)  # sits in front, down and to the left
+    radius = 6
+
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawRoundedRect(back, radius, radius)
+
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(Qt.GlobalColor.black)
+    painter.drawRoundedRect(front.adjusted(-4, -4, 4, 4), radius + 3, radius + 3)
+
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawRoundedRect(front, radius, radius)
+    painter.end()
+    return QIcon(pixmap)

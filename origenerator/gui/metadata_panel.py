@@ -6,7 +6,8 @@ The section/item model lives in ``origenerator.generation_metadata``.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea,
 )
 from PyQt6.QtCore import Qt
 
@@ -74,37 +75,49 @@ def _build_section(section: MetaSection) -> QWidget:
 
 
 def _build_item(item: MetaItem) -> QWidget:
-    return _labeled_item(item) if item.label else _bare_item(item)
+    """A row of ``[label?] value [copy?]``.
 
-
-def _labeled_item(item: MetaItem) -> QWidget:
+    A labeled item reads ``label: value``; a bare one (prompt, filename) shows
+    the value alone as a quoted block. Either gains a copy-to-clipboard button
+    when the item declares copyable text.
+    """
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(8)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-    label = QLabel(item.label)
-    label.setFixedWidth(_LABEL_WIDTH)
-    label.setStyleSheet(f"color: {_h(TEXT_MUTED)};")
-    label.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-    value = QLabel(item.value)
-    value.setWordWrap(True)
-    value.setTextInteractionFlags(_SELECTABLE)
-    value.setStyleSheet(f"color: {_h(TEXT_SECONDARY)};")
-
-    layout.addWidget(label)
-    layout.addWidget(value, 1)
+    if item.label:
+        layout.addWidget(_label_widget(item.label))
+    layout.addWidget(_value_widget(item), 1)
+    if item.copy is not None:
+        layout.addWidget(_copy_button(item.copy), 0, Qt.AlignmentFlag.AlignTop)
     return row
 
 
-def _bare_item(item: MetaItem) -> QWidget:
+def _label_widget(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setFixedWidth(_LABEL_WIDTH)
+    label.setStyleSheet(f"color: {_h(TEXT_MUTED)};")
+    label.setAlignment(Qt.AlignmentFlag.AlignTop)
+    return label
+
+
+def _value_widget(item: MetaItem) -> QLabel:
     value = QLabel(item.value)
     value.setWordWrap(True)
     value.setTextInteractionFlags(_SELECTABLE)
-    value.setStyleSheet(
-        f"color: {_h(TEXT_SECONDARY)};"
-        f" border-left: 2px solid {_h(BORDER_SUBTLE)}; padding: 1px 0 1px 8px;"
-    )
+    style = f"color: {_h(TEXT_SECONDARY)};"
+    if not item.label:  # a bare value reads as a quoted block, set off by a rule
+        style += f" border-left: 2px solid {_h(BORDER_SUBTLE)}; padding: 1px 0 1px 8px;"
+    value.setStyleSheet(style)
     return value
+
+
+def _copy_button(text: str) -> QPushButton:
+    button = QPushButton("Copy")
+    button.setObjectName("copyButton")
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setToolTip("Copy to clipboard")
+    button.setStyleSheet("padding: 1px 8px;")
+    button.clicked.connect(lambda: QApplication.clipboard().setText(text))
+    return button

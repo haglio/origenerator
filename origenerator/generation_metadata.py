@@ -15,10 +15,15 @@ _PROMPT_KEYS = ("positive_prompt", "negative_prompt")
 @dataclass
 class MetaItem:
     """One line in a section. A blank ``label`` renders as a bare value (prompt
-    text, a filename); a set ``label`` renders as ``label: value``."""
+    text, a filename); a set ``label`` renders as ``label: value``.
+
+    ``copy`` is the text a copy-to-clipboard button offers; ``None`` means the
+    item has nothing worth copying and so shows no button.
+    """
 
     label: str
     value: str
+    copy: str | None = None
 
 
 @dataclass
@@ -27,11 +32,18 @@ class MetaSection:
     items: list[MetaItem]
 
 
+def _seed_item(row: dict) -> MetaItem:
+    seed = row.get("seed")
+    if seed is None:
+        return MetaItem("Seed", "N/A")
+    return MetaItem("Seed", str(seed), copy=str(seed))
+
+
 def _details(row: dict) -> MetaSection:
     items = [
         MetaItem("Status", str(row.get("status", ""))),
         MetaItem("Source", str(row.get("source", "generated"))),
-        MetaItem("Seed", str(row.get("seed", "N/A"))),
+        _seed_item(row),
         MetaItem("Created", str(row.get("created_at", ""))),
     ]
     duration = row.get("duration_seconds")
@@ -41,7 +53,8 @@ def _details(row: dict) -> MetaSection:
 
 
 def _prompt(title: str, text: str | None) -> MetaSection:
-    return MetaSection(title, [MetaItem("", text or "(empty)")])
+    item = MetaItem("", text, copy=text) if text else MetaItem("", "(empty)")
+    return MetaSection(title, [item])
 
 
 def _parameters(row: dict) -> MetaSection | None:
@@ -62,7 +75,7 @@ def _output_path(file: dict) -> str:
 
 def _output_files(row: dict) -> MetaSection | None:
     items = [
-        MetaItem("", _output_path(f))
+        MetaItem("", _output_path(f), copy=f["filename"])
         for f in gallery.row_output_files(row)
         if f.get("filename")
     ]

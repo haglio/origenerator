@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.completion import extract_completion
 from origenerator.db import Database
 from origenerator.gallery import (
     config_tab_title, media_type_of_row, output_file_reference,
@@ -22,12 +23,7 @@ from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.progress import ProgressTracker
-from origenerator.thumbnail import generate_thumbnail
-from origenerator.timing import (
-    estimate_label,
-    execution_duration_seconds,
-    format_duration,
-)
+from origenerator.timing import estimate_label, format_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 
@@ -469,27 +465,19 @@ class GenerateConfigPanel(QWidget):
         wf = self._submitted_workflow
         if not wf:
             return
-        files = wf.extract_output_info(history_data)
-
-        thumb_path = None
+        files, thumb_path, duration = extract_completion(
+            wf, history_data, COMFYUI_OUTPUT_DIR, THUMB_DIR, self._client_prompt_id
+        )
         if files:
-            first = files[0]
-            subfolder = first.get("subfolder", "")
-            source = COMFYUI_OUTPUT_DIR / subfolder / first["filename"]
+            source = COMFYUI_OUTPUT_DIR / files[0].get("subfolder", "") / files[0]["filename"]
             if source.exists():
-                THUMB_DIR.mkdir(parents=True, exist_ok=True)
-                thumb_path = str(generate_thumbnail(
-                    source, wf.output_type, THUMB_DIR, name=self._client_prompt_id
-                ))
                 self._preview.show_media(source, wf.output_type)
 
-        now = datetime.now(timezone.utc).isoformat()
-        duration = execution_duration_seconds(history_data)
         fields = dict(
             status="completed",
             output_files=json.dumps(files),
             thumbnail_path=thumb_path,
-            completed_at=now,
+            completed_at=datetime.now(timezone.utc).isoformat(),
         )
         if duration is not None:
             fields["duration_seconds"] = duration

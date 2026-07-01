@@ -15,10 +15,9 @@ from datetime import datetime, timezone
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.progress import ProgressTracker
-from origenerator.thumbnail import generate_thumbnail
-from origenerator.timing import execution_duration_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -222,17 +221,11 @@ class GenerationJob(QObject):
         if self._state not in ("queued", "running"):
             return
         self._detach()
-        files = self.workflow.extract_output_info(history_data)
-        try:
-            thumb = self._make_thumbnail(files)
-        except Exception as e:
-            logger.warning("Thumbnail step failed for %s: %s", self.prompt_id, e)
-            thumb = None
-        try:
-            duration = execution_duration_seconds(history_data)
-        except Exception as e:
-            logger.warning("Duration parse failed for %s: %s", self.prompt_id, e)
-            duration = None
+        # Thumbnail and duration are best-effort inside extract_completion — a
+        # failure in either yields None rather than stranding a real completion.
+        files, thumb, duration = extract_completion(
+            self.workflow, history_data, self._output_dir, self._thumb_dir, self.prompt_id
+        )
         self._state = "finished"
         self.finished.emit(files, thumb, duration)
 
@@ -242,20 +235,3 @@ class GenerationJob(QObject):
         self._detach()
         self._state = "failed"
         self.failed.emit(message)
-
-    def _make_thumbnail(self, files: list) -> str | None:
-        if not files:
-            return None
-        first = files[0]
-        source = self._output_dir / first.get("subfolder", "") / first["filename"]
-        if not source.exists():
-            return None
-        try:
-            self._thumb_dir.mkdir(parents=True, exist_ok=True)
-            return str(generate_thumbnail(
-                source, self.workflow.output_type, self._thumb_dir,
-                name=self.prompt_id,
-            ))
-        except Exception as e:
-            logger.warning("Thumbnail generation failed for %s: %s", source, e)
-            return None

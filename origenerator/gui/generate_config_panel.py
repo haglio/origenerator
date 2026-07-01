@@ -313,7 +313,11 @@ class GenerateConfigPanel(QWidget):
             self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
             self._preview.clear()  # a fresh job: drop the previous result
-            self._show_running()
+            # The job is submitted but ComfyUI may be busy (even with work from
+            # outside Origenerator), so it can sit in the server queue before it
+            # starts. Show that wait instead of a stuck "Generating… 0%"; the bar
+            # flips to running once ComfyUI actually begins our prompt.
+            self._show_waiting("Queued on ComfyUI…")
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))
@@ -341,23 +345,37 @@ class GenerateConfigPanel(QWidget):
         """
         return self._comfy_prompt_id is not None and prompt_id == self._comfy_prompt_id
 
+    def _mark_running(self):
+        """React to the first sign ComfyUI is actually working our prompt.
+
+        Any of executing / progress / preview means our prompt has left the
+        server queue and started, so (once) flip the bar from "Queued on
+        ComfyUI…" to the running state and record that Cancel must now interrupt
+        the run rather than merely dequeue it.
+        """
+        if not self._executing:
+            self._executing = True
+            self._show_running()
+
     def _on_progress(self, prompt_id: str, value: int, max_val: int):
         if not self._is_mine(prompt_id):
             return
+        self._mark_running()
         if max_val > 0:
             self._progress.setRange(0, max_val)
             self._progress.setValue(value)
 
     def _on_node_executing(self, prompt_id: str, _node_id: str):
         # ComfyUI has begun running our prompt (vs. it merely sitting in the
-        # server queue, behind e.g. a gallery re-roll). This decides whether
-        # Cancel interrupts the run or just dequeues it. ``executing`` precedes
-        # any ``progress`` for the prompt, so it's the earliest signal we get.
+        # server queue, behind e.g. a gallery re-roll or work from outside
+        # Origenerator). ``executing`` precedes any ``progress`` for the prompt,
+        # so it's the earliest signal that our turn has come.
         if self._is_mine(prompt_id):
-            self._executing = True
+            self._mark_running()
 
     def _on_preview(self, prompt_id: str, data: bytes):
         if self._is_mine(prompt_id):
+            self._mark_running()
             self._preview.show_frame(data)
 
     def _on_completed(self, prompt_id: str, history_data: dict):

@@ -124,9 +124,36 @@ def test_completion_only_handled_for_own_prompt_id(panel):
 def test_progress_only_moves_for_own_prompt_id(panel):
     panel._on_generate()
     panel._client.progress.emit("comfy-OTHER", 5, 10)
-    assert panel._progress.value() == 0
+    assert panel._progress.property("barState") == "queued"  # foreign progress ignored
     panel._client.progress.emit("comfy-A", 5, 10)
     assert panel._progress.value() == 5
+
+
+# ---- server-side queue (ComfyUI busy with work from outside Origenerator) ----
+
+
+def test_bar_stays_queued_until_comfyui_starts_our_prompt(panel):
+    # ComfyUI may be busy with a prompt submitted outside Origenerator, so ours
+    # can sit in the server's queue before it starts. Until then the bar reads
+    # "queued", not a stuck "Generating… 0%".
+    panel._on_generate()
+    assert panel._progress.property("barState") == "queued"
+    assert "queued" in panel._progress.format().lower()
+
+
+def test_bar_flips_to_running_when_comfyui_starts_our_prompt(panel):
+    panel._on_generate()
+    panel._client.node_executing.emit("comfy-A", "5")  # ComfyUI begins our prompt
+    assert panel._progress.property("barState") == "running"
+    assert "generating" in panel._progress.format().lower()
+
+
+def test_foreign_prompt_starting_leaves_our_bar_queued(panel):
+    # If a sibling job (or outside work) starting flipped us to "running", we'd be
+    # back to a bar that claims it's generating while still stuck in the queue.
+    panel._on_generate()
+    panel._client.node_executing.emit("comfy-OTHER", "5")
+    assert panel._progress.property("barState") == "queued"
 
 
 def test_error_marks_row_for_own_id_only(panel):

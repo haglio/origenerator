@@ -8,8 +8,10 @@ plain Qt signals. It owns no database or widget state; the caller decides what
 to persist and how to display it.
 """
 
+import json
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -19,6 +21,36 @@ from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
 logger = logging.getLogger(__name__)
+
+
+def persist_generation(db, job, files, thumb_path, duration):
+    """Record a finished :class:`GenerationJob` as a completed generation.
+
+    Inserts the job's config, then marks it completed with its output files,
+    thumbnail and (when known) duration. Shared by the gallery re-roll and the
+    Generate tab's random-input step — each produces a generation the app must
+    save exactly as if it had been generated through a panel.
+    """
+    params = job.params
+    db.insert_generation(
+        prompt_id=job.prompt_id,
+        workflow_name=job.workflow.name,
+        workflow_version=job.workflow.version,
+        positive_prompt=params.get("positive_prompt", ""),
+        negative_prompt=params.get("negative_prompt", ""),
+        seed=params.get("seed"),
+        params_json=json.dumps(params),
+        workflow_json=json.dumps(job.payload),
+    )
+    fields = dict(
+        status="completed",
+        output_files=json.dumps(files),
+        thumbnail_path=thumb_path,
+        completed_at=datetime.now(timezone.utc).isoformat(),
+    )
+    if duration is not None:
+        fields["duration_seconds"] = duration
+    db.update_generation(job.prompt_id, **fields)
 
 
 class GenerationJob(QObject):

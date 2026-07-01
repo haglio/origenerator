@@ -200,14 +200,15 @@ def _unannotated(image_ref: str) -> str:
     return stem if stem and tag in _TYPE_ANNOTATION else image_ref
 
 
-def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
-    """Return the prompt_id of the image used as this row's ``input_image``.
+def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
+    """The prompt_id of the image generation an ``input_image`` value names.
 
     Image-to-video rows reference their start frame by filename; match it to an
-    image generation by basename. Returns ``None`` when the row has no input
-    image or none of ``image_rows`` produced a file with that name.
+    image generation by basename (through any ``[output]`` annotation). ``None``
+    when the value is empty or none of ``image_rows`` produced a file with that
+    name. Takes the bare value so the Generate tab — which has the field, not a
+    stored row — can resolve it the same way :func:`find_source_image_id` does.
     """
-    input_image = parse_params(row.get("params_json")).get("input_image")
     if not input_image:
         return None
     target = _basename(_unannotated(input_image)).lower()
@@ -216,6 +217,18 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
             if _basename(f.get("filename", "")).lower() == target:
                 return image["prompt_id"]
     return None
+
+
+def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
+    """Return the prompt_id of the image used as this row's ``input_image``.
+
+    Image-to-video rows reference their start frame by filename; match it to an
+    image generation by basename. Returns ``None`` when the row has no input
+    image or none of ``image_rows`` produced a file with that name.
+    """
+    return source_image_id_for(
+        parse_params(row.get("params_json")).get("input_image"), image_rows
+    )
 
 
 def output_file_reference(files: list[dict]) -> str | None:

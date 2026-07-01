@@ -126,3 +126,17 @@ def randomize_seeds(params: dict, seed_keys) -> dict:
     for key in seed_keys:
         out[key] = random.randint(0, _SEED_MAX)
     return out
+
+
+def prepared_params(row: dict, workflow) -> dict:
+    """A stored row's params readied to generate a fresh variation of it.
+
+    Its recorded params, with any the row didn't carry filled from the workflow's
+    defaults (imports keep only sparse metadata), then every seed re-rolled — the
+    common preparation a gallery re-roll and a Generate-tab random input both run
+    before rebuilding a payload.
+    """
+    params = merge_denormalized(row)
+    for key, value in workflow.default_params().items():
+        params.setdefault(key, value)
+    return randomize_seeds(params, workflow.seed_keys())

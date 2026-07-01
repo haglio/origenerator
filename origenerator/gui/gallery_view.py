@@ -1,6 +1,4 @@
-import json
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -16,11 +14,11 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.generation_config import merge_denormalized, randomize_seeds
+from origenerator.generation_config import merge_denormalized, prepared_params
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.generation_job import GenerationJob
+from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
@@ -467,7 +465,7 @@ class GalleryView(QWidget):
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
             return
-        params = self._reroll_params(row, workflow)
+        params = prepared_params(row, workflow)
         # An i2v whose input image is itself a re-buildable generation re-rolls
         # that image first (fresh start frame), then runs the video on it; any
         # other row just re-rolls its one workflow with the same input, as before.
@@ -476,22 +474,13 @@ class GalleryView(QWidget):
             self._launch_reroll(key, workflow, params, self._on_reroll_finished)
             return
         source_row, image_workflow = source
-        image_params = self._reroll_params(source_row, image_workflow)
+        image_params = prepared_params(source_row, image_workflow)
         self._launch_reroll(
             key, image_workflow, image_params,
             lambda k, job, files, thumb, dur: self._on_image_reroll_finished(
                 k, job, files, thumb, dur, workflow, params
             ),
         )
-
-    def _reroll_params(self, row: dict, workflow) -> dict:
-        """A row's params readied for a re-roll: filled from the workflow's
-        defaults (imports keep only sparse metadata) — the same merge the Generate
-        tab does — then re-rolled to a fresh seed."""
-        params = merge_denormalized(row)
-        for param_key, value in workflow.default_params().items():
-            params.setdefault(param_key, value)
-        return randomize_seeds(params, workflow.seed_keys())
 
     def _reroll_source_image(self, row: dict):
         """The image generation ``row``'s input image came from, paired with its
@@ -552,26 +541,7 @@ class GalleryView(QWidget):
         self._rerender_current_leaf()
 
     def _persist_generation(self, job, files, thumb_path, duration):
-        workflow, params = job.workflow, job.params
-        self._db.insert_generation(
-            prompt_id=job.prompt_id,
-            workflow_name=workflow.name,
-            workflow_version=workflow.version,
-            positive_prompt=params.get("positive_prompt", ""),
-            negative_prompt=params.get("negative_prompt", ""),
-            seed=params.get("seed"),
-            params_json=json.dumps(params),
-            workflow_json=json.dumps(job.payload),
-        )
-        fields = dict(
-            status="completed",
-            output_files=json.dumps(files),
-            thumbnail_path=thumb_path,
-            completed_at=datetime.now(timezone.utc).isoformat(),
-        )
-        if duration is not None:
-            fields["duration_seconds"] = duration
-        self._db.update_generation(job.prompt_id, **fields)
+        persist_generation(self._db, job, files, thumb_path, duration)
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

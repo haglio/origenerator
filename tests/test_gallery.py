@@ -17,6 +17,7 @@ from origenerator.gallery import (
     row_output_files,
     rows_under,
     settings_signature,
+    source_image_id_for,
 )
 
 
@@ -186,6 +187,17 @@ def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
         params_json=json.dumps({"input_image": "sdxl_t2i_00007_.png"}),
     )
     assert find_source_image_id(video, [image, other_image]) == "img-1"
+
+
+def test_source_image_id_for_resolves_a_bare_input_value():
+    # The Generate tab knows only the input_image value (not a whole row), yet
+    # must resolve it the same way — through the "[output]" annotation too.
+    image = _row(prompt_id="img-1", workflow_name="sdxl_t2i",
+                 output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
+                                           "subfolder": "image"}]))
+    assert source_image_id_for("image/sdxl_t2i_00007_.png [output]", [image]) == "img-1"
+    assert source_image_id_for("", [image]) is None
+    assert source_image_id_for("elsewhere.png", [image]) is None
 
 
 def test_find_source_image_matches_through_an_output_annotation():

@@ -4,12 +4,23 @@ from origenerator.generation_config import (
     ConfigSnapshot,
     find_duplicate_generation,
     merge_denormalized,
+    prepared_params,
     randomize_seeds,
 )
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def _snapshot(workflow="sdxl_t2i", params=None, seed_is_random=False):
     return ConfigSnapshot(workflow, params or {}, seed_is_random)
+
+
+def test_prepared_params_fills_defaults_and_rerolls_seeds():
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    row = {"params_json": json.dumps({"positive_prompt": "a cat", "seed": 5})}
+    params = prepared_params(row, wf)
+    assert params["positive_prompt"] == "a cat"                       # kept from the row
+    assert params["checkpoint"] == wf.default_params()["checkpoint"]  # filled from defaults
+    assert params["seed"] != 5                                         # re-rolled
 
 
 def _row(workflow="sdxl_t2i", params=None, status="completed", **extra):

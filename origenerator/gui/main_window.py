@@ -1,3 +1,4 @@
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 from PyQt6.QtGui import QIcon
 
@@ -19,6 +20,7 @@ _GENERATE_TABS_KEY = "generate_tabs"
 _GALLERY_FOLDER_KEY = "gallery_folder"
 _GALLERY_SELECTION_KEY = "gallery_selection"
 _ACTIVE_TAB_KEY = "active_tab"
+_MAXIMIZED_KEY = "maximized"
 
 
 class OrigeneratorWindow(QMainWindow):
@@ -50,7 +52,10 @@ class OrigeneratorWindow(QMainWindow):
         self._tabs.setCurrentWidget(self._generate_view)
 
     def _restore_session(self):
-        """Reopen the Generate subtabs, Gallery folder, and active tab."""
+        """Reopen the Generate subtabs, Gallery folder, and active tab, and
+        remaximize if the window was maximized when it was last closed."""
+        if self._app_state.get(_MAXIMIZED_KEY):
+            self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
         tabs = self._app_state.get(_GENERATE_TABS_KEY)
         if tabs:
             self._generate_view.restore_state(tabs)
@@ -66,5 +71,6 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())
         self._app_state.set(_ACTIVE_TAB_KEY, self._tabs.currentIndex())
+        self._app_state.set(_MAXIMIZED_KEY, self.isMaximized())
         self._app_state.save()
         super().closeEvent(event)

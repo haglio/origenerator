@@ -95,3 +95,26 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
     win.close()  # fires closeEvent
 
     assert AppState(path).get("gallery_selection") == "xyz"
+
+
+def test_restores_maximized_state_from_app_state(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("maximized", True)
+    win = _window(qtbot, tmp_path, state)
+    assert win.isMaximized()
+
+
+def test_default_window_is_not_maximized(qtbot, tmp_path):
+    # With no saved state (a first launch), the window opens at its normal size.
+    win = _window(qtbot, tmp_path)
+    assert not win.isMaximized()
+
+
+def test_close_event_persists_maximized_state(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.showMaximized()
+
+    win.close()  # fires closeEvent
+
+    assert AppState(path).get("maximized") is True

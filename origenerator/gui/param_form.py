@@ -1,7 +1,7 @@
 import random
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QWidget, QFormLayout, QHBoxLayout,
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
     QComboBox, QPushButton,
 )
@@ -29,39 +29,55 @@ class ParamForm(QWidget):
         self._build(param_defs)
 
     def _build(self, defs: list[ParamDef]):
-        layout = QVBoxLayout(self)
+        layout = QFormLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
+        layout.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
+        )
+        # Let the label column size itself to the widest label (at the app's
+        # font) and the inputs take the rest, so no text is clipped.
+        layout.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
 
         for pd in defs:
-            row = QHBoxLayout()
-            label = QLabel(pd.label)
-            label.setFixedWidth(120)
-            label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
-            row.addWidget(label)
-
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             self._wire_changed(widget)
-            row.addWidget(widget, 1)
+            layout.addRow(pd.label, self._field_cell(pd, widget))
 
-            if pd.type == "seed":
-                cb = CheckBox("Random")
-                cb.setChecked(True)
-                cb.toggled.connect(self.changed)
-                self._randomize_checks[pd.key] = cb
-                row.addWidget(cb)
+    def _field_cell(self, pd: ParamDef, widget: QWidget):
+        """The input, optionally paired with a trailing control.
 
-            if pd.type == "image":
-                browse = QPushButton("Browse...")
-                browse.setFixedWidth(80)
-                browse.clicked.connect(
-                    lambda _checked=False, key=pd.key: self._browse_image(key)
-                )
-                self._browse_buttons[pd.key] = browse
-                row.addWidget(browse)
+        Seeds carry a Random checkbox and image fields a Browse button; each
+        sits to the right of the input in a shared cell so the label column
+        stays aligned across every row.
+        """
+        extra = self._make_extra(pd)
+        if extra is None:
+            return widget
+        cell = QHBoxLayout()
+        cell.setContentsMargins(0, 0, 0, 0)
+        cell.addWidget(widget, 1)
+        cell.addWidget(extra)
+        return cell
 
-            layout.addLayout(row)
+    def _make_extra(self, pd: ParamDef) -> QWidget | None:
+        if pd.type == "seed":
+            cb = CheckBox("Random")
+            cb.setChecked(True)
+            cb.toggled.connect(self.changed)
+            self._randomize_checks[pd.key] = cb
+            return cb
+        if pd.type == "image":
+            browse = QPushButton("Browse...")
+            browse.clicked.connect(
+                lambda _checked=False, key=pd.key: self._browse_image(key)
+            )
+            self._browse_buttons[pd.key] = browse
+            return browse
+        return None
 
     def _browse_image(self, key: str):
         dialog = ImagePickerDialog(self)

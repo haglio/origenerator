@@ -1,8 +1,64 @@
 import pytest
 
+from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
+
 from origenerator.workflows.base import ParamDef
+from origenerator.gui.stylesheet import build_stylesheet
 from shared_ui.check_box import CheckBox
+from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from origenerator.gui.param_form import ParamForm
+
+
+def test_field_labels_fit_the_heading_font(qtbot):
+    """A long label must not have its first characters lopped off.
+
+    The form runs at the app's heading font, and labels like "LoRA Strength
+    (High)" are wider than the old fixed 120px column; right-aligned, the
+    overflow used to clip the *start* of the text. The label column must size
+    itself to the widest label instead.
+    """
+    label_text = "LoRA Strength (High)"
+    form = ParamForm([
+        ParamDef("lora_strength_high", label_text, "float", 1.0,
+                 min_val=0.0, max_val=2.0, step=0.05),
+    ])
+    form.setFont(make_font(FONT_UI, SIZE_HEADING))
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+
+    label = next(w for w in form.findChildren(QLabel) if w.text() == label_text)
+    assert label.width() >= label.fontMetrics().horizontalAdvance(label_text)
+
+
+def test_browse_button_fits_its_caption(qtbot):
+    """The Browse button must show its whole caption, not a clipped "B".
+
+    At the heading font, with the stylesheet's horizontal padding, "Browse..."
+    is wider than the old fixed 80px width. The button must size to its content
+    — matching a reference button under the same font and stylesheet.
+    """
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    form.setStyleSheet(build_stylesheet())
+    form.setFont(make_font(FONT_UI, SIZE_HEADING))
+    qtbot.addWidget(form)
+    form.resize(800, 200)  # a roomy panel, as the form has in the real window
+    form.show()
+    qtbot.waitExposed(form)
+
+    # The width "Browse..." needs at this font + stylesheet. The sheet lives on
+    # an ancestor (as it does on the real window), which Qt's sizing accounts
+    # for slightly differently than a sheet set on the button itself.
+    gauge = QWidget()
+    gauge.setStyleSheet(build_stylesheet())
+    gauge.setFont(make_font(FONT_UI, SIZE_HEADING))
+    reference = QPushButton("Browse...", gauge)
+    qtbot.addWidget(gauge)
+    gauge.show()
+    qtbot.waitExposed(gauge)
+
+    btn = form._browse_buttons["input_image"]
+    assert btn.width() >= reference.sizeHint().width()
 
 
 def test_seed_random_control_is_the_ticked_checkbox(qtbot):

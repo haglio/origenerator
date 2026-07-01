@@ -25,6 +25,7 @@ from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.navigation import NavigationHistory
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -85,8 +86,10 @@ class GalleryView(QWidget):
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
+        self._history = NavigationHistory()  # back/forward across viewed generations
         self._build_ui()
         self._sync_undo_button()
+        self._sync_nav_buttons()
         # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
         # Neither keyPressEvent nor a shortcut delivered the key in the running
         # app — a clicked thumbnail's key press never reached the view through
@@ -154,12 +157,16 @@ class GalleryView(QWidget):
         self._tree.itemChanged.connect(self._commit_inline_rename)
         self._panes.addWidget(self._tree)
 
-        # Browser pane: a header (folder title + Undo) over the flowing contents.
-        # Double-clicking the title renames the selected folder in place.
+        # Browser pane: a header (back/forward, folder title, Undo) over the
+        # flowing contents. Double-clicking the title renames the folder in place.
         browser = QWidget()
         browser_box = QVBoxLayout(browser)
         browser_box.setContentsMargins(0, 0, 0, 0)
         header = QHBoxLayout()
+        self._back_btn = self._nav_button("←", "Back", self._go_back)
+        header.addWidget(self._back_btn, 0, Qt.AlignmentFlag.AlignTop)
+        self._forward_btn = self._nav_button("→", "Forward", self._go_forward)
+        header.addWidget(self._forward_btn, 0, Qt.AlignmentFlag.AlignTop)
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
@@ -219,6 +226,13 @@ class GalleryView(QWidget):
         self._panes.setSizes([220, 560, 440])
 
         layout.addWidget(self._panes)
+
+    def _nav_button(self, label: str, tooltip: str, handler) -> QPushButton:
+        btn = QPushButton(label)
+        btn.setToolTip(tooltip)
+        btn.setFixedWidth(32)
+        btn.clicked.connect(handler)
+        return btn
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -630,6 +644,7 @@ class GalleryView(QWidget):
     def _thumbnail_clicked(self, prompt_id: str):
         self._apply_selection(prompt_id, QApplication.keyboardModifiers())
         self._on_thumbnail_clicked(prompt_id)
+        self._record_visit(prompt_id)
 
     def _apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.
@@ -874,10 +889,38 @@ class GalleryView(QWidget):
             self._preview.show_media(*preview)
 
     def _on_source_link(self, prompt_id: str):
+        self._show_generation(prompt_id)
+        self._record_visit(prompt_id)
+
+    # --- back/forward navigation ------------------------------------------
+
+    def _show_generation(self, prompt_id: str):
+        """Select a generation and its folder — the move Back/Forward and a link
+        both make, minus the history bookkeeping the recording callers add."""
         leaf = self._leaf_by_id.get(prompt_id)
         if leaf is not None:
             self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
         self._on_thumbnail_clicked(prompt_id)
+
+    def _record_visit(self, prompt_id: str):
+        self._history.visit(prompt_id)
+        self._sync_nav_buttons()
+
+    def _go_back(self):
+        prompt_id = self._history.back()
+        if prompt_id is not None:
+            self._show_generation(prompt_id)
+        self._sync_nav_buttons()
+
+    def _go_forward(self):
+        prompt_id = self._history.forward()
+        if prompt_id is not None:
+            self._show_generation(prompt_id)
+        self._sync_nav_buttons()
+
+    def _sync_nav_buttons(self):
+        self._back_btn.setEnabled(self._history.can_go_back())
+        self._forward_btn.setEnabled(self._history.can_go_forward())
 
     def _clear_metadata(self):
         self._selected = None

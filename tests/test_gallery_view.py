@@ -367,6 +367,55 @@ def test_i2v_input_image_links_to_source_image_and_navigates(qtbot):
     assert not any("href=" in t for t in _meta_link_texts(view))
 
 
+def test_back_and_forward_walk_the_viewed_generations(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._thumbnail_clicked("i1")
+    view._thumbnail_clicked("i2")
+    assert view._selected["prompt_id"] == "i2"
+
+    view._go_back()
+    assert view._selected["prompt_id"] == "i1"
+    view._go_forward()
+    assert view._selected["prompt_id"] == "i2"
+
+
+def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
+    image = _image("img1", "a cat", 50, 1)
+    video = _row("vid1", "wan22_i2v",
+                 {"positive_prompt": "dance", "seed": 5,
+                  "input_image": "sdxl_t2i_img1.png"},
+                 "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([video, image]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._thumbnail_clicked("vid1")   # viewing the video
+    view._on_source_link("img1")      # follow its input-image link
+
+    assert view._selected["prompt_id"] == "img1"
+    view._go_back()
+    assert view._selected["prompt_id"] == "vid1"
+
+
+def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
+
+    view._thumbnail_clicked("i1")
+    view._thumbnail_clicked("i2")
+    assert view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
+
+    view._go_back()
+    assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
+
+
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

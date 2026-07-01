@@ -12,7 +12,9 @@ from origenerator.gallery import (
     model_label,
     model_signature,
     output_disk_files,
+    output_file_reference,
     resolve_preview,
+    row_output_files,
     rows_under,
     settings_signature,
 )
@@ -78,6 +80,17 @@ def test_settings_signature_ignores_seeds_but_keeps_other_params():
     assert settings_signature(a) == settings_signature(b)
     # A real setting differs -> different signature.
     assert settings_signature(a) != settings_signature(c)
+
+
+def test_settings_signature_ignores_input_image_like_a_seed():
+    # An i2v re-roll regenerates its input image, so two videos that differ only
+    # by their (freshly generated) input image are the same recipe and belong in
+    # one settings folder — input_image is instance-level, like the seed.
+    a = json.dumps({"steps": 20, "input_image": "img_a.png", "seed": 1})
+    b = json.dumps({"steps": 20, "input_image": "image/img_b.png [output]", "seed": 2})
+    c = json.dumps({"steps": 30, "input_image": "img_a.png", "seed": 1})
+    assert settings_signature(a) == settings_signature(b)  # only the image/seed differ
+    assert settings_signature(a) != settings_signature(c)  # a real setting differs
 
 
 def test_settings_signature_tolerates_missing_or_invalid_params():
@@ -173,6 +186,57 @@ def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
         params_json=json.dumps({"input_image": "sdxl_t2i_00007_.png"}),
     )
     assert find_source_image_id(video, [image, other_image]) == "img-1"
+
+
+def test_find_source_image_matches_through_an_output_annotation():
+    # A re-rolled i2v references its freshly generated input by an annotated
+    # output path ("subfolder/name [output]"); the link must still resolve it
+    # back to the image generation by basename.
+    image = _row(
+        prompt_id="img-1",
+        workflow_name="sdxl_t2i",
+        output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
+                                  "subfolder": "image"}]),
+    )
+    video = _row(
+        prompt_id="vid-1",
+        workflow_name="wan22_i2v",
+        params_json=json.dumps(
+            {"input_image": "image/sdxl_t2i_00007_.png [output]"}
+        ),
+    )
+    assert find_source_image_id(video, [image]) == "img-1"
+
+
+def test_output_file_reference_annotates_the_first_output_for_loadimage():
+    # A generation's saved file lives in the output dir; LoadImage resolves it
+    # only when the reference carries its subfolder and an "[output]" tag.
+    files = [{"filename": "sdxl_t2i_00007_.png", "subfolder": "image",
+              "type": "output"}]
+    assert output_file_reference(files) == "image/sdxl_t2i_00007_.png [output]"
+
+
+def test_output_file_reference_without_subfolder_defaults_to_output():
+    assert output_file_reference([{"filename": "img.png"}]) == "img.png [output]"
+
+
+def test_output_file_reference_is_none_when_no_usable_file():
+    assert output_file_reference([]) is None
+    assert output_file_reference([{"subfolder": "image"}]) is None  # no filename
+
+
+def test_output_reference_round_trips_back_to_its_source_image():
+    # The reference a re-roll writes into a video's input_image must resolve back
+    # to the very image it was built from — the contract between the two helpers.
+    image = _row(
+        prompt_id="img-1", workflow_name="sdxl_t2i",
+        output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
+                                  "subfolder": "image", "type": "output"}]),
+    )
+    ref = output_file_reference(row_output_files(image))
+    video = _row(prompt_id="vid", workflow_name="wan22_i2v",
+                 params_json=json.dumps({"input_image": ref}))
+    assert find_source_image_id(video, [image]) == "img-1"
 
 
 def test_find_source_image_returns_none_without_a_match():

@@ -472,8 +472,9 @@ class GenerateConfigPanel(QWidget):
         """The gallery settings-folder this config maps to: (workflow, signature).
 
         The signature mirrors how a generation is stored — the form values plus
-        the workflow's non-form defaults, minus seeds — so it matches the folder
-        this tab's outputs land in, and groups reruns that differ only by seed.
+        the workflow's non-form defaults, minus per-instance keys (seeds and the
+        i2v input image) — so it matches the folder this tab's outputs land in,
+        and groups reruns that differ only by those.
         ``None`` when no workflow is selected.
         """
         key = self._workflow_combo.currentData()

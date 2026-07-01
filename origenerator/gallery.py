@@ -2,7 +2,8 @@
 
 The gallery view organizes generations as nested folders:
 media type (Images/Videos) -> workflow -> model -> [LoRA] -> settings group
-(rows sharing every setting except the seed). A workflow's runs split by which
+(rows sharing every setting except per-instance ones: the seed and, for i2v, the
+input image, since a re-roll regenerates it). A workflow's runs split by which
 model produced them, since the same workflow can yield dramatically different
 output per model; a workflow that declares LoRA keys splits once more, by LoRA,
 beneath each model — so variants that share a base model but differ in LoRA land
@@ -18,9 +19,12 @@ from pathlib import Path
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.workflows import WORKFLOW_REGISTRY
 
-# Params that vary the output without changing its "settings" — collapsed so
-# reruns that differ only by seed land in the same folder.
-SEED_KEYS = frozenset({"seed", "noise_seed"})
+# Params that identify a specific instance of a recipe rather than the recipe
+# itself — collapsed so reruns that differ only in these land in one folder.
+# Seeds vary the sampling noise; ``input_image`` names an i2v's start frame, and
+# a re-roll regenerates that image, so two videos differing only by their
+# (freshly generated) input image are still the same recipe and belong together.
+INSTANCE_KEYS = frozenset({"seed", "noise_seed", "input_image"})
 
 MEDIA_LABELS = {"image": "Images", "video": "Videos"}
 
@@ -40,12 +44,14 @@ def parse_params(params_json: str | None) -> dict:
 
 
 def settings_only(params: dict) -> dict:
-    """The params that define a settings group — everything except seeds."""
-    return {k: v for k, v in params.items() if k not in SEED_KEYS}
+    """The params that define a settings group — everything except the keys that
+    only pick a specific instance of it (seeds and the i2v input image)."""
+    return {k: v for k, v in params.items() if k not in INSTANCE_KEYS}
 
 
 def settings_signature(params_json: str | None) -> str:
-    """Canonical key for grouping: the params minus seeds, order-independent."""
+    """Canonical key for grouping: the params minus per-instance keys (seeds and
+    the i2v input image), order-independent."""
     return json.dumps(settings_only(parse_params(params_json)), sort_keys=True)
 
 
@@ -183,6 +189,17 @@ def _basename(path: str) -> str:
     return path.replace("\\", "/").rsplit("/", 1)[-1]
 
 
+# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
+_TYPE_ANNOTATION = frozenset({"[output]", "[input]", "[temp]"})
+
+
+def _unannotated(image_ref: str) -> str:
+    """A LoadImage value stripped of any trailing "[output]"-style type tag, so a
+    re-roll's annotated output reference compares by plain filename."""
+    stem, _, tag = image_ref.rpartition(" ")
+    return stem if stem and tag in _TYPE_ANNOTATION else image_ref
+
+
 def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     """Return the prompt_id of the image used as this row's ``input_image``.
 
@@ -193,11 +210,29 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     input_image = parse_params(row.get("params_json")).get("input_image")
     if not input_image:
         return None
-    target = _basename(input_image).lower()
+    target = _basename(_unannotated(input_image)).lower()
     for image in image_rows:
         for f in row_output_files(image):
             if _basename(f.get("filename", "")).lower() == target:
                 return image["prompt_id"]
+    return None
+
+
+def output_file_reference(files: list[dict]) -> str | None:
+    """A ``LoadImage``-resolvable reference to a generation's first output file.
+
+    A saved file lives in ComfyUI's output dir, so the reference carries its
+    subfolder and an ``[output]`` tag (LoadImage validates by file existence via
+    that annotation, not by input-folder membership). Feeds a re-rolled i2v its
+    freshly generated start frame. ``None`` when no file has a name to reference.
+    """
+    for f in files:
+        filename = f.get("filename")
+        if not filename:
+            continue
+        subfolder = f.get("subfolder") or ""
+        path = f"{subfolder}/{filename}" if subfolder else filename
+        return f"{path} [{f.get('type') or 'output'}]"
     return None
 
 

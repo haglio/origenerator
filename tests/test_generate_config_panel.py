@@ -129,6 +129,22 @@ def test_progress_only_moves_for_own_prompt_id(panel):
     assert panel._progress.value() == 5
 
 
+def test_progress_bar_accumulates_across_sampler_stages(panel):
+    # A dual-noise workflow samples in two passes; ComfyUI restarts its step
+    # count each pass. The bar must ramp once from 0 to the run's total rather
+    # than fill, snap back to 0, and fill again.
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_t2i"))
+    panel._param_form.set_values({"steps": 20})
+    panel._on_generate()
+
+    panel._client.progress.emit("comfy-A", 10, 10)   # first pass ends (10 of 20)
+    assert panel._progress.maximum() == 20
+    assert panel._progress.value() == 10
+
+    panel._client.progress.emit("comfy-A", 1, 10)    # second pass restarts at 1
+    assert panel._progress.value() == 11             # continues, not reset to 1
+
+
 # ---- server-side queue (ComfyUI busy with work from outside Origenerator) ----
 
 

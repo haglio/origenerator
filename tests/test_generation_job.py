@@ -46,17 +46,39 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     job.started.connect(lambda: started.append(True))
     job.progress.connect(lambda v, m: progress.append((v, m)))
 
-    client.progress.emit("comfy-OTHER", 5, 10)
+    client.progress.emit("comfy-OTHER", 5, 50)
     assert started == [] and progress == []
 
-    client.progress.emit("comfy-A", 5, 10)
+    # SDXL is a single 50-step pass, so progress forwards as value-over-total.
+    client.progress.emit("comfy-A", 5, 50)
     assert started == [True]
-    assert progress == [(5, 10)]
+    assert progress == [(5, 50)]
     assert job.state == "running"
-    assert job.last_progress == (5, 10)
+    assert job.last_progress == (5, 50)
 
-    client.progress.emit("comfy-A", 7, 10)
+    client.progress.emit("comfy-A", 7, 50)
     assert started == [True]  # started fires only once
+
+
+def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
+    # A dual-noise video job samples in two passes. ComfyUI counts each pass from
+    # its own zero, so the job must accumulate them into one 0-to-total ramp
+    # rather than forward a bar that resets halfway through.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    client = _client()
+    job = GenerationJob(
+        client, wf, {**wf.default_params(), "steps": 20},
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    job.start()
+    seen = []
+    job.progress.connect(lambda v, m: seen.append((v, m)))
+
+    client.progress.emit("comfy-A", 10, 10)  # first pass finishes (10 of 20)
+    client.progress.emit("comfy-A", 1, 10)   # second pass restarts its own count
+
+    assert seen == [(10, 20), (11, 20)]       # continues past the halfway mark
+    assert job.last_progress == (11, 20)
 
 
 def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):

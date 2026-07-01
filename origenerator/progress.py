@@ -1,0 +1,84 @@
+"""Turn ComfyUI's per-node sampler progress into one smooth 0-100 for a job.
+
+A multi-stage video workflow denoises in several sampler passes — WAN 2.2 runs a
+high-noise ``KSamplerAdvanced`` and then a low-noise one. ComfyUI reports
+progress per node, so each pass counts from 0 to its own step total: a naive bar
+fills to 100%, snaps back to 0, and fills again. This module measures a job's
+total sampler steps up front and accumulates the passes against it, so the bar
+advances once from 0 to 100 across every stage.
+"""
+
+
+def _ksampler_steps(inputs: dict) -> int:
+    return int(inputs.get("steps", 0))
+
+
+def _ksampler_advanced_steps(inputs: dict) -> int:
+    """Steps a KSamplerAdvanced actually runs: its slice of the schedule.
+
+    ``start_at_step``/``end_at_step`` carve a window out of the full ``steps``
+    schedule (``end_at_step`` is often a sentinel like 10000 meaning "to the
+    end"), and ComfyUI's progress ``max`` for the node is that window's length.
+    """
+    steps = int(inputs.get("steps", 0))
+    start = int(inputs.get("start_at_step", 0))
+    end = int(inputs.get("end_at_step", steps))
+    return max(0, min(end, steps) - start)
+
+
+# ComfyUI sampler node types that emit step progress, and how to size each.
+_SAMPLER_STEPS = {
+    "KSampler": _ksampler_steps,
+    "KSamplerAdvanced": _ksampler_advanced_steps,
+}
+
+
+def expected_progress_steps(payload: dict) -> int:
+    """Total sampler steps ComfyUI will report for a workflow payload.
+
+    Sums the denoising steps of every sampler node — the units ComfyUI's
+    ``progress`` events count in — so a run's several passes read as one total.
+    Returns 0 when no sampler is recognized, which callers treat as "unknown"
+    and fall back to raw per-node numbers.
+    """
+    total = 0
+    for node in payload.values():
+        sizer = _SAMPLER_STEPS.get(node.get("class_type"))
+        if sizer is not None:
+            total += sizer(node.get("inputs", {}))
+    return total
+
+
+class ProgressTracker:
+    """Accumulate a job's per-node sampler progress into one 0-to-total ramp.
+
+    Fed each ComfyUI ``progress`` event as ``(value, max)`` for whichever
+    sampler is running, it returns ``(cumulative, total)`` measured against the
+    job's whole-run step count. Each new pass restarts its own ``value`` from the
+    low end; the tracker banks the finished pass's steps so the next continues
+    where it left off instead of snapping back to zero.
+    """
+
+    @classmethod
+    def for_payload(cls, payload: dict) -> "ProgressTracker":
+        """Build a tracker sized to a workflow payload's total sampler steps."""
+        return cls(expected_progress_steps(payload))
+
+    def __init__(self, total_steps: int):
+        self._total = total_steps
+        self._banked = 0          # steps completed in passes that have finished
+        self._stage_max = 0       # this pass's step count (its reported max)
+        self._last_value = None   # last value seen in this pass, to spot a restart
+
+    def update(self, value: int, max_val: int) -> tuple[int, int]:
+        if self._total <= 0:
+            return value, max_val  # unknown total: fall back to raw per-node numbers
+        # A value that drops below the current pass's last marks a new pass: bank
+        # the finished pass's steps and start accumulating from the fresh count.
+        if self._last_value is not None and value < self._last_value:
+            self._banked += self._stage_max
+            self._stage_max = 0
+        self._last_value = value
+        self._stage_max = max(self._stage_max, max_val)
+        cumulative = min(self._banked + value, self._total)
+        return cumulative, self._total

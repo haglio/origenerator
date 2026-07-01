@@ -17,6 +17,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.progress import ProgressTracker
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import (
     estimate_label,
@@ -52,6 +53,7 @@ class GenerateConfigPanel(QWidget):
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._bar_state = "ready"                     # drives the progress bar's text + color
         self._executing = False                        # has ComfyUI started our prompt yet?
+        self._progress_tracker: ProgressTracker | None = None  # folds multi-pass sampling into one ramp
         self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
         self._build_ui()
@@ -305,6 +307,9 @@ class GenerateConfigPanel(QWidget):
         record = job["record"]
         prompt_id = record["prompt_id"]
         self._db.insert_generation(**record)
+        # Size the ramp to this run's total sampler steps so a multi-pass video
+        # job fills once from 0 to 100 rather than resetting between passes.
+        self._progress_tracker = ProgressTracker.for_payload(job["payload"])
 
         try:
             actual_pid = self._client.submit_job(job["payload"])
@@ -361,9 +366,10 @@ class GenerateConfigPanel(QWidget):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
-        if max_val > 0:
-            self._progress.setRange(0, max_val)
-            self._progress.setValue(value)
+        if max_val > 0 and self._progress_tracker is not None:
+            cumulative, total = self._progress_tracker.update(value, max_val)
+            self._progress.setRange(0, total)
+            self._progress.setValue(cumulative)
 
     def _on_node_executing(self, prompt_id: str, _node_id: str):
         # ComfyUI has begun running our prompt (vs. it merely sitting in the
@@ -467,6 +473,7 @@ class GenerateConfigPanel(QWidget):
         self._comfy_prompt_id = None
         self._submitted_workflow = None
         self._executing = False
+        self._progress_tracker = None
 
     def settings_key(self) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).

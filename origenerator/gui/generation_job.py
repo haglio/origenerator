@@ -14,6 +14,7 @@ import uuid
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.progress import ProgressTracker
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
@@ -39,6 +40,9 @@ class GenerationJob(QObject):
         self._thumb_dir = thumb_dir
         self._comfy_id: str | None = None
         self._state = "idle"  # idle -> queued -> running -> finished/failed/canceled
+        # Fold ComfyUI's per-pass sampler progress into one 0-to-total ramp, so a
+        # multi-stage video job doesn't report a bar that resets between passes.
+        self._progress_tracker = ProgressTracker.for_payload(self.payload)
         self._last_progress = (0, 0)
         self._last_preview: bytes | None = None
 
@@ -124,8 +128,8 @@ class GenerationJob(QObject):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
-        self._last_progress = (value, max_val)
-        self.progress.emit(value, max_val)
+        self._last_progress = self._progress_tracker.update(value, max_val)
+        self.progress.emit(*self._last_progress)
 
     def _on_node_executing(self, prompt_id: str, _node_id: str):
         if not self._is_mine(prompt_id):

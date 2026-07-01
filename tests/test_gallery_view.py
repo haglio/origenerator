@@ -18,7 +18,13 @@ from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
+_WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _REROLL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
+# The two stages of a chained i2v re-roll: a fresh image, then the video on it.
+_IMG_REROLL_HISTORY = {"outputs": {"7": {"images": [
+    {"filename": "sdxl_new.png", "subfolder": "image", "type": "output"}]}}}
+_VID_REROLL_HISTORY = {"outputs": {"19": {"images": [
+    {"filename": "wan_new.mp4", "subfolder": "video", "type": "output"}]}}}
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -1338,6 +1344,110 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 
     assert key in view._reroll_jobs
     assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
+
+
+def _seeded_i2v_db(tmp_path):
+    """A DB with a re-rollable SDXL image and a WAN i2v video built on it."""
+    db = Database(tmp_path / "i2v.db")
+    db.insert_generation(
+        prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", negative_prompt="", seed=7,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=7, positive_prompt="a cat")),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "img", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_src.png", "subfolder": "image"}]),
+    )
+    db.insert_generation(
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="dance", negative_prompt="", seed=3,
+        params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
+                                    positive_prompt="dance", input_image="sdxl_src.png")),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "vid", status="completed",
+        output_files=json.dumps([{"filename": "wan_src.mp4", "subfolder": "video"}]),
+    )
+    return db
+
+
+def _select_leaf_of(view, prompt_id):
+    item = view._leaf_by_id[prompt_id]
+    view._tree.setCurrentItem(item)
+    return item.data(0, _GROUP_ROLE).key
+
+
+def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
+    # Re-rolling an i2v whose input image is a known, re-buildable generation
+    # first makes a fresh image (its settings, new seed), then runs the video on
+    # that image — both persisted, and the new video links back to the new image.
+    db = _seeded_i2v_db(tmp_path)
+    client = _reroll_client()
+    client.submit_job = MagicMock(side_effect=["comfy-img", "comfy-vid"])
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_leaf_of(view, "vid")
+
+    _reroll_tile(view).add_requested.emit()
+
+    # Stage 1: the image re-roll runs first, with the source image's settings.
+    img_job = view._reroll_jobs[key]
+    assert img_job.workflow.name == "sdxl_t2i"
+    assert img_job.params["seed"] != 7  # fresh seed
+
+    client.job_completed.emit("comfy-img", _IMG_REROLL_HISTORY)
+
+    # Stage 2: the video now runs on the just-generated image, its own seeds fresh.
+    vid_job = view._reroll_jobs[key]
+    assert vid_job.workflow.name == "wan22_i2v"
+    assert vid_job.params["input_image"] == "image/sdxl_new.png [output]"
+    assert vid_job.params["noise_seed"] != 9 and vid_job.params["seed"] != 3
+
+    client.job_completed.emit("comfy-vid", _VID_REROLL_HISTORY)
+
+    assert view._reroll_jobs == {}
+    rows = db.list_generations()
+    new_image = next(r for r in rows
+                     if r["workflow_name"] == "sdxl_t2i" and r["prompt_id"] != "img")
+    new_video = next(r for r in rows
+                     if r["workflow_name"] == "wan22_i2v" and r["prompt_id"] != "vid")
+    assert "sdxl_new.png" in new_image["output_files"]
+    assert "wan_new.mp4" in new_video["output_files"]
+    # The new video's stored input image resolves back to the new image (feature 1).
+    image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
+    assert gallery.find_source_image_id(new_video, image_rows) == new_image["prompt_id"]
+
+
+def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_path):
+    # No image generation matches the video's input, so the re-roll can't rebuild
+    # a fresh frame — it re-rolls the video alone, keeping the same input image.
+    db = Database(tmp_path / "i2v.db")
+    db.insert_generation(
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="dance", negative_prompt="", seed=3,
+        params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
+                                    positive_prompt="dance", input_image="outside.png")),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "vid", status="completed",
+        output_files=json.dumps([{"filename": "wan_src.mp4", "subfolder": "video"}]),
+    )
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_leaf_of(view, "vid")
+
+    _reroll_tile(view).add_requested.emit()
+
+    job = view._reroll_jobs[key]
+    assert job.workflow.name == "wan22_i2v"          # no image stage
+    assert job.params["input_image"] == "outside.png"  # same input, re-used
+    client.submit_job.assert_called_once()
 
 
 def _shown_view_with_one_image(qtbot, tmp_path):

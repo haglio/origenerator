@@ -434,16 +434,50 @@ class GalleryView(QWidget):
         group = item.data(0, _GROUP_ROLE) if item else None
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
-        workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
+        row = group.rows[0]
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
             return
-        # Reuse the row's params, filling any the row didn't carry (imports keep
-        # only sparse metadata) from the workflow's defaults — the same merge the
-        # Generate tab does — then re-roll the seed.
-        params = merge_denormalized(group.rows[0])
+        params = self._reroll_params(row, workflow)
+        # An i2v whose input image is itself a re-buildable generation re-rolls
+        # that image first (fresh start frame), then runs the video on it; any
+        # other row just re-rolls its one workflow with the same input, as before.
+        source = self._reroll_source_image(row)
+        if source is None:
+            self._launch_reroll(key, workflow, params, self._on_reroll_finished)
+            return
+        source_row, image_workflow = source
+        image_params = self._reroll_params(source_row, image_workflow)
+        self._launch_reroll(
+            key, image_workflow, image_params,
+            lambda k, job, files, thumb, dur: self._on_image_reroll_finished(
+                k, job, files, thumb, dur, workflow, params
+            ),
+        )
+
+    def _reroll_params(self, row: dict, workflow) -> dict:
+        """A row's params readied for a re-roll: filled from the workflow's
+        defaults (imports keep only sparse metadata) — the same merge the Generate
+        tab does — then re-rolled to a fresh seed."""
+        params = merge_denormalized(row)
         for param_key, value in workflow.default_params().items():
             params.setdefault(param_key, value)
-        params = randomize_seeds(params, workflow.seed_keys())
+        return randomize_seeds(params, workflow.seed_keys())
+
+    def _reroll_source_image(self, row: dict):
+        """The image generation ``row``'s input image came from, paired with its
+        workflow, when the app can rebuild it — so an i2v re-roll can regenerate a
+        fresh start frame first. ``None`` when there's no reusable source image."""
+        source_id = gallery.find_source_image_id(row, self._image_rows)
+        if source_id is None:
+            return None
+        source = self._db.get_generation(source_id)
+        workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
+        return (source, workflow) if workflow is not None else None
+
+    def _launch_reroll(self, key, workflow, params, on_finished):
+        """Build, register and submit one re-roll job, wiring its completion to
+        ``on_finished(key, job, files, thumb_path, duration)``."""
         try:
             job = GenerationJob(self._client, workflow, params)
         except Exception as e:
@@ -451,7 +485,7 @@ class GalleryView(QWidget):
             return
         self._reroll_jobs[key] = job
         job.finished.connect(
-            lambda files, thumb, dur, k=key, j=job: self._on_reroll_finished(k, j, files, thumb, dur)
+            lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
         job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
         try:
@@ -466,6 +500,17 @@ class GalleryView(QWidget):
         if job is not None:
             job.cancel()
         self._rerender_current_leaf()
+
+    def _on_image_reroll_finished(self, key, image_job, files, thumb_path, duration,
+                                  video_workflow, video_params):
+        """First stage of a chained i2v re-roll: persist the fresh image, then run
+        the video on it, pointing its input at the just-saved output."""
+        self._reroll_jobs.pop(key, None)
+        self._persist_generation(image_job, files, thumb_path, duration)
+        input_ref = gallery.output_file_reference(files)
+        if input_ref is not None:
+            video_params = {**video_params, "input_image": input_ref}
+        self._launch_reroll(key, video_workflow, video_params, self._on_reroll_finished)
 
     def _on_reroll_finished(self, key, job, files, thumb_path, duration):
         self._reroll_jobs.pop(key, None)

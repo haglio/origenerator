@@ -100,6 +100,68 @@ def test_generate_does_not_warn_when_no_prior_match(panel, monkeypatch):
     assert len(panel._db.list_generations()) == 1
 
 
+def _seed_source_image(db):
+    """A completed SDXL image in the DB, to serve as an i2v's reproducible input."""
+    sdxl = WORKFLOW_REGISTRY["sdxl_t2i"]
+    db.insert_generation(
+        prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", seed=7,
+        params_json=json.dumps(dict(sdxl.default_params(), seed=7, positive_prompt="a cat")),
+        workflow_json="{}",
+    )
+    db.update_generation("img", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_src.png", "subfolder": "image"}]))
+
+
+def _i2v_panel(qtbot, tmp_path, submit):
+    client = ComfyUIClient()
+    client.submit_job = submit
+    db = Database(tmp_path / "t.db")
+    _seed_source_image(db)
+    panel = GenerateConfigPanel(client, db)
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    return panel, client, db
+
+
+def test_random_input_box_shows_only_for_a_reproducible_input(qtbot, tmp_path):
+    panel, _client, _db = _i2v_panel(qtbot, tmp_path, lambda p: "comfy-A")
+    box = panel._param_form._image_random_checks["input_image"]
+
+    panel._param_form.set_values({"input_image": "hand_placed.png"})  # not a generation
+    assert box.isHidden()
+
+    panel._param_form.set_values({"input_image": "sdxl_src.png"})     # a known generation
+    assert not box.isHidden()
+
+
+def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
+    submit = MagicMock(side_effect=["comfy-img", "comfy-vid"])
+    panel, client, db = _i2v_panel(qtbot, tmp_path, submit)
+    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
+    panel._param_form._image_random_checks["input_image"].setChecked(True)
+
+    panel._on_generate()
+
+    # Stage 1: a fresh input image is generating (its own SDXL job), not the video.
+    assert panel._input_image_job is not None
+    assert panel._input_image_job.workflow.name == "sdxl_t2i"
+    assert db.get_generation("img")  # the original source is untouched
+
+    client.job_completed.emit("comfy-img", SDXL_HISTORY)  # the image finishes
+
+    # Stage 2: the fresh image is saved and the video runs on it.
+    assert panel._input_image_job is None
+    fresh = [r for r in db.list_generations()
+             if r["workflow_name"] == "sdxl_t2i" and r["prompt_id"] != "img"]
+    assert len(fresh) == 1
+    assert panel._comfy_prompt_id == "comfy-vid"
+    video = next(r for r in db.list_generations() if r["workflow_name"] == "wan22_i2v")
+    params = json.loads(video["params_json"])
+    assert params["input_image"] == "a.png [output]"  # the fresh image's output, annotated
+    assert params["positive_prompt"] == "dance"
+
+
 def test_completion_only_handled_for_own_prompt_id(panel):
     completed = []
     panel.generation_completed.connect(completed.append)

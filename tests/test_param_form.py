@@ -181,6 +181,39 @@ def test_set_seed_random_re_checks_the_box(qtbot):
     assert form.seed_is_random() is False
 
 
+def test_image_field_has_a_hidden_random_box_defaulting_off(qtbot):
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    cb = form._image_random_checks["input_image"]
+    assert isinstance(cb, CheckBox)
+    assert cb.isHidden()               # opt-in, and only shown for a reproducible input
+    assert form.image_is_random() is False
+
+
+def test_image_random_available_toggles_visibility_and_clears_when_hidden(qtbot):
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    cb = form._image_random_checks["input_image"]
+
+    form.set_image_random_available("input_image", True)
+    assert not cb.isHidden()
+    cb.setChecked(True)
+    assert form.image_is_random() is True
+
+    form.set_image_random_available("input_image", False)  # input no longer reproducible
+    assert cb.isHidden()
+    assert form.image_is_random() is False                 # its checked state is cleared too
+
+
+def test_image_changed_reports_the_new_field_value(qtbot):
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    seen = []
+    form.image_changed.connect(lambda key, value: seen.append((key, value)))
+    form._widgets["input_image"].setText("cat.png")
+    assert ("input_image", "cat.png") in seen
+
+
 def test_param_form_seed_handles_64bit_values(qtbot):
     defs = [ParamDef("seed", "Seed", "seed", 0)]
     form = ParamForm(defs)

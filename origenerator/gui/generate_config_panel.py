@@ -11,10 +11,14 @@ from PyQt6.QtCore import pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import config_tab_title, settings_signature
-from origenerator.generation_config import (
-    ConfigSnapshot, find_duplicate_generation, randomize_seeds,
+from origenerator.gallery import (
+    config_tab_title, media_type_of_row, output_file_reference,
+    settings_signature, source_image_id_for,
 )
+from origenerator.generation_config import (
+    ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
+)
+from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.progress import ProgressTracker
@@ -56,6 +60,7 @@ class GenerateConfigPanel(QWidget):
         self._progress_tracker: ProgressTracker | None = None  # folds multi-pass sampling into one ramp
         self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
+        self._input_image_job: GenerationJob | None = None  # a random-input pre-step, before the main job
         self._build_ui()
         self._connect_signals()
 
@@ -145,6 +150,7 @@ class GenerateConfigPanel(QWidget):
             wf = WORKFLOW_REGISTRY[key]
             self._param_form = ParamForm(wf.param_definitions())
             self._param_form.changed.connect(self._emit_title)
+            self._param_form.image_changed.connect(self._on_image_field_changed)
             self._scroll.setWidget(self._param_form)
         self._refresh_estimate()
         self._emit_title()
@@ -206,6 +212,13 @@ class GenerateConfigPanel(QWidget):
         self._progress.setValue(1)
         self._progress.setFormat(text)
 
+    def _show_busy(self, text: str):
+        """A running stage without step counts (the random-input pre-step): a
+        live, moving bar rather than a stuck 0%."""
+        self._apply_bar_state("running")
+        self._progress.setRange(0, 0)  # indeterminate
+        self._progress.setFormat(text)
+
     def _on_generate(self):
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
@@ -228,9 +241,17 @@ class GenerateConfigPanel(QWidget):
             )
             return
 
-        # Guard against silently re-running an identical job: a pinned (non-random)
-        # seed that matches a past generation would just re-create it byte-for-byte.
-        snapshot = ConfigSnapshot(key, params, self._param_form.seed_is_random())
+        # "Random" input image: regenerate a fresh input of the same kind first,
+        # then run the main job on it (the box shows only for a reproducible input).
+        if self._param_form.image_is_random():
+            self._generate_random_input_then_run(wf, params)
+        else:
+            self._generate(wf, params)
+
+    def _generate(self, wf, params: dict):
+        """Submit ``wf`` with ``params`` as this tab's main job, warning first if
+        a pinned seed would just re-create an identical past generation."""
+        snapshot = ConfigSnapshot(wf.name, params, self._param_form.seed_is_random())
         if find_duplicate_generation(self._db.list_generations(), snapshot):
             if not self._offer_reroll(wf):
                 return  # let the user change something rather than duplicate it
@@ -254,6 +275,66 @@ class GenerateConfigPanel(QWidget):
                 params_json=json.dumps(params),
                 workflow_json=json.dumps(payload),
             ),
+        )
+
+    # --- random input image: a fresh source frame before the main job ---------
+
+    def _generate_random_input_then_run(self, wf, params: dict):
+        """Generate a fresh input image (the source image's settings, new seed),
+        then run ``wf`` on it. Falls back to the current input if its source has
+        since vanished (the Random box shouldn't have shown, but state can drift)."""
+        source = self._input_image_source(params.get("input_image"))
+        if source is None:
+            self._generate(wf, params)
+            return
+        source_row, image_wf = source
+        job = GenerationJob(self._client, image_wf, prepared_params(source_row, image_wf))
+        self._input_image_job = job
+        job.preview.connect(self._preview.show_frame)  # watch the frame take shape
+        job.finished.connect(
+            lambda files, thumb, dur, j=job: self._on_input_image_done(wf, params, j, files, thumb, dur)
+        )
+        job.failed.connect(self._on_input_image_failed)
+        self._generate_btn.setEnabled(False)
+        self._cancel_btn.setEnabled(True)
+        self._show_busy("Generating input image…")
+        try:
+            job.start()
+        except Exception as e:
+            logger.error("Failed to submit input image: %s", e)
+            self._on_input_image_failed(str(e))
+
+    def _on_input_image_done(self, wf, params, job, files, thumb_path, duration):
+        self._input_image_job = None
+        persist_generation(self._db, job, files, thumb_path, duration)
+        ref = output_file_reference(files)
+        if ref is not None:
+            params = {**params, "input_image": ref}
+        self._generate(wf, params)  # now the main job, on the fresh image
+
+    def _on_input_image_failed(self, message: str):
+        self._input_image_job = None
+        self._show_error(f"Input image failed: {message[:100]}")
+        self._generate_btn.setEnabled(True)
+        self._cancel_btn.setEnabled(False)
+
+    def _input_image_source(self, input_image):
+        """The (image row, workflow) an ``input_image`` value was generated from,
+        when the app can rebuild it; ``None`` for a hand-picked or unknown image."""
+        source_id = source_image_id_for(input_image, self._image_rows())
+        if source_id is None:
+            return None
+        row = self._db.get_generation(source_id)
+        wf = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "") if row else None
+        return (row, wf) if wf is not None else None
+
+    def _image_rows(self):
+        return [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
+
+    def _on_image_field_changed(self, key: str, value: str):
+        """Show the input's Random box only while it names a reproducible image."""
+        self._param_form.set_image_random_available(
+            key, self._input_image_source(value) is not None
         )
 
     def _offer_reroll(self, wf) -> bool:
@@ -446,6 +527,13 @@ class GenerateConfigPanel(QWidget):
     def _on_cancel(self):
         """Stop this tab's generation: a queued slot, a server-queued prompt, or
         a running one — whichever stage it's at — leaving no half-done row."""
+        if self._input_image_job is not None:  # still on the random-input pre-step
+            self._input_image_job.cancel()
+            self._input_image_job = None
+            self._generate_btn.setEnabled(True)
+            self._cancel_btn.setEnabled(False)
+            self._show_canceled()
+            return
         staged = self._prepared is not None
         comfy_id = self._comfy_prompt_id
         if self._queue is not None and (staged or comfy_id is not None):

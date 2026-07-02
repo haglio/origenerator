@@ -30,6 +30,7 @@ from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.inflight_card import InFlightCard, InFlightItem
 from origenerator.navigation import NavigationHistory
 from origenerator.thumbnail import generate_animated_thumbnail
 from origenerator.trash import Trash
@@ -80,13 +81,17 @@ class GalleryView(QWidget):
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
                  actions: GalleryActions | None = None,
-                 claimed_ids=None):
+                 claimed_ids=None, generate_inflight=None):
         super().__init__(parent)
         self._db = db
         self._client = client
         # In-flight ids some other view already tracks (a Generate tab owns its own
         # jobs), so re-roll reconnection doesn't also adopt them. Queried live.
         self._claimed_ids = claimed_ids or (lambda: set())
+        # In-flight InFlightItems from the Generate tabs, so the Recents shelf can
+        # show every queued/running generation app-wide, not just this gallery's
+        # re-rolls. Queried live each render/poll.
+        self._generate_inflight = generate_inflight or (lambda: [])
         self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
@@ -105,6 +110,9 @@ class GalleryView(QWidget):
         self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
         self._recents_item: QTreeWidgetItem | None = None  # the "Recents" shelf row
         self._recent_rows: list[dict] = []  # recently generated rows, newest first
+        self._inflight_cards: dict[str, InFlightCard] = {}  # live in-flight cards, by job key
+        self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
+        self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
         self._starred_item: QTreeWidgetItem | None = None  # the "★ Starred" shelf row
         self._starred_groups: list = []  # folders the shelf collects, in tree order
         self._visible_ids: list[str] = []
@@ -327,6 +335,11 @@ class GalleryView(QWidget):
         if fingerprint != self._fingerprint:
             self._fingerprint = fingerprint
             self._rebuild(rows, meta)
+        elif self._showing_recents():
+            # No DB change, but in-flight cards still need their live frames pushed
+            # and a re-render when a locally-queued Generate tab appears/vanishes
+            # (it carries no DB row to move the fingerprint).
+            self._refresh_inflight()
 
     def _rebuild(self, rows, meta):
         expanded = self._expanded_keys()
@@ -383,15 +396,17 @@ class GalleryView(QWidget):
         self._recents_item = None
         self._starred_item = None
         root = self._tree.invisibleRootItem()
-        # Two synthetic shelves lead the tree whenever the gallery has any content:
-        # Recents (recently generated items, newest first) then Starred (bookmarked
-        # folders). Each is reachable in one click however the tree is scrolled, and
-        # draws its marker in the caret column so its label lines up with the media
-        # folders below.
-        if tree_model:
+        # Synthetic shelves lead the tree: Recents (in-flight work plus recently
+        # finished items) whenever there is anything to show — so a first-ever
+        # generation is visible while it runs, before any folder exists — then
+        # Starred (bookmarked folders) once folders do. Each is reachable in one
+        # click however the tree is scrolled, and draws its marker in the caret
+        # column so its label lines up with the media folders below.
+        if tree_model or self._inflight_items():
             self._recents_item = self._add_shelf(
                 root, _RECENTS_LABEL, _RECENTS_KEY, icons.clock_icon(), "Recently generated"
             )
+        if tree_model:
             self._starred_item = self._add_shelf(
                 root, _STARRED_LABEL, _STARRED_KEY, icons.star_icon(filled=True),
                 "Your starred folders"
@@ -441,14 +456,15 @@ class GalleryView(QWidget):
         return item
 
     def _default_item(self) -> QTreeWidgetItem | None:
-        """The folder to land on with no saved target: the first real media folder,
-        never a synthetic shelf (Recents/Starred)."""
+        """The folder to land on with no saved target: the first real media folder;
+        failing that (only in-flight work so far, no finished folders), the Recents
+        shelf, so a first generation stays visible while it runs."""
         root = self._tree.invisibleRootItem()
         for i in range(root.childCount()):
             item = root.child(i)
             if item is not self._recents_item and item is not self._starred_item:
                 return item
-        return None
+        return self._recents_item
 
     def _expanded_keys(self) -> set[str]:
         return {
@@ -559,22 +575,36 @@ class GalleryView(QWidget):
             self._add_folder_tile(flow, group, starred=group.starred)
         self._show_widget(container)
 
-    # --- the Recents shelf: recently generated items, newest first ---------
+    # --- the Recents shelf: in-flight work, then recently finished items ----
 
     def _show_recents_overview(self):
-        """Render the Recents shelf: a flat, newest-first list of recently generated
-        items (from a Generate tab or a gallery re-roll). Clicking one jumps to it in
-        its folder, the way the Starred shelf opens a bookmarked folder. Like that
-        shelf it lists many items rather than one, so the info pane clears."""
+        """Render the Recents shelf: a card for every in-flight generation (queued
+        or running, from a Generate tab or a gallery re-roll) atop the recently
+        finished items. Clicking an in-flight card reveals where its job runs; a
+        finished one jumps to it in its folder, the way the Starred shelf opens a
+        bookmarked folder. Like that shelf it lists many items, so the info pane
+        clears rather than previewing one."""
         self._title.set_display(_RECENTS_LABEL)
         self._avg_label.setText("")
         self._clear_metadata()
-        self._show_recent_thumbnails(self._recent_rows)
+        self._render_recents()
         self._sync_delete_button()
 
-    def _show_recent_thumbnails(self, rows):
+    def _render_recents(self):
+        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
+        then the finished thumbnails; a hint when there is neither."""
         container, flow = self._new_tile_pane()
-        for row in rows:
+        self._inflight_cards = {}
+        self._inflight_by_key = {}
+        items = self._inflight_items()
+        self._inflight_signature = _inflight_signature(items)
+        for item in items:
+            card = InFlightCard(item)
+            card.clicked.connect(self._on_inflight_clicked)
+            flow.addWidget(card)
+            self._inflight_cards[item.key] = card
+            self._inflight_by_key[item.key] = item
+        for row in self._recent_rows:
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row)
             )
@@ -583,10 +613,64 @@ class GalleryView(QWidget):
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self._show_widget(container if rows else self._empty_state(
+        self._show_widget(container if (items or self._recent_rows) else self._empty_state(
             "No recent generations yet.\n\nItems you make — from a Generate tab or a "
             "gallery re-roll — collect here, newest first."
         ))
+
+    def _showing_recents(self) -> bool:
+        return (self._recents_item is not None
+                and self._tree.currentItem() is self._recents_item)
+
+    def _refresh_inflight(self):
+        """Between rebuilds, keep the in-flight cards live: push each job's latest
+        frame into its card, and re-render only when the *set* of in-flight jobs
+        changes — one ends, or a Generate tab is queued behind another with no DB
+        row to move the fingerprint."""
+        items = self._inflight_items()
+        if _inflight_signature(items) != self._inflight_signature:
+            self._render_recents()
+            return
+        for item in items:
+            self._inflight_by_key[item.key] = item  # keep the reveal current
+            card = self._inflight_cards.get(item.key)
+            if card is not None:
+                card.update_item(item)
+
+    def _inflight_items(self) -> list:
+        """Every queued/running generation as a card model — this gallery's re-rolls
+        and the Generate tabs' jobs — running ones before merely queued ones."""
+        items = self._reroll_inflight_items() + list(self._generate_inflight())
+        items.sort(key=lambda it: it.status != "running")  # stable: running first
+        return items
+
+    def _reroll_inflight_items(self) -> list:
+        """A card per live gallery re-roll, keyed by the folder it runs in — a click
+        opens that folder, where the re-roll's own tile already shows progress."""
+        items = []
+        for key, job in self._reroll_jobs.items():
+            if job.state not in ("queued", "running"):
+                continue
+            items.append(InFlightItem(
+                key=job.prompt_id,
+                caption=gallery.config_tab_title(job.workflow.name, job.params),
+                status="running" if job.state == "running" else "queued",
+                frame=job.last_preview,
+                reveal=lambda k=key: self._reveal_reroll(k),
+            ))
+        return items
+
+    def _reveal_reroll(self, key: str):
+        """Open the folder a re-roll runs in and select its live tile."""
+        item = self._item_by_key.get(key)
+        if item is not None:
+            self._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
+            self._select_reroll(key)
+
+    def _on_inflight_clicked(self, key: str):
+        item = self._inflight_by_key.get(key)
+        if item is not None:
+            item.reveal()
 
     # --- the Starred shelf: every bookmarked folder, gathered in one place ---
 
@@ -1440,3 +1524,9 @@ def _fingerprint(rows, meta) -> int:
         (k, v.get("custom_name"), v.get("starred")) for k, v in meta.items()
     ))
     return hash((row_sig, meta_sig))
+
+
+def _inflight_signature(items) -> tuple:
+    """The identity of the in-flight set — its job keys — so a frame-only change
+    refreshes cards in place while an added or removed job forces a re-render."""
+    return tuple(sorted(it.key for it in items))

@@ -12,12 +12,14 @@ while two built from differently configured images split apart).
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
 (always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
-workflow declares no LoRA keys, so every branch nests the same depth), and — for
-an image-conditioned workflow — the source image the video animates, i.e. the
-configuration of its start frame (:func:`_input_image_config`). A workflow that
-isn't image-conditioned simply grows no source-image level. The settings group is
-the full key, so it nests beneath every projection. This module owns the grouping
-logic with no Qt dependency so it can be unit-tested directly.
+workflow declares no LoRA keys, so every branch nests the same depth), and — in
+the Videos tree only — the source image a video animates, i.e. the configuration
+of its start frame (:func:`_input_image_config`). The source-image level is a
+property of *videos*, so it grows only under Videos; a still an image-conditioned
+workflow happened to output (an imported PNG under a video prefix) lands under
+Images and is grouped like any other image. The settings group is the full key,
+so it nests beneath every projection. This module owns the grouping logic with no
+Qt dependency so it can be unit-tested directly.
 """
 
 import hashlib
@@ -844,10 +846,16 @@ def _build_lora_groups(
 def _build_leaves(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list:
-    """A model or LoRA folder's leaves: source-image folders when the workflow is
-    image-conditioned (each holding its settings leaves), else settings leaves
-    directly — the same conditional the LoRA tier applies for the source image."""
-    if _is_image_conditioned(wf_name):
+    """A model or LoRA folder's leaves: source-image folders when the folder holds
+    videos an image conditions (each holding its settings leaves), else settings
+    leaves directly.
+
+    The split is by *media type*, not just the workflow: a source image is what a
+    video animates, so only the Videos tree grows the level. An image-conditioned
+    workflow can still output a still — an imported PNG under a video prefix — which
+    lands under Images and animates nothing, so it is grouped like any other image.
+    """
+    if media_type == "video" and _is_image_conditioned(wf_name):
         return _build_source_image_groups(media_type, wf_name, rows, folder_meta, image_index)
     return _build_settings_groups(media_type, wf_name, rows, folder_meta, image_index)
 
@@ -879,9 +887,10 @@ def build_gallery_tree(
     settings folders.
 
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
-    it to a single "(no LoRA)" folder. The source-image level appears only under
-    image-conditioned workflows. Rows that produced no output file (failed or
-    unfinished generations) are dropped first, so the tree holds only results
+    it to a single "(no LoRA)" folder. The source-image level appears only in the
+    Videos tree (a still an image-conditioned workflow output is grouped like any
+    other image). Rows that produced no output file (failed or unfinished
+    generations) are dropped first, so the tree holds only results
     worth showing. Folders appear
     in the order their first member appears in ``rows`` (the caller orders rows
     newest-first); a star never moves a folder — bookmarks are gathered by

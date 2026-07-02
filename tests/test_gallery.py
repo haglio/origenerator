@@ -536,6 +536,25 @@ def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
     assert settings_folder_key(video, index) == leaf.key
 
 
+def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
+    # An image-conditioned WORKFLOW can output a still — an imported PNG under a
+    # video prefix — which classifies as an image. A still animates nothing, so it
+    # must not grow a source-image level: under Images it goes straight from LoRA to
+    # its settings leaf, exactly like any other image.
+    still = _row(
+        prompt_id="still",
+        workflow_name="wan22_flf2v_loop",
+        params_json=json.dumps(
+            {"positive_prompt": "a cat", "input_image": "sdxl_t2i_1_.png", "seed": 2}
+        ),
+        output_files=json.dumps([{"filename": "flf2v_loop_00001_.png"}]),
+    )
+    (media,) = build_gallery_tree([still])
+    assert media.media_type == "image"
+    (lora,) = media.workflow_groups[0].model_groups[0].children
+    assert all(isinstance(child, SettingsGroup) for child in lora.children)
+
+
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
     # The reconcile recomputes a settings bookmark's key from a member row; for an
     # i2v that key depends on the start frame's config, so folder_key_at_level must

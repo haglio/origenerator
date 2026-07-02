@@ -3,7 +3,7 @@ import logging
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QToolButton, QSplitter, QTabWidget,
+    QScrollArea, QPushButton, QToolButton, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -28,6 +28,7 @@ from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import offer_reroll
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
+from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -64,18 +65,15 @@ class GalleryView(QWidget):
 
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
-                 actions: GalleryActions | None = None,
-                 claimed_ids=None, generate_inflight=None):
+                 actions: GalleryActions | None = None):
         super().__init__(parent)
         self._db = db
         self._client = client
-        # In-flight ids some other view already tracks (a Generate tab owns its own
-        # jobs), so re-roll reconnection doesn't also adopt them. Queried live.
-        self._claimed_ids = claimed_ids or (lambda: set())
-        # In-flight InFlightItems from the Generate tabs, so the Recents shelf can
-        # show every queued/running generation app-wide, not just this gallery's
-        # re-rolls. Queried live each render/poll.
-        self._generate_inflight = generate_inflight or (lambda: [])
+        # The info pane's config tabs are the source of in-flight Generate work and
+        # the ids the re-roll reconnection must not re-adopt; wired in _build_ui once
+        # the tabs exist. Default to empty until then.
+        self._claimed_ids = lambda: set()
+        self._generate_inflight = lambda: []
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
@@ -274,10 +272,14 @@ class GalleryView(QWidget):
         self._evolver_btn.hide()
         info_box.addWidget(self._evolver_btn)
         # The info pane is a tab widget: this Inspect page is tab 0 — always
-        # present, not closable — and editable config tabs open after it.
-        self._info_tabs = QTabWidget()
-        self._info_tabs.addTab(info, "Inspect")
+        # present, not closable — and editable config tabs (Reuse Parameters or the
+        # "+") open after it, sharing one run queue.
+        self._info_tabs = InfoPaneTabs(self._client, self._db, info)
         self._panes.addWidget(self._info_tabs)
+        # The config tabs feed the Recents shelf its in-flight Generate cards, and
+        # name the running ids the re-roll reconnection must not re-adopt.
+        self._generate_inflight = self._info_tabs.in_flight_items
+        self._claimed_ids = self._info_tabs.active_prompt_ids
         # The controller drives the pane's widgets from the generation on display;
         # an i2v source link or an animation click surfaces here as a source link,
         # and Reuse re-emits as this view's reuse_requested.
@@ -290,6 +292,9 @@ class GalleryView(QWidget):
         )
         self._info.link_activated.connect(self._on_source_link)
         self._info.reuse_requested.connect(self.reuse_requested)
+        # Reuse Parameters opens an editable config tab in this same pane (a no-op
+        # without a client — nothing could run it).
+        self.reuse_requested.connect(self._info_tabs.open_config)
 
         # The TOC pane holds its width; the browser and info panes both grow with
         # the window (the browser faster), so the info pane stays comfortably wide
@@ -763,6 +768,17 @@ class GalleryView(QWidget):
         folder), and quietly dropped if that generation is no longer present.
         """
         self._pending_selection = prompt_id or None
+
+    def capture_config_tabs(self) -> dict:
+        """Snapshot the open editable config tabs (and which is active), for the
+        session. Delegates to the info pane's tab strip."""
+        return self._info_tabs.capture_state()
+
+    def restore_config_tabs(self, state):
+        """Reopen the config tabs saved from a previous session, reconnecting any
+        whose job is still running — done before :meth:`reconnect_running_rerolls`
+        so a tab reclaims its own job before the gallery adopts the rest."""
+        self._info_tabs.restore_state(state)
 
     # --- selection ---------------------------------------------------------
 

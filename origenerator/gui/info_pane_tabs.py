@@ -1,11 +1,24 @@
+"""The gallery's info pane as a tabbed workspace.
+
+Tab 0 is the always-present Inspect view — the gallery builds it and hands it in
+here — and the tabs after it are editable per-configuration panels
+(:class:`GenerateConfigPanel`) opened by Reuse Parameters or the "+" button. This
+owns the config tabs' lifecycle — add, close, rename, session capture/restore, the
+one-generation-at-a-time run queue, and the in-flight reporting the Recents shelf
+reads — while the Inspect tab stays the gallery's concern. Clicking a config tab's
+history-strip thumbnail opens (or reuses) a tab for that generation.
+
+Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
+test) the "+" is hidden and :meth:`open_config` is a no-op, so only Inspect shows.
+"""
+
 import json
 import time
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QToolButton,
-    QInputDialog, QStackedWidget, QLabel, QPushButton, QApplication,
+    QTabWidget, QToolButton, QInputDialog, QTabBar, QApplication,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -20,92 +33,65 @@ from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-class GenerateView(QWidget):
-    """The Generate tab: closable per-configuration subtabs. Each subtab lays out
-    three resizable panes — a strip of every generation in that tab's settings
-    folder, the settings form and run controls, and a live preview — so the tab
-    row spans all three. Clicking a strip thumbnail opens (or reuses) a subtab
-    carrying that generation's settings."""
+class InfoPaneTabs(QTabWidget):
+    """A permanent Inspect tab (index 0) over editable config tabs."""
 
-    reveal_requested = pyqtSignal()  # ask the container to bring this tab forward
-
-    def __init__(self, client: ComfyUIClient, db: Database, parent=None):
+    def __init__(self, client: ComfyUIClient | None, db: Database, inspect_page,
+                 parent=None):
         super().__init__(parent)
         self._client = client
         self._db = db
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        self._subtabs = QTabWidget()
-        # Install the eliding bar before setTabsClosable/setMovable: swapping the
-        # bar afterwards drops those settings (they don't carry to a new bar).
-        self._subtabs.setTabBar(ElidingTabBar())
-        self._subtabs.setTabsClosable(True)
-        self._subtabs.setMovable(True)
-        self._subtabs.tabCloseRequested.connect(self._close_subtab)
-        self._subtabs.tabBarDoubleClicked.connect(self._rename_subtab)
-        add_btn = QToolButton()
-        add_btn.setText("+")
-        add_btn.setToolTip("New configuration")
-        add_btn.clicked.connect(lambda: self._add_subtab())
-        self._subtabs.setCornerWidget(add_btn, Qt.Corner.TopRightCorner)
-
-        # Stack the tabs over an empty-state placeholder shown when none are open.
-        # Each subtab carries its own three-pane splitter (strip, settings,
-        # preview), so the tab row spans all three panes.
-        self._stack = QStackedWidget()
-        self._stack.addWidget(self._subtabs)
-        self._stack.addWidget(self._build_empty_state())
-        layout.addWidget(self._stack, 1)
-
-        self._queue = JobQueue(db)  # one generation at a time across subtabs
-        # A double-click on a tab's ✕ closes it on the first click, then the tabs
-        # shift and the completing double-click lands on the neighbor as a
-        # tabBarDoubleClicked. This stamps each close so that stray double-click
-        # can be told from a genuine rename gesture.
+        self._inspect_page = inspect_page
+        self._queue = JobQueue(db)  # one generation at a time across the config tabs
+        # Install the eliding bar before setTabsClosable: swapping the bar
+        # afterwards drops that setting (it doesn't carry to a new bar).
+        self.setTabBar(ElidingTabBar())
+        self.setTabsClosable(True)
+        self.tabCloseRequested.connect(self._close_subtab)
+        self.tabBarDoubleClicked.connect(self._rename_subtab)
+        self._add_btn = QToolButton()
+        self._add_btn.setText("+")
+        self._add_btn.setToolTip("New configuration")
+        self._add_btn.clicked.connect(lambda: self._add_subtab())
+        self._add_btn.setVisible(client is not None)  # nothing to run without a client
+        self.setCornerWidget(self._add_btn, Qt.Corner.TopRightCorner)
+        # Tab 0: the gallery's Inspect page — always present, never closable, so
+        # strip its close button (either side, whichever the style draws).
+        self.addTab(inspect_page, "Inspect")
+        bar = self.tabBar()
+        bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
+        bar.setTabButton(0, QTabBar.ButtonPosition.LeftSide, None)
+        # A double-click on a tab's ✕ closes it, then the tabs shift and the
+        # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
+        # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
-        self._add_subtab()
 
-    def _build_empty_state(self) -> QWidget:
-        self._empty_state = QWidget()
-        box = QVBoxLayout(self._empty_state)
-        box.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        message = QLabel(
-            "No generation tabs open.\n\n"
-            "Open one from the Gallery — select a generation and choose\n"
-            "“Reuse Parameters” — or start a blank one:"
-        )
-        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Wrap rather than let the longest line set the tab's minimum width,
-        # which would keep the window from tiling narrow.
-        message.setWordWrap(True)
-        box.addWidget(message)
-        self._new_tab_btn = QPushButton("New configuration")
-        self._new_tab_btn.clicked.connect(lambda: self._add_subtab())
-        box.addWidget(self._new_tab_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-        return self._empty_state
+    # --- config tabs -------------------------------------------------------
 
-    def _update_empty_state(self):
-        empty = self._subtabs.count() == 0
-        self._stack.setCurrentWidget(self._empty_state if empty else self._subtabs)
+    def _config_panels(self) -> list[GenerateConfigPanel]:
+        """Every open config panel, in tab order (the Inspect page is skipped)."""
+        return [
+            w for i in range(self.count())
+            if isinstance((w := self.widget(i)), GenerateConfigPanel)
+        ]
 
-    def _add_subtab(self) -> GenerateConfigPanel:
+    def _add_subtab(self) -> GenerateConfigPanel | None:
+        if self._client is None:
+            return None  # no client to run a generation
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
-        index = self._subtabs.addTab(panel, panel.title())
+        index = self.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
         panel.strip_activated.connect(self._on_strip_activated)
-        self._subtabs.setCurrentIndex(index)
-        self._update_empty_state()
+        self.setCurrentIndex(index)
         return panel
 
     def _update_title(self, panel: GenerateConfigPanel, text: str):
-        index = self._subtabs.indexOf(panel)
+        index = self.indexOf(panel)
         if index >= 0:
-            self._subtabs.setTabText(index, text)
+            self.setTabText(index, text)
 
     def _closed_within_double_click(self) -> bool:
-        """Was a subtab closed within one double-click of now?
+        """Was a config tab closed within one double-click of now?
 
         The completing click of a double-click on a ✕ arrives this close, so a
         rename firing that soon after a close is that stray click, not a gesture.
@@ -114,10 +100,12 @@ class GenerateView(QWidget):
         return time.monotonic() - self._last_close_at < interval
 
     def _rename_subtab(self, index: int):
+        if index <= 0:
+            return  # the Inspect tab isn't renamable
         if self._closed_within_double_click():
             return  # a stray double-click left over from closing a tab, not a rename
-        panel = self._subtabs.widget(index)
-        if panel is None:
+        panel = self.widget(index)
+        if not isinstance(panel, GenerateConfigPanel):
             return
         name, ok = QInputDialog.getText(
             self, "Rename tab", "Tab name:", text=panel.title()
@@ -126,17 +114,18 @@ class GenerateView(QWidget):
             panel.set_custom_title(name.strip())
 
     def _discard_subtab(self, index: int):
-        """Remove and tear down one subtab, without revealing the empty state."""
-        panel = self._subtabs.widget(index)
+        """Remove and tear down one config tab (never the Inspect tab)."""
+        panel = self.widget(index)
+        if not isinstance(panel, GenerateConfigPanel):
+            return
         self._queue.cancel(panel)  # drop its slot, advancing the queue if it was running
-        self._subtabs.removeTab(index)
+        self.removeTab(index)
         panel.teardown()
         panel.deleteLater()
 
     def _close_subtab(self, index: int):
         self._last_close_at = time.monotonic()  # arm the stray-double-click guard
         self._discard_subtab(index)
-        self._update_empty_state()  # closing the last tab reveals the empty state
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""
@@ -163,86 +152,89 @@ class GenerateView(QWidget):
             [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
         )
         row_key = (workflow_name, settings_signature(workflow_name, row.get("params_json"), index))
-        active = self._subtabs.currentWidget()
-        if active is not None and active.settings_key() == row_key:
+        active = self.currentWidget()
+        if isinstance(active, GenerateConfigPanel) and active.settings_key() == row_key:
             return  # same settings folder as the active tab — don't spawn a duplicate
         params = merge_denormalized(row)
         if params:
             self.open_config(workflow_name, params)
 
-    def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel:
+    def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel | None:
+        """Open (and select) an editable config tab prefilled from a generation.
+
+        A no-op without a client — nothing could run the resulting config.
+        """
         panel = self._add_subtab()
+        if panel is None:
+            return None
         panel.prefill(workflow_name, params)
         # Seed the new tab's strip with its settings folder; it accumulates from there.
         panel.seed_strip(self._ids_for_settings(panel.settings_key()))
         return panel
 
-    def capture_state(self) -> dict:
-        """Snapshot every open subtab so the session can be restored next launch.
+    def reveal_config(self, panel: GenerateConfigPanel):
+        """Bring a config tab forward — landing a Recents-card click on the panel
+        running its job (the info pane is always on screen, so this just selects it)."""
+        index = self.indexOf(panel)
+        if index >= 0:
+            self.setCurrentIndex(index)
 
-        Each tab carries its configuration, any user-set custom title, and the id
-        of its in-flight job (if any) — so a tab whose generation is still running
-        when the app closes reconnects to it, rather than coming back idle.
+    def capture_state(self) -> dict:
+        """Snapshot every open config tab so the session can be restored next launch.
+
+        Each carries its configuration, any user-set custom title, and the id of its
+        in-flight job (if any) — so a tab whose generation is still running when the
+        app closes reconnects to it rather than coming back idle. ``current`` is the
+        overall active tab (0 is Inspect), so the same tab reopens focused.
         """
-        tabs = []
-        for i in range(self._subtabs.count()):
-            panel = self._subtabs.widget(i)
-            tabs.append({
+        tabs = [
+            {
                 "config": panel.current_config().to_dict(),
                 "title": panel.custom_title(),
                 "active_prompt_id": panel.active_prompt_id(),
-            })
-        return {"tabs": tabs, "current": self._subtabs.currentIndex()}
+            }
+            for panel in self._config_panels()
+        ]
+        return {"tabs": tabs, "current": self.currentIndex()}
 
     def active_prompt_ids(self) -> set[str]:
-        """Every in-flight job id across the open tabs.
+        """Every in-flight job id across the open config tabs.
 
-        Lets the gallery know which running rows a Generate tab already owns, so
-        its re-roll reconnection doesn't adopt a job the tab is already tracking.
+        Lets the gallery know which running rows a config tab already owns, so its
+        re-roll reconnection doesn't adopt a job a tab is already tracking.
         """
         ids = set()
-        for i in range(self._subtabs.count()):
-            pid = self._subtabs.widget(i).active_prompt_id()
+        for panel in self._config_panels():
+            pid = panel.active_prompt_id()
             if pid:
                 ids.add(pid)
         return ids
 
     def in_flight_items(self) -> list[InFlightItem]:
-        """A card per in-flight Generate job — running or waiting its turn in the
+        """A card per in-flight config-tab job — running or waiting its turn in the
         local queue — for the gallery's Recents shelf. Each carries a reveal that
-        brings this tab forward and selects the job's subtab, so clicking the card
-        lands on the panel that's running it.
+        brings its tab forward, so clicking the card lands on the panel running it.
         """
         items = []
-        for i in range(self._subtabs.count()):
-            panel = self._subtabs.widget(i)
+        for panel in self._config_panels():
             desc = panel.in_flight_descriptor()
             if desc is None:
                 continue
             items.append(InFlightItem(
                 key=desc["key"], caption=desc["caption"], status=desc["status"],
-                frame=desc["frame"], reveal=lambda p=panel: self._reveal_panel(p),
+                frame=desc["frame"], reveal=lambda p=panel: self.reveal_config(p),
                 media_type=desc["media_type"],
             ))
         return items
 
-    def _reveal_panel(self, panel):
-        """Select ``panel`` and ask the container to bring the Generate tab
-        forward — landing a Recents-card click on the panel running its job."""
-        index = self._subtabs.indexOf(panel)
-        if index >= 0:
-            self._subtabs.setCurrentIndex(index)
-        self.reveal_requested.emit()
-
     def restore_state(self, state: dict):
-        """Rebuild the subtabs from a :meth:`capture_state` snapshot.
+        """Rebuild the config tabs from a :meth:`capture_state` snapshot.
 
         Entries for workflows no longer in the registry are skipped, as is any
-        malformed data, so a corrupt or cross-version state file degrades to the
-        default tab rather than failing to launch. If nothing restorable remains,
-        the default tab created at construction is left as-is.
+        malformed data, so a corrupt or cross-version state file degrades to just
+        the Inspect tab rather than failing to launch. A no-op without a client.
         """
-        if not isinstance(state, dict):
+        if not isinstance(state, dict) or self._client is None:
             return
         raw_tabs = state.get("tabs")
         restored = []
@@ -260,8 +252,8 @@ class GenerateView(QWidget):
             ))
         if not restored:
             return
-        while self._subtabs.count():
-            self._discard_subtab(0)
+        while self.count() > 1:  # clear every config tab, leaving only Inspect (0)
+            self._discard_subtab(self.count() - 1)
         for snapshot, title, active_prompt_id in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
@@ -270,10 +262,10 @@ class GenerateView(QWidget):
                 panel.set_custom_title(title)
             self._reconnect_if_running(panel, active_prompt_id)
         current = state.get("current", 0)
-        if isinstance(current, int) and 0 <= current < self._subtabs.count():
-            self._subtabs.setCurrentIndex(current)
+        if isinstance(current, int) and 0 <= current < self.count():
+            self.setCurrentIndex(current)
 
-    def _reconnect_if_running(self, panel, active_prompt_id):
+    def _reconnect_if_running(self, panel: GenerateConfigPanel, active_prompt_id):
         """Rebind a restored tab to its job if that job is still running.
 
         The row's stored payload sizes the panel's progress ramp. A job that has

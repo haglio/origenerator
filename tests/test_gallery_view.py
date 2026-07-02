@@ -2073,12 +2073,13 @@ def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
 def test_reconnect_skips_a_reroll_claimed_by_a_generate_tab(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     _insert_running_reroll(db, "rr")
-    view = GalleryView(db, client=_reroll_client(), claimed_ids=lambda: {"rr"})
+    view = GalleryView(db, client=_reroll_client())
+    view._claimed_ids = lambda: {"rr"}  # a config tab already owns this running job
     qtbot.addWidget(view)
 
     view.reconnect_running_rerolls()
 
-    assert view._reroll_jobs == {}  # a Generate tab owns it; the gallery leaves it
+    assert view._reroll_jobs == {}  # a config tab owns it; the gallery leaves it
 
 
 def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
@@ -2529,9 +2530,10 @@ def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
     assert not file_path.exists()
 
 
-def test_delete_works_with_gallery_embedded_in_tabs(qtbot, tmp_path):
-    # Mirror the real app: the gallery lives in a QTabWidget inside a QMainWindow.
-    from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
+def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
+    # Mirror the real app: the gallery is the window's central widget, and the
+    # app-wide Delete key filter must still reach it.
+    from PyQt6.QtWidgets import QMainWindow
     db = Database(tmp_path / "g.db")
     out = tmp_path / "output"
     out.mkdir()
@@ -2549,11 +2551,7 @@ def test_delete_works_with_gallery_embedded_in_tabs(qtbot, tmp_path):
     actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
     view = GalleryView(db, actions=actions)
     win = QMainWindow()
-    tabs = QTabWidget()
-    tabs.addTab(QWidget(), "Generate")
-    tabs.addTab(view, "Gallery")
-    win.setCentralWidget(tabs)
-    tabs.setCurrentWidget(view)
+    win.setCentralWidget(view)
     qtbot.addWidget(win)
     win.show()
     qtbot.waitExposed(win)
@@ -2681,7 +2679,8 @@ def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
 def test_recents_shows_generate_inflight_cards_above_finished_items(qtbot):
     revealed = []
     provider = lambda: [_inflight_item(key="gen1", reveal=lambda: revealed.append("gen1"))]
-    view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]), generate_inflight=provider)
+    view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]))
+    view._generate_inflight = provider
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -2739,8 +2738,8 @@ def test_a_newly_queued_generate_tab_appears_on_recents_via_poll(qtbot):
     # A Generate tab queued behind another has no DB row, so only a poll of the
     # provider (not a DB fingerprint change) can surface it.
     items = []
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]),
-                       generate_inflight=lambda: list(items))
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view._generate_inflight = lambda: list(items)
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -2753,8 +2752,8 @@ def test_a_newly_queued_generate_tab_appears_on_recents_via_poll(qtbot):
 
 def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     frame = {"data": None}
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]),
-                       generate_inflight=lambda: [_inflight_item(key="gen1", frame=frame["data"])])
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view._generate_inflight = lambda: [_inflight_item(key="gen1", frame=frame["data"])]
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -2769,7 +2768,8 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
 def test_recents_shelf_appears_for_a_first_generation_before_any_folder(qtbot):
     # No finished generation yet (empty tree), but a job is running: the Recents
     # shelf still appears and the gallery lands on it, so the job is visible.
-    view = GalleryView(FakeDB([]), generate_inflight=lambda: [_inflight_item(key="gen1")])
+    view = GalleryView(FakeDB([]))
+    view._generate_inflight = lambda: [_inflight_item(key="gen1")]
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2783,7 +2783,8 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
         _inflight_item(key="waiting", status="queued"),
         _inflight_item(key="going", status="running"),
     ]
-    view = GalleryView(FakeDB([]), generate_inflight=provider)
+    view = GalleryView(FakeDB([]))
+    view._generate_inflight = provider
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2802,19 +2803,15 @@ def _finished_row_db(tmp_path):
 
 
 def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_path):
-    # Real wiring, as main_window builds it: a running Generate job must stay on
+    # Real wiring, as the app builds it: a running config-tab job must stay on
     # Recents across navigating to a folder and back, and across poll ticks.
-    from origenerator.gui.generate_view import GenerateView
     client = ComfyUIClient()
     client.submit_job = lambda payload, prompt_id: prompt_id
     db = _finished_row_db(tmp_path)
-    gen = GenerateView(client, db)
-    gv = GalleryView(db, client=client,
-                     claimed_ids=gen.active_prompt_ids,
-                     generate_inflight=gen.in_flight_items)
-    qtbot.addWidget(gen)
+    gv = GalleryView(db, client=client)
     qtbot.addWidget(gv)
-    panel = gen._subtabs.widget(0)
+    gv.refresh()
+    panel = gv._info_tabs._add_subtab()
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()
     pid = panel.active_prompt_id()

@@ -141,14 +141,18 @@ class GalleryView(QWidget):
     def _gallery_owns_keys(self) -> bool:
         """True when a gallery key (Delete/Undo) should act, not pass through.
 
-        Only while the Gallery tab is on screen, no dialog/menu is up, and the
-        focus isn't in a text field (so renaming and any editor keep their keys).
+        Only while the view is on screen, no dialog/menu is up, the focus isn't in
+        a text field (so renaming and any editor keep their keys), and the focus
+        isn't inside the info-pane config tabs — a config form's combos and buttons
+        aren't text fields, so editing one must not let Delete wipe a thumbnail.
         """
         if not self.isVisible():
             return False
         if QApplication.activeModalWidget() or QApplication.activePopupWidget():
             return False
         focus = QApplication.focusWidget()
+        if focus is not None and self._info_tabs.isAncestorOf(focus):
+            return False  # editing a config in the info pane — its keys, not ours
         return not isinstance(
             focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
         )
@@ -1133,9 +1137,3 @@ def _fingerprint(rows, meta) -> int:
         (k, v.get("custom_name"), v.get("starred")) for k, v in meta.items()
     ))
     return hash((row_sig, meta_sig))
-
-
-def _inflight_signature(items) -> tuple:
-    """The identity of the in-flight set — its job keys — so a frame-only change
-    refreshes cards in place while an added or removed job forces a re-render."""
-    return tuple(sorted(it.key for it in items))

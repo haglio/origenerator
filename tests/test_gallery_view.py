@@ -2564,6 +2564,24 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     assert db.get_generation("i1") is None
 
 
+def test_gallery_hands_off_keys_while_a_config_form_is_focused(qtbot, tmp_path, monkeypatch):
+    # The grid and an editable config form are now visible together, so the app-wide
+    # Delete/Undo filter must disarm while a config field has focus — its combos and
+    # buttons aren't text fields, so without this it would wipe a gallery thumbnail.
+    from PyQt6.QtWidgets import QApplication
+    view = GalleryView(Database(tmp_path / "t.db"), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.show()
+    qtbot.waitExposed(view)
+    panel = view._info_tabs._add_subtab()
+
+    monkeypatch.setattr(QApplication, "focusWidget", lambda: panel._workflow_combo)
+    assert view._gallery_owns_keys() is False   # editing a config: the gallery hands off
+
+    monkeypatch.setattr(QApplication, "focusWidget", lambda: view._tree)
+    assert view._gallery_owns_keys() is True     # browsing the tree: the gallery owns Delete
+
+
 def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
     # The real-app failure: a selected item, but focus is on the tree (or nowhere
     # in the gallery), so a focus-scoped handler never fired. The app-wide filter

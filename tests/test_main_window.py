@@ -189,6 +189,16 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     assert effective_min_width <= 704
 
 
+def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
+    # A config tab's preview-over-form column is wider than the Inspect page, so it
+    # governs the info pane's floor. Even with one open, the window must still fit a
+    # narrow tiling slot — its form scrolls rather than widening the window.
+    win = _window(qtbot, tmp_path)
+    win._gallery_view._info_tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
+    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    assert effective_min_width <= 704
+
+
 def test_generate_inflight_shows_on_recents_and_reveals_its_tab(qtbot, tmp_path):
     # The gallery's Recents shelf shows a running config-tab job, and clicking its
     # card selects that job's config tab in the info pane.

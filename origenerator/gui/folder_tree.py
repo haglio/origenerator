@@ -1,31 +1,35 @@
-"""The gallery's folder tree, with per-row hover actions.
+"""The gallery's folder tree, with per-row star/delete actions on the left.
 
-Hovering a row reveals a star toggle and (for a deletable folder) a delete button
-at its left edge; clicking one emits ``star_clicked`` / ``delete_clicked`` with
-the folder's key instead of selecting the row. The star sits leftmost — right
-where a starred folder's ★ marker shows — so toggling it reads as that marker
-appearing in place. A delegate paints the icons on the hovered row; the tree
-hit-tests clicks against the same rects. Which group a row holds and whether it's
-deletable are injected, so this stays free of the gallery model.
+Every row reserves a small left gutter (so text never sits under the actions):
+the star nearest the name and the delete to its left. The star doubles as the
+starred indicator — filled and always shown for a starred folder, an outline
+offered on hover otherwise, so clicking it to star a folder just leaves the star
+in place. Delete shows on hover, for a deletable folder only. Clicking either
+emits ``star_clicked`` / ``delete_clicked`` with the folder's key instead of
+selecting the row; the tree hit-tests clicks against the same rects the delegate
+paints. Which group a row holds and whether it's deletable are injected, so this
+stays free of the gallery model.
 """
 
-from PyQt6.QtWidgets import QTreeWidget, QStyledItemDelegate, QStyle
+from PyQt6.QtWidgets import (
+    QApplication, QTreeWidget, QStyledItemDelegate, QStyleOptionViewItem, QStyle,
+)
 from PyQt6.QtCore import Qt, QRect, pyqtSignal
 
 from origenerator.gui import icons
 
-_ICON = 16   # on-screen size of each hover action
-_PAD = 4     # gap from the row's left edge and between the two icons
+_ICON = 16   # on-screen size of each action
+_PAD = 4     # gap at the edges and between the two icons
+_GUTTER = _PAD + _ICON + _PAD + _ICON + _PAD  # left space reserved: delete, star, then text
 
 
-def _action_rects(row: QRect, deletable: bool):
-    """The (star, delete) icon rects, left-aligned at the row's start; ``delete``
-    is ``None`` for a folder that can't be deleted. Star is leftmost — where a
-    starred folder's ★ marker sits — so toggling it looks like the marker itself."""
+def _action_rects(row: QRect):
+    """The (star, delete) icon rects in the row's left gutter — star nearest the
+    text, delete to its left. Both are laid out for every row so text lines up;
+    the caller decides which to actually show and hit-test."""
     y = row.y() + (row.height() - _ICON) // 2
-    x = row.left() + _PAD
-    star = QRect(x, y, _ICON, _ICON)
-    delete = QRect(x + _ICON + _PAD, y, _ICON, _ICON) if deletable else None
+    delete = QRect(row.left() + _PAD, y, _ICON, _ICON)
+    star = QRect(row.left() + _PAD + _ICON + _PAD, y, _ICON, _ICON)
     return star, delete
 
 
@@ -39,22 +43,33 @@ class _FolderRowDelegate(QStyledItemDelegate):
         self._star_on = icons.star_icon(filled=True)
 
     def paint(self, painter, option, index):
-        super().paint(painter, option, index)
-        if not (option.state & QStyle.StateFlag.State_MouseOver):
-            return
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        widget = opt.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        # The full-row background/selection first (no text), then the text shifted
+        # past the gutter — so the highlight still fills the whole row but the name
+        # clears the action icons rather than sitting under them.
+        background = QStyleOptionViewItem(opt)
+        background.text = ""
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, background, painter, widget)
+        opt.rect = opt.rect.adjusted(_GUTTER, 0, 0, 0)
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter, widget)
+
         group = index.data(self._role)
         if group is None:
             return
-        deletable = self._is_deletable(group)
-        star_rect, delete_rect = _action_rects(option.rect, deletable)
+        hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
         starred = getattr(group, "starred", False)
-        (self._star_on if starred else self._star).paint(painter, star_rect)
-        if delete_rect is not None:
+        star_rect, delete_rect = _action_rects(option.rect)
+        if starred or hovered:
+            (self._star_on if starred else self._star).paint(painter, star_rect)
+        if hovered and self._is_deletable(group):
             self._delete.paint(painter, delete_rect)
 
 
 class FolderTree(QTreeWidget):
-    """A QTreeWidget whose rows show hover star/delete actions."""
+    """A QTreeWidget whose rows carry left-gutter star/delete actions."""
 
     star_clicked = pyqtSignal(object)    # folder key
     delete_clicked = pyqtSignal(object)  # folder key
@@ -63,7 +78,7 @@ class FolderTree(QTreeWidget):
         super().__init__(parent)
         self._role = group_role
         self._is_deletable = is_deletable
-        self.setMouseTracking(True)  # keep the hovered row's icons live as the mouse moves
+        self.setMouseTracking(True)  # keep the hovered row's actions live as the mouse moves
         self.setItemDelegate(_FolderRowDelegate(group_role, is_deletable, self))
 
     def mousePressEvent(self, event):
@@ -71,10 +86,8 @@ class FolderTree(QTreeWidget):
             index = self.indexAt(event.pos())
             group = index.data(self._role) if index.isValid() else None
             if group is not None:
-                star_rect, delete_rect = _action_rects(
-                    self.visualRect(index), self._is_deletable(group)
-                )
-                if delete_rect is not None and delete_rect.contains(event.pos()):
+                star_rect, delete_rect = _action_rects(self.visualRect(index))
+                if self._is_deletable(group) and delete_rect.contains(event.pos()):
                     self.delete_clicked.emit(group.key)
                     return
                 if star_rect.contains(event.pos()):

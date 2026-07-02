@@ -39,9 +39,8 @@ _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represen
 _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
-_STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 _STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
-_STARRED_LABEL = _STAR_PREFIX + "Starred"  # its row, pinned above the media folders
+_STARRED_LABEL = "★ Starred"  # its row, pinned above the media folders (the star is decorative here)
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
@@ -379,8 +378,9 @@ class GalleryView(QWidget):
         self._tree.blockSignals(False)
 
     def _add_node(self, group, parent_item) -> QTreeWidgetItem:
-        prefix = _STAR_PREFIX if group.starred else ""
-        item = QTreeWidgetItem([prefix + group.label])
+        # Starred state shows as the row's star icon (the delegate reads it from
+        # the group), so the label itself carries no ★ prefix.
+        item = QTreeWidgetItem([group.label])
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, _GROUP_ROLE, group)
         item.setToolTip(0, group.label)
@@ -1064,9 +1064,7 @@ class GalleryView(QWidget):
             return
         key = self._editing_key
         self._editing_key = None
-        name = item.text(0)
-        if name.startswith(_STAR_PREFIX):
-            name = name[len(_STAR_PREFIX):]
+        name = item.text(0)  # no ★ prefix to strip — the star is a row icon now
         self._actions.rename_folder(key, name.strip() or None)
         self._sync_undo_button()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.

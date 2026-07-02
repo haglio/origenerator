@@ -265,8 +265,11 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     model = _top_level(view._tree)["Images"].child(0).child(0)
     # The star marks the folder in place; it does not jump above the cat.
     assert [_key(model.child(i)) for i in range(model.childCount())] == [cat_key, dog_key]
-    assert model.child(1).text(0).startswith("★")
-    assert not model.child(0).text(0).startswith("★")
+    # Starred state rides on the group (the row's star icon reads it), not a ★ text
+    # prefix, so the labels stay the plain folder names.
+    assert model.child(1).data(0, _GROUP_ROLE).starred is True
+    assert model.child(0).data(0, _GROUP_ROLE).starred is False
+    assert not model.child(1).text(0).startswith("★")
 
 
 def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):

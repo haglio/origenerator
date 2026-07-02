@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt, QRect, QPoint
 from PyQt6.QtWidgets import QTreeWidgetItem
 
-from origenerator.gui.folder_tree import FolderTree, _action_rects
+from origenerator.gui.folder_tree import FolderTree, _action_rects, _GUTTER
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -12,20 +12,13 @@ class _Group:
         self.starred = starred
 
 
-def test_action_rects_left_align_star_then_delete():
+def test_action_rects_lay_out_delete_then_star_within_the_left_gutter():
     row = QRect(0, 0, 200, 24)
-    star, delete = _action_rects(row, deletable=True)
-    assert delete is not None
-    assert star.left() >= row.left()              # inset from the left edge
-    assert star.left() < row.center().x()          # on the left side
-    assert star.right() <= delete.left()           # star leftmost, delete beside it
+    star, delete = _action_rects(row)
+    assert delete.left() >= row.left()             # inset from the left edge
+    assert delete.right() <= star.left()           # delete leftmost, star beside it toward the text
+    assert star.right() <= row.left() + _GUTTER    # both clear the gutter the text is shifted past
     assert row.contains(star) and row.contains(delete)
-
-
-def test_action_rects_drops_delete_for_a_non_deletable_row():
-    star, delete = _action_rects(QRect(0, 0, 200, 24), deletable=False)
-    assert delete is None
-    assert star.left() < 100                        # star still sits at the left
 
 
 def _tree_with_one_row(qtbot, *, deletable=True, starred=False):
@@ -45,10 +38,22 @@ def test_clicking_the_delete_icon_emits_delete_clicked(qtbot):
     fired = []
     tree.delete_clicked.connect(fired.append)
 
-    _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(item)), deletable=True)
+    _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(item)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=delete_rect.center())
 
     assert fired == ["media/wf/key"]
+
+
+def test_clicking_the_delete_icon_on_a_non_deletable_row_selects_instead(qtbot):
+    tree, item = _tree_with_one_row(qtbot, deletable=False)
+    fired = []
+    tree.delete_clicked.connect(fired.append)
+
+    _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(item)))
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=delete_rect.center())
+
+    assert fired == []                  # no delete offered for a non-deletable folder
+    assert tree.currentItem() is item   # the click just selects the row
 
 
 def test_clicking_the_star_icon_emits_star_clicked(qtbot):
@@ -56,7 +61,7 @@ def test_clicking_the_star_icon_emits_star_clicked(qtbot):
     fired = []
     tree.star_clicked.connect(fired.append)
 
-    star_rect, _ = _action_rects(tree.visualRect(tree.indexFromItem(item)), deletable=True)
+    star_rect, _ = _action_rects(tree.visualRect(tree.indexFromItem(item)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star_rect.center())
 
     assert fired == ["media/wf/key"]

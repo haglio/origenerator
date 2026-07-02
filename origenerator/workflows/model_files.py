@@ -8,8 +8,9 @@ than typing a filename. Shared by every workflow that exposes such a dropdown.
 from origenerator import config
 
 # The suffixes ComfyUI loads as models — LoRAs and checkpoints alike live under
-# these, so one set serves every category.
-_MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt")
+# these, so one set serves every category. ``.gguf`` covers the quantized Flux
+# diffusion models UnetLoaderGGUF loads.
+_MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 
 
 def list_model_files(category: str, fallback: list[str]) -> list[str]:

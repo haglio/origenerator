@@ -281,9 +281,15 @@ class GenerateConfigPanel(QWidget):
         else:
             self._generate(wf, params)
 
-    def _generate(self, wf, params: dict):
+    def _generate(self, wf, params: dict, *, keep_preview: bool = False):
         """Submit ``wf`` with ``params`` as this tab's main job, warning first if
-        a pinned seed would just re-create an identical past generation."""
+        a pinned seed would just re-create an identical past generation.
+
+        ``keep_preview`` leaves the current preview frame up when the job starts
+        (rather than clearing it) — used for the video stage of a random-input
+        i2v, so its freshly generated input image stays on screen until the video
+        streams a frame of its own.
+        """
         snapshot = ConfigSnapshot(wf.name, params, self._param_form.seed_is_random())
         if find_duplicate_generation(self._db.list_generations(), snapshot):
             if not self._offer_reroll(wf):
@@ -298,6 +304,7 @@ class GenerateConfigPanel(QWidget):
             payload=payload,
             workflow=wf,
             queue_name=wf.name,
+            keep_preview=keep_preview,
             record=dict(
                 prompt_id=prompt_id,
                 workflow_name=wf.name,
@@ -343,7 +350,8 @@ class GenerateConfigPanel(QWidget):
         ref = output_file_reference(files)
         if ref is not None:
             params = {**params, "input_image": ref}
-        self._generate(wf, params)  # now the main job, on the fresh image
+        # Keep the just-generated input image on screen until the video previews.
+        self._generate(wf, params, keep_preview=True)
 
     def _on_input_image_failed(self, message: str):
         self._input_image_job = None
@@ -394,13 +402,17 @@ class GenerateConfigPanel(QWidget):
         box.exec()
         return box.clickedButton() is reroll
 
-    def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict):
+    def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict,
+                     keep_preview: bool = False):
         """Stage a built job, then hand it to the queue (or run it now if unqueued).
 
         ``workflow`` is the WorkflowTemplate this job was built from, captured so
-        its output node is used when the job completes.
+        its output node is used when the job completes. ``keep_preview`` rides
+        along to :meth:`_begin_job` so a chained video stage doesn't wipe the
+        input-image frame the queue may only start much later.
         """
-        self._prepared = {"payload": payload, "workflow": workflow, "record": record}
+        self._prepared = {"payload": payload, "workflow": workflow, "record": record,
+                          "keep_preview": keep_preview}
         self._generate_btn.setEnabled(False)
         self._cancel_btn.setEnabled(True)
         if self._queue is not None:
@@ -454,7 +466,9 @@ class GenerateConfigPanel(QWidget):
             self._client_prompt_id = prompt_id
             self._submitted_workflow = job["workflow"]
             self._db.update_generation(prompt_id, status="running")
-            self._preview.clear()  # a fresh job: drop the previous result
+            if not job["keep_preview"]:
+                self._preview.clear()  # a fresh job: drop the previous result
+            # else: a chained video stage — keep the input-image frame until it previews
             # The job is submitted but ComfyUI may be busy (even with work from
             # outside Origenerator), so it can sit in the server queue before it
             # starts. Show that wait instead of a stuck "Generating… 0%"; the bar

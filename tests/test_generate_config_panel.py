@@ -213,6 +213,36 @@ def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):
     assert restored._param_form.image_is_random() is True
 
 
+def test_video_stage_keeps_the_input_image_frame_until_the_video_previews(qtbot, tmp_path):
+    # The random-input i2v flow shows the image being generated, then the video.
+    # Starting the video must not clear the image frame — it stays until the video
+    # streams its own first frame — so the preview doesn't blank between stages.
+    submit = MagicMock(return_value="x")
+    panel, client, _db = _i2v_panel(qtbot, tmp_path, submit)
+    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
+    panel._param_form._image_random_checks["input_image"].setChecked(True)
+    panel._on_generate()
+    img_id = panel._input_image_job.prompt_id
+    panel._preview.clear = MagicMock()
+
+    client.job_completed.emit(img_id, SDXL_HISTORY)  # image done -> the video stage begins
+
+    assert panel._client_prompt_id is not None       # the video job is running
+    panel._preview.clear.assert_not_called()          # the input image frame is left up
+
+
+def test_plain_generate_clears_the_previous_result(qtbot, tmp_path):
+    # A fresh, non-chained job still drops whatever the preview last showed.
+    submit = MagicMock(return_value="x")
+    panel, _client, _db = _i2v_panel(qtbot, tmp_path, submit)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    panel._preview.clear = MagicMock()
+
+    panel._on_generate()
+
+    panel._preview.clear.assert_called_once()
+
+
 def test_completion_only_handled_for_own_prompt_id(panel):
     panel._on_generate()
     our_id = panel._client_prompt_id

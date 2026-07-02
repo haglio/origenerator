@@ -1,4 +1,5 @@
 import json
+from unittest.mock import MagicMock
 
 from origenerator.gallery import (
     LoraGroup,
@@ -7,6 +8,7 @@ from origenerator.gallery import (
     SettingsGroup,
     SourceImageGroup,
     WorkflowGroup,
+    animated_preview_path,
     build_gallery_tree,
     build_image_config_index,
     child_groups,
@@ -64,6 +66,53 @@ def _row(**kw):
     }
     base.update(kw)
     return base
+
+
+def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):
+    """A video row resolves to its looping WebP, generated from the on-disk file."""
+    from origenerator.gallery import output as gallery_output
+    video = tmp_path / "wan22_i2v_v1.mp4"
+    video.write_bytes(b"fake video")
+    row = _row(prompt_id="v1", workflow_name="wan22_i2v",
+               output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]))
+    calls = []
+
+    def fake_generate(source, thumb_dir, *, name):
+        calls.append((source, thumb_dir, name))
+        return thumb_dir / f"{name}_anim.webp"
+
+    monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", fake_generate)
+
+    result = animated_preview_path(row, tmp_path, tmp_path / "thumbs")
+
+    assert result == str(tmp_path / "thumbs" / "v1_anim.webp")
+    assert calls == [(video, tmp_path / "thumbs", "v1")]  # generated from the real file
+
+
+def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
+    """An image row has nothing to animate, so no WebP is generated."""
+    from origenerator.gallery import output as gallery_output
+    image = tmp_path / "sdxl_t2i_i1.png"
+    image.write_bytes(b"fake image")
+    row = _row(prompt_id="i1", output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))
+    generate = MagicMock()
+    monkeypatch.setattr(gallery_output, "generate_animated_thumbnail", generate)
+
+    assert animated_preview_path(row, tmp_path, tmp_path / "thumbs") is None
+    generate.assert_not_called()
+
+
+def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path, monkeypatch):
+    """An unreadable video yields no WebP, so the caller falls back to the still."""
+    from origenerator.gallery import output as gallery_output
+    video = tmp_path / "wan22_i2v_v1.mp4"
+    video.write_bytes(b"fake video")
+    row = _row(prompt_id="v1", workflow_name="wan22_i2v",
+               output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]))
+    monkeypatch.setattr(gallery_output, "generate_animated_thumbnail",
+                        lambda *a, **k: None)
+
+    assert animated_preview_path(row, tmp_path, tmp_path / "thumbs") is None
 
 
 def test_media_type_of_row_uses_actual_output_file_over_workflow_type():

@@ -2,9 +2,12 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal
 
+from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
+
+_IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
 
 # A selected thumbnail lightens its whole tile — behind both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
@@ -34,7 +37,8 @@ class ThumbnailWidget(QWidget):
     unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
-                 parent=None, *, media_type: str | None = None):
+                 parent=None, *, media_type: str | None = None,
+                 movie_path: str | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
@@ -54,13 +58,20 @@ class ThumbnailWidget(QWidget):
         layout.setSpacing(2)
 
         self._image_label = QLabel()
-        self._image_label.setFixedSize(172, 160)
+        self._image_label.setFixedSize(_IMAGE_SIZE)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        if thumb_path and Path(thumb_path).exists():
+        # A video tile loops its short WebP preview; an image (or a video whose
+        # WebP couldn't be built) shows its static frame.
+        if movie_path and Path(movie_path).exists():
+            movie = looping_movie(movie_path, _IMAGE_SIZE, self._image_label)
+            self._image_label.setMovie(movie)
+            movie.start()
+        elif thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
             self._image_label.setPixmap(
-                pm.scaled(172, 160, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                pm.scaled(_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+                          Qt.TransformationMode.SmoothTransformation)
             )
         else:
             self._image_label.setText("No preview")

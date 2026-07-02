@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QScrollArea
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from origenerator import gallery
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
-from origenerator.gallery import settings_signature
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
@@ -55,11 +56,14 @@ class ThumbnailStrip(QWidget):
                 prompt_id,
                 row.get("thumbnail_path"),
                 self._label_for(row),
+                movie_path=gallery.animated_preview_path(
+                    row, COMFYUI_OUTPUT_DIR, THUMB_DIR
+                ),  # a video row loops its preview; an image stays a still
             )
             tw.clicked.connect(self.thumbnail_activated)
             tw.hovered.connect(self._highlight_matching)
             tw.unhovered.connect(self._clear_highlight)
-            self._sig_by_id[prompt_id] = settings_signature(
+            self._sig_by_id[prompt_id] = gallery.settings_signature(
                 row.get("workflow_name"), row.get("params_json")
             )
             self._widgets.append(tw)

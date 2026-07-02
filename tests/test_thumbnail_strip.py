@@ -1,8 +1,20 @@
 import json
 
+from PIL import Image
+from PyQt6.QtGui import QMovie
+
+from origenerator import gallery
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+
+
+def _write_looping_webp(path, size=(64, 48)):
+    frames = [Image.new("RGB", size, c) for c in ((255, 0, 0), (0, 255, 0))]
+    frames[0].save(path, format="WEBP", save_all=True,
+                   append_images=frames[1:], duration=100, loop=0)
+    return path
 
 
 def _seed_db(tmp_path, n):
@@ -64,6 +76,34 @@ def _insert(db, prompt_id, prompt, seed):
         params_json=json.dumps({"positive_prompt": prompt, "seed": seed}),
         workflow_json="{}",
     )
+
+
+def test_video_rows_animate_their_thumbnail(qtbot, tmp_path, monkeypatch):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    db = Database(tmp_path / "v.db")
+    db.insert_generation(
+        prompt_id="v1", workflow_name="wan22_i2v", workflow_version="v1",
+        positive_prompt="dance", negative_prompt="", seed=1,
+        params_json=json.dumps({"seed": 1}), workflow_json="{}",
+    )
+    db.update_generation(
+        "v1", status="completed",
+        output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]),
+    )
+    calls = []
+
+    def fake_anim(row, output_dir, thumb_dir):
+        calls.append((row["prompt_id"], output_dir, thumb_dir))
+        return str(webp)
+
+    monkeypatch.setattr(gallery, "animated_preview_path", fake_anim)
+    strip = ThumbnailStrip(db)
+    qtbot.addWidget(strip)
+    strip.show_generations(["v1"])
+
+    tile = strip._list.itemAt(0).widget()
+    assert tile.findChildren(QMovie)  # the video thumbnail loops
+    assert ("v1", COMFYUI_OUTPUT_DIR, THUMB_DIR) in calls  # via the shared resolver
 
 
 def test_hovering_highlights_thumbnails_with_matching_settings(qtbot, tmp_path):

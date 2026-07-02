@@ -6,12 +6,14 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QMovie
 from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
 from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, THUMB_DIR,
+)
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
@@ -471,6 +473,55 @@ def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
     view.refresh()  # a poll-driven rebuild must not knock us off the shelf
 
     assert view._tree.currentItem().text(0) == "Recents"
+
+
+def _write_looping_webp(path, size=(64, 48)):
+    """A tiny two-frame looping WebP standing in for a video's moving preview."""
+    from PIL import Image as _Image
+    frames = [_Image.new("RGB", size, c) for c in ((255, 0, 0), (0, 255, 0))]
+    frames[0].save(path, format="WEBP", save_all=True,
+                   append_images=frames[1:], duration=100, loop=0)
+    return path
+
+
+def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, monkeypatch):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    rows = [
+        _image("i1", "a cat", 50, 1),
+        _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4"),
+    ]
+    calls = []
+
+    def fake_anim(row, output_dir, thumb_dir):
+        calls.append((row["prompt_id"], output_dir, thumb_dir))
+        return str(webp) if gallery.media_type_of_row(row) == "video" else None
+
+    monkeypatch.setattr(gallery, "animated_preview_path", fake_anim)
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+
+    assert view._thumb_widgets["v1"].findChildren(QMovie)          # the video loops
+    assert view._thumb_widgets["i1"].findChildren(QMovie) == []    # the image is a still
+    # Each tile resolved its preview through the shared helper, with the app's dirs.
+    assert ("v1", COMFYUI_OUTPUT_DIR, THUMB_DIR) in calls
+
+
+def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    rows = [_row("v1", "wan22_i2v",
+                 {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4")]
+    monkeypatch.setattr(
+        gallery, "animated_preview_path",
+        lambda row, o, t: str(webp) if gallery.media_type_of_row(row) == "video" else None,
+    )
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video's settings folder
+    assert view._thumb_widgets["v1"].findChildren(QMovie)  # its grid tile loops
 
 
 def test_recents_tiles_are_badged_image_or_video(qtbot):

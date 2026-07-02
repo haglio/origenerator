@@ -10,10 +10,14 @@ declared output type for the pending-row fallback.
 """
 
 import json
+import logging
 from pathlib import Path
 
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.gallery.signatures import workflow_output_type
+from origenerator.thumbnail import generate_animated_thumbnail
+
+logger = logging.getLogger(__name__)
 
 
 def row_output_files(row: dict) -> list[dict]:
@@ -76,6 +80,26 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
         return Path(thumb), "image"
 
     return None
+
+
+def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str | None:
+    """A cached looping-WebP preview of a video ``row``, generated on first need.
+
+    ``None`` for a non-video row, or when the video file is missing or unreadable
+    — the caller then falls back to the row's static thumbnail. The WebP is cached
+    on disk (keyed by the row's ``prompt_id``), so only the first request pays the
+    frame-sampling cost; every gallery surface that shows a video tile resolves
+    its moving preview through here.
+    """
+    preview = resolve_preview(row, output_dir)
+    if preview is None or preview[1] != "video":
+        return None
+    try:
+        result = generate_animated_thumbnail(preview[0], thumb_dir, name=row["prompt_id"])
+    except Exception as e:
+        logger.warning("Animated preview failed for %s: %s", row.get("prompt_id"), e)
+        return None
+    return str(result) if result is not None else None
 
 
 def output_disk_files(row: dict, output_dir: Path) -> list[Path]:

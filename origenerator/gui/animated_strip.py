@@ -7,10 +7,11 @@ no animation is available), and clicking one navigates to that video. WebP +
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QMovie, QPixmap, QImageReader
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.looping_preview import looping_movie
 
 _TILE = 132
 
@@ -73,9 +74,7 @@ class AnimatedVideoStrip(QWidget):
         tile = _VideoTile(prompt_id)
         tile.clicked.connect(self.video_activated)
         if movie_path:
-            movie = QMovie(str(movie_path))
-            movie.setParent(tile)
-            self._fit_movie(movie, str(movie_path))
+            movie = looping_movie(movie_path, QSize(_TILE, _TILE), tile)
             tile.setMovie(movie)
             movie.start()
         elif still_path:
@@ -87,14 +86,3 @@ class AnimatedVideoStrip(QWidget):
                     Qt.TransformationMode.SmoothTransformation,
                 ))
         return tile
-
-    @staticmethod
-    def _fit_movie(movie: QMovie, path: str):
-        """Scale the movie into the tile keeping its aspect (QMovie's own scaling
-        would otherwise stretch a non-square preview to the square tile)."""
-        native = QImageReader(path).size()
-        if native.isValid() and not native.isEmpty():
-            target = native.scaled(
-                QSize(_TILE, _TILE), Qt.AspectRatioMode.KeepAspectRatio
-            )
-            movie.setScaledSize(target)

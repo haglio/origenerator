@@ -30,7 +30,6 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
 from origenerator.navigation import NavigationHistory
-from origenerator.thumbnail import generate_animated_thumbnail
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -624,6 +623,7 @@ class GalleryView(QWidget):
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+                movie_path=self._animated_preview(row),     # videos loop; images stay still
             )
             tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
             flow.addWidget(tw)
@@ -786,7 +786,8 @@ class GalleryView(QWidget):
             self._add_reroll_tile(flow, group)
         for row in group.rows:
             tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row)
+                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
+                movie_path=self._animated_preview(row),  # videos loop; images stay still
             )
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
@@ -1294,24 +1295,19 @@ class GalleryView(QWidget):
             logger.info("Image %s has %d animations; showing the first %d",
                         row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
         return [
-            (v["prompt_id"], self._animated_preview_path(v), v.get("thumbnail_path"))
+            (v["prompt_id"], self._animated_preview(v), v.get("thumbnail_path"))
             for v in videos[:_ANIMATED_STRIP_LIMIT]
         ]
 
     def _video_rows(self) -> list[dict]:
         return [r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "video"]
 
-    def _animated_preview_path(self, video_row: dict):
-        """A cached looping WebP preview of a video, generated on first need;
-        ``None`` (fall back to the still) if its file is gone or unreadable."""
-        preview = gallery.resolve_preview(video_row, COMFYUI_OUTPUT_DIR)
-        if preview is None or preview[1] != "video":
-            return None
-        try:
-            return generate_animated_thumbnail(preview[0], THUMB_DIR, name=video_row["prompt_id"])
-        except Exception as e:
-            logger.warning("Animated preview failed for %s: %s", video_row.get("prompt_id"), e)
-            return None
+    def _animated_preview(self, row: dict) -> str | None:
+        """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
+        video whose file is gone or unreadable, so the tile shows its still instead.
+        The same resolver feeds the grid tiles, the Recents shelf, and the
+        'Animated in' strip, with the app's output and thumbnail directories."""
+        return gallery.animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR)
 
     def _render_preview(self, preview):
         """Play/show the already-resolved ``(path, media_type)``, or clear when

@@ -1,10 +1,46 @@
+from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
-from PyQt6.QtGui import QColor, QEnterEvent
+from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
+
+
+def _write_looping_webp(path, size=(64, 48)):
+    """A tiny two-frame looping WebP, the shape a video thumbnail animates."""
+    frames = [Image.new("RGB", size, c) for c in ((255, 0, 0), (0, 255, 0))]
+    frames[0].save(path, format="WEBP", save_all=True,
+                   append_images=frames[1:], duration=100, loop=0)
+    return path
+
+
+def test_video_thumbnail_plays_a_looping_movie(qtbot, tmp_path):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    tw = ThumbnailWidget("v1", None, "label", movie_path=str(webp))
+    qtbot.addWidget(tw)
+    movies = tw.findChildren(QMovie)
+    assert len(movies) == 1
+    assert movies[0].state() == QMovie.MovieState.Running  # animating, not paused
+
+
+def test_thumbnail_without_a_movie_path_stays_a_still(qtbot, tmp_path):
+    still = tmp_path / "i1.jpg"
+    Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
+    tw = ThumbnailWidget("i1", str(still), "label")  # image row: no movie_path
+    qtbot.addWidget(tw)
+    assert tw.findChildren(QMovie) == []
+    assert tw._image_label.pixmap() is not None and not tw._image_label.pixmap().isNull()
+
+
+def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
+    still = tmp_path / "i1.jpg"
+    Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
+    tw = ThumbnailWidget("v1", str(still), "label", movie_path=str(tmp_path / "gone.webp"))
+    qtbot.addWidget(tw)
+    assert tw.findChildren(QMovie) == []  # the WebP is gone; show the still instead
+    assert not tw._image_label.pixmap().isNull()
 
 
 def test_hover_emits_hovered_then_unhovered(qtbot):

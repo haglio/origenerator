@@ -16,4 +16,11 @@ COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 
+# Evolver (the sibling video-maintenance app) watches this inbox and ingests any
+# finalized video dropped under a per-source subfolder. Mirrors evolver's own
+# INBOX_DIR; we write under our own source name so Evolver can route
+# Origenerator's videos distinctly from other inbox sources.
+EVOLVER_INBOX_DIR = Path("C:/path/to/suite-root/videos/videos/2D/AI/0_inbox")
+EVOLVER_SOURCE = "origenerator"
+
 THUMB_SIZE = (256, 256)

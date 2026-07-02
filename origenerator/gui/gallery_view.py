@@ -9,10 +9,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
-from origenerator import gallery, timing
+from origenerator import evolver_export, gallery, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, STATE_DIR, THUMB_DIR,
+)
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import merge_denormalized, prepared_params
@@ -249,6 +251,16 @@ class GalleryView(QWidget):
         reuse_box.setContentsMargins(0, 0, 0, 0)
         reuse_box.addWidget(self._reuse_btn)
         info_box.addWidget(self._reuse_wrap)
+        # Video-only: copy the selected clip into Evolver's inbox for sorting and
+        # upscaling. Hidden entirely for images (Evolver is a video pipeline)
+        # rather than shown disabled, so it's absent when it can't apply.
+        self._evolver_btn = QPushButton("Send to Evolver")
+        self._evolver_btn.setToolTip(
+            "Copy this video into Evolver's inbox for sorting and upscaling."
+        )
+        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
+        self._evolver_btn.hide()
+        info_box.addWidget(self._evolver_btn)
         self._panes.addWidget(info)
 
         # The TOC pane holds its width; the browser and info panes both grow with
@@ -665,7 +677,7 @@ class GalleryView(QWidget):
 
         The tile stands for an in-flight job with no saved file yet, so its
         preview comes from the job's streamed frames rather than
-        :meth:`_show_preview`'s on-disk lookup.
+        :meth:`_render_preview`'s on-disk lookup.
         """
         job = self._reroll_jobs.get(key)
         if job is None:
@@ -694,6 +706,7 @@ class GalleryView(QWidget):
             self._reroll_tile.set_selected(True)
         self._reuse_btn.setEnabled(False)
         self._reuse_wrap.setToolTip("")
+        self._update_evolver_button(None)  # a running re-roll isn't a saved video
         self._meta_title.setText("Generating a new variation…")
         self._estimate_label.clear()
         self._meta_panel.clear()
@@ -1112,7 +1125,11 @@ class GalleryView(QWidget):
             "This workflow isn't built into the app yet — ask Claude to "
             "implement it if you want to reuse its parameters."
         )
-        self._show_preview(row)
+        # Resolve the preview once and share it: both the player and the
+        # Send-to-Evolver button key off the same on-disk file.
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        self._update_evolver_button(preview)
+        self._render_preview(preview)
         self._meta_title.setText(
             f"{row['workflow_name']} ({row['workflow_version']})"
         )
@@ -1166,8 +1183,9 @@ class GalleryView(QWidget):
             logger.warning("Animated preview failed for %s: %s", video_row.get("prompt_id"), e)
             return None
 
-    def _show_preview(self, row: dict):
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+    def _render_preview(self, preview):
+        """Play/show the already-resolved ``(path, media_type)``, or clear when
+        ``None`` (nothing displayable resolved for the selection)."""
         if preview is None:
             self._preview.clear()
         else:
@@ -1232,10 +1250,66 @@ class GalleryView(QWidget):
         self._selected = None
         self._reuse_btn.setEnabled(False)
         self._reuse_wrap.setToolTip("")
+        self._update_evolver_button(None)
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
         self._meta_panel.clear()
         self._preview.clear()
+
+    def _update_evolver_button(self, preview):
+        """Show Send-to-Evolver only when the selection is a video with a file on
+        disk. ``preview`` is the selection's resolved ``(path, media_type)``, or
+        ``None`` when nothing displayable is selected.
+
+        Evolver is a video pipeline, so for an image or a missing file the button
+        is hidden rather than shown disabled — simply absent when it can't apply.
+        """
+        is_video = preview is not None and preview[1] == "video"
+        self._evolver_btn.setVisible(is_video)
+        if is_video:  # clear any lingering "Sent ✓" confirmation from last time
+            self._evolver_btn.setEnabled(True)
+            self._evolver_btn.setText("Send to Evolver")
+
+    def _exportable_video_path(self) -> Path | None:
+        """The on-disk video file backing the current selection, or ``None`` when
+        the selection isn't a video (or its file is missing) and can't be sent.
+        Resolved fresh at send time, so a file deleted since selection is caught."""
+        if not self._selected:
+            return None
+        preview = gallery.resolve_preview(self._selected, COMFYUI_OUTPUT_DIR)
+        if preview is None or preview[1] != "video":
+            return None
+        return preview[0]
+
+    def _on_send_to_evolver(self):
+        """Copy the selected video into Evolver's inbox, confirming on the button.
+
+        The copied file lands in another app's inbox with no other visible result
+        here, so a failure must surface loudly and success must be acknowledged.
+        """
+        path = self._exportable_video_path()
+        if path is None:
+            return
+        try:
+            evolver_export.export_video(path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
+        except Exception as e:
+            logger.exception("Failed to send %s to Evolver", path)
+            QMessageBox.warning(
+                self, "Send to Evolver failed",
+                f"Could not send this video to Evolver:\n\n{e}",
+            )
+            return
+        self._flash_evolver_sent()
+
+    def _flash_evolver_sent(self):
+        """Briefly change the button to a sent confirmation, then restore it."""
+        self._evolver_btn.setText("Sent to Evolver ✓")
+        self._evolver_btn.setEnabled(False)
+        QTimer.singleShot(1600, self._reset_evolver_button)
+
+    def _reset_evolver_button(self):
+        self._evolver_btn.setText("Send to Evolver")
+        self._evolver_btn.setEnabled(True)
 
     def _on_reuse(self):
         # Gate on reusability here, not just via the button's enabled state, so

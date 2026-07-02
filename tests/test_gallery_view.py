@@ -8,11 +8,12 @@ from PIL import Image
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
-from origenerator import gallery
+from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
+from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
@@ -886,6 +887,75 @@ def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
     assert view._reuse_btn.isEnabled() is False
     # The hint rides on the wrapper, since a disabled button shows no tooltip.
     assert "claude" in view._reuse_wrap.toolTip().lower()
+
+
+def _video_resolver(video_path):
+    """A resolve_preview stub: a real video file for video rows, a still else."""
+    def resolve(row, output_dir):
+        if gallery.media_type_of_row(row) == "video":
+            return (video_path, "video")
+        return (Path("C:/out/still.png"), "image")
+    return resolve
+
+
+def test_send_to_evolver_button_shows_only_for_a_video(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()  # don't start real WMF playback
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
+
+    view._on_thumbnail_clicked("v1")   # a video with a file on disk
+    assert view._evolver_btn.isHidden() is False
+
+    view._on_thumbnail_clicked("i1")   # an image — Evolver is a video pipeline
+    assert view._evolver_btn.isHidden() is True
+
+
+def test_send_to_evolver_button_hidden_when_the_video_file_is_gone(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    # No displayable file resolves (the output was deleted): nothing to send.
+    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
+
+    view._on_thumbnail_clicked("v1")
+    assert view._evolver_btn.isHidden() is True
+
+
+def test_send_to_evolver_copies_the_selected_video_to_the_inbox(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()  # don't start real WMF playback
+    video_path = Path("C:/out/wan22_i2v_v1.mp4")
+    monkeypatch.setattr(gallery, "resolve_preview", _video_resolver(video_path))
+    export = MagicMock(return_value=EVOLVER_INBOX_DIR / EVOLVER_SOURCE / "wan22_i2v_v1.mp4")
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    view._on_thumbnail_clicked("v1")
+    view._on_send_to_evolver()
+
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
+
+
+def test_send_to_evolver_warns_and_survives_a_failed_copy(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()  # don't start real WMF playback
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
+    monkeypatch.setattr(evolver_export, "export_video",
+                        MagicMock(side_effect=OSError("inbox unreachable")))
+    warn = MagicMock()
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
+
+    view._on_thumbnail_clicked("v1")
+    view._on_send_to_evolver()  # must not raise
+
+    warn.assert_called_once()
 
 
 def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):

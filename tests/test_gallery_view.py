@@ -415,17 +415,37 @@ def test_recents_shelf_excludes_imported_files(qtbot):
     assert view.visible_prompt_ids() == ["gen"]
 
 
-def test_clicking_a_recent_item_opens_it_in_its_folder(qtbot):
+def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    view._on_source_link("i2")  # click the recent tile for the dog image
-    # We've navigated off the shelf into the dog's own folder, with it selected.
+    view._thumb_widgets["i2"].clicked.emit("i2")  # click the recent tile for the dog
+    # Its details fill the info pane, but the shelf stays put — no navigation, so
+    # every recent item is still listed.
     assert view.selected_generation() == "i2"
-    assert set(view.visible_prompt_ids()) == {"i2"}
+    assert view._showing_recents()
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+
+
+def test_go_to_containing_folder_button_appears_then_navigates(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    assert view._containing_folder_btn.isHidden()       # nothing picked yet
+    view._thumb_widgets["i2"].clicked.emit("i2")        # preview a recent item
+    assert not view._containing_folder_btn.isHidden()   # now a jump is on offer
+
+    view._containing_folder_btn.click()                 # take it
+    assert view.selected_generation() == "i2"
+    assert view._showing_recents() is False             # we left the shelf...
+    assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
+    assert view._containing_folder_btn.isHidden()       # and the button retires
 
 
 def test_recents_shelf_shows_empty_state_when_only_imports_exist(qtbot):

@@ -232,6 +232,17 @@ class GalleryView(QWidget):
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
         browser_box.addLayout(header)
+        # Shown only while a Recents item is previewed: that item's generation lives
+        # in a folder other than the shelf on screen, so this jumps the browser to
+        # it. Left-aligned at its natural width, and it collapses away when hidden.
+        self._containing_folder_btn = QPushButton("Go to containing folder")
+        self._containing_folder_btn.clicked.connect(self._go_to_containing_folder)
+        self._containing_folder_btn.hide()
+        folder_row = QHBoxLayout()
+        folder_row.setContentsMargins(0, 0, 0, 0)
+        folder_row.addWidget(self._containing_folder_btn)
+        folder_row.addStretch(1)
+        browser_box.addLayout(folder_row)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
@@ -585,9 +596,10 @@ class GalleryView(QWidget):
         """Render the Recents shelf: a card for every in-flight generation (queued
         or running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight card reveals where its job runs; a
-        finished one jumps to it in its folder, the way the Starred shelf opens a
-        bookmarked folder. Like that shelf it lists many items, so the info pane
-        clears rather than previewing one."""
+        finished one previews in the info pane, right here on the shelf, the way a
+        thumbnail does inside a folder — and a "Go to containing folder" button
+        then offers the jump to its folder. Opens with the info pane cleared, so
+        it shows nothing until an item is picked."""
         self._title.set_display(_RECENTS_LABEL)
         self._avg_label.setText("")
         self._clear_metadata()
@@ -613,7 +625,7 @@ class GalleryView(QWidget):
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             )
-            tw.clicked.connect(self._on_source_link)  # jump to the item in its folder
+            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
@@ -702,6 +714,20 @@ class GalleryView(QWidget):
         item = self._inflight_by_key.get(key)
         if item is not None:
             item.reveal()
+
+    def _go_to_containing_folder(self):
+        """Jump the browser pane to the previewed Recents item's own folder — the
+        button's action, and the same navigation a followed link makes."""
+        if self._selected is not None:
+            self._on_source_link(self._selected["prompt_id"])
+
+    def _sync_containing_folder_button(self):
+        """Offer "Go to containing folder" only while the Recents shelf is showing
+        a previewed item: that's the one view whose info pane holds a generation
+        from a folder other than the one on screen."""
+        self._containing_folder_btn.setVisible(
+            self._showing_recents() and self._selected is not None
+        )
 
     # --- the Starred shelf: every bookmarked folder, gathered in one place ---
 
@@ -1236,6 +1262,7 @@ class GalleryView(QWidget):
         source_id = gallery.find_source_image_id(row, self._image_rows)
         self._meta_panel.show_row(row, source_id)
         self._update_animated_strip(row)
+        self._sync_containing_folder_button()  # a Recents preview offers the jump
         # Every view of a generation — a thumbnail click, a folder's auto-selected
         # first item, a followed link — is a browsing step, unless a rebuild or
         # Back/Forward is re-selecting (those move within history, not onto it).
@@ -1352,6 +1379,7 @@ class GalleryView(QWidget):
         self._estimate_label.clear()
         self._meta_panel.clear()
         self._preview.clear()
+        self._sync_containing_folder_button()  # nothing selected: no jump to offer
 
     def _update_evolver_button(self, preview):
         """Reflect the selection on the Send-to-Evolver button.

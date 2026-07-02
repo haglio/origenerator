@@ -211,6 +211,20 @@ def test_rename_cancelled_leaves_title(view, monkeypatch):
     assert view._subtabs.tabText(idx) == before
 
 
+def test_double_clicking_close_does_not_open_rename(view, monkeypatch):
+    # Double-clicking the ✕ closes a tab on its first click; the remaining tabs
+    # shift left and the completing double-click lands on the neighbor, firing
+    # tabBarDoubleClicked. That stray click must not open the rename dialog.
+    from PyQt6.QtWidgets import QInputDialog
+    view._add_subtab()  # a neighbor to slide under the cursor after the close
+    opened = []
+    monkeypatch.setattr(QInputDialog, "getText",
+                        lambda *a, **k: opened.append(True) or ("X", True))
+    view._close_subtab(0)   # first click of the double-click removes tab 0
+    view._rename_subtab(0)  # completing double-click, now over the shifted neighbor
+    assert opened == []
+
+
 def test_second_generate_is_queued_behind_the_first(view):
     view._client.submit_job = MagicMock(return_value="comfy-1")
     p1 = view._subtabs.widget(0)

@@ -1,8 +1,9 @@
 import json
+import time
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QToolButton,
-    QInputDialog, QStackedWidget, QLabel, QPushButton,
+    QInputDialog, QStackedWidget, QLabel, QPushButton, QApplication,
 )
 from PyQt6.QtCore import Qt
 
@@ -54,6 +55,11 @@ class GenerateView(QWidget):
         layout.addWidget(self._stack, 1)
 
         self._queue = JobQueue(db)  # one generation at a time across subtabs
+        # A double-click on a tab's ✕ closes it on the first click, then the tabs
+        # shift and the completing double-click lands on the neighbor as a
+        # tabBarDoubleClicked. This stamps each close so that stray double-click
+        # can be told from a genuine rename gesture.
+        self._last_close_at = float("-inf")
         self._add_subtab()
 
     def _build_empty_state(self) -> QWidget:
@@ -93,7 +99,18 @@ class GenerateView(QWidget):
         if index >= 0:
             self._subtabs.setTabText(index, text)
 
+    def _closed_within_double_click(self) -> bool:
+        """Was a subtab closed within one double-click of now?
+
+        The completing click of a double-click on a ✕ arrives this close, so a
+        rename firing that soon after a close is that stray click, not a gesture.
+        """
+        interval = QApplication.doubleClickInterval() / 1000  # ms -> s
+        return time.monotonic() - self._last_close_at < interval
+
     def _rename_subtab(self, index: int):
+        if self._closed_within_double_click():
+            return  # a stray double-click left over from closing a tab, not a rename
         panel = self._subtabs.widget(index)
         if panel is None:
             return
@@ -112,6 +129,7 @@ class GenerateView(QWidget):
         panel.deleteLater()
 
     def _close_subtab(self, index: int):
+        self._last_close_at = time.monotonic()  # arm the stray-double-click guard
         self._discard_subtab(index)
         self._update_empty_state()  # closing the last tab reveals the empty state
 

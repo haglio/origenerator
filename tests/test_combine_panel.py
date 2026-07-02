@@ -7,7 +7,7 @@ def _panel(qtbot):
     panel = CombinePanel(
         image_accepts=lambda pid: pid.startswith("img"),
         video_accepts=lambda pid: pid.startswith("vid"),
-        preview=lambda pid: None,
+        preview=lambda pid: (None, None),
     )
     qtbot.addWidget(panel)
     return panel

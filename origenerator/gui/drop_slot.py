@@ -2,18 +2,21 @@
 
 The gallery's combine panel pairs two of these — an image slot and a video slot.
 Each accepts only a generation its ``accepts`` predicate allows (the image slot an
-image, the video slot a rebuildable i2v video), shows the dropped item's preview,
-and reports every change so the panel can enable its Generate button. It knows only
-prompt_ids; the view supplies the predicate and the preview, so the slot stays free
-of database or workflow knowledge.
+image, the video slot a rebuildable i2v video), previews the dropped item — a video
+loops its clip, an image shows its still — and wears a corner badge of its own kind
+so it's clear which item belongs where. It knows only prompt_ids; the view supplies
+the predicate and the preview, so the slot stays free of database knowledge.
 """
 
 from collections.abc import Callable
+from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap, QMovie
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
+from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.thumbnail_widget import GENERATION_MIME
 
 _PREVIEW_SIZE = 96  # the dropped thumbnail fits this box; small enough for a 120px pane
@@ -26,16 +29,19 @@ class DropSlot(QWidget):
 
     def __init__(
         self,
+        kind: str,
         accepts: Callable[[str], bool],
-        preview: Callable[[str], QPixmap | None],
+        preview: Callable[[str], tuple[str | None, str | None]],
         placeholder: str,
         parent=None,
     ):
         super().__init__(parent)
+        self._kind = kind          # "image"/"video" — which badge this slot wears
         self._accepts = accepts
-        self._preview = preview
+        self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
         self._current_id: str | None = None
+        self._movie: QMovie | None = None
         self.setAcceptDrops(True)
         self.setMinimumWidth(0)  # shrink with the TOC pane rather than widen it
 
@@ -49,6 +55,8 @@ class DropSlot(QWidget):
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(_PREVIEW_SIZE)
         layout.addWidget(self._label)
+        # A corner chip naming this slot's kind, shown only once something's dropped.
+        self._badge = MediaBadge(kind, self)
         self._render()
 
     # --- state ------------------------------------------------------------
@@ -70,21 +78,36 @@ class DropSlot(QWidget):
         self._render()
         self.changed.emit()
 
+    def _stop_movie(self):
+        if self._movie is not None:
+            self._movie.stop()
+            self._movie.deleteLater()
+            self._movie = None
+
     def _render(self):
+        self._stop_movie()
         if self._current_id is None:
             self._label.setPixmap(QPixmap())  # drop any prior preview
             self._label.setText(self._placeholder)
+            self._badge.setVisible(False)
             self.setToolTip("")
             return
-        pixmap = self._preview(self._current_id)
-        if pixmap is not None and not pixmap.isNull():
+        thumb_path, movie_path = self._preview(self._current_id)
+        if movie_path and Path(movie_path).exists():
             self._label.setText("")
-            self._label.setPixmap(pixmap.scaled(
+            self._movie = looping_movie(movie_path, QSize(_PREVIEW_SIZE, _PREVIEW_SIZE), self._label)
+            self._label.setMovie(self._movie)
+            self._movie.start()  # a video loops its clip
+        elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
+            self._label.setText("")
+            self._label.setPixmap(QPixmap(str(thumb_path)).scaled(
                 _PREVIEW_SIZE, _PREVIEW_SIZE,
                 Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
             ))
         else:
             self._label.setText("✓")  # held, but no thumbnail to show
+        self._badge.setVisible(True)
+        self._badge.raise_()  # keep the kind chip above the preview
         self.setToolTip("Click to remove")
 
     # --- drag & drop ------------------------------------------------------

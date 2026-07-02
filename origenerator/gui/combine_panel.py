@@ -10,7 +10,6 @@ that gate each slot, and the generation itself.
 from collections.abc import Callable
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import pyqtSignal
 
 from origenerator.gui.drop_slot import DropSlot
@@ -25,12 +24,12 @@ class CombinePanel(QWidget):
         self,
         image_accepts: Callable[[str], bool],
         video_accepts: Callable[[str], bool],
-        preview: Callable[[str], QPixmap | None],
+        preview: Callable[[str], tuple[str | None, str | None]],
         parent=None,
     ):
         super().__init__(parent)
-        self.image_slot = DropSlot(image_accepts, preview, "Drop an image")
-        self.video_slot = DropSlot(video_accepts, preview, "Drop an I2V video")
+        self.image_slot = DropSlot("image", image_accepts, preview, "Drop an image")
+        self.video_slot = DropSlot("video", video_accepts, preview, "Drop an I2V video")
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._sync)
 

@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
-from PyQt6.QtGui import QPixmap
 
 from origenerator import gallery, timing
 from origenerator.gui import icons
@@ -545,15 +544,13 @@ class GalleryView(QWidget):
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
         )
 
-    def _combine_preview(self, prompt_id: str) -> QPixmap | None:
-        """A dropped item's still thumbnail for its slot, or ``None`` if it has none."""
+    def _combine_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
+        """A dropped item's (thumbnail, looping-preview) paths for its slot: a video
+        loops its clip, an image shows its still. Either may be ``None`` when absent."""
         row = self._db.get_generation(prompt_id)
-        thumb = row.get("thumbnail_path") if row else None
-        if thumb and Path(thumb).exists():
-            pixmap = QPixmap(str(thumb))
-            if not pixmap.isNull():
-                return pixmap
-        return None
+        if row is None:
+            return (None, None)
+        return (row.get("thumbnail_path"), self._animated_preview(row))
 
     def _generate_combination(self, image_id: str, video_id: str):
         """Generate a new video from a dropped image + a dropped video's recipe.

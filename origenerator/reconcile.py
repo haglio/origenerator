@@ -119,6 +119,9 @@ def reconcile_folder_meta(db) -> dict:
     if not meta:
         return summary
     rows_by_id = {r["prompt_id"]: r for r in db.list_generations()}
+    image_index = gallery.build_image_config_index(
+        [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == "image"]
+    )
     current, legacy_keys = _index_current_folders(rows_by_id.values())
     meta_by_key = {m["folder_key"]: dict(m) for m in meta}
 
@@ -133,7 +136,7 @@ def reconcile_folder_meta(db) -> dict:
                 cur["level"], cur["ref_prompt_id"] = level, ref
                 summary["refreshed"] += 1
             continue
-        target = _repoint_target(row, current, rows_by_id, legacy_keys)
+        target = _repoint_target(row, current, rows_by_id, legacy_keys, image_index)
         if target is None:
             summary["orphaned"] += 1
             continue
@@ -147,8 +150,8 @@ def reconcile_folder_meta(db) -> dict:
 
 def _index_current_folders(rows):
     """Map every current folder key → ``(level, a member prompt_id)``, plus each
-    settings folder's legacy key → its current key (for the one historical formula
-    change, so bookmarks made before stored identity can still be recovered)."""
+    settings folder's legacy keys → its current key (for the historical formula
+    changes, so bookmarks made before stored identity can still be recovered)."""
     current: dict = {}
     legacy_keys: dict = {}
 
@@ -161,21 +164,24 @@ def _index_current_folders(rows):
                     legacy_keys.setdefault(
                         gallery.legacy_settings_folder_key(members[0]), group.key
                     )
+                    preframe = gallery.legacy_preframe_settings_folder_key(members[0])
+                    if preframe != group.key:  # differs only for image-conditioned folders
+                        legacy_keys.setdefault(preframe, group.key)
             walk(gallery.child_groups(group))
 
     walk(gallery.build_gallery_tree(list(rows), {}))
     return current, legacy_keys
 
 
-def _repoint_target(row, current, rows_by_id, legacy_keys):
+def _repoint_target(row, current, rows_by_id, legacy_keys, image_index):
     """The current key a dangling bookmark should move to, or ``None``.
 
     Prefers recomputing from the bookmark's stored identity — a member row at its
-    tier, robust to any formula change — and falls back to the one legacy settings
+    tier, robust to any formula change — and falls back to a legacy settings
     formula for bookmarks that predate stored identity."""
     ref, level = row["ref_prompt_id"], row["level"]
     if ref and level and ref in rows_by_id:
-        candidate = gallery.folder_key_at_level(rows_by_id[ref], level)
+        candidate = gallery.folder_key_at_level(rows_by_id[ref], level, image_index)
         if candidate in current:
             return candidate
     return legacy_keys.get(row["folder_key"])

@@ -13,8 +13,8 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.completion import extract_completion
 from origenerator.db import Database
 from origenerator.gallery import (
-    config_tab_title, media_type_of_row, output_file_reference,
-    settings_signature, source_image_id_for,
+    build_image_config_index, config_tab_title, media_type_of_row,
+    output_file_reference, settings_signature, source_image_id_for,
 )
 from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
@@ -636,7 +636,8 @@ class GenerateConfigPanel(QWidget):
         if wf is None or self._param_form is None:
             return None
         params = self._param_form.get_values_static()
-        return key, settings_signature(key, json.dumps(params))
+        index = build_image_config_index(self._image_rows())
+        return key, settings_signature(key, json.dumps(params), index)
 
     def seed_strip(self, prompt_ids):
         """Seed this tab's strip with a settings folder when it opens from one.

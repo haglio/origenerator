@@ -760,13 +760,25 @@ class GalleryView(QWidget):
         if self._client is None:
             return
         claimed = self._claimed_ids()
+        # Read the frame configs straight from the DB: the first tree rebuild
+        # (which would populate self._image_rows) hasn't run yet at startup.
+        index = self._image_config_index()
         for row in self._db.list_generations():
             if row.get("status") in ("running", "pending") and row["prompt_id"] not in claimed:
-                self._reconnect_reroll(row)
+                self._reconnect_reroll(row, index)
         self._rerender_current_leaf()
 
-    def _reconnect_reroll(self, row: dict):
-        key = gallery.settings_folder_key(row)
+    def _image_config_index(self) -> dict:
+        """The frame-config index for keying image-conditioned folders, built from
+        the current image rows so an i2v row keys to the same leaf the tree gives
+        it (see :func:`gallery.build_image_config_index`)."""
+        image_rows = [
+            r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "image"
+        ]
+        return gallery.build_image_config_index(image_rows)
+
+    def _reconnect_reroll(self, row: dict, image_index: dict):
+        key = gallery.settings_folder_key(row, image_index)
         if key in self._reroll_jobs:
             return  # a job for this folder is already tracked
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")

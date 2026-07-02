@@ -166,7 +166,8 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
 
     # Simulate a *future* settings-key formula change: the folder's key shifts.
     original = gallery.settings_signature
-    monkeypatch.setattr(gallery, "settings_signature", lambda wf, pj: original(wf, pj) + "X")
+    monkeypatch.setattr(gallery, "settings_signature",
+                        lambda wf, pj, image_index=None: original(wf, pj, image_index) + "X")
     new_key = gallery.settings_folder_key(row)
     assert new_key != key
 
@@ -175,6 +176,33 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     meta = db.folder_meta_map()
     assert meta.get(new_key, {}).get("starred") is True  # the star followed the folder
     assert key not in meta
+    assert summary["repointed"] == 1
+
+
+def test_reconcile_repoints_an_i2v_star_across_the_frame_config_change(tmp_path):
+    # A star made before an i2v's start-frame config was folded into its settings
+    # key dangles once the formula changes. With no stored identity it is recovered
+    # through the pre-frame-config legacy formula and moved onto the live folder —
+    # so the user's bookmark survives this fix.
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "img", params={"positive_prompt": "a face", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_img.png")
+    video = _add_completed(
+        db, "vid", workflow="wan22_i2v",
+        params={"positive_prompt": "", "input_image": "sdxl_t2i_img.png", "seed": 2},
+        filename="wan22_i2v_vid.mp4",
+    )
+    index = gallery.build_image_config_index([db.get_generation("img")])
+    legacy_key = gallery.legacy_preframe_settings_folder_key(video)
+    current_key = gallery.settings_folder_key(video, index)
+    assert legacy_key != current_key                 # the fold moved the folder's key
+    db.set_folder_starred(legacy_key, True)          # a star from before the fold
+
+    summary = reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()
+    assert meta.get(current_key, {}).get("starred") is True  # moved onto the live folder
+    assert legacy_key not in meta                             # old key cleared
     assert summary["repointed"] == 1
 
 

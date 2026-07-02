@@ -64,6 +64,39 @@ def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
     assert key in win._gallery_view._reroll_jobs
 
 
+def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
+    # An i2v re-roll keys to its folder by the *config* of its start frame. The
+    # reconnect must resolve that from the DB (the first tree rebuild, which would
+    # populate the image rows, hasn't run yet), so the adopted job lands under the
+    # same key the gallery tree will later give it.
+    db = Database(tmp_path / "t.db")
+    img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                      seed=1, positive_prompt="a face")
+    db.insert_generation(
+        prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a face", seed=1,
+        params_json=json.dumps(img_params), workflow_json="{}",
+    )
+    db.update_generation(
+        "img", status="completed",
+        output_files=json.dumps([{"filename": "sdxl_t2i_img.png"}]),
+    )
+    vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
+                      seed=7, positive_prompt="", input_image="sdxl_t2i_img.png [output]")
+    db.insert_generation(
+        prompt_id="rr", workflow_name="wan22_i2v", workflow_version="v",
+        positive_prompt="", seed=7,
+        params_json=json.dumps(vid_params), workflow_json="{}",
+    )
+    db.update_generation("rr", status="running")
+
+    win = _window(qtbot, tmp_path)
+
+    index = gallery.build_image_config_index([db.get_generation("img")])
+    key = gallery.settings_folder_key(db.get_generation("rr"), index)
+    assert key in win._gallery_view._reroll_jobs
+
+
 def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_folder", "image/sdxl_t2i")

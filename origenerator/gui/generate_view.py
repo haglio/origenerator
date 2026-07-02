@@ -9,7 +9,9 @@ from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
-from origenerator.gallery import settings_signature
+from origenerator.gallery import (
+    build_image_config_index, media_type_of_row, settings_signature,
+)
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
@@ -138,11 +140,15 @@ class GenerateView(QWidget):
         if key is None:
             return []
         workflow_name, signature = key
+        rows = self._db.list_generations()  # newest first
+        index = build_image_config_index(
+            [r for r in rows if media_type_of_row(r) == "image"]
+        )
         return [
             row["prompt_id"]
-            for row in self._db.list_generations()  # newest first
+            for row in rows
             if (row.get("workflow_name") or "") == workflow_name
-            and settings_signature(workflow_name, row.get("params_json")) == signature
+            and settings_signature(workflow_name, row.get("params_json"), index) == signature
         ]
 
     def _on_strip_activated(self, prompt_id: str):
@@ -150,7 +156,10 @@ class GenerateView(QWidget):
         if not row:
             return
         workflow_name = row.get("workflow_name", "")
-        row_key = (workflow_name, settings_signature(workflow_name, row.get("params_json")))
+        index = build_image_config_index(
+            [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
+        )
+        row_key = (workflow_name, settings_signature(workflow_name, row.get("params_json"), index))
         active = self._subtabs.currentWidget()
         if active is not None and active.settings_key() == row_key:
             return  # same settings folder as the active tab — don't spawn a duplicate

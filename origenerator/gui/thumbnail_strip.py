@@ -59,7 +59,9 @@ class ThumbnailStrip(QWidget):
             tw.clicked.connect(self.thumbnail_activated)
             tw.hovered.connect(self._highlight_matching)
             tw.unhovered.connect(self._clear_highlight)
-            self._sig_by_id[prompt_id] = settings_signature(row.get("params_json"))
+            self._sig_by_id[prompt_id] = settings_signature(
+                row.get("workflow_name"), row.get("params_json")
+            )
             self._widgets.append(tw)
             self._list.addWidget(tw)
 

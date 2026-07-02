@@ -49,10 +49,36 @@ def settings_only(params: dict) -> dict:
     return {k: v for k, v in params.items() if k not in INSTANCE_KEYS}
 
 
-def settings_signature(params_json: str | None) -> str:
-    """Canonical key for grouping: the params minus per-instance keys (seeds and
-    the i2v input image), order-independent."""
-    return json.dumps(settings_only(parse_params(params_json)), sort_keys=True)
+def canonical_settings(workflow_name: str | None, params: dict) -> dict:
+    """The settings that place a row in a folder, normalized so a row's provenance
+    can't split it from its own re-roll.
+
+    For a registered workflow this is exactly its non-instance ``default_params``
+    keys, valued from the row where present and the workflow default otherwise —
+    so a sparse import (which recorded only a few keys) and a full re-roll of it
+    (``prepared_params`` fills every default) hash the same, and stored keys the
+    workflow doesn't define (an i2v import's in-graph-derived ``width``/``height``,
+    raw sampler-node fields) never split a folder. Falls back to dropping only the
+    per-instance keys when the workflow is unknown — there are then no defaults to
+    normalize against.
+    """
+    wf = _registered(workflow_name)
+    if wf is None:
+        return settings_only(params)
+    return {
+        key: params.get(key, default)
+        for key, default in wf.default_params().items()
+        if key not in INSTANCE_KEYS
+    }
+
+
+def settings_signature(workflow_name: str | None, params_json: str | None) -> str:
+    """Canonical grouping key: a row's normalized settings (see
+    :func:`canonical_settings`), order-independent."""
+    return json.dumps(
+        canonical_settings(workflow_name, parse_params(params_json)),
+        sort_keys=True, default=str,
+    )
 
 
 def _registered(workflow_name: str | None):
@@ -460,7 +486,7 @@ def settings_folder_key(row: dict) -> str:
     """
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
-    return _settings_key(media_type, workflow_name, settings_signature(row.get("params_json")))
+    return _settings_key(media_type, workflow_name, settings_signature(workflow_name, row.get("params_json")))
 
 
 def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
@@ -493,10 +519,10 @@ def _build_settings_groups(
     here and never re-appears in a settings name.
     """
     grouped = _group_ordered(
-        rows, lambda r: settings_signature(r.get("params_json"))
+        rows, lambda r: settings_signature(wf_name, r.get("params_json"))
     )
     settings_dicts = [
-        settings_only(parse_params(sig_rows[0].get("params_json")))
+        canonical_settings(wf_name, parse_params(sig_rows[0].get("params_json")))
         for _sig, sig_rows in grouped
     ]
     distinguishing = _distinguishing_keys(settings_dicts)

@@ -686,8 +686,8 @@ def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel):
     workflow, signature = panel.settings_key()
     assert workflow == "sdxl_t2i"
     # The same params at any seed share the signature; a different setting splits it.
-    assert signature == gallery.settings_signature(json.dumps({**full, "seed": 999}))
-    assert signature != gallery.settings_signature(json.dumps({**full, "steps": 7}))
+    assert signature == gallery.settings_signature("sdxl_t2i", json.dumps({**full, "seed": 999}))
+    assert signature != gallery.settings_signature("sdxl_t2i", json.dumps({**full, "steps": 7}))
 
 
 # ---- live preview ----

@@ -626,10 +626,9 @@ class GenerateConfigPanel(QWidget):
     def settings_key(self) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).
 
-        The signature mirrors how a generation is stored — the form values plus
-        the workflow's non-form defaults, minus per-instance keys (seeds and the
-        i2v input image) — so it matches the folder this tab's outputs land in,
-        and groups reruns that differ only by those.
+        The signature is normalized against the workflow's defaults (see
+        ``canonical_settings``), so it matches the folder this tab's outputs land
+        in and groups reruns that differ only by per-instance keys.
         ``None`` when no workflow is selected.
         """
         key = self._workflow_combo.currentData()
@@ -637,9 +636,7 @@ class GenerateConfigPanel(QWidget):
         if wf is None or self._param_form is None:
             return None
         params = self._param_form.get_values_static()
-        for name, value in wf.default_params().items():
-            params.setdefault(name, value)
-        return key, settings_signature(json.dumps(params))
+        return key, settings_signature(key, json.dumps(params))
 
     def seed_strip(self, prompt_ids):
         """Seed this tab's strip with a settings folder when it opens from one.

@@ -142,7 +142,7 @@ class GenerateView(QWidget):
             row["prompt_id"]
             for row in self._db.list_generations()  # newest first
             if (row.get("workflow_name") or "") == workflow_name
-            and settings_signature(row.get("params_json")) == signature
+            and settings_signature(workflow_name, row.get("params_json")) == signature
         ]
 
     def _on_strip_activated(self, prompt_id: str):
@@ -150,7 +150,7 @@ class GenerateView(QWidget):
         if not row:
             return
         workflow_name = row.get("workflow_name", "")
-        row_key = (workflow_name, settings_signature(row.get("params_json")))
+        row_key = (workflow_name, settings_signature(workflow_name, row.get("params_json")))
         active = self._subtabs.currentWidget()
         if active is not None and active.settings_key() == row_key:
             return  # same settings folder as the active tab — don't spawn a duplicate

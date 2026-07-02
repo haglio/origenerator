@@ -79,9 +79,9 @@ def test_settings_signature_ignores_seeds_but_keeps_other_params():
     b = json.dumps({"cfg": 7.5, "steps": 50, "seed": 2, "noise_seed": 7})
     c = json.dumps({"steps": 40, "cfg": 7.5, "seed": 1})
     # Same settings, different seeds -> identical signature (order-independent).
-    assert settings_signature(a) == settings_signature(b)
+    assert settings_signature(None, a) == settings_signature(None, b)
     # A real setting differs -> different signature.
-    assert settings_signature(a) != settings_signature(c)
+    assert settings_signature(None, a) != settings_signature(None, c)
 
 
 def test_settings_signature_ignores_input_image_like_a_seed():
@@ -91,13 +91,63 @@ def test_settings_signature_ignores_input_image_like_a_seed():
     a = json.dumps({"steps": 20, "input_image": "img_a.png", "seed": 1})
     b = json.dumps({"steps": 20, "input_image": "image/img_b.png [output]", "seed": 2})
     c = json.dumps({"steps": 30, "input_image": "img_a.png", "seed": 1})
-    assert settings_signature(a) == settings_signature(b)  # only the image/seed differ
-    assert settings_signature(a) != settings_signature(c)  # a real setting differs
+    assert settings_signature(None, a) == settings_signature(None, b)  # only image/seed differ
+    assert settings_signature(None, a) != settings_signature(None, c)  # a real setting differs
 
 
 def test_settings_signature_tolerates_missing_or_invalid_params():
-    assert settings_signature(None) == settings_signature("{}")
-    assert settings_signature("not json") == settings_signature("{}")
+    assert settings_signature(None, None) == settings_signature(None, "{}")
+    assert settings_signature(None, "not json") == settings_signature(None, "{}")
+
+
+def test_reroll_of_a_sparse_row_stays_in_its_folder():
+    # A re-roll builds its params via prepared_params, which fills every workflow
+    # default. If the folder signature is taken over the raw stored keys, a sparse
+    # import (only its prompt recorded) and its full-keyset re-roll hash
+    # differently, so the re-roll spawns a new folder. The folder a row maps to
+    # must be invariant under that default-filling.
+    from origenerator.gallery import settings_folder_key
+    from origenerator.generation_config import prepared_params
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    sparse = _row(
+        workflow_name="wan22_i2v",
+        params_json=json.dumps({"positive_prompt": "a wave", "input_image": "src.png"}),
+        output_files=json.dumps([{"filename": "wan22_i2v_a.mp4"}]),
+    )
+    reroll_params = prepared_params(sparse, wf)  # exactly what the gallery re-roll runs
+    reroll_params["input_image"] = "video/x_00001.mp4 [output]"  # a fresh start frame
+    reroll = _row(
+        workflow_name="wan22_i2v",
+        params_json=json.dumps(reroll_params),
+        output_files=json.dumps([{"filename": "wan22_i2v_b.mp4"}]),
+    )
+    assert settings_folder_key(reroll) == settings_folder_key(sparse)
+
+
+def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
+    # i2v derives width/height in-graph from the input image, so a generation
+    # never stores them — but an imported graph does, along with raw sampler-node
+    # fields. Those keys the workflow doesn't define must not split the import
+    # into a folder of its own, away from an otherwise identical generation.
+    from origenerator.gallery import settings_folder_key
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    generated_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params())
+    generated_params["positive_prompt"] = "a wave"
+    imported_params = {**generated_params, "width": 720, "height": 544, "add_noise": "enable"}
+    generated = _row(
+        workflow_name="wan22_i2v",
+        params_json=json.dumps(generated_params),
+        output_files=json.dumps([{"filename": "wan22_i2v_g.mp4"}]),
+    )
+    imported = _row(
+        workflow_name="wan22_i2v",
+        params_json=json.dumps(imported_params),
+        output_files=json.dumps([{"filename": "wan22_i2v_i.mp4"}]),
+    )
+    assert settings_folder_key(imported) == settings_folder_key(generated)
 
 
 def test_model_signature_groups_by_model_params_only():

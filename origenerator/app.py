@@ -222,6 +222,18 @@ def main():
     except Exception as e:
         logger.warning("Duration backfill failed: %s", e)
 
+    status("Restoring folder bookmarks...")
+    # Heal stars and custom names whose folder key drifted after a key formula
+    # change, and stamp identity onto live ones so the next change is handled
+    # automatically. Runs after the backfills above — they can move a generation's
+    # folder by filling in its workflow/model/LoRA — so the tree it reconciles
+    # against is final.
+    from origenerator.reconcile import reconcile_folder_meta
+    try:
+        reconcile_folder_meta(db)
+    except Exception as e:
+        logger.warning("Folder bookmark reconcile failed: %s", e)
+
     status("Connecting to ComfyUI...")
     client.start()
 

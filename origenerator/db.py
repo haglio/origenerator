@@ -28,9 +28,13 @@ CREATE INDEX IF NOT EXISTS idx_generations_workflow ON generations(workflow_name
 CREATE INDEX IF NOT EXISTS idx_generations_created ON generations(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS folder_meta (
-    folder_key  TEXT PRIMARY KEY,
-    custom_name TEXT,
-    starred     INTEGER NOT NULL DEFAULT 0
+    folder_key    TEXT PRIMARY KEY,
+    custom_name   TEXT,
+    starred       INTEGER NOT NULL DEFAULT 0,
+    -- A bookmark's identity: the tree tier it sits at and a member generation, so
+    -- its key can be recomputed under any future key formula (see reconcile).
+    level         TEXT,
+    ref_prompt_id TEXT
 );
 """
 
@@ -67,6 +71,11 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
         if "evolver_exported_at" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
+        folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
+        if "level" not in folder_cols:
+            conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
+        if "ref_prompt_id" not in folder_cols:
+            conn.execute("ALTER TABLE folder_meta ADD COLUMN ref_prompt_id TEXT")
 
     def _connect(self):
         conn = sqlite3.connect(self.path)
@@ -257,3 +266,48 @@ class Database:
                    DO UPDATE SET starred = excluded.starred""",
                 (folder_key, 1 if starred else 0),
             )
+
+    def folder_meta_full(self) -> list[dict]:
+        """Every folder_meta row with its bookmark identity, for the reconcile.
+
+        Unlike :meth:`folder_meta_map` (which the view uses for labels/stars), this
+        also carries ``level`` and ``ref_prompt_id`` so a stale key can be re-derived.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT folder_key, custom_name, starred, level, ref_prompt_id "
+                "FROM folder_meta"
+            ).fetchall()
+        return [
+            {
+                "folder_key": r["folder_key"],
+                "custom_name": r["custom_name"],
+                "starred": bool(r["starred"]),
+                "level": r["level"],
+                "ref_prompt_id": r["ref_prompt_id"],
+            }
+            for r in rows
+        ]
+
+    def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
+                           starred: bool, level: str | None, ref_prompt_id: str | None):
+        """Write a folder_meta row in full — the reconcile's tool for re-pointing a
+        bookmark onto a new key and for stamping identity onto a matched one."""
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO folder_meta
+                       (folder_key, custom_name, starred, level, ref_prompt_id)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(folder_key) DO UPDATE SET
+                       custom_name = excluded.custom_name,
+                       starred = excluded.starred,
+                       level = excluded.level,
+                       ref_prompt_id = excluded.ref_prompt_id""",
+                (folder_key, custom_name, 1 if starred else 0, level, ref_prompt_id),
+            )
+
+    def delete_folder_meta(self, folder_key: str):
+        """Drop a folder_meta row — used to clear a bookmark's old key after the
+        reconcile has re-pointed it onto its current one."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM folder_meta WHERE folder_key = ?", (folder_key,))

@@ -262,6 +262,43 @@ def test_star_folder_round_trips_and_preserves_custom_name(tmp_path):
     assert db.folder_meta_map()["image/sdxl_t2i"]["starred"] is False
 
 
+def test_folder_meta_full_reports_identity_columns(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.upsert_folder_meta("image/sdxl_t2i/abc123", custom_name="Cats", starred=True,
+                          level="settings", ref_prompt_id="p1")
+    assert db.folder_meta_full() == [{
+        "folder_key": "image/sdxl_t2i/abc123", "custom_name": "Cats",
+        "starred": True, "level": "settings", "ref_prompt_id": "p1",
+    }]
+
+
+def test_a_star_set_through_the_plain_api_has_null_identity(tmp_path):
+    # The view stars by key alone; a bookmark's identity (tier + a member row)
+    # stays NULL until the reconcile backfills it, so folder_meta_full surfaces that.
+    db = Database(tmp_path / "test.db")
+    db.set_folder_starred("image/sdxl_t2i", True)
+    (row,) = db.folder_meta_full()
+    assert row["starred"] is True
+    assert row["level"] is None and row["ref_prompt_id"] is None
+
+
+def test_upsert_folder_meta_overwrites_every_field(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.set_folder_starred("k", True)
+    db.upsert_folder_meta("k", custom_name="N", starred=False,
+                          level="model", ref_prompt_id="p2")
+    (row,) = db.folder_meta_full()
+    assert row["custom_name"] == "N" and row["starred"] is False
+    assert row["level"] == "model" and row["ref_prompt_id"] == "p2"
+
+
+def test_delete_folder_meta_removes_the_row(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.set_folder_starred("k", True)
+    db.delete_folder_meta("k")
+    assert db.folder_meta_full() == []
+
+
 def test_list_generations_ordered_newest_first(tmp_path):
     db = Database(tmp_path / "test.db")
     for i in range(3):

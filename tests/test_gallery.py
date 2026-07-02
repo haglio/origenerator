@@ -403,6 +403,42 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
     assert settings_folder_key(row) == leaf.key
 
 
+def test_group_level_names_each_tier():
+    from origenerator.gallery import group_level
+    rows = [_i2v("v1", "styleA")]  # video -> wan22_i2v -> model -> lora -> settings
+    media = build_gallery_tree(rows)[0]
+    wf = media.workflow_groups[0]
+    model = wf.model_groups[0]
+    lora = model.children[0]
+    settings = lora.children[0]
+    assert [group_level(g) for g in (media, wf, model, lora, settings)] == \
+        ["media", "workflow", "model", "lora", "settings"]
+
+
+def test_folder_key_at_level_recomputes_each_tiers_key_from_a_member_row():
+    # A bookmark stores its tier + a member row; recomputing the key from that row
+    # must reproduce the folder's key at every tier, so the star can follow it.
+    from origenerator.gallery import folder_key_at_level, group_level
+    rows = [_i2v("v1", "styleA")]
+    media = build_gallery_tree(rows)[0]
+    wf = media.workflow_groups[0]
+    model = wf.model_groups[0]
+    lora = model.children[0]
+    settings = lora.children[0]
+    for g in (media, wf, model, lora, settings):
+        assert folder_key_at_level(rows[0], group_level(g)) == g.key
+
+
+def test_legacy_settings_key_differs_from_the_current_normalized_key():
+    # canonical_settings changed the settings hash, so the legacy formula yields a
+    # different key for the same row — exactly why a star set before the change no
+    # longer matches its folder, and what the reconcile recomputes to re-point it.
+    from origenerator.gallery import legacy_settings_folder_key, settings_folder_key
+    row = _img("i1", "a cat", 50, 1)
+    assert legacy_settings_folder_key(row) != settings_folder_key(row)
+    assert legacy_settings_folder_key(row).startswith("image/sdxl_t2i/")
+
+
 def test_build_gallery_tree_grows_no_lora_level_without_lora_keys():
     # SDXL declares no LoRA keys, so a model folder holds settings leaves directly
     # — no intervening LoRA level to click through.

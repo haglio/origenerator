@@ -470,6 +470,22 @@ def rows_under(group) -> list[dict]:
     return [row for child in child_groups(group) for row in rows_under(child)]
 
 
+def group_level(group) -> str:
+    """Which tier of the tree ``group`` sits at: media, workflow, model, lora, or
+    settings. A bookmark records its tier so its key can be recomputed from a
+    member row under whatever key formula is current (see
+    :func:`folder_key_at_level`)."""
+    if isinstance(group, MediaGroup):
+        return "media"
+    if isinstance(group, WorkflowGroup):
+        return "workflow"
+    if isinstance(group, ModelGroup):
+        return "model"
+    if isinstance(group, LoraGroup):
+        return "lora"
+    return "settings"
+
+
 def _group_ordered(rows, key):
     """Group rows by ``key(row)``, preserving first-appearance order of keys."""
     grouped: dict = {}
@@ -511,6 +527,42 @@ def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
 
 def _lora_key(media_type: str, workflow_name: str, signature: str) -> str:
     return _sig_key(media_type, workflow_name, signature, "l")
+
+
+def folder_key_at_level(row: dict, level: str) -> str:
+    """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
+    row under the *current* key formulas.
+
+    A bookmark stores its tier and a representative member row; recomputing here
+    re-derives the folder's key so a star or custom name follows the folder even
+    after a key formula changes — the silent orphaning the reconcile undoes."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    params_json = row.get("params_json")
+    if level == "media":
+        return media_type
+    if level == "workflow":
+        return f"{media_type}/{workflow_name}"
+    if level == "model":
+        return _model_key(media_type, workflow_name, model_signature(workflow_name, params_json))
+    if level == "lora":
+        return _lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
+    if level == "settings":
+        return settings_folder_key(row)
+    raise ValueError(f"unknown folder level: {level!r}")
+
+
+def legacy_settings_folder_key(row: dict) -> str:
+    """The settings-folder key ``row`` had under the pre-normalization formula:
+    ``settings_only`` hashed with sort_keys, before :func:`canonical_settings`.
+
+    That change is the one historical key formula shift that orphaned bookmarks
+    made before it. The reconcile recomputes this to re-point such a stale star or
+    name onto the row's current settings folder."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    signature = json.dumps(settings_only(parse_params(row.get("params_json"))), sort_keys=True)
+    return _settings_key(media_type, workflow_name, signature)
 
 
 def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:

@@ -14,6 +14,11 @@ against the server it was submitted to — matched by the shared prompt_id — a
 Runs before the importer so a finalized row's output is already recorded and is
 not imported a second time. Never raises: if ComfyUI can't be read, in-flight
 rows are left untouched for a later launch to resolve.
+
+Also home to :func:`reconcile_folder_meta`, the other startup reconcile: it heals
+gallery bookmarks (stars and custom names) whose folder key drifted after a key
+formula changed, and stamps each live bookmark with the identity needed to survive
+the next such change.
 """
 
 import json
@@ -21,6 +26,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from origenerator import gallery
 from origenerator.completion import extract_completion
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -87,3 +93,104 @@ def _safe_history(client, prompt_id: str) -> dict:
     except Exception as e:
         logger.warning("Could not fetch history for %s: %s", prompt_id, e)
         return {}
+
+
+def reconcile_folder_meta(db) -> dict:
+    """Re-point gallery bookmarks whose folder key no longer matches a folder, and
+    stamp identity onto the ones that still do.
+
+    A bookmark (a star or custom name) is keyed by a hash of its folder's settings;
+    when a key formula changes, that key stops matching and the bookmark silently
+    detaches. On startup, for each ``folder_meta`` row:
+
+      - **key still matches a folder** → refresh its stored ``(level, ref)`` so a
+        future formula change can re-derive it from a member generation;
+      - **key dangles, stored ref still exists** → recompute the key at the stored
+        tier and move the bookmark onto it (robust to *any* formula change);
+      - **key dangles, no usable identity** → try the one legacy settings formula
+        to find its folder (recovers bookmarks predating stored identity);
+      - **still nothing** → leave it alone; its generations are gone, and a user's
+        star or name is never dropped.
+
+    Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
+    """
+    meta = db.folder_meta_full()
+    summary = {"refreshed": 0, "repointed": 0, "orphaned": 0}
+    if not meta:
+        return summary
+    rows_by_id = {r["prompt_id"]: r for r in db.list_generations()}
+    current, legacy_keys = _index_current_folders(rows_by_id.values())
+    meta_by_key = {m["folder_key"]: dict(m) for m in meta}
+
+    for row in meta:
+        key = row["folder_key"]
+        if key in current:
+            level, ref = current[key]
+            if (row["level"], row["ref_prompt_id"]) != (level, ref):
+                cur = meta_by_key[key]
+                db.upsert_folder_meta(key, custom_name=cur["custom_name"],
+                                      starred=cur["starred"], level=level, ref_prompt_id=ref)
+                cur["level"], cur["ref_prompt_id"] = level, ref
+                summary["refreshed"] += 1
+            continue
+        target = _repoint_target(row, current, rows_by_id, legacy_keys)
+        if target is None:
+            summary["orphaned"] += 1
+            continue
+        _move_bookmark(db, row, target, current[target], meta_by_key)
+        summary["repointed"] += 1
+
+    logger.info("Reconciled folder bookmarks: %(refreshed)d refreshed, "
+                "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
+    return summary
+
+
+def _index_current_folders(rows):
+    """Map every current folder key → ``(level, a member prompt_id)``, plus each
+    settings folder's legacy key → its current key (for the one historical formula
+    change, so bookmarks made before stored identity can still be recovered)."""
+    current: dict = {}
+    legacy_keys: dict = {}
+
+    def walk(groups):
+        for group in groups:
+            members = gallery.rows_under(group)
+            if members:
+                current[group.key] = (gallery.group_level(group), members[0]["prompt_id"])
+                if isinstance(group, gallery.SettingsGroup):
+                    legacy_keys.setdefault(
+                        gallery.legacy_settings_folder_key(members[0]), group.key
+                    )
+            walk(gallery.child_groups(group))
+
+    walk(gallery.build_gallery_tree(list(rows), {}))
+    return current, legacy_keys
+
+
+def _repoint_target(row, current, rows_by_id, legacy_keys):
+    """The current key a dangling bookmark should move to, or ``None``.
+
+    Prefers recomputing from the bookmark's stored identity — a member row at its
+    tier, robust to any formula change — and falls back to the one legacy settings
+    formula for bookmarks that predate stored identity."""
+    ref, level = row["ref_prompt_id"], row["level"]
+    if ref and level and ref in rows_by_id:
+        candidate = gallery.folder_key_at_level(rows_by_id[ref], level)
+        if candidate in current:
+            return candidate
+    return legacy_keys.get(row["folder_key"])
+
+
+def _move_bookmark(db, row, target, identity, meta_by_key):
+    """Move a bookmark's star/name onto ``target`` (merging into any bookmark
+    already there — a name and a star both survive), then drop its stale key."""
+    level, ref = identity
+    existing = meta_by_key.get(target)
+    name = (existing["custom_name"] if existing else None) or row["custom_name"]
+    starred = bool((existing["starred"] if existing else False) or row["starred"])
+    db.upsert_folder_meta(target, custom_name=name, starred=starred,
+                          level=level, ref_prompt_id=ref)
+    db.delete_folder_meta(row["folder_key"])
+    meta_by_key[target] = {"folder_key": target, "custom_name": name, "starred": starred,
+                           "level": level, "ref_prompt_id": ref}
+    meta_by_key.pop(row["folder_key"], None)

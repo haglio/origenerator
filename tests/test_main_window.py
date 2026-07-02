@@ -287,3 +287,18 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
     assert win._gallery_view._combine.image_slot.current_id() == "img"
     assert win._gallery_view._combine.video_slot.current_id() == "vid"
+
+
+def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
+    # The end-to-end round trip: pick a pair, close, and a fresh window restores it.
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._combine.image_slot.set_item("img")
+    first._gallery_view._combine.video_slot.set_item("vid")
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._combine.image_slot.current_id() == "img"
+    assert reopened._gallery_view._combine.video_slot.current_id() == "vid"

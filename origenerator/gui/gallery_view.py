@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
+from origenerator.generation_config import (
+    ConfigSnapshot, find_duplicate_generation, randomize_seeds,
+)
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
@@ -23,6 +27,7 @@ from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_controller import RerollController
+from origenerator.gui.reroll_prompt import offer_reroll
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
@@ -112,6 +117,9 @@ class GalleryView(QWidget):
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
+        # A combine's brand-new folder doesn't exist until its job finishes; hold
+        # its key so _on_reroll_finished can drill in once the tree has the folder.
+        self._pending_combine_key: str | None = None
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
@@ -764,6 +772,56 @@ class GalleryView(QWidget):
         self._reroll.start(key, group, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
 
+    # --- combine: a video's recipe applied to a dropped image -------------
+
+    def _generate_combination(self, image_id: str, video_id: str):
+        """Generate a new video from a dropped image + a dropped video's recipe.
+
+        Reuses the video's workflow, settings and seed, swapping only the input
+        image to the dropped one, and lands the result in the folder for that
+        (image × settings) combination. A pinned seed can reproduce an identical
+        past run, so this warns first via the shared "already generated" dialog,
+        offering a fresh seed — exactly as the Generate tab does. A no-op if either
+        row is gone, the video isn't a rebuildable image-conditioned recipe, the
+        image has no output file, or that folder is already generating.
+        """
+        image_row = self._db.get_generation(image_id)
+        video_row = self._db.get_generation(video_id)
+        if not image_row or not video_row:
+            return
+        workflow_name = video_row.get("workflow_name") or ""
+        workflow = WORKFLOW_REGISTRY.get(workflow_name)
+        if workflow is None or not gallery.is_image_conditioned(workflow_name):
+            return  # the video must be a rebuildable, image-conditioned recipe
+        params = gallery.combined_params(video_row, image_row, workflow)
+        if params is None:
+            return  # the dropped image has no output file to seed from
+        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
+        if find_duplicate_generation(self._db.list_generations(), snapshot):
+            if not offer_reroll(self, workflow):
+                return  # let the user pick a different pair rather than duplicate
+            params = randomize_seeds(params, workflow.seed_keys())
+        key = gallery.settings_folder_key(
+            {**dict(video_row), "params_json": json.dumps(params)},
+            gallery.build_image_config_index(self._image_rows),
+        )
+        if self._reroll.start_prepared(key, workflow, params):
+            self._reveal_combination(key)
+
+    def _reveal_combination(self, key: str):
+        """Show a just-launched combine. If its (image × settings) folder already
+        exists, open it and mirror the live tile; otherwise it's a brand-new
+        combination with no folder yet, so park on Recents — where its in-flight
+        card shows — and remember the key for :meth:`_on_reroll_finished` to drill
+        into once the finished row gives the folder a node."""
+        item = self._item_by_key.get(key)
+        if item is not None:
+            self._tree.setCurrentItem(item)  # existing folder: watch the live tile
+            self._select_reroll(key)
+        elif self._recents_item is not None:
+            self._pending_combine_key = key
+            self._tree.setCurrentItem(self._recents_item)
+
     # --- re-roll as the info-pane source ----------------------------------
 
     def _select_reroll(self, key: str):
@@ -846,6 +904,13 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
+        # A combine whose brand-new folder we parked off (on Recents) now has a
+        # finished row, so the rebuild above gave that folder a node: drill in.
+        if key == self._pending_combine_key:
+            self._pending_combine_key = None
+            item = self._item_by_key.get(key)
+            if item is not None:
+                self._tree.setCurrentItem(item)
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if

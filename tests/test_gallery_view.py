@@ -2889,3 +2889,159 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     gv._tree.setCurrentItem(gv._recents_item)
 
     assert "rr_running" in gv._inflight_cards
+
+
+# --- combine: a video's recipe applied to a dropped image -------------------
+
+
+def _combine_db(tmp_path):
+    """A DB with one SDXL image to drop in and one i2v video whose recipe to reuse.
+
+    The video's own input image is left at the workflow default (empty), so the
+    combined result — keyed to the dropped image — lands in a fresh folder.
+    """
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a dog", seed=1,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=1, positive_prompt="a dog")),
+        workflow_json="{}",
+    )
+    db.update_generation("img", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_pick.png", "subfolder": ""}]))
+    db.insert_generation(
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="dance", seed=42,
+        params_json=json.dumps(dict(_WAN_I2V.default_params(),
+                                    seed=42, noise_seed=99, positive_prompt="dance")),
+        workflow_json="{}",
+    )
+    db.update_generation("vid", status="completed",
+                         output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
+    return db
+
+
+def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vid")
+
+    assert len(view._reroll_jobs) == 1
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "wan22_i2v"
+    assert job.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
+    assert job.params["seed"] == 42       # the video's seed, reused (not randomized)
+    assert job.params["noise_seed"] == 99
+    view._client.submit_job.assert_called_once()
+
+
+def _insert_completed_video(db, prompt_id, params, filename):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
+        seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed",
+                         output_files=json.dumps([{"filename": filename, "subfolder": ""}]))
+
+
+def test_combine_duplicate_declined_submits_nothing(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
+    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")  # this exact run exists
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll", lambda parent, wf: False)
+
+    view._generate_combination("img", "vid")
+
+    assert view._reroll_jobs == {}                    # declined: nothing submitted
+    view._client.submit_job.assert_not_called()
+
+
+def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
+    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll", lambda parent, wf: True)
+
+    view._generate_combination("img", "vid")
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["seed"] != 42        # a fresh seed, not the duplicate's
+    assert job.params["noise_seed"] != 99  # both dual-noise seeds re-rolled
+
+
+def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    db.insert_generation(prompt_id="vx", workflow_name="mystery", workflow_version="v",
+                         positive_prompt="", seed=1, params_json=json.dumps({"seed": 1}),
+                         workflow_json="{}")
+    db.update_generation("vx", status="completed",
+                         output_files=json.dumps([{"filename": "mystery_vx.mp4", "subfolder": ""}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vx")  # can't rebuild "mystery"
+
+    assert view._reroll_jobs == {}
+    view._client.submit_job.assert_not_called()
+
+
+def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    db.update_generation("img", output_files=json.dumps([]))  # file pruned since it was dropped
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vid")
+
+    assert view._reroll_jobs == {}
+
+
+def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vid")
+
+    assert view._showing_recents()  # brand-new folder: watch it cook on the shelf
+    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+
+    client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
+
+    assert not view._showing_recents()  # the finished row gave its folder a node
+    new_row = db.get_generation(prompt_id)
+    image_rows = [r for r in db.list_generations() if gallery.media_type_of_row(r) == "image"]
+    expected = gallery.settings_folder_key(new_row, gallery.build_image_config_index(image_rows))
+    assert view._selected_folder_key() == expected
+
+
+def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    # A sibling already made from this image with the recipe's settings (other seed)
+    # gives the target (image × settings) folder a node before we combine.
+    sib = dict(_WAN_I2V.default_params(), seed=7, noise_seed=7, positive_prompt="dance",
+               input_image="sdxl_pick.png [output]")
+    _insert_completed_video(db, "vsib", sib, "wan22_i2v_vsib.mp4")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vid")
+
+    expected = view._leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
+    assert not view._showing_recents()
+    assert view._selected_folder_key() == expected
+    assert view._selected_reroll_key == expected  # watching the live combine tile

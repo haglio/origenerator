@@ -7,7 +7,7 @@ input a user picks — without touching a Generate tab. Qt-free so it stays
 unit-testable; the seed is deliberately kept (reused), not re-rolled.
 """
 
-from origenerator.generation_config import merge_denormalized
+from origenerator.generation_config import filled_params
 from origenerator.gallery.output import output_file_reference, row_output_files
 
 
@@ -15,16 +15,12 @@ def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
     """The video's recipe readied to re-run on a new input image, seed kept.
 
     ``video_row``'s stored params (anything sparse filled from ``workflow``'s
-    defaults, exactly as :func:`generation_config.prepared_params` does minus the
-    seed re-roll), with ``input_image`` replaced by a ``LoadImage``-resolvable
-    reference to ``image_row``'s output file. ``None`` when the image produced no
-    file to reference.
+    defaults, exactly as :func:`generation_config.filled_params` — the seed is
+    kept, not re-rolled), with ``input_image`` replaced by a ``LoadImage``-
+    resolvable reference to ``image_row``'s output file. ``None`` when the image
+    produced no file to reference.
     """
-    params = merge_denormalized(video_row)
-    for key, value in workflow.default_params().items():
-        params.setdefault(key, value)
     ref = output_file_reference(row_output_files(image_row))
     if ref is None:
         return None
-    params["input_image"] = ref
-    return params
+    return {**filled_params(video_row, workflow), "input_image": ref}

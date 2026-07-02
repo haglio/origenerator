@@ -2,6 +2,7 @@ import json
 
 from origenerator.generation_config import (
     ConfigSnapshot,
+    filled_params,
     find_duplicate_generation,
     merge_denormalized,
     prepared_params,
@@ -35,6 +36,18 @@ def test_prepared_params_fills_defaults_and_rerolls_seeds():
     assert params["positive_prompt"] == "a cat"                       # kept from the row
     assert params["checkpoint"] == wf.default_params()["checkpoint"]  # filled from defaults
     assert params["seed"] != 5                                         # re-rolled
+
+
+def test_filled_params_fills_defaults_but_keeps_every_seed():
+    # The seed-preserving half of prepared_params: sparse row filled from the
+    # workflow's defaults, but the stored seeds left exactly as they were.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    row = {"params_json": json.dumps({"positive_prompt": "a cat", "seed": 5, "noise_seed": 9})}
+    params = filled_params(row, wf)
+    assert params["positive_prompt"] == "a cat"            # kept from the row
+    assert params["steps"] == wf.default_params()["steps"]  # filled from defaults
+    assert params["seed"] == 5                              # both seeds kept, not re-rolled
+    assert params["noise_seed"] == 9
 
 
 def _row(workflow="sdxl_t2i", params=None, status="completed", **extra):

@@ -133,15 +133,24 @@ def randomize_seeds(params: dict, seed_keys) -> dict:
     return out
 
 
-def prepared_params(row: dict, workflow) -> dict:
-    """A stored row's params readied to generate a fresh variation of it.
-
-    Its recorded params, with any the row didn't carry filled from the workflow's
-    defaults (imports keep only sparse metadata), then every seed re-rolled — the
-    common preparation a gallery re-roll and a Generate-tab random input both run
-    before rebuilding a payload.
+def filled_params(row: dict, workflow) -> dict:
+    """A stored row's params with any it didn't carry filled from the workflow's
+    defaults (imports keep only sparse metadata) — its seeds left exactly as
+    stored. The reproducible half of :func:`prepared_params`, used on its own to
+    re-run a recipe while pinning one of its two seeds (an i2v re-roll that keeps
+    the video seed, say).
     """
     params = merge_denormalized(row)
     for key, value in workflow.default_params().items():
         params.setdefault(key, value)
-    return randomize_seeds(params, workflow.seed_keys())
+    return params
+
+
+def prepared_params(row: dict, workflow) -> dict:
+    """A stored row's params readied to generate a fresh variation of it.
+
+    :func:`filled_params` with every seed re-rolled — the common preparation a
+    gallery re-roll and a Generate-tab random input both run before rebuilding a
+    payload.
+    """
+    return randomize_seeds(filled_params(row, workflow), workflow.seed_keys())

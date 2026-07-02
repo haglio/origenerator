@@ -24,9 +24,11 @@ class ThumbnailStrip(QWidget):
         self._db = db
         self._widgets: list[ThumbnailWidget] = []
         self._sig_by_id: dict[str, str] = {}  # prompt_id -> settings signature
-        # A floor wide enough for a thumbnail plus the scrollbar; the splitter
+        # A slim floor — a thumbnail plus the scrollbar — so a config tab's
+        # preview-over-form column keeps most of the width and the whole window
+        # can still tile into a monitor third or a portrait half. The splitter
         # sizes the pane from here up.
-        self.setMinimumWidth(200)
+        self.setMinimumWidth(120)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)

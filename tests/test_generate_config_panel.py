@@ -39,30 +39,31 @@ def _is_descendant(widget, ancestor) -> bool:
     return False
 
 
-# --- layout: three resizable panes ----------------------------------------
+# --- layout: preview-over-form beside a slim history strip -----------------
 
-def test_panel_lays_out_three_resizable_panes(panel):
+def test_panel_lays_out_two_resizable_panes(panel):
     from PyQt6.QtWidgets import QSplitter
     assert isinstance(panel._panes, QSplitter)
-    assert panel._panes.count() == 3
+    assert panel._panes.count() == 2
 
 
-def test_thumbnail_history_is_the_left_pane(panel):
+def test_thumbnail_history_is_the_right_pane(panel):
     from origenerator.gui.thumbnail_strip import ThumbnailStrip
-    left = panel._panes.widget(0)
-    assert left is panel._strip
-    assert isinstance(left, ThumbnailStrip)
+    right = panel._panes.widget(1)
+    assert right is panel._strip
+    assert isinstance(right, ThumbnailStrip)
 
 
-def test_run_controls_live_in_the_main_pane_not_the_preview(panel):
-    # The preview is its own pane; the progress bar and run buttons sit under the
-    # middle "main" pane, so they span only the settings, not the preview.
-    main = panel._panes.widget(1)
-    assert panel._preview is panel._panes.widget(2)
+def test_preview_over_form_share_the_main_pane(panel):
+    # Preview-over-form: the live preview sits on top of the settings in the left
+    # "main" pane, with the progress bar and run buttons under it — beside the slim
+    # history strip. The preview is no longer its own splitter pane.
+    main = panel._panes.widget(0)
+    assert _is_descendant(panel._preview, main)
     assert _is_descendant(panel._progress, main)
     assert _is_descendant(panel._generate_btn, main)
     assert _is_descendant(panel._cancel_btn, main)
-    assert not _is_descendant(panel._progress, panel._preview)
+    assert panel._preview is not main  # nested inside the pane, not the pane itself
 
 
 def test_generate_inserts_row_and_submits(panel):

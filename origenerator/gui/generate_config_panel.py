@@ -37,11 +37,11 @@ class GenerateConfigPanel(QWidget):
     """One generation configuration: pick a workflow, set params, run a job.
 
     Several panels share a single ComfyUIClient, so each filters the client's
-    signals down to its own in-flight job. The panel lays out its three resizable
-    panes itself — this tab's own strip of past runs (left), the settings and run
-    controls (middle), and a live preview (right) — so the tab row spans all
-    three. Clicking a strip thumbnail re-emits its prompt id via
-    ``strip_activated`` so a container can open (or reuse) a tab for it.
+    signals down to its own in-flight job. The panel lays out two resizable panes
+    itself — a main column with the live preview over the settings and run
+    controls, and this tab's own slim strip of past runs on the right. Clicking a
+    strip thumbnail re-emits its prompt id via ``strip_activated`` so a container
+    can open (or reuse) a tab for it.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
@@ -70,25 +70,22 @@ class GenerateConfigPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Three resizable panes, their dividers doubling as drag handles like the
-        # Gallery: this tab's strip of past runs (left), the settings and run
-        # controls (middle), and a live preview (right).
+        # Two resizable panes, the divider doubling as a drag handle: a main column
+        # (live preview on top, then the settings and run controls) and this tab's
+        # own slim strip of past runs on the right.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
 
-        # Left pane: this tab's own accumulating strip of past runs.
-        self._strip = ThumbnailStrip(self._db)
-        self._strip.thumbnail_activated.connect(self.strip_activated)
-        self._panes.addWidget(self._strip)
-
-        # Middle pane: workflow picker, settings form, and the run controls. The
-        # progress bar and buttons live here, so they span only the settings —
-        # never the preview.
+        # Main pane: the live preview over the settings form and run controls. The
+        # preview leads (mirroring ComfyUI's frames, then the finished output); the
+        # progress bar and buttons sit at the bottom, under the settings.
         main = QWidget()
         main_box = QVBoxLayout(main)
         main_box.setContentsMargins(0, 0, 0, 0)
         main_box.setSpacing(8)
+        self._preview = PreviewWidget()
+        main_box.addWidget(self._preview, 3)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = QComboBox()
@@ -109,7 +106,7 @@ class GenerateConfigPanel(QWidget):
         main_box.addWidget(self._estimate_label)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        main_box.addWidget(self._scroll, 1)
+        main_box.addWidget(self._scroll, 2)
         self._progress = QProgressBar()
         self._progress.setTextVisible(True)
         main_box.addWidget(self._progress)
@@ -127,21 +124,18 @@ class GenerateConfigPanel(QWidget):
         main_box.addLayout(btn_row)
         self._panes.addWidget(main)
 
-        # Right pane: a live preview mirroring the job in progress (ComfyUI's
-        # preview frames) and then its finished output.
-        self._preview = PreviewWidget()
-        self._panes.addWidget(self._preview)
+        # Right pane: this tab's own accumulating strip of past runs, kept slim so
+        # the whole window can still tile into a monitor third or a portrait half.
+        self._strip = ThumbnailStrip(self._db)
+        self._strip.thumbnail_activated.connect(self.strip_activated)
+        self._panes.addWidget(self._strip)
 
-        # The strip holds its width; the settings and preview panes grow with the
-        # window (settings faster), mirroring the Gallery's proportions. The floors
-        # stay low enough that the whole window can still tile into a monitor third
-        # or a portrait-monitor half.
-        main.setMinimumWidth(240)
-        self._preview.setMinimumWidth(180)
-        self._panes.setStretchFactor(0, 0)
-        self._panes.setStretchFactor(1, 3)
-        self._panes.setStretchFactor(2, 2)
-        self._panes.setSizes([210, 480, 320])
+        # The main column grows with the window; the strip holds its width. The
+        # floor stays low enough that the window can still tile narrow.
+        main.setMinimumWidth(230)
+        self._panes.setStretchFactor(0, 1)
+        self._panes.setStretchFactor(1, 0)
+        self._panes.setSizes([500, 150])
 
         layout.addWidget(self._panes)
 

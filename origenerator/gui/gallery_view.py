@@ -9,15 +9,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
-from origenerator import evolver_export, gallery, timing
+from origenerator import gallery, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, STATE_DIR, THUMB_DIR,
-)
+from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.generation_config import merge_denormalized
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
@@ -29,6 +26,7 @@ from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
+from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
 from origenerator.navigation import NavigationHistory
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -45,7 +43,6 @@ _RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
 _STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
 _STARRED_LABEL = "Starred"  # its row label; the star is drawn in the caret column
 _STARRED_TITLE = "★ " + _STARRED_LABEL  # the browser-pane heading for the shelf
-_ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
 
@@ -60,16 +57,6 @@ def _is_deletable_folder(group) -> bool:
         group,
         (gallery.ModelGroup, gallery.LoraGroup, gallery.SourceImageGroup, gallery.SettingsGroup),
     )
-
-
-def _is_reusable_workflow(workflow_name) -> bool:
-    """Whether the app can rebuild this workflow from its template.
-
-    The single gate for both Reuse Parameters and the gallery re-roll, so the
-    re-roll '+' appears exactly where Reuse works (a re-roll is just Reuse with
-    a random seed).
-    """
-    return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
 class GalleryView(QWidget):
@@ -107,7 +94,6 @@ class GalleryView(QWidget):
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
-        self._selected: dict | None = None
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
         self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
@@ -129,7 +115,6 @@ class GalleryView(QWidget):
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed generations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
-        self._strip_pid: str | None = None  # generation whose animations the strip shows
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
@@ -265,15 +250,10 @@ class GalleryView(QWidget):
         self._preview = PreviewWidget()
         info_box.addWidget(self._preview, 3)
         self._meta_panel = MetadataPanel()
-        # An i2v's input_image value links to the image it came from; follow it.
-        self._meta_panel.link_activated.connect(self._on_source_link)
         info_box.addWidget(self._meta_panel, 2)
-        # For an image, the videos it was animated into — click one to open it.
         self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self._on_source_link)
         info_box.addWidget(self._animated_strip)
         self._reuse_btn = QPushButton("Reuse Parameters")
-        self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
         # A disabled QPushButton receives no hover events, so its own tooltip
         # never shows; carry the "ask Claude" hint on an enabled wrapper instead.
@@ -289,10 +269,21 @@ class GalleryView(QWidget):
         self._evolver_btn.setToolTip(
             "Copy this video into Evolver's inbox for sorting and upscaling."
         )
-        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
         self._evolver_btn.hide()
         info_box.addWidget(self._evolver_btn)
         self._panes.addWidget(info)
+        # The controller drives the pane's widgets from the generation on display;
+        # an i2v source link or an animation click surfaces here as a source link,
+        # and Reuse re-emits as this view's reuse_requested.
+        self._info = InfoPaneController(
+            self._db,
+            preview=self._preview, meta_panel=self._meta_panel, meta_title=self._meta_title,
+            estimate_label=self._estimate_label, animated_strip=self._animated_strip,
+            reuse_btn=self._reuse_btn, reuse_wrap=self._reuse_wrap, evolver_btn=self._evolver_btn,
+            parent=self,
+        )
+        self._info.link_activated.connect(self._on_source_link)
+        self._info.reuse_requested.connect(self.reuse_requested)
 
         # The TOC pane holds its width; the browser and info panes both grow with
         # the window (the browser faster), so the info pane stays comfortably wide
@@ -385,8 +376,7 @@ class GalleryView(QWidget):
                 self._title.set_display("")
                 self._avg_label.setText("")
                 self._show_widget(QWidget())
-                self._strip_pid = None
-                self._animated_strip.show_videos([])  # nothing selected: no animations
+                self._info.reset_animated_strip()  # nothing selected: no animations
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
@@ -822,6 +812,13 @@ class GalleryView(QWidget):
         controller; surfaced here for the Recents shelf and the info pane."""
         return self._reroll.jobs
 
+    @property
+    def _selected(self) -> dict | None:
+        """The saved generation on display in the info pane, or ``None``. Owned by
+        the info-pane controller; read here for navigation, delete, and the
+        Recents "containing folder" jump."""
+        return self._info.current_row()
+
     def _add_reroll_tile(self, flow, group):
         tile = RerollTile(self._reroll.job_for(group.key))
         tile.set_selected(group.key == self._selected_reroll_key)
@@ -852,8 +849,8 @@ class GalleryView(QWidget):
         frames into the info pane.
 
         The tile stands for an in-flight job with no saved file yet, so its
-        preview comes from the job's streamed frames rather than
-        :meth:`_render_preview`'s on-disk lookup.
+        preview comes from the job's streamed frames rather than the info pane's
+        on-disk lookup.
         """
         job = self._reroll_jobs.get(key)
         if job is None:
@@ -876,27 +873,17 @@ class GalleryView(QWidget):
         """Point the info pane at re-roll ``key`` and show its last frame — or a
         'waiting' note, never the idle 'select a generation' placeholder."""
         self._selected_reroll_key = key
-        self._selected = None
         self._clear_thumbnail_selection()
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(True)
-        self._reuse_btn.setEnabled(False)
-        self._reuse_wrap.setToolTip("")
-        self._update_evolver_button(None)  # a running re-roll isn't a saved video
-        self._meta_title.setText("Generating a new variation…")
-        self._estimate_label.clear()
-        self._meta_panel.clear()
-        if self._last_reroll_frame:
-            self._preview.show_frame(self._last_reroll_frame)
-        else:
-            self._preview.show_message("Waiting for preview…")
+        self._info.show_generating(self._last_reroll_frame)
 
     def _on_reroll_preview(self, key: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
         remembering it so it survives the rebuild each stage completion triggers."""
         if key == self._selected_reroll_key:
             self._last_reroll_frame = data
-            self._preview.show_frame(data)
+            self._info.show_frame(data)
 
     def _clear_thumbnail_selection(self):
         """Drop the thumbnail multi-selection and its highlights while keeping the
@@ -1252,28 +1239,7 @@ class GalleryView(QWidget):
         if not row:
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane
-        self._selected = row
-        reusable = _is_reusable_workflow(row.get("workflow_name"))
-        self._reuse_btn.setEnabled(reusable)
-        self._reuse_wrap.setToolTip(
-            "" if reusable else
-            "This workflow isn't built into the app yet — ask Claude to "
-            "implement it if you want to reuse its parameters."
-        )
-        # Resolve the preview once and share it: both the player and the
-        # Send-to-Evolver button key off the same on-disk file.
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-        self._update_evolver_button(preview)
-        self._render_preview(preview)
-        self._meta_title.setText(
-            f"{row['workflow_name']} ({row['workflow_version']})"
-        )
-        self._estimate_label.setText(
-            f"Typical time: {timing.estimate_label(self._db.recent_durations(row['workflow_name']))}"
-        )
-        source_id = gallery.find_source_image_id(row, self._image_rows)
-        self._meta_panel.show_row(row, source_id)
-        self._update_animated_strip(row)
+        self._info.show_generation(row, self._image_rows)
         self._sync_containing_folder_button()  # a Recents preview offers the jump
         # Every view of a generation — a thumbnail click, a folder's auto-selected
         # first item, a followed link — is a browsing step, unless a rebuild or
@@ -1281,46 +1247,12 @@ class GalleryView(QWidget):
         if not self._suppress_history:
             self._record_visit(prompt_id)
 
-    def _update_animated_strip(self, row: dict):
-        """Show the videos an image was animated into. Rebuilt only when the
-        selection changes, so a poll's re-selection doesn't restart the previews
-        every tick."""
-        if row["prompt_id"] == self._strip_pid:
-            return
-        self._strip_pid = row["prompt_id"]
-        self._animated_strip.show_videos(self._animated_items(row))
-
-    def _animated_items(self, row: dict) -> list[tuple]:
-        """(prompt_id, looping-preview path, still path) for each video this image
-        was animated into — empty for anything but an image with animations."""
-        if gallery.media_type_of_row(row) != "image":
-            return []
-        videos = gallery.videos_from_source_image(row, self._video_rows())
-        if len(videos) > _ANIMATED_STRIP_LIMIT:
-            logger.info("Image %s has %d animations; showing the first %d",
-                        row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
-        return [
-            (v["prompt_id"], self._animated_preview(v), v.get("thumbnail_path"))
-            for v in videos[:_ANIMATED_STRIP_LIMIT]
-        ]
-
-    def _video_rows(self) -> list[dict]:
-        return [r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "video"]
-
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
         video whose file is gone or unreadable, so the tile shows its still instead.
-        The same resolver feeds the grid tiles, the Recents shelf, and the
-        'Animated in' strip, with the app's output and thumbnail directories."""
+        Feeds the grid tiles and the Recents shelf (the info pane's 'Animated in'
+        strip resolves the same path through :func:`gallery.animated_preview_path`)."""
         return gallery.animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR)
-
-    def _render_preview(self, preview):
-        """Play/show the already-resolved ``(path, media_type)``, or clear when
-        ``None`` (nothing displayable resolved for the selection)."""
-        if preview is None:
-            self._preview.clear()
-        else:
-            self._preview.show_media(*preview)
 
     def _on_source_link(self, prompt_id: str):
         self._show_generation(prompt_id)
@@ -1378,87 +1310,14 @@ class GalleryView(QWidget):
             self._delete_btn.setToolTip("Nothing to delete")
 
     def _clear_metadata(self):
-        self._selected = None
-        self._reuse_btn.setEnabled(False)
-        self._reuse_wrap.setToolTip("")
-        self._update_evolver_button(None)
-        self._meta_title.setText("Select a generation")
-        self._estimate_label.clear()
-        self._meta_panel.clear()
-        self._preview.clear()
+        self._info.clear()
         self._sync_containing_folder_button()  # nothing selected: no jump to offer
 
-    def _update_evolver_button(self, preview):
-        """Reflect the selection on the Send-to-Evolver button.
-
-        Shown only when the selection is a video with a file on disk; Evolver is
-        a video pipeline, so for an image or a missing file the button is hidden
-        rather than shown disabled. A video already sent shows a persistent,
-        disabled "Sent ✓" so the gallery remembers the handoff across selections
-        and sessions (the flag is read from the row, which the DB persists).
-
-        ``preview`` is the selection's resolved ``(path, media_type)``, or
-        ``None`` when nothing displayable is selected.
-        """
-        is_video = preview is not None and preview[1] == "video"
-        self._evolver_btn.setVisible(is_video)
-        if not is_video:
-            return
-        already_sent = bool(self._selected and self._selected.get("evolver_exported_at"))
-        self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
-        self._evolver_btn.setEnabled(not already_sent)
-
-    def _exportable_video_path(self) -> Path | None:
-        """The on-disk video file backing the current selection, or ``None`` when
-        the selection isn't a video (or its file is missing) and can't be sent.
-        Resolved fresh at send time, so a file deleted since selection is caught."""
-        if not self._selected:
-            return None
-        preview = gallery.resolve_preview(self._selected, COMFYUI_OUTPUT_DIR)
-        if preview is None or preview[1] != "video":
-            return None
-        return preview[0]
-
     def _on_send_to_evolver(self):
-        """Copy the selected video into Evolver's inbox and remember the send.
-
-        Re-checks the persisted flag (not just the button's disabled state) so
-        the handoff can't be repeated, mirroring how _on_reuse re-gates. The copy
-        lands in another app's inbox with no other visible result here, so a
-        failure must surface loudly; success is remembered on the button.
-        """
-        if not self._selected or self._selected.get("evolver_exported_at"):
-            return
-        path = self._exportable_video_path()
-        if path is None:
-            return
-        try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
-        except Exception as e:
-            logger.exception("Failed to send %s to Evolver", path)
-            QMessageBox.warning(
-                self, "Send to Evolver failed",
-                f"Could not send this video to Evolver:\n\n{e}",
-            )
-            return
-        prompt_id = self._selected["prompt_id"]
-        self._db.mark_evolver_exported(prompt_id)
-        # Re-read so the row (and thus the button) reflects the persisted send.
-        self._selected = self._db.get_generation(prompt_id) or self._selected
-        self._update_evolver_button((path, "video"))
+        self._info._on_send_to_evolver()
 
     def _on_reuse(self):
-        # Gate on reusability here, not just via the button's enabled state, so
-        # the double-click path is inert for a workflow the app can't rebuild.
-        if not self._selected or not _is_reusable_workflow(
-            self._selected.get("workflow_name")
-        ):
-            return
-        params = merge_denormalized(self._selected)
-        if not params:
-            return
-        workflow_name = self._selected.get("workflow_name", "")
-        self.reuse_requested.emit(workflow_name, params)
+        self._info._on_reuse()
 
 
 def _group_workflow(group) -> str | None:

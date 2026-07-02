@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QToolButton, QTreeWidget, QTreeWidgetItem, QSplitter,
+    QScrollArea, QPushButton, QToolButton, QTreeWidgetItem, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -19,6 +19,7 @@ from origenerator.generation_config import merge_denormalized, prepared_params
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
+from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
 )
@@ -166,7 +167,7 @@ class GalleryView(QWidget):
         # TOC pane: folder tree (media -> workflow -> model -> [LoRA] -> settings;
         # the LoRA level shows only for workflows that use one). Folders start
         # collapsed and only expand on the disclosure arrow; double-click renames.
-        self._tree = QTreeWidget()
+        self._tree = FolderTree(_GROUP_ROLE, _is_deletable_folder)
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)
@@ -175,6 +176,8 @@ class GalleryView(QWidget):
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
         self._tree.itemChanged.connect(self._commit_inline_rename)
+        self._tree.star_clicked.connect(self._toggle_star)          # hover-row action
+        self._tree.delete_clicked.connect(self._delete_folder_by_key)
         toc = QWidget()
         toc_box = QVBoxLayout(toc)
         toc_box.setContentsMargins(*_PANE_MARGINS)
@@ -1026,6 +1029,13 @@ class GalleryView(QWidget):
         starred = bool(item and item.data(0, _GROUP_ROLE).starred)
         self._db.set_folder_starred(key, not starred)
         self.refresh()
+
+    def _delete_folder_by_key(self, key: str):
+        """Delete the folder a hover-row trash click names."""
+        item = self._item_by_key.get(key)
+        group = item.data(0, _GROUP_ROLE) if item else None
+        if group is not None:
+            self._delete_folder(group)
 
     # --- metadata sidebar --------------------------------------------------
 

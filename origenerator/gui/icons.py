@@ -6,6 +6,8 @@ panel's copy icon uses. Drawn rather than glyphs so they render identically in a
 font and read clearly at a small size.
 """
 
+import math
+
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
 from PyQt6.QtCore import Qt, QRectF, QPointF
 
@@ -32,6 +34,12 @@ def undo_icon() -> QIcon:
 
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
+
+
+def star_icon(*, filled: bool) -> QIcon:
+    """A five-pointed star — solid when the folder is starred, an outline when
+    not, so the hover control shows the state it will toggle."""
+    return _two_mode(lambda p, color: _draw_star(p, color, filled))
 
 
 def _two_mode(draw) -> QIcon:
@@ -85,3 +93,21 @@ def _draw_trash(painter: QPainter):
                          QPointF(30, 37), QPointF(32, 16))                    # body
     painter.drawLine(QPointF(21, 20), QPointF(22, 33))                       # ridges
     painter.drawLine(QPointF(27, 20), QPointF(26, 33))
+
+
+def _draw_star(painter: QPainter, color, filled: bool):
+    cx, cy, outer, inner = 24, 25, 15, 6.2
+    points = []
+    for i in range(10):
+        angle = -math.pi / 2 + i * math.pi / 5
+        radius = outer if i % 2 == 0 else inner
+        points.append(QPointF(cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    if filled:
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+    else:
+        pen = QPen(color)
+        pen.setWidthF(3)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)  # a thinner outline than the default stroke
+    painter.drawPolygon(*points)

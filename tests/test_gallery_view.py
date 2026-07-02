@@ -445,6 +445,10 @@ def test_go_to_containing_folder_button_appears_then_navigates(qtbot):
     assert view.selected_generation() == "i2"
     assert view._showing_recents() is False             # we left the shelf...
     assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
+    # The item lands selected — its tile picked and highlighted, not merely
+    # previewed — as if we'd navigated in and clicked it.
+    assert view.selected_prompt_ids() == ["i2"]
+    assert view._thumb_widgets["i2"].is_selected()
     assert view._containing_folder_btn.isHidden()       # and the button retires
 
 

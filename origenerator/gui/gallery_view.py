@@ -716,10 +716,16 @@ class GalleryView(QWidget):
             item.reveal()
 
     def _go_to_containing_folder(self):
-        """Jump the browser pane to the previewed Recents item's own folder — the
-        button's action, and the same navigation a followed link makes."""
-        if self._selected is not None:
-            self._on_source_link(self._selected["prompt_id"])
+        """Jump the browser pane to the previewed Recents item's own folder and land
+        on the item itself — its tile picked and highlighted, as if you'd navigated
+        in and clicked it, not just auto-previewing the folder's first item."""
+        if self._selected is None:
+            return
+        prompt_id = self._selected["prompt_id"]
+        self._on_source_link(prompt_id)  # open the folder, previewing the item
+        # The navigation renders the folder's tiles; now pick this one so it reads
+        # as the selected item rather than an unhighlighted preview.
+        self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
 
     def _sync_containing_folder_button(self):
         """Offer "Go to containing folder" only while the Recents shelf is showing

@@ -170,7 +170,7 @@ class GalleryView(QWidget):
         # TOC pane: folder tree (media -> workflow -> model -> [LoRA] -> settings;
         # the LoRA level shows only for workflows that use one). Folders start
         # collapsed and only expand on the disclosure arrow; double-click renames.
-        self._tree = FolderTree(_GROUP_ROLE, _is_deletable_folder)
+        self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)

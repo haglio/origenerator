@@ -21,7 +21,7 @@ from origenerator.generation_config import merge_denormalized, prepared_params
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import FolderTree
+from origenerator.gui.folder_tree import FolderTree, BRANCH_STAR_ROLE
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
 )
@@ -42,7 +42,8 @@ _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
 _STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
-_STARRED_LABEL = "★ Starred"  # its row, pinned above the media folders (the star is decorative here)
+_STARRED_LABEL = "Starred"  # its row label; the star is drawn in the caret column
+_STARRED_TITLE = "★ " + _STARRED_LABEL  # the browser-pane heading for the shelf
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
@@ -377,6 +378,7 @@ class GalleryView(QWidget):
         # reachable in one click no matter how deeply they're nested.
         if tree_model:
             self._starred_item = QTreeWidgetItem([_STARRED_LABEL])
+            self._starred_item.setData(0, BRANCH_STAR_ROLE, True)  # star in the caret column
             self._starred_item.setToolTip(0, "Your starred folders")
             root.addChild(self._starred_item)
             self._item_by_key[_STARRED_KEY] = self._starred_item
@@ -525,7 +527,7 @@ class GalleryView(QWidget):
         with its breadcrumb so identically-named folders stay tellable apart. Like
         a branch folder it lists sub-folders rather than a single generation, so the
         info pane clears instead of previewing one folder's first item."""
-        self._title.set_display(_STARRED_LABEL)
+        self._title.set_display(_STARRED_TITLE)
         self._avg_label.setText("")
         self._clear_metadata()
         self._show_starred_tiles(self._starred_groups)

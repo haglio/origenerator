@@ -8,8 +8,10 @@ in place. A row grows a left gutter (and slides its label past it) only while it
 actually shows an action, so parent folders and unstarred leaves at rest keep
 their normal indentation. Clicking an icon emits ``star_clicked`` /
 ``delete_clicked`` with the folder's key instead of selecting the row; the tree
-hit-tests clicks against the same rects the delegate paints. Which group a row
-holds is injected, so this stays free of the gallery model.
+hit-tests clicks against the same rects the delegate paints. A row flagged with
+``BRANCH_STAR_ROLE`` (the Starred shelf) draws a star in its caret column so its
+label lines up with the sibling folders'. Which group a row holds is injected, so
+this stays free of the gallery model.
 """
 
 from PyQt6.QtWidgets import (
@@ -21,6 +23,11 @@ from origenerator.gui import icons
 
 _ICON = 16   # on-screen size of each action
 _PAD = 4     # gap at the edges and between the two icons
+
+# A row carrying this draws a star where its disclosure chevron would go, so a
+# childless shelf row aligns with the sibling folders instead of shifting a ★
+# into its label. Distinct from the injected group role (plain UserRole).
+BRANCH_STAR_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 def _action_rects(row: QRect):
@@ -83,8 +90,20 @@ class FolderTree(QTreeWidget):
     def __init__(self, group_role, parent=None):
         super().__init__(parent)
         self._role = group_role
+        self._branch_star = icons.star_icon(filled=True)
         self.setMouseTracking(True)  # keep the hovered row's actions live as the mouse moves
         self.setItemDelegate(_FolderRowDelegate(group_role, self))
+
+    def drawBranches(self, painter, rect, index):
+        """Paint a star in the caret column of a BRANCH_STAR_ROLE row (the Starred
+        shelf), so its label aligns with the sibling folders' rather than sitting a
+        chevron-width off. Every other row keeps its normal disclosure control."""
+        if index.data(BRANCH_STAR_ROLE):
+            x = rect.left() + (rect.width() - _ICON) // 2
+            y = rect.top() + (rect.height() - _ICON) // 2
+            self._branch_star.paint(painter, QRect(x, y, _ICON, _ICON))
+            return
+        super().drawBranches(painter, rect, index)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

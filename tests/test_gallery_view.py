@@ -14,6 +14,7 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_S
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.folder_tree import BRANCH_STAR_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
@@ -177,7 +178,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"★ Starred", "Images", "Videos"}
+    assert set(top) == {"Starred", "Images", "Videos"}
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
@@ -285,12 +286,25 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     view._toggle_star(dog_key)
 
     # The shelf is the very first row in the tree, above the media folders.
-    assert view._tree.topLevelItem(0).text(0) == "★ Starred"
+    assert view._tree.topLevelItem(0).text(0) == "Starred"
     # Selecting it lists a tile for each starred folder, wherever it lives.
-    shelf = _top_level(view._tree)["★ Starred"]
+    shelf = _top_level(view._tree)["Starred"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_folder_keys() == [dog_key]
     assert view.visible_prompt_ids() == []
+
+
+def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = view._tree.topLevelItem(0)
+    # No "★ " text prefix: the star is drawn in the caret column instead, so the
+    # "Starred" label lines up with "Images"/"Videos" rather than sitting a
+    # chevron-width to the right of them.
+    assert shelf.text(0) == "Starred"
+    assert shelf.data(0, BRANCH_STAR_ROLE) is True
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
@@ -304,7 +318,7 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     dog_key = _key(model.child(1))
     view._toggle_star(dog_key)
 
-    shelf = _top_level(view._tree)["★ Starred"]
+    shelf = _top_level(view._tree)["Starred"]
     view._tree.setCurrentItem(shelf)
     view._drill_into(view.visible_folder_keys()[0])  # click the starred tile
     assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
@@ -315,7 +329,7 @@ def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _top_level(view._tree)["★ Starred"]
+    shelf = _top_level(view._tree)["Starred"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_folder_keys() == []   # no tiles, just the hint
     assert view.visible_prompt_ids() == []
@@ -325,18 +339,18 @@ def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["★ Starred"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
 
     view.refresh()  # a poll-driven rebuild must not knock us off the shelf
 
-    assert view._tree.currentItem().text(0) == "★ Starred"
+    assert view._tree.currentItem().text(0) == "Starred"
 
 
 def test_starred_shelf_is_absent_until_a_folder_exists(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
-    assert "★ Starred" not in _top_level(view._tree)
+    assert "Starred" not in _top_level(view._tree)
 
 
 def test_new_generations_appear_without_manual_refresh(qtbot):
@@ -344,13 +358,13 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"★ Starred", "Images"}
+    assert set(_top_level(view._tree)) == {"Starred", "Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_top_level(view._tree)) == {"★ Starred", "Images", "Videos"}
+    assert set(_top_level(view._tree)) == {"Starred", "Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):

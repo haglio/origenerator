@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from origenerator.workflows.model_files import is_no_lora
+
 
 @dataclass
 class ParamDef:
@@ -54,6 +56,33 @@ class WorkflowTemplate(ABC):
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
+
+    @staticmethod
+    def lora_model_input(node_id: str, model_ref, lora_name, strength):
+        """The optional model-only LoRA node to add to a payload, and the model
+        input the downstream node should read.
+
+        With a real ``lora_name``, returns ``({node_id: <LoraLoaderModelOnly>},
+        [node_id, 0])`` — a one-node dict to merge into the payload, and the ref
+        pointing at it. When ``lora_name`` is the "None" sentinel (or empty),
+        returns ``({}, model_ref)``: no node, and ``model_ref`` passed straight
+        through, so the graph carries no LoRA for that slot and the base model
+        runs unmodified. ComfyUI validates ``lora_name`` against the installed
+        files, so a bypassed slot must be omitted, not passed a placeholder name.
+        """
+        if is_no_lora(lora_name):
+            return {}, model_ref
+        node = {
+            node_id: {
+                "class_type": "LoraLoaderModelOnly",
+                "inputs": {
+                    "model": model_ref,
+                    "lora_name": lora_name,
+                    "strength_model": strength,
+                },
+            }
+        }
+        return node, [node_id, 0]
 
     def extract_output_info(self, history_data: dict) -> list[dict]:
         """Find this workflow's saved files in a ComfyUI /history response.

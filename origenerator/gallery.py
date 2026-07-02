@@ -29,6 +29,7 @@ from pathlib import Path
 
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.model_files import is_no_lora
 
 # Params that identify a specific instance of a recipe rather than the recipe
 # itself — dropped from a row's settings so reruns that differ only in these land
@@ -144,10 +145,22 @@ def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     return tuple(wf.lora_keys) if wf else ()
 
 
+def _keyed_signature(keys: tuple[str, ...], params: dict) -> str:
+    """Canonical, order-stable key from the values ``params`` holds for ``keys``."""
+    return json.dumps([params.get(key) for key in keys], default=str)
+
+
 def _values_signature(keys: tuple[str, ...], params_json: str | None) -> str:
     """Canonical, order-stable key from the values a row recorded for ``keys``."""
-    params = parse_params(params_json)
-    return json.dumps([params.get(key) for key in keys], default=str)
+    return _keyed_signature(keys, parse_params(params_json))
+
+
+def _named_loras(keys: tuple[str, ...], params: dict) -> dict:
+    """``params`` narrowed to the LoRA ``keys`` that actually name a LoRA — the
+    "None" sentinel and empty values dropped. A bypassed LoRA then groups and
+    labels as no LoRA at all, the same as an import whose graph had no LoRA node.
+    """
+    return {k: params.get(k) for k in keys if not is_no_lora(params.get(k))}
 
 
 def model_signature(workflow_name: str | None, params_json: str | None) -> str:
@@ -156,8 +169,13 @@ def model_signature(workflow_name: str | None, params_json: str | None) -> str:
 
 
 def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
-    """Canonical key for grouping a workflow's rows by the LoRA(s) they used."""
-    return _values_signature(workflow_lora_keys(workflow_name), params_json)
+    """Canonical key for grouping a workflow's rows by the LoRA(s) they used.
+
+    A "None"/empty LoRA reads as no LoRA (see :func:`_named_loras`), so a run
+    that bypassed a LoRA shares one signature with a no-LoRA import.
+    """
+    keys = workflow_lora_keys(workflow_name)
+    return _keyed_signature(keys, _named_loras(keys, parse_params(params_json)))
 
 
 def row_output_files(row: dict) -> list[dict]:
@@ -416,10 +434,11 @@ def lora_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the LoRA(s) a row used.
 
     Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
-    the row recorded none of their values (e.g. an older import that didn't carry
-    the LoRA).
+    the row recorded no LoRA — none of the values (e.g. an older import that
+    didn't carry the LoRA), or the "None" sentinel a run chose to bypass it.
     """
-    return _joined_file_label(workflow_lora_keys(workflow_name), params, "(no LoRA)")
+    keys = workflow_lora_keys(workflow_name)
+    return _joined_file_label(keys, _named_loras(keys, params), "(no LoRA)")
 
 
 def _prompt_headline(params: dict) -> str:

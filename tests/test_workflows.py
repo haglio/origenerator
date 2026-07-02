@@ -41,24 +41,63 @@ def test_workflows_declare_the_params_that_identify_their_lora():
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # The WAN video workflows pick their LoRA from the installed files, like the
-    # SDXL Model dropdown: a combo per high/low LoRA, its options from the loras
-    # scan and its default matching the persisted default — not a hidden param the
-    # form silently reset to default. Where the pickers sit is asserted separately,
-    # by test_wan_video_workflows_group_all_models_then_all_loras.
+    # SDXL Model dropdown: a combo per high/low LoRA, its options led by "None"
+    # (so a run can opt out of a LoRA) then the loras scan, and its default
+    # matching the persisted default — not a hidden param the form silently reset
+    # to default. Where the pickers sit is asserted separately, by
+    # test_wan_video_workflows_group_all_models_then_all_loras.
     import origenerator.workflows.wan22_flf2v_loop as flf
     import origenerator.workflows.wan22_i2v as i2v
+    from origenerator.workflows.model_files import NO_LORA
 
-    installed = ["x_high.safetensors", "y_low.safetensors"]
-    monkeypatch.setattr(i2v, "list_model_files", lambda category, fallback: installed)
-    monkeypatch.setattr(flf, "list_model_files", lambda category, fallback: installed)
+    options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
+    monkeypatch.setattr(i2v, "list_lora_files", lambda fallback: options)
+    monkeypatch.setattr(flf, "list_lora_files", lambda fallback: options)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
             picker = by_key[f"lora_{level}"]
             assert picker.type == "combo"
-            assert picker.options == installed
+            assert picker.options == options
+            assert picker.options[0] == NO_LORA  # a run can bypass the LoRA
             assert picker.default == wf.default_params()[f"lora_{level}"]
+
+
+def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
+    # Choosing "None" for a LoRA builds the graph with no LoraLoader for that
+    # slot: the sampler's model runs straight from the UNET, unmodified. The
+    # other stage's real LoRA is untouched. Verified both by the payload (how
+    # many LoraLoaderModelOnly nodes it has) and by reading the graph back the
+    # way the importer does — a bypassed stage resolves to no LoRA at all.
+    from origenerator.comfy_graph import dual_sampler_model_files
+    from origenerator.workflows.model_files import NO_LORA
+
+    def lora_count(payload):
+        return sum(n["class_type"] == "LoraLoaderModelOnly" for n in payload.values())
+
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        base = dict(wf.default_params(), lora_high="hi.safetensors", lora_low="lo.safetensors")
+
+        both = wf.build_api_payload(base)
+        assert lora_count(both) == 2
+        read = dual_sampler_model_files(both)
+        assert read["lora_high"] == "hi.safetensors"
+        assert read["lora_low"] == "lo.safetensors"
+
+        high_off = wf.build_api_payload(dict(base, lora_high=NO_LORA))
+        assert lora_count(high_off) == 1
+        read = dual_sampler_model_files(high_off)
+        assert "lora_high" not in read           # bypassed → no LoRA on that stage
+        assert read["lora_low"] == "lo.safetensors"
+        assert read["unet_high"] == base["unet_high"]  # base model still runs
+
+        none = wf.build_api_payload(dict(base, lora_high=NO_LORA, lora_low=NO_LORA))
+        assert lora_count(none) == 0
+        read = dual_sampler_model_files(none)
+        assert "lora_high" not in read and "lora_low" not in read
+        assert read["unet_high"] == base["unet_high"]
+        assert read["unet_low"] == base["unet_low"]
 
 
 def test_wan_video_workflows_expose_model_pickers(monkeypatch):

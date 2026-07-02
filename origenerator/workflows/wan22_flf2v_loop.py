@@ -1,5 +1,5 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import list_lora_files, list_model_files
 
 
 class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
@@ -50,7 +50,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         models = list_model_files("diffusion_models", [defaults["unet_high"], defaults["unet_low"]])
-        loras = list_model_files("loras", [defaults["lora_high"], defaults["lora_low"]])
+        loras = list_lora_files([defaults["lora_high"], defaults["lora_low"]])
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
@@ -74,6 +74,14 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
+        # Each LoRA is optional: "None" adds no LoraLoader for that stage, so its
+        # sampler runs the base UNET unmodified (WorkflowTemplate.lora_model_input).
+        lora_high, model_high = self.lora_model_input(
+            "5", ["3", 0], params["lora_high"], params["lora_strength_high"]
+        )
+        lora_low, model_low = self.lora_model_input(
+            "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
+        )
         return {
             "1": {
                 "class_type": "CLIPLoader",
@@ -101,29 +109,15 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                     "weight_dtype": "default",
                 },
             },
-            "5": {
-                "class_type": "LoraLoaderModelOnly",
-                "inputs": {
-                    "model": ["3", 0],
-                    "lora_name": params["lora_high"],
-                    "strength_model": params["lora_strength_high"],
-                },
-            },
-            "6": {
-                "class_type": "LoraLoaderModelOnly",
-                "inputs": {
-                    "model": ["4", 0],
-                    "lora_name": params["lora_low"],
-                    "strength_model": params["lora_strength_low"],
-                },
-            },
+            **lora_high,
+            **lora_low,
             "7": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": ["5", 0], "shift": params["shift_high"]},
+                "inputs": {"model": model_high, "shift": params["shift_high"]},
             },
             "8": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": ["6", 0], "shift": params["shift_low"]},
+                "inputs": {"model": model_low, "shift": params["shift_low"]},
             },
             "9": {
                 "class_type": "CLIPTextEncode",

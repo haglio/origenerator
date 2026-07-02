@@ -1,7 +1,9 @@
 import os
 
 from origenerator import config
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import (
+    NO_LORA, is_no_lora, list_lora_files, list_model_files,
+)
 
 
 def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
@@ -52,3 +54,28 @@ def test_falls_back_when_the_category_dir_is_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     (tmp_path / "models" / "loras").mkdir(parents=True)
     assert list_model_files("loras", ["default.safetensors"]) == ["default.safetensors"]
+
+
+def test_lora_picker_leads_with_the_none_sentinel(tmp_path, monkeypatch):
+    # A LoRA is optional: the picker offers "None" first (which the workflow
+    # builds with no LoraLoader, running the base model unmodified), then the
+    # installed files from the same scan as any model picker.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    loras = tmp_path / "models" / "loras"
+    loras.mkdir(parents=True)
+    (loras / "b.safetensors").touch()
+    (loras / "a.safetensors").touch()
+    assert list_lora_files(["fallback.safetensors"]) == [
+        NO_LORA, "a.safetensors", "b.safetensors",
+    ]
+    assert NO_LORA not in list_model_files("loras", ["fallback.safetensors"])
+
+
+def test_is_no_lora_recognizes_the_sentinel_and_empty_values():
+    # A bypassed LoRA reads the same however it was recorded: the "None" sentinel
+    # a generation stores, or the empty/absent value an older row or a no-LoRA
+    # import carries.
+    assert is_no_lora(NO_LORA)
+    assert is_no_lora("")
+    assert is_no_lora(None)
+    assert not is_no_lora("real_lora.safetensors")

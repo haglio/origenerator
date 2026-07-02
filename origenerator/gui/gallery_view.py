@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QToolButton, QTreeWidgetItem, QSplitter,
+    QScrollArea, QPushButton, QToolButton, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -18,7 +18,7 @@ from origenerator.gallery_actions import GalleryActions
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import FolderTree, BRANCH_ICON_ROLE
+from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
@@ -27,21 +27,24 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
 from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
+from origenerator.gui.gallery_tree import (
+    GalleryTree,
+    GROUP_ROLE as _GROUP_ROLE,
+    RECENTS_KEY as _RECENTS_KEY,
+    RECENTS_LABEL as _RECENTS_LABEL,
+    STARRED_KEY as _STARRED_KEY,
+    STARRED_LABEL as _STARRED_LABEL,
+)
 from origenerator.navigation import NavigationHistory
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-_GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
-_RECENTS_KEY = "__recents__"  # synthetic tree node listing recently generated items
-_RECENTS_LABEL = "Recents"  # its row label; a clock is drawn in the caret column
 _RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
-_STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
-_STARRED_LABEL = "Starred"  # its row label; the star is drawn in the caret column
 _STARRED_TITLE = "★ " + _STARRED_LABEL  # the browser-pane heading for the shelf
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
@@ -95,14 +98,10 @@ class GalleryView(QWidget):
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
         self._image_rows: list[dict] = []
-        self._item_by_key: dict[str, QTreeWidgetItem] = {}
-        self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
-        self._recents_item: QTreeWidgetItem | None = None  # the "Recents" shelf row
         self._recent_rows: list[dict] = []  # recently generated rows, newest first
         self._inflight_cards: dict[str, InFlightCard] = {}  # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
-        self._starred_item: QTreeWidgetItem | None = None  # the "★ Starred" shelf row
         self._starred_groups: list = []  # folders the shelf collects, in tree order
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
@@ -178,6 +177,7 @@ class GalleryView(QWidget):
         # image-conditioned workflows). Folders start collapsed and only expand on
         # the disclosure arrow; double-click renames.
         self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
+        self._tree_view = GalleryTree(self._tree)  # builds it + the key/prompt→item maps
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)
@@ -347,9 +347,9 @@ class GalleryView(QWidget):
             self._refresh_inflight()
 
     def _rebuild(self, rows, meta):
-        expanded = self._expanded_keys()
+        expanded = self._tree_view.expanded_keys()
         # Pending restore targets stand in until the user makes a live choice.
-        selected_key = self._selected_folder_key() or self._pending_key
+        selected_key = self._tree_view.selected_folder_key() or self._pending_key
         selected_gen = self.selected_generation()
         # A running re-roll drives the info pane from live frames, not a saved row,
         # so capture it to restore afterward rather than let the folder's default
@@ -362,9 +362,10 @@ class GalleryView(QWidget):
         tree_model = gallery.build_gallery_tree(rows, meta)
         self._starred_groups = gallery.starred_folders(tree_model)
         self._recent_rows = gallery.recent_generations(rows, _RECENTS_LIMIT)
-        self._populate_tree(tree_model, expanded)
+        self._tree_view.populate(tree_model, expanded,
+                                 show_recents=bool(tree_model or self._inflight_items()))
         self._clear_metadata()
-        target = self._item_by_key.get(selected_key) or self._default_item()
+        target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
         self._suppress_history = True
@@ -392,102 +393,6 @@ class GalleryView(QWidget):
         if prompt_id and prompt_id in self._visible_ids:
             self._on_thumbnail_clicked(prompt_id)
 
-    # --- folder tree -------------------------------------------------------
-
-    def _populate_tree(self, tree_model, expanded_keys):
-        self._tree.blockSignals(True)
-        self._tree.clear()
-        self._item_by_key = {}
-        self._leaf_by_id = {}
-        self._recents_item = None
-        self._starred_item = None
-        root = self._tree.invisibleRootItem()
-        # Synthetic shelves lead the tree: Recents (in-flight work plus recently
-        # finished items) whenever there is anything to show — so a first-ever
-        # generation is visible while it runs, before any folder exists — then
-        # Starred (bookmarked folders) once folders do. Each is reachable in one
-        # click however the tree is scrolled, and draws its marker in the caret
-        # column so its label lines up with the media folders below.
-        if tree_model or self._inflight_items():
-            self._recents_item = self._add_shelf(
-                root, _RECENTS_LABEL, _RECENTS_KEY, icons.clock_icon(), "Recently generated"
-            )
-        if tree_model:
-            self._starred_item = self._add_shelf(
-                root, _STARRED_LABEL, _STARRED_KEY, icons.star_icon(filled=True),
-                "Your starred folders"
-            )
-        for media in tree_model:
-            self._add_node(media, root)
-        # Folders default to collapsed; only restore folders the user had open.
-        for key in expanded_keys:
-            item = self._item_by_key.get(key)
-            if item is not None:
-                item.setExpanded(True)
-        self._tree.blockSignals(False)
-
-    def _add_shelf(self, root, label, key, icon, tooltip) -> QTreeWidgetItem:
-        """Add a synthetic shelf row (Recents/Starred) leading the tree, its marker
-        drawn in the caret column so its label aligns with the media folders below."""
-        item = QTreeWidgetItem([label])
-        item.setData(0, BRANCH_ICON_ROLE, icon)  # marker in the caret column
-        item.setToolTip(0, tooltip)
-        root.addChild(item)
-        self._item_by_key[key] = item
-        return item
-
-    def _add_node(self, group, parent_item) -> QTreeWidgetItem:
-        # Starred state shows as the row's star icon (the delegate reads it from
-        # the group), so the label itself carries no ★ prefix.
-        item = QTreeWidgetItem([group.label])
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
-        item.setData(0, _GROUP_ROLE, group)
-        # A workflow/model/LoRA row wears a lettered chip naming its recipe level,
-        # so its place in the hierarchy reads at a glance rather than by counting
-        # indentation; the level joins the tooltip too. Media roots and settings
-        # leaves get neither (folder_level returns None).
-        level = gallery.folder_level(group)
-        if level is not None:
-            item.setIcon(0, icons.level_badge_icon(level))
-            item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
-        else:
-            item.setToolTip(0, group.label)
-        self._item_by_key[group.key] = item
-        parent_item.addChild(item)
-        for child in gallery.child_groups(group):
-            self._add_node(child, item)
-        if isinstance(group, gallery.SettingsGroup):
-            for row in group.rows:
-                self._leaf_by_id[row["prompt_id"]] = item
-        return item
-
-    def _default_item(self) -> QTreeWidgetItem | None:
-        """The folder to land on with no saved target: the first real media folder;
-        failing that (only in-flight work so far, no finished folders), the Recents
-        shelf, so a first generation stays visible while it runs."""
-        root = self._tree.invisibleRootItem()
-        for i in range(root.childCount()):
-            item = root.child(i)
-            if item is not self._recents_item and item is not self._starred_item:
-                return item
-        return self._recents_item
-
-    def _expanded_keys(self) -> set[str]:
-        return {
-            key for key, item in self._item_by_key.items() if item.isExpanded()
-        }
-
-    def _selected_folder_key(self) -> str | None:
-        item = self._tree.currentItem()
-        if item is None:
-            return None
-        if item is self._recents_item:
-            return _RECENTS_KEY  # so a rebuild keeps the shelf selected
-        if item is self._starred_item:
-            return _STARRED_KEY  # so a rebuild keeps the shelf selected
-        group = item.data(0, _GROUP_ROLE)
-        return group.key if group else None
-
     def _on_folder_selected(self, current, _previous):
         if current is None:
             self._title.set_display("")
@@ -504,7 +409,7 @@ class GalleryView(QWidget):
             self._show_starred_overview()
             return
         group = current.data(0, _GROUP_ROLE)
-        self._title.set_display(self._breadcrumb(current))
+        self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
             self._show_thumbnails(group)
@@ -537,16 +442,6 @@ class GalleryView(QWidget):
                 durations = self._db.recent_durations(workflow)
         label = timing.average_label(durations)
         self._avg_label.setText(f"Average time: {label}" if label else "")
-
-    def _breadcrumb(self, item) -> str:
-        parts = []
-        node = item
-        while node is not None:
-            group = node.data(0, _GROUP_ROLE)
-            if group is not None:
-                parts.append(group.label)
-            node = node.parent()
-        return "  ›  ".join(reversed(parts))
 
     # --- main view: folder tiles or thumbnails -----------------------------
 
@@ -751,7 +646,7 @@ class GalleryView(QWidget):
         container, flow = self._new_tile_pane()
         for group in groups:
             item = self._item_by_key.get(group.key)
-            context = self._breadcrumb(item.parent()) if item and item.parent() else ""
+            context = self._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
             self._add_folder_tile(flow, group, starred=False, context=context)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         self._show_widget(container if groups else self._empty_state(
@@ -823,6 +718,28 @@ class GalleryView(QWidget):
         Recents "containing folder" jump."""
         return self._info.current_row()
 
+    # The folder tree's key→item / prompt→item maps and shelf rows are owned by the
+    # GalleryTree renderer; surfaced here for navigation, selection, and rebuild.
+    @property
+    def _item_by_key(self) -> dict:
+        return self._tree_view.item_by_key
+
+    @property
+    def _leaf_by_id(self) -> dict:
+        return self._tree_view.leaf_by_id
+
+    @property
+    def _recents_item(self):
+        return self._tree_view.recents_item
+
+    @property
+    def _starred_item(self):
+        return self._tree_view.starred_item
+
+    def _selected_folder_key(self) -> str | None:
+        """The selected folder's key (or a shelf's), from the tree renderer."""
+        return self._tree_view.selected_folder_key()
+
     def _add_reroll_tile(self, flow, group):
         tile = RerollTile(self._reroll.job_for(group.key))
         tile.set_selected(group.key == self._selected_reroll_key)
@@ -868,7 +785,7 @@ class GalleryView(QWidget):
         video stage warms up) rather than the fresh video job's empty preview.
         A no-op unless that re-roll is still running in the folder now on screen.
         """
-        if key is None or key not in self._reroll_jobs or self._selected_folder_key() != key:
+        if key is None or key not in self._reroll_jobs or self._tree_view.selected_folder_key() != key:
             return
         self._last_reroll_frame = frame
         self._enter_reroll_selection(key)
@@ -972,7 +889,7 @@ class GalleryView(QWidget):
         Falls back to a not-yet-applied restore target, so a saved folder
         survives even a session where the Gallery tab was never opened.
         """
-        return self._selected_folder_key() or self._pending_key
+        return self._tree_view.selected_folder_key() or self._pending_key
 
     def select_folder(self, key: str | None):
         """Open ``key`` on the next rebuild — used to restore the last session.
@@ -1217,7 +1134,7 @@ class GalleryView(QWidget):
             self._title.begin_edit(group.label)
 
     def _commit_title_rename(self, name: str):
-        key = self._selected_folder_key()
+        key = self._tree_view.selected_folder_key()
         if key is not None:
             self._actions.rename_folder(key, name.strip() or None)
             self.refresh()

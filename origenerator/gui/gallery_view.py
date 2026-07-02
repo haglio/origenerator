@@ -54,12 +54,13 @@ _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
-    Model, LoRA, and settings folders live within a workflow folder and are fair
-    game; a whole workflow or media folder is off-limits, so a workflow's entire
-    history can never be wiped in one action.
+    Model, LoRA, source-image, and settings folders live within a workflow folder
+    and are fair game; a whole workflow or media folder is off-limits, so a
+    workflow's entire history can never be wiped in one action.
     """
     return isinstance(
-        group, (gallery.ModelGroup, gallery.LoraGroup, gallery.SettingsGroup)
+        group,
+        (gallery.ModelGroup, gallery.LoraGroup, gallery.SourceImageGroup, gallery.SettingsGroup),
     )
 
 
@@ -175,9 +176,10 @@ class GalleryView(QWidget):
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
 
-        # TOC pane: folder tree (media -> workflow -> model -> [LoRA] -> settings;
-        # the LoRA level shows only for workflows that use one). Folders start
-        # collapsed and only expand on the disclosure arrow; double-click renames.
+        # TOC pane: folder tree (media -> workflow -> model -> [LoRA] ->
+        # [source image] -> settings; the LoRA level shows only for workflows that
+        # use one, the source-image level only for image-conditioned ones). Folders
+        # start collapsed and only expand on the disclosure arrow; double-click renames.
         self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)

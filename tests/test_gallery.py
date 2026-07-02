@@ -5,6 +5,7 @@ from origenerator.gallery import (
     MediaGroup,
     ModelGroup,
     SettingsGroup,
+    SourceImageGroup,
     WorkflowGroup,
     build_gallery_tree,
     build_image_config_index,
@@ -31,11 +32,12 @@ from origenerator.gallery import (
 
 
 def test_folder_level_names_the_recipe_levels_and_nothing_else():
-    # The workflow -> model -> LoRA folders each report their level; the media
-    # roots and the settings leaves report none (they carry no recipe badge).
+    # The workflow -> model -> LoRA -> source-image folders each report their
+    # level; the media roots and the settings leaves report none (no badge).
     assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
     assert folder_level(ModelGroup("k", "M", [])) == "model"
     assert folder_level(LoraGroup("k", "L", [])) == "lora"
+    assert folder_level(SourceImageGroup("k", "I", [])) == "source_image"
     assert folder_level(SettingsGroup("k", "S", [])) is None
     assert folder_level(MediaGroup("image", "image", "Images", [])) is None
 
@@ -435,46 +437,103 @@ def _i2v_frame(prompt_id, frame_file, prompt=""):
     )
 
 
-def _i2v_leaves(rows):
-    """The settings-group leaves of the sole video/workflow/model/LoRA path."""
+def _i2v_source_folders(rows):
+    """The source-image folders of the sole video/workflow/model/LoRA path."""
     video = build_gallery_tree(rows)[0]
     return video.workflow_groups[0].model_groups[0].children[0].children
 
 
-def test_i2v_videos_split_by_their_input_image_config():
-    # The reported bug: two i2v videos sharing every video setting but built from
-    # differently configured frames were landing in one folder. They must split.
+def _i2v_leaves(rows):
+    """The settings leaves under the sole video/workflow/model/LoRA/source path."""
+    (source,) = _i2v_source_folders(rows)
+    return source.children
+
+
+def test_i2v_videos_split_into_a_folder_per_input_image_config():
+    # Two i2v videos sharing every video setting but built from differently
+    # configured frames land in separate source-image folders.
     face = _img("face", "a face", 30, 1)
     scene = _img("scene", "a landscape", 30, 1)
-    leaves = _i2v_leaves([
+    sources = _i2v_source_folders([
         _i2v_frame("vface", "sdxl_t2i_face.png"),
         _i2v_frame("vscene", "sdxl_t2i_scene.png"),
         face, scene,
     ])
-    assert len(leaves) == 2
-    assert {frozenset(r["prompt_id"] for r in leaf.rows) for leaf in leaves} == {
+    assert len(sources) == 2
+    assert {frozenset(r["prompt_id"] for r in rows_under(s)) for s in sources} == {
         frozenset({"vface"}), frozenset({"vscene"}),
     }
 
 
-def test_i2v_videos_from_rerolls_of_one_image_share_a_folder():
-    # A frame re-rolled (same image config, fresh file) keeps its videos together.
+def test_i2v_videos_from_rerolls_of_one_image_share_a_source_folder():
+    # A frame re-rolled (same image config, fresh file) keeps its videos in one
+    # source-image folder, collapsed into a single settings leaf beneath it.
     face1 = _img("face1", "a face", 30, 1)
     face2 = _img("face2", "a face", 30, 2)  # re-roll of the same image config
-    (leaf,) = _i2v_leaves([
+    (source,) = _i2v_source_folders([
         _i2v_frame("v1", "sdxl_t2i_face1.png"),
         _i2v_frame("v2", "sdxl_t2i_face2.png"),
         face1, face2,
     ])
+    (leaf,) = source.children
     assert {r["prompt_id"] for r in leaf.rows} == {"v1", "v2"}
 
 
-def test_i2v_folder_is_named_by_the_frame_it_animates():
-    # With no video prompt to name it, an i2v folder is named by its start frame
-    # so sibling folders built from different frames read apart.
+def test_i2v_source_folder_is_named_by_the_image_it_animates():
+    # A source-image folder takes the name of the image generation it animates, so
+    # sibling folders built from different images read apart — the same label that
+    # image's own settings folder carries.
     face = _img("face", "a smiling face", 30, 1)
-    (leaf,) = _i2v_leaves([_i2v_frame("vf", "sdxl_t2i_face.png"), face])
-    assert "smiling face" in leaf.label
+    (source,) = _i2v_source_folders([_i2v_frame("vf", "sdxl_t2i_face.png"), face])
+    assert "smiling face" in source.label
+
+
+def test_i2v_settings_leaf_names_itself_by_video_prompt_not_the_frame():
+    # The source-image folder pins the frame, so the leaf beneath drops it and is
+    # named by the video's own prompt instead.
+    face = _img("face", "a smiling face", 30, 1)
+    (source,) = _i2v_source_folders(
+        [_i2v_frame("vf", "sdxl_t2i_face.png", prompt="a slow zoom"), face]
+    )
+    (leaf,) = source.children
+    assert leaf.label == "a slow zoom"
+    assert "smiling face" not in leaf.label
+
+
+def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
+    # A frame that isn't a known generation can't borrow an image's folder name, so
+    # the source folder falls back to the bare filename (distinct frames still read
+    # apart) rather than a blank or collapsed name.
+    (source,) = _i2v_source_folders([_i2v_frame("vf", "input/hand_picked.png [input]")])
+    assert source.label == "hand_picked.png"
+
+
+def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
+    # A source-image bookmark's key is recomputed from a member row; it depends on
+    # the start frame's config, so folder_key_at_level must resolve it through the
+    # image index — matching the tree, not the bare filename.
+    from origenerator.gallery import folder_key_at_level
+    face = _img("face", "a face", 30, 1)
+    video = _i2v_frame("vf", "sdxl_t2i_face.png")
+    index = build_image_config_index([face])
+    (source,) = _i2v_source_folders([video, face])
+    assert source.key.startswith("video/wan22_i2v/i")  # the source level tags its key with 'i'
+    assert folder_key_at_level(video, "source_image", index) == source.key
+    # Without the index it falls back to the filename and misses the real folder.
+    assert folder_key_at_level(video, "source_image", index) != \
+        folder_key_at_level(video, "source_image")
+
+
+def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
+    # The leaf key is independent of the new source-image parent, so an in-flight
+    # i2v (absent from the tree) still matches the exact leaf it will join — the
+    # invariant the Generate tab and re-roll reconnection rely on.
+    from origenerator.gallery import settings_folder_key
+    face = _img("face", "a face", 30, 1)
+    video = _i2v_frame("vf", "sdxl_t2i_face.png")
+    index = build_image_config_index([face])
+    (leaf,) = _i2v_leaves([video, face])
+    assert settings_folder_key(video, index) == leaf.key
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
@@ -514,7 +573,8 @@ def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
     loras = {lg.label: lg for lg in model.children}
     assert set(loras) == {"styleA_high / styleA_low", "styleB_high / styleB_low"}
 
-    (a_settings,) = loras["styleA_high / styleA_low"].children  # the two seeds collapse
+    (a_source,) = loras["styleA_high / styleA_low"].children  # one "(no input image)" source
+    (a_settings,) = a_source.children                          # the two seeds collapse
     assert {r["prompt_id"] for r in a_settings.rows} == {"v1", "v2"}
     assert {r["prompt_id"] for r in rows_under(loras["styleB_high / styleB_low"])} == {"v3"}
 
@@ -530,14 +590,15 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
 
 def test_group_level_names_each_tier():
     from origenerator.gallery import group_level
-    rows = [_i2v("v1", "styleA")]  # video -> wan22_i2v -> model -> lora -> settings
+    rows = [_i2v("v1", "styleA")]  # video -> wan22_i2v -> model -> lora -> source -> settings
     media = build_gallery_tree(rows)[0]
     wf = media.workflow_groups[0]
     model = wf.model_groups[0]
     lora = model.children[0]
-    settings = lora.children[0]
-    assert [group_level(g) for g in (media, wf, model, lora, settings)] == \
-        ["media", "workflow", "model", "lora", "settings"]
+    source = lora.children[0]
+    settings = source.children[0]
+    assert [group_level(g) for g in (media, wf, model, lora, source, settings)] == \
+        ["media", "workflow", "model", "lora", "source_image", "settings"]
 
 
 def test_folder_key_at_level_recomputes_each_tiers_key_from_a_member_row():
@@ -549,8 +610,9 @@ def test_folder_key_at_level_recomputes_each_tiers_key_from_a_member_row():
     wf = media.workflow_groups[0]
     model = wf.model_groups[0]
     lora = model.children[0]
-    settings = lora.children[0]
-    for g in (media, wf, model, lora, settings):
+    source = lora.children[0]
+    settings = source.children[0]
+    for g in (media, wf, model, lora, source, settings):
         assert folder_key_at_level(rows[0], group_level(g)) == g.key
 
 
@@ -593,7 +655,8 @@ def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
     rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
     model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
     for lora in model.children:
-        (settings,) = lora.children
+        (source,) = lora.children
+        (settings,) = source.children
         assert settings.label == "dance"
         assert "safetensors" not in settings.label
 
@@ -688,8 +751,9 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     video = media["video"]
     assert [w.workflow_name for w in video.workflow_groups] == ["wan22_i2v"]
     (video_model,) = video.workflow_groups[0].model_groups
-    (video_lora,) = video_model.children  # wan22_i2v grows a LoRA level ("(no LoRA)" here)
-    assert len(video_lora.children) == 1
+    (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no LoRA)" here)
+    (video_source,) = video_lora.children   # then a source-image level ("(no input image)")
+    assert len(video_source.children) == 1
 
 
 def test_build_gallery_tree_assigns_stable_folder_keys():

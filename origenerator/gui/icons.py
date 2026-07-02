@@ -18,16 +18,22 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import TEXT_PRIMARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER
+from shared_ui.colors import TEXT_PRIMARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER, GREEN
 
 _SIZE = 48  # drawn large, then scaled down on the button, so edges stay crisp
 
-# Recipe-hierarchy level badges. A gallery folder below the media roots sits at
-# one of these levels; a small lettered chip names which, so a tree row or a
-# browser tile is self-describing without the reader counting indentation. The
-# media roots (Images/Videos) and the settings leaves carry none.
-LEVEL_LABELS = {"workflow": "Workflow", "model": "Model", "lora": "LoRA"}
-_LEVEL_BADGES = {"workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER)}
+# Hierarchy level badges. A gallery folder below the media roots sits at one of
+# these levels; a small lettered chip names which, so a tree row or a browser
+# tile is self-describing without the reader counting indentation. The media
+# roots (Images/Videos) and the settings leaves carry none.
+LEVEL_LABELS = {
+    "workflow": "Workflow", "model": "Model", "lora": "LoRA",
+    "source_image": "Source Image",
+}
+_LEVEL_BADGES = {
+    "workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER),
+    "source_image": ("I", GREEN),
+}
 
 
 def back_icon() -> QIcon:

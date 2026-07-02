@@ -154,7 +154,7 @@ def _image(prompt_id, prompt, steps, seed):
 
 def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
     """A WAN I2V video row that shares a base model but names its own LoRA, so the
-    tree grows Videos -> WAN I2V -> model -> LoRA -> settings."""
+    tree grows Videos -> WAN I2V -> model -> LoRA -> source image -> settings."""
     return _row(prompt_id, "wan22_i2v",
                 {"positive_prompt": prompt,
                  "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
@@ -203,12 +203,15 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     workflow = videos.child(0)
     model = workflow.child(0)
     lora = model.child(0)
-    settings = lora.child(0)
+    source = lora.child(0)
+    settings = source.child(0)
 
-    # Each recipe level shows a chip icon and names itself in the tooltip...
+    # Each level below the media root shows a chip icon and names itself in the
+    # tooltip...
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
     assert not lora.icon(0).isNull() and "LoRA" in lora.toolTip(0)
+    assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
     # ...while the media root and the settings leaf carry no badge.
     assert videos.icon(0).isNull()
     assert settings.icon(0).isNull()

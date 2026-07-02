@@ -29,6 +29,7 @@ from origenerator.gui.reroll_prompt import offer_reroll
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -158,7 +159,7 @@ class GalleryView(QWidget):
         )
 
     def _build_ui(self):
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # The three panes live in a splitter, so the divider between each doubles
         # as a drag handle: the TOC pane (folder tree), the browser pane (a
@@ -314,7 +315,12 @@ class GalleryView(QWidget):
         self._panes.setStretchFactor(2, 2)
         self._panes.setSizes([220, 560, 440])
 
-        layout.addWidget(self._panes)
+        layout.addWidget(self._panes, 1)
+        # A slim bar under the panes shows the one job currently in flight (ComfyUI
+        # runs them one at a time), reachable from any folder or config tab. Hidden
+        # until something runs; fed on every rebuild and poll.
+        self._running_bar = RunningJobBar()
+        layout.addWidget(self._running_bar)
 
     def _tool_button(self, icon, tooltip: str, handler) -> QToolButton:
         """A compact, icon-only toolbar button for the browser-pane header."""
@@ -357,9 +363,12 @@ class GalleryView(QWidget):
             self._rebuild(rows, meta)
         elif self._browser.showing_recents():
             # No DB change, but in-flight cards still need their live frames pushed
-            # and a re-render when a locally-queued Generate tab appears/vanishes
+            # and a re-render when a locally-queued config tab appears/vanishes
             # (it carries no DB row to move the fingerprint).
             self._browser.refresh_inflight()
+        # The bottom bar is always on screen, so refresh the active job every tick —
+        # its live frame and progress advance between rebuilds.
+        self._update_running_bar()
 
     def _rebuild(self, rows, meta):
         expanded = self._tree_view.expanded_keys()
@@ -403,6 +412,7 @@ class GalleryView(QWidget):
             location = self._current_location()
             if location is not None:
                 self._record_visit(location)
+        self._update_running_bar()
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -735,6 +745,11 @@ class GalleryView(QWidget):
 
     def _inflight_items(self) -> list:
         return self._browser._inflight_items()
+
+    def _update_running_bar(self):
+        """Feed the bottom bar the in-flight jobs (running first), so the active
+        generation shows from anywhere — the bar hides itself when nothing runs."""
+        self._running_bar.set_items(self._inflight_items())
 
     # --- session persistence ----------------------------------------------
 

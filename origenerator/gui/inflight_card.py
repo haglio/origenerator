@@ -35,6 +35,8 @@ class InFlightItem:
     frame: bytes | None          # latest live preview frame, if one has arrived
     reveal: Callable[[], None]   # bring the job's own view forward (tab or folder)
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
+    progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for the bottom bar
+    cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
 
 
 class InFlightCard(QWidget):

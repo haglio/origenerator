@@ -2672,10 +2672,12 @@ def _inflight_item(key="j1", caption="SDXL › x", status="running", frame=None,
 class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
-    def __init__(self, prompt_id, workflow_name, params, state="running", frame=None):
+    def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
+                 progress=(0, 0)):
         self.prompt_id = prompt_id
         self.state = state
         self.last_preview = frame
+        self.last_progress = progress
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
 
@@ -2807,6 +2809,23 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
+
+
+def test_running_bar_shows_the_active_job_and_hides_when_idle(qtbot):
+    # The slim bottom bar surfaces the one in-flight job from anywhere in the view,
+    # then disappears once nothing is running.
+    view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]))
+    view._generate_inflight = lambda: [_inflight_item(key="gen1", caption="my job")]
+    qtbot.addWidget(view)
+    view.show()
+    qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the bar
+
+    assert view._running_bar.isVisible()
+    assert view._running_bar._item.key == "gen1"
+
+    view._generate_inflight = lambda: []
+    view._poll()
+    assert not view._running_bar.isVisible()
 
 
 def _finished_row_db(tmp_path):

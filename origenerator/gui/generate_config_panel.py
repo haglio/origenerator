@@ -63,6 +63,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form: ParamForm | None = None
         self._input_image_job: GenerationJob | None = None  # a random-input pre-step, before the main job
         self._last_frame: bytes | None = None         # latest live preview frame, for an external in-flight view
+        self._last_progress: tuple[int, int] | None = None  # (cumulative, total) steps, for the running-job bar
         self._build_ui()
         self._connect_signals()
 
@@ -434,6 +435,7 @@ class GenerateConfigPanel(QWidget):
             "caption": self.title(),
             "status": status,
             "frame": self._last_frame,
+            "progress": self._last_progress,
             "media_type": workflow_output_type(self._workflow_combo.currentData()),
         }
 
@@ -525,6 +527,7 @@ class GenerateConfigPanel(QWidget):
             cumulative, total = self._progress_tracker.update(value, max_val)
             self._progress.setRange(0, total)
             self._progress.setValue(cumulative)
+            self._last_progress = (cumulative, total)  # mirrored to the running-job bar
 
     def _on_node_executing(self, prompt_id: str, _node_id: str):
         # ComfyUI has begun running our prompt (vs. it merely sitting in the
@@ -634,6 +637,7 @@ class GenerateConfigPanel(QWidget):
         self._executing = False
         self._progress_tracker = None
         self._last_frame = None
+        self._last_progress = None
 
     def settings_key(self) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).

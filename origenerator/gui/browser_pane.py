@@ -192,11 +192,14 @@ class BrowserPane:
                 continue
             tracked = reroll_by_pid.get(pid)
             if tracked is not None:
-                folder_key, frame = tracked[0], tracked[1].last_preview
-            else:  # a running row no live job holds — still show it, keyed to its folder
+                folder_key, job = tracked
+                frame, progress = job.last_preview, job.last_progress
+                cancel = lambda k=folder_key: self._v._cancel_reroll(k)
+            else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
-                folder_key, frame = gallery.settings_folder_key(row, image_index), None
+                folder_key = gallery.settings_folder_key(row, image_index)
+                frame, progress, cancel = None, None, None
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(
@@ -206,6 +209,8 @@ class BrowserPane:
                 frame=frame,
                 reveal=lambda k=folder_key: self._reveal_reroll(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
+                progress=progress,
+                cancel=cancel,
             ))
         # A Generate tab queued behind another carries no DB row yet — add it too.
         for pid, item in generate.items():

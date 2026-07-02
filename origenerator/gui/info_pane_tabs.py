@@ -223,7 +223,8 @@ class InfoPaneTabs(QTabWidget):
             items.append(InFlightItem(
                 key=desc["key"], caption=desc["caption"], status=desc["status"],
                 frame=desc["frame"], reveal=lambda p=panel: self.reveal_config(p),
-                media_type=desc["media_type"],
+                media_type=desc["media_type"], progress=desc["progress"],
+                cancel=lambda p=panel: p._on_cancel(),
             ))
         return items
 

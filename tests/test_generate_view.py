@@ -40,8 +40,24 @@ def _insert_gen(db, prompt_id, params):
 
 
 def _strip_ids(view):
-    strip = view._strip
+    strip = view._subtabs.currentWidget()._strip
     return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
+
+
+def _has_ancestor(widget, ancestor) -> bool:
+    node = widget.parent()
+    while node is not None:
+        if node is ancestor:
+            return True
+        node = node.parent()
+    return False
+
+
+def test_thumbnail_strip_sits_within_the_tabbed_content(view):
+    # The strip lives inside the tab's content, so the tab row spans it just like
+    # the settings and preview panes — it isn't a sibling of the tab bar.
+    panel = view._subtabs.currentWidget()
+    assert _has_ancestor(panel._strip, view._subtabs)
 
 
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "x.png", "subfolder": ""}]}}}
@@ -70,13 +86,11 @@ def test_empty_state_new_tab_button_adds_a_subtab(view):
     assert view._stack.currentWidget() is view._subtabs
 
 
-def test_closing_last_subtab_empties_the_strip(view):
+def test_open_config_seeds_the_active_panel_strip(view):
+    # Opening a tab from a settings folder seeds that tab's own strip with it.
     _insert_gen(view._db, "x1", _sdxl_full(positive_prompt="cat"))
-    view.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))  # seeds the strip with x1
+    view.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))
     assert _strip_ids(view) == ["x1"]
-    while view._subtabs.count():
-        view._close_subtab(0)
-    assert _strip_ids(view) == []
 
 
 def test_close_subtab_removes_and_tears_down_when_multiple(view):
@@ -86,15 +100,6 @@ def test_close_subtab_removes_and_tears_down_when_multiple(view):
         view._close_subtab(view._subtabs.indexOf(panel))
     spy.assert_called_once()
     assert view._subtabs.count() == 1
-
-
-def test_active_panel_completion_refreshes_strip(view):
-    panel = view._subtabs.currentWidget()
-    with patch.object(
-        view._strip, "show_generations", wraps=view._strip.show_generations
-    ) as spy:
-        panel.generation_completed.emit("anything")
-    spy.assert_called()
 
 
 def test_strip_keeps_earlier_runs_after_a_settings_change(view):

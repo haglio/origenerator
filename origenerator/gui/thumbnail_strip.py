@@ -9,7 +9,7 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 class ThumbnailStrip(QWidget):
     """A vertical, scrollable list of thumbnails for a set of generations.
 
-    Lives beside the generate subtabs and shows the active tab's own history;
+    A resizable pane inside a generate subtab, showing that tab's own history;
     clicking a thumbnail re-emits its prompt_id via ``thumbnail_activated`` so
     the container can decide whether to reuse the active subtab or open a new one.
     Hovering a thumbnail highlights every other one sharing its settings — a
@@ -23,7 +23,9 @@ class ThumbnailStrip(QWidget):
         self._db = db
         self._widgets: list[ThumbnailWidget] = []
         self._sig_by_id: dict[str, str] = {}  # prompt_id -> settings signature
-        self.setFixedWidth(200)
+        # A floor wide enough for a thumbnail plus the scrollbar; the splitter
+        # sizes the pane from here up.
+        self.setMinimumWidth(200)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)

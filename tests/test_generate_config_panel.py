@@ -30,6 +30,41 @@ def _combo_index(panel, key):
     raise AssertionError(f"workflow {key} not in combo")
 
 
+def _is_descendant(widget, ancestor) -> bool:
+    node = widget.parent()
+    while node is not None:
+        if node is ancestor:
+            return True
+        node = node.parent()
+    return False
+
+
+# --- layout: three resizable panes ----------------------------------------
+
+def test_panel_lays_out_three_resizable_panes(panel):
+    from PyQt6.QtWidgets import QSplitter
+    assert isinstance(panel._panes, QSplitter)
+    assert panel._panes.count() == 3
+
+
+def test_thumbnail_history_is_the_left_pane(panel):
+    from origenerator.gui.thumbnail_strip import ThumbnailStrip
+    left = panel._panes.widget(0)
+    assert left is panel._strip
+    assert isinstance(left, ThumbnailStrip)
+
+
+def test_run_controls_live_in_the_main_pane_not_the_preview(panel):
+    # The preview is its own pane; the progress bar and run buttons sit under the
+    # middle "main" pane, so they span only the settings, not the preview.
+    main = panel._panes.widget(1)
+    assert panel._preview is panel._panes.widget(2)
+    assert _is_descendant(panel._progress, main)
+    assert _is_descendant(panel._generate_btn, main)
+    assert _is_descendant(panel._cancel_btn, main)
+    assert not _is_descendant(panel._progress, panel._preview)
+
+
 def test_generate_inserts_row_and_submits(panel):
     panel._on_generate()
     rows = panel._db.list_generations()
@@ -164,8 +199,6 @@ def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
 
 
 def test_completion_only_handled_for_own_prompt_id(panel):
-    completed = []
-    panel.generation_completed.connect(completed.append)
     panel._on_generate()
     our_id = panel._client_prompt_id
 
@@ -173,7 +206,7 @@ def test_completion_only_handled_for_own_prompt_id(panel):
     panel._client.job_completed.emit("comfy-OTHER", SDXL_HISTORY)
     assert panel._db.get_generation(our_id)["status"] == "running"
     assert panel._generate_btn.isEnabled() is False
-    assert completed == []
+    assert our_id not in panel._strip_ids  # our run isn't done, so not in the strip
 
     # Our own job's completion is handled.
     panel._client.job_completed.emit(our_id, SDXL_HISTORY)
@@ -181,7 +214,7 @@ def test_completion_only_handled_for_own_prompt_id(panel):
     assert row["status"] == "completed"
     assert "a.png" in row["output_files"]
     assert panel._generate_btn.isEnabled() is True
-    assert completed == [our_id]
+    assert panel._strip_ids == [our_id]  # the finished run now leads this tab's strip
 
 
 def test_progress_only_moves_for_own_prompt_id(panel):
@@ -375,7 +408,12 @@ def test_reused_lora_survives_to_the_generated_payload(qtbot, tmp_path):
 
 
 class SpyDB:
-    """Records the calls a panel makes, returning canned recent durations."""
+    """Records the calls a panel makes, returning canned recent durations.
+
+    It stores no rows, so ``get_generation`` (used when the panel re-renders its
+    strip on completion) always returns ``None`` — the strip stays empty, which
+    these duration/status tests don't inspect.
+    """
 
     def __init__(self, durations=None):
         self._durations = durations or []
@@ -390,6 +428,9 @@ class SpyDB:
 
     def update_generation(self, prompt_id, **fields):
         self.updates.append((prompt_id, fields))
+
+    def get_generation(self, prompt_id):
+        return None
 
 
 def _history_with_duration(seconds):

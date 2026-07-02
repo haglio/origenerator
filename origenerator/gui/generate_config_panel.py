@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
     QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.completion import extract_completion
@@ -22,6 +22,7 @@ from origenerator.generation_config import (
 from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.progress import ProgressTracker
 from origenerator.timing import estimate_label, format_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -34,12 +35,15 @@ class GenerateConfigPanel(QWidget):
     """One generation configuration: pick a workflow, set params, run a job.
 
     Several panels share a single ComfyUIClient, so each filters the client's
-    signals down to its own in-flight job. ``generation_completed`` fires (with
-    our DB prompt id) when a job finishes so a container can refresh its strip.
+    signals down to its own in-flight job. The panel lays out its three resizable
+    panes itself — this tab's own strip of past runs (left), the settings and run
+    controls (middle), and a live preview (right) — so the tab row spans all
+    three. Clicking a strip thumbnail re-emits its prompt id via
+    ``strip_activated`` so a container can open (or reuse) a tab for it.
     """
 
-    generation_completed = pyqtSignal(str)  # our (client-side) prompt_id
-    title_changed = pyqtSignal(str)         # current tab title
+    title_changed = pyqtSignal(str)     # current tab title
+    strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
 
     def __init__(self, client: ComfyUIClient, db: Database, queue=None, parent=None):
         super().__init__(parent)
@@ -61,8 +65,27 @@ class GenerateConfigPanel(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
 
+        # Three resizable panes, their dividers doubling as drag handles like the
+        # Gallery: this tab's strip of past runs (left), the settings and run
+        # controls (middle), and a live preview (right).
+        self._panes = QSplitter(Qt.Orientation.Horizontal)
+        self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
+        self._panes.setHandleWidth(6)
+
+        # Left pane: this tab's own accumulating strip of past runs.
+        self._strip = ThumbnailStrip(self._db)
+        self._strip.thumbnail_activated.connect(self.strip_activated)
+        self._panes.addWidget(self._strip)
+
+        # Middle pane: workflow picker, settings form, and the run controls. The
+        # progress bar and buttons live here, so they span only the settings —
+        # never the preview.
+        main = QWidget()
+        main_box = QVBoxLayout(main)
+        main_box.setContentsMargins(0, 0, 0, 0)
+        main_box.setSpacing(8)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = QComboBox()
@@ -70,26 +93,16 @@ class GenerateConfigPanel(QWidget):
             self._workflow_combo.addItem(wf.display_name, key)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
         header.addWidget(self._workflow_combo, 1)
-        layout.addLayout(header)
-
+        main_box.addLayout(header)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
-        layout.addWidget(self._estimate_label)
-
-        # The settings form sits beside a live preview that mirrors the job in
-        # progress (ComfyUI's preview frames) and then the finished output.
-        body = QHBoxLayout()
+        main_box.addWidget(self._estimate_label)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        body.addWidget(self._scroll, 3)
-        self._preview = PreviewWidget()
-        body.addWidget(self._preview, 2)
-        layout.addLayout(body, 1)
-
-        bottom = QVBoxLayout()
+        main_box.addWidget(self._scroll, 1)
         self._progress = QProgressBar()
         self._progress.setTextVisible(True)
-        bottom.addWidget(self._progress)
+        main_box.addWidget(self._progress)
         self._show_ready()
         btn_row = QHBoxLayout()
         self._generate_btn = QPushButton("Generate")
@@ -101,8 +114,24 @@ class GenerateConfigPanel(QWidget):
         btn_row.addStretch()
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
-        bottom.addLayout(btn_row)
-        layout.addLayout(bottom)
+        main_box.addLayout(btn_row)
+        self._panes.addWidget(main)
+
+        # Right pane: a live preview mirroring the job in progress (ComfyUI's
+        # preview frames) and then its finished output.
+        self._preview = PreviewWidget()
+        self._panes.addWidget(self._preview)
+
+        # The strip holds its width; the settings and preview panes grow with the
+        # window (settings faster), mirroring the Gallery's proportions.
+        main.setMinimumWidth(280)
+        self._preview.setMinimumWidth(200)
+        self._panes.setStretchFactor(0, 0)
+        self._panes.setStretchFactor(1, 3)
+        self._panes.setStretchFactor(2, 2)
+        self._panes.setSizes([210, 480, 320])
+
+        layout.addWidget(self._panes)
 
         self._on_workflow_changed()
 
@@ -515,8 +544,8 @@ class GenerateConfigPanel(QWidget):
         completed_id = self._client_prompt_id
         if completed_id not in self._strip_ids:
             self._strip_ids.insert(0, completed_id)  # accumulate; never drops earlier runs
+            self._strip.show_generations(self._strip_ids)
         self._reset_job()
-        self.generation_completed.emit(completed_id)
         self._refresh_estimate()
         self._release_queue_slot()
 
@@ -589,18 +618,15 @@ class GenerateConfigPanel(QWidget):
             params.setdefault(name, value)
         return key, settings_signature(json.dumps(params))
 
-    def strip_ids(self) -> list[str]:
-        """The generations to show in this tab's strip, newest first.
+    def seed_strip(self, prompt_ids):
+        """Seed this tab's strip with a settings folder when it opens from one.
 
         An accumulating history: whatever folder the tab was seeded with plus
-        every generation it has produced since — including ones whose settings no
-        longer match the current form, so tweaks-and-regenerate stays visible.
+        every generation it produces after — including runs whose settings no
+        longer match the current form, so tweak-and-regenerate stays visible.
         """
-        return list(self._strip_ids)
-
-    def seed_strip(self, prompt_ids):
-        """Seed the strip with a settings folder when the tab opens from one."""
         self._strip_ids = list(prompt_ids)
+        self._strip.show_generations(self._strip_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

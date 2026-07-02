@@ -11,15 +11,16 @@ from origenerator.db import Database
 from origenerator.gallery import settings_signature
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 class GenerateView(QWidget):
-    """The Generate tab: closable per-configuration subtabs, each beside a strip
-    of every generation in that tab's settings folder. Clicking a strip thumbnail
-    opens (or reuses) a subtab carrying that generation's settings."""
+    """The Generate tab: closable per-configuration subtabs. Each subtab lays out
+    three resizable panes — a strip of every generation in that tab's settings
+    folder, the settings form and run controls, and a live preview — so the tab
+    row spans all three. Clicking a strip thumbnail opens (or reuses) a subtab
+    carrying that generation's settings."""
 
     def __init__(self, client: ComfyUIClient, db: Database, parent=None):
         super().__init__(parent)
@@ -34,7 +35,6 @@ class GenerateView(QWidget):
         self._subtabs.setMovable(True)
         self._subtabs.tabCloseRequested.connect(self._close_subtab)
         self._subtabs.tabBarDoubleClicked.connect(self._rename_subtab)
-        self._subtabs.currentChanged.connect(self._on_active_tab_changed)
         add_btn = QToolButton()
         add_btn.setText("+")
         add_btn.setToolTip("New configuration")
@@ -42,14 +42,12 @@ class GenerateView(QWidget):
         self._subtabs.setCornerWidget(add_btn, Qt.Corner.TopRightCorner)
 
         # Stack the tabs over an empty-state placeholder shown when none are open.
+        # Each subtab carries its own three-pane splitter (strip, settings,
+        # preview), so the tab row spans all three panes.
         self._stack = QStackedWidget()
         self._stack.addWidget(self._subtabs)
         self._stack.addWidget(self._build_empty_state())
         layout.addWidget(self._stack, 1)
-
-        self._strip = ThumbnailStrip(db)
-        self._strip.thumbnail_activated.connect(self._on_strip_activated)
-        layout.addWidget(self._strip)
 
         self._queue = JobQueue(db)  # one generation at a time across subtabs
         self._add_subtab()
@@ -78,7 +76,7 @@ class GenerateView(QWidget):
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self._subtabs.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
-        panel.generation_completed.connect(self._on_generation_completed)
+        panel.strip_activated.connect(self._on_strip_activated)
         self._subtabs.setCurrentIndex(index)
         self._update_empty_state()
         return panel
@@ -99,7 +97,7 @@ class GenerateView(QWidget):
             panel.set_custom_title(name.strip())
 
     def _discard_subtab(self, index: int):
-        """Remove and tear down one subtab, without the empty-strip backfill."""
+        """Remove and tear down one subtab, without revealing the empty state."""
         panel = self._subtabs.widget(index)
         self._queue.cancel(panel)  # drop its slot, advancing the queue if it was running
         self._subtabs.removeTab(index)
@@ -109,18 +107,6 @@ class GenerateView(QWidget):
     def _close_subtab(self, index: int):
         self._discard_subtab(index)
         self._update_empty_state()  # closing the last tab reveals the empty state
-
-    def _on_active_tab_changed(self, _index: int):
-        self._refresh_strip()
-
-    def _on_generation_completed(self, _prompt_id: str):
-        # The active tab just appended a run to its own strip history.
-        self._refresh_strip()
-
-    def _refresh_strip(self):
-        """Show the active tab's accumulated strip (its seeded folder + its runs)."""
-        panel = self._subtabs.currentWidget()
-        self._strip.show_generations(panel.strip_ids() if panel is not None else [])
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""
@@ -152,7 +138,6 @@ class GenerateView(QWidget):
         panel.prefill(workflow_name, params)
         # Seed the new tab's strip with its settings folder; it accumulates from there.
         panel.seed_strip(self._ids_for_settings(panel.settings_key()))
-        self._refresh_strip()
         return panel
 
     def capture_state(self) -> dict:

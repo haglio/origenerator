@@ -26,6 +26,7 @@ _BORDER_HIGHLIGHT = "2px solid #3080e0"
 
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
+    double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
     hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
     unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
@@ -126,3 +127,9 @@ class ThumbnailWidget(QWidget):
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.prompt_id)
+
+    def mouseDoubleClickEvent(self, event):
+        # A left double-click is an "open" gesture; the first click's press has
+        # already selected the tile, so the handler acts on the current selection.
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.double_clicked.emit(self.prompt_id)

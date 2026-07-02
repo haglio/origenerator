@@ -46,6 +46,19 @@ def test_left_click_emits_clicked_but_right_click_does_not(qtbot):
     assert clicks == ["p1"]
 
 
+def test_double_click_emits_double_clicked_for_left_button_only(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    dbl = []
+    tw.double_clicked.connect(dbl.append)
+
+    qtbot.mouseDClick(tw, Qt.MouseButton.RightButton)
+    assert dbl == []  # a right double-click is not an "open" gesture
+
+    qtbot.mouseDClick(tw, Qt.MouseButton.LeftButton)
+    assert dbl == ["p1"]
+
+
 def test_right_click_requests_a_context_menu_for_this_thumbnail(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)

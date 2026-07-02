@@ -699,6 +699,44 @@ def test_reuse_emits_merged_params(qtbot, tmp_path):
     }
 
 
+def test_double_clicking_a_thumbnail_reuses_its_parameters(qtbot, tmp_path):
+    db = _make_db(tmp_path)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    # Double-clicking is the same "open it as a Generate tab" gesture as picking
+    # the item and clicking Reuse Parameters.
+    with qtbot.waitSignal(view.reuse_requested) as blocker:
+        view._thumbnail_double_clicked("p1")
+
+    workflow_name, params = blocker.args
+    assert workflow_name == "sdxl_t2i"
+    assert params == {
+        "steps": 20,
+        "positive_prompt": "a cat",
+        "negative_prompt": "blurry",
+        "seed": 7,
+    }
+
+
+def test_double_clicking_an_unregistered_thumbnail_does_not_reuse(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    fired = []
+    view.reuse_requested.connect(lambda *a: fired.append(a))
+
+    # No template exists for this workflow, so the gesture is inert — the same
+    # gate that greys out the Reuse button.
+    view._thumbnail_double_clicked("unreg")
+
+    assert fired == []
+
+
 def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     db.insert_generation(

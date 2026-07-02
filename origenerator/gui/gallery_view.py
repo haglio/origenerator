@@ -473,6 +473,7 @@ class GalleryView(QWidget):
             )
             tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._thumbnail_clicked)
+            tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
@@ -783,6 +784,13 @@ class GalleryView(QWidget):
     def _thumbnail_clicked(self, prompt_id: str):
         self._apply_selection(prompt_id, QApplication.keyboardModifiers())
         self._on_thumbnail_clicked(prompt_id)  # records the visit itself
+
+    def _thumbnail_double_clicked(self, prompt_id: str):
+        """Open a thumbnail as a Generate tab — the same "reuse parameters"
+        gesture as picking it and clicking the button. Inert for a workflow the
+        app can't rebuild, matching the button's greyed-out state."""
+        self._on_thumbnail_clicked(prompt_id)  # make it the selected generation
+        self._on_reuse()
 
     def _apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.
@@ -1121,7 +1129,11 @@ class GalleryView(QWidget):
         self._preview.clear()
 
     def _on_reuse(self):
-        if not self._selected:
+        # Gate on reusability here, not just via the button's enabled state, so
+        # the double-click path is inert for a workflow the app can't rebuild.
+        if not self._selected or not _is_reusable_workflow(
+            self._selected.get("workflow_name")
+        ):
             return
         params = merge_denormalized(self._selected)
         if not params:

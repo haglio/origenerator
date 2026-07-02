@@ -67,6 +67,22 @@ def test_starts_with_one_subtab(view):
     assert view._subtabs.count() == 1
 
 
+def test_subtabs_use_the_eliding_tab_bar(view):
+    # The subtab row caps and elides long titles and keeps every tab on screen.
+    from origenerator.gui.eliding_tab_bar import ElidingTabBar
+    assert isinstance(view._subtabs.tabBar(), ElidingTabBar)
+
+
+def test_subtabs_keep_their_close_button_with_the_eliding_bar(view):
+    # Installing a custom bar must precede setTabsClosable, or the per-tab close
+    # button silently vanishes — this guards that ordering.
+    from PyQt6.QtWidgets import QTabBar
+    bar = view._subtabs.tabBar()
+    close_btn = (bar.tabButton(0, QTabBar.ButtonPosition.RightSide)
+                 or bar.tabButton(0, QTabBar.ButtonPosition.LeftSide))
+    assert close_btn is not None
+
+
 def test_add_subtab_increases_count_and_focuses_new(view):
     view._add_subtab()
     assert view._subtabs.count() == 2

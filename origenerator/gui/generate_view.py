@@ -10,6 +10,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import settings_signature
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
+from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -31,6 +32,9 @@ class GenerateView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._subtabs = QTabWidget()
+        # Install the eliding bar before setTabsClosable/setMovable: swapping the
+        # bar afterwards drops those settings (they don't carry to a new bar).
+        self._subtabs.setTabBar(ElidingTabBar())
         self._subtabs.setTabsClosable(True)
         self._subtabs.setMovable(True)
         self._subtabs.tabCloseRequested.connect(self._close_subtab)

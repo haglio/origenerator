@@ -626,6 +626,7 @@ class GalleryView(QWidget):
                 movie_path=self._animated_preview(row),     # videos loop; images stay still
             )
             tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
+            tw.double_clicked.connect(self._open_in_containing_folder)  # or open its folder
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
@@ -716,12 +717,16 @@ class GalleryView(QWidget):
             item.reveal()
 
     def _go_to_containing_folder(self):
-        """Jump the browser pane to the previewed Recents item's own folder and land
-        on the item itself — its tile picked and highlighted, as if you'd navigated
-        in and clicked it, not just auto-previewing the folder's first item."""
-        if self._selected is None:
-            return
-        prompt_id = self._selected["prompt_id"]
+        """The 'Go to containing folder' button's action: open the previewed Recents
+        item in its own folder, selected."""
+        if self._selected is not None:
+            self._open_in_containing_folder(self._selected["prompt_id"])
+
+    def _open_in_containing_folder(self, prompt_id: str):
+        """Jump the browser pane to ``prompt_id``'s own folder and land on the item
+        itself — its tile picked and highlighted, as if you'd navigated in and
+        clicked it, not just auto-previewing the folder's first item. Shared by the
+        button and a double-click on a Recents tile."""
         self._on_source_link(prompt_id)  # open the folder, previewing the item
         # The navigation renders the folder's tiles; now pick this one so it reads
         # as the selected item rather than an unhighlighted preview.

@@ -454,6 +454,21 @@ def test_go_to_containing_folder_button_appears_then_navigates(qtbot):
     assert view._containing_folder_btn.isHidden()       # and the button retires
 
 
+def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    # Double-clicking a recent tile makes the same jump the button does.
+    view._thumb_widgets["i2"].double_clicked.emit("i2")
+    assert view._showing_recents() is False             # off the shelf...
+    assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
+    assert view.selected_prompt_ids() == ["i2"]         # landed selected
+    assert view._thumb_widgets["i2"].is_selected()
+
+
 def test_recents_shelf_shows_empty_state_when_only_imports_exist(qtbot):
     imported = _row("imp", "sdxl_t2i", {"seed": 9}, "imp.png", source="imported")
     view = GalleryView(FakeDB([imported]))

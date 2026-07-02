@@ -444,6 +444,75 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
     assert Path(new).exists()
 
 
+def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
+    import origenerator.importer as imp
+    # Flux embeds no checkpoint and no Wan node: its UnetLoaderGGUF + DualCLIPLoader
+    # + FluxGuidance signature is what names it, and the GGUF model is pulled out
+    # so the gallery can split Flux runs by which model made them. The filename
+    # matches no workflow prefix, proving the embedded graph alone suffices.
+    graph = {
+        "1": {"class_type": "UnetLoaderGGUF",
+              "inputs": {"unet_name": "ultrarealFineTune_v4_fp16.gguf"}},
+        "2": {"class_type": "DualCLIPLoader",
+              "inputs": {"clip_name1": "clip_l.safetensors",
+                         "clip_name2": "t5xxl_fp16.safetensors", "type": "flux"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "a portrait"},
+              "_meta": {"title": "Positive Prompt"}},
+        "5": {"class_type": "FluxGuidance",
+              "inputs": {"conditioning": ["4", 0], "guidance": 4.5}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""},
+              "_meta": {"title": "Negative (empty)"}},
+        "8": {"class_type": "KSampler",
+              "inputs": {"seed": 355448440510534, "steps": 20, "cfg": 1.0}},
+        "12": {"class_type": "SaveImage",
+               "inputs": {"filename_prefix": "image/flux_t2i_upscaled"}},
+    }
+    _make_png_with_metadata(tmp_path / "renamed_flux.png", graph)
+    meta = imp._extract_metadata(tmp_path / "renamed_flux.png", ".png")
+
+    assert meta["workflow_name"] == "flux_t2i_upscaled"
+    assert meta["positive_prompt"] == "a portrait"
+    assert meta["seed"] == 355448440510534
+    assert meta["params"]["unet"] == "ultrarealFineTune_v4_fp16.gguf"
+
+
+def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
+    # The Flux imports that predate this workflow landed as "unknown"; once it's
+    # registered, the flux_t2i_upscaled_* filename prefix identifies them.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="flux", workflow_name="unknown", workflow_version="imported",
+        params_json="{}", workflow_json="{}", source="imported",
+    )
+    db.update_generation("flux", output_files=json.dumps(
+        [{"filename": "flux_t2i_upscaled_00004_.png", "subfolder": "image", "type": "output"}]
+    ))
+    assert backfill_unknown_workflows(db) == 1
+    assert db.get_generation("flux")["workflow_name"] == "flux_t2i_upscaled"
+
+
+def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
+    # The same "unknown"-era Flux imports stored their graph but never pulled the
+    # GGUF model into params, so they collapse under "(unknown model)" until the
+    # backfill reads it back — the same repair the WAN dual-sampler test covers.
+    db = Database(tmp_path / "test.db")
+    graph = {
+        "1": {"class_type": "UnetLoaderGGUF",
+              "inputs": {"unet_name": "cyberrealisticFlux_v25GGUFQ80.gguf"}},
+        "8": {"class_type": "KSampler", "inputs": {"seed": 1}},
+    }
+    db.insert_generation(
+        prompt_id="flux-old", workflow_name="flux_t2i_upscaled", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a portrait", "seed": 1}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+    assert backfill_model_and_lora_params(db) == 1
+    params = json.loads(db.get_generation("flux-old")["params_json"])
+    assert params["unet"] == "cyberrealisticFlux_v25GGUFQ80.gguf"
+    assert params["positive_prompt"] == "a portrait"   # existing params kept
+    assert backfill_model_and_lora_params(db) == 0      # idempotent
+
+
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
     import origenerator.importer as imp
     # WAN 2.2 text-to-image embeds no Wan conditioning node and no checkpoint, so

@@ -78,6 +78,31 @@ def dual_sampler_model_files(graph: dict) -> dict:
     return result
 
 
+def graph_model_params(graph: dict) -> dict:
+    """The model-file params a graph loads, keyed as the workflows store them.
+
+    One place the importer (and its backfill) reads a graph's models from, so
+    every workflow's model nests into the gallery's folders the same way:
+
+    * ``checkpoint`` — SDXL's ``CheckpointLoaderSimple``.
+    * ``unet`` — Flux's ``UnetLoaderGGUF`` (the quantized diffusion model).
+    * ``unet_high``/``unet_low`` (and any ``lora_high``/``lora_low``) — WAN's
+      dual-noise samplers, paired to their stage by :func:`dual_sampler_model_files`.
+
+    Returns only the keys it resolves; empty for a graph with no model loaders.
+    """
+    params: dict = {}
+    for node in graph.values():
+        inputs = node.get("inputs", {})
+        class_type = node.get("class_type", "")
+        if class_type == "CheckpointLoaderSimple" and isinstance(inputs.get("ckpt_name"), str):
+            params["checkpoint"] = inputs["ckpt_name"]
+        elif class_type == "UnetLoaderGGUF" and isinstance(inputs.get("unet_name"), str):
+            params["unet"] = inputs["unet_name"]
+    params.update(dual_sampler_model_files(graph))
+    return params
+
+
 def clip_prompt_nodes(graph: dict):
     """Return the (positive, negative) CLIPTextEncode nodes.
 

@@ -13,7 +13,7 @@ from PIL import Image
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
-    dual_sampler_model_files,
+    graph_model_params,
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
@@ -246,18 +246,18 @@ def backfill_unknown_workflows(db: Database) -> int:
 def backfill_model_and_lora_params(db: Database) -> int:
     """Record the base model and LoRA on imports that predate reading them.
 
-    Early imports stored the embedded graph but not the UNET/LoRA filenames it
-    loads, so those rows lack the params the gallery's model and LoRA folders
-    group by — they collapse under "(unknown model)" / "(no LoRA)". This re-reads
-    each row's stored graph and folds any high/low UNET and LoRA it finds into
-    ``params_json``, filling only keys the row is missing so a row that already
-    carries them (or whose graph has none) is left untouched. Returns how many
-    rows were filled. Idempotent.
+    Early imports stored the embedded graph but not the model filenames it loads,
+    so those rows lack the params the gallery's model and LoRA folders group by —
+    they collapse under "(unknown model)" / "(no LoRA)". This re-reads each row's
+    stored graph and folds any model file it finds (SDXL checkpoint, Flux GGUF
+    UNET, WAN high/low UNET + LoRA) into ``params_json``, filling only keys the
+    row is missing so a row that already carries them (or whose graph has none)
+    is left untouched. Returns how many rows were filled. Idempotent.
     """
     updated = 0
     for row in db.list_generations():
         graph = _as_graph(row.get("workflow_json") or "")
-        found = dual_sampler_model_files(graph) if graph else {}
+        found = graph_model_params(graph) if graph else {}
         params = parse_params(row.get("params_json"))
         missing = {k: v for k, v in found.items() if k not in params}
         if not missing:
@@ -379,11 +379,6 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
             if isinstance(image, str):
                 result["params"]["input_image"] = image
 
-        if class_type == "CheckpointLoaderSimple":
-            ckpt = inputs.get("ckpt_name")
-            if isinstance(ckpt, str):
-                result["params"]["checkpoint"] = ckpt
-
         if class_type == "KSampler":
             seed = inputs.get("seed")
             if isinstance(seed, int):
@@ -403,10 +398,10 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
                 if isinstance(v, (int, float, str, bool))
             })
 
-    # A WAN dual-noise graph carries its base model and LoRA in the two samplers'
-    # model chains; record them so the gallery can nest the import by model and
-    # LoRA the same way it does a run generated here.
-    result["params"].update(dual_sampler_model_files(prompt_data))
+    # Record whichever model files the graph loads (SDXL checkpoint, Flux GGUF
+    # UNET, WAN dual-noise high/low UNET + LoRA) so the gallery can nest the
+    # import by model the same way it does a run generated here.
+    result["params"].update(graph_model_params(prompt_data))
 
     # The embedded graph is authoritative; refine the filename guess.
     node_types = {n.get("class_type") for n in prompt_data.values()}
@@ -417,6 +412,10 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     elif {"EmptyHunyuanLatentVideo", "SaveImage"} <= node_types:
         # A Wan/Hunyuan video latent saved as a still image: text-to-image.
         result["workflow_name"] = "wan22_t2i"
+    elif "FluxGuidance" in node_types or {"UnetLoaderGGUF", "DualCLIPLoader"} <= node_types:
+        # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders
+        # and a FluxGuidance node — none of which the other workflows use.
+        result["workflow_name"] = "flux_t2i_upscaled"
     elif "CheckpointLoaderSimple" in node_types:
         result["workflow_name"] = "sdxl_t2i"
 

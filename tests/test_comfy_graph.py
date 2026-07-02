@@ -3,6 +3,7 @@ from origenerator.comfy_graph import (
     conditioning_node,
     dual_sampler_model_files,
     follow,
+    graph_model_params,
 )
 
 
@@ -93,3 +94,39 @@ def test_dual_sampler_model_files_empty_without_advanced_samplers():
     # A plain KSampler graph (SDXL) has no high/low split to read.
     graph = {"5": {"class_type": "KSampler", "inputs": {"model": ["1", 0]}}}
     assert dual_sampler_model_files(graph) == {}
+
+
+def test_graph_model_params_reads_sdxl_checkpoint():
+    graph = {"1": {"class_type": "CheckpointLoaderSimple",
+                   "inputs": {"ckpt_name": "reapony_v80.safetensors"}}}
+    assert graph_model_params(graph) == {"checkpoint": "reapony_v80.safetensors"}
+
+
+def test_graph_model_params_reads_flux_gguf_unet():
+    # Flux loads its diffusion model via UnetLoaderGGUF; the gallery groups Flux
+    # runs by this "unet" value, so it must be pulled out of the graph.
+    graph = {
+        "1": {"class_type": "UnetLoaderGGUF",
+              "inputs": {"unet_name": "ultrarealFineTune_v4_fp16.gguf"}},
+        "8": {"class_type": "KSampler", "inputs": {"model": ["1", 0]}},
+    }
+    assert graph_model_params(graph) == {"unet": "ultrarealFineTune_v4_fp16.gguf"}
+
+
+def test_graph_model_params_reads_wan_dual_sampler_unets():
+    graph = {
+        "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_high.safetensors"}},
+        "4": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_low.safetensors"}},
+        "10": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["3", 0], "add_noise": "enable"}},
+        "11": {"class_type": "KSamplerAdvanced",
+               "inputs": {"model": ["4", 0], "add_noise": "disable"}},
+    }
+    assert graph_model_params(graph) == {
+        "unet_high": "t2v_high.safetensors",
+        "unet_low": "t2v_low.safetensors",
+    }
+
+
+def test_graph_model_params_empty_when_no_model_loaders():
+    assert graph_model_params({"5": {"class_type": "KSampler", "inputs": {}}}) == {}

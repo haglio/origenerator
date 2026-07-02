@@ -1,7 +1,7 @@
 """Pure gallery model: classify and group generations into a folder tree.
 
 The gallery view organizes generations as nested folders:
-media type (Images/Videos) -> workflow -> model -> [LoRA] -> [source image] ->
+media type (Images/Videos) -> workflow -> model -> LoRA -> [source image] ->
 settings group (rows sharing every setting except per-instance ones: the seed,
 and — for an image-to-video workflow — the specific start-frame *file*. A re-roll
 regenerates that frame, so the raw filename is per-instance; but the
@@ -11,12 +11,13 @@ while two built from differently configured images split apart).
 
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
-(always), LoRA (only when the workflow declares LoRA keys), and — for an
-image-conditioned workflow — the source image the video animates, i.e. the
-configuration of its start frame (:func:`_input_image_config`). Workflows that
-declare no LoRA, or aren't image-conditioned, simply grow no such level. The
-settings group is the full key, so it nests beneath every projection. This module
-owns the grouping logic with no Qt dependency so it can be unit-tested directly.
+(always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
+workflow declares no LoRA keys, so every branch nests the same depth), and — for
+an image-conditioned workflow — the source image the video animates, i.e. the
+configuration of its start frame (:func:`_input_image_config`). A workflow that
+isn't image-conditioned simply grows no source-image level. The settings group is
+the full key, so it nests beneath every projection. This module owns the grouping
+logic with no Qt dependency so it can be unit-tested directly.
 """
 
 import hashlib
@@ -134,8 +135,8 @@ def workflow_model_keys(workflow_name: str | None) -> tuple[str, ...]:
 def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     """The param keys whose values name the LoRA(s) a workflow's row ran with.
 
-    Empty for a workflow with no LoRA, which the gallery reads as "draw no LoRA
-    level" (every row then shares one empty signature).
+    Empty for a workflow with no LoRA; every row then shares one empty signature,
+    collapsing the model folder's LoRA level to a single "(no LoRA)" folder.
     """
     wf = _registered(workflow_name)
     return tuple(wf.lora_keys) if wf else ()
@@ -514,10 +515,10 @@ class LoraGroup:
 class ModelGroup:
     key: str
     label: str
-    # LoraGroups (when the workflow declares LoRA keys), else SourceImageGroups
-    # (when it's image-conditioned), else SettingsGroups directly — a model folder
-    # skips any level its workflow doesn't call for.
-    children: list
+    # Always LoraGroups: a workflow with no LoRA keys collapses to a single
+    # "(no LoRA)" folder rather than skipping the level, so depth stays uniform.
+    # (An image-conditioned workflow grows a source-image level below the LoRA.)
+    children: list[LoraGroup]
     starred: bool = False
 
 
@@ -813,31 +814,24 @@ def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, childr
 def _build_model_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[ModelGroup]:
-    """The model folders under one workflow, each holding its LoRA folders — or,
-    for a LoRA-less workflow, whatever level comes next (see :func:`_build_under_model`)."""
+    """The model folders under one workflow, each holding its LoRA folders."""
     return _grouped_folders(
         rows, folder_meta, cls=ModelGroup,
         signature=lambda r: model_signature(wf_name, r.get("params_json")),
         key_for=lambda sig: _model_key(media_type, wf_name, sig),
         label_for=lambda params: model_label(wf_name, params),
-        children_for=lambda sub: _build_under_model(media_type, wf_name, sub, folder_meta, image_index),
+        children_for=lambda sub: _build_lora_groups(media_type, wf_name, sub, folder_meta, image_index),
     )
-
-
-def _build_under_model(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list:
-    """A model folder's children: LoRA folders when the workflow declares LoRA
-    keys, else the leaves directly (LoRA-less workflows skip that level)."""
-    if workflow_lora_keys(wf_name):
-        return _build_lora_groups(media_type, wf_name, rows, folder_meta, image_index)
-    return _build_leaves(media_type, wf_name, rows, folder_meta, image_index)
 
 
 def _build_lora_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[LoraGroup]:
-    """The LoRA folders under one model, each holding its leaves."""
+    """The LoRA folders under one model, each holding its leaves.
+
+    A workflow with no LoRA keys collapses to a single ``(no LoRA)`` folder — every
+    row shares one empty LoRA signature — so a model folder nests the same way
+    whether or not the pipeline uses a LoRA."""
     return _grouped_folders(
         rows, folder_meta, cls=LoraGroup,
         signature=lambda r: lora_signature(wf_name, r.get("params_json")),
@@ -881,13 +875,14 @@ def _build_source_image_groups(
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None
 ) -> list[MediaGroup]:
-    """Nest rows into media -> workflow -> model -> [LoRA] -> [source image] ->
+    """Nest rows into media -> workflow -> model -> LoRA -> [source image] ->
     settings folders.
 
-    The LoRA level appears only under workflows that declare LoRA keys; the
-    source-image level only under image-conditioned workflows. Rows that produced
-    no output file (failed or unfinished generations) are dropped first, so the
-    tree holds only results worth showing. Folders appear
+    Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
+    it to a single "(no LoRA)" folder. The source-image level appears only under
+    image-conditioned workflows. Rows that produced no output file (failed or
+    unfinished generations) are dropped first, so the tree holds only results
+    worth showing. Folders appear
     in the order their first member appears in ``rows`` (the caller orders rows
     newest-first); a star never moves a folder — bookmarks are gathered by
     :func:`starred_folders` instead. ``folder_meta`` (keyed by each folder's

@@ -176,10 +176,11 @@ class GalleryView(QWidget):
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
 
-        # TOC pane: folder tree (media -> workflow -> model -> [LoRA] ->
-        # [source image] -> settings; the LoRA level shows only for workflows that
-        # use one, the source-image level only for image-conditioned ones). Folders
-        # start collapsed and only expand on the disclosure arrow; double-click renames.
+        # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
+        # -> settings; a LoRA-less workflow collapses the LoRA level to one
+        # "(no LoRA)" folder, and the source-image level shows only for
+        # image-conditioned workflows). Folders start collapsed and only expand on
+        # the disclosure arrow; double-click renames.
         self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
         self._tree.setHeaderHidden(True)
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)

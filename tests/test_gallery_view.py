@@ -188,10 +188,11 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
-    # A model folder sits under the workflow; beneath it the two seed variants
-    # collapse into a single settings folder.
-    assert workflow_node.childCount() == 1
-    assert workflow_node.child(0).childCount() == 1
+    # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
+    # which the two seed variants collapse.
+    assert workflow_node.childCount() == 1                    # one model
+    assert workflow_node.child(0).childCount() == 1           # its single "(no LoRA)" level
+    assert workflow_node.child(0).child(0).childCount() == 1  # the two seeds collapse
 
 
 def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
@@ -239,14 +240,14 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    model = _top_level(view._tree)["Images"].child(0).child(0)
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
-    view._tree.setCurrentItem(model)
+    view._tree.setCurrentItem(lora)
     assert len(view.visible_folder_keys()) == 2
     assert view.visible_prompt_ids() == []
 
     # A leaf (settings) folder shows the actual item thumbnails.
-    cat_leaf = model.child(0)
+    cat_leaf = lora.child(0)
     view._tree.setCurrentItem(cat_leaf)
     assert set(view.visible_prompt_ids()) == {"i1", "i2"}
     assert view.visible_folder_keys() == []
@@ -258,9 +259,9 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    model = _top_level(view._tree)["Images"].child(0).child(0)
-    view._tree.setCurrentItem(model)
-    a_tile_key = view.visible_folder_keys()[0]  # a settings tile under the model
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    view._tree.setCurrentItem(lora)
+    a_tile_key = view.visible_folder_keys()[0]  # a settings tile under the LoRA folder
 
     view._drill_into(a_tile_key)  # same path the tile's clicked signal triggers
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
@@ -287,20 +288,20 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    model = _top_level(view._tree)["Images"].child(0).child(0)
-    cat_key = _key(model.child(0))
-    dog_key = _key(model.child(1))  # cat is first, dog second
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    cat_key = _key(lora.child(0))
+    dog_key = _key(lora.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
-    model = _top_level(view._tree)["Images"].child(0).child(0)
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
     # The star marks the folder in place; it does not jump above the cat.
-    assert [_key(model.child(i)) for i in range(model.childCount())] == [cat_key, dog_key]
+    assert [_key(lora.child(i)) for i in range(lora.childCount())] == [cat_key, dog_key]
     # Starred state rides on the group (the row's star icon reads it), not a ★ text
     # prefix, so the labels stay the plain folder names.
-    assert model.child(1).data(0, _GROUP_ROLE).starred is True
-    assert model.child(0).data(0, _GROUP_ROLE).starred is False
-    assert not model.child(1).text(0).startswith("★")
+    assert lora.child(1).data(0, _GROUP_ROLE).starred is True
+    assert lora.child(0).data(0, _GROUP_ROLE).starred is False
+    assert not lora.child(1).text(0).startswith("★")
 
 
 def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
@@ -310,8 +311,8 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    model = _top_level(view._tree)["Images"].child(0).child(0)
-    dog_key = _key(model.child(1))
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
     # The Starred shelf sits just below Recents, above the media folders.
@@ -344,8 +345,8 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    model = _top_level(view._tree)["Images"].child(0).child(0)
-    dog_key = _key(model.child(1))
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
     shelf = _top_level(view._tree)["Starred"]
@@ -495,8 +496,8 @@ def test_selecting_a_folder_auto_selects_its_first_item(qtbot):
     view._tree.setCurrentItem(workflow)
     assert view._selected["prompt_id"] == "i1"
 
-    # ...and so does selecting a leaf folder (workflow -> model -> settings).
-    view._tree.setCurrentItem(workflow.child(0).child(0))
+    # ...and so does selecting a leaf folder (workflow -> model -> "(no LoRA)" -> settings).
+    view._tree.setCurrentItem(workflow.child(0).child(0).child(0))
     assert view._selected["prompt_id"] == "i1"
 
 
@@ -821,8 +822,8 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    # Images -> SDXL workflow -> model -> dog settings leaf (cat is sibling 0).
-    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(0).child(1)
+    # Images -> SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
+    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(0).child(0).child(1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
     chosen = set(saved.visible_prompt_ids())
@@ -1264,7 +1265,7 @@ def test_emptying_the_gallery_clears_a_stale_estimate(qtbot):
 def _open_leaf(view):
     """Select the first settings-group leaf so its thumbnails are showing."""
     workflow = _top_level(view._tree)["Images"].child(0)
-    leaf = workflow.child(0).child(0)  # workflow -> model -> settings
+    leaf = workflow.child(0).child(0).child(0)  # workflow -> model -> "(no LoRA)" -> settings
     view._tree.setCurrentItem(leaf)
     return leaf
 
@@ -1505,14 +1506,15 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     model = _top_level(view._tree)["Images"].child(0).child(0)
-    view._tree.setCurrentItem(model.child(0))  # one of the two settings leaves
+    view._tree.setCurrentItem(model.child(0).child(0))  # one of the two settings leaves
     view._confirm = lambda text: True
 
     view._delete_selection()  # deletes that settings folder
 
-    # The model (parent) survives via its sibling; the tree stays on it.
+    # The leaf's parent — the "(no LoRA)" folder — survives via its sibling leaf,
+    # so the tree falls back onto it rather than jumping up to the top.
     current = view._tree.currentItem().data(0, _GROUP_ROLE)
-    assert isinstance(current, gallery.ModelGroup)
+    assert isinstance(current, gallery.LoraGroup)
 
 
 def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
@@ -1663,8 +1665,8 @@ def _reroll_tile(view):
 
 
 def _select_first_leaf(view):
-    # media -> workflow -> model -> settings (the thumbnail leaf)
-    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    # media -> workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
+    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -2351,7 +2353,7 @@ def test_delete_works_with_gallery_embedded_in_tabs(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"].child(0).child(0).child(0).child(0))
     view._apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)

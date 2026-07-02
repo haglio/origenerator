@@ -584,7 +584,8 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
     # gives it, so an in-flight sibling (absent from the tree) can be matched to it.
     from origenerator.gallery import settings_folder_key
     row = _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)
-    (leaf,) = build_gallery_tree([row])[0].workflow_groups[0].model_groups[0].children
+    (lora,) = build_gallery_tree([row])[0].workflow_groups[0].model_groups[0].children
+    (leaf,) = lora.children
     assert settings_folder_key(row) == leaf.key
 
 
@@ -626,12 +627,16 @@ def test_legacy_settings_key_differs_from_the_current_normalized_key():
     assert legacy_settings_folder_key(row).startswith("image/sdxl_t2i/")
 
 
-def test_build_gallery_tree_grows_no_lora_level_without_lora_keys():
-    # SDXL declares no LoRA keys, so a model folder holds settings leaves directly
-    # — no intervening LoRA level to click through.
+def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
+    # SDXL declares no LoRA keys, so its model folder still grows a LoRA level — a
+    # single "(no LoRA)" folder wrapping the settings leaves — so every branch of
+    # the tree nests to the same depth whether or not the pipeline uses a LoRA.
     rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
     (model,) = build_gallery_tree(rows)[0].workflow_groups[0].model_groups
-    assert all(isinstance(child, SettingsGroup) for child in model.children)
+    (lora,) = model.children
+    assert isinstance(lora, LoraGroup)
+    assert lora.label == "(no LoRA)"
+    assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
 def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
@@ -673,8 +678,9 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     assert set(models) == {"reapony_v80", "dreamshaper"}
 
     reapony = models["reapony_v80"]
-    assert len(reapony.children) == 1  # the two seeds collapse
-    assert {r["prompt_id"] for r in reapony.children[0].rows} == {"i1", "i2"}
+    (reapony_lora,) = reapony.children              # the single "(no LoRA)" level
+    assert len(reapony_lora.children) == 1          # the two seeds collapse
+    assert {r["prompt_id"] for r in reapony_lora.children[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
 
 
@@ -704,7 +710,8 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
     ]
     workflow = build_gallery_tree(rows)[0].workflow_groups[0]
     for model in workflow.model_groups:
-        (settings,) = model.children
+        (lora,) = model.children
+        (settings,) = lora.children
         assert settings.label == "a cat"
         assert "safetensors" not in settings.label
 
@@ -743,7 +750,8 @@ def test_build_gallery_tree_nests_media_then_workflow_then_settings():
     sdxl_groups = media["image"].workflow_groups
     assert [w.workflow_name for w in sdxl_groups] == ["sdxl_t2i"]
     (model,) = sdxl_groups[0].model_groups  # no checkpoint recorded -> one model
-    settings = model.children
+    (lora,) = model.children                # the single "(no LoRA)" level
+    settings = lora.children
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
@@ -764,7 +772,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert workflow.key == "image/sdxl_t2i"
     model = workflow.model_groups[0]
     assert model.key.startswith("image/sdxl_t2i/")
-    settings = model.children[0]
+    settings = model.children[0].children[0]     # model -> "(no LoRA)" -> settings
     assert settings.key.startswith("image/sdxl_t2i/")
 
     # The model and settings keys are derived from signatures, so they are
@@ -772,17 +780,18 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     again_model = build_gallery_tree([_img("i9", "a cat", 50, 7)])[0] \
         .workflow_groups[0].model_groups[0]
     assert again_model.key == model.key
-    assert again_model.children[0].key == settings.key
+    assert again_model.children[0].children[0].key == settings.key
 
 
 def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
-    plain_model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
-    cat, dog = plain_model.children  # newest-first: cat, dog
+    plain_lora = build_gallery_tree(rows)[0] \
+        .workflow_groups[0].model_groups[0].children[0]  # the "(no LoRA)" level
+    cat, dog = plain_lora.children  # newest-first: cat, dog
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
     settings = build_gallery_tree(rows, meta)[0] \
-        .workflow_groups[0].model_groups[0].children
+        .workflow_groups[0].model_groups[0].children[0].children
 
     assert [s.key for s in settings] == [cat.key, dog.key]  # order unchanged — no reshuffle
     assert settings[1].label == "Doggos"      # custom name applied in place
@@ -795,7 +804,7 @@ def test_starred_folders_collects_starred_across_every_level():
     # returns both, top-down in tree order, regardless of how deep each sits.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     workflow = build_gallery_tree(rows)[0].workflow_groups[0]
-    cat_leaf = workflow.model_groups[0].children[0]
+    cat_leaf = workflow.model_groups[0].children[0].children[0]  # model -> "(no LoRA)" -> settings
 
     meta = {
         workflow.key: {"custom_name": None, "starred": True},
@@ -847,7 +856,8 @@ def test_child_groups_and_rows_under_walk_the_tree():
     workflows = child_groups(media)
     assert [w.workflow_name for w in workflows] == ["sdxl_t2i"]
     (model,) = child_groups(workflows[0])  # no checkpoint recorded -> one model
-    settings = child_groups(model)
+    (lora,) = child_groups(model)          # the single "(no LoRA)" level
+    settings = child_groups(lora)
     assert len(settings) == 2
     assert child_groups(settings[0]) == []  # a leaf has no child folders
 
@@ -867,7 +877,7 @@ def test_settings_group_labels_disambiguate_same_prompt_different_params():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 40, 2)])
     labels = [sg.label for sg in
-              tree[0].workflow_groups[0].model_groups[0].children]
+              tree[0].workflow_groups[0].model_groups[0].children[0].children]
     assert len(labels) == 2
     assert labels[0] != labels[1]
     assert all("a cat" in label for label in labels)
@@ -879,7 +889,8 @@ def test_settings_group_label_omits_params_when_only_one_group():
     # A lone settings folder needs no disambiguating suffix.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 50, 2)])
-    (only,) = tree[0].workflow_groups[0].model_groups[0].children
+    (lora,) = tree[0].workflow_groups[0].model_groups[0].children
+    (only,) = lora.children
     assert only.label == "a cat"
 
 

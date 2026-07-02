@@ -1,12 +1,15 @@
-"""Small vector icons for the gallery's toolbar buttons, drawn with QPainter.
+"""Small vector icons the gallery draws with QPainter.
 
-Each returns a QIcon carrying a normal and a muted "disabled" rendering (Qt swaps
-to the latter when a button is disabled), the same two-mode approach the metadata
-panel's copy icon uses. Drawn rather than glyphs so they render identically in any
+The toolbar-button icons each return a QIcon carrying a normal and a muted
+"disabled" rendering (Qt swaps to the latter when a button is disabled), the same
+two-mode approach the metadata panel's copy icon uses. The recipe-level badges
+(:func:`level_badge_icon`) are lettered chips marking which of workflow/model/LoRA
+a folder is. All are drawn rather than glyphs so they render identically in any
 font and read clearly at a small size.
 """
 
 import math
+from functools import lru_cache
 
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
 from PyQt6.QtCore import Qt, QRectF, QPointF
@@ -15,9 +18,16 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import TEXT_PRIMARY, TEXT_MUTED
+from shared_ui.colors import TEXT_PRIMARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER
 
 _SIZE = 48  # drawn large, then scaled down on the button, so edges stay crisp
+
+# Recipe-hierarchy level badges. A gallery folder below the media roots sits at
+# one of these levels; a small lettered chip names which, so a tree row or a
+# browser tile is self-describing without the reader counting indentation. The
+# media roots (Images/Videos) and the settings leaves carry none.
+LEVEL_LABELS = {"workflow": "Workflow", "model": "Model", "lora": "LoRA"}
+_LEVEL_BADGES = {"workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER)}
 
 
 def back_icon() -> QIcon:
@@ -40,6 +50,45 @@ def star_icon(*, filled: bool) -> QIcon:
     """A five-pointed star — solid when the folder is starred, an outline when
     not, so the hover control shows the state it will toggle."""
     return _two_mode(lambda p, color: _draw_star(p, color, filled))
+
+
+@lru_cache(maxsize=None)
+def level_badge_icon(level: str) -> QIcon:
+    """A filled, lettered chip marking a folder's recipe level (see LEVEL_LABELS).
+
+    Cached: the same three chips decorate many tree rows and tiles, so they're
+    rendered once and shared rather than re-drawn per folder.
+    """
+    letter, color = _LEVEL_BADGES[level]
+    icon = QIcon()
+    icon.addPixmap(_render_badge(letter, color))
+    return icon
+
+
+def _render_badge(letter: str, color) -> QPixmap:
+    """A rounded chip filled with ``color``, its ``letter`` centred in readable
+    contrast — dark on a light chip, light on a saturated one."""
+    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawRoundedRect(QRectF(3, 3, _SIZE - 6, _SIZE - 6), 12, 12)
+    font = painter.font()
+    font.setBold(True)
+    font.setPixelSize(30)
+    painter.setFont(font)
+    painter.setPen(_readable_on(color))
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, letter)
+    painter.end()
+    return pixmap
+
+
+def _readable_on(color):
+    """Near-black or the primary text color, whichever reads on ``color``."""
+    luminance = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+    return BG_PRIMARY if luminance > 150 else TEXT_PRIMARY
 
 
 def _two_mode(draw) -> QIcon:

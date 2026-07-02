@@ -188,6 +188,26 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     assert workflow_node.child(0).childCount() == 1
 
 
+def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    videos = _top_level(view._tree)["Videos"]
+    workflow = videos.child(0)
+    model = workflow.child(0)
+    lora = model.child(0)
+    settings = lora.child(0)
+
+    # Each recipe level shows a chip icon and names itself in the tooltip...
+    assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
+    assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
+    assert not lora.icon(0).isNull() and "LoRA" in lora.toolTip(0)
+    # ...while the media root and the settings leaf carry no badge.
+    assert videos.icon(0).isNull()
+    assert settings.icon(0).isNull()
+
+
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

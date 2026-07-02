@@ -17,7 +17,7 @@ this stays free of the gallery model.
 from PyQt6.QtWidgets import (
     QApplication, QTreeWidget, QStyledItemDelegate, QStyleOptionViewItem, QStyle,
 )
-from PyQt6.QtCore import Qt, QRect, pyqtSignal
+from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
 
 from origenerator.gui import icons
 
@@ -91,6 +91,7 @@ class FolderTree(QTreeWidget):
         super().__init__(parent)
         self._role = group_role
         self._branch_star = icons.star_icon(filled=True)
+        self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
         self.setMouseTracking(True)  # keep the hovered row's actions live as the mouse moves
         self.setItemDelegate(_FolderRowDelegate(group_role, self))
 

@@ -397,7 +397,16 @@ class GalleryView(QWidget):
         item = QTreeWidgetItem([group.label])
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, _GROUP_ROLE, group)
-        item.setToolTip(0, group.label)
+        # A workflow/model/LoRA row wears a lettered chip naming its recipe level,
+        # so its place in the hierarchy reads at a glance rather than by counting
+        # indentation; the level joins the tooltip too. Media roots and settings
+        # leaves get neither (folder_level returns None).
+        level = gallery.folder_level(group)
+        if level is not None:
+            item.setIcon(0, icons.level_badge_icon(level))
+            item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
+        else:
+            item.setToolTip(0, group.label)
         self._item_by_key[group.key] = item
         parent_item.addChild(item)
         for child in gallery.child_groups(group):
@@ -508,6 +517,7 @@ class GalleryView(QWidget):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), starred=starred, context=context,
+            level=gallery.folder_level(group),
         )
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self._folder_context_menu)

@@ -1,6 +1,10 @@
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QGridLayout, QLabel, QWidget
+from PyQt6.QtWidgets import (
+    QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QWidget,
+)
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal
+
+from origenerator.gui import icons
 
 
 class FolderTile(QFrame):
@@ -13,8 +17,10 @@ class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
+    _BADGE = 16  # on-tile size of the recipe-level chip
+
     def __init__(self, key, text, preview_paths, count, starred=False,
-                 context="", parent=None):
+                 context="", level=None, parent=None):
         super().__init__(parent)
         self._key = key
         self.setObjectName("folderTile")
@@ -47,14 +53,31 @@ class FolderTile(QFrame):
             crumb.setToolTip(context)
             layout.addWidget(crumb)
 
+        # The name, led by its recipe-level chip when the folder has one (the same
+        # badge the tree shows), so a Starred-shelf tile is placeable even out of
+        # its parent's context.
+        caption_row = QHBoxLayout()
+        caption_row.setContentsMargins(0, 0, 0, 0)
+        caption_row.setSpacing(4)
+        if level is not None:
+            caption_row.addWidget(self._level_badge(level), 0, Qt.AlignmentFlag.AlignTop)
         caption = QLabel(("★ " if starred else "") + text)
         caption.setWordWrap(True)
         caption.setMaximumHeight(30)
-        layout.addWidget(caption)
+        caption_row.addWidget(caption, 1)
+        layout.addLayout(caption_row)
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
         count_label.setStyleSheet("color: #9a9a9a; font-size: 10px;")
         layout.addWidget(count_label)
+
+    def _level_badge(self, level) -> QLabel:
+        """The lettered recipe-level chip, tooltip'd with the level's full name."""
+        badge = QLabel()
+        badge.setFixedSize(self._BADGE, self._BADGE)
+        badge.setPixmap(icons.level_badge_icon(level).pixmap(QSize(self._BADGE, self._BADGE)))
+        badge.setToolTip(icons.LEVEL_LABELS[level])
+        return badge
 
     @staticmethod
     def _build_collage(preview_paths) -> QWidget:

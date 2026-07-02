@@ -1,10 +1,15 @@
 import json
 
 from origenerator.gallery import (
+    LoraGroup,
+    MediaGroup,
+    ModelGroup,
     SettingsGroup,
+    WorkflowGroup,
     build_gallery_tree,
     child_groups,
     config_tab_title,
+    folder_level,
     find_source_image_id,
     media_type_of_row,
     lora_label,
@@ -21,6 +26,16 @@ from origenerator.gallery import (
     starred_folders,
     videos_from_source_image,
 )
+
+
+def test_folder_level_names_the_recipe_levels_and_nothing_else():
+    # The workflow -> model -> LoRA folders each report their level; the media
+    # roots and the settings leaves report none (they carry no recipe badge).
+    assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
+    assert folder_level(ModelGroup("k", "M", [])) == "model"
+    assert folder_level(LoraGroup("k", "L", [])) == "lora"
+    assert folder_level(SettingsGroup("k", "S", [])) is None
+    assert folder_level(MediaGroup("image", "image", "Images", [])) is None
 
 
 def test_config_tab_title_leads_with_model_then_prompt():

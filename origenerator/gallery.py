@@ -436,6 +436,22 @@ class MediaGroup:
     starred: bool = False
 
 
+def folder_level(group) -> str | None:
+    """Which recipe-hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
+    or ``"lora"`` — or ``None`` for the media roots and settings leaves.
+
+    Powers the per-level badge the gallery draws on tree rows and browser tiles:
+    a media folder is self-evidently Images/Videos and a settings leaf is where
+    the generations themselves live, so neither needs one.
+    """
+    for cls, level in (
+        (WorkflowGroup, "workflow"), (ModelGroup, "model"), (LoraGroup, "lora")
+    ):
+        if isinstance(group, cls):
+            return level
+    return None
+
+
 def child_groups(group) -> list:
     """The sub-folders directly under a folder (empty for a settings leaf)."""
     if isinstance(group, MediaGroup):

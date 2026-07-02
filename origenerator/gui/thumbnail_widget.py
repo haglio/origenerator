@@ -1,13 +1,24 @@
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
+from PyQt6.QtGui import QPixmap, QDrag
+from PyQt6.QtCore import Qt, QPoint, QSize, QMimeData, QByteArray, pyqtSignal
 
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 
 _IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
+
+# A dragged thumbnail carries its generation's prompt_id under this type, which the
+# gallery's combine drop slots read to know which image or video was dropped.
+GENERATION_MIME = "application/x-origenerator-generation"
+
+
+def generation_mime(prompt_id: str) -> QMimeData:
+    """The drag payload naming a generation by prompt_id, for a drop slot to read."""
+    mime = QMimeData()
+    mime.setData(GENERATION_MIME, QByteArray(prompt_id.encode("utf-8")))
+    return mime
 
 # A selected thumbnail lightens its whole tile — behind both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
@@ -43,6 +54,7 @@ class ThumbnailWidget(QWidget):
         self.prompt_id = prompt_id
         self._selected = False
         self._highlighted = False
+        self._press_pos: QPoint | None = None  # left-press origin, for drag detection
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -145,7 +157,25 @@ class ThumbnailWidget(QWidget):
         # Only a left click (re)selects. A right click opens the context menu via
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
+            self._press_pos = event.position().toPoint()  # origin for a possible drag
             self.clicked.emit(self.prompt_id)
+
+    def mouseMoveEvent(self, event):
+        # Drag the generation out to a combine drop slot, but only once the press
+        # has travelled far enough to read as a drag rather than a click — so a
+        # plain click still just selects, and a double-click still opens.
+        if self._press_pos is None or not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
+        moved = (event.position().toPoint() - self._press_pos).manhattanLength()
+        if moved < QApplication.startDragDistance():
+            return
+        self._press_pos = None
+        drag = QDrag(self)
+        drag.setMimeData(generation_mime(self.prompt_id))
+        pixmap = self._image_label.pixmap()
+        if pixmap is not None and not pixmap.isNull():
+            drag.setPixmap(pixmap)  # the tile's image trails the cursor
+        drag.exec(Qt.DropAction.CopyAction)
 
     def mouseDoubleClickEvent(self, event):
         # A left double-click is an "open" gesture; the first click's press has

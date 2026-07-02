@@ -3,6 +3,7 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
+import origenerator.gui.thumbnail_widget as tw_module
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
@@ -68,6 +69,13 @@ def test_highlight_toggles_and_is_distinct_from_selection(qtbot):
     tw.set_highlighted(False)
     assert tw.is_highlighted() is False
     assert tw.styleSheet() == ""
+
+
+def test_generation_mime_carries_the_prompt_id(qtbot):
+    # The drag payload a slot reads to know which generation was dropped.
+    mime = tw_module.generation_mime("abc123")
+    assert mime.hasFormat(tw_module.GENERATION_MIME)
+    assert bytes(mime.data(tw_module.GENERATION_MIME)) == b"abc123"
 
 
 def test_left_click_emits_clicked_but_right_click_does_not(qtbot):

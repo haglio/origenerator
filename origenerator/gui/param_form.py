@@ -218,6 +218,14 @@ class ParamForm(QWidget):
             cb.setChecked(False)
         cb.setVisible(available)
 
+    def set_image_random(self, is_random: bool):
+        """Restore an image field's Random state, e.g. a reopened tab. Only a
+        box that's currently available (shown) is set; a hidden one can't
+        randomize an unknown input, so it stays off."""
+        for cb in self._image_random_checks.values():
+            if not cb.isHidden():
+                cb.setChecked(is_random)
+
     def _collect(self, randomize_seed: bool) -> dict:
         # Start from the hidden params (disjoint from the widget keys), then lay
         # the live field values on top.

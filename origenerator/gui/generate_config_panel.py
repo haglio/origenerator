@@ -636,6 +636,7 @@ class GenerateConfigPanel(QWidget):
             self._workflow_combo.currentData(),
             self._param_form.get_values_static(),
             self._param_form.seed_is_random(),
+            self._param_form.image_is_random(),
         )
 
     def title(self) -> str:
@@ -670,10 +671,13 @@ class GenerateConfigPanel(QWidget):
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.
 
-        Like :meth:`prefill`, but also restores the seed's Random state so a tab
-        the user left on Random comes back random instead of pinned to the stale
-        seed that was in the field at save time.
+        Like :meth:`prefill`, but also restores the seed's and the input image's
+        Random states so a tab comes back the way it was left instead of pinned to
+        the stale values that were in its fields at save time. The image box is set
+        after prefill, once prefill's input value has told the panel whether that
+        box should be available at all.
         """
         self.prefill(snapshot.workflow_name, snapshot.params)
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
+            self._param_form.set_image_random(snapshot.image_is_random)

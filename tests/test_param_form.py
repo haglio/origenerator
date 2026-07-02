@@ -205,6 +205,20 @@ def test_image_random_available_toggles_visibility_and_clears_when_hidden(qtbot)
     assert form.image_is_random() is False                 # its checked state is cleared too
 
 
+def test_set_image_random_only_affects_an_available_box(qtbot):
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+
+    form.set_image_random(True)                 # box hidden (unavailable) → ignored
+    assert form.image_is_random() is False
+
+    form.set_image_random_available("input_image", True)
+    form.set_image_random(True)                 # now shown → restored to checked
+    assert form.image_is_random() is True
+    form.set_image_random(False)
+    assert form.image_is_random() is False
+
+
 def test_image_changed_reports_the_new_field_value(qtbot):
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
     qtbot.addWidget(form)

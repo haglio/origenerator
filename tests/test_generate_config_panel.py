@@ -198,6 +198,21 @@ def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
     assert params["positive_prompt"] == "dance"
 
 
+def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):
+    panel, client, db = _i2v_panel(qtbot, tmp_path, lambda p: "comfy-A")
+    panel._param_form.set_values({"input_image": "sdxl_src.png"})  # reproducible → box shows
+    panel._param_form._image_random_checks["input_image"].setChecked(True)
+
+    snapshot = panel.current_config()
+    assert snapshot.image_is_random is True
+
+    restored = GenerateConfigPanel(client, db)
+    qtbot.addWidget(restored)
+    restored.restore_config(snapshot)
+
+    assert restored._param_form.image_is_random() is True
+
+
 def test_completion_only_handled_for_own_prompt_id(panel):
     panel._on_generate()
     our_id = panel._client_prompt_id

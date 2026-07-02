@@ -204,3 +204,26 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
+
+
+def test_generate_inflight_shows_on_recents_and_reveals_its_subtab(qtbot, tmp_path):
+    # The gallery's Recents shelf shows a running Generate-tab job, and clicking
+    # its card brings the Generate tab forward on that job's own subtab.
+    win = _window(qtbot, tmp_path)
+    win._generate_view._client.submit_job = lambda payload, prompt_id: prompt_id
+    gen = win._generate_view
+    first = gen._subtabs.widget(0)
+    first._on_generate()               # the first subtab runs a job
+    pid = first.active_prompt_id()
+    gen._add_subtab()                  # a second subtab is now current
+    assert gen._subtabs.currentWidget() is not first
+
+    gv = win._gallery_view
+    gv.refresh()                       # the gallery reads the tabs' in-flight jobs
+    gv._tree.setCurrentItem(gv._recents_item)
+    assert pid in gv._inflight_cards   # the Generate job shows as an in-flight card
+
+    win._tabs.setCurrentWidget(gv)     # sit on the Gallery tab
+    gv._on_inflight_clicked(pid)       # click that card
+    assert win._tabs.currentWidget() is win._generate_view   # brought Generate forward
+    assert gen._subtabs.currentWidget() is first             # on the generating subtab

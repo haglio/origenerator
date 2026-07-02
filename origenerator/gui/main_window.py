@@ -50,13 +50,22 @@ class OrigeneratorWindow(QMainWindow):
         self._generate_view = GenerateView(client, db)
         # The gallery skips re-roll rows a Generate tab already owns, so the two
         # never both track one job; the tabs claim theirs during _restore_session.
+        # It also reads the tabs' in-flight jobs so its Recents shelf shows every
+        # queued/running generation app-wide, not just its own re-rolls.
         self._gallery_view = GalleryView(
-            db, client=client, claimed_ids=self._generate_view.active_prompt_ids
+            db, client=client,
+            claimed_ids=self._generate_view.active_prompt_ids,
+            generate_inflight=self._generate_view.in_flight_items,
         )
         self._tabs.addTab(self._generate_view, "Generate")
         self._tabs.addTab(self._gallery_view, "Gallery")
 
         self._gallery_view.reuse_requested.connect(self._on_reuse)
+        # Clicking a Recents in-flight card for a Generate job selects its subtab
+        # (in the Generate view) and asks here to bring that tab forward.
+        self._generate_view.reveal_requested.connect(
+            lambda: self._tabs.setCurrentWidget(self._generate_view)
+        )
         self._restore_session()
         # After the tabs have reclaimed their own running jobs, adopt whatever
         # in-flight re-rolls remain from the previous session.

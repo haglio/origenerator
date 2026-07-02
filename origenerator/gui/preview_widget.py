@@ -33,6 +33,9 @@ class PreviewWidget(QWidget):
         self._image_label = QLabel(_PLACEHOLDER)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image_label.setMinimumHeight(240)
+        # Let the placeholder wrap so its text width doesn't set a wide minimum
+        # on the preview pane (and thus the whole window).
+        self._image_label.setWordWrap(True)
         self._stack.addWidget(self._image_label)
 
         self._video = QVideoWidget()

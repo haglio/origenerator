@@ -237,10 +237,12 @@ class GalleryView(QWidget):
         # The TOC pane holds its width; the browser and info panes both grow with
         # the window (the browser faster), so the info pane stays comfortably wide
         # instead of a thin strip on a large screen. Long metadata values wrap
-        # rather than scroll sideways, so these floors are only for readability.
-        self._tree.setMinimumWidth(150)
-        browser.setMinimumWidth(240)
-        info.setMinimumWidth(340)
+        # rather than scroll sideways, so these floors only need to keep the panes
+        # readable — kept low enough that the window can still tile into a monitor
+        # third or a portrait-monitor half.
+        self._tree.setMinimumWidth(120)
+        browser.setMinimumWidth(210)
+        info.setMinimumWidth(300)
         self._panes.setStretchFactor(0, 0)
         self._panes.setStretchFactor(1, 3)
         self._panes.setStretchFactor(2, 2)

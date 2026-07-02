@@ -92,6 +92,13 @@ class GenerateConfigPanel(QWidget):
         for key, wf in WORKFLOW_REGISTRY.items():
             self._workflow_combo.addItem(wf.display_name, key)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
+        # Elide to a short floor when the window is narrow instead of holding the
+        # width of the longest workflow name, which would set the tab's whole
+        # minimum width and block tiling. It still expands to fill (stretch=1).
+        self._workflow_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self._workflow_combo.setMinimumContentsLength(12)
         header.addWidget(self._workflow_combo, 1)
         main_box.addLayout(header)
         self._estimate_label = QLabel()
@@ -123,9 +130,11 @@ class GenerateConfigPanel(QWidget):
         self._panes.addWidget(self._preview)
 
         # The strip holds its width; the settings and preview panes grow with the
-        # window (settings faster), mirroring the Gallery's proportions.
-        main.setMinimumWidth(280)
-        self._preview.setMinimumWidth(200)
+        # window (settings faster), mirroring the Gallery's proportions. The floors
+        # stay low enough that the whole window can still tile into a monitor third
+        # or a portrait-monitor half.
+        main.setMinimumWidth(240)
+        self._preview.setMinimumWidth(180)
         self._panes.setStretchFactor(0, 0)
         self._panes.setStretchFactor(1, 3)
         self._panes.setStretchFactor(2, 2)

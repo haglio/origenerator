@@ -549,9 +549,11 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
 def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # Long metadata values wrap rather than scroll sideways, so this floor is
-    # about readability: the info pane never collapses to a cramped strip.
-    assert view._panes.widget(2).minimumWidth() >= 340
+    # Long metadata values wrap rather than scroll sideways, so this floor keeps
+    # the info pane readable without a sideways scrollbar. It's lower than it once
+    # was so the whole window can still tile into a narrow monitor slot, but it
+    # must never collapse to a cramped strip.
+    assert view._panes.widget(2).minimumWidth() >= 280
 
 
 def test_selected_folder_returns_current_folder_key(qtbot):

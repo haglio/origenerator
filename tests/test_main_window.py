@@ -158,3 +158,16 @@ def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
 
     reopened = _window(qtbot, tmp_path, AppState(path))
     assert not reopened.isMaximized()
+
+
+def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
+    """A tiling window manager snaps windows into fractional slots — a third of a
+    2560px monitor (~853px) or a half of a 1440px portrait monitor (~720px). The
+    window, frame included (~+16px), must fit the smallest of those, so its
+    effective minimum width has to stay under ~704px. Guards against a large
+    minimum — explicit or content-driven (a non-wrapping label, a combo sized to
+    its longest item) — that makes the window refuse to fit and breaks
+    monitor-to-monitor tiling."""
+    win = _window(qtbot, tmp_path)
+    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    assert effective_min_width <= 704

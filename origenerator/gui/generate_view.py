@@ -66,6 +66,9 @@ class GenerateView(QWidget):
             "“Reuse Parameters” — or start a blank one:"
         )
         message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Wrap rather than let the longest line set the tab's minimum width,
+        # which would keep the window from tiling narrow.
+        message.setWordWrap(True)
         box.addWidget(message)
         self._new_tab_btn = QPushButton("New configuration")
         self._new_tab_btn.clicked.connect(lambda: self._add_subtab())

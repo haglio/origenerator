@@ -31,7 +31,13 @@ class OrigeneratorWindow(QMainWindow):
         super().__init__(parent)
         self._app_state = app_state
         self.setWindowTitle("Origenerator")
-        self.setMinimumSize(1000, 700)
+        # A small floor (not the old 1000x700) so a tiling window manager can snap
+        # the window into a monitor third (~853px) or a portrait-monitor half
+        # (~720px) — Qt maps this straight to the window's min track size. The tab
+        # widgets' own content minimum is ~660px (their pane/label/combo floors),
+        # so content renders fully at those slot sizes; only a manual drag below
+        # that compresses it.
+        self.setMinimumSize(600, 400)
         self.setStyleSheet(build_stylesheet())
         icon_path = PROJECT_DIR / "icon.ico"
         if icon_path.exists():

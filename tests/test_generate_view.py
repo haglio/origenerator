@@ -348,6 +348,14 @@ def test_in_flight_items_reports_a_running_generate_job(view):
     assert items[0].key == panel.active_prompt_id()
 
 
+def test_in_flight_items_carry_the_tab_media_type(view):
+    # The Recents card badges a Generate job image-or-video from its tab's workflow;
+    # the default tab runs SDXL, an image pipeline.
+    view._client.submit_job = MagicMock(return_value="x")
+    view._subtabs.widget(0)._on_generate()
+    assert view.in_flight_items()[0].media_type == "image"
+
+
 def test_in_flight_items_includes_a_tab_queued_behind_a_running_one(view):
     view._client.submit_job = MagicMock(return_value="x")
     p1 = view._subtabs.widget(0)

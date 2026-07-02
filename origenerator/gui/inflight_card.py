@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from origenerator.gui.media_badge import MediaBadge
+
 _CARD_SIZE = (180, 200)   # matches ThumbnailWidget so cards flow with finished tiles
 _IMAGE_SIZE = (172, 160)
 _BORDER = "2px solid #3080e0"  # a blue "in progress" edge, distinct from a resting tile
@@ -32,6 +34,7 @@ class InFlightItem:
     status: str                  # "running" or "queued"
     frame: bytes | None          # latest live preview frame, if one has arrived
     reveal: Callable[[], None]   # bring the job's own view forward (tab or folder)
+    media_type: str | None = None  # "image"/"video" for the corner badge, if known
 
 
 class InFlightCard(QWidget):
@@ -70,6 +73,11 @@ class InFlightCard(QWidget):
         layout.addWidget(self._image)
         layout.addWidget(self._caption)
         self.update_item(item)
+
+        # The kind is fixed for a job, so the badge is placed once here (not in the
+        # in-place update_item). It matches the badge a finished tile will wear.
+        if item.media_type:
+            MediaBadge(item.media_type, self)
 
     @property
     def key(self) -> str:

@@ -4,6 +4,7 @@ from PIL import Image
 from PyQt6.QtCore import Qt
 
 from origenerator.gui.inflight_card import InFlightItem, InFlightCard
+from origenerator.gui.media_badge import MediaBadge
 
 
 def _png_bytes(color=(200, 50, 50)):
@@ -36,6 +37,17 @@ def test_card_shows_the_live_frame_when_one_is_present(qtbot):
     card = InFlightCard(_item(status="running", frame=_png_bytes()))
     qtbot.addWidget(card)
     assert not card._image.pixmap().isNull()  # the placeholder gave way to the frame
+
+
+def test_media_badge_shows_only_when_the_item_names_a_type(qtbot):
+    # An in-flight card on the Recents shelf wears the same image/video badge as a
+    # finished tile, so a queued video reads as a video before its first frame.
+    plain = InFlightCard(_item())                    # no type known → no badge
+    qtbot.addWidget(plain)
+    assert plain.findChildren(MediaBadge) == []
+    badged = InFlightCard(_item(media_type="video"))
+    qtbot.addWidget(badged)
+    assert len(badged.findChildren(MediaBadge)) == 1
 
 
 def test_clicking_the_card_emits_its_key(qtbot):

@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 
+from origenerator.gui.media_badge import MediaBadge
+
 # A selected thumbnail lightens its whole tile — behind both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
 # the fill actually show:
@@ -31,7 +33,8 @@ class ThumbnailWidget(QWidget):
     hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
     unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
 
-    def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str, parent=None):
+    def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
+                 parent=None, *, media_type: str | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
@@ -77,6 +80,11 @@ class ThumbnailWidget(QWidget):
         layout.addWidget(self._image_label)
         layout.addWidget(self._text_label)
         self._apply_styles()
+
+        # In a mixed listing (the Recents shelf) a corner badge names the kind;
+        # inside a single-type folder the caller leaves it off as redundant.
+        if media_type:
+            MediaBadge(media_type, self)
 
     def is_selected(self) -> bool:
         return self._selected

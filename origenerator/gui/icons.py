@@ -4,14 +4,15 @@ The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled), the same
 two-mode approach the metadata panel's copy icon uses. The recipe-level badges
 (:func:`level_badge_icon`) are lettered chips marking which of workflow/model/LoRA
-a folder is. All are drawn rather than glyphs so they render identically in any
-font and read clearly at a small size.
+a folder is; the media-type badges (:func:`media_type_badge`) are corner chips
+marking a Recents tile as an image or a video. All are drawn rather than glyphs so
+they render identically in any font and read clearly at a small size.
 """
 
 import math
 from functools import lru_cache
 
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QRectF, QPointF
 
 from origenerator.paths import ensure_shared_ui_on_path
@@ -34,6 +35,13 @@ _LEVEL_BADGES = {
     "workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER),
     "source_image": ("I", GREEN),
 }
+
+# The Recents shelf mixes images and videos in one flow, so each tile wears a
+# small corner badge naming its kind. A white glyph on a translucent dark chip,
+# so it reads over a thumbnail of any color.
+_BADGE_CHIP = QColor(0, 0, 0, 160)
+_BADGE_GLYPH = QColor(255, 255, 255)
+_BADGE_DISPLAY = 22  # the badge's on-screen size, in px
 
 
 def back_icon() -> QIcon:
@@ -61,6 +69,30 @@ def star_icon(*, filled: bool) -> QIcon:
 def clock_icon() -> QIcon:
     """A clock face — the Recents shelf's caret marker, drawn to match the star."""
     return _two_mode(_draw_clock)
+
+
+@lru_cache(maxsize=None)
+def media_type_badge(media_type: str) -> QPixmap:
+    """A small corner badge marking a Recents tile as an image or a video.
+
+    A white glyph — a play triangle for a video, a framed photo for an image — on
+    a translucent dark chip, so it reads over a thumbnail of any color. Cached and
+    pre-scaled to its on-screen size; the same two badges decorate every tile.
+    """
+    draw = _draw_play if media_type == "video" else _draw_photo
+    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_BADGE_CHIP)
+    painter.drawRoundedRect(QRectF(4, 4, _SIZE - 8, _SIZE - 8), 11, 11)
+    draw(painter)
+    painter.end()
+    return pixmap.scaled(
+        _BADGE_DISPLAY, _BADGE_DISPLAY,
+        Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+    )
 
 
 @lru_cache(maxsize=None)
@@ -171,6 +203,28 @@ def _draw_star(painter: QPainter, color, filled: bool):
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)  # a thinner outline than the default stroke
     painter.drawPolygon(*points)
+
+
+def _draw_play(painter: QPainter):
+    """A filled play triangle — the universal 'this is a video' mark."""
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_BADGE_GLYPH)
+    painter.drawPolygon(QPointF(20, 16), QPointF(20, 32), QPointF(34, 24))
+
+
+def _draw_photo(painter: QPainter):
+    """A framed photo — a sun over a mountain — the 'this is an image' mark."""
+    pen = QPen(_BADGE_GLYPH)
+    pen.setWidthF(2.6)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawRoundedRect(QRectF(14, 16, 20, 16), 3, 3)   # the picture frame
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_BADGE_GLYPH)
+    painter.drawEllipse(QPointF(20, 21), 2.3, 2.3)          # the sun, upper-left
+    painter.drawPolygon(QPointF(16, 31), QPointF(24, 23),   # a single mountain peak
+                        QPointF(33, 31))
 
 
 def _draw_clock(painter: QPainter, _color):

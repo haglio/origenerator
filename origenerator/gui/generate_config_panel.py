@@ -15,6 +15,7 @@ from origenerator.db import Database
 from origenerator.gallery import (
     build_image_config_index, config_tab_title, media_type_of_row,
     output_file_reference, settings_signature, source_image_id_for,
+    workflow_output_type,
 )
 from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
@@ -458,6 +459,7 @@ class GenerateConfigPanel(QWidget):
             "caption": self.title(),
             "status": status,
             "frame": self._last_frame,
+            "media_type": workflow_output_type(self._workflow_combo.currentData()),
         }
 
     def reconnect(self, prompt_id: str, workflow, payload: dict):

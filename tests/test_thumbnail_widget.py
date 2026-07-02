@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent
 from PyQt6.QtWidgets import QApplication
 
+from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
 
@@ -69,6 +70,17 @@ def test_right_click_requests_a_context_menu_for_this_thumbnail(qtbot):
     tw.customContextMenuRequested.emit(QPoint(5, 5))
 
     assert received == ["p1"]
+
+
+def test_media_badge_appears_only_when_a_type_is_given(qtbot):
+    # Inside a single-type folder the kind is obvious, so a bare tile wears none...
+    plain = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(plain)
+    assert plain.findChildren(MediaBadge) == []
+    # ...but a Recents tile, which mixes kinds, is told its type and shows a badge.
+    badged = ThumbnailWidget("p2", None, "label", media_type="video")
+    qtbot.addWidget(badged)
+    assert len(badged.findChildren(MediaBadge)) == 1
 
 
 def test_thumbnail_starts_unselected(qtbot):

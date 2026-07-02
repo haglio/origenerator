@@ -12,20 +12,27 @@ from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
+# Idle/active resting look (a dashed "+" box) versus the solid border that marks
+# the tile as the selected item driving the info pane, mirroring a thumbnail.
+_IDLE_FRAME_CSS = (
+    "#rerollTile { border: 1px dashed #4a4a4a; border-radius: 4px; }"
+    "#rerollTile:hover { border-color: #6f6f6f; }"
+)
+_SELECTED_FRAME_CSS = "#rerollTile { border: 2px solid #8a8a8a; border-radius: 4px; }"
+
 
 class RerollTile(QFrame):
     add_requested = pyqtSignal()
     cancel_requested = pyqtSignal()
+    selected = pyqtSignal()  # a running tile was clicked to drive the info pane
 
     def __init__(self, job=None, parent=None):
         super().__init__(parent)
         self._job = job
+        self._selected = False
         self.setObjectName("rerollTile")
         self.setFixedSize(180, 200)
-        self.setStyleSheet(
-            "#rerollTile { border: 1px dashed #4a4a4a; border-radius: 4px; }"
-            "#rerollTile:hover { border-color: #6f6f6f; }"
-        )
+        self.set_selected(False)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
@@ -77,6 +84,17 @@ class RerollTile(QFrame):
         else:
             self._render_waiting()
 
+    # --- selection ---------------------------------------------------------
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool):
+        """Give the tile a solid selection border when it drives the info pane,
+        else restore the dashed resting look."""
+        self._selected = selected
+        self.setStyleSheet(_SELECTED_FRAME_CSS if selected else _IDLE_FRAME_CSS)
+
     # --- state rendering ---------------------------------------------------
 
     def _has_image(self) -> bool:
@@ -109,5 +127,11 @@ class RerollTile(QFrame):
             ))
 
     def mousePressEvent(self, event):
-        if self._job is None and event.button() == Qt.MouseButton.LeftButton:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        # An idle "+" tile starts a re-roll; a running tile selects itself so the
+        # info pane can show its live preview at full size.
+        if self._job is None:
             self.add_requested.emit()
+        else:
+            self.selected.emit()

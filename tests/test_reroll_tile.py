@@ -81,6 +81,40 @@ def test_active_tile_does_not_emit_add_on_click(qtbot):
     assert clicks == []
 
 
+def test_active_tile_emits_selected_on_click(qtbot):
+    # Clicking a running tile selects it (so the info pane can mirror its
+    # preview), rather than starting another re-roll.
+    tile = RerollTile(FakeJob(state="running"))
+    qtbot.addWidget(tile)
+    picks = []
+    tile.selected.connect(lambda: picks.append(True))
+    qtbot.mouseClick(tile, Qt.MouseButton.LeftButton)
+    assert picks == [True]
+
+
+def test_idle_tile_does_not_emit_selected_on_click(qtbot):
+    tile = RerollTile()
+    qtbot.addWidget(tile)
+    picks = []
+    tile.selected.connect(lambda: picks.append(True))
+    qtbot.mouseClick(tile, Qt.MouseButton.LeftButton)
+    assert picks == []
+
+
+def test_set_selected_toggles_the_tile_highlight(qtbot):
+    tile = RerollTile(FakeJob(state="running"))
+    qtbot.addWidget(tile)
+    assert not tile.is_selected()
+
+    tile.set_selected(True)
+    assert tile.is_selected()
+    assert "solid" in tile.styleSheet()  # a solid selection border, not the dashed idle one
+
+    tile.set_selected(False)
+    assert not tile.is_selected()
+    assert "dashed" in tile.styleSheet()
+
+
 def test_started_signal_switches_status_to_generating(qtbot):
     job = FakeJob(state="queued")
     tile = RerollTile(job)

@@ -74,6 +74,11 @@ class GalleryView(QWidget):
         # jobs), so re-roll reconnection doesn't also adopt them. Queried live.
         self._claimed_ids = claimed_ids or (lambda: set())
         self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
+        # The folder whose running re-roll currently drives the info pane (its
+        # tile is the selected item), and that tile — so live frames can be
+        # mirrored from the browser-pane thumbnail into the full-size preview.
+        self._selected_reroll_key: str | None = None
+        self._reroll_tile: RerollTile | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
@@ -401,6 +406,7 @@ class GalleryView(QWidget):
         container = QWidget()
         flow = FlowLayout(container, spacing=_TILE_SPACING)
         self._clear_selection()
+        self._reroll_tile = None  # re-created below only when this folder re-rolls
         self._visible_ids = []
         self._visible_keys = []
         return container, flow
@@ -456,9 +462,12 @@ class GalleryView(QWidget):
 
     def _add_reroll_tile(self, flow, group):
         tile = RerollTile(self._reroll_jobs.get(group.key))
+        tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
+        tile.selected.connect(lambda k=group.key: self._select_reroll(k))
         flow.addWidget(tile)
+        self._reroll_tile = tile
 
     def _start_reroll(self, key: str):
         if self._client is None or key in self._reroll_jobs:
@@ -529,6 +538,54 @@ class GalleryView(QWidget):
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
         job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
+        job.preview.connect(lambda data, k=key: self._on_reroll_preview(k, data))
+
+    # --- re-roll as the info-pane source ----------------------------------
+
+    def _select_reroll(self, key: str):
+        """Make a running re-roll's tile the selected item and mirror its live
+        frames into the info pane.
+
+        The tile stands for an in-flight job with no saved file yet, so its
+        preview comes from the job's streamed frames rather than
+        :meth:`_show_preview`'s on-disk lookup.
+        """
+        job = self._reroll_jobs.get(key)
+        if job is None:
+            return
+        self._selected_reroll_key = key
+        self._selected = None
+        self._clear_thumbnail_selection()
+        if self._reroll_tile is not None:
+            self._reroll_tile.set_selected(True)
+        self._reuse_btn.setEnabled(False)
+        self._reuse_wrap.setToolTip("")
+        self._meta_title.setText("Generating a new variation…")
+        self._estimate_label.clear()
+        self._meta_panel.clear()
+        if job.last_preview:
+            self._preview.show_frame(job.last_preview)
+        else:
+            self._preview.clear()
+
+    def _on_reroll_preview(self, key: str, data: bytes):
+        """Mirror a re-roll's live frame into the info pane while it's selected."""
+        if key == self._selected_reroll_key:
+            self._preview.show_frame(data)
+
+    def _clear_thumbnail_selection(self):
+        """Drop the thumbnail multi-selection and its highlights while keeping the
+        on-screen tiles (unlike a rebuild), so picking the re-roll deselects them."""
+        self._selected_ids = set()
+        self._selection_anchor = None
+        self._refresh_selection_highlights()
+
+    def _clear_reroll_selection(self):
+        """Stop treating a running re-roll as the info-pane source — a real
+        generation is taking over the pane, or the re-roll has ended."""
+        self._selected_reroll_key = None
+        if self._reroll_tile is not None:
+            self._reroll_tile.set_selected(False)
 
     def reconnect_running_rerolls(self):
         """Rebind live jobs to any re-rolls left running by a previous session.
@@ -566,7 +623,15 @@ class GalleryView(QWidget):
         if job is not None:
             job.cancel()
             self._db.delete_generation(job.prompt_id)  # drop the abandoned running row
+        self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
+
+    def _abandon_reroll_preview(self, key: str):
+        """Empty the info pane if it was mirroring a re-roll that has ended with no
+        result to show (cancelled or failed)."""
+        if key == self._selected_reroll_key:
+            self._clear_reroll_selection()
+            self._clear_metadata()
 
     def _on_image_reroll_finished(self, key, image_job, files, thumb_path, duration,
                                   video_workflow, video_params):
@@ -581,6 +646,8 @@ class GalleryView(QWidget):
 
     def _on_reroll_finished(self, key, job, files, thumb_path, duration):
         self._reroll_jobs.pop(key, None)
+        if key == self._selected_reroll_key:
+            self._selected_reroll_key = None  # refresh re-selects it as a real thumbnail
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.refresh()  # the finished generation now shows as a normal thumbnail
 
@@ -588,6 +655,7 @@ class GalleryView(QWidget):
         job = self._reroll_jobs.pop(key, None)
         if job is not None:
             self._db.update_generation(job.prompt_id, status="error", error_message=message)
+        self._abandon_reroll_preview(key)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self._rerender_current_leaf()
 
@@ -881,6 +949,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if not row:
             return
+        self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._selected = row
         reusable = _is_reusable_workflow(row.get("workflow_name"))
         self._reuse_btn.setEnabled(reusable)

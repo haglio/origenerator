@@ -1,8 +1,10 @@
 import json
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
@@ -1171,6 +1173,12 @@ def _reroll_client():
     return client
 
 
+def _png_bytes(color=(10, 120, 200)):
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color).save(buf, "PNG")
+    return buf.getvalue()
+
+
 def _reroll_tile(view):
     tiles = view._scroll.widget().findChildren(RerollTile)
     return tiles[0] if tiles else None
@@ -1502,6 +1510,114 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 
     assert key in view._reroll_jobs
     assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
+
+
+# --- re-roll preview mirrored into the info pane ----------------------------
+
+
+def _running_reroll(view):
+    """Start a re-roll and return (key, job) for the freshly launched job."""
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    return key, view._reroll_jobs[key]
+
+
+def test_selecting_a_running_reroll_shows_its_live_preview_in_the_info_pane(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    frame = _png_bytes()
+    client.preview_image.emit(job.prompt_id, frame)  # a frame arrives, cached on the job
+    view._preview.show_frame = MagicMock()
+
+    _reroll_tile(view).selected.emit()  # user clicks the running tile
+
+    view._preview.show_frame.assert_called_once_with(frame)
+
+
+def test_new_frames_route_to_the_info_pane_while_the_reroll_is_selected(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    view._preview.show_frame = MagicMock()
+
+    client.preview_image.emit(job.prompt_id, _png_bytes())  # a later frame
+
+    view._preview.show_frame.assert_called_once_with(_png_bytes())
+
+
+def test_frames_leave_the_info_pane_untouched_when_the_reroll_is_not_selected(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    view._preview.show_frame = MagicMock()
+
+    client.preview_image.emit(job.prompt_id, _png_bytes())  # tile only, never selected
+
+    view._preview.show_frame.assert_not_called()
+
+
+def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_info_pane(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    view._on_thumbnail_clicked("orig")  # user views the finished item instead
+    view._preview.show_frame = MagicMock()
+
+    client.preview_image.emit(job.prompt_id, _png_bytes())
+
+    view._preview.show_frame.assert_not_called()
+    assert view._selected_reroll_key is None
+
+
+def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)
+    view._apply_selection("orig", _NO_MOD)  # a thumbnail is picked while it runs
+    assert view.selected_prompt_ids() == ["orig"]
+
+    _reroll_tile(view).selected.emit()
+
+    assert _reroll_tile(view).is_selected()
+    assert view.selected_prompt_ids() == []  # the thumbnail pick is cleared
+
+
+def test_finishing_a_selected_reroll_clears_the_reroll_selection(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert view._selected_reroll_key is None
+
+
+def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+
+    view._cancel_reroll(key)
+
+    assert view._selected_reroll_key is None
 
 
 def _seeded_i2v_db(tmp_path):

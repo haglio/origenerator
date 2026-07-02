@@ -245,3 +245,45 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     gv.refresh()
     gv._tree.setCurrentItem(gv._recents_item)
     assert "vid_run" in gv._inflight_cards
+
+
+def _seed_combine_db(tmp_path):
+    """Put a completed image + i2v video in the window's DB so the combine slots
+    can be filled from persisted ids."""
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
+                         positive_prompt="a dog", seed=1,
+                         params_json=json.dumps({"positive_prompt": "a dog", "seed": 1}),
+                         workflow_json="{}")
+    db.update_generation("img", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_img.png"}]))
+    db.insert_generation(prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v",
+                         positive_prompt="dance", seed=42,
+                         params_json=json.dumps(dict(
+                             WORKFLOW_REGISTRY["wan22_i2v"].default_params(), seed=42)),
+                         workflow_json="{}")
+    db.update_generation("vid", status="completed",
+                         output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4"}]))
+
+
+def test_close_event_persists_combine_selection(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    _seed_combine_db(tmp_path)
+    win = _window(qtbot, tmp_path, AppState(path))
+    win._gallery_view._combine.image_slot.set_item("img")
+    win._gallery_view._combine.video_slot.set_item("vid")
+
+    win.close()
+
+    assert AppState(path).get("gallery_combine") == ["img", "vid"]
+
+
+def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    state = AppState(tmp_path / "ui.json")
+    state.set("gallery_combine", ["img", "vid"])
+
+    win = _window(qtbot, tmp_path, state)
+
+    assert win._gallery_view._combine.image_slot.current_id() == "img"
+    assert win._gallery_view._combine.video_slot.current_id() == "vid"

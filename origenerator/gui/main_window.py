@@ -16,6 +16,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 _CONFIG_TABS_KEY = "generate_tabs"
 _GALLERY_FOLDER_KEY = "gallery_folder"
 _GALLERY_SELECTION_KEY = "gallery_selection"
+_GALLERY_COMBINE_KEY = "gallery_combine"
 _GEOMETRY_KEY = "window_geometry"
 
 
@@ -55,6 +56,7 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.restore_config_tabs(self._app_state.get(_CONFIG_TABS_KEY))
         self._gallery_view.select_folder(self._app_state.get(_GALLERY_FOLDER_KEY))
         self._gallery_view.select_generation(self._app_state.get(_GALLERY_SELECTION_KEY))
+        self._gallery_view.restore_combine_selection(self._app_state.get(_GALLERY_COMBINE_KEY))
 
     def _restore_geometry(self):
         """Reapply the saved window geometry: screen, size, and maximized state.
@@ -76,6 +78,7 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())
+        self._app_state.set(_GALLERY_COMBINE_KEY, self._gallery_view.combine_selection())
         self._app_state.set(
             _GEOMETRY_KEY,
             base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),

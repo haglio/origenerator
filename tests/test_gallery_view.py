@@ -3117,3 +3117,47 @@ def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
     assert job.params["seed"] == 42
+
+
+def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine.image_slot.set_item("img")
+    view._combine.video_slot.set_item("vid")
+
+    assert view.combine_selection() == ["img", "vid"]
+
+
+def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.restore_combine_selection(["img", "vid"])
+
+    assert view._combine.image_slot.current_id() == "img"
+    assert view._combine.video_slot.current_id() == "vid"
+
+
+def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    # image slot given a deleted id; video slot given an image (wrong kind)
+    view.restore_combine_selection(["ghost", "img"])
+
+    assert view._combine.image_slot.current_id() is None   # "ghost" no longer exists
+    assert view._combine.video_slot.current_id() is None   # "img" isn't an i2v recipe
+
+
+def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.restore_combine_selection(None)          # nothing saved yet
+    view.restore_combine_selection(["only-one"])  # malformed
+
+    assert view.combine_selection() == [None, None]

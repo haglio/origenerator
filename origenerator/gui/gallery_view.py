@@ -575,6 +575,21 @@ class GalleryView(QWidget):
             return (None, None)
         return (row.get("thumbnail_path"), self._animated_preview(row))
 
+    def combine_selection(self) -> list:
+        """The ``[image_id, video_id]`` sitting in the combine slots, for session save."""
+        return [self._combine.image_slot.current_id(), self._combine.video_slot.current_id()]
+
+    def restore_combine_selection(self, saved) -> None:
+        """Refill the combine slots from a saved ``[image_id, video_id]``, skipping an
+        item that's since been deleted or no longer fits its slot."""
+        if not isinstance(saved, (list, tuple)) or len(saved) != 2:
+            return
+        image_id, video_id = saved
+        if image_id and self._combine_accepts_image(image_id):
+            self._combine.image_slot.set_item(image_id)
+        if video_id and self._combine_accepts_video(video_id):
+            self._combine.video_slot.set_item(video_id)
+
     def _generate_combination(self, image_id: str, video_id: str):
         """Generate a new video from a dropped image + a dropped video's recipe.
 

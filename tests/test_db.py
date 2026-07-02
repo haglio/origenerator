@@ -104,6 +104,60 @@ def test_opening_db_without_duration_column_migrates_it(tmp_path):
     assert db.get_generation("old-001")["duration_seconds"] == 9.5
 
 
+def test_mark_evolver_exported_persists_across_reopen(tmp_path):
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    db.insert_generation(
+        prompt_id="vid-001",
+        workflow_name="wan22_i2v",
+        workflow_version="v1",
+        params_json="{}",
+        workflow_json="{}",
+    )
+    # A never-sent video carries no export timestamp.
+    assert db.get_generation("vid-001")["evolver_exported_at"] is None
+
+    db.mark_evolver_exported("vid-001")
+
+    # Reopening the file (a fresh app session) must still remember the send.
+    reopened = Database(db_path)
+    assert reopened.get_generation("vid-001")["evolver_exported_at"] is not None
+
+
+def test_opening_db_without_evolver_column_migrates_it(tmp_path):
+    db_path = tmp_path / "old.db"
+    # Faithful pre-evolver schema: the table as it was before this column.
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE generations ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " prompt_id TEXT NOT NULL UNIQUE,"
+        " source TEXT NOT NULL DEFAULT 'generated',"
+        " workflow_name TEXT NOT NULL,"
+        " workflow_version TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'pending',"
+        " positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
+        " params_json TEXT NOT NULL,"
+        " workflow_json TEXT NOT NULL,"
+        " output_files TEXT, thumbnail_path TEXT, error_message TEXT,"
+        " duration_seconds REAL,"
+        " created_at TEXT NOT NULL DEFAULT (datetime('now')),"
+        " completed_at TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO generations"
+        " (prompt_id, workflow_name, workflow_version, params_json, workflow_json)"
+        " VALUES ('old-001', 'wan22_i2v', 'v1', '{}', '{}')"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(db_path)
+    assert db.get_generation("old-001")["evolver_exported_at"] is None
+    db.mark_evolver_exported("old-001")
+    assert db.get_generation("old-001")["evolver_exported_at"] is not None
+
+
 def test_set_workflow_name_relabels_row(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

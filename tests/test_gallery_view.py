@@ -108,6 +108,11 @@ class FakeDB:
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(starred)
 
+    def mark_evolver_exported(self, prompt_id):
+        row = self._by_id.get(prompt_id)
+        if row is not None:
+            row["evolver_exported_at"] = "2026-07-02T00:00:00"
+
     def delete_generation(self, prompt_id):
         self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
         self._by_id.pop(prompt_id, None)
@@ -972,6 +977,46 @@ def test_send_to_evolver_copies_the_selected_video_to_the_inbox(qtbot, monkeypat
     view._on_send_to_evolver()
 
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
+    # The send is remembered: persisted on the row and shown on the button.
+    assert view._selected["evolver_exported_at"]
+    assert view._evolver_btn.text() == "Sent to Evolver ✓"
+    assert view._evolver_btn.isEnabled() is False
+
+
+def test_send_to_evolver_button_remembers_an_already_sent_video(qtbot, monkeypatch):
+    # A row already marked exported, as if sent in an earlier session.
+    video = _i2v_video("v1", "styleA")
+    video["evolver_exported_at"] = "2026-07-01T12:00:00"
+    view = GalleryView(FakeDB([video]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()  # don't start real WMF playback
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
+
+    view._on_thumbnail_clicked("v1")  # selecting it again, later on
+
+    assert view._evolver_btn.isHidden() is False
+    assert view._evolver_btn.text() == "Sent to Evolver ✓"
+    assert view._evolver_btn.isEnabled() is False
+
+
+def test_send_to_evolver_does_not_re_export_an_already_sent_video(qtbot, monkeypatch):
+    video = _i2v_video("v1", "styleA")
+    video["evolver_exported_at"] = "2026-07-01T12:00:00"
+    view = GalleryView(FakeDB([video]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._preview.show_media = MagicMock()
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
+    export = MagicMock()
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    view._on_thumbnail_clicked("v1")
+    view._on_send_to_evolver()  # the disabled button shouldn't act if driven anyway
+
+    export.assert_not_called()
 
 
 def test_send_to_evolver_warns_and_survives_a_failed_copy(qtbot, monkeypatch):

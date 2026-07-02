@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS generations (
     error_message   TEXT,
     duration_seconds REAL,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-    completed_at    TEXT
+    completed_at    TEXT,
+    evolver_exported_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -39,7 +40,7 @@ _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
     "output_files", "thumbnail_path", "error_message", "duration_seconds",
-    "created_at", "completed_at",
+    "created_at", "completed_at", "evolver_exported_at",
 )
 
 
@@ -64,6 +65,8 @@ class Database:
         existing = {row[1] for row in conn.execute("PRAGMA table_info(generations)")}
         if "duration_seconds" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
+        if "evolver_exported_at" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
 
     def _connect(self):
         conn = sqlite3.connect(self.path)
@@ -133,6 +136,19 @@ class Database:
             conn.execute(
                 "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
                 (params_json, prompt_id),
+            )
+
+    def mark_evolver_exported(self, prompt_id: str):
+        """Record that this generation's video was sent to Evolver's inbox.
+
+        Stamps the current time so the gallery remembers the send across sessions
+        (a plain marker — the value is only ever tested for presence).
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET evolver_exported_at = datetime('now')"
+                " WHERE prompt_id = ?",
+                (prompt_id,),
             )
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:

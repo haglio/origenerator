@@ -1269,18 +1269,24 @@ class GalleryView(QWidget):
         self._preview.clear()
 
     def _update_evolver_button(self, preview):
-        """Show Send-to-Evolver only when the selection is a video with a file on
-        disk. ``preview`` is the selection's resolved ``(path, media_type)``, or
-        ``None`` when nothing displayable is selected.
+        """Reflect the selection on the Send-to-Evolver button.
 
-        Evolver is a video pipeline, so for an image or a missing file the button
-        is hidden rather than shown disabled — simply absent when it can't apply.
+        Shown only when the selection is a video with a file on disk; Evolver is
+        a video pipeline, so for an image or a missing file the button is hidden
+        rather than shown disabled. A video already sent shows a persistent,
+        disabled "Sent ✓" so the gallery remembers the handoff across selections
+        and sessions (the flag is read from the row, which the DB persists).
+
+        ``preview`` is the selection's resolved ``(path, media_type)``, or
+        ``None`` when nothing displayable is selected.
         """
         is_video = preview is not None and preview[1] == "video"
         self._evolver_btn.setVisible(is_video)
-        if is_video:  # clear any lingering "Sent ✓" confirmation from last time
-            self._evolver_btn.setEnabled(True)
-            self._evolver_btn.setText("Send to Evolver")
+        if not is_video:
+            return
+        already_sent = bool(self._selected and self._selected.get("evolver_exported_at"))
+        self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
+        self._evolver_btn.setEnabled(not already_sent)
 
     def _exportable_video_path(self) -> Path | None:
         """The on-disk video file backing the current selection, or ``None`` when
@@ -1294,11 +1300,15 @@ class GalleryView(QWidget):
         return preview[0]
 
     def _on_send_to_evolver(self):
-        """Copy the selected video into Evolver's inbox, confirming on the button.
+        """Copy the selected video into Evolver's inbox and remember the send.
 
-        The copied file lands in another app's inbox with no other visible result
-        here, so a failure must surface loudly and success must be acknowledged.
+        Re-checks the persisted flag (not just the button's disabled state) so
+        the handoff can't be repeated, mirroring how _on_reuse re-gates. The copy
+        lands in another app's inbox with no other visible result here, so a
+        failure must surface loudly; success is remembered on the button.
         """
+        if not self._selected or self._selected.get("evolver_exported_at"):
+            return
         path = self._exportable_video_path()
         if path is None:
             return
@@ -1311,17 +1321,11 @@ class GalleryView(QWidget):
                 f"Could not send this video to Evolver:\n\n{e}",
             )
             return
-        self._flash_evolver_sent()
-
-    def _flash_evolver_sent(self):
-        """Briefly change the button to a sent confirmation, then restore it."""
-        self._evolver_btn.setText("Sent to Evolver ✓")
-        self._evolver_btn.setEnabled(False)
-        QTimer.singleShot(1600, self._reset_evolver_button)
-
-    def _reset_evolver_button(self):
-        self._evolver_btn.setText("Send to Evolver")
-        self._evolver_btn.setEnabled(True)
+        prompt_id = self._selected["prompt_id"]
+        self._db.mark_evolver_exported(prompt_id)
+        # Re-read so the row (and thus the button) reflects the persisted send.
+        self._selected = self._db.get_generation(prompt_id) or self._selected
+        self._update_evolver_button((path, "video"))
 
     def _on_reuse(self):
         # Gate on reusability here, not just via the button's enabled state, so

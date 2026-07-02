@@ -111,24 +111,37 @@ def reroll_seed_icon(media_type: str) -> QIcon:
 
 
 def _draw_reroll_seed(painter: QPainter, media_type: str):
-    # A ~290° ring with an arrowhead at its opening — the "regenerate" mark.
-    painter.drawArc(QRectF(11, 11, 26, 26), 55 * 16, 285 * 16)
+    # The media identity, drawn large so video vs image reads at a glance...
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(_REROLL_GLYPH)
-    painter.drawPolygon(QPointF(37, 15), QPointF(31, 13), QPointF(33, 20))  # arrowhead
     if media_type == "video":
-        painter.drawPolygon(QPointF(20, 17), QPointF(20, 31), QPointF(31, 24))  # play triangle
+        painter.drawPolygon(QPointF(11, 9), QPointF(11, 31), QPointF(29, 20))  # play triangle
     else:
         pen = QPen(_REROLL_GLYPH)
-        pen.setWidthF(2.4)
+        pen.setWidthF(3.0)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(17, 18, 14, 11), 2, 2)                  # photo frame
+        painter.drawRoundedRect(QRectF(8, 11, 24, 19), 3, 3)                   # photo frame
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(_REROLL_GLYPH)
-        painter.drawEllipse(QPointF(21, 22), 1.6, 1.6)                         # the sun
-        painter.drawPolygon(QPointF(18, 28), QPointF(23, 24), QPointF(30, 28))  # a mountain peak
+        painter.drawEllipse(QPointF(15, 18), 2.6, 2.6)                         # the sun
+        painter.drawPolygon(QPointF(10, 28), QPointF(18, 20), QPointF(31, 28))  # a mountain peak
+    _draw_regen_badge(painter)
+
+
+def _draw_regen_badge(painter: QPainter):
+    """A small circular arrow in the bottom-right — the 're-roll' modifier over
+    the media glyph, so the control reads as 'regenerate this' not 'play this'."""
+    pen = QPen(_REROLL_GLYPH)
+    pen.setWidthF(3.4)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawArc(QRectF(29, 29, 15, 15), 35 * 16, 250 * 16)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_REROLL_GLYPH)
+    painter.drawPolygon(QPointF(45, 33), QPointF(39, 31), QPointF(41, 38))  # arrowhead
 
 
 @lru_cache(maxsize=None)

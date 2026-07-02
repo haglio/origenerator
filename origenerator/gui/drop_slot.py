@@ -51,6 +51,7 @@ class DropSlot(QWidget):
         # paints no stylesheet border without WA_StyledBackground.
         self._label = QLabel(placeholder)
         self._label.setObjectName("dropSlot")
+        self._label.setProperty("dragActive", False)  # lit while a valid drag hovers
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(_PREVIEW_SIZE)
@@ -119,8 +120,17 @@ class DropSlot(QWidget):
         pid = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
         return pid if self._accepts(pid) else None
 
+    def _set_drag_active(self, active: bool):
+        """Toggle the 'a valid drop is hovering' highlight (a stylesheet state)."""
+        if self._label.property("dragActive") == active:
+            return
+        self._label.setProperty("dragActive", active)
+        self._label.style().unpolish(self._label)
+        self._label.style().polish(self._label)
+
     def dragEnterEvent(self, event):
         if self._pid_from(event.mimeData()) is not None:
+            self._set_drag_active(True)  # invite the drop
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -131,7 +141,11 @@ class DropSlot(QWidget):
         else:
             event.ignore()
 
+    def dragLeaveEvent(self, event):
+        self._set_drag_active(False)
+
     def dropEvent(self, event):
+        self._set_drag_active(False)
         pid = self._pid_from(event.mimeData())
         if pid is None:
             event.ignore()

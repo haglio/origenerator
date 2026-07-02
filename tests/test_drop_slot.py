@@ -1,8 +1,9 @@
 """DropSlot: a kind-gated drop target for a dragged gallery generation."""
 
+import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QPointF
-from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QMovie
+from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QDragLeaveEvent, QMovie
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.media_badge import MediaBadge
@@ -101,13 +102,48 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
 
 
-def test_the_kind_badge_appears_only_once_filled(qtbot):
-    slot = _slot(qtbot, kind="video")
+def test_a_valid_drag_over_invites_the_drop_by_highlighting(qtbot):
+    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+
+    _drag_enter(slot, "img1")
+
+    assert slot._label.property("dragActive") is True  # the landing spot responds
+
+
+def test_an_incompatible_drag_does_not_highlight(qtbot):
+    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+
+    _drag_enter(slot, "vid1")  # a video over the image slot
+
+    assert slot._label.property("dragActive") is False  # no false invitation
+
+
+def test_leaving_clears_the_highlight(qtbot):
+    slot = _slot(qtbot)
+    _drag_enter(slot, "img1")
+
+    slot.dragLeaveEvent(QDragLeaveEvent())
+
+    assert slot._label.property("dragActive") is False
+
+
+def test_dropping_clears_the_highlight(qtbot):
+    slot = _slot(qtbot)
+    _drag_enter(slot, "img1")
+
+    _drop(slot, "img1")
+
+    assert slot._label.property("dragActive") is False
+
+
+@pytest.mark.parametrize("kind", ["image", "video"])
+def test_the_kind_badge_appears_only_once_filled(qtbot, kind):
+    slot = _slot(qtbot, kind=kind)
     badge = slot.findChild(MediaBadge)
-    assert badge.media_type == "video"   # the slot's kind, so you know what to drop here
+    assert badge.media_type == kind      # an image/video chip, so you know what goes here
     assert badge.isHidden()              # nothing dropped yet (isHidden works offscreen)
 
-    _drop(slot, "vid1")
+    _drop(slot, "x1")
     assert not badge.isHidden()
 
     slot.clear()

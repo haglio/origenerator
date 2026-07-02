@@ -156,4 +156,9 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_MUTED)};
         padding: 8px;
     }}
+    QLabel#dropSlot[dragActive="true"] {{
+        border: 1px solid {_h(BLUE)};
+        background-color: {_h(BG_TERTIARY)};
+        color: {_h(TEXT_PRIMARY)};
+    }}
     """

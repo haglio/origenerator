@@ -1,5 +1,6 @@
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
+from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
@@ -424,3 +425,106 @@ def test_wan22_t2i_extract_output_info():
     files = wf.extract_output_info(history)
     assert len(files) == 1
     assert files[0]["filename"] == "wan22_t2i_00026_.png"
+
+
+# ---- Flux text-to-image, GGUF UNET, with a RealESRGAN upscale pass ----
+
+def test_flux_t2i_upscaled_is_registered_as_an_image_workflow():
+    assert WORKFLOW_REGISTRY["flux_t2i_upscaled"].__class__ is FluxT2iUpscaledWorkflow
+    wf = FluxT2iUpscaledWorkflow()
+    assert wf.name == "flux_t2i_upscaled"
+    assert wf.output_type == "image"
+    # The GGUF diffusion model identifies the output; the gallery groups by it,
+    # so runs that differ only in which Flux model made them split into folders.
+    assert wf.model_keys == ("unet",)
+    assert wf.seed_keys() == ("seed",)
+
+
+def test_flux_t2i_upscaled_default_params_has_required_keys():
+    wf = FluxT2iUpscaledWorkflow()
+    params = wf.default_params()
+    required = {
+        "positive_prompt", "seed", "steps", "guidance", "width", "height",
+        "unet", "clip_name1", "clip_name2", "vae", "upscale_model",
+    }
+    assert required.issubset(params.keys())
+    # Flux is a guidance-distilled model: it samples at cfg 1.0 with an empty
+    # negative, so the real "prompt strength" knob is FluxGuidance, not cfg.
+    assert params["guidance"] == 4.5
+    assert params["unet"].endswith(".gguf")
+
+
+def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
+    # The GGUF diffusion model is a combo drawn from the installed diffusion
+    # models, like SDXL's checkpoint picker — the one thing a user varies most.
+    import origenerator.workflows.flux_t2i_upscaled as flux
+
+    installed = ["a_flux.gguf", "b_flux.gguf"]
+    monkeypatch.setattr(flux, "list_model_files", lambda category, fallback: installed)
+
+    wf = FluxT2iUpscaledWorkflow()
+    by_key = {pd.key: pd for pd in wf.param_definitions()}
+    assert "unet" in by_key
+    picker = by_key["unet"]
+    assert picker.type == "combo"
+    assert picker.options == installed
+    assert picker.default == wf.default_params()["unet"]
+
+
+def test_flux_t2i_upscaled_build_api_payload_structure():
+    wf = FluxT2iUpscaledWorkflow()
+    params = wf.default_params()
+    params["positive_prompt"] = "a portrait"
+    params["seed"] = 355448440510534
+    params["guidance"] = 3.5
+    payload = wf.build_api_payload(params)
+
+    # GGUF UNET loader carries the model that identifies the run.
+    unet = _find_node(payload, "UnetLoaderGGUF")
+    assert unet["inputs"]["unet_name"] == params["unet"]
+
+    # Flux's dual text encoders (clip_l + t5xxl) via DualCLIPLoader, type "flux".
+    dual = _find_node(payload, "DualCLIPLoader")
+    assert dual["inputs"]["type"] == "flux"
+    assert dual["inputs"]["clip_name1"] == params["clip_name1"]
+    assert dual["inputs"]["clip_name2"] == params["clip_name2"]
+
+    # Guidance rides on the positive conditioning; the KSampler runs at cfg 1.0.
+    fg = _find_node(payload, "FluxGuidance")
+    assert fg["inputs"]["guidance"] == 3.5
+    fg_id = _node_id(payload, "FluxGuidance")
+    ks = _find_node(payload, "KSampler")
+    assert ks["inputs"]["seed"] == 355448440510534
+    assert ks["inputs"]["cfg"] == 1.0
+    assert ks["inputs"]["positive"] == [fg_id, 0]
+
+    # The saved image is the upscaled one: SaveImage reads the upscaler's output,
+    # which in turn reads the VAE-decoded sample.
+    upscale = _find_node(payload, "ImageUpscaleWithModel")
+    decode_id = _node_id(payload, "VAEDecode")
+    assert upscale["inputs"]["image"] == [decode_id, 0]
+    upscale_id = _node_id(payload, "ImageUpscaleWithModel")
+    save = _find_node(payload, "SaveImage")
+    assert save["inputs"]["images"] == [upscale_id, 0]
+    assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
+    assert _find_node(payload, "UpscaleModelLoader")["inputs"]["model_name"] == params["upscale_model"]
+
+    # No LLM prompt-enhancer node: it hangs off the side of the saved graph,
+    # unconnected, and needs a custom node + API key we don't drive.
+    assert _find_node(payload, "VRGDG_LLM_Multi") is None
+
+
+def test_flux_t2i_upscaled_extract_output_info():
+    wf = FluxT2iUpscaledWorkflow()
+    history = {
+        "outputs": {
+            wf.output_node_id: {
+                "images": [
+                    {"filename": "flux_t2i_upscaled_00004_.png", "subfolder": "image", "type": "output"}
+                ]
+            }
+        }
+    }
+    files = wf.extract_output_info(history)
+    assert len(files) == 1
+    assert files[0]["filename"] == "flux_t2i_upscaled_00004_.png"

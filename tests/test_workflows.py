@@ -41,9 +41,10 @@ def test_workflows_declare_the_params_that_identify_their_lora():
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # The WAN video workflows pick their LoRA from the installed files, like the
-    # SDXL Model dropdown: a combo per high/low LoRA (sitting above its strength
-    # slider), its options from the loras scan and its default matching the
-    # persisted default — not a hidden param the form silently reset to default.
+    # SDXL Model dropdown: a combo per high/low LoRA, its options from the loras
+    # scan and its default matching the persisted default — not a hidden param the
+    # form silently reset to default. Where the pickers sit is asserted separately,
+    # by test_wan_video_workflows_group_all_models_then_all_loras.
     import origenerator.workflows.wan22_flf2v_loop as flf
     import origenerator.workflows.wan22_i2v as i2v
 
@@ -52,21 +53,19 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     monkeypatch.setattr(flf, "list_model_files", lambda category, fallback: installed)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
-        defs = wf.param_definitions()
-        by_key = {pd.key: pd for pd in defs}
-        keys = [pd.key for pd in defs]
+        by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
             picker = by_key[f"lora_{level}"]
             assert picker.type == "combo"
             assert picker.options == installed
             assert picker.default == wf.default_params()[f"lora_{level}"]
-            assert keys.index(f"lora_{level}") < keys.index(f"lora_strength_{level}")
 
 
 def test_wan_video_workflows_expose_model_pickers(monkeypatch):
     # The base diffusion model (high/low UNET) is a combo too, drawn from the
-    # installed diffusion_models and sitting above its stage's LoRA — selectable,
-    # not a hidden default the form silently reset.
+    # installed diffusion_models — selectable, not a hidden default the form
+    # silently reset. Where the pickers sit is asserted separately, by
+    # test_wan_video_workflows_group_all_models_then_all_loras.
     import origenerator.workflows.wan22_flf2v_loop as flf
     import origenerator.workflows.wan22_i2v as i2v
 
@@ -79,16 +78,32 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
     monkeypatch.setattr(flf, "list_model_files", picker)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
-        defs = wf.param_definitions()
-        by_key = {pd.key: pd for pd in defs}
-        keys = [pd.key for pd in defs]
+        by_key = {pd.key: pd for pd in wf.param_definitions()}
         for level in ("high", "low"):
             model = by_key[f"unet_{level}"]
             assert model.type == "combo"
             assert model.options == installed["diffusion_models"]
             assert model.default == wf.default_params()[f"unet_{level}"]
-            assert keys.index(f"unet_{level}") < keys.index(f"lora_{level}")
-        assert keys.index("unet_high") < keys.index("unet_low")
+
+
+def test_wan_video_workflows_group_all_models_then_all_loras():
+    # Model and LoRA settings are grouped by kind, not by noise level: both UNET
+    # pickers sit together, then both LoRA pickers (each directly above its own
+    # strength). So the Generate form and the gallery info pane read as "all the
+    # models, then all the LoRAs" rather than "everything high, then everything
+    # low". This order is the single source both surfaces draw from.
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        keys = [d.key for d in wf.param_definitions()]
+        model_block = [keys.index(k) for k in ("unet_high", "unet_low")]
+        lora_block = [
+            keys.index(k) for k in
+            ("lora_high", "lora_strength_high", "lora_low", "lora_strength_low")
+        ]
+        # Each kind is one contiguous run, in the listed order...
+        assert model_block == list(range(model_block[0], model_block[0] + 2))
+        assert lora_block == list(range(lora_block[0], lora_block[0] + 4))
+        # ...with every model picker above every LoRA picker.
+        assert model_block[-1] < lora_block[0]
 
 
 def test_workflows_expose_their_seed_param_keys():

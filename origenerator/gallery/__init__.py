@@ -28,136 +28,28 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator.media import media_type_from_filename, sibling_of_type
-from origenerator.workflows import WORKFLOW_REGISTRY
-
-# Params that identify a specific instance of a recipe rather than the recipe
-# itself — dropped from a row's settings so reruns that differ only in these land
-# in one folder. Seeds vary the sampling noise; ``input_image`` names the exact
-# start-frame file an i2v ran on, and a re-roll regenerates that file. Dropping
-# the raw filename keeps a video with its own re-rolls; the *configuration* that
-# produced the frame is added back by :func:`settings_signature` so videos built
-# from differently configured frames still split. See :func:`_input_image_config`.
-INSTANCE_KEYS = frozenset({"seed", "noise_seed", "input_image"})
+from origenerator.gallery.signatures import (
+    _basename,
+    _frame_name,
+    _input_image_config,
+    _is_image_conditioned,
+    _registered,
+    _unannotated,
+    canonical_settings,
+    lora_signature,
+    model_signature,
+    parse_params,
+    settings_only,
+    settings_signature,
+    workflow_lora_keys,
+    workflow_model_keys,
+    workflow_output_type,
+)
 
 MEDIA_LABELS = {"image": "Images", "video": "Videos"}
 
 # File extensions stripped from a model filename to make a tidy folder label.
 MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
-
-
-def parse_params(params_json: str | None) -> dict:
-    """Parse a row's ``params_json`` into a dict, tolerating bad data."""
-    if not params_json:
-        return {}
-    try:
-        params = json.loads(params_json)
-    except (json.JSONDecodeError, TypeError):
-        return {}
-    return params if isinstance(params, dict) else {}
-
-
-def settings_only(params: dict) -> dict:
-    """The params that define a settings group — everything except the keys that
-    only pick a specific instance of it (seeds and the i2v input image)."""
-    return {k: v for k, v in params.items() if k not in INSTANCE_KEYS}
-
-
-def canonical_settings(workflow_name: str | None, params: dict) -> dict:
-    """The settings that place a row in a folder, normalized so a row's provenance
-    can't split it from its own re-roll.
-
-    For a registered workflow this is exactly its non-instance ``default_params``
-    keys, valued from the row where present and the workflow default otherwise —
-    so a sparse import (which recorded only a few keys) and a full re-roll of it
-    (``prepared_params`` fills every default) hash the same, and stored keys the
-    workflow doesn't define (an i2v import's in-graph-derived ``width``/``height``,
-    raw sampler-node fields) never split a folder. Falls back to dropping only the
-    per-instance keys when the workflow is unknown — there are then no defaults to
-    normalize against.
-    """
-    wf = _registered(workflow_name)
-    if wf is None:
-        return settings_only(params)
-    return {
-        key: params.get(key, default)
-        for key, default in wf.default_params().items()
-        if key not in INSTANCE_KEYS
-    }
-
-
-def settings_signature(
-    workflow_name: str | None,
-    params_json: str | None,
-    image_index: dict | None = None,
-) -> str:
-    """Canonical grouping key: a row's normalized settings (see
-    :func:`canonical_settings`), order-independent.
-
-    For an image-conditioned workflow the start frame's own configuration is
-    folded in — resolved through ``image_index`` (see
-    :func:`build_image_config_index`) — so videos built from differently
-    configured frames get distinct keys while a video and its re-rolls (same
-    frame config, a freshly regenerated file) share one. ``image_index`` may be
-    omitted for rows that aren't image-conditioned.
-    """
-    params = parse_params(params_json)
-    settings = canonical_settings(workflow_name, params)
-    if _is_image_conditioned(workflow_name):
-        settings = {
-            **settings,
-            "input_image_config": _input_image_config(params.get("input_image"), image_index),
-        }
-    return json.dumps(settings, sort_keys=True, default=str)
-
-
-def _registered(workflow_name: str | None):
-    """The registered WorkflowTemplate for ``workflow_name``, or ``None``."""
-    return WORKFLOW_REGISTRY.get(workflow_name or "")
-
-
-def _is_image_conditioned(workflow_name: str | None) -> bool:
-    """True when a workflow drives its output from an ``input_image`` — an i2v
-    whose start frame is itself (usually) a generation with its own settings."""
-    wf = _registered(workflow_name)
-    return wf is not None and "input_image" in wf.default_params()
-
-
-def workflow_output_type(workflow_name: str | None) -> str | None:
-    """Return the registered workflow's ``output_type``, or ``None`` if unknown."""
-    wf = _registered(workflow_name)
-    return wf.output_type if wf else None
-
-
-def workflow_model_keys(workflow_name: str | None) -> tuple[str, ...]:
-    """The param keys whose values name the model a workflow's row ran with."""
-    wf = _registered(workflow_name)
-    return tuple(wf.model_keys) if wf else ()
-
-
-def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
-    """The param keys whose values name the LoRA(s) a workflow's row ran with.
-
-    Empty for a workflow with no LoRA; every row then shares one empty signature,
-    collapsing the model folder's LoRA level to a single "(no LoRA)" folder.
-    """
-    wf = _registered(workflow_name)
-    return tuple(wf.lora_keys) if wf else ()
-
-
-def _values_signature(keys: tuple[str, ...], params_json: str | None) -> str:
-    """Canonical, order-stable key from the values a row recorded for ``keys``."""
-    params = parse_params(params_json)
-    return json.dumps([params.get(key) for key in keys], default=str)
-
-
-def model_signature(workflow_name: str | None, params_json: str | None) -> str:
-    """Canonical key for grouping a workflow's rows by the model they used."""
-    return _values_signature(workflow_model_keys(workflow_name), params_json)
-
-
-def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
-    """Canonical key for grouping a workflow's rows by the LoRA(s) they used."""
-    return _values_signature(workflow_lora_keys(workflow_name), params_json)
 
 
 def row_output_files(row: dict) -> list[dict]:
@@ -246,30 +138,6 @@ def output_disk_files(row: dict, output_dir: Path) -> list[Path]:
     return paths
 
 
-def _basename(path: str) -> str:
-    """Final path segment, tolerant of either OS separator."""
-    return path.replace("\\", "/").rsplit("/", 1)[-1]
-
-
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
-_TYPE_ANNOTATION = frozenset({"[output]", "[input]", "[temp]"})
-
-
-def _unannotated(image_ref: str) -> str:
-    """A LoadImage value stripped of any trailing "[output]"-style type tag, so a
-    re-roll's annotated output reference compares by plain filename."""
-    stem, _, tag = image_ref.rpartition(" ")
-    return stem if stem and tag in _TYPE_ANNOTATION else image_ref
-
-
-def _frame_name(image_ref: str | None) -> str:
-    """The comparison key for an i2v start frame: its basename, lowercased, with
-    any ``[output]``-style annotation stripped — so a LoadImage reference, an
-    annotated re-roll output, and a stored output filename all match by the plain
-    file they name."""
-    return _basename(_unannotated(image_ref or "")).lower()
-
-
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
     """The prompt_id of the image generation an ``input_image`` value names.
 
@@ -330,23 +198,6 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
             if name:
                 index.setdefault(name, config)
     return index
-
-
-def _input_image_config(input_image: str | None, image_index: dict | None) -> str:
-    """The grouping key for an i2v's start frame: the settings signature of the
-    image generation that produced it, so a video groups with its own re-rolls
-    (same config, a freshly regenerated frame) yet splits from videos built off a
-    differently configured frame.
-
-    Falls back to the frame's own filename when it isn't a known generation
-    (hand-picked, external, or since deleted), so distinct frames still separate,
-    and to ``""`` when there's no input image at all.
-    """
-    name = _frame_name(input_image)
-    if not name:
-        return ""
-    entry = (image_index or {}).get(name)
-    return entry.signature if entry is not None else name
 
 
 def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[dict]:

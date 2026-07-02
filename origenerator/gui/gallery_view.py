@@ -17,17 +17,15 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.generation_config import merge_denormalized, prepared_params
+from origenerator.generation_config import merge_denormalized
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import FolderTree, BRANCH_ICON_ROLE
-from origenerator.gui.generation_job import (
-    GenerationJob, insert_generation_row, mark_generation_completed,
-)
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
@@ -92,7 +90,13 @@ class GalleryView(QWidget):
         # show every queued/running generation app-wide, not just this gallery's
         # re-rolls. Queried live each render/poll.
         self._generate_inflight = generate_inflight or (lambda: [])
-        self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
+        # The re-roll controller owns the live jobs and their DB lifecycle; the
+        # view reacts to its signals with the redraws they call for.
+        self._reroll = RerollController(db, client)
+        self._reroll.changed.connect(self._rerender_current_leaf)
+        self._reroll.preview.connect(self._on_reroll_preview)
+        self._reroll.finished.connect(self._on_reroll_finished)
+        self._reroll.failed.connect(self._on_reroll_failed)
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -774,8 +778,14 @@ class GalleryView(QWidget):
             return False
         return _is_reusable_workflow(group.rows[0].get("workflow_name"))
 
+    @property
+    def _reroll_jobs(self) -> dict:
+        """The live re-roll jobs, keyed by settings-folder key. Owned by the
+        controller; surfaced here for the Recents shelf and the info pane."""
+        return self._reroll.jobs
+
     def _add_reroll_tile(self, flow, group):
-        tile = RerollTile(self._reroll_jobs.get(group.key))
+        tile = RerollTile(self._reroll.job_for(group.key))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
@@ -784,78 +794,18 @@ class GalleryView(QWidget):
         self._reroll_tile = tile
 
     def _start_reroll(self, key: str):
+        """Start a fresh variation for the folder ``key`` names and select it, so
+        its live preview fills the info pane at once.
+
+        Skips a folder already re-rolling (or a missing client) without stealing
+        the info pane — the same guard the controller enforces before launching.
+        """
         if self._client is None or key in self._reroll_jobs:
             return  # no client, or this folder already has one running
         item = self._item_by_key.get(key)
         group = item.data(0, _GROUP_ROLE) if item else None
-        if not isinstance(group, gallery.SettingsGroup) or not group.rows:
-            return
-        row = group.rows[0]
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        if workflow is None:
-            return
-        params = prepared_params(row, workflow)
-        # An i2v whose input image is itself a re-buildable generation re-rolls
-        # that image first (fresh start frame), then runs the video on it; any
-        # other row just re-rolls its one workflow with the same input, as before.
-        source = self._reroll_source_image(row)
-        if source is None:
-            self._launch_reroll(key, workflow, params, self._on_reroll_finished)
-        else:
-            source_row, image_workflow = source
-            image_params = prepared_params(source_row, image_workflow)
-            self._launch_reroll(
-                key, image_workflow, image_params,
-                lambda k, job, files, thumb, dur: self._on_image_reroll_finished(
-                    k, job, files, thumb, dur, workflow, params
-                ),
-            )
-        # One click starts the re-roll and selects it, so its live preview fills
-        # the info pane at once (a no-op if the launch above failed to register).
-        self._select_reroll(key)
-
-    def _reroll_source_image(self, row: dict):
-        """The image generation ``row``'s input image came from, paired with its
-        workflow, when the app can rebuild it — so an i2v re-roll can regenerate a
-        fresh start frame first. ``None`` when there's no reusable source image."""
-        source_id = gallery.find_source_image_id(row, self._image_rows)
-        if source_id is None:
-            return None
-        source = self._db.get_generation(source_id)
-        workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
-        return (source, workflow) if workflow is not None else None
-
-    def _launch_reroll(self, key, workflow, params, on_finished):
-        """Build, register and submit one re-roll job, wiring its completion to
-        ``on_finished(key, job, files, thumb_path, duration)``.
-
-        A running row is recorded before the job is submitted so an app restart
-        mid-generation can find it and reconnect, exactly as the Generate tab does.
-        """
-        try:
-            job = GenerationJob(self._client, workflow, params)
-        except Exception as e:
-            logger.warning("Could not build a re-roll for %s: %s", key, e)
-            return
-        self._register_reroll_job(key, job, on_finished)
-        insert_generation_row(self._db, job)
-        try:
-            job.start()
-            self._db.update_generation(job.prompt_id, status="running")
-        except Exception as e:
-            logger.warning("Re-roll submission failed for %s: %s", key, e)
-            self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
-            self._reroll_jobs.pop(key, None)
-        self._rerender_current_leaf()
-
-    def _register_reroll_job(self, key, job, on_finished):
-        """Track a re-roll job for a folder and wire its completion and failure."""
-        self._reroll_jobs[key] = job
-        job.finished.connect(
-            lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
-        )
-        job.failed.connect(lambda msg, k=key: self._on_reroll_failed(k, msg))
-        job.preview.connect(lambda data, k=key: self._on_reroll_preview(k, data))
+        self._reroll.start(key, group, self._image_rows)
+        self._select_reroll(key)  # a no-op if the launch above failed to register
 
     # --- re-roll as the info-pane source ----------------------------------
 
@@ -926,53 +876,13 @@ class GalleryView(QWidget):
             self._reroll_tile.set_selected(False)
 
     def reconnect_running_rerolls(self):
-        """Rebind live jobs to any re-rolls left running by a previous session.
-
-        Each still-in-flight row this app doesn't already own (a Generate tab owns
-        its own jobs) is picked back up so its completion is recorded and its tile
-        shows live progress again — even for a folder the user hasn't opened yet.
-        Called once at startup, after the Generate tabs have claimed their jobs.
-        """
-        if self._client is None:
-            return
-        claimed = self._claimed_ids()
-        # Read the frame configs straight from the DB: the first tree rebuild
-        # (which would populate self._image_rows) hasn't run yet at startup.
-        index = self._image_config_index()
-        for row in self._db.list_generations():
-            if row.get("status") in ("running", "pending") and row["prompt_id"] not in claimed:
-                self._reconnect_reroll(row, index)
-        self._rerender_current_leaf()
-
-    def _image_config_index(self) -> dict:
-        """The frame-config index for keying image-conditioned folders, built from
-        the current image rows so an i2v row keys to the same leaf the tree gives
-        it (see :func:`gallery.build_image_config_index`)."""
-        image_rows = [
-            r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "image"
-        ]
-        return gallery.build_image_config_index(image_rows)
-
-    def _reconnect_reroll(self, row: dict, image_index: dict):
-        key = gallery.settings_folder_key(row, image_index)
-        if key in self._reroll_jobs:
-            return  # a job for this folder is already tracked
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        if workflow is None:
-            return
-        params = gallery.parse_params(row.get("params_json"))
-        try:
-            job = GenerationJob.reconnect(self._client, workflow, params, row["prompt_id"])
-        except Exception as e:
-            logger.warning("Could not reconnect re-roll for %s: %s", key, e)
-            return
-        self._register_reroll_job(key, job, self._on_reroll_finished)
+        """Rebind live jobs to any re-rolls left running by a previous session, so
+        each shows live progress and records its completion again. Called once at
+        startup, after the Generate tabs have claimed their own jobs."""
+        self._reroll.reconnect_running(self._claimed_ids())
 
     def _cancel_reroll(self, key: str):
-        job = self._reroll_jobs.pop(key, None)
-        if job is not None:
-            job.cancel()
-            self._db.delete_generation(job.prompt_id)  # drop the abandoned running row
+        self._reroll.cancel(key)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
 
@@ -983,30 +893,17 @@ class GalleryView(QWidget):
             self._clear_reroll_selection()
             self._clear_metadata()
 
-    def _on_image_reroll_finished(self, key, image_job, files, thumb_path, duration,
-                                  video_workflow, video_params):
-        """First stage of a chained i2v re-roll: finalize the fresh image, then run
-        the video on it, pointing its input at the just-saved output."""
-        self._reroll_jobs.pop(key, None)
-        mark_generation_completed(self._db, image_job.prompt_id, files, thumb_path, duration)
-        input_ref = gallery.output_file_reference(files)
-        if input_ref is not None:
-            video_params = {**video_params, "input_image": input_ref}
-        self._launch_reroll(key, video_workflow, video_params, self._on_reroll_finished)
-
-    def _on_reroll_finished(self, key, job, files, thumb_path, duration):
-        self._reroll_jobs.pop(key, None)
+    def _on_reroll_finished(self, key: str):
+        """A re-roll saved its result (finalized by the controller): drop it as the
+        info-pane source and rebuild so it shows as a normal thumbnail."""
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
-        mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
-        self.refresh()  # the finished generation now shows as a normal thumbnail
+        self.refresh()
 
-    def _on_reroll_failed(self, key, message):
-        job = self._reroll_jobs.pop(key, None)
-        if job is not None:
-            self._db.update_generation(job.prompt_id, status="error", error_message=message)
+    def _on_reroll_failed(self, key: str):
+        """A re-roll failed (recorded by the controller): release the info pane if
+        it was showing this one, and redraw the folder without its tile."""
         self._abandon_reroll_preview(key)
-        logger.warning("Re-roll failed for %s: %s", key, message)
         self._rerender_current_leaf()
 
     def _rerender_current_leaf(self):

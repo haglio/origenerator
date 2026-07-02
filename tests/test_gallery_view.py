@@ -3045,3 +3045,29 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     assert not view._showing_recents()
     assert view._selected_folder_key() == expected
     assert view._selected_reroll_key == expected  # watching the live combine tile
+
+
+def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._combine_accepts_image("img") is True
+    assert view._combine_accepts_image("vid") is False   # a video isn't a start frame
+    assert view._combine_accepts_video("vid") is True
+    assert view._combine_accepts_video("img") is False   # an image isn't an i2v recipe
+
+
+def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine.image_slot.set_item("img")
+    view._combine.video_slot.set_item("vid")
+
+    view._combine._generate_btn.click()  # the panel's button, wired to the view
+
+    assert len(view._reroll_jobs) == 1
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["input_image"] == "sdxl_pick.png [output]"
+    assert job.params["seed"] == 42

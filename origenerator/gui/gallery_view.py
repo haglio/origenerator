@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
+from PyQt6.QtGui import QPixmap
 
 from origenerator import gallery, timing
 from origenerator.gui import icons
@@ -24,6 +25,7 @@ from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_controller import RerollController
@@ -200,7 +202,15 @@ class GalleryView(QWidget):
         toc = QWidget()
         toc_box = QVBoxLayout(toc)
         toc_box.setContentsMargins(*_PANE_MARGINS)
-        toc_box.addWidget(self._tree)
+        toc_box.addWidget(self._tree, 1)  # the tree takes the height; combine sits below
+        # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
+        # on the image. Needs a client to generate, so it hides without one.
+        self._combine = CombinePanel(
+            self._combine_accepts_image, self._combine_accepts_video, self._combine_preview
+        )
+        self._combine.generate_requested.connect(self._generate_combination)
+        self._combine.setVisible(self._client is not None)
+        toc_box.addWidget(self._combine)
         self._panes.addWidget(toc)
 
         # Browser pane: a header (folder title, then a back/forward/undo toolbar)
@@ -773,6 +783,36 @@ class GalleryView(QWidget):
         self._select_reroll(key)  # a no-op if the launch above failed to register
 
     # --- combine: a video's recipe applied to a dropped image -------------
+
+    def _combine_accepts_image(self, prompt_id: str) -> bool:
+        """Whether the image slot accepts a dropped generation: an image with a
+        file to seed an i2v from (not merely anything that produced a file — a
+        video's clip would satisfy that and can't be a start frame)."""
+        row = self._db.get_generation(prompt_id)
+        return bool(
+            row and gallery.media_type_of_row(row) == "image"
+            and gallery.output_file_reference(gallery.row_output_files(row)) is not None
+        )
+
+    def _combine_accepts_video(self, prompt_id: str) -> bool:
+        """Whether the video slot accepts a dropped generation: a video whose i2v
+        recipe the app can rebuild — so its settings can be re-run on a new image.
+        (``is_image_conditioned`` already implies the workflow is registered.)"""
+        row = self._db.get_generation(prompt_id)
+        return bool(
+            row and gallery.media_type_of_row(row) == "video"
+            and gallery.is_image_conditioned(row.get("workflow_name") or "")
+        )
+
+    def _combine_preview(self, prompt_id: str) -> QPixmap | None:
+        """A dropped item's still thumbnail for its slot, or ``None`` if it has none."""
+        row = self._db.get_generation(prompt_id)
+        thumb = row.get("thumbnail_path") if row else None
+        if thumb and Path(thumb).exists():
+            pixmap = QPixmap(str(thumb))
+            if not pixmap.isNull():
+                return pixmap
+        return None
 
     def _generate_combination(self, image_id: str, video_id: str):
         """Generate a new video from a dropped image + a dropped video's recipe.

@@ -145,4 +145,15 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
+    QLabel#combineHeading {{
+        color: {_h(TEXT_MUTED)};
+        font-weight: bold;
+        padding: 2px 0;
+    }}
+    QLabel#dropSlot {{
+        border: 1px dashed {_h(BORDER_PANEL)};
+        border-radius: 4px;
+        color: {_h(TEXT_MUTED)};
+        padding: 8px;
+    }}
     """

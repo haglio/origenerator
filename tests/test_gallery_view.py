@@ -871,20 +871,37 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     assert view._tree.currentItem() is view._starred_item  # Back returns to Starred
 
 
-def test_back_from_a_recents_preview_returns_to_the_bare_shelf(qtbot):
-    # Previewing an item on the shelf is its own history step, so Back from it lands
-    # back on the shelf with the preview cleared — not off it.
+def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    view._thumb_widgets["i2"].clicked.emit("i2")   # single-click previews it on the shelf
-    assert view.selected_generation() == "i2"
+    view._thumb_widgets["i2"].clicked.emit("i2")         # select i2 on the shelf
+    view._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
+    assert view._showing_recents() is False
 
     view._go_back()
-    assert view._showing_recents()                 # still on the shelf...
-    assert view.selected_generation() is None      # ...with the preview cleared
+    assert view._showing_recents()                       # back on the shelf...
+    assert view.selected_generation() == "i2"            # ...with i2 previewed again
+    assert view._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
+
+
+def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
+    # Selecting items on the shelf is shelf state, not navigation: Back leaves the
+    # shelf for wherever you came from, rather than stepping through each preview.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    landing = view.selected_generation()                 # opened on a folder's item
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._thumb_widgets["i1"].clicked.emit("i1")         # browse a couple of previews
+    view._thumb_widgets["i2"].clicked.emit("i2")
+
+    view._go_back()
+    assert view._showing_recents() is False              # Back leaves the shelf...
+    assert view.selected_generation() == landing         # ...to where we came from
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):

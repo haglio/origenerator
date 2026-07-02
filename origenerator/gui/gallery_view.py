@@ -107,6 +107,7 @@ class GalleryView(QWidget):
         self._visible_keys: list[str] = []
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
+        self._shelf_selection: dict[str, str] = {}  # last item previewed on each shelf
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
@@ -1162,10 +1163,16 @@ class GalleryView(QWidget):
         self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._info.show_generation(row, self._image_rows)
         self._sync_containing_folder_button()  # a Recents preview offers the jump
-        # Viewing a generation — a thumbnail click, a folder's auto-selected first
-        # item, a followed link — is a browsing step recorded in history, on the
-        # same footing as landing on a shelf.
-        self._record_location(prompt_id)
+        shelf_key = self._current_shelf_key()
+        if shelf_key is not None:
+            # Previewing an item on a shelf is shelf state, not a navigation: it's
+            # remembered so Back can restore it, but the shelf stays the one history
+            # stop (stepping through each preview would bury where you came from).
+            self._shelf_selection[shelf_key] = prompt_id
+        else:
+            # In a folder, each viewed generation — a click, the auto-selected first
+            # item, a followed link — is its own browsing step.
+            self._record_location(prompt_id)
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
@@ -1194,13 +1201,17 @@ class GalleryView(QWidget):
         finally:
             self._suppress_history = False
 
+    def _current_shelf_key(self) -> str | None:
+        """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""
+        key = self._selected_folder_key()
+        return key if key in (_RECENTS_KEY, _STARRED_KEY) else None
+
     def _current_location(self) -> str | None:
         """The history key for the view on screen — a shelf key on a shelf, else the
         selected generation's id (``None`` when nothing is selected)."""
-        key = self._selected_folder_key()
-        if key in (_RECENTS_KEY, _STARRED_KEY):
-            return key
-        return self._selected["prompt_id"] if self._selected else None
+        return self._current_shelf_key() or (
+            self._selected["prompt_id"] if self._selected else None
+        )
 
     def _record_location(self, location: str):
         """Record a visit to a location — a generation id or a shelf key — unless a
@@ -1234,20 +1245,25 @@ class GalleryView(QWidget):
             self._show_generation(location)
 
     def _return_to_shelf(self, key: str):
-        """Back/Forward onto a shelf: make its row current and show it, without
-        recording (so the move doesn't pile back onto the history). Re-shows it even
-        when its row is already current, to clear an item previewed on the shelf."""
+        """Back/Forward onto a shelf: show it and restore the item that was selected
+        there, all without recording (so the move doesn't pile back onto history)."""
         item = self._item_by_key.get(key)
         if item is None:
             return
         self._suppress_history = True
         try:
-            if self._tree.currentItem() is item:
-                self._on_folder_selected(item, None)
-            else:
-                self._tree.setCurrentItem(item)
+            self._tree.setCurrentItem(item)  # shows the shelf, cleared of any selection
+            self._restore_shelf_selection(key)
         finally:
             self._suppress_history = False
+
+    def _restore_shelf_selection(self, key: str):
+        """Re-preview the item last selected on this shelf, if it's still listed —
+        so returning to a shelf lands on it, not on a blank shelf."""
+        prompt_id = self._shelf_selection.get(key)
+        if prompt_id is not None and prompt_id in self._visible_ids:
+            self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+            self._on_thumbnail_clicked(prompt_id)
 
     def _sync_nav_buttons(self):
         self._back_btn.setEnabled(self._history.can_go_back())

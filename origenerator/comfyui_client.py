@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -14,6 +15,35 @@ _PREVIEW_IMAGE_EVENT = 1
 # A preview frame's payload is then a 4-byte image-format tag followed by the
 # encoded image, so the displayable bytes start at offset 8.
 _PREVIEW_IMAGE_OFFSET = 8
+
+
+def format_prompt_error(body: str) -> str:
+    """Turn ComfyUI's 400 ``/prompt`` body into a one-line, human-readable reason.
+
+    A rejected prompt returns JSON with ``node_errors`` — per failing node, its
+    ``class_type`` and one or more ``errors`` whose ``details`` say what's wrong
+    (e.g. ``LoadImage: image - Invalid image file: foo.png``). That detail is
+    what makes a 400 actionable; ``urllib``'s own ``HTTPError`` string throws it
+    away as a bare "Bad Request". Falls back to the top-level ``error`` message,
+    then to the raw body, when the shape isn't the expected one.
+    """
+    try:
+        data = json.loads(body)
+    except (json.JSONDecodeError, TypeError):
+        return body.strip() or "Bad Request"
+    if not isinstance(data, dict):
+        return body.strip() or "Bad Request"
+    parts = []
+    for node_id, info in (data.get("node_errors") or {}).items():
+        label = info.get("class_type") or f"node {node_id}"
+        for err in info.get("errors") or []:
+            detail = err.get("details") or err.get("message") or ""
+            parts.append(f"{label}: {detail}" if detail else label)
+    if parts:
+        return "; ".join(parts)
+    error = data.get("error") or {}
+    reason = ": ".join(p for p in (error.get("message"), error.get("details")) if p)
+    return reason or body.strip() or "Bad Request"
 
 
 def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
@@ -218,8 +248,15 @@ class ComfyUIClient(QThread):
             data=body,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            # ComfyUI explains a rejected prompt in the response body (which node
+            # and why); HTTPError's own string is only "Bad Request". Surface the
+            # body so the failure is actionable rather than opaque.
+            detail = e.read().decode("utf-8", "replace")
+            raise RuntimeError(format_prompt_error(detail)) from e
 
     def fetch_history(self, prompt_id: str) -> dict:
         url = f"{self.base_url}/history/{prompt_id}"

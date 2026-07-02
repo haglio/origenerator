@@ -1,7 +1,10 @@
+import io
 import json
 import struct
 import urllib.error
 from unittest.mock import patch, MagicMock
+
+import pytest
 
 from origenerator.comfyui_client import ComfyUIClient, comfyui_responding
 
@@ -57,6 +60,51 @@ def test_submit_job_posts_our_prompt_id_and_returns_it():
     assert body["client_id"] == "test-client"
     assert body["prompt_id"] == "our-id"
     assert "1" in body["prompt"]
+
+
+def test_submit_job_surfaces_comfyui_node_validation_detail_on_400():
+    # ComfyUI rejects an invalid prompt with 400 whose *body* names the failing
+    # node and why (here: LoadImage's image doesn't resolve). urlopen raises
+    # HTTPError, and str(HTTPError) is only "HTTP Error 400: Bad Request" — the
+    # useful detail lives in its body. The client must read and surface it.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    client.client_id = "test-client"
+    body = json.dumps({
+        "error": {"message": "Prompt outputs failed validation"},
+        "node_errors": {
+            "12": {
+                "class_type": "LoadImage",
+                "errors": [{"details": "image - Invalid image file: foo.png"}],
+            }
+        },
+    }).encode()
+    err = urllib.error.HTTPError(
+        "http://127.0.0.1:8188/prompt", 400, "Bad Request", {}, io.BytesIO(body)
+    )
+    with patch("urllib.request.urlopen", side_effect=err):
+        with pytest.raises(Exception) as excinfo:
+            client.submit_job(
+                {"12": {"class_type": "LoadImage", "inputs": {"image": "foo.png"}}},
+                "our-id",
+            )
+    message = str(excinfo.value)
+    assert "LoadImage" in message
+    assert "Invalid image file: foo.png" in message
+    assert "Bad Request" not in message  # the bare status is not what we surface
+
+
+def test_format_prompt_error_falls_back_when_body_is_not_the_expected_json():
+    # Not every non-2xx body is ComfyUI's node_errors JSON (a proxy may return
+    # HTML, a body may be empty). The formatter must degrade gracefully.
+    from origenerator.comfyui_client import format_prompt_error
+
+    assert format_prompt_error("<html>502 Bad Gateway</html>") == "<html>502 Bad Gateway</html>"
+    assert format_prompt_error("") == "Bad Request"
+    assert format_prompt_error(
+        json.dumps({"error": {"message": "Prompt has no outputs"}})
+    ) == "Prompt has no outputs"
 
 
 def test_fetch_queue_returns_running_and_pending_ids():

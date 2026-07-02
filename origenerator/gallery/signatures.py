@@ -50,7 +50,7 @@ def _registered(workflow_name: str | None):
     return WORKFLOW_REGISTRY.get(workflow_name or "")
 
 
-def _is_image_conditioned(workflow_name: str | None) -> bool:
+def is_image_conditioned(workflow_name: str | None) -> bool:
     """True when a workflow drives its output from an ``input_image`` — an i2v
     whose start frame is itself (usually) a generation with its own settings."""
     wf = _registered(workflow_name)
@@ -205,7 +205,7 @@ def settings_signature(
     """
     params = parse_params(params_json)
     settings = canonical_settings(workflow_name, params)
-    if _is_image_conditioned(workflow_name):
+    if is_image_conditioned(workflow_name):
         settings = {
             **settings,
             "input_image_config": _input_image_config(params.get("input_image"), image_index),

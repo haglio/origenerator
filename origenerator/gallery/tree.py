@@ -45,7 +45,7 @@ from origenerator.gallery.labels import (
 from origenerator.gallery.output import media_type_of_row, produced_output
 from origenerator.gallery.signatures import (
     _input_image_config,
-    _is_image_conditioned,
+    is_image_conditioned,
     canonical_settings,
     lora_signature,
     model_signature,
@@ -302,7 +302,7 @@ def _build_leaves(
     workflow can still output a still — an imported PNG under a video prefix — which
     lands under Images and animates nothing, so it is grouped like any other image.
     """
-    if media_type == "video" and _is_image_conditioned(wf_name):
+    if media_type == "video" and is_image_conditioned(wf_name):
         return _build_source_image_groups(media_type, wf_name, rows, folder_meta, image_index)
     return _build_settings_groups(media_type, wf_name, rows, folder_meta, image_index)
 

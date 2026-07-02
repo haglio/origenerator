@@ -21,7 +21,7 @@ from origenerator.generation_config import merge_denormalized, prepared_params
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import FolderTree, BRANCH_STAR_ROLE
+from origenerator.gui.folder_tree import FolderTree, BRANCH_ICON_ROLE
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
 )
@@ -41,6 +41,9 @@ _GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represen
 _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
+_RECENTS_KEY = "__recents__"  # synthetic tree node listing recently generated items
+_RECENTS_LABEL = "Recents"  # its row label; a clock is drawn in the caret column
+_RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
 _STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
 _STARRED_LABEL = "Starred"  # its row label; the star is drawn in the caret column
 _STARRED_TITLE = "★ " + _STARRED_LABEL  # the browser-pane heading for the shelf
@@ -99,6 +102,8 @@ class GalleryView(QWidget):
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
         self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
+        self._recents_item: QTreeWidgetItem | None = None  # the "Recents" shelf row
+        self._recent_rows: list[dict] = []  # recently generated rows, newest first
         self._starred_item: QTreeWidgetItem | None = None  # the "★ Starred" shelf row
         self._starred_groups: list = []  # folders the shelf collects, in tree order
         self._visible_ids: list[str] = []
@@ -335,6 +340,7 @@ class GalleryView(QWidget):
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
         tree_model = gallery.build_gallery_tree(rows, meta)
         self._starred_groups = gallery.starred_folders(tree_model)
+        self._recent_rows = gallery.recent_generations(rows, _RECENTS_LIMIT)
         self._populate_tree(tree_model, expanded)
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._default_item()
@@ -371,17 +377,22 @@ class GalleryView(QWidget):
         self._tree.clear()
         self._item_by_key = {}
         self._leaf_by_id = {}
+        self._recents_item = None
         self._starred_item = None
         root = self._tree.invisibleRootItem()
-        # A "★ Starred" shelf leads the tree whenever the gallery has any content,
-        # gathering every bookmarked folder (see _show_starred_overview) so they're
-        # reachable in one click no matter how deeply they're nested.
+        # Two synthetic shelves lead the tree whenever the gallery has any content:
+        # Recents (recently generated items, newest first) then Starred (bookmarked
+        # folders). Each is reachable in one click however the tree is scrolled, and
+        # draws its marker in the caret column so its label lines up with the media
+        # folders below.
         if tree_model:
-            self._starred_item = QTreeWidgetItem([_STARRED_LABEL])
-            self._starred_item.setData(0, BRANCH_STAR_ROLE, True)  # star in the caret column
-            self._starred_item.setToolTip(0, "Your starred folders")
-            root.addChild(self._starred_item)
-            self._item_by_key[_STARRED_KEY] = self._starred_item
+            self._recents_item = self._add_shelf(
+                root, _RECENTS_LABEL, _RECENTS_KEY, icons.clock_icon(), "Recently generated"
+            )
+            self._starred_item = self._add_shelf(
+                root, _STARRED_LABEL, _STARRED_KEY, icons.star_icon(filled=True),
+                "Your starred folders"
+            )
         for media in tree_model:
             self._add_node(media, root)
         # Folders default to collapsed; only restore folders the user had open.
@@ -390,6 +401,16 @@ class GalleryView(QWidget):
             if item is not None:
                 item.setExpanded(True)
         self._tree.blockSignals(False)
+
+    def _add_shelf(self, root, label, key, icon, tooltip) -> QTreeWidgetItem:
+        """Add a synthetic shelf row (Recents/Starred) leading the tree, its marker
+        drawn in the caret column so its label aligns with the media folders below."""
+        item = QTreeWidgetItem([label])
+        item.setData(0, BRANCH_ICON_ROLE, icon)  # marker in the caret column
+        item.setToolTip(0, tooltip)
+        root.addChild(item)
+        self._item_by_key[key] = item
+        return item
 
     def _add_node(self, group, parent_item) -> QTreeWidgetItem:
         # Starred state shows as the row's star icon (the delegate reads it from
@@ -417,12 +438,12 @@ class GalleryView(QWidget):
         return item
 
     def _default_item(self) -> QTreeWidgetItem | None:
-        """The folder to land on with no saved target: the first real media
-        folder, never the synthetic Starred shelf."""
+        """The folder to land on with no saved target: the first real media folder,
+        never a synthetic shelf (Recents/Starred)."""
         root = self._tree.invisibleRootItem()
         for i in range(root.childCount()):
             item = root.child(i)
-            if item is not self._starred_item:
+            if item is not self._recents_item and item is not self._starred_item:
                 return item
         return None
 
@@ -435,6 +456,8 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         if item is None:
             return None
+        if item is self._recents_item:
+            return _RECENTS_KEY  # so a rebuild keeps the shelf selected
         if item is self._starred_item:
             return _STARRED_KEY  # so a rebuild keeps the shelf selected
         group = item.data(0, _GROUP_ROLE)
@@ -448,6 +471,9 @@ class GalleryView(QWidget):
             self._visible_ids = []
             self._visible_keys = []
             self._sync_delete_button()
+            return
+        if current is self._recents_item:
+            self._show_recents_overview()
             return
         if current is self._starred_item:
             self._show_starred_overview()
@@ -530,6 +556,35 @@ class GalleryView(QWidget):
             self._add_folder_tile(flow, group, starred=group.starred)
         self._show_widget(container)
 
+    # --- the Recents shelf: recently generated items, newest first ---------
+
+    def _show_recents_overview(self):
+        """Render the Recents shelf: a flat, newest-first list of recently generated
+        items (from a Generate tab or a gallery re-roll). Clicking one jumps to it in
+        its folder, the way the Starred shelf opens a bookmarked folder. Like that
+        shelf it lists many items rather than one, so the info pane clears."""
+        self._title.set_display(_RECENTS_LABEL)
+        self._avg_label.setText("")
+        self._clear_metadata()
+        self._show_recent_thumbnails(self._recent_rows)
+        self._sync_delete_button()
+
+    def _show_recent_thumbnails(self, rows):
+        container, flow = self._new_tile_pane()
+        for row in rows:
+            tw = ThumbnailWidget(
+                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row)
+            )
+            tw.clicked.connect(self._on_source_link)  # jump to the item in its folder
+            flow.addWidget(tw)
+            self._visible_ids.append(row["prompt_id"])
+            self._thumb_widgets[row["prompt_id"]] = tw
+        # An empty shelf teaches how to fill it rather than showing a blank pane.
+        self._show_widget(container if rows else self._empty_state(
+            "No recent generations yet.\n\nItems you make — from a Generate tab or a "
+            "gallery re-roll — collect here, newest first."
+        ))
+
     # --- the Starred shelf: every bookmarked folder, gathered in one place ---
 
     def _show_starred_overview(self):
@@ -550,19 +605,28 @@ class GalleryView(QWidget):
             context = self._breadcrumb(item.parent()) if item and item.parent() else ""
             self._add_folder_tile(flow, group, starred=False, context=context)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self._show_widget(container if groups else self._starred_empty_state())
-
-    @staticmethod
-    def _starred_empty_state() -> QWidget:
-        label = QLabel(
+        self._show_widget(container if groups else self._empty_state(
             "No starred folders yet.\n\nHover a folder in the list and click its "
             "star, or right-click a folder and choose Star, to collect it here."
-        )
+        ))
+
+    @staticmethod
+    def _empty_state(text: str) -> QWidget:
+        """A centered hint filling an otherwise-blank shelf pane (Recents/Starred)."""
+        label = QLabel(text)
         label.setObjectName("estimateLabel")
         label.setWordWrap(True)
         label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         label.setContentsMargins(16, 24, 16, 16)
         return label
+
+    @staticmethod
+    def _thumbnail_caption(row) -> str:
+        """A thumbnail's caption: its seed, else a snippet of its prompt."""
+        seed = row.get("seed")
+        if seed is not None:
+            return f"seed {seed}"
+        return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
 
     def _show_thumbnails(self, group):
         container, flow = self._new_tile_pane()
@@ -571,11 +635,9 @@ class GalleryView(QWidget):
         if self._can_reroll(group):
             self._add_reroll_tile(flow, group)
         for row in group.rows:
-            seed = row.get("seed")
-            label = f"seed {seed}" if seed is not None else (
-                (row.get("positive_prompt") or "")[:40] or "(no prompt)"
+            tw = ThumbnailWidget(
+                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row)
             )
-            tw = ThumbnailWidget(row["prompt_id"], row.get("thumbnail_path"), label)
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)

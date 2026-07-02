@@ -52,6 +52,11 @@ def star_icon(*, filled: bool) -> QIcon:
     return _two_mode(lambda p, color: _draw_star(p, color, filled))
 
 
+def clock_icon() -> QIcon:
+    """A clock face — the Recents shelf's caret marker, drawn to match the star."""
+    return _two_mode(_draw_clock)
+
+
 @lru_cache(maxsize=None)
 def level_badge_icon(level: str) -> QIcon:
     """A filled, lettered chip marking a folder's recipe level (see LEVEL_LABELS).
@@ -160,3 +165,10 @@ def _draw_star(painter: QPainter, color, filled: bool):
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)  # a thinner outline than the default stroke
     painter.drawPolygon(*points)
+
+
+def _draw_clock(painter: QPainter, _color):
+    """A round clock face with two hands (at 12 and 3) — the "recent" marker."""
+    painter.drawEllipse(QRectF(13, 13, 22, 22))
+    painter.drawLine(QPointF(24, 24), QPointF(24, 15))   # hour hand, pointing up
+    painter.drawLine(QPointF(24, 24), QPointF(31, 24))   # minute hand, to the right

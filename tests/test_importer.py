@@ -6,6 +6,7 @@ from PIL.PngImagePlugin import PngInfo
 
 from origenerator.db import Database
 from origenerator.importer import (
+    backfill_input_image,
     backfill_model_and_lora_params,
     backfill_shared_thumbnails,
     backfill_unknown_workflows,
@@ -125,6 +126,48 @@ def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
     assert json.loads(db.get_generation("fresh")["params_json"])["lora_high"] == "l_h.safetensors"
     # Idempotent: a second pass finds nothing left to fill.
     assert backfill_model_and_lora_params(db) == 0
+
+
+def test_backfill_fills_input_image_from_stored_graph(tmp_path):
+    db = Database(tmp_path / "test.db")
+    # An early video import: the graph is on the row (LoadImage names the source
+    # frame), but input_image was never pulled into params, so the video can't
+    # link back to the gallery image it was animated from.
+    graph = {
+        "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
+        "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
+    }
+    db.insert_generation(
+        prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+    # A row that already names its input image is left alone — a re-roll's fresh
+    # start-frame reference must not be clobbered by the graph's original.
+    db.insert_generation(
+        prompt_id="fresh", workflow_name="wan22_flf2v_loop", workflow_version="v005",
+        params_json=json.dumps({"input_image": "video/x_00001.mp4 [output]"}),
+        workflow_json=json.dumps(graph),
+    )
+    # A row whose graph loads no image (a text-to-image) has no source to recover.
+    db.insert_generation(
+        prompt_id="t2i", workflow_name="sdxl_t2i", workflow_version="imported",
+        params_json=json.dumps({"seed": 9}),
+        workflow_json=json.dumps({"5": {"class_type": "KSampler", "inputs": {}}}),
+        source="imported",
+    )
+
+    updated = backfill_input_image(db)
+
+    assert updated == 1
+    old = json.loads(db.get_generation("old")["params_json"])
+    assert old["input_image"] == "sdxl_t2i_00022_.png"
+    assert old["positive_prompt"] == "a fox"  # existing params kept
+    # The re-rolled row's fresh input reference is preserved.
+    assert json.loads(db.get_generation("fresh")["params_json"])["input_image"] == "video/x_00001.mp4 [output]"
+    assert "input_image" not in json.loads(db.get_generation("t2i")["params_json"])
+    # Idempotent: a second pass finds nothing left to fill.
+    assert backfill_input_image(db) == 0
 
 
 def test_backfill_relabels_unknown_imports_by_filename(tmp_path):

@@ -103,6 +103,24 @@ def graph_model_params(graph: dict) -> dict:
     return params
 
 
+def input_image_name(graph: dict) -> str | None:
+    """The image filename an image-to-video graph loads, or ``None``.
+
+    i2v and flf2v graphs start from a single ``LoadImage`` whose ``image`` input
+    names the source frame — the value the gallery links a video back to. Returns
+    the last such filename found (graphs here carry one), or ``None`` when no
+    ``LoadImage`` holds a plain filename (a graph without one, or one fed by a
+    wired link rather than a name).
+    """
+    result = None
+    for node in graph.values():
+        if node.get("class_type") == "LoadImage":
+            image = node.get("inputs", {}).get("image")
+            if isinstance(image, str):
+                result = image
+    return result
+
+
 def clip_prompt_nodes(graph: dict):
     """Return the (positive, negative) CLIPTextEncode nodes.
 

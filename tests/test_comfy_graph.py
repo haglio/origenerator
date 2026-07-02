@@ -4,6 +4,7 @@ from origenerator.comfy_graph import (
     dual_sampler_model_files,
     follow,
     graph_model_params,
+    input_image_name,
 )
 
 
@@ -130,3 +131,21 @@ def test_graph_model_params_reads_wan_dual_sampler_unets():
 
 def test_graph_model_params_empty_when_no_model_loaders():
     assert graph_model_params({"5": {"class_type": "KSampler", "inputs": {}}}) == {}
+
+
+def test_input_image_name_reads_the_loadimage_filename():
+    # i2v/flf2v graphs start from a LoadImage; its filename is the source frame
+    # the gallery links back to.
+    graph = {
+        "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
+        "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
+    }
+    assert input_image_name(graph) == "sdxl_t2i_00022_.png"
+
+
+def test_input_image_name_none_without_a_string_source():
+    # No LoadImage, or one whose image is a wired link rather than a filename,
+    # names no source image.
+    assert input_image_name({"5": {"class_type": "KSampler", "inputs": {}}}) is None
+    linked = {"1": {"class_type": "LoadImage", "inputs": {"image": ["9", 0]}}}
+    assert input_image_name(linked) is None

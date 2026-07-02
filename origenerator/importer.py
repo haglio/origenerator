@@ -14,6 +14,7 @@ from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
     graph_model_params,
+    input_image_name,
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
@@ -268,6 +269,31 @@ def backfill_model_and_lora_params(db: Database) -> int:
     return updated
 
 
+def backfill_input_image(db: Database) -> int:
+    """Record the source image on image-to-video imports that predate reading it.
+
+    Early video imports stored the embedded graph but not the ``LoadImage``
+    filename it starts from, so i2v/flf2v rows couldn't link back to the gallery
+    image they were animated from. This re-reads each row's stored graph and fills
+    ``input_image`` only when the row lacks it and the graph names one — a row that
+    already carries an input image (a re-roll's fresh start frame) or whose graph
+    loads none is left untouched. Returns how many rows were filled. Idempotent.
+    """
+    updated = 0
+    for row in db.list_generations():
+        params = parse_params(row.get("params_json"))
+        if params.get("input_image"):
+            continue
+        graph = _as_graph(row.get("workflow_json") or "")
+        name = input_image_name(graph) if graph else None
+        if not name:
+            continue
+        params["input_image"] = name
+        db.set_params_json(row["prompt_id"], json.dumps(params))
+        updated += 1
+    return updated
+
+
 def _get_existing_filenames(db: Database) -> set[str]:
     result = set()
     for row in db.list_generations():
@@ -370,14 +396,13 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
             if isinstance(ci.get(src), int):
                 result["params"][dst] = ci[src]
 
+    image_name = input_image_name(prompt_data)
+    if image_name is not None:
+        result["params"]["input_image"] = image_name
+
     for node in prompt_data.values():
         class_type = node.get("class_type", "")
         inputs = node.get("inputs", {})
-
-        if class_type == "LoadImage":
-            image = inputs.get("image")
-            if isinstance(image, str):
-                result["params"]["input_image"] = image
 
         if class_type == "KSampler":
             seed = inputs.get("seed")

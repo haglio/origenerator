@@ -147,6 +147,7 @@ def main():
 
     status("Scanning for new images...")
     from origenerator.importer import (
+        backfill_input_image,
         backfill_model_and_lora_params,
         backfill_shared_thumbnails,
         backfill_unknown_workflows,
@@ -187,6 +188,17 @@ def main():
             logger.info("Backfilled model/LoRA for %d imports", sorted_)
     except Exception as e:
         logger.warning("Model/LoRA backfill failed: %s", e)
+
+    status("Linking videos to their source images...")
+    # Fill input_image onto image-to-video imports that predate reading it from
+    # the embedded graph, so each video links back to the gallery image it was
+    # animated from (the same link a freshly generated i2v/flf2v already carries).
+    try:
+        linked = backfill_input_image(db)
+        if linked:
+            logger.info("Backfilled source image for %d video imports", linked)
+    except Exception as e:
+        logger.warning("Input-image backfill failed: %s", e)
 
     status("Repairing thumbnails...")
     # Re-render any thumbnail an old filename-stem collision left wrong or

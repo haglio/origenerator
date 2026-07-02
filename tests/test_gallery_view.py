@@ -1671,30 +1671,16 @@ def test_new_frames_route_to_the_info_pane_while_the_reroll_is_selected(qtbot, t
     view._preview.show_frame.assert_called_once_with(_png_bytes())
 
 
-def test_frames_leave_the_info_pane_untouched_when_the_reroll_is_not_selected(qtbot, tmp_path):
-    client = _reroll_client()
-    view = GalleryView(_seeded_db(tmp_path), client=client)
-    qtbot.addWidget(view)
-    view.refresh()
-    _key, job = _running_reroll(view)
-    view._preview.show_frame = MagicMock()
-
-    client.preview_image.emit(job.prompt_id, _png_bytes())  # tile only, never selected
-
-    view._preview.show_frame.assert_not_called()
-
-
 def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_info_pane(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
-    view._on_thumbnail_clicked("orig")  # user views the finished item instead
-    view._preview.show_frame = MagicMock()
+    _key, job = _running_reroll(view)  # starting the re-roll selects it
+    view._on_thumbnail_clicked("orig")  # user views a finished item instead
 
-    client.preview_image.emit(job.prompt_id, _png_bytes())
+    view._preview.show_frame = MagicMock()
+    client.preview_image.emit(job.prompt_id, _png_bytes())  # tile updates, info pane does not
 
     view._preview.show_frame.assert_not_called()
     assert view._selected_reroll_key is None
@@ -1738,6 +1724,20 @@ def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
     view._cancel_reroll(key)
 
     assert view._selected_reroll_key is None
+
+
+def test_clicking_add_selects_the_reroll_so_its_preview_shows_at_once(qtbot, tmp_path):
+    # One click on "+" both starts the re-roll and selects it, so the info pane
+    # shows its live preview without a second click on the now-running tile.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert view._selected_reroll_key == key
+    assert _reroll_tile(view).is_selected()
 
 
 def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, tmp_path):

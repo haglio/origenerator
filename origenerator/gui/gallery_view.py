@@ -532,15 +532,18 @@ class GalleryView(QWidget):
         source = self._reroll_source_image(row)
         if source is None:
             self._launch_reroll(key, workflow, params, self._on_reroll_finished)
-            return
-        source_row, image_workflow = source
-        image_params = prepared_params(source_row, image_workflow)
-        self._launch_reroll(
-            key, image_workflow, image_params,
-            lambda k, job, files, thumb, dur: self._on_image_reroll_finished(
-                k, job, files, thumb, dur, workflow, params
-            ),
-        )
+        else:
+            source_row, image_workflow = source
+            image_params = prepared_params(source_row, image_workflow)
+            self._launch_reroll(
+                key, image_workflow, image_params,
+                lambda k, job, files, thumb, dur: self._on_image_reroll_finished(
+                    k, job, files, thumb, dur, workflow, params
+                ),
+            )
+        # One click starts the re-roll and selects it, so its live preview fills
+        # the info pane at once (a no-op if the launch above failed to register).
+        self._select_reroll(key)
 
     def _reroll_source_image(self, row: dict):
         """The image generation ``row``'s input image came from, paired with its

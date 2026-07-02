@@ -95,6 +95,42 @@ def media_type_badge(media_type: str) -> QPixmap:
     )
 
 
+_REROLL_GLYPH = QColor(255, 255, 255)
+
+
+@lru_cache(maxsize=None)
+def reroll_seed_icon(media_type: str) -> QIcon:
+    """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
+    mark — "re-roll this video" (its motion) or "this image" (its start frame).
+
+    White line art; the button paints its own translucent chip behind it, so the
+    glyph reads over a thumbnail of any color. The two differ by their inner mark,
+    so a video seed control is never mistaken for an image seed one.
+    """
+    return QIcon(_render(lambda p, _c: _draw_reroll_seed(p, media_type), _REROLL_GLYPH))
+
+
+def _draw_reroll_seed(painter: QPainter, media_type: str):
+    # A ~290° ring with an arrowhead at its opening — the "regenerate" mark.
+    painter.drawArc(QRectF(11, 11, 26, 26), 55 * 16, 285 * 16)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_REROLL_GLYPH)
+    painter.drawPolygon(QPointF(37, 15), QPointF(31, 13), QPointF(33, 20))  # arrowhead
+    if media_type == "video":
+        painter.drawPolygon(QPointF(20, 17), QPointF(20, 31), QPointF(31, 24))  # play triangle
+    else:
+        pen = QPen(_REROLL_GLYPH)
+        pen.setWidthF(2.4)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(17, 18, 14, 11), 2, 2)                  # photo frame
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(_REROLL_GLYPH)
+        painter.drawEllipse(QPointF(21, 22), 1.6, 1.6)                         # the sun
+        painter.drawPolygon(QPointF(18, 28), QPointF(23, 24), QPointF(30, 28))  # a mountain peak
+
+
 @lru_cache(maxsize=None)
 def level_badge_icon(level: str) -> QIcon:
     """A filled, lettered chip marking a folder's recipe level (see LEVEL_LABELS).

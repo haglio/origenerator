@@ -547,6 +547,25 @@ class GalleryView(QWidget):
         self._reroll.start(key, group, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
 
+    def _reroll_item_seed(self, prompt_id: str, which: str):
+        """Re-roll one i2v item, randomizing a single seed (its top-left hover
+        controls). ``which`` is ``"video"`` (new motion, same frame) or ``"image"``
+        (a new frame, same motion). Lands in the same folder — its live tile — as
+        the whole-folder re-roll does; skips a folder already re-rolling."""
+        if self._client is None:
+            return
+        row = self._db.get_generation(prompt_id)
+        if row is None:
+            return
+        key = gallery.settings_folder_key(row, gallery.build_image_config_index(self._image_rows))
+        if key in self._reroll_jobs:
+            return  # this folder already has a re-roll running
+        if which == "video":
+            self._reroll.reroll_video_seed(key, row)
+        else:
+            self._reroll.reroll_image_seed(key, row, self._image_rows)
+        self._select_reroll(key)  # a no-op if the launch above failed to register
+
     # --- combine: a video's recipe applied to a dropped image -------------
 
     def _combine_accepts_image(self, prompt_id: str) -> bool:

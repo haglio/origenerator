@@ -4,9 +4,17 @@ from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
 import origenerator.gui.thumbnail_widget as tw_module
+from origenerator.gui import icons
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
+
+
+def _corner_actions():
+    return [
+        ("video", icons.reroll_seed_icon("video"), "Randomize video seed"),
+        ("image", icons.reroll_seed_icon("image"), "Randomize image seed"),
+    ]
 
 
 def _write_looping_webp(path, size=(64, 48)):
@@ -125,6 +133,58 @@ def test_media_badge_appears_only_when_a_type_is_given(qtbot):
     badged = ThumbnailWidget("p2", None, "label", media_type="video")
     qtbot.addWidget(badged)
     assert len(badged.findChildren(MediaBadge)) == 1
+
+
+def test_no_corner_actions_by_default(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    assert tw._corner_buttons == []
+
+
+def test_corner_actions_build_hidden_buttons_with_tooltips(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    assert [b.toolTip() for b in tw._corner_buttons] == [
+        "Randomize video seed", "Randomize image seed",
+    ]
+    assert all(b.isHidden() for b in tw._corner_buttons)  # revealed only on hover
+
+
+def test_corner_actions_reveal_on_hover_and_hide_when_the_cursor_leaves(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    pos = QPointF(1, 1)
+
+    tw.enterEvent(QEnterEvent(pos, pos, pos))
+    assert all(not b.isHidden() for b in tw._corner_buttons)
+
+    tw._cursor_over_tile = lambda: False  # the cursor has truly left the tile
+    tw.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert all(b.isHidden() for b in tw._corner_buttons)
+
+
+def test_corner_actions_stay_up_while_the_cursor_is_on_a_button(qtbot):
+    # Moving onto a corner button fires the tile's leaveEvent; the buttons must
+    # stay up (else they'd vanish under the cursor — a hover/hide flicker loop).
+    tw = ThumbnailWidget("p1", None, "label", corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    pos = QPointF(1, 1)
+    tw.enterEvent(QEnterEvent(pos, pos, pos))
+
+    tw._cursor_over_tile = lambda: True  # still within the tile (over a button)
+    tw.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert all(not b.isHidden() for b in tw._corner_buttons)
+
+
+def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    fired = []
+    tw.corner_action_triggered.connect(lambda pid, aid: fired.append((pid, aid)))
+
+    tw._corner_buttons[1].click()
+
+    assert fired == [("p1", "image")]  # carries the tile's id and the chosen action
 
 
 def test_thumbnail_starts_unselected(qtbot):

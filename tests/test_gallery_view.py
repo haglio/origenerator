@@ -2446,6 +2446,83 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     assert gallery.find_source_image_id(new_video, image_rows) == new_image["prompt_id"]
 
 
+def _handpicked_i2v_db(tmp_path):
+    """A DB with a single i2v whose start frame is a hand-picked (un-rebuildable)
+    image — no source generation, so its image seed can't be re-rolled."""
+    db = Database(tmp_path / "hp.db")
+    db.insert_generation(
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="dance", negative_prompt="", seed=3,
+        params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
+                                    positive_prompt="dance", input_image="handpicked.png")),
+        workflow_json="{}",
+    )
+    db.update_generation("vid", status="completed",
+                         output_files=json.dumps([{"filename": "wan22_i2v_vid.mp4", "subfolder": ""}]))
+    return db
+
+
+def _tooltips(view, prompt_id):
+    return [b.toolTip() for b in view._thumb_widgets[prompt_id]._corner_buttons]
+
+
+def test_i2v_folder_item_carries_both_seed_reroll_hovers(qtbot, tmp_path):
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")  # the i2v's own settings leaf
+
+    # Its start frame is a re-buildable image, so both per-seed controls show.
+    assert _tooltips(view, "vid") == ["Randomize video seed", "Randomize image seed"]
+
+
+def test_image_folder_item_has_no_seed_reroll_hovers(qtbot, tmp_path):
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "img")  # a plain SDXL image leaf — not image-conditioned
+
+    assert _tooltips(view, "img") == []
+
+
+def test_i2v_item_with_a_handpicked_frame_offers_only_the_video_seed(qtbot, tmp_path):
+    view = GalleryView(_handpicked_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+
+    # The frame can't be re-rolled, so only the video-seed control is offered.
+    assert _tooltips(view, "vid") == ["Randomize video seed"]
+
+
+def test_video_seed_hover_rerolls_only_the_item_video_seed(qtbot, tmp_path):
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+    view._reroll.reroll_video_seed = MagicMock()
+
+    view._thumb_widgets["vid"]._corner_buttons[0].click()  # "Randomize video seed"
+
+    view._reroll.reroll_video_seed.assert_called_once()
+    _key, row = view._reroll.reroll_video_seed.call_args.args
+    assert row["prompt_id"] == "vid"
+
+
+def test_image_seed_hover_rerolls_only_the_item_image_seed(qtbot, tmp_path):
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+    view._reroll.reroll_image_seed = MagicMock()
+
+    view._thumb_widgets["vid"]._corner_buttons[1].click()  # "Randomize image seed"
+
+    view._reroll.reroll_image_seed.assert_called_once()
+    _key, row, image_rows = view._reroll.reroll_image_seed.call_args.args
+    assert row["prompt_id"] == "vid"
+
+
 def test_poll_reconciles_a_reroll_whose_completion_signal_was_missed(qtbot, tmp_path):
     # If ComfyUI's one-shot completion frame is missed, the periodic poll pulls
     # /history as a backstop so the finished generation still lands in the gallery

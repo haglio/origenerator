@@ -1,13 +1,23 @@
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
-from PyQt6.QtGui import QPixmap, QDrag
-from PyQt6.QtCore import Qt, QPoint, QSize, QMimeData, QByteArray, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
+from PyQt6.QtGui import QPixmap, QDrag, QCursor
+from PyQt6.QtCore import Qt, QPoint, QSize, QMimeData, QByteArray, QEvent, pyqtSignal
 
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 
 _IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
+
+# Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls): a small
+# translucent chip in the top-left, blue on hover, sized to sit over the thumbnail.
+_CORNER_INSET = 6
+_CORNER_SIZE = 28
+_CORNER_GAP = 4
+_CORNER_BUTTON_CSS = (
+    "QPushButton { background: rgba(0,0,0,0.55); border: none; border-radius: 6px; }"
+    "QPushButton:hover { background: rgba(48,128,224,0.9); }"
+)
 
 # A dragged thumbnail carries its generation's prompt_id under this type, which the
 # gallery's combine drop slots read to know which image or video was dropped.
@@ -48,14 +58,17 @@ class ThumbnailWidget(QWidget):
     unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
     drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
+    corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
-                 movie_path: str | None = None):
+                 movie_path: str | None = None,
+                 corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
         self._highlighted = False
+        self._corner_buttons: list[QPushButton] = []
         self._press_pos: QPoint | None = None  # left-press origin, for drag detection
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -111,6 +124,10 @@ class ThumbnailWidget(QWidget):
         if media_type:
             MediaBadge(media_type, self)
 
+        # An i2v folder's tiles carry top-left hover controls to re-roll one seed
+        # on its own; other tiles pass none and grow no buttons.
+        self._build_corner_actions(corner_actions or [])
+
     def is_selected(self) -> bool:
         return self._selected
 
@@ -147,12 +164,56 @@ class ThumbnailWidget(QWidget):
             f"background-color: transparent; border: {border}; border-radius: 3px;"
         )
 
+    # --- corner action buttons (hover-revealed per-seed re-rolls) -----------
+
+    def _build_corner_actions(self, actions: list):
+        """Lay out one hidden top-left button per ``(action_id, icon, tooltip)``.
+
+        Each fires :attr:`corner_action_triggered` with this tile's prompt_id and
+        its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
+        an event filter keeps them up while the cursor sits on a button rather than
+        the tile itself, so they don't flicker out from under the pointer.
+        """
+        for i, (action_id, icon, tooltip) in enumerate(actions):
+            button = QPushButton(self)
+            button.setIcon(icon)
+            button.setIconSize(QSize(_CORNER_SIZE - 8, _CORNER_SIZE - 8))
+            button.setToolTip(tooltip)
+            button.setFixedSize(_CORNER_SIZE, _CORNER_SIZE)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setStyleSheet(_CORNER_BUTTON_CSS)
+            button.move(_CORNER_INSET + i * (_CORNER_SIZE + _CORNER_GAP), _CORNER_INSET)
+            button.setVisible(False)
+            button.installEventFilter(self)  # keep the set up while hovering a button
+            button.clicked.connect(lambda _=False, a=action_id: self.corner_action_triggered.emit(self.prompt_id, a))
+            self._corner_buttons.append(button)
+
+    def _set_corner_actions_visible(self, visible: bool):
+        for button in self._corner_buttons:
+            button.setVisible(visible)
+
+    def _cursor_over_tile(self) -> bool:
+        """Whether the pointer is still anywhere within the tile — including over a
+        corner button — so leaving for a button doesn't read as leaving the tile."""
+        return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
+
+    def eventFilter(self, obj, event):
+        # A button is a child, so the cursor leaving it (back onto the tile, or off
+        # the tile entirely) is where an off-tile exit from a button surfaces.
+        if event.type() == QEvent.Type.Leave and obj in self._corner_buttons:
+            if not self._cursor_over_tile():
+                self._set_corner_actions_visible(False)
+        return super().eventFilter(obj, event)
+
     def enterEvent(self, event):
         self.hovered.emit(self.prompt_id)
+        self._set_corner_actions_visible(True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         self.unhovered.emit(self.prompt_id)
+        if not self._cursor_over_tile():  # moving onto a button isn't leaving the tile
+            self._set_corner_actions_visible(False)
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):

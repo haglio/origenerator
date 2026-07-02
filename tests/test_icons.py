@@ -26,6 +26,19 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     assert image_badge.toImage() != video_badge.toImage()
 
 
+def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
+    from PyQt6.QtCore import QSize
+
+    # The i2v hover controls: a video-seed and an image-seed re-roll glyph, each
+    # a non-blank pixmap, and visibly distinct so one isn't mistaken for the other.
+    video = icons.reroll_seed_icon("video")
+    image = icons.reroll_seed_icon("image")
+    size = QSize(24, 24)
+    assert not video.pixmap(size).isNull()
+    assert not image.pixmap(size).isNull()
+    assert video.pixmap(size).toImage() != image.pixmap(size).toImage()
+
+
 def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon

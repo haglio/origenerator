@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
 from PyQt6.QtCore import Qt
 
 from origenerator import gallery
+from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
@@ -304,6 +305,9 @@ class BrowserPane:
 
     def show_thumbnails(self, group):
         container, flow = self._new_tile_pane()
+        # An image-conditioned folder's items carry per-seed re-roll hover controls;
+        # its rows all share the one workflow, so the kind is decided once.
+        i2v = bool(group.rows) and gallery.is_image_conditioned(group.rows[0].get("workflow_name"))
         # The re-roll tile leads the flow so it sits beside the newest item
         # (thumbnails are sorted newest-first).
         if self._v._can_reroll(group):
@@ -312,15 +316,27 @@ class BrowserPane:
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+                corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
+            if i2v:
+                tw.corner_action_triggered.connect(self._v._reroll_item_seed)
             self._wire_drag(tw)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         self.show_widget(container)
+
+    def _seed_reroll_actions(self, row) -> list:
+        """The per-seed re-roll hover controls for an i2v item: always the video
+        seed (new motion of the same frame), plus the image seed (a new frame)
+        when the item's start frame is itself a re-buildable generation."""
+        actions = [("video", icons.reroll_seed_icon("video"), "Randomize video seed")]
+        if gallery.find_source_image_id(row, self._v._image_rows) is not None:
+            actions.append(("image", icons.reroll_seed_icon("image"), "Randomize image seed"))
+        return actions
 
     @staticmethod
     def _preview_paths(group) -> list[str]:

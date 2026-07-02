@@ -700,6 +700,24 @@ def starred_folders(tree: list[MediaGroup]) -> list:
     return found
 
 
+def recent_generations(rows: list[dict], limit: int) -> list[dict]:
+    """The most recently generated rows, newest first — the Recents shelf's list.
+
+    "Generated" means this app produced the row, from a Generate tab or a gallery
+    re-roll; an imported file discovered on disk (``source`` ``"imported"``) is not
+    a recent *generation* and is left out. As in the tree, only rows that produced
+    an output file appear — the shelf is a gallery of results, so a failed or
+    in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
+    (the caller lists them by descending id), so the first ``limit`` survivors are
+    the most recent.
+    """
+    generated = [
+        row for row in rows
+        if (row.get("source") or "generated") == "generated" and produced_output(row)
+    ]
+    return generated[:limit]
+
+
 def _build_settings_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[SettingsGroup]:

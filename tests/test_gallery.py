@@ -19,6 +19,7 @@ from origenerator.gallery import (
     model_signature,
     output_disk_files,
     output_file_reference,
+    recent_generations,
     resolve_preview,
     row_output_files,
     rows_under,
@@ -743,6 +744,35 @@ def test_starred_folders_collects_starred_across_every_level():
 def test_starred_folders_is_empty_when_nothing_is_starred():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
     assert starred_folders(tree) == []
+
+
+def test_recent_generations_keeps_the_callers_newest_first_order():
+    # Rows arrive newest-first (the DB lists by descending id); the shelf keeps
+    # that order and doesn't re-sort.
+    rows = [_img("i3", "c", 50, 3), _img("i2", "b", 50, 2), _img("i1", "a", 50, 1)]
+    assert [r["prompt_id"] for r in recent_generations(rows, 10)] == ["i3", "i2", "i1"]
+
+
+def test_recent_generations_excludes_imported_files():
+    # "Recently generated" means this app made it — an imported file discovered on
+    # disk is not a generation and never joins the shelf.
+    generated = _img("gen", "a cat", 50, 1)
+    imported = _row(prompt_id="imp", source="imported",
+                    output_files=json.dumps([{"filename": "imp.png"}]))
+    assert [r["prompt_id"] for r in recent_generations([imported, generated], 10)] == ["gen"]
+
+
+def test_recent_generations_excludes_rows_that_produced_no_output():
+    # Mirrors the tree: a failed or in-flight row wrote no file, so it has nothing
+    # to show and stays off the shelf.
+    done = _img("done", "a cat", 50, 1)
+    pending = _row(prompt_id="wip", output_files=None)
+    assert [r["prompt_id"] for r in recent_generations([done, pending], 10)] == ["done"]
+
+
+def test_recent_generations_caps_at_the_limit():
+    rows = [_img(f"i{n}", "a cat", 50, n) for n in range(5)]
+    assert [r["prompt_id"] for r in recent_generations(rows, 3)] == ["i0", "i1", "i2"]
 
 
 def test_child_groups_and_rows_under_walk_the_tree():

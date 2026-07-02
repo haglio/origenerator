@@ -503,9 +503,23 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
     return (meta.get("custom_name") or label, bool(meta.get("starred")))
 
 
-def _starred_first(groups: list) -> list:
-    """Stable-sort starred folders to the top, leaving order otherwise intact."""
-    return sorted(groups, key=lambda g: not g.starred)
+def starred_folders(tree: list[MediaGroup]) -> list:
+    """Every starred folder in ``tree``, at any depth, in top-down tree order.
+
+    Powers the gallery's Starred shelf: a folder is bookmarked in place (its
+    position in the tree never changes) and collected here so all bookmarks —
+    however deeply nested — are reachable from one spot.
+    """
+    found: list = []
+
+    def walk(groups):
+        for group in groups:
+            if group.starred:
+                found.append(group)
+            walk(child_groups(group))
+
+    walk(tree)
+    return found
 
 
 def _build_settings_groups(
@@ -533,12 +547,12 @@ def _build_settings_groups(
             settings_label(settings_dicts[i], distinguishing), key, folder_meta
         )
         groups.append(SettingsGroup(key, label, sig_rows, starred))
-    return _starred_first(groups)
+    return groups
 
 
 def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, children_for, cls):
-    """Build one folder level: order rows by ``signature``, key + label + overlay
-    each folder, recurse for its children, and float starred folders first.
+    """Build one folder level: order rows by ``signature``, then key + label +
+    overlay each folder and recurse for its children.
 
     The model and LoRA levels are the same folder-building contract over
     different params, so both go through here — differing only in the callables.
@@ -549,7 +563,7 @@ def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, childr
         params = parse_params(sub_rows[0].get("params_json"))
         label, starred = _overlay(label_for(params), key, folder_meta)
         groups.append(cls(key, label, children_for(sub_rows), starred))
-    return _starred_first(groups)
+    return groups
 
 
 def _build_model_groups(
@@ -598,9 +612,9 @@ def build_gallery_tree(
     produced no output file (failed or unfinished generations) are
     dropped first, so the tree holds only results worth showing. Folders appear
     in the order their first member appears in ``rows`` (the caller orders rows
-    newest-first), except that starred folders float to the top of their level.
-    ``folder_meta`` (keyed by each folder's stable ``key``) overrides the
-    default label and supplies the star state.
+    newest-first); a star never moves a folder — bookmarks are gathered by
+    :func:`starred_folders` instead. ``folder_meta`` (keyed by each folder's
+    stable ``key``) overrides the default label and supplies the star state.
     """
     folder_meta = folder_meta or {}
     rows = [row for row in rows if produced_output(row)]
@@ -623,6 +637,6 @@ def build_gallery_tree(
         )
         tree.append(MediaGroup(
             media_type, media_type, media_label,
-            _starred_first(workflow_groups), media_starred,
+            workflow_groups, media_starred,
         ))
-    return _starred_first(tree)
+    return tree

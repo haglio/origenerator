@@ -40,6 +40,8 @@ _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
+_STARRED_KEY = "__starred__"  # synthetic tree node collecting every starred folder
+_STARRED_LABEL = _STAR_PREFIX + "Starred"  # its row, pinned above the media folders
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
@@ -95,6 +97,8 @@ class GalleryView(QWidget):
         self._image_rows: list[dict] = []
         self._item_by_key: dict[str, QTreeWidgetItem] = {}
         self._leaf_by_id: dict[str, QTreeWidgetItem] = {}
+        self._starred_item: QTreeWidgetItem | None = None  # the "★ Starred" shelf row
+        self._starred_groups: list = []  # folders the shelf collects, in tree order
         self._visible_ids: list[str] = []
         self._visible_keys: list[str] = []
         self._selected_ids: set[str] = set()
@@ -317,7 +321,9 @@ class GalleryView(QWidget):
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
-        self._populate_tree(gallery.build_gallery_tree(rows, meta), expanded)
+        tree_model = gallery.build_gallery_tree(rows, meta)
+        self._starred_groups = gallery.starred_folders(tree_model)
+        self._populate_tree(tree_model, expanded)
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
@@ -353,8 +359,18 @@ class GalleryView(QWidget):
         self._tree.clear()
         self._item_by_key = {}
         self._leaf_by_id = {}
+        self._starred_item = None
+        root = self._tree.invisibleRootItem()
+        # A "★ Starred" shelf leads the tree whenever the gallery has any content,
+        # gathering every bookmarked folder (see _show_starred_overview) so they're
+        # reachable in one click no matter how deeply they're nested.
+        if tree_model:
+            self._starred_item = QTreeWidgetItem([_STARRED_LABEL])
+            self._starred_item.setToolTip(0, "Your starred folders")
+            root.addChild(self._starred_item)
+            self._item_by_key[_STARRED_KEY] = self._starred_item
         for media in tree_model:
-            self._add_node(media, self._tree.invisibleRootItem())
+            self._add_node(media, root)
         # Folders default to collapsed; only restore folders the user had open.
         for key in expanded_keys:
             item = self._item_by_key.get(key)
@@ -378,8 +394,14 @@ class GalleryView(QWidget):
         return item
 
     def _default_item(self) -> QTreeWidgetItem | None:
+        """The folder to land on with no saved target: the first real media
+        folder, never the synthetic Starred shelf."""
         root = self._tree.invisibleRootItem()
-        return root.child(0) if root.childCount() else None
+        for i in range(root.childCount()):
+            item = root.child(i)
+            if item is not self._starred_item:
+                return item
+        return None
 
     def _expanded_keys(self) -> set[str]:
         return {
@@ -390,6 +412,8 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         if item is None:
             return None
+        if item is self._starred_item:
+            return _STARRED_KEY  # so a rebuild keeps the shelf selected
         group = item.data(0, _GROUP_ROLE)
         return group.key if group else None
 
@@ -401,6 +425,9 @@ class GalleryView(QWidget):
             self._visible_ids = []
             self._visible_keys = []
             self._sync_delete_button()
+            return
+        if current is self._starred_item:
+            self._show_starred_overview()
             return
         group = current.data(0, _GROUP_ROLE)
         self._title.set_display(self._breadcrumb(current))
@@ -462,21 +489,56 @@ class GalleryView(QWidget):
         self._visible_keys = []
         return container, flow
 
+    def _add_folder_tile(self, flow, group, *, starred, context=""):
+        """Build one folder tile, wire its click/context signals, and track it."""
+        tile = FolderTile(
+            group.key, group.label, self._preview_paths(group),
+            len(gallery.rows_under(group)), starred=starred, context=context,
+        )
+        tile.clicked.connect(self._drill_into)
+        tile.context_requested.connect(self._folder_context_menu)
+        flow.addWidget(tile)
+        self._visible_keys.append(group.key)
+
     def _show_folder_tiles(self, groups):
         container, flow = self._new_tile_pane()
         for group in groups:
-            tile = FolderTile(
-                group.key,
-                group.label,
-                self._preview_paths(group),
-                len(gallery.rows_under(group)),
-                group.starred,
-            )
-            tile.clicked.connect(self._drill_into)
-            tile.context_requested.connect(self._folder_context_menu)
-            flow.addWidget(tile)
-            self._visible_keys.append(group.key)
+            self._add_folder_tile(flow, group, starred=group.starred)
         self._show_widget(container)
+
+    # --- the Starred shelf: every bookmarked folder, gathered in one place ---
+
+    def _show_starred_overview(self):
+        """Render the Starred shelf: one tile per bookmarked folder, each captioned
+        with its breadcrumb so identically-named folders stay tellable apart. Like
+        a branch folder it lists sub-folders rather than a single generation, so the
+        info pane clears instead of previewing one folder's first item."""
+        self._title.set_display(_STARRED_LABEL)
+        self._avg_label.setText("")
+        self._clear_metadata()
+        self._show_starred_tiles(self._starred_groups)
+        self._sync_delete_button()
+
+    def _show_starred_tiles(self, groups):
+        container, flow = self._new_tile_pane()
+        for group in groups:
+            item = self._item_by_key.get(group.key)
+            context = self._breadcrumb(item.parent()) if item and item.parent() else ""
+            self._add_folder_tile(flow, group, starred=False, context=context)
+        # An empty shelf teaches how to fill it rather than showing a blank pane.
+        self._show_widget(container if groups else self._starred_empty_state())
+
+    @staticmethod
+    def _starred_empty_state() -> QWidget:
+        label = QLabel(
+            "No starred folders yet.\n\nHover a folder in the list and click its "
+            "star, or right-click a folder and choose Star, to collect it here."
+        )
+        label.setObjectName("estimateLabel")
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        label.setContentsMargins(16, 24, 16, 16)
+        return label
 
     def _show_thumbnails(self, group):
         container, flow = self._new_tile_pane()

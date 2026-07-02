@@ -18,6 +18,7 @@ from origenerator.gallery import (
     rows_under,
     settings_signature,
     source_image_id_for,
+    starred_folders,
     videos_from_source_image,
 )
 
@@ -404,10 +405,10 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
 
     meta = {b.key: {"custom_name": "Style B", "starred": True}}
     loras = build_gallery_tree(rows, meta)[0].workflow_groups[0].model_groups[0].children
-    assert loras[0].label == "Style B"     # custom name applied
-    assert loras[0].starred is True
-    assert loras[0].key == b.key           # and the star floated it to the top
-    assert loras[1].starred is False
+    assert [lora.key for lora in loras] == [a.key, b.key]  # order unchanged — no reshuffle
+    assert loras[1].label == "Style B"     # custom name applied in place
+    assert loras[1].starred is True
+    assert loras[0].starred is False
 
 
 def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
@@ -449,10 +450,10 @@ def test_model_folders_get_stable_keys_and_apply_custom_names_and_stars():
 
     meta = {dream.key: {"custom_name": "Dreamy", "starred": True}}
     models = build_gallery_tree(rows, meta)[0].workflow_groups[0].model_groups
-    assert models[0].label == "Dreamy"     # custom name applied
-    assert models[0].starred is True
-    assert models[0].key == dream.key       # and the star floated it to the top
-    assert models[1].starred is False
+    assert [m.key for m in models] == [reapony.key, dream.key]  # order unchanged
+    assert models[1].label == "Dreamy"     # custom name applied in place
+    assert models[1].starred is True
+    assert models[0].starred is False
 
 
 def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
@@ -534,7 +535,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert again_model.children[0].key == settings.key
 
 
-def test_build_gallery_tree_applies_custom_names_and_floats_stars_first():
+def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_model = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0]
     cat, dog = plain_model.children  # newest-first: cat, dog
@@ -543,10 +544,30 @@ def test_build_gallery_tree_applies_custom_names_and_floats_stars_first():
     settings = build_gallery_tree(rows, meta)[0] \
         .workflow_groups[0].model_groups[0].children
 
-    assert settings[0].label == "Doggos"      # custom name applied
-    assert settings[0].starred is True
-    assert settings[0].key == dog.key         # and it floated above the cat
-    assert settings[1].starred is False
+    assert [s.key for s in settings] == [cat.key, dog.key]  # order unchanged — no reshuffle
+    assert settings[1].label == "Doggos"      # custom name applied in place
+    assert settings[1].starred is True
+    assert settings[0].starred is False
+
+
+def test_starred_folders_collects_starred_across_every_level():
+    # Star a whole workflow folder and one deep settings leaf; the collector
+    # returns both, top-down in tree order, regardless of how deep each sits.
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
+    workflow = build_gallery_tree(rows)[0].workflow_groups[0]
+    cat_leaf = workflow.model_groups[0].children[0]
+
+    meta = {
+        workflow.key: {"custom_name": None, "starred": True},
+        cat_leaf.key: {"custom_name": None, "starred": True},
+    }
+    starred = starred_folders(build_gallery_tree(rows, meta))
+    assert [g.key for g in starred] == [workflow.key, cat_leaf.key]
+
+
+def test_starred_folders_is_empty_when_nothing_is_starred():
+    tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
+    assert starred_folders(tree) == []
 
 
 def test_child_groups_and_rows_under_walk_the_tree():

@@ -176,7 +176,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"Images", "Videos"}
+    assert set(top) == {"★ Starred", "Images", "Videos"}
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
@@ -249,7 +249,7 @@ def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     assert _top_level(view._tree)["Images"].child(0).text(0) == "Best Models"
 
 
-def test_starring_a_folder_persists_and_floats_it_to_top(qtbot):
+def test_starring_a_folder_persists_without_reordering(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -257,13 +257,82 @@ def test_starring_a_folder_persists_and_floats_it_to_top(qtbot):
     view.refresh()
 
     model = _top_level(view._tree)["Images"].child(0).child(0)
+    cat_key = _key(model.child(0))
     dog_key = _key(model.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
     model = _top_level(view._tree)["Images"].child(0).child(0)
-    assert _key(model.child(0)) == dog_key          # floated above the cat
-    assert model.child(0).text(0).startswith("★")
+    # The star marks the folder in place; it does not jump above the cat.
+    assert [_key(model.child(i)) for i in range(model.childCount())] == [cat_key, dog_key]
+    assert model.child(1).text(0).startswith("★")
+    assert not model.child(0).text(0).startswith("★")
+
+
+def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    dog_key = _key(model.child(1))
+    view._toggle_star(dog_key)
+
+    # The shelf is the very first row in the tree, above the media folders.
+    assert view._tree.topLevelItem(0).text(0) == "★ Starred"
+    # Selecting it lists a tile for each starred folder, wherever it lives.
+    shelf = _top_level(view._tree)["★ Starred"]
+    view._tree.setCurrentItem(shelf)
+    assert view.visible_folder_keys() == [dog_key]
+    assert view.visible_prompt_ids() == []
+
+
+def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    model = _top_level(view._tree)["Images"].child(0).child(0)
+    dog_key = _key(model.child(1))
+    view._toggle_star(dog_key)
+
+    shelf = _top_level(view._tree)["★ Starred"]
+    view._tree.setCurrentItem(shelf)
+    view._drill_into(view.visible_folder_keys()[0])  # click the starred tile
+    assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
+
+
+def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = _top_level(view._tree)["★ Starred"]
+    view._tree.setCurrentItem(shelf)
+    assert view.visible_folder_keys() == []   # no tiles, just the hint
+    assert view.visible_prompt_ids() == []
+
+
+def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["★ Starred"])
+
+    view.refresh()  # a poll-driven rebuild must not knock us off the shelf
+
+    assert view._tree.currentItem().text(0) == "★ Starred"
+
+
+def test_starred_shelf_is_absent_until_a_folder_exists(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert "★ Starred" not in _top_level(view._tree)
 
 
 def test_new_generations_appear_without_manual_refresh(qtbot):
@@ -271,13 +340,13 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Images"}
+    assert set(_top_level(view._tree)) == {"★ Starred", "Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_top_level(view._tree)) == {"Images", "Videos"}
+    assert set(_top_level(view._tree)) == {"★ Starred", "Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):
@@ -285,9 +354,9 @@ def test_folders_start_collapsed(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    top = view._tree.topLevelItem(0)
-    assert top.isExpanded() is False
-    assert top.child(0).isExpanded() is False
+    images = _top_level(view._tree)["Images"]
+    assert images.isExpanded() is False
+    assert images.child(0).isExpanded() is False
 
 
 def test_selecting_a_folder_auto_selects_its_first_item(qtbot):

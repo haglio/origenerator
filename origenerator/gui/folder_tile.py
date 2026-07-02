@@ -13,12 +13,14 @@ class FolderTile(QFrame):
     clicked = pyqtSignal(str)
     context_requested = pyqtSignal(str, QPoint)
 
-    def __init__(self, key, text, preview_paths, count, starred=False, parent=None):
+    def __init__(self, key, text, preview_paths, count, starred=False,
+                 context="", parent=None):
         super().__init__(parent)
         self._key = key
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(180, 200)
+        # A breadcrumb line (used by the Starred shelf) needs a little more height.
+        self.setFixedSize(180, 216 if context else 200)
         self.setStyleSheet(
             "#folderTile { border: 1px solid #3f3f3f; border-radius: 4px; }"
             "#folderTile:hover { border-color: #6f6f6f; }"
@@ -32,6 +34,18 @@ class FolderTile(QFrame):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
         layout.addWidget(self._build_collage(preview_paths))
+
+        if context:
+            # Where this folder lives, so a starred folder is tellable apart from a
+            # same-named one elsewhere. Elided from the left to keep the tail — the
+            # folder's own parent — visible; the whole path sits in the tooltip.
+            crumb = QLabel()
+            crumb.setStyleSheet("color: #7a7a7a; font-size: 10px;")
+            crumb.setFixedHeight(14)
+            crumb.setText(crumb.fontMetrics().elidedText(
+                context, Qt.TextElideMode.ElideLeft, 164))
+            crumb.setToolTip(context)
+            layout.addWidget(crumb)
 
         caption = QLabel(("★ " if starred else "") + text)
         caption.setWordWrap(True)

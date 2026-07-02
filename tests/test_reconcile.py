@@ -165,8 +165,10 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
                           level="settings", ref_prompt_id="p1")
 
     # Simulate a *future* settings-key formula change: the folder's key shifts.
+    # Patch where the tree builder looks the signature up (settings_folder_key and
+    # build_gallery_tree both resolve it in gallery.tree), not the facade re-export.
     original = gallery.settings_signature
-    monkeypatch.setattr(gallery, "settings_signature",
+    monkeypatch.setattr(gallery.tree, "settings_signature",
                         lambda wf, pj, image_index=None: original(wf, pj, image_index) + "X")
     new_key = gallery.settings_folder_key(row)
     assert new_key != key

@@ -1,0 +1,373 @@
+"""Nest a flat list of generations into the gallery's folder tree.
+
+The gallery view organizes generations as nested folders:
+media type (Images/Videos) -> workflow -> model -> LoRA -> [source image] ->
+settings group (rows sharing every setting except per-instance ones: the seed,
+and — for an image-to-video workflow — the specific start-frame *file*. A re-roll
+regenerates that frame, so the raw filename is per-instance; but the
+*configuration* that produced the frame is not, so it is folded back into the
+settings key. Two i2v videos built from re-rolls of one image stay together,
+while two built from differently configured images split apart).
+
+Each level below the workflow is a *projection* of that settings key onto one
+facet, splitting a folder into sub-folders that differ in that facet alone: model
+(always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
+workflow declares no LoRA keys, so every branch nests the same depth), and — in
+the Videos tree only — the source image a video animates, i.e. the configuration
+of its start frame (:func:`_input_image_config`). The source-image level is a
+property of *videos*, so it grows only under Videos; a still an image-conditioned
+workflow happened to output (an imported PNG under a video prefix) lands under
+Images and is grouped like any other image. The settings group is the full key,
+so it nests beneath every projection. This module owns the grouping logic with no
+Qt dependency so it can be unit-tested directly.
+"""
+
+import hashlib
+import json
+
+from origenerator.gallery.groups import (
+    LoraGroup,
+    MediaGroup,
+    ModelGroup,
+    SettingsGroup,
+    SourceImageGroup,
+    WorkflowGroup,
+    child_groups,
+)
+from origenerator.gallery.labels import (
+    _distinguishing_keys,
+    _source_image_label,
+    lora_label,
+    model_label,
+    settings_label,
+    workflow_label,
+)
+from origenerator.gallery.output import media_type_of_row, produced_output
+from origenerator.gallery.signatures import (
+    _input_image_config,
+    _is_image_conditioned,
+    canonical_settings,
+    lora_signature,
+    model_signature,
+    parse_params,
+    settings_only,
+    settings_signature,
+)
+from origenerator.gallery.source_image import build_image_config_index
+
+MEDIA_LABELS = {"image": "Images", "video": "Videos"}
+
+
+def _group_ordered(rows, key):
+    """Group rows by ``key(row)``, preserving first-appearance order of keys."""
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(key(row), []).append(row)
+    return list(grouped.items())
+
+
+def _sig_key(media_type: str, workflow_name: str, signature: str, prefix: str = "") -> str:
+    """A folder's stable key from its signature, tagged by level.
+
+    The one-letter ``prefix`` (``m`` model, ``l`` LoRA, ``i`` source image; none
+    for settings) keeps each level's key clear of the others' — a settings
+    folder's segment is pure hex, so no prefixed key can collide with it in
+    ``folder_meta``.
+    """
+    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
+    return f"{media_type}/{workflow_name}/{prefix}{digest}"
+
+
+def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature)
+
+
+def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
+    """The key of the settings-folder leaf a row belongs to in the gallery tree.
+
+    Mirrors how :func:`build_gallery_tree` keys that leaf — media type, workflow
+    name, settings signature — so an in-flight row (which has no output yet and so
+    never appears in the tree itself) can still be matched to the folder it joins.
+    ``image_index`` must be the same one the tree was built with (see
+    :func:`build_image_config_index`) so an image-conditioned row keys to the same
+    leaf its start frame's configuration places it in.
+    """
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    return _settings_key(
+        media_type, workflow_name,
+        settings_signature(workflow_name, row.get("params_json"), image_index),
+    )
+
+
+def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature, "m")
+
+
+def _lora_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature, "l")
+
+
+def _source_image_key(media_type: str, workflow_name: str, signature: str) -> str:
+    return _sig_key(media_type, workflow_name, signature, "i")
+
+
+def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) -> str:
+    """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
+    row under the *current* key formulas.
+
+    A bookmark stores its tier and a representative member row; recomputing here
+    re-derives the folder's key so a star or custom name follows the folder even
+    after a key formula changes — the silent orphaning the reconcile undoes.
+    ``image_index`` (see :func:`build_image_config_index`) lets the source-image
+    and settings tiers resolve an image-conditioned row's start-frame config the
+    way the tree does."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    params_json = row.get("params_json")
+    if level == "media":
+        return media_type
+    if level == "workflow":
+        return f"{media_type}/{workflow_name}"
+    if level == "model":
+        return _model_key(media_type, workflow_name, model_signature(workflow_name, params_json))
+    if level == "lora":
+        return _lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
+    if level == "source_image":
+        config = _input_image_config(parse_params(params_json).get("input_image"), image_index)
+        return _source_image_key(media_type, workflow_name, config)
+    if level == "settings":
+        return settings_folder_key(row, image_index)
+    raise ValueError(f"unknown folder level: {level!r}")
+
+
+def legacy_settings_folder_key(row: dict) -> str:
+    """The settings-folder key ``row`` had under the pre-normalization formula:
+    ``settings_only`` hashed with sort_keys, before :func:`canonical_settings`.
+
+    One historical key formula shift that orphaned bookmarks made before it. The
+    reconcile recomputes this to re-point such a stale star or name onto the row's
+    current settings folder."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    signature = json.dumps(settings_only(parse_params(row.get("params_json"))), sort_keys=True)
+    return _settings_key(media_type, workflow_name, signature)
+
+
+def legacy_preframe_settings_folder_key(row: dict) -> str:
+    """The settings-folder key an image-conditioned row had before its start
+    frame's configuration was folded into the key — :func:`canonical_settings`
+    hashed with the input image dropped entirely (the pre-frame-config formula).
+
+    The reconcile recomputes this to re-point a star or name made before that
+    change onto the row's current settings folder. Equal to the current key for
+    workflows that aren't image-conditioned, which never folded a frame in."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    signature = json.dumps(
+        canonical_settings(workflow_name, parse_params(row.get("params_json"))),
+        sort_keys=True, default=str,
+    )
+    return _settings_key(media_type, workflow_name, signature)
+
+
+def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
+    """Apply a folder's saved custom name and star, returning (label, starred)."""
+    meta = folder_meta.get(key, {})
+    return (meta.get("custom_name") or label, bool(meta.get("starred")))
+
+
+def starred_folders(tree: list[MediaGroup]) -> list:
+    """Every starred folder in ``tree``, at any depth, in top-down tree order.
+
+    Powers the gallery's Starred shelf: a folder is bookmarked in place (its
+    position in the tree never changes) and collected here so all bookmarks —
+    however deeply nested — are reachable from one spot.
+    """
+    found: list = []
+
+    def walk(groups):
+        for group in groups:
+            if group.starred:
+                found.append(group)
+            walk(child_groups(group))
+
+    walk(tree)
+    return found
+
+
+def recent_generations(rows: list[dict], limit: int) -> list[dict]:
+    """The most recently generated rows, newest first — the Recents shelf's list.
+
+    "Generated" means this app produced the row, from a Generate tab or a gallery
+    re-roll; an imported file discovered on disk (``source`` ``"imported"``) is not
+    a recent *generation* and is left out. As in the tree, only rows that produced
+    an output file appear — the shelf is a gallery of results, so a failed or
+    in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
+    (the caller lists them by descending id), so the first ``limit`` survivors are
+    the most recent.
+    """
+    generated = [
+        row for row in rows
+        if (row.get("source") or "generated") == "generated" and produced_output(row)
+    ]
+    return generated[:limit]
+
+
+def _build_settings_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
+) -> list[SettingsGroup]:
+    """The settings-group leaves under one model, LoRA, or source-image folder.
+
+    Rows collapse by settings signature (all non-instance params, plus an i2v's
+    start-frame configuration), and each leaf's label is disambiguated only
+    against its siblings under the same parent — so a value the folder above
+    already pins (the model, the LoRA, and for an i2v the source image) is
+    constant here and never re-appears in a settings name.
+    """
+    grouped = _group_ordered(
+        rows, lambda r: settings_signature(wf_name, r.get("params_json"), image_index)
+    )
+    settings_dicts = [
+        canonical_settings(wf_name, parse_params(sig_rows[0].get("params_json")))
+        for _sig, sig_rows in grouped
+    ]
+    distinguishing = _distinguishing_keys(settings_dicts)
+    groups = []
+    for i, (sig, sig_rows) in enumerate(grouped):
+        key = _settings_key(media_type, wf_name, sig)
+        label, starred = _overlay(
+            settings_label(settings_dicts[i], distinguishing), key, folder_meta
+        )
+        groups.append(SettingsGroup(key, label, sig_rows, starred))
+    return groups
+
+
+def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, children_for, cls):
+    """Build one folder level: order rows by ``signature``, then key + label +
+    overlay each folder and recurse for its children.
+
+    The model, LoRA, and source-image levels are the same folder-building contract
+    over different projections of the settings key, so all three go through here —
+    differing only in the callables.
+    """
+    groups = []
+    for sig, sub_rows in _group_ordered(rows, signature):
+        key = key_for(sig)
+        params = parse_params(sub_rows[0].get("params_json"))
+        label, starred = _overlay(label_for(params), key, folder_meta)
+        groups.append(cls(key, label, children_for(sub_rows), starred))
+    return groups
+
+
+def _build_model_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
+) -> list[ModelGroup]:
+    """The model folders under one workflow, each holding its LoRA folders."""
+    return _grouped_folders(
+        rows, folder_meta, cls=ModelGroup,
+        signature=lambda r: model_signature(wf_name, r.get("params_json")),
+        key_for=lambda sig: _model_key(media_type, wf_name, sig),
+        label_for=lambda params: model_label(wf_name, params),
+        children_for=lambda sub: _build_lora_groups(media_type, wf_name, sub, folder_meta, image_index),
+    )
+
+
+def _build_lora_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
+) -> list[LoraGroup]:
+    """The LoRA folders under one model, each holding its leaves.
+
+    A workflow with no LoRA keys collapses to a single ``(no LoRA)`` folder — every
+    row shares one empty LoRA signature — so a model folder nests the same way
+    whether or not the pipeline uses a LoRA."""
+    return _grouped_folders(
+        rows, folder_meta, cls=LoraGroup,
+        signature=lambda r: lora_signature(wf_name, r.get("params_json")),
+        key_for=lambda sig: _lora_key(media_type, wf_name, sig),
+        label_for=lambda params: lora_label(wf_name, params),
+        children_for=lambda sub: _build_leaves(media_type, wf_name, sub, folder_meta, image_index),
+    )
+
+
+def _build_leaves(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
+) -> list:
+    """A model or LoRA folder's leaves: source-image folders when the folder holds
+    videos an image conditions (each holding its settings leaves), else settings
+    leaves directly.
+
+    The split is by *media type*, not just the workflow: a source image is what a
+    video animates, so only the Videos tree grows the level. An image-conditioned
+    workflow can still output a still — an imported PNG under a video prefix — which
+    lands under Images and animates nothing, so it is grouped like any other image.
+    """
+    if media_type == "video" and _is_image_conditioned(wf_name):
+        return _build_source_image_groups(media_type, wf_name, rows, folder_meta, image_index)
+    return _build_settings_groups(media_type, wf_name, rows, folder_meta, image_index)
+
+
+def _build_source_image_groups(
+    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
+) -> list[SourceImageGroup]:
+    """The source-image folders under one model/LoRA folder: videos split by the
+    configuration of the start frame they animate, each holding its settings leaves.
+
+    Keyed by that configuration (:func:`_input_image_config`), the same projection
+    of the settings signature that the model and LoRA levels use for theirs — so
+    re-rolls of one image stay together while differently configured frames split."""
+    return _grouped_folders(
+        rows, folder_meta, cls=SourceImageGroup,
+        signature=lambda r: _input_image_config(
+            parse_params(r.get("params_json")).get("input_image"), image_index
+        ),
+        key_for=lambda sig: _source_image_key(media_type, wf_name, sig),
+        label_for=lambda params: _source_image_label(params, image_index),
+        children_for=lambda sub: _build_settings_groups(media_type, wf_name, sub, folder_meta, image_index),
+    )
+
+
+def build_gallery_tree(
+    rows: list[dict], folder_meta: dict[str, dict] | None = None
+) -> list[MediaGroup]:
+    """Nest rows into media -> workflow -> model -> LoRA -> [source image] ->
+    settings folders.
+
+    Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
+    it to a single "(no LoRA)" folder. The source-image level appears only in the
+    Videos tree (a still an image-conditioned workflow output is grouped like any
+    other image). Rows that produced no output file (failed or unfinished
+    generations) are dropped first, so the tree holds only results
+    worth showing. Folders appear
+    in the order their first member appears in ``rows`` (the caller orders rows
+    newest-first); a star never moves a folder — bookmarks are gathered by
+    :func:`starred_folders` instead. ``folder_meta`` (keyed by each folder's
+    stable ``key``) overrides the default label and supplies the star state.
+    """
+    folder_meta = folder_meta or {}
+    rows = [row for row in rows if produced_output(row)]
+    image_index = build_image_config_index(
+        [row for row in rows if media_type_of_row(row) == "image"]
+    )
+    tree = []
+    for media_type, media_rows in _group_ordered(rows, media_type_of_row):
+        workflow_groups = []
+        for wf_name, wf_rows in _group_ordered(
+            media_rows, lambda r: r.get("workflow_name") or "unknown"
+        ):
+            wf_key = f"{media_type}/{wf_name}"
+            wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
+            workflow_groups.append(WorkflowGroup(
+                wf_key, wf_name, wf_label,
+                _build_model_groups(media_type, wf_name, wf_rows, folder_meta, image_index),
+                wf_starred,
+            ))
+
+        media_label, media_starred = _overlay(
+            MEDIA_LABELS.get(media_type, media_type.title()), media_type, folder_meta
+        )
+        tree.append(MediaGroup(
+            media_type, media_type, media_label,
+            workflow_groups, media_starred,
+        ))
+    return tree

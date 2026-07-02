@@ -25,9 +25,7 @@ Qt dependency so it can be unit-tested directly.
 import hashlib
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
-from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
@@ -57,97 +55,19 @@ from origenerator.gallery.groups import (
     group_level,
     rows_under,
 )
+from origenerator.gallery.output import (
+    media_type_of_row,
+    output_disk_files,
+    output_file_reference,
+    produced_output,
+    resolve_preview,
+    row_output_files,
+)
 
 MEDIA_LABELS = {"image": "Images", "video": "Videos"}
 
 # File extensions stripped from a model filename to make a tidy folder label.
 MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
-
-
-def row_output_files(row: dict) -> list[dict]:
-    """Parse a row's ``output_files`` JSON into a list, tolerating bad data."""
-    raw = row.get("output_files")
-    if not raw:
-        return []
-    try:
-        files = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    return files if isinstance(files, list) else []
-
-
-def produced_output(row: dict) -> bool:
-    """True when a row recorded at least one output file.
-
-    The gallery is a gallery of results: a generation that failed (or hasn't
-    finished) wrote no file, so it has nothing to show and is left out of the
-    tree entirely rather than surfacing as an empty, file-less entry.
-    """
-    return bool(row_output_files(row))
-
-
-def media_type_of_row(row: dict) -> str:
-    """Classify a row as ``"image"`` or ``"video"``.
-
-    The actual output file is authoritative — a still saved under a video
-    workflow's prefix is an image and must not surface in the Videos folder.
-    Rows with no file yet (pending) fall back to the workflow's declared type,
-    then to ``"image"``.
-    """
-    for f in row_output_files(row):
-        inferred = media_type_from_filename(f.get("filename", ""))
-        if inferred:
-            return inferred
-    return workflow_output_type(row.get("workflow_name")) or "image"
-
-
-def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
-    """Locate the file to preview for ``row`` and how to render it.
-
-    Prefers the full-resolution output under ``output_dir`` (so videos play and
-    images show at full quality), classifying it by extension. Falls back to the
-    stored thumbnail — always a still image — when the output is missing. Returns
-    ``None`` when nothing displayable can be found.
-    """
-    for f in row_output_files(row):
-        filename = f.get("filename")
-        if not filename:
-            continue
-        full = output_dir / f.get("subfolder", "") / filename
-        rendered_as = media_type_from_filename(filename)
-        if rendered_as is not None and full.exists():
-            return full, rendered_as
-        break
-
-    thumb = row.get("thumbnail_path")
-    if thumb and Path(thumb).exists():
-        return Path(thumb), "image"
-
-    return None
-
-
-def output_disk_files(row: dict, output_dir: Path) -> list[Path]:
-    """Every on-disk output file a row owns, for deletion.
-
-    The referenced output file plus any same-stem sidecar of the other media
-    type — a video's VHS_VideoCombine metadata PNG, say. Removing the sidecar
-    too is what stops a later import from resurrecting the orphan as its own
-    entry. Files already absent are skipped.
-    """
-    paths: list[Path] = []
-    for f in row_output_files(row):
-        filename = f.get("filename")
-        if not filename:
-            continue
-        full = output_dir / f.get("subfolder", "") / filename
-        if not full.exists():
-            continue
-        paths.append(full)
-        other = "video" if media_type_from_filename(filename) == "image" else "image"
-        sidecar = sibling_of_type(full, other)
-        if sidecar is not None:
-            paths.append(sidecar)
-    return paths
 
 
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
@@ -220,24 +140,6 @@ def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[di
     if image_id is None:
         return []
     return [v for v in video_rows if find_source_image_id(v, [image_row]) == image_id]
-
-
-def output_file_reference(files: list[dict]) -> str | None:
-    """A ``LoadImage``-resolvable reference to a generation's first output file.
-
-    A saved file lives in ComfyUI's output dir, so the reference carries its
-    subfolder and an ``[output]`` tag (LoadImage validates by file existence via
-    that annotation, not by input-folder membership). Feeds a re-rolled i2v its
-    freshly generated start frame. ``None`` when no file has a name to reference.
-    """
-    for f in files:
-        filename = f.get("filename")
-        if not filename:
-            continue
-        subfolder = f.get("subfolder") or ""
-        path = f"{subfolder}/{filename}" if subfolder else filename
-        return f"{path} [{f.get('type') or 'output'}]"
-    return None
 
 
 def workflow_label(workflow_name: str | None) -> str:

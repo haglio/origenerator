@@ -30,6 +30,11 @@ def _item(sections, title, label):
     return next(i for i in _section(sections, title).items if i.label == label)
 
 
+def _labels(sections, title):
+    """The section's item labels, in display order."""
+    return [i.label for i in _section(sections, title).items]
+
+
 # --- section layout --------------------------------------------------------
 
 def test_sections_run_basic_first_and_details_last():
@@ -86,6 +91,34 @@ def test_parameters_section_lists_params_except_the_prompts():
     assert _items(build_sections(_row(params_json=json.dumps(params))), "Parameters") == {
         "steps": "20", "cfg": "7",
     }
+
+
+def test_parameters_follow_the_workflows_form_order_not_the_saved_order():
+    # The info pane orders parameters by the workflow's param_definitions() — the
+    # same source the Generate form lays out — not by however the row's JSON was
+    # serialized. So a generation saved before the model/LoRA regroup still reads
+    # grouped: all the models, then all the LoRAs.
+    pre_regroup = {  # the old noise-major serialization: high block, then low block
+        "unet_high": "mh", "lora_high": "lh", "lora_strength_high": 1.0,
+        "unet_low": "ml", "lora_low": "ll", "lora_strength_low": 1.0,
+    }
+    row = _row(workflow_name="wan22_i2v", params_json=json.dumps(pre_regroup))
+    assert _labels(build_sections(row), "Parameters") == [
+        "unet_high", "unet_low",
+        "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
+    ]
+
+
+def test_parameters_keep_keys_the_form_doesnt_lay_out_after_the_known_ones():
+    # Hidden passthrough params (vae, clip…) aren't in the form's
+    # param_definitions, but a row still recorded them — they show after the
+    # ordered known params, in their stored order, never dropped.
+    params = {"steps": 20, "vae_name": "v.safetensors", "cfg": 7}
+    labels = _labels(build_sections(_row(workflow_name="wan22_i2v",
+                                         params_json=json.dumps(params))), "Parameters")
+    assert set(labels) == {"steps", "cfg", "vae_name"}    # nothing lost
+    assert labels.index("steps") < labels.index("cfg")     # known ones in form order
+    assert labels[-1] == "vae_name"                        # the unlaid-out key trails
 
 
 def test_parameters_section_omitted_when_only_prompts_remain():

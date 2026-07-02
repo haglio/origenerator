@@ -238,45 +238,66 @@ def test_param_form_seed_handles_64bit_values(qtbot):
     assert vals["seed"] == big_seed
 
 
-def test_param_form_browse_button_picks_image(qtbot, monkeypatch):
+def _stub_file_dialog(monkeypatch, chosen, captured=None):
+    """Replace the native file dialog so Browse tests never open a window.
+
+    Returns ``(chosen, "")`` — the ``(path, selected_filter)`` shape of
+    :meth:`QFileDialog.getOpenFileName` — and, when given ``captured``, records
+    the directory the dialog was asked to open in.
+    """
     import origenerator.gui.param_form as pf
 
-    class _FakePicker:
-        def __init__(self, parent=None):
-            pass
+    def fake(parent, caption, directory, filt):
+        if captured is not None:
+            captured["dir"] = directory
+        return chosen, ""
 
-        def exec(self):
-            return 1  # QDialog.Accepted
+    monkeypatch.setattr(pf.QFileDialog, "getOpenFileName", fake)
 
-        def selected_image(self):
-            return "cat.png"
 
-    monkeypatch.setattr(pf, "ImagePickerDialog", _FakePicker)
+def test_param_form_browse_button_picks_any_file(qtbot, monkeypatch):
+    _stub_file_dialog(monkeypatch, "C:/Users/Example/Pictures/cat.png")
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
     qtbot.addWidget(form)
     form._browse_buttons["input_image"].click()
 
-    assert form.get_values()["input_image"] == "cat.png"
+    # The full path is stored verbatim; ComfyUI's LoadImage resolves an
+    # absolute path outside its input folder.
+    assert form.get_values()["input_image"] == "C:/Users/Example/Pictures/cat.png"
 
 
 def test_param_form_browse_cancel_keeps_existing_image(qtbot, monkeypatch):
-    import origenerator.gui.param_form as pf
-
-    class _CancelPicker:
-        def __init__(self, parent=None):
-            pass
-
-        def exec(self):
-            return 0  # QDialog.Rejected
-
-        def selected_image(self):
-            return None
-
-    monkeypatch.setattr(pf, "ImagePickerDialog", _CancelPicker)
+    _stub_file_dialog(monkeypatch, "")  # an empty path is Qt's "cancelled"
 
     form = ParamForm([ParamDef("input_image", "Input Image", "image", "preset.png")])
     qtbot.addWidget(form)
     form._browse_buttons["input_image"].click()
 
     assert form.get_values()["input_image"] == "preset.png"
+
+
+def test_param_form_browse_defaults_to_input_dir(qtbot, monkeypatch):
+    import origenerator.gui.param_form as pf
+
+    captured = {}
+    _stub_file_dialog(monkeypatch, "", captured)
+
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
+
+
+def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, tmp_path):
+    img = tmp_path / "cat.png"
+    img.write_bytes(b"\x89PNG")
+    captured = {}
+    _stub_file_dialog(monkeypatch, "", captured)
+
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", str(img))])
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert captured["dir"] == str(img)

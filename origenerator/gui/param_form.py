@@ -1,14 +1,15 @@
 import random
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QFormLayout, QHBoxLayout,
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
-    QComboBox, QPushButton,
+    QComboBox, QPushButton, QFileDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from origenerator.config import COMFYUI_INPUT_DIR
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.gui.image_picker import ImagePickerDialog
 from origenerator.workflows.base import ParamDef
 
 ensure_shared_ui_on_path()
@@ -118,9 +119,34 @@ class ParamForm(QWidget):
         return None
 
     def _browse_image(self, key: str):
-        dialog = ImagePickerDialog(self)
-        if dialog.exec() and dialog.selected_image():
-            self._widgets[key].setText(dialog.selected_image())
+        """Pick an input image anywhere on disk via the native file dialog.
+
+        The chosen path is stored verbatim: ComfyUI's ``LoadImage`` resolves a
+        bare name against its input folder but takes an absolute path outside
+        it unchanged, so a full path lets the user draw an input from anywhere.
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Input Image",
+            self._initial_browse_path(self._widgets[key].text().strip()),
+            "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)",
+        )
+        if path:
+            self._widgets[key].setText(path)
+
+    @staticmethod
+    def _initial_browse_path(current: str) -> str:
+        """Where the file dialog opens: the current value's own location when it
+        points at a real file (a full path, or a bare name from ComfyUI's input
+        folder), else the input folder as a sensible home."""
+        if current:
+            full = Path(current)
+            if full.is_file():
+                return str(full)
+            in_input = COMFYUI_INPUT_DIR / current
+            if in_input.is_file():
+                return str(in_input)
+        return str(COMFYUI_INPUT_DIR)
 
     def _wire_changed(self, widget: QWidget):
         """Re-emit ``changed`` whenever this input's value changes."""

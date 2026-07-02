@@ -18,7 +18,7 @@ import logging
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import gallery
-from origenerator.generation_config import prepared_params
+from origenerator.generation_config import filled_params, prepared_params
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
 )
@@ -70,7 +70,8 @@ class RerollController(QObject):
         return key in self._jobs
 
     def start(self, key: str, group, image_rows: list[dict]):
-        """Launch a fresh variation of the settings folder ``key`` names.
+        """Launch a fresh variation of the settings folder ``key`` names — both
+        seeds re-rolled (a new start frame *and* a new video seed).
 
         An i2v whose input image is itself a re-buildable generation re-rolls that
         image first (fresh start frame), then runs the video on it; any other row
@@ -78,25 +79,55 @@ class RerollController(QObject):
         there's no client, the folder already has a running re-roll, or ``group``
         isn't a settings leaf with rows.
         """
-        if self._client is None or key in self._jobs:
-            return  # no client, or this folder already has one running
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
-        row = group.rows[0]
+        self._reroll_variation(key, group.rows[0], image_rows, new_image=True, new_video=True)
+
+    def reroll_video_seed(self, key: str, row: dict):
+        """Re-roll one i2v item keeping its start frame, with a fresh video seed.
+
+        Re-runs the video on the same input image — a new motion of the same frame.
+        The image seed is untouched, so no image is regenerated first.
+        """
+        self._reroll_variation(key, row, (), new_image=False, new_video=True)
+
+    def reroll_image_seed(self, key: str, row: dict, image_rows: list[dict]):
+        """Re-roll one i2v item keeping its video seed, on a freshly drawn frame.
+
+        Regenerates the start frame (the source image's settings, a new seed) then
+        re-runs the video with this item's *existing* video seed — the same motion
+        on a new frame. A no-op when the frame isn't a re-buildable generation
+        (nothing to re-roll, and keeping both seeds would just duplicate the item).
+        """
+        self._reroll_variation(key, row, image_rows, new_image=True, new_video=False)
+
+    def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
+        """Launch ``row``'s recipe with each seed independently re-rolled or kept.
+
+        The video seed is re-rolled (``new_video``) or reused as stored; the start
+        frame is freshly regenerated (``new_image``, when it's a re-buildable
+        generation) or reused. When neither the frame nor the video seed would
+        change, there's nothing to make, so it's a no-op — the guard that keeps an
+        image-seed re-roll of a hand-picked (un-rebuildable) frame from duplicating
+        the item. Also a no-op with no client or a folder already re-rolling.
+        """
+        if self._client is None or key in self._jobs:
+            return  # no client, or this folder already has one running
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
             return
-        params = prepared_params(row, workflow)
-        source = self._reroll_source_image(row, image_rows)
+        video_params = prepared_params(row, workflow) if new_video else filled_params(row, workflow)
+        source = self._reroll_source_image(row, image_rows) if new_image else None
         if source is None:
-            self._launch(key, workflow, params, self._on_finished)
+            if not new_video:
+                return  # neither seed changes — nothing to generate
+            self._launch(key, workflow, video_params, self._on_finished)
         else:
             source_row, image_workflow = source
-            image_params = prepared_params(source_row, image_workflow)
             self._launch(
-                key, image_workflow, image_params,
+                key, image_workflow, prepared_params(source_row, image_workflow),
                 lambda k, job, files, thumb, dur: self._on_image_finished(
-                    k, job, files, thumb, dur, workflow, params
+                    k, job, files, thumb, dur, workflow, video_params
                 ),
             )
 

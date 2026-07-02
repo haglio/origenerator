@@ -1,6 +1,9 @@
-"""Owns the gallery's re-roll jobs: launching a fresh variation of a settings
-folder, chaining an i2v's image->video stages, reconnecting jobs a prior session
-left running, and finalizing or failing each in the database.
+"""Owns the gallery's in-flight generation jobs: launching a fresh variation of a
+settings folder (re-roll) or a video from an arbitrary image + another video's
+recipe (combine, via :meth:`start_prepared`), chaining an i2v's image->video
+stages, reconnecting jobs a prior session left running, and finalizing or failing
+each in the database. Both kinds are keyed by their settings-folder key, so a
+combine reconnects and lands in its folder exactly as a re-roll does.
 
 Pure job/database machinery with no widget knowledge — it reports what the view
 must redraw through signals (``changed`` to re-render the open folder, ``preview``
@@ -25,8 +28,9 @@ logger = logging.getLogger(__name__)
 
 
 class RerollController(QObject):
-    """Tracks one in-flight re-roll per settings-folder key and drives each to
-    completion, emitting the redraws the view should make along the way."""
+    """Tracks one in-flight job (re-roll or combine) per settings-folder key and
+    drives each to completion, emitting the redraws the view should make along
+    the way."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
@@ -49,6 +53,20 @@ class RerollController(QObject):
         return self._jobs.get(key)
 
     def has(self, key: str) -> bool:
+        return key in self._jobs
+
+    def start_prepared(self, key: str, workflow, params: dict) -> bool:
+        """Launch a job with already-built ``params`` under folder ``key``.
+
+        Unlike :meth:`start`, the caller owns the params — no defaults are filled
+        and no seed is re-rolled. This is the gallery's image+video combine, which
+        reuses the recipe video's exact seed. Returns ``True`` once the job is
+        tracked; ``False`` when there's no client, a job for ``key`` is already
+        running, or the submit failed (``_launch`` drops the job in that case).
+        """
+        if self._client is None or key in self._jobs:
+            return False
+        self._launch(key, workflow, params, self._on_finished)
         return key in self._jobs
 
     def start(self, key: str, group, image_rows: list[dict]):

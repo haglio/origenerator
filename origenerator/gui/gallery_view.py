@@ -3,13 +3,14 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QTreeWidget, QTreeWidgetItem, QSplitter,
+    QScrollArea, QPushButton, QToolButton, QTreeWidget, QTreeWidgetItem, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
-from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
 from origenerator import gallery, timing
+from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
@@ -39,6 +40,7 @@ _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
+_PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
 
 def _is_deletable_folder(group) -> bool:
@@ -172,25 +174,32 @@ class GalleryView(QWidget):
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
         self._tree.itemChanged.connect(self._commit_inline_rename)
-        self._panes.addWidget(self._tree)
+        toc = QWidget()
+        toc_box = QVBoxLayout(toc)
+        toc_box.setContentsMargins(*_PANE_MARGINS)
+        toc_box.addWidget(self._tree)
+        self._panes.addWidget(toc)
 
-        # Browser pane: a header (back/forward, folder title, Undo) over the
-        # flowing contents. Double-clicking the title renames the folder in place.
+        # Browser pane: a header (folder title, then a back/forward/undo toolbar)
+        # over the flowing contents. Double-clicking the title renames the folder.
         browser = QWidget()
         browser_box = QVBoxLayout(browser)
-        browser_box.setContentsMargins(0, 0, 0, 0)
+        browser_box.setContentsMargins(*_PANE_MARGINS)
         header = QHBoxLayout()
-        self._back_btn = self._nav_button("←", "Back", self._go_back)
-        header.addWidget(self._back_btn, 0, Qt.AlignmentFlag.AlignTop)
-        self._forward_btn = self._nav_button("→", "Forward", self._go_forward)
-        header.addWidget(self._forward_btn, 0, Qt.AlignmentFlag.AlignTop)
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
         header.addWidget(self._title, 1)
-        self._undo_btn = QPushButton("Undo")
-        self._undo_btn.clicked.connect(self._undo)
-        header.addWidget(self._undo_btn, 0, Qt.AlignmentFlag.AlignTop)
+        # A compact, grouped toolbar: browse back/forward and undo, all icon-only.
+        self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
+        self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
+        self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
+        toolbar = QHBoxLayout()
+        toolbar.setSpacing(2)
+        for button in (self._back_btn, self._forward_btn, self._undo_btn):
+            toolbar.addWidget(button)
+        header.addLayout(toolbar)
+        header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
         browser_box.addLayout(header)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
@@ -204,7 +213,7 @@ class GalleryView(QWidget):
         # Info pane: preview + metadata sidebar
         info = QWidget()
         info_box = QVBoxLayout(info)
-        info_box.setContentsMargins(0, 0, 0, 0)
+        info_box.setContentsMargins(*_PANE_MARGINS)
         self._meta_title = QLabel("Select a generation")
         self._meta_title.setWordWrap(True)
         info_box.addWidget(self._meta_title)
@@ -240,7 +249,7 @@ class GalleryView(QWidget):
         # rather than scroll sideways, so these floors only need to keep the panes
         # readable — kept low enough that the window can still tile into a monitor
         # third or a portrait-monitor half.
-        self._tree.setMinimumWidth(120)
+        toc.setMinimumWidth(120)
         browser.setMinimumWidth(210)
         info.setMinimumWidth(300)
         self._panes.setStretchFactor(0, 0)
@@ -250,10 +259,12 @@ class GalleryView(QWidget):
 
         layout.addWidget(self._panes)
 
-    def _nav_button(self, label: str, tooltip: str, handler) -> QPushButton:
-        # Size to the label: the stylesheet's 16px side padding alone is wider
-        # than a hardcoded 32px, which clipped the arrow to a blank button.
-        btn = QPushButton(label)
+    def _tool_button(self, icon, tooltip: str, handler) -> QToolButton:
+        """A compact, icon-only toolbar button for the browser-pane header."""
+        btn = QToolButton()
+        btn.setObjectName("iconButton")
+        btn.setIcon(icon)
+        btn.setIconSize(QSize(16, 16))
         btn.setToolTip(tooltip)
         btn.clicked.connect(handler)
         return btn

@@ -81,6 +81,13 @@ def build_stylesheet() -> str:
     QToolButton:hover {{
         background-color: {_h(BG_TERTIARY)};
     }}
+    QToolButton#iconButton {{
+        padding: 4px;
+    }}
+    QToolButton:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+    }}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};

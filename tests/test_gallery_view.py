@@ -418,15 +418,16 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
 
 
-def test_nav_buttons_show_arrow_labels_without_width_clipping(qtbot):
-    # The buttons carried a hardcoded 32px width, narrower than the stylesheet's
-    # own side padding, which clipped the arrow to a blank button.
+def test_nav_and_undo_are_compact_icon_buttons(qtbot):
+    from PyQt6.QtWidgets import QToolButton
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    assert view._back_btn.text() == "←"
-    assert view._forward_btn.text() == "→"
-    assert view._back_btn.maximumWidth() > 32     # no longer pinned narrower than its padding
-    assert view._forward_btn.maximumWidth() > 32
+    # Back, forward and undo are now one group of icon-only tool buttons, not the
+    # oversized text buttons that split them across the header.
+    for btn in (view._back_btn, view._forward_btn, view._undo_btn):
+        assert isinstance(btn, QToolButton)
+        assert not btn.icon().isNull()
+        assert btn.text() == ""
 
 
 def test_back_after_following_a_link_returns_to_the_initial_view(qtbot):
@@ -541,7 +542,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert isinstance(splitter, QSplitter)
     assert splitter.count() == 3                            # TOC, browser, info pane
     assert not splitter.childrenCollapsible()               # none can be dragged shut
-    assert splitter.widget(0) is view._tree                 # the folder tree (TOC)
+    assert splitter.widget(0).isAncestorOf(view._tree)      # TOC pane holds the folder tree
     assert splitter.widget(1).isAncestorOf(view._scroll)    # browser holds the contents
     assert splitter.widget(2).isAncestorOf(view._preview)   # info pane holds the preview
 

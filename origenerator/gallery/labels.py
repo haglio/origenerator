@@ -11,6 +11,7 @@ import json
 from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
+    _named_loras,
     _registered,
     _unannotated,
     settings_only,
@@ -61,10 +62,11 @@ def lora_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the LoRA(s) a row used.
 
     Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
-    the row recorded none of their values (e.g. an older import that didn't carry
-    the LoRA).
+    the row recorded no LoRA — none of the values (e.g. an older import that
+    didn't carry the LoRA), or the "None" sentinel a run chose to bypass it.
     """
-    return _joined_file_label(workflow_lora_keys(workflow_name), params, "(no LoRA)")
+    keys = workflow_lora_keys(workflow_name)
+    return _joined_file_label(keys, _named_loras(keys, params), "(no LoRA)")
 
 
 def _prompt_headline(params: dict) -> str:

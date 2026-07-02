@@ -45,6 +45,8 @@ from origenerator.gallery.signatures import (
     model_signature,
     parse_params,
     settings_signature,
+    workflow_output_type,
+    workflow_param_order,
 )
 from origenerator.gallery.source_image import (
     build_image_config_index,

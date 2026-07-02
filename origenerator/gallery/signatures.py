@@ -10,8 +10,10 @@ configuration into the settings key.
 """
 
 import json
+from functools import lru_cache
 
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.model_files import is_no_lora
 
 # Params that identify a specific instance of a recipe rather than the recipe
 # itself — dropped from a row's settings so reruns that differ only in these land
@@ -100,10 +102,38 @@ def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     return tuple(wf.lora_keys) if wf else ()
 
 
+@lru_cache(maxsize=None)
+def workflow_param_order(workflow_name: str | None) -> tuple[str, ...]:
+    """The param keys a workflow lays out in its form, in that order.
+
+    This is the single order both surfaces present settings in: the Generate form
+    builds its rows straight from ``param_definitions()``, and the gallery info
+    pane sorts a row's stored params by this so every generation groups the same
+    way regardless of the order its JSON was serialized in. Empty for an unknown
+    workflow (an import with no registered template), leaving the caller to fall
+    back to the stored order. Cached because the order is static per workflow —
+    so this pays ``param_definitions()``'s model-directory scan at most once each.
+    """
+    wf = _registered(workflow_name)
+    return tuple(pd.key for pd in wf.param_definitions()) if wf else ()
+
+
+def _keyed_signature(keys: tuple[str, ...], params: dict) -> str:
+    """Canonical, order-stable key from the values ``params`` holds for ``keys``."""
+    return json.dumps([params.get(key) for key in keys], default=str)
+
+
 def _values_signature(keys: tuple[str, ...], params_json: str | None) -> str:
     """Canonical, order-stable key from the values a row recorded for ``keys``."""
-    params = parse_params(params_json)
-    return json.dumps([params.get(key) for key in keys], default=str)
+    return _keyed_signature(keys, parse_params(params_json))
+
+
+def _named_loras(keys: tuple[str, ...], params: dict) -> dict:
+    """``params`` narrowed to the LoRA ``keys`` that actually name a LoRA — the
+    "None" sentinel and empty values dropped. A bypassed LoRA then groups and
+    labels as no LoRA at all, the same as an import whose graph had no LoRA node.
+    """
+    return {k: params.get(k) for k in keys if not is_no_lora(params.get(k))}
 
 
 def model_signature(workflow_name: str | None, params_json: str | None) -> str:
@@ -112,8 +142,13 @@ def model_signature(workflow_name: str | None, params_json: str | None) -> str:
 
 
 def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
-    """Canonical key for grouping a workflow's rows by the LoRA(s) they used."""
-    return _values_signature(workflow_lora_keys(workflow_name), params_json)
+    """Canonical key for grouping a workflow's rows by the LoRA(s) they used.
+
+    A "None"/empty LoRA reads as no LoRA (see :func:`_named_loras`), so a run
+    that bypassed a LoRA shares one signature with a no-LoRA import.
+    """
+    keys = workflow_lora_keys(workflow_name)
+    return _keyed_signature(keys, _named_loras(keys, parse_params(params_json)))
 
 
 def _basename(path: str) -> str:

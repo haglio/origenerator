@@ -18,6 +18,7 @@ from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.inflight_card import InFlightItem
+from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.trash import Trash
@@ -446,6 +447,39 @@ def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
     view.refresh()  # a poll-driven rebuild must not knock us off the shelf
 
     assert view._tree.currentItem().text(0) == "Recents"
+
+
+def test_recents_tiles_are_badged_image_or_video(qtbot):
+    # The shelf mixes kinds, so each finished tile wears a corner badge naming its
+    # own — an image thumbnail and a video thumbnail, told apart at a glance.
+    rows = [
+        _image("i1", "a cat", 50, 1),
+        _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4"),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+
+    def badge_type(pid):
+        badges = view._thumb_widgets[pid].findChildren(MediaBadge)
+        return badges[0].media_type if badges else None
+
+    assert badge_type("i1") == "image"
+    assert badge_type("v1") == "video"
+
+
+def test_inflight_card_is_badged_by_its_media_type(qtbot):
+    # A running video row with no file yet still badges its in-flight card a video,
+    # inferred from the workflow — so the kind reads before the first frame lands.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["rr1"].media_type == "video"
 
 
 def test_a_new_generation_appears_at_the_top_of_recents(qtbot):

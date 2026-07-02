@@ -277,6 +277,27 @@ def test_lora_label_falls_back_when_no_lora_recorded():
     assert lora_label("wan22_i2v", {}) == "(no LoRA)"
 
 
+def test_lora_label_treats_the_none_sentinel_as_no_lora():
+    # Picking "None" for a LoRA is not a file: it reads as no LoRA, not a literal
+    # "None" folder. Both off -> "(no LoRA)"; one off -> just the real one.
+    from origenerator.workflows.model_files import NO_LORA
+    assert lora_label("wan22_i2v", {"lora_high": NO_LORA, "lora_low": NO_LORA}) == "(no LoRA)"
+    label = lora_label("wan22_i2v", {"lora_high": "styleA-high.safetensors", "lora_low": NO_LORA})
+    assert label == "styleA-high"
+
+
+def test_lora_signature_merges_the_none_sentinel_with_no_lora():
+    # A run generated with "None" LoRAs and a no-LoRA import (whose graph carried
+    # no LoRA node, so no lora_* keys) are the same "no LoRA" bucket: one folder.
+    from origenerator.workflows.model_files import NO_LORA
+    generated = json.dumps({"lora_high": NO_LORA, "lora_low": NO_LORA, "steps": 20})
+    imported = json.dumps({"steps": 30})  # no lora keys at all
+    assert lora_signature("wan22_i2v", generated) == lora_signature("wan22_i2v", imported)
+    # ...but still distinct from a real LoRA.
+    real = json.dumps({"lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors"})
+    assert lora_signature("wan22_i2v", generated) != lora_signature("wan22_i2v", real)
+
+
 def test_find_source_image_matches_i2v_input_to_an_image_row_by_basename():
     image = _row(
         prompt_id="img-1",

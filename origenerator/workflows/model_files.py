@@ -12,6 +12,12 @@ from origenerator import config
 # diffusion models UnetLoaderGGUF loads.
 _MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 
+# The picker option that means "no LoRA": choosing it builds the graph with no
+# LoraLoader for that slot (see the workflows' ``build_api_payload``), so the
+# base model runs unmodified. Never a real filename — a file's option always
+# carries its extension — so it is safe as a sentinel.
+NO_LORA = "None"
+
 
 def list_model_files(category: str, fallback: list[str]) -> list[str]:
     """Sorted model files in ``ComfyUI/models/<category>``, subfolders included.
@@ -31,3 +37,18 @@ def list_model_files(category: str, fallback: list[str]) -> list[str]:
         if f.is_file() and f.suffix in _MODEL_SUFFIXES
     )
     return found or list(fallback)
+
+
+def list_lora_files(fallback: list[str]) -> list[str]:
+    """The LoRA picker's options: the "None" sentinel first, then the installed
+    LoRAs from the ``loras`` scan. "None" bypasses the LoRA (see
+    :data:`NO_LORA`), so every LoRA picker can opt out of applying one.
+    """
+    return [NO_LORA, *list_model_files("loras", fallback)]
+
+
+def is_no_lora(value) -> bool:
+    """True when a LoRA param names no LoRA: the "None" sentinel, or an empty or
+    absent value (an older row, or an import whose graph carried no LoRA node).
+    """
+    return not value or value == NO_LORA

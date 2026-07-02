@@ -222,6 +222,7 @@ class GenerateView(QWidget):
             items.append(InFlightItem(
                 key=desc["key"], caption=desc["caption"], status=desc["status"],
                 frame=desc["frame"], reveal=lambda p=panel: self._reveal_panel(p),
+                media_type=desc["media_type"],
             ))
         return items
 

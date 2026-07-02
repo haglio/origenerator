@@ -79,11 +79,23 @@ def _param_item(key: str, value, source_image_id: str | None) -> MetaItem:
     return MetaItem(key, str(value), copy=copy, link=link)
 
 
+def _ordered_param_keys(params: dict, workflow_name: str | None) -> list[str]:
+    """``params``' keys in the workflow's form order, so every generation's info
+    pane groups its settings the way the Generate form does — no matter what order
+    the row's JSON happens to carry them in. Keys the workflow doesn't lay out
+    (hidden passthrough params like vae/clip, or an import's extras) keep their
+    stored order, after the ones it does — so nothing a row recorded is dropped."""
+    order = gallery.workflow_param_order(workflow_name)
+    known = [key for key in order if key in params]
+    rest = [key for key in params if key not in order]
+    return known + rest
+
+
 def _parameters(row: dict, source_image_id: str | None) -> MetaSection | None:
     params = gallery.parse_params(row.get("params_json"))
     items = [
-        _param_item(key, value, source_image_id)
-        for key, value in params.items()
+        _param_item(key, params[key], source_image_id)
+        for key in _ordered_param_keys(params, row.get("workflow_name"))
         if key not in _PROMPT_KEYS
     ]
     return MetaSection("Parameters", items) if items else None

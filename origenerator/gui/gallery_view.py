@@ -606,7 +606,8 @@ class GalleryView(QWidget):
             self._inflight_by_key[item.key] = item
         for row in self._recent_rows:
             tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row)
+                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
+                media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             )
             tw.clicked.connect(self._on_source_link)  # jump to the item in its folder
             flow.addWidget(tw)
@@ -677,6 +678,7 @@ class GalleryView(QWidget):
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
                 reveal=lambda k=folder_key: self._reveal_reroll(k),
+                media_type=gallery.media_type_of_row(row),  # image/video corner badge
             ))
         # A Generate tab queued behind another carries no DB row yet — add it too.
         for pid, item in generate.items():

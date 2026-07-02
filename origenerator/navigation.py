@@ -1,8 +1,9 @@
 """A browser-style back/forward history of visited locations.
 
 Qt-free so the traversal logic stays unit-testable without a widget toolkit. The
-gallery records each generation the user opens and lets Back/Forward return to
-where they just were — most useful after following an i2v's input-image link.
+gallery records each location the user opens — a generation or a shelf (Recents,
+Starred) — and lets Back/Forward return to where they just were, whether that was
+a generation reached by an i2v's input-image link or the shelf they drilled from.
 """
 
 

@@ -113,7 +113,7 @@ class GalleryView(QWidget):
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
-        self._history = NavigationHistory()  # back/forward across viewed generations
+        self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._build_ui()
         self._sync_undo_button()
@@ -380,10 +380,12 @@ class GalleryView(QWidget):
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
-        # Seed history once with wherever the gallery first lands, so Back works
-        # even if the user's very first move is following a link.
-        if self._selected and self._history.current() is None:
-            self._record_visit(self._selected["prompt_id"])
+        # Seed history once with wherever the gallery first lands — a generation or
+        # a shelf — so Back works even if the user's very first move leaves it.
+        if self._history.current() is None:
+            location = self._current_location()
+            if location is not None:
+                self._record_visit(location)
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -594,6 +596,7 @@ class GalleryView(QWidget):
         self._clear_metadata()
         self._render_recents()
         self._sync_delete_button()
+        self._record_location(_RECENTS_KEY)  # so Back can return to the shelf
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
@@ -742,6 +745,7 @@ class GalleryView(QWidget):
         self._clear_metadata()
         self._show_starred_tiles(self._starred_groups)
         self._sync_delete_button()
+        self._record_location(_STARRED_KEY)  # so Back can return to the shelf
 
     def _show_starred_tiles(self, groups):
         container, flow = self._new_tile_pane()
@@ -1241,11 +1245,10 @@ class GalleryView(QWidget):
         self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._info.show_generation(row, self._image_rows)
         self._sync_containing_folder_button()  # a Recents preview offers the jump
-        # Every view of a generation — a thumbnail click, a folder's auto-selected
-        # first item, a followed link — is a browsing step, unless a rebuild or
-        # Back/Forward is re-selecting (those move within history, not onto it).
-        if not self._suppress_history:
-            self._record_visit(prompt_id)
+        # Viewing a generation — a thumbnail click, a folder's auto-selected first
+        # item, a followed link — is a browsing step recorded in history, on the
+        # same footing as landing on a shelf.
+        self._record_location(prompt_id)
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
@@ -1274,21 +1277,60 @@ class GalleryView(QWidget):
         finally:
             self._suppress_history = False
 
-    def _record_visit(self, prompt_id: str):
-        self._history.visit(prompt_id)
+    def _current_location(self) -> str | None:
+        """The history key for the view on screen — a shelf key on a shelf, else the
+        selected generation's id (``None`` when nothing is selected)."""
+        key = self._selected_folder_key()
+        if key in (_RECENTS_KEY, _STARRED_KEY):
+            return key
+        return self._selected["prompt_id"] if self._selected else None
+
+    def _record_location(self, location: str):
+        """Record a visit to a location — a generation id or a shelf key — unless a
+        rebuild or Back/Forward is re-showing it (those move within history, not
+        onto it)."""
+        if not self._suppress_history:
+            self._record_visit(location)
+
+    def _record_visit(self, location: str):
+        self._history.visit(location)
         self._sync_nav_buttons()
 
     def _go_back(self):
-        prompt_id = self._history.back()
-        if prompt_id is not None:
-            self._show_generation(prompt_id)
+        location = self._history.back()
+        if location is not None:
+            self._restore_location(location)
         self._sync_nav_buttons()
 
     def _go_forward(self):
-        prompt_id = self._history.forward()
-        if prompt_id is not None:
-            self._show_generation(prompt_id)
+        location = self._history.forward()
+        if location is not None:
+            self._restore_location(location)
         self._sync_nav_buttons()
+
+    def _restore_location(self, location: str):
+        """Re-show a history location without recording the move — a shelf overview
+        (Recents/Starred) or a generation in its folder."""
+        if location in (_RECENTS_KEY, _STARRED_KEY):
+            self._return_to_shelf(location)
+        else:
+            self._show_generation(location)
+
+    def _return_to_shelf(self, key: str):
+        """Back/Forward onto a shelf: make its row current and show it, without
+        recording (so the move doesn't pile back onto the history). Re-shows it even
+        when its row is already current, to clear an item previewed on the shelf."""
+        item = self._item_by_key.get(key)
+        if item is None:
+            return
+        self._suppress_history = True
+        try:
+            if self._tree.currentItem() is item:
+                self._on_folder_selected(item, None)
+            else:
+                self._tree.setCurrentItem(item)
+        finally:
+            self._suppress_history = False
 
     def _sync_nav_buttons(self):
         self._back_btn.setEnabled(self._history.can_go_back())

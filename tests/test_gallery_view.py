@@ -836,6 +836,57 @@ def test_history_spans_folder_navigation(qtbot):
     assert view._selected["prompt_id"] == "v1"  # Back walks folder moves, not just clicks
 
 
+def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
+    assert view._showing_recents() is False
+    assert view._back_btn.isEnabled()                    # the shelf is somewhere to go back to
+
+    view._go_back()
+    assert view._showing_recents()                       # Back returns to the Recents shelf
+
+    view._go_forward()
+    assert view._showing_recents() is False              # Forward re-opens the folder
+    assert view.selected_generation() == "i2"
+
+
+def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    dog_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0).child(1))
+    view._toggle_star(dog_key)
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
+    view._drill_into(view.visible_folder_keys()[0])      # into the dog folder
+    assert view._tree.currentItem() is not view._starred_item
+
+    view._go_back()
+    assert view._tree.currentItem() is view._starred_item  # Back returns to Starred
+
+
+def test_back_from_a_recents_preview_returns_to_the_bare_shelf(qtbot):
+    # Previewing an item on the shelf is its own history step, so Back from it lands
+    # back on the shelf with the preview cleared — not off it.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._thumb_widgets["i2"].clicked.emit("i2")   # single-click previews it on the shelf
+    assert view.selected_generation() == "i2"
+
+    view._go_back()
+    assert view._showing_recents()                 # still on the shelf...
+    assert view.selected_generation() is None      # ...with the preview cleared
+
+
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
     from origenerator.gui.animated_strip import _VideoTile
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png

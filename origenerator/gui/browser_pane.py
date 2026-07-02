@@ -137,6 +137,7 @@ class BrowserPane:
             )
             tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
             tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
+            self._wire_drag(tw)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
@@ -315,6 +316,7 @@ class BrowserPane:
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
+            self._wire_drag(tw)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
@@ -330,6 +332,11 @@ class BrowserPane:
                 if len(paths) >= _PREVIEW_COUNT:
                     break
         return paths
+
+    def _wire_drag(self, tw: ThumbnailWidget):
+        """Light the combine slot a tile fits while it's being dragged out."""
+        tw.drag_started.connect(self._v._on_thumbnail_drag_started)
+        tw.drag_ended.connect(self._v._on_thumbnail_drag_ended)
 
     def _drill_into(self, key: str):
         item = self._v._item_by_key.get(key)

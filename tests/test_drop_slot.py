@@ -3,7 +3,7 @@
 import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QPointF
-from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QDragLeaveEvent, QMovie
+from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QMovie
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.media_badge import MediaBadge
@@ -102,38 +102,21 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
 
 
-def test_a_valid_drag_over_invites_the_drop_by_highlighting(qtbot):
+def test_set_candidate_lights_and_clears_the_slot(qtbot):
+    slot = _slot(qtbot)
+
+    slot.set_candidate(True)
+    assert slot._label.property("dragActive") is True   # the drop zone stands out
+
+    slot.set_candidate(False)
+    assert slot._label.property("dragActive") is False  # cleared when the drag ends
+
+
+def test_accepts_delegates_to_the_predicate(qtbot):
     slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
 
-    _drag_enter(slot, "img1")
-
-    assert slot._label.property("dragActive") is True  # the landing spot responds
-
-
-def test_an_incompatible_drag_does_not_highlight(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
-
-    _drag_enter(slot, "vid1")  # a video over the image slot
-
-    assert slot._label.property("dragActive") is False  # no false invitation
-
-
-def test_leaving_clears_the_highlight(qtbot):
-    slot = _slot(qtbot)
-    _drag_enter(slot, "img1")
-
-    slot.dragLeaveEvent(QDragLeaveEvent())
-
-    assert slot._label.property("dragActive") is False
-
-
-def test_dropping_clears_the_highlight(qtbot):
-    slot = _slot(qtbot)
-    _drag_enter(slot, "img1")
-
-    _drop(slot, "img1")
-
-    assert slot._label.property("dragActive") is False
+    assert slot.accepts("img1") is True
+    assert slot.accepts("vid1") is False
 
 
 @pytest.mark.parametrize("kind", ["image", "video"])

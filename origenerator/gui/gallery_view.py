@@ -590,6 +590,14 @@ class GalleryView(QWidget):
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
 
+    def _on_thumbnail_drag_started(self, prompt_id: str):
+        """A gallery thumbnail began dragging: light the combine slot it fits, so
+        the drop target is obvious from the very start of the gesture."""
+        self._combine.show_drop_candidates(prompt_id)
+
+    def _on_thumbnail_drag_ended(self):
+        self._combine.clear_drop_candidates()
+
     def _generate_combination(self, image_id: str, video_id: str):
         """Generate a new video from a dropped image + a dropped video's recipe.
 

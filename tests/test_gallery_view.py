@@ -23,6 +23,7 @@ from origenerator.gui.inflight_card import InFlightItem
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -3161,3 +3162,19 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     view.restore_combine_selection(["only-one"])  # malformed
 
     assert view.combine_selection() == [None, None]
+
+
+def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tw = ThumbnailWidget("vid", None, "v")  # a video tile, wired like a real one
+    qtbot.addWidget(tw)
+    view._browser._wire_drag(tw)
+
+    tw.drag_started.emit("vid")  # the drag begins — before reaching any slot
+    assert view._combine.video_slot._label.property("dragActive") is True
+    assert view._combine.image_slot._label.property("dragActive") is False
+
+    tw.drag_ended.emit()
+    assert view._combine.video_slot._label.property("dragActive") is False

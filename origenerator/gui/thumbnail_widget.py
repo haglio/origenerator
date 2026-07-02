@@ -46,6 +46,8 @@ class ThumbnailWidget(QWidget):
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
     hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
     unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
+    drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
+    drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
@@ -175,7 +177,13 @@ class ThumbnailWidget(QWidget):
         pixmap = self._image_label.pixmap()
         if pixmap is not None and not pixmap.isNull():
             drag.setPixmap(pixmap)  # the tile's image trails the cursor
-        drag.exec(Qt.DropAction.CopyAction)
+        # Announce the drag so a combine slot can light up the moment it starts —
+        # QDrag.exec is modal, so the highlight is on for the whole gesture.
+        self.drag_started.emit(self.prompt_id)
+        try:
+            drag.exec(Qt.DropAction.CopyAction)
+        finally:
+            self.drag_ended.emit()
 
     def mouseDoubleClickEvent(self, event):
         # A left double-click is an "open" gesture; the first click's press has

@@ -51,7 +51,7 @@ class DropSlot(QWidget):
         # paints no stylesheet border without WA_StyledBackground.
         self._label = QLabel(placeholder)
         self._label.setObjectName("dropSlot")
-        self._label.setProperty("dragActive", False)  # lit while a valid drag hovers
+        self._label.setProperty("dragActive", False)  # lit while a matching drag is underway
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(_PREVIEW_SIZE)
@@ -120,8 +120,16 @@ class DropSlot(QWidget):
         pid = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
         return pid if self._accepts(pid) else None
 
-    def _set_drag_active(self, active: bool):
-        """Toggle the 'a valid drop is hovering' highlight (a stylesheet state)."""
+    def accepts(self, prompt_id: str) -> bool:
+        """Whether this slot would take ``prompt_id`` (its kind gate)."""
+        return self._accepts(prompt_id)
+
+    def set_candidate(self, active: bool):
+        """Light the slot as a valid target for the in-progress drag (or clear it).
+
+        Driven by the drag's start/end, not by hover, so the drop zone stands out
+        the moment a matching drag begins — you see where to aim before arriving.
+        """
         if self._label.property("dragActive") == active:
             return
         self._label.setProperty("dragActive", active)
@@ -129,8 +137,9 @@ class DropSlot(QWidget):
         self._label.style().polish(self._label)
 
     def dragEnterEvent(self, event):
+        # Accept so the drop lands (and the OS shows a "can drop" cursor); the
+        # highlight is already on from drag-start, so nothing to toggle here.
         if self._pid_from(event.mimeData()) is not None:
-            self._set_drag_active(True)  # invite the drop
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -141,11 +150,7 @@ class DropSlot(QWidget):
         else:
             event.ignore()
 
-    def dragLeaveEvent(self, event):
-        self._set_drag_active(False)
-
     def dropEvent(self, event):
-        self._set_drag_active(False)
         pid = self._pid_from(event.mimeData())
         if pid is None:
             event.ignore()

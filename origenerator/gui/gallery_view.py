@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, pyqtSignal
 
 from origenerator import gallery, timing
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import merge_denormalized, prepared_params
@@ -21,11 +21,13 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
 )
+from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.navigation import NavigationHistory
+from origenerator.thumbnail import generate_animated_thumbnail
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -36,6 +38,7 @@ _TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
 _PREVIEW_COUNT = 4
 _STAR_PREFIX = "★ "  # marks a starred folder in the tree label
+_ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 
 
 def _is_deletable_folder(group) -> bool:
@@ -100,6 +103,7 @@ class GalleryView(QWidget):
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed generations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
+        self._strip_pid: str | None = None  # generation whose animations the strip shows
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
@@ -214,6 +218,10 @@ class GalleryView(QWidget):
         # An i2v's input_image value links to the image it came from; follow it.
         self._meta_panel.link_activated.connect(self._on_source_link)
         info_box.addWidget(self._meta_panel, 2)
+        # For an image, the videos it was animated into — click one to open it.
+        self._animated_strip = AnimatedVideoStrip()
+        self._animated_strip.video_activated.connect(self._on_source_link)
+        info_box.addWidget(self._animated_strip)
         self._reuse_btn = QPushButton("Reuse Parameters")
         self._reuse_btn.clicked.connect(self._on_reuse)
         self._reuse_btn.setEnabled(False)
@@ -305,6 +313,8 @@ class GalleryView(QWidget):
                 self._title.set_display("")
                 self._avg_label.setText("")
                 self._show_widget(QWidget())
+                self._strip_pid = None
+                self._animated_strip.show_videos([])  # nothing selected: no animations
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
@@ -1007,11 +1017,50 @@ class GalleryView(QWidget):
         )
         source_id = gallery.find_source_image_id(row, self._image_rows)
         self._meta_panel.show_row(row, source_id)
+        self._update_animated_strip(row)
         # Every view of a generation — a thumbnail click, a folder's auto-selected
         # first item, a followed link — is a browsing step, unless a rebuild or
         # Back/Forward is re-selecting (those move within history, not onto it).
         if not self._suppress_history:
             self._record_visit(prompt_id)
+
+    def _update_animated_strip(self, row: dict):
+        """Show the videos an image was animated into. Rebuilt only when the
+        selection changes, so a poll's re-selection doesn't restart the previews
+        every tick."""
+        if row["prompt_id"] == self._strip_pid:
+            return
+        self._strip_pid = row["prompt_id"]
+        self._animated_strip.show_videos(self._animated_items(row))
+
+    def _animated_items(self, row: dict) -> list[tuple]:
+        """(prompt_id, looping-preview path, still path) for each video this image
+        was animated into — empty for anything but an image with animations."""
+        if gallery.media_type_of_row(row) != "image":
+            return []
+        videos = gallery.videos_from_source_image(row, self._video_rows())
+        if len(videos) > _ANIMATED_STRIP_LIMIT:
+            logger.info("Image %s has %d animations; showing the first %d",
+                        row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
+        return [
+            (v["prompt_id"], self._animated_preview_path(v), v.get("thumbnail_path"))
+            for v in videos[:_ANIMATED_STRIP_LIMIT]
+        ]
+
+    def _video_rows(self) -> list[dict]:
+        return [r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "video"]
+
+    def _animated_preview_path(self, video_row: dict):
+        """A cached looping WebP preview of a video, generated on first need;
+        ``None`` (fall back to the still) if its file is gone or unreadable."""
+        preview = gallery.resolve_preview(video_row, COMFYUI_OUTPUT_DIR)
+        if preview is None or preview[1] != "video":
+            return None
+        try:
+            return generate_animated_thumbnail(preview[0], THUMB_DIR, name=video_row["prompt_id"])
+        except Exception as e:
+            logger.warning("Animated preview failed for %s: %s", video_row.get("prompt_id"), e)
+            return None
 
     def _show_preview(self, row: dict):
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)

@@ -460,6 +460,43 @@ def test_history_spans_folder_navigation(qtbot):
     assert view._selected["prompt_id"] == "v1"  # Back walks folder moves, not just clicks
 
 
+def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
+    from origenerator.gui.animated_strip import _VideoTile
+    image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
+    video = _row("vid1", "wan22_i2v",
+                 {"positive_prompt": "dance", "input_image": "sdxl_t2i_img1.png"},
+                 "wan22_i2v_vid1.mp4")
+    view = GalleryView(FakeDB([image, video]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("img1")
+    assert not view._animated_strip.isHidden()
+    assert len(view._animated_strip.findChildren(_VideoTile)) == 1
+
+    # Clicking the preview navigates to that video.
+    view._animated_strip.video_activated.emit("vid1")
+    assert view._selected["prompt_id"] == "vid1"
+
+
+def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
+    from origenerator.gui.animated_strip import _VideoTile
+    image = _image("img1", "a cat", 50, 1)
+    lonely = _image("img2", "a dog", 50, 2)  # never animated
+    video = _row("vid1", "wan22_i2v",
+                 {"input_image": "sdxl_t2i_img1.png"}, "wan22_i2v_vid1.mp4")
+    view = GalleryView(FakeDB([image, lonely, video]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("vid1")   # a video isn't "animated into" anything
+    assert view._animated_strip.isHidden()
+
+    view._on_thumbnail_clicked("img2")   # an image nothing was made from
+    assert view._animated_strip.isHidden()
+    assert view._animated_strip.findChildren(_VideoTile) == []
+
+
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

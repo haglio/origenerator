@@ -231,6 +231,16 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     )
 
 
+def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[dict]:
+    """The video rows that used this image as their input — the videos it was
+    animated into. The inverse of :func:`find_source_image_id`, for showing an
+    image the animations made from it."""
+    image_id = image_row.get("prompt_id")
+    if image_id is None:
+        return []
+    return [v for v in video_rows if find_source_image_id(v, [image_row]) == image_id]
+
+
 def output_file_reference(files: list[dict]) -> str | None:
     """A ``LoadImage``-resolvable reference to a generation's first output file.
 

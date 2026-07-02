@@ -1,8 +1,10 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from PIL import Image
 
-from origenerator.thumbnail import generate_thumbnail
+import origenerator.thumbnail as thumbnail
+from origenerator.thumbnail import generate_animated_thumbnail, generate_thumbnail
 
 
 def test_generate_thumbnail_from_image(tmp_path):
@@ -47,3 +49,32 @@ def test_thumbnail_named_by_caller_not_by_source_stem(tmp_path):
     # Each thumbnail keeps its own source's proportions — no overwrite.
     assert Image.open(thumb_a).size[0] < Image.open(thumb_a).size[1]   # portrait
     assert Image.open(thumb_b).size[0] > Image.open(thumb_b).size[1]   # landscape
+
+
+def test_animated_thumbnail_writes_a_looping_multiframe_webp(tmp_path, monkeypatch):
+    frames = [Image.new("RGB", (64, 48), c) for c in ((255, 0, 0), (0, 255, 0), (0, 0, 255))]
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: frames)
+
+    result = generate_animated_thumbnail(tmp_path / "v.mp4", tmp_path / "thumbs", name="vid1")
+
+    assert result.exists() and result.suffix == ".webp"
+    anim = Image.open(result)
+    assert getattr(anim, "n_frames", 1) == 3  # every sampled frame is in the loop
+
+
+def test_animated_thumbnail_is_cached_and_not_regenerated(tmp_path, monkeypatch):
+    thumb_dir = tmp_path / "thumbs"
+    thumb_dir.mkdir()
+    (thumb_dir / "vid1_anim.webp").write_bytes(b"cached")
+    sampler = MagicMock()
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", sampler)
+
+    result = generate_animated_thumbnail(tmp_path / "v.mp4", thumb_dir, name="vid1")
+
+    assert result == thumb_dir / "vid1_anim.webp"
+    sampler.assert_not_called()  # reused the cache, didn't re-read the video
+
+
+def test_animated_thumbnail_is_none_when_no_frames_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: [])
+    assert generate_animated_thumbnail(tmp_path / "v.mp4", tmp_path / "thumbs", name="v") is None

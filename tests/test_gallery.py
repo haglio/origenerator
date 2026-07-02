@@ -18,6 +18,7 @@ from origenerator.gallery import (
     rows_under,
     settings_signature,
     source_image_id_for,
+    videos_from_source_image,
 )
 
 
@@ -249,6 +250,18 @@ def test_output_reference_round_trips_back_to_its_source_image():
     video = _row(prompt_id="vid", workflow_name="wan22_i2v",
                  params_json=json.dumps({"input_image": ref}))
     assert find_source_image_id(video, [image]) == "img-1"
+
+
+def test_videos_from_source_image_lists_the_videos_that_animated_it():
+    image = _row(prompt_id="img-1", workflow_name="sdxl_t2i",
+                 output_files=json.dumps([{"filename": "sdxl_t2i_00007_.png",
+                                           "subfolder": "image"}]))
+    used = _row(prompt_id="v-used", workflow_name="wan22_i2v",
+                params_json=json.dumps({"input_image": "image/sdxl_t2i_00007_.png [output]"}))
+    other = _row(prompt_id="v-other", workflow_name="wan22_i2v",
+                 params_json=json.dumps({"input_image": "somethingelse.png"}))
+    assert videos_from_source_image(image, [used, other]) == [used]
+    assert videos_from_source_image(image, [other]) == []
 
 
 def test_find_source_image_returns_none_without_a_match():

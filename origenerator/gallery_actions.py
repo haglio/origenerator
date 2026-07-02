@@ -18,8 +18,10 @@ from origenerator.gallery import output_disk_files
 
 @dataclass
 class _UndoEntry:
+    # ``undo`` returns a prompt_id to navigate back to (a restored generation), or
+    # ``None`` when there's nowhere in particular to go (e.g. a rename).
     label: str
-    undo: Callable[[], None]
+    undo: Callable[[], str | None]
     commit: Callable[[], None] | None = None  # run when dropped without undoing
 
 
@@ -44,10 +46,11 @@ class GalleryActions:
 
         captured = list(rows)
 
-        def undo() -> None:
+        def undo() -> str | None:
             batch.restore()
             for row in captured:
                 self._db.restore_generation(row)
+            return captured[0]["prompt_id"]  # a restored item to navigate back to
 
         self._push(_UndoEntry(_delete_label(len(rows)), undo, batch.purge))
 
@@ -83,10 +86,12 @@ class GalleryActions:
     def undo_label(self) -> str | None:
         return self._stack[-1].label if self._stack else None
 
-    def undo(self) -> None:
+    def undo(self) -> str | None:
+        """Reverse the most recent mutation, returning a prompt_id to navigate
+        back to (a restored generation) when the undone step has one."""
         if not self._stack:
-            return
-        self._stack.pop().undo()
+            return None
+        return self._stack.pop().undo()
 
     def _push(self, entry: _UndoEntry) -> None:
         self._stack.append(entry)

@@ -418,16 +418,71 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
 
 
-def test_nav_and_undo_are_compact_icon_buttons(qtbot):
+def test_toolbar_is_a_group_of_compact_icon_buttons(qtbot):
     from PyQt6.QtWidgets import QToolButton
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
-    # Back, forward and undo are now one group of icon-only tool buttons, not the
-    # oversized text buttons that split them across the header.
-    for btn in (view._back_btn, view._forward_btn, view._undo_btn):
+    # Back, forward, undo and delete are one group of icon-only tool buttons, not
+    # the oversized text buttons that split them across the header.
+    for btn in (view._back_btn, view._forward_btn, view._undo_btn, view._delete_btn):
         assert isinstance(btn, QToolButton)
         assert not btn.icon().isNull()
         assert btn.text() == ""
+
+
+def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    images = _top_level(view._tree)["Images"]  # a media group — not deletable, nothing picked
+    view._tree.setCurrentItem(images)
+    assert not view._delete_btn.isEnabled()
+
+    _select_first_leaf(view)                    # a settings folder — deletable
+    assert view._delete_btn.isEnabled()
+
+    view._thumbnail_clicked("i1")               # a picked thumbnail — deletable
+    assert view._delete_btn.isEnabled()
+
+
+def test_delete_button_deletes_the_picked_thumbnails(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
+                       actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._thumbnail_clicked("i1")
+
+    view._delete_btn.click()
+
+    assert actions.deleted and {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+
+
+def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    for pid, prompt, steps in (("a", "alpha", 10), ("b", "beta", 20)):  # two settings folders
+        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+                             positive_prompt=prompt, seed=1,
+                             params_json=json.dumps({"positive_prompt": prompt, "seed": 1, "steps": steps}),
+                             workflow_json="{}")
+        db.update_generation(pid, status="completed",
+                             output_files=json.dumps([{"filename": f"{pid}.png", "subfolder": ""}]))
+    actions = GalleryActions(db, tmp_path / "out", Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["a"])  # the folder holding "a"
+    view._confirm = lambda text: True
+    view._delete_folder(view._current_deletable_folder())
+    assert db.get_generation("a") is None
+    assert view._selected["prompt_id"] != "a"          # navigated off the emptied folder
+
+    view._undo()
+    assert db.get_generation("a") is not None            # restored
+    assert view._selected["prompt_id"] == "a"            # and back where we deleted from
 
 
 def test_back_after_following_a_link_returns_to_the_initial_view(qtbot):

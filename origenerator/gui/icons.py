@@ -30,6 +30,10 @@ def undo_icon() -> QIcon:
     return _two_mode(_draw_undo)
 
 
+def delete_icon() -> QIcon:
+    return _two_mode(lambda p, _color: _draw_trash(p))
+
+
 def _two_mode(draw) -> QIcon:
     icon = QIcon()
     icon.addPixmap(_render(draw, TEXT_PRIMARY), QIcon.Mode.Normal)
@@ -70,3 +74,14 @@ def _draw_undo(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(19, 15), QPointF(28, 10), QPointF(28, 20))
+
+
+def _draw_trash(painter: QPainter):
+    """A trash can: lid with a small handle over a lightly tapered body."""
+    painter.drawLine(QPointF(13, 16), QPointF(35, 16))                       # lid
+    painter.drawPolyline(QPointF(20, 16), QPointF(20, 12),
+                         QPointF(28, 12), QPointF(28, 16))                    # handle
+    painter.drawPolyline(QPointF(16, 16), QPointF(18, 37),
+                         QPointF(30, 37), QPointF(32, 16))                    # body
+    painter.drawLine(QPointF(21, 20), QPointF(22, 33))                       # ridges
+    painter.drawLine(QPointF(27, 20), QPointF(26, 33))

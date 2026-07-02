@@ -109,6 +109,7 @@ class GalleryView(QWidget):
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
+        self._sync_delete_button()
         # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
         # Neither keyPressEvent nor a shortcut delivered the key in the running
         # app — a clicked thumbnail's key press never reached the view through
@@ -190,13 +191,14 @@ class GalleryView(QWidget):
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
         header.addWidget(self._title, 1)
-        # A compact, grouped toolbar: browse back/forward and undo, all icon-only.
+        # A compact, grouped toolbar: browse back/forward, undo, delete — icon-only.
         self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
         self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
         self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
+        self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
-        for button in (self._back_btn, self._forward_btn, self._undo_btn):
+        for button in (self._back_btn, self._forward_btn, self._undo_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -395,6 +397,7 @@ class GalleryView(QWidget):
             self._show_widget(QWidget())
             self._visible_ids = []
             self._visible_keys = []
+            self._sync_delete_button()
             return
         group = current.data(0, _GROUP_ROLE)
         self._title.set_display(self._breadcrumb(current))
@@ -404,6 +407,7 @@ class GalleryView(QWidget):
         else:
             self._show_folder_tiles(gallery.child_groups(group))
         self._select_first_item(group)
+        self._sync_delete_button()
 
     def _select_first_item(self, group):
         """Immediately preview the first generation under the chosen folder."""
@@ -831,11 +835,13 @@ class GalleryView(QWidget):
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():
             widget.set_selected(pid in self._selected_ids)
+        self._sync_delete_button()
 
     def _clear_selection(self):
         self._selected_ids = set()
         self._selection_anchor = None
         self._thumb_widgets = {}
+        self._sync_delete_button()
 
     def selected_prompt_ids(self) -> list[str]:
         return [pid for pid in self._visible_ids if pid in self._selected_ids]
@@ -915,9 +921,13 @@ class GalleryView(QWidget):
         if not self._actions.can_undo():
             return
         self._preview.clear()
-        self._actions.undo()
+        focus = self._actions.undo()  # a restored generation to return to, if any
         self._clear_selection()
         self.refresh()
+        # After undoing a delete, go back to the folder it emptied (now restored),
+        # rather than leaving the user on the parent we'd navigated to.
+        if focus and focus in self._leaf_by_id:
+            self._show_generation(focus)
         self._sync_undo_button()
 
     def _sync_undo_button(self):
@@ -1132,6 +1142,21 @@ class GalleryView(QWidget):
     def _sync_nav_buttons(self):
         self._back_btn.setEnabled(self._history.can_go_back())
         self._forward_btn.setEnabled(self._history.can_go_forward())
+
+    def _sync_delete_button(self):
+        """Enable Delete when there's a target — picked thumbnails, else the
+        current deletable folder — and say which in its tooltip."""
+        count = len(self._selected_ids)
+        folder = self._current_deletable_folder()
+        if count:
+            self._delete_btn.setEnabled(True)
+            self._delete_btn.setToolTip(f"Delete {count} item{'s' if count != 1 else ''}")
+        elif folder is not None:
+            self._delete_btn.setEnabled(True)
+            self._delete_btn.setToolTip(f"Delete folder “{folder.label}”")
+        else:
+            self._delete_btn.setEnabled(False)
+            self._delete_btn.setToolTip("Nothing to delete")
 
     def _clear_metadata(self):
         self._selected = None

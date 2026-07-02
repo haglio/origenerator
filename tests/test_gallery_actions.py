@@ -62,6 +62,25 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     assert not actions.can_undo()
 
 
+def test_undo_of_a_delete_returns_a_restored_prompt_id(tmp_path):
+    # The view uses it to navigate back to the folder the delete emptied.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    actions.delete_rows([row])
+    assert actions.undo() == "p1"
+
+
+def test_undo_of_a_rename_returns_no_focus(tmp_path):
+    actions, _db, _out = _actions(tmp_path)
+    actions.rename_folder("media/wf/deadbeef", "My Folder")
+    assert actions.undo() is None
+
+
+def test_undo_with_nothing_to_undo_returns_none(tmp_path):
+    actions, _db, _out = _actions(tmp_path)
+    assert actions.undo() is None
+
+
 def test_delete_also_takes_the_video_metadata_sidecar(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "v1", "clip.mp4", subfolder="video")

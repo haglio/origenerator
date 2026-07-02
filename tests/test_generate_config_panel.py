@@ -7,7 +7,9 @@ from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -87,7 +89,7 @@ def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkey
     _complete_one(panel)
     asked = []
     monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
     )
 
     panel._on_generate()  # identical config, seed not random
@@ -99,7 +101,7 @@ def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkey
 
 def test_generate_duplicate_reroll_randomizes_seed_and_checks_random(panel, monkeypatch):
     _complete_one(panel, seed=12345)
-    monkeypatch.setattr(panel, "_offer_reroll", lambda wf: True)
+    monkeypatch.setattr(panel, "_offer_reroll", lambda wf, params: REROLL_VIDEO)
 
     panel._on_generate()
 
@@ -114,7 +116,7 @@ def test_generate_with_random_seed_never_warns(panel, monkeypatch):
     panel._param_form.set_seed_random(True)  # but the user re-checks Random
     asked = []
     monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
     )
 
     panel._on_generate()
@@ -126,7 +128,7 @@ def test_generate_with_random_seed_never_warns(panel, monkeypatch):
 def test_generate_does_not_warn_when_no_prior_match(panel, monkeypatch):
     asked = []
     monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf: asked.append(wf) or False
+        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
     )
     panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
 
@@ -197,6 +199,25 @@ def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
     params = json.loads(video["params_json"])
     assert params["input_image"] == "a.png [output]"  # the fresh image's output, annotated
     assert params["positive_prompt"] == "dance"
+
+
+def test_i2v_duplicate_image_seed_choice_draws_a_fresh_frame_keeping_the_video_seed(
+    qtbot, tmp_path, monkeypatch
+):
+    # Picking "New Image Seed" on a would-be duplicate i2v regenerates the start
+    # frame (the source image's own SDXL job) instead of re-submitting the video.
+    submit = MagicMock(return_value="x")
+    panel, _client, _db = _i2v_panel(qtbot, tmp_path, submit)
+    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
+    monkeypatch.setattr(gcp_module, "find_duplicate_generation", lambda rows, snap: {"prompt_id": "dup"})
+    monkeypatch.setattr(panel, "_offer_reroll", lambda wf, params: REROLL_IMAGE)
+
+    panel._on_generate()
+
+    assert panel._input_image_job is not None                  # a fresh start frame is drawing
+    assert panel._input_image_job.workflow.name == "sdxl_t2i"
+    assert panel._client_prompt_id is None                     # the video waits for that frame
+    submit.assert_called_once()                                # only the image job, so far
 
 
 def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):

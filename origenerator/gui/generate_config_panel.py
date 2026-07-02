@@ -22,7 +22,9 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.reroll_prompt import offer_reroll
+from origenerator.gui.reroll_prompt import (
+    REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
+)
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.progress import ProgressTracker
@@ -290,10 +292,17 @@ class GenerateConfigPanel(QWidget):
         """
         snapshot = ConfigSnapshot(wf.name, params, self._param_form.seed_is_random())
         if find_duplicate_generation(self._db.list_generations(), snapshot):
-            if not self._offer_reroll(wf):
+            choice = self._offer_reroll(wf, params)
+            if choice is None:
                 return  # let the user change something rather than duplicate it
-            params = randomize_seeds(params, wf.seed_keys())
-            self._param_form.set_seed_random(True)
+            if choice in (REROLL_VIDEO, REROLL_BOTH):
+                params = randomize_seeds(params, wf.seed_keys())
+                self._param_form.set_seed_random(True)
+            if choice in (REROLL_IMAGE, REROLL_BOTH):
+                # Draw a fresh start frame (new image seed) and run the video on
+                # it, carrying whatever video seed we settled on just above.
+                self._generate_random_input_then_run(wf, params)
+                return
 
         # Build the job now (fixing the seed), but let the queue decide when it runs.
         prompt_id = str(uuid.uuid4())
@@ -376,9 +385,14 @@ class GenerateConfigPanel(QWidget):
             key, self._input_image_source(value) is not None
         )
 
-    def _offer_reroll(self, wf) -> bool:
-        """Ask whether to re-roll a would-be duplicate (shared with the gallery)."""
-        return offer_reroll(self, wf)
+    def _offer_reroll(self, wf, params: dict) -> str | None:
+        """Ask whether/how to re-roll a would-be duplicate (shared with the gallery).
+
+        Offers the i2v two-seed choice only when the input image is itself a
+        reproducible generation, so a fresh start frame can be drawn from it.
+        """
+        can_reroll_image = self._input_image_source(params.get("input_image")) is not None
+        return offer_reroll(self, wf, can_reroll_image=can_reroll_image)
 
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict,
                      keep_preview: bool = False):

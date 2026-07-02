@@ -3,7 +3,7 @@ import logging
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QToolButton, QSplitter,
+    QScrollArea, QPushButton, QToolButton, QSplitter, QTabWidget,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -273,7 +273,11 @@ class GalleryView(QWidget):
         )
         self._evolver_btn.hide()
         info_box.addWidget(self._evolver_btn)
-        self._panes.addWidget(info)
+        # The info pane is a tab widget: this Inspect page is tab 0 — always
+        # present, not closable — and editable config tabs open after it.
+        self._info_tabs = QTabWidget()
+        self._info_tabs.addTab(info, "Inspect")
+        self._panes.addWidget(self._info_tabs)
         # The controller drives the pane's widgets from the generation on display;
         # an i2v source link or an animation click surfaces here as a source link,
         # and Reuse re-emits as this view's reuse_requested.
@@ -295,7 +299,7 @@ class GalleryView(QWidget):
         # third or a portrait-monitor half.
         toc.setMinimumWidth(120)
         browser.setMinimumWidth(210)
-        info.setMinimumWidth(300)
+        self._info_tabs.setMinimumWidth(300)
         self._panes.setStretchFactor(0, 0)
         self._panes.setStretchFactor(1, 3)
         self._panes.setStretchFactor(2, 2)

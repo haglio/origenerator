@@ -1000,6 +1000,18 @@ def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     assert view._panes.widget(2).minimumWidth() >= 280
 
 
+def test_info_pane_is_a_tab_widget_with_an_inspect_tab(qtbot):
+    from PyQt6.QtWidgets import QTabWidget
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    # The info pane is a tab widget: tab 0 is the always-present Inspect view
+    # (preview + metadata + Reuse); editable config tabs open after it.
+    assert isinstance(view._info_tabs, QTabWidget)
+    assert view._panes.widget(2) is view._info_tabs
+    assert view._info_tabs.tabText(0) == "Inspect"
+    assert view._info_tabs.widget(0).isAncestorOf(view._preview)
+
+
 def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

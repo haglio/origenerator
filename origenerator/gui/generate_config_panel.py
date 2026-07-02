@@ -60,6 +60,7 @@ class GenerateConfigPanel(QWidget):
         self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
         self._input_image_job: GenerationJob | None = None  # a random-input pre-step, before the main job
+        self._last_frame: bytes | None = None         # latest live preview frame, for an external in-flight view
         self._build_ui()
         self._connect_signals()
 
@@ -330,7 +331,7 @@ class GenerateConfigPanel(QWidget):
         source_row, image_wf = source
         job = GenerationJob(self._client, image_wf, prepared_params(source_row, image_wf))
         self._input_image_job = job
-        job.preview.connect(self._preview.show_frame)  # watch the frame take shape
+        job.preview.connect(self._note_frame)  # watch the frame take shape
         job.finished.connect(
             lambda files, thumb, dur, j=job: self._on_input_image_done(wf, params, j, files, thumb, dur)
         )
@@ -433,6 +434,32 @@ class GenerateConfigPanel(QWidget):
         """
         return self._client_prompt_id
 
+    def in_flight_descriptor(self) -> dict | None:
+        """This panel's in-flight job as a plain descriptor for an external
+        in-flight view (the gallery's Recents shelf), or ``None`` when idle.
+
+        Covers every in-flight stage: a job actively executing, one still waiting
+        its turn in the local queue (staged but not begun), and the random-input
+        pre-step that runs before the main job. ``frame`` is the latest live
+        preview, if one has arrived. A container pairs this with a way to reveal
+        the panel, so a click on the card brings this tab forward.
+        """
+        if self._input_image_job is not None:
+            prompt_id, status = self._input_image_job.prompt_id, "running"
+        elif self._client_prompt_id is not None:
+            prompt_id = self._client_prompt_id
+            status = "running" if self._executing else "queued"
+        elif self._prepared is not None:
+            prompt_id, status = self._prepared["record"]["prompt_id"], "queued"
+        else:
+            return None
+        return {
+            "key": prompt_id,
+            "caption": self.title(),
+            "status": status,
+            "frame": self._last_frame,
+        }
+
     def reconnect(self, prompt_id: str, workflow, payload: dict):
         """Rebind to a job already running in ComfyUI, submitted by a prior session.
 
@@ -533,7 +560,14 @@ class GenerateConfigPanel(QWidget):
     def _on_preview(self, prompt_id: str, data: bytes):
         if self._is_mine(prompt_id):
             self._mark_running()
-            self._preview.show_frame(data)
+            self._note_frame(data)
+
+    def _note_frame(self, data: bytes):
+        """Remember the latest live preview frame — shown in this panel's preview
+        and mirrored into any external in-flight view (the gallery's Recents shelf,
+        which pulls it via :meth:`in_flight_descriptor`) — and display it here."""
+        self._last_frame = data
+        self._preview.show_frame(data)
 
     def _on_completed(self, prompt_id: str, history_data: dict):
         if not self._is_mine(prompt_id):
@@ -622,6 +656,7 @@ class GenerateConfigPanel(QWidget):
         self._submitted_workflow = None
         self._executing = False
         self._progress_tracker = None
+        self._last_frame = None
 
     def settings_key(self) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).

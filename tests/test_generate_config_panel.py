@@ -768,3 +768,52 @@ def test_cancel_colors_the_bar_yellow(panel):
     panel._on_generate()
     panel._on_cancel()
     assert panel._progress.property("barState") == "canceled"
+
+
+# --- in-flight descriptor: what the gallery's Recents shelf reads from a tab ---
+
+def test_in_flight_descriptor_is_none_when_idle(panel):
+    assert panel.in_flight_descriptor() is None
+
+
+def test_in_flight_descriptor_reports_a_running_job_and_mirrors_its_frame(panel):
+    panel._param_form.set_values({"positive_prompt": "a cat", "seed": 1})
+    panel._on_generate()  # no queue: submits at once, then waits on ComfyUI
+    desc = panel.in_flight_descriptor()
+    assert desc["key"] == panel._client_prompt_id
+    assert desc["status"] == "queued"        # submitted, ComfyUI hasn't begun it
+    assert desc["frame"] is None
+
+    panel._client.preview_image.emit(panel._client_prompt_id, b"frame-bytes")
+    desc = panel.in_flight_descriptor()
+    assert desc["status"] == "running"       # a preview means our prompt is executing
+    assert desc["frame"] == b"frame-bytes"
+
+
+def test_in_flight_descriptor_clears_when_the_job_finishes(panel):
+    panel._on_generate()
+    panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
+    assert panel.in_flight_descriptor() is None
+
+
+def test_in_flight_descriptor_reports_a_tab_queued_behind_a_running_one(qtbot, tmp_path):
+    from origenerator.job_queue import JobQueue
+    client = ComfyUIClient()
+    client.submit_job = lambda payload, prompt_id: prompt_id
+    db = Database(tmp_path / "q.db")
+    queue = JobQueue(db)
+    running = GenerateConfigPanel(client, db, queue=queue)
+    waiting = GenerateConfigPanel(client, db, queue=queue)
+    qtbot.addWidget(running)
+    qtbot.addWidget(waiting)
+    running._param_form.set_values({"seed": 1})
+    waiting._param_form.set_values({"seed": 2})
+
+    running._on_generate()   # takes the single slot and runs
+    waiting._on_generate()   # sits in the local queue behind it, no DB row yet
+
+    desc = waiting.in_flight_descriptor()
+    assert desc["status"] == "queued"
+    # A waiting tab still has a card, keyed by its staged id, though it isn't yet a
+    # live job (nothing to reconnect to) — so active_prompt_id stays None.
+    assert desc["key"] and waiting.active_prompt_id() is None

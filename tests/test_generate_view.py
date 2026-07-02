@@ -333,6 +333,43 @@ def test_active_prompt_ids_collects_in_flight_tabs(view):
     assert view.active_prompt_ids() == {p0._client_prompt_id}
 
 
+# --- in-flight items: the cards the gallery's Recents shelf reads from here ---
+
+def test_in_flight_items_is_empty_when_nothing_is_generating(view):
+    assert view.in_flight_items() == []
+
+
+def test_in_flight_items_reports_a_running_generate_job(view):
+    view._client.submit_job = MagicMock(return_value="x")
+    panel = view._subtabs.widget(0)
+    panel._on_generate()
+    items = view.in_flight_items()
+    assert len(items) == 1
+    assert items[0].key == panel.active_prompt_id()
+
+
+def test_in_flight_items_includes_a_tab_queued_behind_a_running_one(view):
+    view._client.submit_job = MagicMock(return_value="x")
+    p1 = view._subtabs.widget(0)
+    p2 = view._add_subtab()
+    p1._param_form.set_values({"seed": 1})
+    p2._param_form.set_values({"seed": 2})
+    p1._on_generate()   # running
+    p2._on_generate()   # queued behind it — no DB row, but still in flight
+    assert len(view.in_flight_items()) == 2
+
+
+def test_revealing_an_item_selects_its_tab_and_asks_to_come_forward(view, qtbot):
+    view._client.submit_job = MagicMock(return_value="x")
+    first = view._subtabs.widget(0)
+    view._add_subtab()  # a second tab is now current
+    assert view._subtabs.currentWidget() is not first
+    first._on_generate()  # the first tab is the one generating
+    with qtbot.waitSignal(view.reveal_requested):
+        view.in_flight_items()[0].reveal()
+    assert view._subtabs.currentWidget() is first  # reveal jumped to the generating tab
+
+
 def test_restore_state_rebuilds_tabs_replacing_default(view):
     state = {"tabs": [
         _config_tab("wan22_i2v", {"positive_prompt": "a fox"}),

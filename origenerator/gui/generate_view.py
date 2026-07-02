@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QToolButton,
     QInputDialog, QStackedWidget, QLabel, QPushButton, QApplication,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -15,6 +15,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.inflight_card import InFlightItem
 from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -25,6 +26,8 @@ class GenerateView(QWidget):
     folder, the settings form and run controls, and a live preview — so the tab
     row spans all three. Clicking a strip thumbnail opens (or reuses) a subtab
     carrying that generation's settings."""
+
+    reveal_requested = pyqtSignal()  # ask the container to bring this tab forward
 
     def __init__(self, client: ComfyUIClient, db: Database, parent=None):
         super().__init__(parent)
@@ -203,6 +206,32 @@ class GenerateView(QWidget):
             if pid:
                 ids.add(pid)
         return ids
+
+    def in_flight_items(self) -> list[InFlightItem]:
+        """A card per in-flight Generate job — running or waiting its turn in the
+        local queue — for the gallery's Recents shelf. Each carries a reveal that
+        brings this tab forward and selects the job's subtab, so clicking the card
+        lands on the panel that's running it.
+        """
+        items = []
+        for i in range(self._subtabs.count()):
+            panel = self._subtabs.widget(i)
+            desc = panel.in_flight_descriptor()
+            if desc is None:
+                continue
+            items.append(InFlightItem(
+                key=desc["key"], caption=desc["caption"], status=desc["status"],
+                frame=desc["frame"], reveal=lambda p=panel: self._reveal_panel(p),
+            ))
+        return items
+
+    def _reveal_panel(self, panel):
+        """Select ``panel`` and ask the container to bring the Generate tab
+        forward — landing a Recents-card click on the panel running its job."""
+        index = self._subtabs.indexOf(panel)
+        if index >= 0:
+            self._subtabs.setCurrentIndex(index)
+        self.reveal_requested.emit()
 
     def restore_state(self, state: dict):
         """Rebuild the subtabs from a :meth:`capture_state` snapshot.

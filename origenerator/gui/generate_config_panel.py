@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
-    QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
+    QComboBox, QPushButton, QProgressBar, QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -22,6 +22,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.reroll_prompt import offer_reroll
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.progress import ProgressTracker
@@ -381,28 +382,8 @@ class GenerateConfigPanel(QWidget):
         )
 
     def _offer_reroll(self, wf) -> bool:
-        """Warn that this exact config was already generated; ask whether to re-roll.
-
-        Re-running it would just re-create an identical output, so the only
-        useful choices are a fresh random seed or backing out to change a
-        setting. Returns ``True`` to re-roll with a new random seed, ``False`` to
-        cancel (also the dialog's close box).
-        """
-        media = wf.output_type if wf.output_type in ("image", "video") else "output"
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setWindowTitle("Already generated")
-        box.setText(
-            f"You've already generated this exact {media} — same settings and "
-            f"the same seed.\nRunning it again will just re-create an identical "
-            f"{media}."
-        )
-        box.setInformativeText("Generate a new random seed instead, or cancel to change a setting?")
-        reroll = box.addButton("New Random Seed", QMessageBox.ButtonRole.AcceptRole)
-        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        box.setDefaultButton(reroll)
-        box.exec()
-        return box.clickedButton() is reroll
+        """Ask whether to re-roll a would-be duplicate (shared with the gallery)."""
+        return offer_reroll(self, wf)
 
     def _prepare_job(self, *, payload: dict, workflow, queue_name: str, record: dict,
                      keep_preview: bool = False):

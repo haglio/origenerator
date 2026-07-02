@@ -418,6 +418,48 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
 
 
+def test_nav_buttons_show_arrow_labels_without_width_clipping(qtbot):
+    # The buttons carried a hardcoded 32px width, narrower than the stylesheet's
+    # own side padding, which clipped the arrow to a blank button.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    assert view._back_btn.text() == "←"
+    assert view._forward_btn.text() == "→"
+    assert view._back_btn.maximumWidth() > 32     # no longer pinned narrower than its padding
+    assert view._forward_btn.maximumWidth() > 32
+
+
+def test_back_after_following_a_link_returns_to_the_initial_view(qtbot):
+    # The gallery opens on a generation the user never "clicked"; Back must still
+    # return there after their first move is following a link.
+    image = _image("img1", "a cat", 50, 1)
+    video = _row("vid1", "wan22_i2v",
+                 {"positive_prompt": "dance", "seed": 5,
+                  "input_image": "sdxl_t2i_img1.png"},
+                 "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([video, image]))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert view._selected["prompt_id"] == "vid1"  # opened here, unprompted
+
+    view._on_source_link("img1")                  # first move: follow the link
+    assert view._selected["prompt_id"] == "img1"
+    view._go_back()
+    assert view._selected["prompt_id"] == "vid1"  # Back to where it opened
+
+
+def test_history_spans_folder_navigation(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # browse to the video folder
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then to the image folder
+    assert view._selected["prompt_id"] == "i1"
+
+    view._go_back()
+    assert view._selected["prompt_id"] == "v1"  # Back walks folder moves, not just clicks
+
+
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

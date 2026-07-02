@@ -99,6 +99,7 @@ class GalleryView(QWidget):
         self._pending_selection: str | None = None  # a generation to highlight once shown
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed generations
+        self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
@@ -240,9 +241,10 @@ class GalleryView(QWidget):
         layout.addWidget(self._panes)
 
     def _nav_button(self, label: str, tooltip: str, handler) -> QPushButton:
+        # Size to the label: the stylesheet's 16px side padding alone is wider
+        # than a hardcoded 32px, which clipped the arrow to a blank button.
         btn = QPushButton(label)
         btn.setToolTip(tooltip)
-        btn.setFixedWidth(32)
         btn.clicked.connect(handler)
         return btn
 
@@ -292,14 +294,24 @@ class GalleryView(QWidget):
         self._populate_tree(gallery.build_gallery_tree(rows, meta), expanded)
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._default_item()
-        if target is not None:
-            self._tree.setCurrentItem(target)  # shows the folder's thumbnails
-            self._reselect_generation(selected_gen)
-        else:
-            self._title.set_display("")
-            self._avg_label.setText("")
-            self._show_widget(QWidget())
-        self._restore_reroll_selection(reroll_key, reroll_frame)
+        # A rebuild restores the prior view; that re-selection isn't a navigation,
+        # so keep it off the history (a poll would otherwise pile up duplicates).
+        self._suppress_history = True
+        try:
+            if target is not None:
+                self._tree.setCurrentItem(target)  # shows the folder's thumbnails
+                self._reselect_generation(selected_gen)
+            else:
+                self._title.set_display("")
+                self._avg_label.setText("")
+                self._show_widget(QWidget())
+            self._restore_reroll_selection(reroll_key, reroll_frame)
+        finally:
+            self._suppress_history = False
+        # Seed history once with wherever the gallery first lands, so Back works
+        # even if the user's very first move is following a link.
+        if self._selected and self._history.current() is None:
+            self._record_visit(self._selected["prompt_id"])
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -758,8 +770,7 @@ class GalleryView(QWidget):
 
     def _thumbnail_clicked(self, prompt_id: str):
         self._apply_selection(prompt_id, QApplication.keyboardModifiers())
-        self._on_thumbnail_clicked(prompt_id)
-        self._record_visit(prompt_id)
+        self._on_thumbnail_clicked(prompt_id)  # records the visit itself
 
     def _apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.
@@ -996,6 +1007,11 @@ class GalleryView(QWidget):
         )
         source_id = gallery.find_source_image_id(row, self._image_rows)
         self._meta_panel.show_row(row, source_id)
+        # Every view of a generation — a thumbnail click, a folder's auto-selected
+        # first item, a followed link — is a browsing step, unless a rebuild or
+        # Back/Forward is re-selecting (those move within history, not onto it).
+        if not self._suppress_history:
+            self._record_visit(prompt_id)
 
     def _show_preview(self, row: dict):
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
@@ -1011,12 +1027,18 @@ class GalleryView(QWidget):
     # --- back/forward navigation ------------------------------------------
 
     def _show_generation(self, prompt_id: str):
-        """Select a generation and its folder — the move Back/Forward and a link
-        both make, minus the history bookkeeping the recording callers add."""
-        leaf = self._leaf_by_id.get(prompt_id)
-        if leaf is not None:
-            self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
-        self._on_thumbnail_clicked(prompt_id)
+        """Select a generation and its folder without recording — the move
+        Back/Forward and a link both make. Switching folders auto-selects the
+        folder's first item on the way; suppressing keeps that off the history,
+        and a recording caller (a link) adds the real target itself afterward."""
+        self._suppress_history = True
+        try:
+            leaf = self._leaf_by_id.get(prompt_id)
+            if leaf is not None:
+                self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
+            self._on_thumbnail_clicked(prompt_id)
+        finally:
+            self._suppress_history = False
 
     def _record_visit(self, prompt_id: str):
         self._history.visit(prompt_id)

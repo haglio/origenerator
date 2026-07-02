@@ -227,3 +227,30 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_subtab(qtbot, tmp_pa
     gv._on_inflight_clicked(pid)       # click that card
     assert win._tabs.currentWidget() is win._generate_view   # brought Generate forward
     assert gen._subtabs.currentWidget() is first             # on the generating subtab
+
+
+def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
+    # The reported bug: a Generate tab's job left running by a prior session (here an
+    # i2v video), with the gallery restored onto Recents. It must show as an
+    # in-flight card — the shelf reads the database's running rows, so a card
+    # appears whether or not the reconnected tab is tracking the job this instant.
+    db = Database(tmp_path / "t.db")
+    vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
+                      seed=7, positive_prompt="x", input_image="img.png")
+    db.insert_generation(prompt_id="vid_run", workflow_name="wan22_i2v",
+                         workflow_version="v", positive_prompt="x", seed=7,
+                         params_json=json.dumps(vid_params),
+                         workflow_json=json.dumps({"1": {"inputs": {}}}))
+    db.update_generation("vid_run", status="running")
+    state = AppState(tmp_path / "ui.json")
+    state.set("generate_tabs", {"tabs": [
+        {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
+         "title": None, "active_prompt_id": "vid_run"},
+    ], "current": 0})
+    state.set("gallery_folder", "__recents__")
+    win = _window(qtbot, tmp_path, state)
+
+    gv = win._gallery_view
+    gv.refresh()
+    gv._tree.setCurrentItem(gv._recents_item)
+    assert "vid_run" in gv._inflight_cards

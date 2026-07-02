@@ -638,26 +638,51 @@ class GalleryView(QWidget):
                 card.update_item(item)
 
     def _inflight_items(self) -> list:
-        """Every queued/running generation as a card model — this gallery's re-rolls
-        and the Generate tabs' jobs — running ones before merely queued ones."""
-        items = self._reroll_inflight_items() + list(self._generate_inflight())
-        items.sort(key=lambda it: it.status != "running")  # stable: running first
-        return items
+        """Every queued/running generation as a card model, running ones first.
 
-    def _reroll_inflight_items(self) -> list:
-        """A card per live gallery re-roll, keyed by the folder it runs in — a click
-        opens that folder, where the re-roll's own tile already shows progress."""
-        items = []
-        for key, job in self._reroll_jobs.items():
-            if job.state not in ("queued", "running"):
+        The database's running/pending rows are the source of truth for what's in
+        flight — a Generate tab's job or a gallery re-roll — so a card shows even
+        when no live job object is tracking a row (after a restart that hasn't
+        re-adopted it, say). Live frames and tab-routing are grafted on from the
+        tracking objects when present: a Generate tab's own job carries them, and
+        a re-roll's frame comes from its :class:`GenerationJob`. A Generate tab
+        still waiting its turn in the local queue has no row yet, so those are
+        added straight from the provider.
+        """
+        generate = {it.key: it for it in self._generate_inflight()}
+        reroll_by_pid = {job.prompt_id: (key, job)
+                         for key, job in self._reroll_jobs.items()}
+        image_index = None  # built lazily, only to place an untracked row's folder
+        items, seen = [], set()
+        for row in self._db.list_generations():
+            if row.get("status") not in ("running", "pending"):
                 continue
+            pid = row["prompt_id"]
+            seen.add(pid)
+            if pid in generate:
+                items.append(generate[pid])  # a Generate tab's job: its own frame + reveal
+                continue
+            tracked = reroll_by_pid.get(pid)
+            if tracked is not None:
+                folder_key, frame = tracked[0], tracked[1].last_preview
+            else:  # a running row no live job holds — still show it, keyed to its folder
+                if image_index is None:
+                    image_index = gallery.build_image_config_index(self._image_rows)
+                folder_key, frame = gallery.settings_folder_key(row, image_index), None
             items.append(InFlightItem(
-                key=job.prompt_id,
-                caption=gallery.config_tab_title(job.workflow.name, job.params),
-                status="running" if job.state == "running" else "queued",
-                frame=job.last_preview,
-                reveal=lambda k=key: self._reveal_reroll(k),
+                key=pid,
+                caption=gallery.config_tab_title(
+                    row.get("workflow_name") or "", gallery.parse_params(row.get("params_json"))
+                ),
+                status="running" if row.get("status") == "running" else "queued",
+                frame=frame,
+                reveal=lambda k=folder_key: self._reveal_reroll(k),
             ))
+        # A Generate tab queued behind another carries no DB row yet — add it too.
+        for pid, item in generate.items():
+            if pid not in seen:
+                items.append(item)
+        items.sort(key=lambda it: it.status != "running")  # stable: running first
         return items
 
     def _reveal_reroll(self, key: str):

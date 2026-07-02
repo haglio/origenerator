@@ -69,6 +69,28 @@ class RerollController(QObject):
         self._launch(key, workflow, params, self._on_finished)
         return key in self._jobs
 
+    def start_reroll_from_image(self, key: str, image_row: dict, image_workflow,
+                                video_workflow, video_params: dict) -> bool:
+        """Re-roll a fresh start frame from ``image_row`` (a new image seed), then
+        run ``video_workflow`` with the already-built ``video_params`` on it.
+
+        The gallery combine's image-seed and both-seed choices: the frame to re-roll
+        is the dropped image itself, so — unlike :meth:`reroll_image_seed` — the
+        image row is handed in directly rather than looked up from a video's input.
+        The caller owns ``video_params`` (already seed-kept or re-rolled to taste).
+        Returns ``True`` once the chained job is tracked; ``False`` with no client
+        or a job for ``key`` already running.
+        """
+        if self._client is None or key in self._jobs:
+            return False
+        self._launch(
+            key, image_workflow, prepared_params(image_row, image_workflow),
+            lambda k, job, files, thumb, dur: self._on_image_finished(
+                k, job, files, thumb, dur, video_workflow, video_params
+            ),
+        )
+        return key in self._jobs
+
     def start(self, key: str, group, image_rows: list[dict]):
         """Launch a fresh variation of the settings folder ``key`` names — both
         seeds re-rolled (a new start frame *and* a new video seed).

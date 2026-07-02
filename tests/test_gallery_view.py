@@ -22,6 +22,7 @@ from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.inflight_card import InFlightItem
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.trash import Trash
@@ -3001,7 +3002,8 @@ def test_combine_duplicate_declined_submits_nothing(qtbot, tmp_path, monkeypatch
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll", lambda parent, wf: False)
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: None)
 
     view._generate_combination("img", "vid")
 
@@ -3016,13 +3018,34 @@ def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeyp
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll", lambda parent, wf: True)
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
 
     view._generate_combination("img", "vid")
 
     job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "wan22_i2v"  # the video runs on the same dropped frame
     assert job.params["seed"] != 42        # a fresh seed, not the duplicate's
     assert job.params["noise_seed"] != 99  # both dual-noise seeds re-rolled
+
+
+def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
+    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")  # this exact run exists
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: REROLL_IMAGE)
+
+    view._generate_combination("img", "vid")
+
+    # The dropped image is re-drawn first — the tracked job is its SDXL re-roll,
+    # not the video — so a fresh frame precedes the (seed-kept) video.
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "sdxl_t2i"
+    assert json.loads(view._db.get_generation(job.prompt_id)["params_json"])["seed"] != 1
 
 
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):

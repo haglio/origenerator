@@ -166,3 +166,41 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     video_params = _launched_params(db, "wan22_i2v")
     assert video_params["input_image"] == "newframe.png [output]"     # fresh frame
     assert video_params["noise_seed"] != 11 and video_params["seed"] != 22  # video seed re-rolled too
+
+
+# --- combine's image re-roll: a fresh frame from the dropped image ------------
+
+def test_start_reroll_from_image_regenerates_the_frame_then_runs_the_given_video(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    image = _image_row(seed=100)
+    image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
+    video_params = _params(input_image="frame_001.png [output]", noise_seed=11, seed=22)
+
+    started = controller.start_reroll_from_image("k", image, image_wf, _I2V, video_params)
+
+    # The dropped image is re-rolled first (its own seed fresh)...
+    assert started is True
+    client.submit_job.assert_called_once()
+    assert _launched_params(db, _IMAGE_WF)["seed"] != 100
+    # ...then the given video runs on the new frame, its seed used verbatim.
+    image_job = controller.job_for("k")
+    image_job.finished.emit(
+        [{"filename": "newframe.png", "subfolder": "", "type": "output"}], None, 1.0
+    )
+    vparams = _launched_params(db, "wan22_i2v")
+    assert vparams["input_image"] == "newframe.png [output]"
+    assert vparams["noise_seed"] == 11 and vparams["seed"] == 22
+
+
+def test_start_reroll_from_image_is_a_noop_when_the_folder_is_already_running(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
+    controller.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
+
+    again = controller.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
+
+    assert again is False
+    client.submit_job.assert_called_once()

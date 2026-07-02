@@ -25,7 +25,9 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_controller import RerollController
-from origenerator.gui.reroll_prompt import offer_reroll
+from origenerator.gui.reroll_prompt import (
+    REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
+)
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
@@ -604,10 +606,12 @@ class GalleryView(QWidget):
         Reuses the video's workflow, settings and seed, swapping only the input
         image to the dropped one, and lands the result in the folder for that
         (image × settings) combination. A pinned seed can reproduce an identical
-        past run, so this warns first via the shared "already generated" dialog,
-        offering a fresh seed — exactly as the Generate tab does. A no-op if either
-        row is gone, the video isn't a rebuildable image-conditioned recipe, the
-        image has no output file, or that folder is already generating.
+        past run, so this warns first via the shared "already generated" dialog —
+        which, when the dropped image is itself a re-buildable generation, offers a
+        fresh video seed (same frame), a fresh image seed (re-draw the dropped
+        image), or both. A no-op if either row is gone, the video isn't a
+        rebuildable image-conditioned recipe, the image has no output file, or that
+        folder is already generating.
         """
         image_row = self._db.get_generation(image_id)
         video_row = self._db.get_generation(video_id)
@@ -620,15 +624,33 @@ class GalleryView(QWidget):
         params = gallery.combined_params(video_row, image_row, workflow)
         if params is None:
             return  # the dropped image has no output file to seed from
-        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
-        if find_duplicate_generation(self._db.list_generations(), snapshot):
-            if not offer_reroll(self, workflow):
-                return  # let the user pick a different pair rather than duplicate
-            params = randomize_seeds(params, workflow.seed_keys())
+        # The frame is re-buildable independently of the video seed, so the key —
+        # which groups by the image's config, not its filename — is the same one
+        # whether we re-roll the seed, the frame, or both.
         key = gallery.settings_folder_key(
             {**dict(video_row), "params_json": json.dumps(params)},
             gallery.build_image_config_index(self._image_rows),
         )
+        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
+        if find_duplicate_generation(self._db.list_generations(), snapshot):
+            image_workflow = WORKFLOW_REGISTRY.get(image_row.get("workflow_name") or "")
+            can_reroll_image = (
+                image_workflow is not None
+                and image_row.get("source", "generated") == "generated"
+            )
+            choice = offer_reroll(self, workflow, can_reroll_image=can_reroll_image)
+            if choice is None:
+                return  # let the user pick a different pair rather than duplicate
+            if choice in (REROLL_VIDEO, REROLL_BOTH):
+                params = randomize_seeds(params, workflow.seed_keys())
+            if choice in (REROLL_IMAGE, REROLL_BOTH):
+                # Re-draw the dropped image (a new frame) and run the video on it,
+                # carrying whatever video seed we settled on just above.
+                if self._reroll.start_reroll_from_image(
+                    key, image_row, image_workflow, workflow, params
+                ):
+                    self._reveal_combination(key)
+                return
         if self._reroll.start_prepared(key, workflow, params):
             self._reveal_combination(key)
 

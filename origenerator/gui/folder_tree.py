@@ -1,11 +1,12 @@
 """The gallery's folder tree, with per-row hover actions.
 
 Hovering a row reveals a star toggle and (for a deletable folder) a delete button
-at its right edge; clicking one emits ``star_clicked`` / ``delete_clicked`` with
-the folder's key instead of selecting the row. A delegate paints the icons on the
-hovered row; the tree hit-tests clicks against the same rects. Which group a row
-holds and whether it's deletable are injected, so this stays free of the gallery
-model.
+at its left edge; clicking one emits ``star_clicked`` / ``delete_clicked`` with
+the folder's key instead of selecting the row. The star sits leftmost — right
+where a starred folder's ★ marker shows — so toggling it reads as that marker
+appearing in place. A delegate paints the icons on the hovered row; the tree
+hit-tests clicks against the same rects. Which group a row holds and whether it's
+deletable are injected, so this stays free of the gallery model.
 """
 
 from PyQt6.QtWidgets import QTreeWidget, QStyledItemDelegate, QStyle
@@ -14,19 +15,18 @@ from PyQt6.QtCore import Qt, QRect, pyqtSignal
 from origenerator.gui import icons
 
 _ICON = 16   # on-screen size of each hover action
-_PAD = 4     # gap from the row's right edge and between the two icons
+_PAD = 4     # gap from the row's left edge and between the two icons
 
 
 def _action_rects(row: QRect, deletable: bool):
-    """The (star, delete) icon rects, right-aligned in ``row``; ``delete`` is
-    ``None`` for a folder that can't be deleted, leaving the star rightmost."""
+    """The (star, delete) icon rects, left-aligned at the row's start; ``delete``
+    is ``None`` for a folder that can't be deleted. Star is leftmost — where a
+    starred folder's ★ marker sits — so toggling it looks like the marker itself."""
     y = row.y() + (row.height() - _ICON) // 2
-    x = row.right() - _PAD - _ICON
-    delete = None
-    if deletable:
-        delete = QRect(x, y, _ICON, _ICON)
-        x -= _ICON + _PAD
-    return QRect(x, y, _ICON, _ICON), delete
+    x = row.left() + _PAD
+    star = QRect(x, y, _ICON, _ICON)
+    delete = QRect(x + _ICON + _PAD, y, _ICON, _ICON) if deletable else None
+    return star, delete
 
 
 class _FolderRowDelegate(QStyledItemDelegate):

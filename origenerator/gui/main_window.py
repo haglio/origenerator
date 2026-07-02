@@ -1,4 +1,6 @@
-from PyQt6.QtCore import Qt
+import base64
+
+from PyQt6.QtCore import QByteArray
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 from PyQt6.QtGui import QIcon
 
@@ -20,7 +22,7 @@ _GENERATE_TABS_KEY = "generate_tabs"
 _GALLERY_FOLDER_KEY = "gallery_folder"
 _GALLERY_SELECTION_KEY = "gallery_selection"
 _ACTIVE_TAB_KEY = "active_tab"
-_MAXIMIZED_KEY = "maximized"
+_GEOMETRY_KEY = "window_geometry"
 
 
 class OrigeneratorWindow(QMainWindow):
@@ -60,9 +62,9 @@ class OrigeneratorWindow(QMainWindow):
 
     def _restore_session(self):
         """Reopen the Generate subtabs, Gallery folder, and active tab, and
-        remaximize if the window was maximized when it was last closed."""
-        if self._app_state.get(_MAXIMIZED_KEY):
-            self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
+        put the window back where it was — same monitor, size, and maximized
+        state — when it was last closed."""
+        self._restore_geometry()
         tabs = self._app_state.get(_GENERATE_TABS_KEY)
         if tabs:
             self._generate_view.restore_state(tabs)
@@ -72,12 +74,30 @@ class OrigeneratorWindow(QMainWindow):
         if isinstance(active, int) and 0 <= active < self._tabs.count():
             self._tabs.setCurrentIndex(active)
 
+    def _restore_geometry(self):
+        """Reapply the saved window geometry: screen, size, and maximized state.
+
+        Qt's ``saveGeometry`` blob is stored base64-encoded in the JSON state.
+        A missing or corrupt value just leaves the window at its default size.
+        """
+        blob = self._app_state.get(_GEOMETRY_KEY)
+        if not isinstance(blob, str):
+            return
+        try:
+            self.restoreGeometry(QByteArray(base64.b64decode(blob)))
+        except ValueError:
+            pass  # corrupt/hand-edited state — fall back to the default size
+
     def closeEvent(self, event):
-        """Persist the open Generate subtabs, Gallery folder, and active tab."""
+        """Persist the session (open tabs, gallery folder/selection, active
+        tab) and the window geometry so the next launch reopens as it was."""
         self._app_state.set(_GENERATE_TABS_KEY, self._generate_view.capture_state())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())
         self._app_state.set(_ACTIVE_TAB_KEY, self._tabs.currentIndex())
-        self._app_state.set(_MAXIMIZED_KEY, self.isMaximized())
+        self._app_state.set(
+            _GEOMETRY_KEY,
+            base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),
+        )
         self._app_state.save()
         super().closeEvent(event)

@@ -120,24 +120,41 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
     assert AppState(path).get("gallery_selection") == "xyz"
 
 
-def test_restores_maximized_state_from_app_state(qtbot, tmp_path):
-    state = AppState(tmp_path / "ui.json")
-    state.set("maximized", True)
-    win = _window(qtbot, tmp_path, state)
-    assert win.isMaximized()
-
-
 def test_default_window_is_not_maximized(qtbot, tmp_path):
     # With no saved state (a first launch), the window opens at its normal size.
     win = _window(qtbot, tmp_path)
     assert not win.isMaximized()
 
 
-def test_close_event_persists_maximized_state(qtbot, tmp_path):
+def test_close_event_persists_window_geometry(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
     win.showMaximized()
 
     win.close()  # fires closeEvent
 
-    assert AppState(path).get("maximized") is True
+    # Geometry is stored as a base64 string (Qt's opaque saveGeometry blob),
+    # which also carries the window's screen and maximized state.
+    assert isinstance(AppState(path).get("window_geometry"), str)
+
+
+def test_reopening_a_maximized_window_reopens_maximized(qtbot, tmp_path):
+    # The whole point: close it maximized, and the next launch is maximized —
+    # on the same monitor, since the geometry blob records the screen too.
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first.showMaximized()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    assert reopened.isMaximized()
+
+
+def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first.show()
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    assert not reopened.isMaximized()

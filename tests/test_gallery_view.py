@@ -1620,6 +1620,70 @@ def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
     assert view._selected_reroll_key is None
 
 
+def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, tmp_path):
+    # "Select a generation to preview" would misdescribe a running re-roll, so a
+    # queued one with no frame yet shows a waiting note instead of clearing.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)  # no preview frame has arrived yet
+    view._preview.clear = MagicMock()
+    view._preview.show_message = MagicMock()
+
+    _reroll_tile(view).selected.emit()
+
+    view._preview.clear.assert_not_called()
+    view._preview.show_message.assert_called_once()
+
+
+def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tmp_path):
+    # Submitting a re-roll inserts a running row, so the next poll rebuilds the
+    # tree — the selected re-roll must keep driving the info pane across it.
+    client = _reroll_client()
+    client.fetch_history = MagicMock(return_value={})  # reconcile finds nothing done
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, job = _running_reroll(view)
+    frame = _png_bytes()
+    client.preview_image.emit(job.prompt_id, frame)
+    _reroll_tile(view).selected.emit()
+    view._preview.show_frame = MagicMock()
+
+    view._poll()  # the rebuild the new running row triggers
+
+    assert view._selected_reroll_key == key
+    assert _reroll_tile(view).is_selected()
+    view._preview.show_frame.assert_called_with(frame)
+
+
+def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
+    # Re-rolling an i2v runs a fresh image, then the video. When it moves onto the
+    # video — which has no preview of its own yet — the info pane must keep showing
+    # the image frame rather than going blank across the rebuild that the finished
+    # image row triggers.
+    client = _reroll_client()
+    client.fetch_history = MagicMock(return_value={})
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_leaf_of(view, "vid")
+    _reroll_tile(view).add_requested.emit()  # image stage starts
+    img_job = view._reroll_jobs[key]
+    _reroll_tile(view).selected.emit()
+    image_frame = _png_bytes()
+    client.preview_image.emit(img_job.prompt_id, image_frame)
+
+    client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image done -> video starts
+    assert view._reroll_jobs[key].workflow.name == "wan22_i2v"
+    view._preview.show_frame = MagicMock()
+
+    view._poll()  # the rebuild the finished image row triggers
+
+    assert view._selected_reroll_key == key
+    view._preview.show_frame.assert_called_with(image_frame)
+
+
 def _seeded_i2v_db(tmp_path):
     """A DB with a re-rollable SDXL image and a WAN i2v video built on it."""
     db = Database(tmp_path / "i2v.db")

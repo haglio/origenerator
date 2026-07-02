@@ -75,10 +75,13 @@ class GalleryView(QWidget):
         self._claimed_ids = claimed_ids or (lambda: set())
         self._reroll_jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
         # The folder whose running re-roll currently drives the info pane (its
-        # tile is the selected item), and that tile — so live frames can be
-        # mirrored from the browser-pane thumbnail into the full-size preview.
+        # tile is the selected item), that tile, and the last frame shown — so
+        # live frames mirror from the browser-pane thumbnail into the full-size
+        # preview, and the frame outlives both the rebuild each stage completion
+        # triggers and an i2v's image->video job swap.
         self._selected_reroll_key: str | None = None
         self._reroll_tile: RerollTile | None = None
+        self._last_reroll_frame: bytes | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
@@ -278,6 +281,11 @@ class GalleryView(QWidget):
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._selected_folder_key() or self._pending_key
         selected_gen = self.selected_generation()
+        # A running re-roll drives the info pane from live frames, not a saved row,
+        # so capture it to restore afterward rather than let the folder's default
+        # selection replace it. This matters because every re-roll (and each i2v
+        # stage) triggers a rebuild the moment its running row lands.
+        reroll_key, reroll_frame = self._selected_reroll_key, self._last_reroll_frame
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
@@ -291,6 +299,7 @@ class GalleryView(QWidget):
             self._title.set_display("")
             self._avg_label.setText("")
             self._show_widget(QWidget())
+        self._restore_reroll_selection(reroll_key, reroll_frame)
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -553,6 +562,23 @@ class GalleryView(QWidget):
         job = self._reroll_jobs.get(key)
         if job is None:
             return
+        self._last_reroll_frame = job.last_preview
+        self._enter_reroll_selection(key)
+
+    def _restore_reroll_selection(self, key: str | None, frame: bytes | None):
+        """After a rebuild, re-assert a still-running re-roll as the info-pane
+        source, keeping the frame it was showing (an i2v's image frame while the
+        video stage warms up) rather than the fresh video job's empty preview.
+        A no-op unless that re-roll is still running in the folder now on screen.
+        """
+        if key is None or key not in self._reroll_jobs or self._selected_folder_key() != key:
+            return
+        self._last_reroll_frame = frame
+        self._enter_reroll_selection(key)
+
+    def _enter_reroll_selection(self, key: str):
+        """Point the info pane at re-roll ``key`` and show its last frame — or a
+        'waiting' note, never the idle 'select a generation' placeholder."""
         self._selected_reroll_key = key
         self._selected = None
         self._clear_thumbnail_selection()
@@ -563,14 +589,16 @@ class GalleryView(QWidget):
         self._meta_title.setText("Generating a new variation…")
         self._estimate_label.clear()
         self._meta_panel.clear()
-        if job.last_preview:
-            self._preview.show_frame(job.last_preview)
+        if self._last_reroll_frame:
+            self._preview.show_frame(self._last_reroll_frame)
         else:
-            self._preview.clear()
+            self._preview.show_message("Waiting for preview…")
 
     def _on_reroll_preview(self, key: str, data: bytes):
-        """Mirror a re-roll's live frame into the info pane while it's selected."""
+        """Mirror a re-roll's live frame into the info pane while it's selected,
+        remembering it so it survives the rebuild each stage completion triggers."""
         if key == self._selected_reroll_key:
+            self._last_reroll_frame = data
             self._preview.show_frame(data)
 
     def _clear_thumbnail_selection(self):
@@ -584,6 +612,7 @@ class GalleryView(QWidget):
         """Stop treating a running re-roll as the info-pane source — a real
         generation is taking over the pane, or the re-roll has ended."""
         self._selected_reroll_key = None
+        self._last_reroll_frame = None
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(False)
 
@@ -647,7 +676,7 @@ class GalleryView(QWidget):
     def _on_reroll_finished(self, key, job, files, thumb_path, duration):
         self._reroll_jobs.pop(key, None)
         if key == self._selected_reroll_key:
-            self._selected_reroll_key = None  # refresh re-selects it as a real thumbnail
+            self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.refresh()  # the finished generation now shows as a normal thumbnail
 

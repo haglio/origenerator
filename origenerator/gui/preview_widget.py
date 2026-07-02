@@ -100,13 +100,21 @@ class PreviewWidget(QWidget):
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
 
-    def clear(self) -> None:
+    def show_message(self, text: str) -> None:
+        """Show a plain text message in place of any media.
+
+        For a transient state the idle placeholder would misdescribe — a re-roll
+        that's generating but hasn't streamed a preview frame yet.
+        """
         self._player.stop()
-        self._player.setSource(QUrl())  # release any held video file so it can be deleted
         self._set_movie(None)
         self._pixmap = None
-        self._image_label.setText(_PLACEHOLDER)
+        self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
+
+    def clear(self) -> None:
+        self.show_message(_PLACEHOLDER)
+        self._player.setSource(QUrl())  # release any held video file so it can be deleted
 
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video

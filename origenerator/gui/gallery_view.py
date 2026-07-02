@@ -1,6 +1,5 @@
 import json
 import logging
-from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
@@ -21,8 +20,6 @@ from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, randomize_seeds,
 )
 from origenerator.gui.editable_header import EditableHeader
-from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.combine_panel import CombinePanel
@@ -31,16 +28,13 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import offer_reroll
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.gui.inflight_card import InFlightCard, InFlightItem
 from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
+from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
     GROUP_ROLE as _GROUP_ROLE,
     RECENTS_KEY as _RECENTS_KEY,
-    RECENTS_LABEL as _RECENTS_LABEL,
     STARRED_KEY as _STARRED_KEY,
-    STARRED_LABEL as _STARRED_LABEL,
 )
 from origenerator.navigation import NavigationHistory
 from origenerator.trash import Trash
@@ -48,11 +42,8 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-_TILE_SPACING = 8  # gap between tiles in the flowing main view
 _POLL_INTERVAL_MS = 1500
-_PREVIEW_COUNT = 4
 _RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
-_STARRED_TITLE = "★ " + _STARRED_LABEL  # the browser-pane heading for the shelf
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
 
@@ -105,17 +96,10 @@ class GalleryView(QWidget):
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
         self._image_rows: list[dict] = []
-        self._recent_rows: list[dict] = []  # recently generated rows, newest first
-        self._inflight_cards: dict[str, InFlightCard] = {}  # live in-flight cards, by job key
-        self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
-        self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
-        self._starred_groups: list = []  # folders the shelf collects, in tree order
-        self._visible_ids: list[str] = []
-        self._visible_keys: list[str] = []
-        self._selected_ids: set[str] = set()
-        self._selection_anchor: str | None = None
+        # The browser pane renders the middle column (tiles / thumbnails / shelves)
+        # and owns the thumbnail multi-selection and in-flight cards.
+        self._browser = BrowserPane(self)
         self._shelf_selection: dict[str, str] = {}  # last item previewed on each shelf
-        self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
@@ -239,7 +223,7 @@ class GalleryView(QWidget):
         # in a folder other than the shelf on screen, so this jumps the browser to
         # it. Left-aligned at its natural width, and it collapses away when hidden.
         self._containing_folder_btn = QPushButton("Go to containing folder")
-        self._containing_folder_btn.clicked.connect(self._go_to_containing_folder)
+        self._containing_folder_btn.clicked.connect(self._browser.go_to_containing_folder)
         self._containing_folder_btn.hide()
         folder_row = QHBoxLayout()
         folder_row.setContentsMargins(0, 0, 0, 0)
@@ -359,11 +343,11 @@ class GalleryView(QWidget):
         if fingerprint != self._fingerprint:
             self._fingerprint = fingerprint
             self._rebuild(rows, meta)
-        elif self._showing_recents():
+        elif self._browser.showing_recents():
             # No DB change, but in-flight cards still need their live frames pushed
             # and a re-render when a locally-queued Generate tab appears/vanishes
             # (it carries no DB row to move the fingerprint).
-            self._refresh_inflight()
+            self._browser.refresh_inflight()
 
     def _rebuild(self, rows, meta):
         expanded = self._tree_view.expanded_keys()
@@ -379,10 +363,11 @@ class GalleryView(QWidget):
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
         tree_model = gallery.build_gallery_tree(rows, meta)
-        self._starred_groups = gallery.starred_folders(tree_model)
-        self._recent_rows = gallery.recent_generations(rows, _RECENTS_LIMIT)
+        self._browser.set_model(
+            gallery.recent_generations(rows, _RECENTS_LIMIT), gallery.starred_folders(tree_model)
+        )
         self._tree_view.populate(tree_model, expanded,
-                                 show_recents=bool(tree_model or self._inflight_items()))
+                                 show_recents=bool(tree_model or self._browser._inflight_items()))
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
@@ -395,7 +380,7 @@ class GalleryView(QWidget):
             else:
                 self._title.set_display("")
                 self._avg_label.setText("")
-                self._show_widget(QWidget())
+                self._browser.show_widget(QWidget())
                 self._info.reset_animated_strip()  # nothing selected: no animations
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
@@ -409,31 +394,29 @@ class GalleryView(QWidget):
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
-        if prompt_id and prompt_id in self._visible_ids:
+        if prompt_id and prompt_id in self._browser.visible_prompt_ids():
             self._on_thumbnail_clicked(prompt_id)
 
     def _on_folder_selected(self, current, _previous):
         if current is None:
             self._title.set_display("")
             self._avg_label.setText("")
-            self._show_widget(QWidget())
-            self._visible_ids = []
-            self._visible_keys = []
+            self._browser.show_empty()
             self._sync_delete_button()
             return
         if current is self._recents_item:
-            self._show_recents_overview()
+            self._browser.show_recents_overview()
             return
         if current is self._starred_item:
-            self._show_starred_overview()
+            self._browser.show_starred_overview()
             return
         group = current.data(0, _GROUP_ROLE)
         self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
-            self._show_thumbnails(group)
+            self._browser.show_thumbnails(group)
         else:
-            self._show_folder_tiles(gallery.child_groups(group))
+            self._browser.show_folder_tiles(gallery.child_groups(group))
         self._select_first_item(group)
         self._sync_delete_button()
 
@@ -464,251 +447,9 @@ class GalleryView(QWidget):
 
     # --- main view: folder tiles or thumbnails -----------------------------
 
-    def _show_widget(self, widget: QWidget):
-        self._scroll.setWidget(widget)  # replaces & deletes the previous widget
-
-    def _new_tile_pane(self) -> tuple[QWidget, FlowLayout]:
-        """A fresh container whose tiles flow to fill the pane's width."""
-        container = QWidget()
-        flow = FlowLayout(container, spacing=_TILE_SPACING)
-        self._clear_selection()
-        self._reroll_tile = None  # re-created below only when this folder re-rolls
-        self._visible_ids = []
-        self._visible_keys = []
-        return container, flow
-
-    def _add_folder_tile(self, flow, group, *, starred, context=""):
-        """Build one folder tile, wire its click/context signals, and track it."""
-        tile = FolderTile(
-            group.key, group.label, self._preview_paths(group),
-            len(gallery.rows_under(group)), starred=starred, context=context,
-            level=gallery.folder_level(group),
-        )
-        tile.clicked.connect(self._drill_into)
-        tile.context_requested.connect(self._folder_context_menu)
-        flow.addWidget(tile)
-        self._visible_keys.append(group.key)
-
-    def _show_folder_tiles(self, groups):
-        container, flow = self._new_tile_pane()
-        for group in groups:
-            self._add_folder_tile(flow, group, starred=group.starred)
-        self._show_widget(container)
-
     # --- the Recents shelf: in-flight work, then recently finished items ----
 
-    def _show_recents_overview(self):
-        """Render the Recents shelf: a card for every in-flight generation (queued
-        or running, from a Generate tab or a gallery re-roll) atop the recently
-        finished items. Clicking an in-flight card reveals where its job runs; a
-        finished one previews in the info pane, right here on the shelf, the way a
-        thumbnail does inside a folder — and a "Go to containing folder" button
-        then offers the jump to its folder. Opens with the info pane cleared, so
-        it shows nothing until an item is picked."""
-        self._title.set_display(_RECENTS_LABEL)
-        self._avg_label.setText("")
-        self._clear_metadata()
-        self._render_recents()
-        self._sync_delete_button()
-        self._record_location(_RECENTS_KEY)  # so Back can return to the shelf
-
-    def _render_recents(self):
-        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails; a hint when there is neither."""
-        container, flow = self._new_tile_pane()
-        self._inflight_cards = {}
-        self._inflight_by_key = {}
-        items = self._inflight_items()
-        self._inflight_signature = _inflight_signature(items)
-        for item in items:
-            card = InFlightCard(item)
-            card.clicked.connect(self._on_inflight_clicked)
-            flow.addWidget(card)
-            self._inflight_cards[item.key] = card
-            self._inflight_by_key[item.key] = item
-        for row in self._recent_rows:
-            tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-                movie_path=self._animated_preview(row),     # videos loop; images stay still
-            )
-            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
-            tw.double_clicked.connect(self._open_in_containing_folder)  # or open its folder
-            flow.addWidget(tw)
-            self._visible_ids.append(row["prompt_id"])
-            self._thumb_widgets[row["prompt_id"]] = tw
-        # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self._show_widget(container if (items or self._recent_rows) else self._empty_state(
-            "No recent generations yet.\n\nItems you make — from a Generate tab or a "
-            "gallery re-roll — collect here, newest first."
-        ))
-
-    def _showing_recents(self) -> bool:
-        return (self._recents_item is not None
-                and self._tree.currentItem() is self._recents_item)
-
-    def _refresh_inflight(self):
-        """Between rebuilds, keep the in-flight cards live: push each job's latest
-        frame into its card, and re-render only when the *set* of in-flight jobs
-        changes — one ends, or a Generate tab is queued behind another with no DB
-        row to move the fingerprint."""
-        items = self._inflight_items()
-        if _inflight_signature(items) != self._inflight_signature:
-            self._render_recents()
-            return
-        for item in items:
-            self._inflight_by_key[item.key] = item  # keep the reveal current
-            card = self._inflight_cards.get(item.key)
-            if card is not None:
-                card.update_item(item)
-
-    def _inflight_items(self) -> list:
-        """Every queued/running generation as a card model, running ones first.
-
-        The database's running/pending rows are the source of truth for what's in
-        flight — a Generate tab's job or a gallery re-roll — so a card shows even
-        when no live job object is tracking a row (after a restart that hasn't
-        re-adopted it, say). Live frames and tab-routing are grafted on from the
-        tracking objects when present: a Generate tab's own job carries them, and
-        a re-roll's frame comes from its :class:`GenerationJob`. A Generate tab
-        still waiting its turn in the local queue has no row yet, so those are
-        added straight from the provider.
-        """
-        generate = {it.key: it for it in self._generate_inflight()}
-        reroll_by_pid = {job.prompt_id: (key, job)
-                         for key, job in self._reroll_jobs.items()}
-        image_index = None  # built lazily, only to place an untracked row's folder
-        items, seen = [], set()
-        for row in self._db.list_generations():
-            if row.get("status") not in ("running", "pending"):
-                continue
-            pid = row["prompt_id"]
-            seen.add(pid)
-            if pid in generate:
-                items.append(generate[pid])  # a Generate tab's job: its own frame + reveal
-                continue
-            tracked = reroll_by_pid.get(pid)
-            if tracked is not None:
-                folder_key, frame = tracked[0], tracked[1].last_preview
-            else:  # a running row no live job holds — still show it, keyed to its folder
-                if image_index is None:
-                    image_index = gallery.build_image_config_index(self._image_rows)
-                folder_key, frame = gallery.settings_folder_key(row, image_index), None
-            items.append(InFlightItem(
-                key=pid,
-                caption=gallery.config_tab_title(
-                    row.get("workflow_name") or "", gallery.parse_params(row.get("params_json"))
-                ),
-                status="running" if row.get("status") == "running" else "queued",
-                frame=frame,
-                reveal=lambda k=folder_key: self._reveal_reroll(k),
-                media_type=gallery.media_type_of_row(row),  # image/video corner badge
-            ))
-        # A Generate tab queued behind another carries no DB row yet — add it too.
-        for pid, item in generate.items():
-            if pid not in seen:
-                items.append(item)
-        items.sort(key=lambda it: it.status != "running")  # stable: running first
-        return items
-
-    def _reveal_reroll(self, key: str):
-        """Open the folder a re-roll runs in and select its live tile."""
-        item = self._item_by_key.get(key)
-        if item is not None:
-            self._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
-            self._select_reroll(key)
-
-    def _on_inflight_clicked(self, key: str):
-        item = self._inflight_by_key.get(key)
-        if item is not None:
-            item.reveal()
-
-    def _go_to_containing_folder(self):
-        """The 'Go to containing folder' button's action: open the previewed Recents
-        item in its own folder, selected."""
-        if self._selected is not None:
-            self._open_in_containing_folder(self._selected["prompt_id"])
-
-    def _open_in_containing_folder(self, prompt_id: str):
-        """Jump the browser pane to ``prompt_id``'s own folder and land on the item
-        itself — its tile picked and highlighted, as if you'd navigated in and
-        clicked it, not just auto-previewing the folder's first item. Shared by the
-        button and a double-click on a Recents tile."""
-        self._on_source_link(prompt_id)  # open the folder, previewing the item
-        # The navigation renders the folder's tiles; now pick this one so it reads
-        # as the selected item rather than an unhighlighted preview.
-        self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-
-    def _sync_containing_folder_button(self):
-        """Offer "Go to containing folder" only while the Recents shelf is showing
-        a previewed item: that's the one view whose info pane holds a generation
-        from a folder other than the one on screen."""
-        self._containing_folder_btn.setVisible(
-            self._showing_recents() and self._selected is not None
-        )
-
     # --- the Starred shelf: every bookmarked folder, gathered in one place ---
-
-    def _show_starred_overview(self):
-        """Render the Starred shelf: one tile per bookmarked folder, each captioned
-        with its breadcrumb so identically-named folders stay tellable apart. Like
-        a branch folder it lists sub-folders rather than a single generation, so the
-        info pane clears instead of previewing one folder's first item."""
-        self._title.set_display(_STARRED_TITLE)
-        self._avg_label.setText("")
-        self._clear_metadata()
-        self._show_starred_tiles(self._starred_groups)
-        self._sync_delete_button()
-        self._record_location(_STARRED_KEY)  # so Back can return to the shelf
-
-    def _show_starred_tiles(self, groups):
-        container, flow = self._new_tile_pane()
-        for group in groups:
-            item = self._item_by_key.get(group.key)
-            context = self._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
-            self._add_folder_tile(flow, group, starred=False, context=context)
-        # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self._show_widget(container if groups else self._empty_state(
-            "No starred folders yet.\n\nHover a folder in the list and click its "
-            "star, or right-click a folder and choose Star, to collect it here."
-        ))
-
-    @staticmethod
-    def _empty_state(text: str) -> QWidget:
-        """A centered hint filling an otherwise-blank shelf pane (Recents/Starred)."""
-        label = QLabel(text)
-        label.setObjectName("estimateLabel")
-        label.setWordWrap(True)
-        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        label.setContentsMargins(16, 24, 16, 16)
-        return label
-
-    @staticmethod
-    def _thumbnail_caption(row) -> str:
-        """A thumbnail's caption: its seed, else a snippet of its prompt."""
-        seed = row.get("seed")
-        if seed is not None:
-            return f"seed {seed}"
-        return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
-
-    def _show_thumbnails(self, group):
-        container, flow = self._new_tile_pane()
-        # The re-roll tile leads the flow so it sits beside the newest item
-        # (thumbnails are sorted newest-first).
-        if self._can_reroll(group):
-            self._add_reroll_tile(flow, group)
-        for row in group.rows:
-            tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                movie_path=self._animated_preview(row),  # videos loop; images stay still
-            )
-            tw.clicked.connect(self._thumbnail_clicked)
-            tw.double_clicked.connect(self._thumbnail_double_clicked)
-            tw.context_requested.connect(self._thumbnail_context_menu)
-            flow.addWidget(tw)
-            self._visible_ids.append(row["prompt_id"])
-            self._thumb_widgets[row["prompt_id"]] = tw
-        self._show_widget(container)
 
     # --- re-roll: a new variation of a folder's settings, here in the gallery
 
@@ -893,7 +634,7 @@ class GalleryView(QWidget):
         """Point the info pane at re-roll ``key`` and show its last frame — or a
         'waiting' note, never the idle 'select a generation' placeholder."""
         self._selected_reroll_key = key
-        self._clear_thumbnail_selection()
+        self._browser.clear_thumbnail_selection()
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(True)
         self._info.show_generating(self._last_reroll_frame)
@@ -904,13 +645,6 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key:
             self._last_reroll_frame = data
             self._info.show_frame(data)
-
-    def _clear_thumbnail_selection(self):
-        """Drop the thumbnail multi-selection and its highlights while keeping the
-        on-screen tiles (unlike a rebuild), so picking the re-roll deselects them."""
-        self._selected_ids = set()
-        self._selection_anchor = None
-        self._refresh_selection_highlights()
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -963,29 +697,34 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         group = item.data(0, _GROUP_ROLE) if item else None
         if isinstance(group, gallery.SettingsGroup):
-            self._show_thumbnails(group)
-
-    @staticmethod
-    def _preview_paths(group) -> list[str]:
-        paths = []
-        for row in gallery.rows_under(group):
-            thumb = row.get("thumbnail_path")
-            if thumb and Path(thumb).exists():
-                paths.append(thumb)
-                if len(paths) >= _PREVIEW_COUNT:
-                    break
-        return paths
-
-    def _drill_into(self, key: str):
-        item = self._item_by_key.get(key)
-        if item is not None:
-            self._tree.setCurrentItem(item)
+            self._browser.show_thumbnails(group)
 
     def visible_prompt_ids(self) -> list[str]:
-        return list(self._visible_ids)
+        return self._browser.visible_prompt_ids()
 
     def visible_folder_keys(self) -> list[str]:
-        return list(self._visible_keys)
+        return self._browser.visible_folder_keys()
+
+    # --- browser-pane facade (the shelves/inflight the view drives into it) -
+
+    @property
+    def _inflight_cards(self) -> dict:
+        return self._browser._inflight_cards
+
+    def _showing_recents(self) -> bool:
+        return self._browser.showing_recents()
+
+    def _drill_into(self, key: str):
+        self._browser._drill_into(key)
+
+    def _thumbnail_double_clicked(self, prompt_id: str):
+        self._browser._thumbnail_double_clicked(prompt_id)
+
+    def _on_inflight_clicked(self, key: str):
+        self._browser._on_inflight_clicked(key)
+
+    def _inflight_items(self) -> list:
+        return self._browser._inflight_items()
 
     # --- session persistence ----------------------------------------------
 
@@ -1027,72 +766,27 @@ class GalleryView(QWidget):
     # --- selection ---------------------------------------------------------
 
     def _thumbnail_clicked(self, prompt_id: str):
-        self._apply_selection(prompt_id, QApplication.keyboardModifiers())
-        self._on_thumbnail_clicked(prompt_id)  # records the visit itself
-
-    def _thumbnail_double_clicked(self, prompt_id: str):
-        """Open a thumbnail as a Generate tab — the same "reuse parameters"
-        gesture as picking it and clicking the button. Inert for a workflow the
-        app can't rebuild, matching the button's greyed-out state."""
-        self._on_thumbnail_clicked(prompt_id)  # make it the selected generation
-        self._on_reuse()
+        self._browser._thumbnail_clicked(prompt_id)
 
     def _apply_selection(self, prompt_id: str, modifiers):
-        """Update the multi-select set the way the held modifiers dictate.
-
-        Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
-        a plain click resets to just this tile. Mirrors a typical file browser.
-        """
-        ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
-        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
-        if ctrl:
-            self._selected_ids ^= {prompt_id}
-            self._selection_anchor = prompt_id
-        elif shift and self._selection_anchor in self._visible_ids \
-                and prompt_id in self._visible_ids:
-            a = self._visible_ids.index(self._selection_anchor)
-            b = self._visible_ids.index(prompt_id)
-            lo, hi = sorted((a, b))
-            self._selected_ids = set(self._visible_ids[lo:hi + 1])
-        else:
-            self._selected_ids = {prompt_id}
-            self._selection_anchor = prompt_id
-        self._refresh_selection_highlights()
-
-    def _refresh_selection_highlights(self):
-        for pid, widget in self._thumb_widgets.items():
-            widget.set_selected(pid in self._selected_ids)
-        self._sync_delete_button()
-
-    def _clear_selection(self):
-        self._selected_ids = set()
-        self._selection_anchor = None
-        self._thumb_widgets = {}
-        self._sync_delete_button()
+        self._browser.apply_selection(prompt_id, modifiers)
 
     def selected_prompt_ids(self) -> list[str]:
-        return [pid for pid in self._visible_ids if pid in self._selected_ids]
+        return self._browser.selected_prompt_ids()
+
+    @property
+    def _thumb_widgets(self) -> dict:
+        """The on-screen thumbnail widgets, owned by the browser pane."""
+        return self._browser._thumb_widgets
 
     # --- deletion & undo ---------------------------------------------------
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        """Right-click menu for a thumbnail: delete the picked item(s).
-
-        Right-clicking a tile that isn't part of the current selection first
-        selects just it, so the menu always acts on something visible.
-        """
-        if prompt_id not in self._selected_ids:
-            self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-            self._on_thumbnail_clicked(prompt_id)
-        count = len(self._selected_ids)
-        menu = QMenu(self)
-        delete_action = menu.addAction(f"Delete {count} item{'s' if count != 1 else ''}")
-        if menu.exec(global_pos) is delete_action:
-            self._delete_selection()
+        self._browser._thumbnail_context_menu(prompt_id, global_pos)
 
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked."""
-        if self._selected_ids:
+        if self._browser.selected_ids:
             rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
             self._delete_rows([r for r in rows if r])
             return
@@ -1140,7 +834,7 @@ class GalleryView(QWidget):
                 f"Could not delete the selected item(s):\n\n{e}",
             )
             return
-        self._clear_selection()
+        self._browser.clear_selection()
         self.refresh()
         self._sync_undo_button()
 
@@ -1149,7 +843,7 @@ class GalleryView(QWidget):
             return
         self._preview.clear()
         focus = self._actions.undo()  # a restored generation to return to, if any
-        self._clear_selection()
+        self._browser.clear_selection()
         self.refresh()
         # After undoing a delete, go back to the folder it emptied (now restored),
         # rather than leaving the user on the parent we'd navigated to.
@@ -1267,7 +961,7 @@ class GalleryView(QWidget):
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._info.show_generation(row, self._image_rows)
-        self._sync_containing_folder_button()  # a Recents preview offers the jump
+        self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()
         if shelf_key is not None:
             # Previewing an item on a shelf is shelf state, not a navigation: it's
@@ -1366,7 +1060,7 @@ class GalleryView(QWidget):
         """Re-preview the item last selected on this shelf, if it's still listed —
         so returning to a shelf lands on it, not on a blank shelf."""
         prompt_id = self._shelf_selection.get(key)
-        if prompt_id is not None and prompt_id in self._visible_ids:
+        if prompt_id is not None and prompt_id in self._browser.visible_prompt_ids():
             self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
             self._on_thumbnail_clicked(prompt_id)
 
@@ -1377,7 +1071,7 @@ class GalleryView(QWidget):
     def _sync_delete_button(self):
         """Enable Delete when there's a target — picked thumbnails, else the
         current deletable folder — and say which in its tooltip."""
-        count = len(self._selected_ids)
+        count = len(self._browser.selected_ids)
         folder = self._current_deletable_folder()
         if count:
             self._delete_btn.setEnabled(True)
@@ -1391,7 +1085,7 @@ class GalleryView(QWidget):
 
     def _clear_metadata(self):
         self._info.clear()
-        self._sync_containing_folder_button()  # nothing selected: no jump to offer
+        self._browser.sync_containing_folder_button()  # nothing selected: no jump to offer
 
     def _on_send_to_evolver(self):
         self._info._on_send_to_evolver()

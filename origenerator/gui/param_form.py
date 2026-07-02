@@ -17,6 +17,19 @@ from shared_ui.check_box import CheckBox
 
 _SEED_MAX = (1 << 63) - 1
 
+# Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
+# The metadata panel inserts zero-width spaces into displayed paths for on-screen
+# wrapping, so text copied from there carries them; none belongs in a real path.
+# U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 word-joiner, U+FEFF BOM.
+_INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
+
+
+def _clean_image_ref(value: str) -> str:
+    """A ``LoadImage`` path with invisible wrapping characters and stray
+    surrounding whitespace stripped, so a value that looks right actually
+    resolves against ComfyUI's input folder (or as an absolute path)."""
+    return value.translate(_INVISIBLE).strip()
+
 
 def _select_combo_value(combo: QComboBox, value: str):
     """Show ``value`` in ``combo``, offering it as a new option if it isn't one.
@@ -269,7 +282,9 @@ class ParamForm(QWidget):
                         result[pd.key] = 0
             elif pd.type == "str" and pd.multiline:
                 result[pd.key] = w.toPlainText()
-            elif pd.type == "str" or pd.type == "image":
+            elif pd.type == "image":
+                result[pd.key] = _clean_image_ref(w.text())
+            elif pd.type == "str":
                 result[pd.key] = w.text()
             elif pd.type == "int":
                 result[pd.key] = w.value()

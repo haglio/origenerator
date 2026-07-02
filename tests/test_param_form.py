@@ -301,3 +301,18 @@ def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, 
     form._browse_buttons["input_image"].click()
 
     assert captured["dir"] == str(img)
+
+
+def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
+    # The metadata panel inserts zero-width spaces into displayed paths so long
+    # names wrap on screen. Pasting such a path back into the field would carry
+    # those invisible characters (and any stray whitespace) into ComfyUI's
+    # LoadImage, which then can't match the file. The form must return a clean
+    # path so a value that looks right actually is.
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", "")])
+    qtbot.addWidget(form)
+    zwsp = chr(0x200B)  # the zero-width space _wrappable() inserts after / _ - . \
+    wrapped = f"image/{zwsp}sdxl_{zwsp}t2i_{zwsp}00792_{zwsp}.{zwsp}png  "
+    form.set_values({"input_image": wrapped})
+
+    assert form.get_values()["input_image"] == "image/sdxl_t2i_00792_.png"

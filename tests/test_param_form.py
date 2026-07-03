@@ -69,6 +69,42 @@ def test_seed_random_control_is_the_ticked_checkbox(qtbot):
     assert isinstance(form._randomize_checks["seed"], CheckBox)
 
 
+def _dimension_defs():
+    return [
+        ParamDef("width", "Width", "int", 1280, min_val=64, max_val=4096, step=64),
+        ParamDef("height", "Height", "int", 720, min_val=64, max_val=4096, step=64),
+    ]
+
+
+def test_swap_dimensions_button_exchanges_width_and_height(qtbot):
+    form = ParamForm(_dimension_defs())
+    qtbot.addWidget(form)
+    assert form._swap_dimensions_btn is not None
+    form._swap_dimensions_btn.click()
+    vals = form.get_values()
+    assert vals["width"] == 720
+    assert vals["height"] == 1280
+
+
+def test_no_swap_button_when_workflow_has_no_dimensions(qtbot):
+    # An i2v form derives its size in-graph from the input image — no width or
+    # height field, so there is nothing to swap.
+    form = ParamForm([ParamDef("steps", "Steps", "int", 50, min_val=1, max_val=200)])
+    qtbot.addWidget(form)
+    assert form._swap_dimensions_btn is None
+
+
+def test_swapping_dimensions_emits_changed(qtbot):
+    # The panel refreshes its title from the form's ``changed`` signal, so a swap
+    # must announce itself just as a manual edit does.
+    form = ParamForm(_dimension_defs())
+    qtbot.addWidget(form)
+    fired = []
+    form.changed.connect(lambda: fired.append(True))
+    form._swap_dimensions_btn.click()
+    assert fired
+
+
 @pytest.fixture
 def sample_defs():
     return [

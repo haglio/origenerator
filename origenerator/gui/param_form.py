@@ -55,6 +55,10 @@ class ParamForm(QWidget):
         self._randomize_checks: dict[str, CheckBox] = {}
         self._image_random_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
+        # A single swap-width-and-height button, built only when the workflow has
+        # both dimension params (t2i does; i2v derives its size in-graph). None
+        # when absent, so callers can tell whether the control exists.
+        self._swap_dimensions_btn: QPushButton | None = None
         # Params a config carries but this form has no widget for — the workflow's
         # remaining hidden settings (VAE, CLIP, batch size…). The form has no field
         # to edit them, but must round-trip whatever value it was given so reusing
@@ -129,7 +133,25 @@ class ParamForm(QWidget):
             hb.addWidget(browse)
             random_cb.setVisible(False)
             return holder
+        if pd.key == "width" and self._has_param("height"):
+            # The width row carries a button that swaps its value with height's,
+            # for turning a landscape frame portrait (or back) in one click.
+            btn = QPushButton("⇅")  # ⇅ up/down arrows: swap the stacked pair
+            btn.setToolTip("Swap width and height")
+            btn.clicked.connect(self.swap_dimensions)
+            self._swap_dimensions_btn = btn
+            return btn
         return None
+
+    def _has_param(self, key: str) -> bool:
+        return any(pd.key == key for pd in self._param_defs)
+
+    def swap_dimensions(self):
+        """Exchange the width and height field values."""
+        width, height = self._widgets["width"], self._widgets["height"]
+        w, h = width.value(), height.value()
+        width.setValue(h)
+        height.setValue(w)
 
     def _browse_image(self, key: str):
         """Pick an input image anywhere on disk via the native file dialog.

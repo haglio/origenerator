@@ -18,9 +18,12 @@ _DWELL_STEP_MS = 1000
 
 
 class SlideshowView(QWidget):
-    def __init__(self, items, *, image_dwell_ms=4000, player=None, parent=None):
+    def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, player=None, parent=None):
         super().__init__(parent)
-        self._playlist = SlideshowPlaylist(items, image_dwell_ms=image_dwell_ms)
+        playlist_kwargs = {"image_dwell_ms": image_dwell_ms}
+        if shuffle is not None:  # else the playlist uses its own random shuffle
+            playlist_kwargs["shuffle"] = shuffle
+        self._playlist = SlideshowPlaylist(items, **playlist_kwargs)
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround behind the media

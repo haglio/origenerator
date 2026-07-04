@@ -11,6 +11,7 @@ _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
 
 def _view(qtbot, items=_ITEMS, **kw):
+    kw.setdefault("shuffle", lambda order: None)  # deterministic order for these tests
     view = SlideshowView(items, player=MagicMock(), **kw)
     qtbot.addWidget(view)
     return view

@@ -4,6 +4,7 @@ from origenerator.slideshow import SlideshowPlaylist
 
 
 def _playlist(**kw):
+    kw.setdefault("shuffle", lambda order: None)  # identity: deterministic order here
     return SlideshowPlaylist(
         [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")], **kw
     )
@@ -39,6 +40,31 @@ def test_advance_and_back_on_an_empty_playlist_stay_empty():
     playlist = SlideshowPlaylist([])
     assert playlist.advance() is None
     assert playlist.back() is None
+
+
+def test_plays_in_a_shuffled_order():
+    playlist = SlideshowPlaylist(
+        [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")],
+        shuffle=lambda order: order.reverse(),  # a deterministic stand-in for randomness
+    )
+    assert playlist.current() == ("c.png", "image")  # shuffled: the last item leads
+    assert playlist.advance() == ("b.mp4", "video")
+    assert playlist.advance() == ("a.png", "image")
+
+
+def test_reshuffles_each_full_pass():
+    calls = {"n": 0}
+
+    def shuffle(order):
+        calls["n"] += 1
+        order.reverse()
+
+    playlist = SlideshowPlaylist([("a.png", "image"), ("b.png", "image")], shuffle=shuffle)
+    assert calls["n"] == 1  # shuffled once at construction
+    playlist.advance()      # the second of the pass
+    playlist.advance()      # wraps -> a fresh shuffle
+
+    assert calls["n"] == 2
 
 
 def test_index_tracks_the_current_position():

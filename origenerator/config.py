@@ -26,15 +26,15 @@ EVOLVER_SOURCE = "origenerator"
 THUMB_SIZE = (256, 256)
 
 # --- Voice command → prompt edit ------------------------------------------
-# Push-to-talk speech is transcribed locally (faster-whisper on the CPU) and a
-# local LLM rewrites the current prompt per the spoken instruction. All local —
-# no audio or prompt text leaves the machine. Point LOCAL_LLM_* at your own
-# OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …) and set
-# the model you run.
+# While a folder auto-generates, the mic listens (always-on); each spoken
+# instruction is transcribed locally (faster-whisper, CPU) and a local LLM
+# rewrites that loop's prompt. All local — no audio or prompt text leaves the
+# machine. Point LOCAL_LLM_* at your own OpenAI-compatible chat server (Ollama's
+# /v1, LM Studio, llama.cpp, …).
 WHISPER_MODEL = "base"                            # faster-whisper size: tiny/base/small/…
-VOICE_VAD_THRESHOLD = 0.02                         # mic RMS above which a frame counts as speech; raise if it trips on background noise
+VOICE_VAD_THRESHOLD = 0.02                        # mic RMS above which a frame counts as speech; raise if it trips on background noise
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-LOCAL_LLM_MODEL = "llama3.1"                       # the chat model that rewrites prompts
+LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
 VOICE_REWRITE_SYSTEM_PROMPT = (
     "You edit image-generation prompts. Given the current prompt and a spoken "
     "instruction, apply the change and reply with ONLY the full revised prompt — "

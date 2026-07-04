@@ -40,6 +40,11 @@ class SlideshowPlaylist:
         """The current item's position in the running pass (0 when empty)."""
         return self._pos
 
+    @property
+    def order(self) -> list:
+        """The shuffled play order (item indices) — exposed for diagnostics."""
+        return list(self._order)
+
     def advance(self):
         """Step to the next item; at the end, reshuffle and start a fresh pass."""
         if self._items:

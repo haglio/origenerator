@@ -99,6 +99,7 @@ def main():
         handlers=log_handlers,
     )
     logger = logging.getLogger(__name__)
+    logger.info("BUILD MARKERS: slideshow=random, voice=always-listening (Auto = voice on)")
 
     app = QApplication.instance() or QApplication(sys.argv)
 

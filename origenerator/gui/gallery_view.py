@@ -672,6 +672,8 @@ class GalleryView(QWidget):
         if not items:
             return
         self._slideshow = SlideshowView(items)
+        logger.info("Slideshow: %d items, shuffled order[:10]=%s",
+                    len(items), self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
 
     def _slideshow_items(self, group) -> list:

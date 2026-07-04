@@ -9,8 +9,12 @@ simple and will occasionally trip on background/TV speech — the accepted cost 
 hands-free — so ``threshold`` is tunable.
 """
 
+import logging
+
 import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal
+
+logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000  # what faster-whisper expects
 
@@ -71,6 +75,8 @@ class Listener(QObject):
         self._sd = sd
         self._stream = None
         self._segmenter = None
+        self._frame_count = 0
+        self._peak_rms = 0.0
 
     def _backend(self):
         if self._sd is None:
@@ -87,10 +93,23 @@ class Listener(QObject):
             blocksize=_FRAME_SAMPLES, callback=self._on_audio,
         )
         self._stream.start()
+        self._frame_count = 0
+        self._peak_rms = 0.0
+        logger.info("Voice: mic opened (VAD threshold=%.3f)", self._threshold)
 
     def _on_audio(self, indata, _frames, _time, _status):
-        completed = self._segmenter.push(np.asarray(indata).reshape(-1))
+        frame = np.asarray(indata).reshape(-1)
+        rms = float(np.sqrt(np.mean(np.square(frame)))) if len(frame) else 0.0
+        self._peak_rms = max(self._peak_rms, rms)
+        self._frame_count += 1
+        if self._frame_count % 100 == 0:  # ~every 3s: is the mic hearing anything?
+            if self._peak_rms > 0.005:
+                logger.info("Voice: mic peak RMS %.4f vs threshold %.3f",
+                            self._peak_rms, self._threshold)
+            self._peak_rms = 0.0
+        completed = self._segmenter.push(frame)
         if completed is not None:
+            logger.info("Voice: utterance captured (%d samples)", len(completed))
             self.utterance.emit(completed)  # queued to the owner's thread
 
     def stop(self):

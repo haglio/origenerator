@@ -7,7 +7,11 @@ global thread pool; the worker's signals carry the result back to the UI thread
 that owns it.
 """
 
+import logging
+
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceWorker(QObject):
@@ -27,6 +31,7 @@ class VoiceWorker(QObject):
         self.busy.emit(True)
         try:
             instruction = self._transcribe(audio)
+            logger.info("Voice: transcribed %r", instruction)
             if not instruction.strip():
                 self.failed.emit("Didn't catch that.")
                 return

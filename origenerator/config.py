@@ -32,7 +32,7 @@ THUMB_SIZE = (256, 256)
 # machine. Point LOCAL_LLM_* at your own OpenAI-compatible chat server (Ollama's
 # /v1, LM Studio, llama.cpp, …).
 WHISPER_MODEL = "base"                            # faster-whisper size: tiny/base/small/…
-VOICE_VAD_THRESHOLD = 0.02                        # mic RMS above which a frame counts as speech; raise if it trips on background noise
+VOICE_VAD_THRESHOLD = 0.008                       # minimum speech floor; the gate self-calibrates above your mic's ambient level
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
 VOICE_REWRITE_SYSTEM_PROMPT = (

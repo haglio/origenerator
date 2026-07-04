@@ -1,12 +1,13 @@
 """Continuous microphone listening for voice-steered auto-generate.
 
 While a folder is auto-generating, the mic is open the whole time (the user chose
-hands-free over push-to-talk). :class:`UtteranceSegmenter` is a pure energy-based
-endpointer that turns the frame stream into discrete utterances; :class:`Listener`
-wires it to a ``sounddevice`` input stream (lazily imported) and emits each
-finished utterance for transcription. Energy-based detection is deliberately
-simple and will occasionally trip on background/TV speech — the accepted cost of
-hands-free — so ``threshold`` is tunable.
+hands-free over push-to-talk). :class:`UtteranceSegmenter` turns the frame stream
+into discrete utterances; :class:`Listener` wires it to a ``sounddevice`` input
+stream (lazily imported) and emits each finished utterance for transcription.
+
+Detection is adaptive: the first frames calibrate the mic's ambient level and the
+speech threshold tracks it (``noise * ratio``), so a faint or noisy mic — where a
+fixed gate sits on top of the background and never endpoints — still works.
 """
 
 import logging
@@ -23,31 +24,51 @@ _FRAME_SAMPLES = SAMPLE_RATE * _FRAME_MS // 1000
 
 
 class UtteranceSegmenter:
-    """Emits a finished utterance once loud frames are followed by ``hangover_frames``
-    quiet ones, discarding runs shorter than ``min_speech_frames``. Pure and
-    frame-driven — energy/VAD detection is all it does, no audio backend."""
+    """Emits a finished utterance once speech (energy above the calibrated noise
+    floor) is followed by ``hangover_frames`` quiet ones, discarding runs shorter
+    than ``min_speech_frames``. The first ``calibration_frames`` measure ambient so
+    the threshold (``noise * ratio``, never below ``floor``) fits the mic. Pure and
+    frame-driven — no audio backend."""
 
-    def __init__(self, *, threshold=0.02, hangover_frames=25, min_speech_frames=8):
-        self._threshold = threshold
+    def __init__(self, *, floor=0.008, ratio=2.0, calibration_frames=15,
+                 hangover_frames=20, min_speech_frames=5):
+        self._floor = floor
+        self._ratio = ratio
+        self._calibration_frames = calibration_frames
         self._hangover = hangover_frames
         self._min_speech = min_speech_frames
+        self._noise = None  # set once calibration finishes
+        self._calib_sum = 0.0
+        self._calib_count = 0
         self._buf: list = []
         self._speech_frames = 0
         self._silence_run = 0
         self._in_speech = False
 
+    @property
+    def threshold(self) -> float:
+        base = self._noise if self._noise is not None else self._floor
+        return max(self._floor, base * self._ratio)
+
     def push(self, frame):
         """Feed one audio frame. Returns the completed utterance (a mono array) when
         speech has just ended, otherwise ``None``."""
         rms = float(np.sqrt(np.mean(np.square(frame)))) if len(frame) else 0.0
-        if rms >= self._threshold:
+        if self._noise is None:  # still calibrating the ambient level
+            self._calib_sum += rms
+            self._calib_count += 1
+            if self._calib_count >= self._calibration_frames:
+                self._noise = self._calib_sum / self._calib_count
+            return None
+        if rms >= self.threshold:
             self._in_speech = True
             self._silence_run = 0
             self._speech_frames += 1
             self._buf.append(frame)
             return None
+        self._noise = 0.98 * self._noise + 0.02 * rms  # track ambient drift on quiet
         if not self._in_speech:
-            return None  # still waiting for speech to begin
+            return None
         self._silence_run += 1
         self._buf.append(frame)  # keep the trailing quiet; whisper reads it better
         if self._silence_run >= self._hangover:
@@ -69,9 +90,9 @@ class Listener(QObject):
 
     utterance = pyqtSignal(object)  # a finished utterance (mono float32 array)
 
-    def __init__(self, *, threshold=0.02, sd=None, parent=None):
+    def __init__(self, *, floor=0.008, sd=None, parent=None):
         super().__init__(parent)
-        self._threshold = threshold
+        self._floor = floor
         self._sd = sd
         self._stream = None
         self._segmenter = None
@@ -87,7 +108,7 @@ class Listener(QObject):
     def start(self):
         if self._stream is not None:
             return
-        self._segmenter = UtteranceSegmenter(threshold=self._threshold)
+        self._segmenter = UtteranceSegmenter(floor=self._floor)
         self._stream = self._backend().InputStream(
             samplerate=SAMPLE_RATE, channels=1, dtype="float32",
             blocksize=_FRAME_SAMPLES, callback=self._on_audio,
@@ -95,17 +116,17 @@ class Listener(QObject):
         self._stream.start()
         self._frame_count = 0
         self._peak_rms = 0.0
-        logger.info("Voice: mic opened (VAD threshold=%.3f)", self._threshold)
+        logger.info("Voice: mic opened (calibrating ambient, floor=%.3f)", self._floor)
 
     def _on_audio(self, indata, _frames, _time, _status):
         frame = np.asarray(indata).reshape(-1)
         rms = float(np.sqrt(np.mean(np.square(frame)))) if len(frame) else 0.0
         self._peak_rms = max(self._peak_rms, rms)
         self._frame_count += 1
-        if self._frame_count % 100 == 0:  # ~every 3s: is the mic hearing anything?
+        if self._frame_count % 100 == 0:  # ~every 3s: is the mic hearing speech?
             if self._peak_rms > 0.005:
-                logger.info("Voice: mic peak RMS %.4f vs threshold %.3f",
-                            self._peak_rms, self._threshold)
+                logger.info("Voice: mic peak RMS %.4f vs adaptive threshold %.4f",
+                            self._peak_rms, self._segmenter.threshold)
             self._peak_rms = 0.0
         completed = self._segmenter.push(frame)
         if completed is not None:

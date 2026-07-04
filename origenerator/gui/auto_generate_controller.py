@@ -44,6 +44,14 @@ class AutoGenerateController(QObject):
         workflow."""
         self._end(key)
 
+    def any_active(self) -> bool:
+        return bool(self._active)
+
+    def stop_all(self) -> None:
+        """End every running loop at once (e.g. the user pressed Esc)."""
+        for key in list(self._active):
+            self._end(key)
+
     def _end(self, key: str) -> None:
         if key in self._active:
             self._active.discard(key)

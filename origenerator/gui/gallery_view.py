@@ -150,6 +150,9 @@ class GalleryView(QWidget):
             if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
                 self._delete_selection()
                 return True
+            if event.key() == Qt.Key.Key_Escape and self._auto.any_active():
+                self._auto.stop_all()  # Esc ends auto-generate
+                return True
             if (event.key() == Qt.Key.Key_Z
                     and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
                 self._undo()
@@ -674,20 +677,26 @@ class GalleryView(QWidget):
         items = self._slideshow_items(group)
         if not items:
             return
-        self._slideshow = SlideshowView(items)
+        self._slideshow = SlideshowView(items, on_delete=self._slideshow_delete)
         logger.info("Slideshow: %d items, shuffled order[:10]=%s",
                     len(items), self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
 
     def _slideshow_items(self, group) -> list:
-        """(path, media_type) for each generation under ``group`` with a resolvable
-        preview, in gallery order — the slideshow's playlist."""
+        """(path, media_type, prompt_id) for each generation under ``group`` with a
+        resolvable preview, in gallery order — the slideshow's playlist."""
         items = []
         for row in gallery.rows_under(group):
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
             if resolved is not None:
-                items.append(resolved)
+                items.append((resolved[0], resolved[1], row["prompt_id"]))
         return items
+
+    def _slideshow_delete(self, prompt_id: str):
+        """Trash a generation culled from the slideshow (its Up key)."""
+        row = self._db.get_generation(prompt_id)
+        if row is not None:
+            self._actions.delete_rows([row])
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         """Re-roll one i2v item, randomizing a single seed (its top-left hover

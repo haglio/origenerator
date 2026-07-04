@@ -102,12 +102,10 @@ def test_a_paused_or_empty_playlist_has_no_dwell():
     assert SlideshowPlaylist([]).dwell_ms() is None
 
 
-def test_adjusting_the_dwell_clamps_to_bounds():
-    playlist = _playlist(image_dwell_ms=4000)
-    assert playlist.adjust_dwell(1000) == 5000
-    for _ in range(100):
-        playlist.adjust_dwell(5000)
-    assert playlist.image_dwell_ms == playlist.MAX_DWELL_MS
-    for _ in range(100):
-        playlist.adjust_dwell(-5000)
-    assert playlist.image_dwell_ms == playlist.MIN_DWELL_MS
+def test_remove_current_drops_the_item_and_advances():
+    playlist = SlideshowPlaylist(
+        [("a", "image"), ("b", "image"), ("c", "image")], shuffle=lambda order: None,
+    )  # order == [0, 1, 2], current == a
+    playlist.remove_current()
+    assert len(playlist) == 2
+    assert playlist.current() == ("b", "image")  # the next item becomes current

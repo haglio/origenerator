@@ -30,7 +30,7 @@ class VoiceSteering(QObject):
     def __init__(self, *, listener=None, worker=None, parent=None):
         super().__init__(parent)
         self._listener = listener if listener is not None else Listener(
-            threshold=config.VOICE_VAD_THRESHOLD
+            floor=config.VOICE_VAD_THRESHOLD
         )
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
         self._transcriber = None  # set when building the real worker, for preloading

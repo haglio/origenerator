@@ -14,12 +14,12 @@ from PyQt6.QtCore import Qt, QTimer
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.slideshow import SlideshowPlaylist
 
-_DWELL_STEP_MS = 1000
-
 
 class SlideshowView(QWidget):
-    def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, player=None, parent=None):
+    def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, on_delete=None,
+                 player=None, parent=None):
         super().__init__(parent)
+        self._on_delete = on_delete
         playlist_kwargs = {"image_dwell_ms": image_dwell_ms}
         if shuffle is not None:  # else the playlist uses its own random shuffle
             playlist_kwargs["shuffle"] = shuffle
@@ -59,7 +59,7 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         if item is None:
             return
-        path, media_type = item
+        path, media_type = item[0], item[1]
         self._preview.show_media(path, media_type)
         self._update_counter()
         dwell = self._playlist.dwell_ms()
@@ -69,6 +69,19 @@ class SlideshowView(QWidget):
     def _advance(self):
         self._playlist.advance()
         self._show_current()
+
+    def _delete_current(self):
+        """Delete the current item (if a deleter is wired) and advance to the next."""
+        item = self._playlist.current()
+        if item is None:
+            return
+        if self._on_delete is not None and len(item) > 2:
+            self._on_delete(item[2])
+        self._playlist.remove_current()
+        if self._playlist.is_empty():
+            self.close()
+        else:
+            self._show_current()
 
     def _back(self):
         self._playlist.back()
@@ -86,17 +99,12 @@ class SlideshowView(QWidget):
         else:
             self._show_current()  # resume, re-arming the dwell timer
 
-    def _adjust_dwell(self, delta_ms):
-        self._playlist.adjust_dwell(delta_ms)
-        if self._timer.isActive():  # retime the image currently on screen
-            self._show_current()
-
     # --- caption -----------------------------------------------------------
 
     def _update_counter(self):
-        # Show the item's number within the folder (the shuffled position), not the
-        # step count — so a random slideshow visibly jumps around, e.g. #7, #23, #16.
-        text = f"#{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
+        # Show the item's number within the folder (its shuffled position), not the
+        # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
+        text = f"{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
         if self._playlist.paused:
             text += "  ·  paused"
         self._counter.setText(text)
@@ -121,9 +129,9 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Right:
             self._advance()
         elif key == Qt.Key.Key_Up:
-            self._adjust_dwell(_DWELL_STEP_MS)
+            self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
-            self._adjust_dwell(-_DWELL_STEP_MS)
+            self._toggle_pause()    # hold on the current item
         else:
             super().keyPressEvent(event)
 

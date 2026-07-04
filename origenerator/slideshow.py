@@ -14,9 +14,6 @@ import random
 
 
 class SlideshowPlaylist:
-    MIN_DWELL_MS = 1000
-    MAX_DWELL_MS = 20000
-
     def __init__(self, items, *, image_dwell_ms=4000, shuffle=random.shuffle):
         self._items = list(items)  # each an (path, media_type) pair
         self._shuffle = shuffle
@@ -60,6 +57,16 @@ class SlideshowPlaylist:
             self._pos = (self._pos - 1) % len(self._items)
         return self.current()
 
+    def remove_current(self):
+        """Drop the current item; the item that followed it becomes current."""
+        if not self._items:
+            return
+        removed = self._order[self._pos]
+        del self._items[removed]
+        self._order = [i - 1 if i > removed else i for i in self._order if i != removed]
+        if not self._order or self._pos >= len(self._order):
+            self._pos = 0
+
     @property
     def paused(self) -> bool:
         return self._paused
@@ -88,11 +95,4 @@ class SlideshowPlaylist:
 
     @property
     def image_dwell_ms(self) -> int:
-        return self._image_dwell_ms
-
-    def adjust_dwell(self, delta_ms: int) -> int:
-        """Nudge the image dwell time by ``delta_ms``, clamped to the bounds."""
-        self._image_dwell_ms = max(
-            self.MIN_DWELL_MS, min(self.MAX_DWELL_MS, self._image_dwell_ms + delta_ms)
-        )
         return self._image_dwell_ms

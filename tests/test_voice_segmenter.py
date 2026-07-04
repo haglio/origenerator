@@ -14,10 +14,22 @@ SPEECH = np.full(4, 0.5, dtype=np.float32)
 
 
 def _seg(**kw):
-    kw.setdefault("threshold", 0.1)
+    kw.setdefault("floor", 0.05)
+    kw.setdefault("ratio", 1.5)
+    kw.setdefault("calibration_frames", 2)
     kw.setdefault("hangover_frames", 3)
     kw.setdefault("min_speech_frames", 2)
-    return UtteranceSegmenter(**kw)
+    seg = UtteranceSegmenter(**kw)
+    seg.push(SILENCE)  # calibrate on quiet, so the ambient floor is ~0
+    seg.push(SILENCE)
+    return seg
+
+
+def test_threshold_adapts_to_the_calibrated_ambient():
+    seg = UtteranceSegmenter(floor=0.001, ratio=2.0, calibration_frames=3)
+    for _ in range(3):
+        seg.push(np.full(4, 0.05, dtype=np.float32))  # ambient ~0.05
+    assert abs(seg.threshold - 0.10) < 1e-3  # noise 0.05 * ratio 2.0
 
 
 def test_silence_never_produces_an_utterance():

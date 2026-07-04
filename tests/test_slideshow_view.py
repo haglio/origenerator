@@ -69,17 +69,30 @@ def test_escape_closes_the_view(qtbot):
     assert not view.isVisible()
 
 
-def test_up_and_down_adjust_the_dwell(qtbot):
-    view = _view(qtbot, image_dwell_ms=4000)
+def test_up_deletes_the_current_item_and_advances(qtbot):
+    deleted = []
+    items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
+             ("c.png", "image", "id-c")]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None,
+                         on_delete=deleted.append)
+    qtbot.addWidget(view)
+    assert view._playlist.current()[2] == "id-a"
+
     _press(view, Qt.Key.Key_Up)
-    assert view._playlist.image_dwell_ms == 5000
+
+    assert deleted == ["id-a"]                     # culled via the on_delete hook
+    assert len(view._playlist) == 2
+    assert view._playlist.current()[2] == "id-b"   # advanced to the next
+
+
+def test_down_holds_the_slideshow(qtbot):
+    view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    _press(view, Qt.Key.Key_Down)
-    assert view._playlist.image_dwell_ms == 3000
+    assert view._playlist.paused
 
 
 def test_the_caption_shows_the_item_number(qtbot):
     view = _view(qtbot)  # identity shuffle, so order == [0, 1, 2]
-    assert view._counter.text().startswith("#1 / 3")
+    assert view._counter.text().startswith("1 / 3")
     _press(view, Qt.Key.Key_Right)
-    assert view._counter.text().startswith("#2 / 3")
+    assert view._counter.text().startswith("2 / 3")

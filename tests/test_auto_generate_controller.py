@@ -116,6 +116,21 @@ def test_starting_an_already_looping_folder_does_not_double_launch(qtbot):
     assert launcher.calls == ["k"]  # the second start is a no-op
 
 
+def test_stop_all_ends_every_active_loop(qtbot):
+    launcher = FakeLauncher()
+    auto = AutoGenerateController(launcher)
+    stopped = []
+    auto.stopped.connect(stopped.append)
+    auto.start("a")
+    auto.start("b")
+
+    auto.stop_all()
+
+    assert not auto.is_active("a") and not auto.is_active("b")
+    assert sorted(stopped) == ["a", "b"]
+    assert not auto.any_active()
+
+
 def test_folders_loop_independently(qtbot):
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)

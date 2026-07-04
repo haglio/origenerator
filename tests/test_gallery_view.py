@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint, QObject, pyqtSignal
-from PyQt6.QtGui import QIcon, QMovie
+from PyQt6.QtCore import Qt, QPoint, QObject, QEvent, pyqtSignal
+from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
 from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
 from origenerator import evolver_export, gallery
@@ -2173,6 +2173,23 @@ def test_turning_auto_off_stops_voice(qtbot, tmp_path):
     view._toggle_auto(False)
 
     assert view._voice.stopped
+
+
+def test_esc_stops_auto_generate(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    assert view._auto.is_active(key)
+    view._gallery_owns_keys = lambda: True  # pretend the gallery holds key focus
+
+    handled = view.eventFilter(
+        view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+    )
+
+    assert handled is True
+    assert not view._auto.is_active(key)
 
 
 # --- slideshow: play a folder's media fullscreen ----------------------------

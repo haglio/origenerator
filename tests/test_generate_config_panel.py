@@ -68,24 +68,6 @@ def test_preview_over_form_share_the_main_pane(panel):
     assert panel._preview is not main  # nested inside the pane, not the pane itself
 
 
-# --- voice: speak an edit, the local model rewrites the prompt in place -----
-
-def test_voice_button_sits_in_the_run_controls(panel):
-    main = panel._panes.widget(0)
-    assert _is_descendant(panel._voice_btn, main)
-
-
-def test_voice_prompt_edit_updates_the_positive_prompt_in_place(panel):
-    panel._param_form.set_field_value("positive_prompt", "a cat")
-    panel._apply_voice_prompt("a cat, no redacted")
-    assert panel._param_form.field_value("positive_prompt") == "a cat, no redacted"
-
-
-def test_voice_button_reads_the_current_prompt(panel):
-    panel._param_form.set_field_value("positive_prompt", "a dog on a beach")
-    assert panel._voice_btn._get_prompt() == "a dog on a beach"
-
-
 def test_generate_inserts_row_and_submits(panel):
     panel._on_generate()
     rows = panel._db.list_generations()

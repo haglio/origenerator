@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QObject, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie
 from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
 
@@ -80,6 +80,36 @@ def _stub_preview_resolution(monkeypatch):
     Tests that assert routing override this with their own return value.
     """
     monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
+
+
+class _FakeVoiceSteering(QObject):
+    """Stands in for VoiceSteering so gallery tests never open a real microphone;
+    ``say`` simulates a heard-and-rewritten utterance steering the loop's prompt."""
+
+    error = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.started = False
+        self.stopped = False
+        self._set = None
+
+    def start(self, get_prompt, set_prompt):
+        self.started = True
+        self._set = set_prompt
+
+    def stop(self):
+        self.stopped = True
+
+    def say(self, new_prompt):
+        self._set(new_prompt)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_mic(monkeypatch):
+    """Default every GalleryView's voice steering to the inert fake above, so
+    toggling Auto in a test never opens the microphone."""
+    monkeypatch.setattr(gallery_view_module, "VoiceSteering", _FakeVoiceSteering)
 
 
 class FakeDB:
@@ -2112,6 +2142,37 @@ def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
 
     view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # a media root, not a leaf
     assert view._auto_btn.isHidden()
+
+
+# --- voice steering: Auto is voice's "on"; utterances steer the loop's prompt --
+
+def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    assert view._voice.started
+    view._voice.say("a cat, no redacted")  # a heard + rewritten utterance
+    job = view._reroll_jobs[key]
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # finishing relaunches
+
+    # the relaunched generation carries the steered prompt
+    assert view._reroll_jobs[key].params["positive_prompt"] == "a cat, no redacted"
+
+
+def test_turning_auto_off_stops_voice(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    view._toggle_auto(False)
+
+    assert view._voice.stopped
 
 
 # --- slideshow: play a folder's media fullscreen ----------------------------

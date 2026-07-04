@@ -16,7 +16,7 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    ConfigSnapshot, find_duplicate_generation, randomize_seeds,
+    ConfigSnapshot, filled_params, find_duplicate_generation, randomize_seeds,
 )
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tree import FolderTree
@@ -27,6 +27,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
@@ -89,7 +90,14 @@ class GalleryView(QWidget):
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_reroll)
-        self._auto.stopped.connect(lambda _key: self._sync_auto_button())
+        self._auto.stopped.connect(self._on_auto_stopped)
+        # Auto-generate holds a mutable copy of a folder's params per active loop so
+        # voice can steer the prompt mid-loop; turning Auto on is voice's "on" and
+        # begins always-listening steering of the current folder.
+        self._auto_working: dict = {}
+        self._voice = VoiceSteering()
+        self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
+        self._voice_target_key: str | None = None
         self._slideshow = None  # the fullscreen slideshow window while one is open
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
@@ -573,21 +581,71 @@ class GalleryView(QWidget):
             return False
         if key in self._reroll_jobs:
             return True  # one is already running for this folder
-        item = self._item_by_key.get(key)
-        group = item.data(0, _GROUP_ROLE) if item else None
-        self._reroll.start(key, group, self._image_rows)
+        working = self._auto_working.get(key)
+        if working is not None:
+            # A voice-steered auto loop launches its (possibly edited) working prompt
+            # with fresh seeds, not the folder's stored rows.
+            params = randomize_seeds(working["params"], working["workflow"].seed_keys())
+            self._reroll.start_prepared(key, working["workflow"], params)
+        else:
+            item = self._item_by_key.get(key)
+            group = item.data(0, _GROUP_ROLE) if item else None
+            self._reroll.start(key, group, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
         return self._reroll.has(key)
 
     def _toggle_auto(self, checked: bool):
-        """Start or stop auto-generating fresh variations of the open folder."""
+        """Start or stop auto-generating fresh variations of the open folder. Auto
+        is also voice's on/off: starting a loop begins always-listening steering."""
         key = self._selected_folder_key()
         if key is not None:
             if checked:
-                self._auto.start(key)
+                self._begin_auto(key)
             else:
-                self._auto.stop(key)
+                self._auto.stop(key)  # cleanup + voice-off run in _on_auto_stopped
         self._sync_auto_button()  # reflect the real state — a start may not take
+
+    def _begin_auto(self, key: str):
+        """Capture the folder's settings as the loop's working params, start the
+        loop, and begin voice steering of its prompt."""
+        self._capture_working(key)
+        self._auto.start(key)
+        if self._auto.is_active(key):
+            self._voice_target_key = key
+            self._voice.start(
+                lambda k=key: self._working_prompt(k),
+                lambda new, k=key: self._steer_prompt(k, new),
+            )
+        else:
+            self._auto_working.pop(key, None)  # the launch didn't take
+
+    def _capture_working(self, key: str):
+        group = self._current_group()
+        if not isinstance(group, gallery.SettingsGroup) or not group.rows:
+            return
+        workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
+        if workflow is not None:
+            self._auto_working[key] = {
+                "workflow": workflow, "params": filled_params(group.rows[0], workflow),
+            }
+
+    def _working_prompt(self, key: str) -> str:
+        return self._auto_working.get(key, {}).get("params", {}).get("positive_prompt", "")
+
+    def _steer_prompt(self, key: str, new_prompt: str):
+        """A voice command rewrote the prompt: the loop's next launches use it."""
+        working = self._auto_working.get(key)
+        if working is not None:
+            working["params"]["positive_prompt"] = new_prompt
+
+    def _on_auto_stopped(self, key: str):
+        """A folder's loop ended (toggled off, cancelled, or failed): drop its
+        working params and, if it was the voice target, stop listening."""
+        self._auto_working.pop(key, None)
+        if key == self._voice_target_key:
+            self._voice.stop()
+            self._voice_target_key = None
+        self._sync_auto_button()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,

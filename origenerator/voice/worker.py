@@ -1,0 +1,51 @@
+"""Off-UI-thread transcribe + rewrite for a captured utterance.
+
+A :class:`VoiceWorker` turns one audio utterance into an edited prompt: it
+transcribes (faster-whisper) and rewrites (local LLM) via injected callables, so
+the pipeline unit-tests inline. :class:`ProcessTask` runs one such call on the
+global thread pool; the worker's signals carry the result back to the UI thread
+that owns it.
+"""
+
+from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot
+
+
+class VoiceWorker(QObject):
+    rewritten = pyqtSignal(str)   # the revised prompt
+    failed = pyqtSignal(str)      # a human-readable reason (nothing heard, no server, …)
+    busy = pyqtSignal(bool)       # work started / finished
+
+    def __init__(self, transcribe_fn, rewrite_fn, parent=None):
+        super().__init__(parent)
+        self._transcribe = transcribe_fn
+        self._rewrite = rewrite_fn
+
+    @pyqtSlot(object, str)
+    def process(self, audio, current_prompt: str) -> None:
+        """Transcribe ``audio`` and apply it to ``current_prompt``, emitting the new
+        prompt or a failure. Runs on a pool thread; never raises."""
+        self.busy.emit(True)
+        try:
+            instruction = self._transcribe(audio)
+            if not instruction.strip():
+                self.failed.emit("Didn't catch that.")
+                return
+            self.rewritten.emit(self._rewrite(current_prompt, instruction))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        finally:
+            self.busy.emit(False)
+
+
+class ProcessTask(QRunnable):
+    """Runs one ``VoiceWorker.process`` off the UI thread. The worker's signals
+    carry the result back — delivered (queued) to the thread that owns the worker."""
+
+    def __init__(self, worker: VoiceWorker, audio, prompt: str):
+        super().__init__()
+        self._worker = worker
+        self._audio = audio
+        self._prompt = prompt
+
+    def run(self):
+        self._worker.process(self._audio, self._prompt)

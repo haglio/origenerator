@@ -294,22 +294,6 @@ class ParamForm(QWidget):
         """
         return self._collect(randomize_seed=False)
 
-    def field_value(self, key: str):
-        """One field's current value, statically — no seed re-roll, no side effects.
-        The voice prompt edit reads the prompt this way."""
-        pd = self._param_def(key)
-        return self._read_field(pd, randomize_seed=False) if pd is not None else None
-
-    def set_field_value(self, key: str, value) -> None:
-        """Set a single field, leaving every other field — and the seed Random
-        toggles — untouched. The voice edit updates only the prompt."""
-        pd = self._param_def(key)
-        if pd is not None:
-            self._write_field(pd, value)
-
-    def _param_def(self, key: str):
-        return next((pd for pd in self._param_defs if pd.key == key), None)
-
     def seed_is_random(self) -> bool:
         """True if any seed param's Random box is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())

@@ -32,6 +32,7 @@ THUMB_SIZE = (256, 256)
 # OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …) and set
 # the model you run.
 WHISPER_MODEL = "base"                            # faster-whisper size: tiny/base/small/…
+VOICE_VAD_THRESHOLD = 0.02                         # mic RMS above which a frame counts as speech; raise if it trips on background noise
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 LOCAL_LLM_MODEL = "llama3.1"                       # the chat model that rewrites prompts
 VOICE_REWRITE_SYSTEM_PROMPT = (

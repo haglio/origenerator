@@ -31,28 +31,6 @@ def test_field_labels_fit_the_heading_font(qtbot):
     assert label.width() >= label.fontMetrics().horizontalAdvance(label_text)
 
 
-def test_field_value_reads_a_single_field(qtbot):
-    form = ParamForm([ParamDef("positive_prompt", "Prompt", "str", "a cat", multiline=True)])
-    qtbot.addWidget(form)
-    assert form.field_value("positive_prompt") == "a cat"
-
-
-def test_set_field_value_updates_only_that_field_and_leaves_seed_random(qtbot):
-    # The voice prompt edit sets just the prompt; unlike set_values it must not pin
-    # the seed (uncheck Random), which would silently stop seeds from re-rolling.
-    form = ParamForm([
-        ParamDef("positive_prompt", "Prompt", "str", "a cat", multiline=True),
-        ParamDef("seed", "Seed", "seed", 0),
-    ])
-    qtbot.addWidget(form)
-    assert form.seed_is_random()
-
-    form.set_field_value("positive_prompt", "a dog")
-
-    assert form.field_value("positive_prompt") == "a dog"
-    assert form.seed_is_random()  # untouched
-
-
 def test_browse_button_fits_its_caption(qtbot):
     """The Browse button must show its whole caption, not a clipped "B".
 

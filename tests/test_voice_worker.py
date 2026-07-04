@@ -4,7 +4,7 @@ The recorder and whisper/LLM calls are injected as plain functions, so the whole
 pipeline is exercised synchronously without a mic, a model, or a server.
 """
 
-from origenerator.gui.voice_button import VoiceWorker
+from origenerator.voice.worker import VoiceWorker
 
 
 def test_transcribes_then_rewrites_and_emits_the_new_prompt(qtbot):

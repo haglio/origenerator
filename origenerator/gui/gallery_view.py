@@ -24,6 +24,7 @@ from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
@@ -84,6 +85,10 @@ class GalleryView(QWidget):
         self._reroll.preview.connect(self._on_reroll_preview)
         self._reroll.finished.connect(self._on_reroll_finished)
         self._reroll.failed.connect(self._on_reroll_failed)
+        # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
+        # the next variation each time one finishes, until stopped or one fails.
+        self._auto = AutoGenerateController(self._start_reroll)
+        self._auto.stopped.connect(lambda _key: self._sync_auto_button())
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -215,10 +220,16 @@ class GalleryView(QWidget):
         self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
         self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
         self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
+        self._auto_btn = self._tool_button(
+            icons.autoloop_icon(), "Auto-generate variations of this folder",
+            self._toggle_auto, checkable=True,
+        )
+        self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
-        for button in (self._back_btn, self._forward_btn, self._undo_btn, self._delete_btn):
+        for button in (self._back_btn, self._forward_btn, self._undo_btn,
+                       self._auto_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -324,14 +335,16 @@ class GalleryView(QWidget):
         self._running_bar = RunningJobBar()
         layout.addWidget(self._running_bar)
 
-    def _tool_button(self, icon, tooltip: str, handler) -> QToolButton:
-        """A compact, icon-only toolbar button for the browser-pane header."""
+    def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
+        """A compact, icon-only toolbar button for the browser-pane header. A
+        ``checkable`` one is a toggle whose ``handler`` receives its on/off state."""
         btn = QToolButton()
         btn.setObjectName("iconButton")
         btn.setIcon(icon)
         btn.setIconSize(QSize(16, 16))
         btn.setToolTip(tooltip)
-        btn.clicked.connect(handler)
+        btn.setCheckable(checkable)
+        (btn.toggled if checkable else btn.clicked).connect(handler)
         return btn
 
     def showEvent(self, event):
@@ -422,6 +435,7 @@ class GalleryView(QWidget):
             self._on_thumbnail_clicked(prompt_id)
 
     def _on_folder_selected(self, current, _previous):
+        self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         if current is None:
             self._title.set_display("")
             self._avg_label.setText("")
@@ -533,19 +547,46 @@ class GalleryView(QWidget):
         flow.addWidget(tile)
         self._reroll_tile = tile
 
-    def _start_reroll(self, key: str):
+    def _start_reroll(self, key: str) -> bool:
         """Start a fresh variation for the folder ``key`` names and select it, so
-        its live preview fills the info pane at once.
+        its live preview fills the info pane at once. Returns whether a variation
+        is now running for the folder — the auto-generate loop's cue that a launch
+        took hold, and its cue to stop when one can't.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
         """
-        if self._client is None or key in self._reroll_jobs:
-            return  # no client, or this folder already has one running
+        if self._client is None:
+            return False
+        if key in self._reroll_jobs:
+            return True  # one is already running for this folder
         item = self._item_by_key.get(key)
         group = item.data(0, _GROUP_ROLE) if item else None
         self._reroll.start(key, group, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
+        return self._reroll.has(key)
+
+    def _toggle_auto(self, checked: bool):
+        """Start or stop auto-generating fresh variations of the open folder."""
+        key = self._selected_folder_key()
+        if key is not None:
+            if checked:
+                self._auto.start(key)
+            else:
+                self._auto.stop(key)
+        self._sync_auto_button()  # reflect the real state — a start may not take
+
+    def _sync_auto_button(self):
+        """Offer the auto-generate toggle only on a re-rollable settings folder,
+        and keep it checked while that folder's loop runs."""
+        item = self._tree.currentItem()
+        group = item.data(0, _GROUP_ROLE) if item else None
+        available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
+        key = self._selected_folder_key()
+        self._auto_btn.setVisible(available)
+        self._auto_btn.blockSignals(True)
+        self._auto_btn.setChecked(available and key is not None and self._auto.is_active(key))
+        self._auto_btn.blockSignals(False)
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         """Re-roll one i2v item, randomizing a single seed (its top-left hover
@@ -745,6 +786,7 @@ class GalleryView(QWidget):
         self._reroll.reconnect_running(self._claimed_ids())
 
     def _cancel_reroll(self, key: str):
+        self._auto.stop(key)  # cancelling the in-flight job ends the loop too
         self._reroll.cancel(key)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
@@ -769,10 +811,12 @@ class GalleryView(QWidget):
             item = self._item_by_key.get(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
+        self._auto.note_finished(key)  # if auto-looping this folder, launch the next
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if
         it was showing this one, and redraw the folder without its tile."""
+        self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
 

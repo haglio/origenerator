@@ -2026,6 +2026,94 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
+# --- auto-generate: the folder re-roll on a loop until stopped --------------
+
+def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._auto_btn.click()  # the header's Auto toggle, switched on
+
+    assert view._auto.is_active(key)
+    assert key in view._reroll_jobs          # a first variation is running
+    client.submit_job.assert_called_once()
+    assert view._auto_btn.isChecked()
+
+
+def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    job = view._reroll_jobs[key]
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the variation finishes
+
+    assert client.submit_job.call_count == 2   # the next one was launched
+    assert view._auto.is_active(key)
+    assert key in view._reroll_jobs            # a fresh variation is running
+
+
+def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    job = view._reroll_jobs[key]
+
+    view._toggle_auto(False)
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert client.submit_job.call_count == 1   # not relaunched after stop
+    assert not view._auto.is_active(key)
+
+
+def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    job = view._reroll_jobs[key]
+
+    client.job_error.emit(job.prompt_id, "boom")   # ComfyUI rejected it
+
+    assert not view._auto.is_active(key)
+    assert client.submit_job.call_count == 1       # did not spin on the failure
+
+
+def test_cancelling_a_reroll_stops_the_auto_loop(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+
+    view._cancel_reroll(key)  # cancelling the in-flight job also ends the loop
+
+    assert not view._auto.is_active(key)
+
+
+def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._auto_btn.isHidden()             # offered on a re-rollable leaf
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # a media root, not a leaf
+    assert view._auto_btn.isHidden()
+
+
 def _insert_running_reroll(db, prompt_id="rr", seed=99):
     """A re-roll left running by a prior session: same settings folder as
     _seeded_db's 'orig', no output yet, status running."""

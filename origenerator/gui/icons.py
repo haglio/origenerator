@@ -56,6 +56,11 @@ def undo_icon() -> QIcon:
     return _two_mode(_draw_undo)
 
 
+def autoloop_icon() -> QIcon:
+    """A clockwise circular arrow — auto-generate: keep re-rolling this folder."""
+    return _two_mode(_draw_autoloop)
+
+
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
 
@@ -223,6 +228,15 @@ def _draw_undo(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(19, 15), QPointF(28, 10), QPointF(28, 20))
+
+
+def _draw_autoloop(painter: QPainter, color):
+    """A clockwise circular arrow — the horizontal mirror of the undo glyph, so
+    "keep going" and "go back" read as opposites."""
+    painter.drawArc(QRectF(13, 15, 22, 22), 80 * 16, -300 * 16)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawPolygon(QPointF(29, 15), QPointF(20, 10), QPointF(20, 20))
 
 
 def _draw_trash(painter: QPainter):

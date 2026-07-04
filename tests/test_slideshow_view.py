@@ -78,8 +78,8 @@ def test_up_and_down_adjust_the_dwell(qtbot):
     assert view._playlist.image_dwell_ms == 3000
 
 
-def test_the_caption_shows_position(qtbot):
-    view = _view(qtbot)
-    assert view._counter.text().startswith("1 / 3")
+def test_the_caption_shows_the_item_number(qtbot):
+    view = _view(qtbot)  # identity shuffle, so order == [0, 1, 2]
+    assert view._counter.text().startswith("#1 / 3")
     _press(view, Qt.Key.Key_Right)
-    assert view._counter.text().startswith("2 / 3")
+    assert view._counter.text().startswith("#2 / 3")

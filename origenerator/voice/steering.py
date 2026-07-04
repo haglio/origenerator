@@ -9,6 +9,7 @@ without a mic, a model, or a server.
 """
 
 import logging
+import threading
 from functools import partial
 
 from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
@@ -32,6 +33,7 @@ class VoiceSteering(QObject):
             threshold=config.VOICE_VAD_THRESHOLD
         )
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
+        self._transcriber = None  # set when building the real worker, for preloading
         self._worker = worker if worker is not None else self._build_worker()
         self._get_prompt = None
         self._set_prompt = None
@@ -40,8 +42,9 @@ class VoiceSteering(QObject):
         self._worker.failed.connect(self.error)
 
     def _build_worker(self) -> VoiceWorker:
+        self._transcriber = Transcriber()
         return VoiceWorker(
-            Transcriber().transcribe,
+            self._transcriber.transcribe,
             partial(
                 rewrite_prompt,
                 base_url=config.LOCAL_LLM_BASE_URL, model=config.LOCAL_LLM_MODEL,
@@ -53,10 +56,18 @@ class VoiceSteering(QObject):
         """Begin listening; each utterance rewrites ``get_prompt()`` via ``set_prompt``."""
         self._get_prompt = get_prompt
         self._set_prompt = set_prompt
+        if self._transcriber is not None:  # warm the model now, not on the 1st command
+            threading.Thread(target=self._preload, daemon=True).start()
         try:
             self._listener.start()
         except Exception as exc:  # no mic or no audio backend
             self.error.emit(str(exc))
+
+    def _preload(self) -> None:
+        try:
+            self._transcriber.preload()
+        except Exception as exc:
+            logger.warning("Voice: whisper preload failed: %s", exc)
 
     def stop(self) -> None:
         self._listener.stop()

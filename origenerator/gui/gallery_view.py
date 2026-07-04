@@ -238,6 +238,9 @@ class GalleryView(QWidget):
             icons.autoloop_icon(), "Auto-generate variations of this folder",
             self._toggle_auto, checkable=True,
         )
+        self._auto_btn.setStyleSheet(  # a lit background while auto-generate is running
+            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+        )
         self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()

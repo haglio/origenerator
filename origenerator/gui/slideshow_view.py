@@ -94,7 +94,9 @@ class SlideshowView(QWidget):
     # --- caption -----------------------------------------------------------
 
     def _update_counter(self):
-        text = f"{self._playlist.index + 1} / {len(self._playlist)}"
+        # Show the item's number within the folder (the shuffled position), not the
+        # step count — so a random slideshow visibly jumps around, e.g. #7, #23, #16.
+        text = f"#{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
         if self._playlist.paused:
             text += "  ·  paused"
         self._counter.setText(text)

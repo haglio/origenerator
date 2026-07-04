@@ -66,6 +66,11 @@ def slideshow_icon() -> QIcon:
     return _two_mode(_draw_slideshow)
 
 
+def mic_icon() -> QIcon:
+    """A microphone — hold to speak a prompt edit (push-to-talk)."""
+    return _two_mode(_draw_mic)
+
+
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
 
@@ -250,6 +255,16 @@ def _draw_slideshow(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(21, 19), QPointF(21, 29), QPointF(30, 24))  # play triangle
+
+
+def _draw_mic(painter: QPainter, color):
+    """A microphone capsule in its cradle on a stand — push-to-talk."""
+    painter.setBrush(color)
+    painter.drawRoundedRect(QRectF(19, 9, 10, 17), 5, 5)          # the mic body
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawArc(QRectF(14, 13, 20, 20), 200 * 16, 140 * 16)   # the cradle
+    painter.drawLine(QPointF(24, 33), QPointF(24, 38))            # the stand
+    painter.drawLine(QPointF(19, 38), QPointF(29, 38))            # the base
 
 
 def _draw_trash(painter: QPainter):

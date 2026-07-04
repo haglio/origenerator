@@ -24,3 +24,19 @@ EVOLVER_INBOX_DIR = Path("C:/path/to/suite-root/videos/videos/2D/AI/0_inbox")
 EVOLVER_SOURCE = "origenerator"
 
 THUMB_SIZE = (256, 256)
+
+# --- Voice command → prompt edit ------------------------------------------
+# Push-to-talk speech is transcribed locally (faster-whisper on the CPU) and a
+# local LLM rewrites the current prompt per the spoken instruction. All local —
+# no audio or prompt text leaves the machine. Point LOCAL_LLM_* at your own
+# OpenAI-compatible chat server (Ollama's /v1, LM Studio, llama.cpp, …) and set
+# the model you run.
+WHISPER_MODEL = "base"                            # faster-whisper size: tiny/base/small/…
+LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
+LOCAL_LLM_MODEL = "llama3.1"                       # the chat model that rewrites prompts
+VOICE_REWRITE_SYSTEM_PROMPT = (
+    "You edit image-generation prompts. Given the current prompt and a spoken "
+    "instruction, apply the change and reply with ONLY the full revised prompt — "
+    "no quotes, no explanation, no preamble. Preserve the parts of the prompt the "
+    "instruction doesn't touch."
+)

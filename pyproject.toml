@@ -8,6 +8,7 @@ dependencies = [
     "Pillow",
     "opencv-python>=4.8",
     "websockets",
+    "numpy",
 ]
 
 [project.scripts]
@@ -15,6 +16,10 @@ origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-qt", "vulture"]
+# Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
+# optional — the mic button degrades gracefully when these aren't installed.
+# Install with:  pip install -e .[voice]
+voice = ["faster-whisper", "sounddevice"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

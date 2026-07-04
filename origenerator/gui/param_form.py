@@ -294,6 +294,22 @@ class ParamForm(QWidget):
         """
         return self._collect(randomize_seed=False)
 
+    def field_value(self, key: str):
+        """One field's current value, statically — no seed re-roll, no side effects.
+        The voice prompt edit reads the prompt this way."""
+        pd = self._param_def(key)
+        return self._read_field(pd, randomize_seed=False) if pd is not None else None
+
+    def set_field_value(self, key: str, value) -> None:
+        """Set a single field, leaving every other field — and the seed Random
+        toggles — untouched. The voice edit updates only the prompt."""
+        pd = self._param_def(key)
+        if pd is not None:
+            self._write_field(pd, value)
+
+    def _param_def(self, key: str):
+        return next((pd for pd in self._param_defs if pd.key == key), None)
+
     def seed_is_random(self) -> bool:
         """True if any seed param's Random box is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
@@ -333,33 +349,56 @@ class ParamForm(QWidget):
             if not cb.isHidden():
                 cb.setChecked(is_random)
 
+    def _read_field(self, pd: ParamDef, randomize_seed: bool):
+        """One field's current value. A seed with its Random box checked is
+        re-rolled when ``randomize_seed``; otherwise it's read from the field."""
+        w = self._widgets[pd.key]
+        if pd.type == "seed":
+            cb = self._randomize_checks.get(pd.key)
+            if randomize_seed and cb and cb.isChecked():
+                return random.randint(0, _SEED_MAX)
+            try:
+                return int(w.text())
+            except ValueError:
+                return 0
+        if pd.type == "str" and pd.multiline:
+            return w.toPlainText()
+        if pd.type == "image":
+            return _clean_image_ref(w.text())
+        if pd.type == "str":
+            return w.text()
+        if pd.type in ("int", "float"):
+            return w.value()
+        if pd.type == "combo":
+            return w.currentText()
+        return None
+
+    def _write_field(self, pd: ParamDef, value) -> None:
+        """Apply one value to its widget. A seed is pinned (its Random box cleared),
+        matching how reusing a generation reproduces an exact seed."""
+        w = self._widgets[pd.key]
+        if pd.type == "seed":
+            w.setText(str(int(value)))
+            cb = self._randomize_checks.get(pd.key)
+            if cb:
+                cb.setChecked(False)
+        elif pd.type == "str" and pd.multiline:
+            w.setPlainText(str(value))
+        elif pd.type == "str" or pd.type == "image":
+            w.setText(str(value))
+        elif pd.type == "int":
+            w.setValue(int(value))
+        elif pd.type == "float":
+            w.setValue(float(value))
+        elif pd.type == "combo":
+            _select_combo_value(w, str(value))
+
     def _collect(self, randomize_seed: bool) -> dict:
         # Start from the hidden params (disjoint from the widget keys), then lay
         # the live field values on top.
         result = dict(self._passthrough)
         for pd in self._param_defs:
-            w = self._widgets[pd.key]
-            if pd.type == "seed":
-                cb = self._randomize_checks.get(pd.key)
-                if randomize_seed and cb and cb.isChecked():
-                    result[pd.key] = random.randint(0, _SEED_MAX)
-                else:
-                    try:
-                        result[pd.key] = int(w.text())
-                    except ValueError:
-                        result[pd.key] = 0
-            elif pd.type == "str" and pd.multiline:
-                result[pd.key] = w.toPlainText()
-            elif pd.type == "image":
-                result[pd.key] = _clean_image_ref(w.text())
-            elif pd.type == "str":
-                result[pd.key] = w.text()
-            elif pd.type == "int":
-                result[pd.key] = w.value()
-            elif pd.type == "float":
-                result[pd.key] = w.value()
-            elif pd.type == "combo":
-                result[pd.key] = w.currentText()
+            result[pd.key] = self._read_field(pd, randomize_seed)
         return result
 
     def set_values(self, params: dict):
@@ -367,22 +406,5 @@ class ParamForm(QWidget):
         # rest are applied to their widgets below.
         self._passthrough = {k: v for k, v in params.items() if k not in self._widgets}
         for pd in self._param_defs:
-            if pd.key not in params:
-                continue
-            val = params[pd.key]
-            w = self._widgets[pd.key]
-            if pd.type == "seed":
-                w.setText(str(int(val)))
-                cb = self._randomize_checks.get(pd.key)
-                if cb:
-                    cb.setChecked(False)
-            elif pd.type == "str" and pd.multiline:
-                w.setPlainText(str(val))
-            elif pd.type == "str" or pd.type == "image":
-                w.setText(str(val))
-            elif pd.type == "int":
-                w.setValue(int(val))
-            elif pd.type == "float":
-                w.setValue(float(val))
-            elif pd.type == "combo":
-                _select_combo_value(w, str(val))
+            if pd.key in params:
+                self._write_field(pd, params[pd.key])

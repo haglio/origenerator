@@ -27,6 +27,7 @@ from origenerator.gui.reroll_prompt import (
 )
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
+from origenerator.gui.voice_button import VoiceButton
 from origenerator.progress import ProgressTracker
 from origenerator.timing import estimate_label, format_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -115,12 +116,21 @@ class GenerateConfigPanel(QWidget):
         main_box.addWidget(self._progress)
         self._show_ready()
         btn_row = QHBoxLayout()
+        # Hold-to-talk: speak an edit ("no redacted", "bigger X") and a local model
+        # rewrites the positive prompt in place. Left of the run controls.
+        self._voice_btn = VoiceButton(
+            lambda: (self._param_form.field_value("positive_prompt") or "")
+                    if self._param_form else "",
+            self._apply_voice_prompt,
+            on_error=self._show_error,
+        )
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.setObjectName("generateBtn")
         self._generate_btn.clicked.connect(self._on_generate)
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.clicked.connect(self._on_cancel)
         self._cancel_btn.setEnabled(False)
+        btn_row.addWidget(self._voice_btn)
         btn_row.addStretch()
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
@@ -238,6 +248,11 @@ class GenerateConfigPanel(QWidget):
         self._progress.setRange(0, 1)
         self._progress.setValue(1)
         self._progress.setFormat(text)
+
+    def _apply_voice_prompt(self, new_prompt: str):
+        """Write a voice-edited prompt back into the form's positive-prompt field."""
+        if self._param_form is not None:
+            self._param_form.set_field_value("positive_prompt", new_prompt)
 
     def _show_canceled(self, text: str = "Canceled"):
         self._apply_bar_state("canceled")

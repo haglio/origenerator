@@ -57,8 +57,11 @@ class ParamForm(QWidget):
         self._browse_buttons: dict[str, QPushButton] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
-        # when absent, so callers can tell whether the control exists.
+        # when absent, so callers can tell whether the control exists. It floats
+        # as a free child, centered between the two labels below.
         self._swap_dimensions_btn: QPushButton | None = None
+        self._width_label: QWidget | None = None
+        self._height_label: QWidget | None = None
         # Params a config carries but this form has no widget for — the workflow's
         # remaining hidden settings (VAE, CLIP, batch size…). The form has no field
         # to edit them, but must round-trip whatever value it was given so reusing
@@ -89,6 +92,7 @@ class ParamForm(QWidget):
                     lambda text, key=pd.key: self.image_changed.emit(key, text)
                 )
             layout.addRow(pd.label, self._field_cell(pd, widget))
+        self._build_swap_button(layout)
 
     def _field_cell(self, pd: ParamDef, widget: QWidget):
         """The input, optionally paired with a trailing control.
@@ -133,18 +137,60 @@ class ParamForm(QWidget):
             hb.addWidget(browse)
             random_cb.setVisible(False)
             return holder
-        if pd.key == "width" and self._has_param("height"):
-            # The width row carries a button that swaps its value with height's,
-            # for turning a landscape frame portrait (or back) in one click.
-            btn = QPushButton("⇅")  # ⇅ up/down arrows: swap the stacked pair
-            btn.setToolTip("Swap width and height")
-            btn.clicked.connect(self.swap_dimensions)
-            self._swap_dimensions_btn = btn
-            return btn
         return None
 
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)
+
+    def _build_swap_button(self, layout: QFormLayout):
+        """Add a swap-width-and-height button when the form has both dimensions.
+
+        It floats to the left of the two labels, midway between their rows, so it
+        reads as linking the pair rather than trailing either field. As a free
+        child (not a form cell) it needs manual placement — see
+        :meth:`_position_swap_button`. Absent for a workflow that derives its size
+        in-graph (i2v) and so has no dimensions to swap.
+        """
+        if not (self._has_param("width") and self._has_param("height")):
+            return
+        btn = QPushButton("⇅", self)  # ⇅ up/down arrows: swap the stacked pair
+        btn.setToolTip("Swap width and height")
+        btn.clicked.connect(self.swap_dimensions)
+        btn.adjustSize()
+        self._swap_dimensions_btn = btn
+        self._width_label = layout.labelForField(self._widgets["width"])
+        self._height_label = layout.labelForField(self._widgets["height"])
+
+    def _position_swap_button(self):
+        """Center the swap button between the width and height rows, just left of
+        their labels. Called on every resize/show since a free child gets no help
+        from the layout."""
+        btn = self._swap_dimensions_btn
+        if btn is None:
+            return
+        btn.adjustSize()
+        top = self._widgets["width"].geometry()
+        bottom = self._widgets["height"].geometry()
+        y = (top.center().y() + bottom.center().y()) // 2 - btn.height() // 2
+        # Labels are right-aligned in a shared column, so the wider word starts
+        # leftmost; sit a small gap to the left of it, clamped to the form edge.
+        label = self._width_label.geometry()
+        fm = self._width_label.fontMetrics()
+        text_left = label.right() - max(
+            fm.horizontalAdvance(self._width_label.text()),
+            fm.horizontalAdvance(self._height_label.text()),
+        )
+        x = max(0, text_left - btn.width() - 6)
+        btn.move(x, y)
+        btn.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_swap_button()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._position_swap_button()
 
     def swap_dimensions(self):
         """Exchange the width and height field values."""

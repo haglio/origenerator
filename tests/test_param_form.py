@@ -105,6 +105,30 @@ def test_swapping_dimensions_emits_changed(qtbot):
     assert fired
 
 
+def test_swap_button_sits_between_the_rows_and_left_of_the_fields(qtbot):
+    # The button reads as linking the pair: vertically midway between the width
+    # and height rows, and off to the left of the labels rather than trailing a
+    # field. A wide label ("Positive Prompt") gives the left column real room.
+    form = ParamForm([
+        ParamDef("prompt", "Positive Prompt", "str", "", multiline=True),
+        *_dimension_defs(),
+    ])
+    form.setFont(make_font(FONT_UI, SIZE_HEADING))
+    qtbot.addWidget(form)
+    form.resize(400, 320)
+    form.show()
+    qtbot.waitExposed(form)
+
+    btn = form._swap_dimensions_btn.geometry()
+    width = form._widgets["width"].geometry()
+    height = form._widgets["height"].geometry()
+
+    # Halfway between the two rows, vertically.
+    assert width.center().y() < btn.center().y() < height.center().y()
+    # On the left — entirely clear of the input column.
+    assert btn.right() <= width.left()
+
+
 @pytest.fixture
 def sample_defs():
     return [

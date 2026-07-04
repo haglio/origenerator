@@ -2114,6 +2114,36 @@ def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
     assert view._auto_btn.isHidden()
 
 
+# --- slideshow: play a folder's media fullscreen ----------------------------
+
+def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
+    monkeypatch.setattr(
+        gallery, "resolve_preview",
+        lambda row, output_dir: (row["prompt_id"] + ".png", "image"),
+    )
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert len(view._slideshow._playlist) == 2  # both variations queued to play
+    view._slideshow.close()
+
+
+def test_slideshow_button_hidden_off_a_folder(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._slideshow_btn.isHidden()      # a folder with media offers it
+
+    view._tree.setCurrentItem(view._recents_item)  # a shelf holds no folder group
+    assert view._slideshow_btn.isHidden()
+
+
 def _insert_running_reroll(db, prompt_id="rr", seed=99):
     """A re-roll left running by a prior session: same settings folder as
     _seeded_db's 'orig', no output yet, status running."""

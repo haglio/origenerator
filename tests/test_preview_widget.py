@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QUrl
+from PyQt6.QtMultimedia import QMediaPlayer
 
 from origenerator.gui.preview_widget import PreviewWidget
 
@@ -159,3 +160,32 @@ def test_show_frame_ignores_undecodable_bytes(make_preview):
     w = make_preview()
     w.show_frame(b"not an image")
     assert w._image_label.pixmap().isNull()
+
+
+# --- slideshow support: play a video once and report when it ends -----------
+
+def test_video_loops_by_default(make_preview):
+    w = make_preview()
+    w._player.setLoops.assert_called_with(QMediaPlayer.Loops.Infinite)
+
+
+def test_slideshow_mode_plays_a_video_once(qtbot):
+    w = PreviewWidget(player=MagicMock(), loop_videos=False)
+    qtbot.addWidget(w)
+    w._player.setLoops.assert_called_with(QMediaPlayer.Loops.Once)
+
+
+def test_reaching_end_of_media_emits_video_ended(make_preview):
+    w = make_preview()
+    ended = []
+    w.video_ended.connect(lambda: ended.append(True))
+    w._on_media_status(QMediaPlayer.MediaStatus.EndOfMedia)
+    assert ended == [True]
+
+
+def test_other_media_status_does_not_emit_video_ended(make_preview):
+    w = make_preview()
+    ended = []
+    w.video_ended.connect(lambda: ended.append(True))
+    w._on_media_status(QMediaPlayer.MediaStatus.LoadedMedia)
+    assert ended == []

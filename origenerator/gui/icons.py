@@ -61,6 +61,11 @@ def autoloop_icon() -> QIcon:
     return _two_mode(_draw_autoloop)
 
 
+def slideshow_icon() -> QIcon:
+    """A play triangle in a frame — play this folder as a fullscreen slideshow."""
+    return _two_mode(_draw_slideshow)
+
+
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
 
@@ -237,6 +242,14 @@ def _draw_autoloop(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(29, 15), QPointF(20, 10), QPointF(20, 20))
+
+
+def _draw_slideshow(painter: QPainter, color):
+    """A framed screen with a play triangle — 'play this folder fullscreen'."""
+    painter.drawRoundedRect(QRectF(11, 14, 26, 20), 3, 3)                  # the screen
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawPolygon(QPointF(21, 19), QPointF(21, 29), QPointF(30, 24))  # play triangle
 
 
 def _draw_trash(painter: QPainter):

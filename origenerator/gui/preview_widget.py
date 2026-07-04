@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QStackedLayout, QLabel, QSizePolicy, QApplication
 from PyQt6.QtGui import QPixmap, QMovie, QImageReader
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -20,7 +20,10 @@ _PLACEHOLDER = "Select a generation to preview"
 
 
 class PreviewWidget(QWidget):
-    def __init__(self, parent=None, *, player: QMediaPlayer | None = None):
+    video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
+
+    def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
+                 loop_videos: bool = True):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -46,7 +49,12 @@ class PreviewWidget(QWidget):
         self._player = player if player is not None else QMediaPlayer(self)
         self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video)
-        self._player.setLoops(QMediaPlayer.Loops.Infinite)
+        # Infinite for the info-pane preview (an immediate moving thumbnail); a
+        # slideshow plays each clip once and advances when it ends.
+        self._player.setLoops(
+            QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
+        )
+        self._player.mediaStatusChanged.connect(self._on_media_status)
         self._stack.addWidget(self._video)
 
         self._stack.setCurrentWidget(self._image_label)
@@ -121,6 +129,11 @@ class PreviewWidget(QWidget):
 
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video
+
+    def _on_media_status(self, status) -> None:
+        """Report a finished (non-looping) video so a slideshow can advance."""
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self.video_ended.emit()
 
     def _release(self) -> None:
         """Tear down the media pipeline so shutdown can't deadlock the backend."""

@@ -26,6 +26,7 @@ from origenerator.gui.metadata_panel import MetadataPanel
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
+from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
@@ -89,6 +90,7 @@ class GalleryView(QWidget):
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_reroll)
         self._auto.stopped.connect(lambda _key: self._sync_auto_button())
+        self._slideshow = None  # the fullscreen slideshow window while one is open
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -220,6 +222,10 @@ class GalleryView(QWidget):
         self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
         self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
         self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
+        self._slideshow_btn = self._tool_button(
+            icons.slideshow_icon(), "Play this folder as a slideshow", self._start_slideshow
+        )
+        self._slideshow_btn.hide()  # shown only while a folder with media is open
         self._auto_btn = self._tool_button(
             icons.autoloop_icon(), "Auto-generate variations of this folder",
             self._toggle_auto, checkable=True,
@@ -229,7 +235,7 @@ class GalleryView(QWidget):
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
-                       self._auto_btn, self._delete_btn):
+                       self._slideshow_btn, self._auto_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -436,6 +442,7 @@ class GalleryView(QWidget):
 
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
+        self._sync_slideshow_button()  # the slideshow fits any folder holding media
         if current is None:
             self._title.set_display("")
             self._avg_label.setText("")
@@ -538,6 +545,12 @@ class GalleryView(QWidget):
         """The selected folder's key (or a shelf's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
 
+    def _current_group(self):
+        """The gallery group of the selected tree item, or ``None`` (a shelf or an
+        empty selection)."""
+        item = self._tree.currentItem()
+        return item.data(0, _GROUP_ROLE) if item else None
+
     def _add_reroll_tile(self, flow, group):
         tile = RerollTile(self._reroll.job_for(group.key))
         tile.set_selected(group.key == self._selected_reroll_key)
@@ -579,14 +592,39 @@ class GalleryView(QWidget):
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,
         and keep it checked while that folder's loop runs."""
-        item = self._tree.currentItem()
-        group = item.data(0, _GROUP_ROLE) if item else None
+        group = self._current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
         key = self._selected_folder_key()
         self._auto_btn.setVisible(available)
         self._auto_btn.blockSignals(True)
         self._auto_btn.setChecked(available and key is not None and self._auto.is_active(key))
         self._auto_btn.blockSignals(False)
+
+    def _sync_slideshow_button(self):
+        """Offer the slideshow only on a folder that actually holds media."""
+        group = self._current_group()
+        self._slideshow_btn.setVisible(group is not None and bool(gallery.rows_under(group)))
+
+    def _start_slideshow(self):
+        """Open the current folder's media in a fullscreen slideshow."""
+        group = self._current_group()
+        if group is None:
+            return
+        items = self._slideshow_items(group)
+        if not items:
+            return
+        self._slideshow = SlideshowView(items)
+        self._slideshow.showFullScreen()
+
+    def _slideshow_items(self, group) -> list:
+        """(path, media_type) for each generation under ``group`` with a resolvable
+        preview, in gallery order — the slideshow's playlist."""
+        items = []
+        for row in gallery.rows_under(group):
+            resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+            if resolved is not None:
+                items.append(resolved)
+        return items
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         """Re-roll one i2v item, randomizing a single seed (its top-left hover
@@ -822,8 +860,7 @@ class GalleryView(QWidget):
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""
-        item = self._tree.currentItem()
-        group = item.data(0, _GROUP_ROLE) if item else None
+        group = self._current_group()
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)
 

@@ -9,13 +9,16 @@ pauses genau while it drives and parks the device + restores genau when it stops
 
 from __future__ import annotations
 
+import logging
+
 from PyQt6.QtCore import QObject, QTimer
-from PyQt6.QtMultimedia import QMediaPlayer
 
 from origenerator.config import (
     OSR2_BROKER_HOST, OSR2_GENAU_ENABLED_FILE, OSR2_TCODE_UDP_PORT,
 )
 from origenerator.osr2 import Osr2Broker
+
+logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 50
 
@@ -30,6 +33,7 @@ class Osr2Driver(QObject):
         self._player = None
         self._actions: list[tuple[int, int]] = []  # (at_ms, pos), sorted by time
         self._duration_ms = 0
+        self._streaming = False
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
@@ -46,8 +50,11 @@ class Osr2Driver(QObject):
         self._player = player
         self._actions = sorted((int(a["at"]), int(a["pos"])) for a in actions)
         self._duration_ms = self._actions[-1][0]
+        self._streaming = False  # for a one-shot "first T-code sent" log line
         self._broker.pause_genau()
         self._timer.start()
+        logger.info("OSR2 drive engaged: %d actions, %d ms; genau paused",
+                    len(self._actions), self._duration_ms)
 
     def stop(self) -> None:
         """Release the device: stop streaming, park it, and restore genau."""
@@ -59,20 +66,29 @@ class Osr2Driver(QObject):
         self._duration_ms = 0
         self._broker.park()
         self._broker.restore_genau()
+        logger.info("OSR2 drive released: parked, genau restored")
 
     def poll(self) -> None:
-        """Advance the device toward the action following the current playhead."""
+        """Advance the device toward the action following the current playhead.
+
+        Driven purely by ``position()`` — the driver doesn't gate on the player's
+        playback state (the info-pane preview auto-plays with no pause control; the
+        Drive OSR2 button is the on/off). A stalled playhead simply holds the device
+        at the current target.
+        """
         player = self._player
         if player is None:
             return
-        if player.playbackState() != QMediaPlayer.PlaybackState.PlayingState:
-            return  # paused/stopped video → hold position
         now_ms = player.position()
         if self._duration_ms > 0:
             now_ms %= self._duration_ms  # the preview loops; fold onto the script
         pos, interval = self._next_target(now_ms)
         if pos is not None:
             self._broker.send_position(pos, interval)
+            if not self._streaming:
+                self._streaming = True
+                logger.info("OSR2 drive streaming: first T-code pos=%d interval=%d "
+                            "(playhead %d ms)", pos, interval, now_ms)
 
     def _next_target(self, now_ms: int):
         """The next action strictly after ``now_ms`` and the time until it — or, past

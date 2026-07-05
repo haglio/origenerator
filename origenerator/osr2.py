@@ -54,6 +54,7 @@ class Osr2Broker:
         )
         self._sock = None
         self._prior_genau: str | None = None
+        self._send_error_logged = False
 
     def send_position(self, pos_0_100: float, interval_ms: float) -> None:
         """Move the stroke axis to ``pos_0_100`` over ``interval_ms``."""
@@ -88,8 +89,10 @@ class Osr2Broker:
             if self._sock is None:
                 self._sock = self._sock_factory()
             self._sock.sendto((line + "\n").encode("ascii"), (self._host, self._port))
-        except OSError as e:  # nobody listening / socket gone — harmless
-            logger.debug("OSR2 UDP send failed: %s", e)
+        except OSError as e:  # nobody listening / socket gone — harmless, but surface it once
+            if not self._send_error_logged:
+                self._send_error_logged = True
+                logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
 
     def _read_genau(self) -> str:
         try:

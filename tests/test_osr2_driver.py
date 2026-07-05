@@ -1,5 +1,3 @@
-from PyQt6.QtMultimedia import QMediaPlayer
-
 from origenerator.gui.osr2_driver import Osr2Driver
 
 
@@ -24,18 +22,15 @@ class FakeBroker:
 
 
 class FakePlayer:
-    def __init__(self, pos=0, playing=True):
+    """Only exposes position() — the driver follows the playhead and doesn't gate
+    on QMediaPlayer's playback state (the info-pane preview auto-plays and has no
+    pause control; the Drive OSR2 button is the on/off)."""
+
+    def __init__(self, pos=0):
         self._pos = pos
-        self._playing = playing
 
     def position(self):
         return self._pos
-
-    def playbackState(self):
-        return (
-            QMediaPlayer.PlaybackState.PlayingState if self._playing
-            else QMediaPlayer.PlaybackState.PausedState
-        )
 
 
 ACTIONS = [{"at": 0, "pos": 0}, {"at": 500, "pos": 100}, {"at": 1000, "pos": 0}]
@@ -52,13 +47,14 @@ def test_start_pauses_genau_and_poll_streams_toward_the_next_action(qapp):
     assert broker.positions[-1] == (100, 400)
 
 
-def test_poll_sends_nothing_while_the_player_is_paused(qapp):
+def test_poll_drives_from_the_playhead_without_a_playback_state(qapp):
+    # A player that exposes only position() still drives — no playbackState() needed.
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
-    driver.start(FakePlayer(pos=100, playing=False), ACTIONS)
+    driver.start(FakePlayer(pos=0), ACTIONS)
 
     driver.poll()
-    assert broker.positions == []
+    assert broker.positions == [(100, 500)]  # from the bottom, head to the top at 500 ms
 
 
 def test_poll_wraps_position_onto_a_looping_clip(qapp):

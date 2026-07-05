@@ -4,8 +4,10 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QUrl
+from PyQt6.QtWidgets import QWidget
 from PyQt6.QtMultimedia import QMediaPlayer
 
+import origenerator.gui.fullscreen_preview as fullscreen_preview
 from origenerator.gui.preview_widget import PreviewWidget
 
 
@@ -189,3 +191,46 @@ def test_other_media_status_does_not_emit_video_ended(make_preview):
     w.video_ended.connect(lambda: ended.append(True))
     w._on_media_status(QMediaPlayer.MediaStatus.LoadedMedia)
     assert ended == []
+
+
+# --- double-click to open the current media fullscreen ----------------------
+
+def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path, monkeypatch):
+    opened = {}
+
+    class Fake(QWidget):
+        def __init__(self, media, **kwargs):
+            super().__init__()
+            opened["media"] = media
+
+        def showFullScreen(self):
+            opened["shown"] = True
+
+    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", Fake)
+    w = make_preview()
+    png = _make_png(tmp_path / "p.png")
+    w.show_image(png)
+    win = w.mouseDoubleClickEvent(None) or w._fullscreen
+    assert opened["media"] == (png, "image")
+    assert opened.get("shown") is True
+    assert w._fullscreen is win
+
+
+def test_open_fullscreen_is_a_no_op_without_media(make_preview):
+    w = make_preview()  # just the placeholder
+    assert w.open_fullscreen() is None
+
+
+def test_open_fullscreen_ignores_a_live_frame(make_preview):
+    # A generating preview shows streamed frames with no file behind them yet.
+    w = make_preview()
+    w.show_frame(_png_bytes())
+    assert w.open_fullscreen() is None
+
+
+def test_a_preview_that_opted_out_never_opens_fullscreen(qtbot, tmp_path):
+    # The slideshow / the fullscreen view itself pass allow_fullscreen=False.
+    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False)
+    qtbot.addWidget(w)
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w.open_fullscreen() is None

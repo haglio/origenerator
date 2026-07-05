@@ -33,7 +33,10 @@ class SlideshowView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._preview = PreviewWidget(player=player, loop_videos=False)
+        # Already a fullscreen view with its own keys, so a double-click here must
+        # not spawn a nested fullscreen preview.
+        self._preview = PreviewWidget(player=player, loop_videos=False,
+                                      allow_fullscreen=False)
         self._preview.video_ended.connect(self._on_video_ended)
         layout.addWidget(self._preview, 1)
 

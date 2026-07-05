@@ -23,11 +23,16 @@ class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 loop_videos: bool = True):
+                 loop_videos: bool = True, allow_fullscreen: bool = True):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
         self._movie_native = None
+        # The current on-disk media as (path, media_type), or None while showing a
+        # placeholder or a live frame — what a double-click pops open fullscreen.
+        self._media: tuple | None = None
+        self._allow_fullscreen = allow_fullscreen  # a slideshow / the fullscreen view opts out
+        self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self._stack = QStackedLayout(self)
@@ -76,6 +81,7 @@ class PreviewWidget(QWidget):
 
     def show_image(self, path) -> None:
         self._player.stop()
+        self._media = (path, "image")
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._pixmap = None
@@ -88,6 +94,7 @@ class PreviewWidget(QWidget):
 
     def show_video(self, path) -> None:
         self._set_movie(None)
+        self._media = (path, "video")
         self._pixmap = None
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
@@ -106,6 +113,7 @@ class PreviewWidget(QWidget):
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
         self._player.stop()
+        self._media = None  # a transient live frame, not a file to open fullscreen
         self._set_movie(None)
         self._pixmap = pixmap
         self._rescale()
@@ -118,6 +126,7 @@ class PreviewWidget(QWidget):
         that's generating but hasn't streamed a preview frame yet.
         """
         self._player.stop()
+        self._media = None  # a message, not a file to open fullscreen
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(text)
@@ -129,6 +138,23 @@ class PreviewWidget(QWidget):
 
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        self.open_fullscreen()
+
+    def open_fullscreen(self):
+        """Pop the current media open fullscreen (Escape or a double-click closes
+        it). A no-op when this preview opted out (a slideshow, or the fullscreen
+        view itself) or nothing displayable is on screen — a placeholder, a
+        message, or a live in-progress frame with no file behind it yet."""
+        if not self._allow_fullscreen or self._media is None:
+            return None
+        # Imported here, not at module scope: fullscreen_preview builds a
+        # PreviewWidget, so a top-level import would be circular.
+        from origenerator.gui.fullscreen_preview import FullscreenPreview
+        self._fullscreen = FullscreenPreview(self._media)
+        self._fullscreen.showFullScreen()
+        return self._fullscreen
 
     def _on_media_status(self, status) -> None:
         """Report a finished (non-looping) video so a slideshow can advance."""

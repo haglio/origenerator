@@ -87,6 +87,8 @@ class _FakeVoiceSteering(QObject):
     ``say`` simulates a heard-and-rewritten utterance steering the loop's prompt."""
 
     error = pyqtSignal(str)
+    heard = pyqtSignal(str)
+    edited = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -2173,6 +2175,23 @@ def test_turning_auto_off_stops_voice(qtbot, tmp_path):
     view._toggle_auto(False)
 
     assert view._voice.stopped
+
+
+def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    assert not view._voice_status.isHidden()
+    assert "Listening" in view._voice_status.text()
+
+    view._voice.heard.emit("no redacted")
+    assert "no redacted" in view._voice_status.text()
+
+    view._toggle_auto(False)
+    assert view._voice_status.isHidden()
 
 
 def test_esc_stops_auto_generate(qtbot, tmp_path):

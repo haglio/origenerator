@@ -18,6 +18,7 @@ class VoiceWorker(QObject):
     rewritten = pyqtSignal(str)   # the revised prompt
     failed = pyqtSignal(str)      # a human-readable reason (nothing heard, no server, …)
     busy = pyqtSignal(bool)       # work started / finished
+    heard = pyqtSignal(str)       # the raw transcription, for on-screen feedback
 
     def __init__(self, transcribe_fn, rewrite_fn, parent=None):
         super().__init__(parent)
@@ -32,6 +33,7 @@ class VoiceWorker(QObject):
         try:
             instruction = self._transcribe(audio)
             logger.info("Voice: transcribed %r", instruction)
+            self.heard.emit(instruction)
             if not any(char.isalpha() for char in instruction):  # '', '. . . .', noise
                 self.failed.emit("Didn't catch that.")
                 return

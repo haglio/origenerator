@@ -97,7 +97,24 @@ class GalleryView(QWidget):
         self._auto_working: dict = {}
         self._voice = VoiceSteering()
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
+        self._voice.heard.connect(self._on_voice_heard)
+        self._voice.edited.connect(self._on_voice_edited)
+        self._voice.error.connect(self._on_voice_error)
         self._voice_target_key: str | None = None
+        # A floating caption over the top of the gallery showing what voice heard and
+        # did, so it's visible without reading the log. A free child, positioned by
+        # hand; transient messages revert to the idle "Listening…" after a moment.
+        self._voice_status = QLabel(self)
+        self._voice_status.setObjectName("voiceStatus")
+        self._voice_status.setStyleSheet(
+            "#voiceStatus { color: white; background: rgba(20, 20, 20, 225);"
+            " padding: 8px 16px; border-radius: 6px; }"
+        )
+        self._voice_status.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._voice_status.hide()
+        self._voice_status_timer = QTimer(self)
+        self._voice_status_timer.setSingleShot(True)
+        self._voice_status_timer.timeout.connect(self._voice_status_revert)
         self._slideshow = None  # the fullscreen slideshow window while one is open
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
@@ -622,6 +639,7 @@ class GalleryView(QWidget):
                 lambda k=key: self._working_prompt(k),
                 lambda new, k=key: self._steer_prompt(k, new),
             )
+            self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._auto_working.pop(key, None)  # the launch didn't take
 
@@ -651,7 +669,46 @@ class GalleryView(QWidget):
         if key == self._voice_target_key:
             self._voice.stop()
             self._voice_target_key = None
+            self._voice_status_timer.stop()
+            self._voice_status.hide()
         self._sync_auto_button()
+
+    # --- voice feedback: a floating caption of what voice heard and did --------
+
+    def _show_voice_status(self, text: str, *, transient: bool):
+        self._voice_status.setText(text)
+        self._voice_status.adjustSize()
+        self._reposition_voice_status()
+        self._voice_status.show()
+        self._voice_status.raise_()
+        if transient:
+            self._voice_status_timer.start(4000)  # then revert to the idle caption
+        else:
+            self._voice_status_timer.stop()
+
+    def _voice_status_revert(self):
+        if self._voice_target_key is not None:  # still listening
+            self._show_voice_status("🎤 Listening…", transient=False)
+        else:
+            self._voice_status.hide()
+
+    def _reposition_voice_status(self):
+        self._voice_status.move(max(0, (self.width() - self._voice_status.width()) // 2), 12)
+
+    def _on_voice_heard(self, text: str):
+        if any(char.isalpha() for char in text):
+            self._show_voice_status(f"🎤 heard: “{text}”", transient=True)
+
+    def _on_voice_edited(self, _new_prompt: str):
+        self._show_voice_status("🎤 ✓ prompt updated", transient=True)
+
+    def _on_voice_error(self, message: str):
+        self._show_voice_status(f"🎤 {message}", transient=True)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._voice_status.isVisible():
+            self._reposition_voice_status()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,

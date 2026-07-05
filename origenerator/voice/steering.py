@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class VoiceSteering(QObject):
     edited = pyqtSignal(str)   # applied a revised prompt
     error = pyqtSignal(str)    # a mic/transcribe/rewrite failure, for the caller to surface
+    heard = pyqtSignal(str)    # the raw transcription (re-emitted from the worker)
 
     def __init__(self, *, listener=None, worker=None, parent=None):
         super().__init__(parent)
@@ -40,6 +41,7 @@ class VoiceSteering(QObject):
         self._listener.utterance.connect(self._on_utterance)
         self._worker.rewritten.connect(self._on_rewritten)
         self._worker.failed.connect(self.error)
+        self._worker.heard.connect(self.heard)  # re-emit for on-screen feedback
 
     def _build_worker(self) -> VoiceWorker:
         self._transcriber = Transcriber()

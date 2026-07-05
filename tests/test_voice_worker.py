@@ -17,6 +17,16 @@ def test_transcribes_then_rewrites_and_emits_the_new_prompt(qtbot):
     assert out == ["a cat -> make it a dog"]
 
 
+def test_heard_emits_the_transcription_for_on_screen_feedback(qtbot):
+    worker = VoiceWorker(lambda audio: "make it a dog", lambda cur, instr: cur)
+    heard = []
+    worker.heard.connect(heard.append)
+
+    worker.process(object(), "a cat")
+
+    assert heard == ["make it a dog"]
+
+
 def test_an_empty_transcription_is_a_failure_not_a_rewrite(qtbot):
     worker = VoiceWorker(lambda audio: "   ", lambda cur, instr: "should not run")
     fails, rewrites = [], []

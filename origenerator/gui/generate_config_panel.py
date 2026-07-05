@@ -49,11 +49,15 @@ class GenerateConfigPanel(QWidget):
     title_changed = pyqtSignal(str)     # current tab title
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
 
-    def __init__(self, client: ComfyUIClient, db: Database, queue=None, parent=None):
+    def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
+                 parent=None, *, preview: PreviewWidget | None = None,
+                 show_strip: bool = True):
         super().__init__(parent)
-        self._client = client
+        self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._queue = queue                          # serializes jobs across panels; None = run at once
+        self._injected_preview = preview             # the Inspect tab shares the one info-pane preview; None = build our own
+        self._show_strip = show_strip                # the Inspect tab has no per-tab strip (the gallery is its history)
         self._client_prompt_id: str | None = None   # our uuid: the DB row key, and the id ComfyUI keys its signals on
         self._submitted_workflow = None              # workflow captured at submit time
         self._prepared: dict | None = None           # a job built but not yet started
@@ -87,8 +91,12 @@ class GenerateConfigPanel(QWidget):
         main_box = QVBoxLayout(main)
         main_box.setContentsMargins(0, 0, 0, 0)
         main_box.setSpacing(8)
-        self._preview = PreviewWidget()
-        main_box.addWidget(self._preview, 3)
+        # The Inspect tab shares the one info-pane preview (so its live frames and
+        # the browsed generation land in the same widget); a standalone config tab
+        # builds and leads with its own.
+        self._preview = self._injected_preview if self._injected_preview is not None else PreviewWidget()
+        if self._injected_preview is None:
+            main_box.addWidget(self._preview, 3)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = QComboBox()
@@ -129,22 +137,29 @@ class GenerateConfigPanel(QWidget):
 
         # Right pane: this tab's own accumulating strip of past runs, kept slim so
         # the whole window can still tile into a monitor third or a portrait half.
-        self._strip = ThumbnailStrip(self._db)
-        self._strip.thumbnail_activated.connect(self.strip_activated)
-        self._panes.addWidget(self._strip)
-
-        # The main column grows with the window; the strip holds its width. The
-        # floor stays low enough that the window can still tile narrow.
-        main.setMinimumWidth(230)
-        self._panes.setStretchFactor(0, 1)
-        self._panes.setStretchFactor(1, 0)
-        self._panes.setSizes([500, 150])
+        # Suppressed for the Inspect tab, whose history is the whole gallery.
+        if self._show_strip:
+            self._strip = ThumbnailStrip(self._db)
+            self._strip.thumbnail_activated.connect(self.strip_activated)
+            self._panes.addWidget(self._strip)
+            # The main column grows with the window; the strip holds its width. The
+            # floor stays low enough that the window can still tile narrow.
+            main.setMinimumWidth(230)
+            self._panes.setStretchFactor(0, 1)
+            self._panes.setStretchFactor(1, 0)
+            self._panes.setSizes([500, 150])
+        else:
+            self._strip = None
 
         layout.addWidget(self._panes)
 
+        if self._client is None:
+            self._generate_btn.setEnabled(False)  # nothing to run against
         self._on_workflow_changed()
 
     def _connect_signals(self):
+        if self._client is None:
+            return  # a read-only gallery: no client signals to track
         self._client.progress.connect(self._on_progress)
         self._client.node_executing.connect(self._on_node_executing)
         self._client.preview_image.connect(self._on_preview)
@@ -155,6 +170,8 @@ class GenerateConfigPanel(QWidget):
 
     def teardown(self):
         """Disconnect from the shared client before the panel is destroyed."""
+        if self._client is None:
+            return  # never connected
         for signal, slot in (
             (self._client.progress, self._on_progress),
             (self._client.node_executing, self._on_node_executing),
@@ -253,6 +270,8 @@ class GenerateConfigPanel(QWidget):
         self._progress.setFormat(text)
 
     def _on_generate(self):
+        if self._client is None:
+            return  # a read-only gallery: nothing to run against
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
             return
@@ -593,7 +612,7 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
         completed_id = self._client_prompt_id
-        if completed_id not in self._strip_ids:
+        if self._strip is not None and completed_id not in self._strip_ids:
             self._strip_ids.insert(0, completed_id)  # accumulate; never drops earlier runs
             self._strip.show_generations(self._strip_ids)
         self._reset_job()
@@ -677,7 +696,8 @@ class GenerateConfigPanel(QWidget):
         longer match the current form, so tweak-and-regenerate stays visible.
         """
         self._strip_ids = list(prompt_ids)
-        self._strip.show_generations(self._strip_ids)
+        if self._strip is not None:
+            self._strip.show_generations(self._strip_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

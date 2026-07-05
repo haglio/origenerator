@@ -56,6 +56,36 @@ def test_thumbnail_history_is_the_right_pane(panel):
     assert isinstance(right, ThumbnailStrip)
 
 
+# --- headless variants (the Inspect tab embeds one of these) ----------------
+
+def test_tolerates_a_missing_client(qtbot, tmp_path):
+    # A read-only gallery has no ComfyUI client. The panel still builds — the form
+    # shows for inspection — but Generate is disabled and no signals are wired.
+    p = GenerateConfigPanel(None, Database(tmp_path / "t.db"))
+    qtbot.addWidget(p)
+    assert p._generate_btn.isEnabled() is False
+    p._on_generate()                      # no-op, no crash
+    assert p.active_prompt_id() is None
+    p.teardown()                          # never connected, so a no-op too
+
+
+def test_uses_an_injected_preview_instead_of_building_one(qtbot, tmp_path):
+    from origenerator.gui.preview_widget import PreviewWidget
+    shared = PreviewWidget(player=MagicMock())
+    qtbot.addWidget(shared)
+    p = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"), preview=shared)
+    qtbot.addWidget(p)
+    assert p._preview is shared
+    assert not _is_descendant(shared, p)  # the shared preview lives outside the panel
+
+
+def test_can_suppress_the_history_strip(qtbot, tmp_path):
+    p = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"), show_strip=False)
+    qtbot.addWidget(p)
+    assert p._strip is None
+    assert p._panes.count() == 1          # just the form column, no strip pane
+
+
 def test_preview_over_form_share_the_main_pane(panel):
     # Preview-over-form: the live preview sits on top of the settings in the left
     # "main" pane, with the progress bar and run buttons under it — beside the slim

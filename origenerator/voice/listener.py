@@ -136,7 +136,9 @@ class Listener(QObject):
         logger.info("Voice: mic opened (calibrating ambient, floor=%.3f)", self._floor)
 
     def _on_audio(self, indata, _frames, _time, _status):
-        frame = np.asarray(indata).reshape(-1)
+        # Copy: sounddevice reuses indata's buffer between callbacks, so storing a
+        # view would leave the buffered utterance holding stale/silent samples.
+        frame = np.array(indata, dtype=np.float32).reshape(-1)
         rms = float(np.sqrt(np.mean(np.square(frame)))) if len(frame) else 0.0
         self._peak_rms = max(self._peak_rms, rms)
         self._frame_count += 1

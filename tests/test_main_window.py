@@ -1,5 +1,8 @@
 import json
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
+
 from origenerator import gallery
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
@@ -16,6 +19,31 @@ def _window(qtbot, tmp_path, app_state=None):
     )
     qtbot.addWidget(win)
     return win
+
+
+def _quit_shortcut(win):
+    seq = QKeySequence("Ctrl+Alt+Q")
+    for shortcut in win.findChildren(QShortcut):
+        if shortcut.key() == seq:
+            return shortcut
+    raise AssertionError("window has no Ctrl+Alt+Q shortcut")
+
+
+def test_ctrl_alt_q_quits_persisting_the_session(qtbot, tmp_path):
+    # The quit shortcut goes through close(), so it saves the session like any close.
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win._gallery_view.select_generation("xyz")
+
+    _quit_shortcut(win).activated.emit()  # what pressing Ctrl+Alt+Q fires
+
+    assert AppState(path).get("gallery_selection") == "xyz"
+
+
+def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
+    # Application-scoped, so it triggers regardless of which widget holds focus.
+    win = _window(qtbot, tmp_path)
+    assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
 
 
 def test_reuse_requested_opens_a_config_tab(qtbot, tmp_path):

@@ -1,8 +1,8 @@
 import base64
 
-from PyQt6.QtCore import QByteArray
+from PyQt6.QtCore import QByteArray, Qt
 from PyQt6.QtWidgets import QMainWindow
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
@@ -43,6 +43,14 @@ class OrigeneratorWindow(QMainWindow):
         # the re-roll "+", and the combine panel all feed it.
         self._gallery_view = GalleryView(db, client=client)
         self.setCentralWidget(self._gallery_view)
+
+        # Ctrl+Alt+Q quits from anywhere in the app: an application-scoped shortcut
+        # fires no matter which widget holds focus. close() runs closeEvent — which
+        # persists the session and geometry — and the app exits on the last window
+        # closing, releasing the OSR2 via aboutToQuit.
+        quit_shortcut = QShortcut(QKeySequence("Ctrl+Alt+Q"), self)
+        quit_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        quit_shortcut.activated.connect(self.close)
 
         self._restore_session()
         # Reconnect to any generation left running by the previous session. A tab's

@@ -18,3 +18,9 @@ def test_stylesheet_greys_disabled_buttons():
     # Without an explicit :disabled rule a styled QPushButton ignores Qt's
     # disabled palette and never looks greyed out.
     assert "QPushButton:disabled" in build_stylesheet()
+
+
+def test_stylesheet_styles_tooltips():
+    # A global QWidget background rule leaves QToolTip unreadable/blank unless it's
+    # styled explicitly, so the toolbar buttons' tooltips never appear on hover.
+    assert "QToolTip" in build_stylesheet()

@@ -25,6 +25,16 @@ def build_stylesheet() -> str:
     QLabel#estimateLabel {{
         color: {_h(TEXT_MUTED)};
     }}
+    QToolTip {{
+        /* QToolTip is a QWidget, so the global QWidget rule above paints it but
+           leaves it borderless and hard to read; style it explicitly so the
+           toolbar buttons' tooltips actually show, legibly, on hover. */
+        background-color: {_h(BG_TERTIARY)};
+        color: {_h(TEXT_PRIMARY)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 3px;
+        padding: 4px 6px;
+    }}
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_PRIMARY)};

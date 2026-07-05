@@ -7,13 +7,11 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLabel, QLineEdit
+from PyQt6.QtWidgets import QSplitter, QLineEdit
 
-from origenerator import evolver_export, gallery
+from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, THUMB_DIR,
-)
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
@@ -146,11 +144,6 @@ class FakeDB:
     def set_folder_starred(self, key, starred):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(starred)
-
-    def mark_evolver_exported(self, prompt_id):
-        row = self._by_id.get(prompt_id)
-        if row is not None:
-            row["evolver_exported_at"] = "2026-07-02T00:00:00"
 
     def delete_generation(self, prompt_id):
         self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
@@ -695,32 +688,34 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     assert _top_level(view._tree)["Images"].child(0).text(0) == "Favorites"
 
 
-def _meta_link_texts(view):
-    return [l.text() for l in view._meta_panel.findChildren(QLabel)]
+def _source_link(view):
+    return view._info_tabs.current_config_panel()._source_link
 
 
-def test_i2v_input_image_links_to_source_image_and_navigates(qtbot):
+def test_video_source_link_points_to_its_image_and_navigates(qtbot):
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]))
+    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
+    for panel in view._info_tabs._config_panels():
+        panel._preview.show_media = MagicMock()  # don't start WMF playback
 
-    # Viewing the video renders its input_image (among the other params) as a link
-    # to the image it was built from — not a separate line of its own.
+    # Viewing the video shows a footer link back to the image it was built from.
     view._on_thumbnail_clicked("vid1")
-    assert any('href="img1"' in t for t in _meta_link_texts(view))
+    assert not _source_link(view).isHidden()
+    assert 'href="img1"' in _source_link(view).text()
 
     # Activating that link navigates the gallery to the source image.
-    view._meta_panel.link_activated.emit("img1")
+    _source_link(view).linkActivated.emit("img1")
     assert "img1" in view.visible_prompt_ids()
     assert view._selected["prompt_id"] == "img1"
-    # The image itself has no input image, so nothing renders as a link.
+    # The image itself has no source image, so no link shows.
     view._on_thumbnail_clicked("img1")
-    assert not any("href=" in t for t in _meta_link_texts(view))
+    assert _source_link(view).isHidden()
 
 
 def test_back_and_forward_walk_the_viewed_generations(qtbot):
@@ -938,22 +933,26 @@ def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
     assert view.selected_generation() == landing         # ...to where we came from
 
 
+def _animated_strip(view):
+    return view._info_tabs.current_config_panel()._animated_strip
+
+
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
     from origenerator.gui.animated_strip import _VideoTile
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, video]))
+    view = GalleryView(FakeDB([image, video]), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
 
     view._on_thumbnail_clicked("img1")
-    assert not view._animated_strip.isHidden()
-    assert len(view._animated_strip.findChildren(_VideoTile)) == 1
+    assert not _animated_strip(view).isHidden()
+    assert len(_animated_strip(view).findChildren(_VideoTile)) == 1
 
     # Clicking the preview navigates to that video.
-    view._animated_strip.video_activated.emit("vid1")
+    _animated_strip(view).video_activated.emit("vid1")
     assert view._selected["prompt_id"] == "vid1"
 
 
@@ -963,44 +962,49 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     lonely = _image("img2", "a dog", 50, 2)  # never animated
     video = _row("vid1", "wan22_i2v",
                  {"input_image": "sdxl_t2i_img1.png"}, "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, lonely, video]))
+    view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
+    for panel in view._info_tabs._config_panels():
+        panel._preview.show_media = MagicMock()  # don't start WMF playback
 
     view._on_thumbnail_clicked("vid1")   # a video isn't "animated into" anything
-    assert view._animated_strip.isHidden()
+    assert _animated_strip(view).isHidden()
 
     view._on_thumbnail_clicked("img2")   # an image nothing was made from
-    assert view._animated_strip.isHidden()
-    assert view._animated_strip.findChildren(_VideoTile) == []
+    assert _animated_strip(view).isHidden()
+    assert _animated_strip(view).findChildren(_VideoTile) == []
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
+    from origenerator.gui import generate_config_panel as gcp_module
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._preview.show_media = MagicMock()
     resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
-    resolve = MagicMock(return_value=resolved)
-    monkeypatch.setattr(gallery, "resolve_preview", resolve)
+    monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=resolved))
 
     view._on_thumbnail_clicked("i1")
 
-    resolve.assert_called_once_with(view._selected, COMFYUI_OUTPUT_DIR)
-    view._preview.show_media.assert_called_once_with(resolved[0], "image")
+    # The loaded tab resolves the selection's output and shows it last (after any
+    # settings-folder autoshow the form prefill does).
+    assert view._preview.show_media.call_args.args == (resolved[0], "image")
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
+    from origenerator.gui import generate_config_panel as gcp_module
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._preview.clear = MagicMock()
     view._preview.show_media = MagicMock()
-    monkeypatch.setattr(gallery, "resolve_preview", MagicMock(return_value=None))
+    monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=None))
 
     view._on_thumbnail_clicked("i1")
 
-    view._preview.clear.assert_called_once()
+    # Nothing displayable resolved for the selection, so the preview ends cleared.
+    assert view._preview.clear.called
     view._preview.show_media.assert_not_called()
 
 
@@ -1034,50 +1038,55 @@ def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     assert view._panes.widget(2).minimumWidth() >= 280
 
 
-def test_info_pane_is_a_tab_widget_with_an_inspect_tab(qtbot):
+def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     from PyQt6.QtWidgets import QTabWidget
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # The info pane is a tab widget: tab 0 is the always-present Inspect view
-    # (preview + metadata + Reuse); editable config tabs open after it.
+    # The info pane is a tab widget of identical editable generate panels — no
+    # special or permanent tab. The first one opens on construction, hosting the
+    # preview a selection lands in.
     assert isinstance(view._info_tabs, QTabWidget)
     assert view._panes.widget(2) is view._info_tabs
-    assert view._info_tabs.tabText(0) == "Inspect"
+    assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
     assert view._info_tabs.widget(0).isAncestorOf(view._preview)
 
 
-def test_selecting_a_thumbnail_activates_the_inspect_tab(qtbot):
-    # Picking an item in the browser brings the Inspect tab forward, even when a
-    # config tab was in front.
+def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
+    # Picking an item loads it into a config tab, brought to the front.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
-    view._info_tabs._add_subtab()  # a config tab, now current at index 1
-    assert view._info_tabs.currentIndex() == 1
+    view.refresh()
 
     view._on_thumbnail_clicked("i1")
 
-    assert view._info_tabs.currentIndex() == 0  # Inspect came forward
+    panel = view._info_tabs.current_config_panel()
+    assert panel is view._info_tabs.currentWidget()
+    assert panel._displayed_row["prompt_id"] == "i1"
 
 
 def test_a_suppressed_reselection_leaves_the_active_tab_alone(qtbot):
     # A poll/rebuild re-selects the current generation with history suppressed; that
-    # must not yank the user off a config tab they're editing.
+    # must not yank the user off a config tab they're editing or fork a new one.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
-    view._info_tabs._add_subtab()  # config tab at index 1, current
+    editing = view._info_tabs._add_subtab()  # config tab at index 1, current
+    count = view._info_tabs.count()
     view._suppress_history = True
     view._on_thumbnail_clicked("i1")
     view._suppress_history = False
-    assert view._info_tabs.currentIndex() == 1  # stayed on the config tab
+    assert view._info_tabs.currentWidget() is editing  # stayed on the config tab
+    assert view._info_tabs.count() == count            # no new tab forked
+    assert editing._displayed_row is None              # its form/footer untouched
 
 
-def _inspect_form(view):
-    return view._info_tabs.inspect_panel().config._param_form
+def _current_form(view):
+    return view._info_tabs.current_config_panel()._param_form
 
 
-def test_selecting_a_thumbnail_loads_its_params_into_the_inspect_form(qtbot, tmp_path):
-    # The Inspect tab is an editable generate panel: picking a generation seeds its
-    # form with that generation's settings, ready to tweak and re-run.
+def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
+    # A tab is an editable generate panel: picking a generation seeds its form with
+    # that generation's settings, ready to tweak and re-run.
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard", seed=123)
     db.insert_generation(
@@ -1091,14 +1100,14 @@ def test_selecting_a_thumbnail_loads_its_params_into_the_inspect_form(qtbot, tmp
 
     view._on_thumbnail_clicked("g1")
 
-    values = _inspect_form(view).get_values_static()
+    values = _current_form(view).get_values_static()
     assert values["positive_prompt"] == "a wizard"
     assert values["seed"] == 123
 
 
-def test_a_suppressed_reselection_does_not_reload_the_inspect_form(qtbot, tmp_path):
+def test_a_suppressed_reselection_does_not_reload_the_form(qtbot, tmp_path):
     # A poll/rebuild re-selects the current generation with history suppressed; that
-    # must not wipe edits the user has made in the Inspect form.
+    # must not wipe edits the user has made in the form.
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard")
     db.insert_generation(
@@ -1109,16 +1118,18 @@ def test_a_suppressed_reselection_does_not_reload_the_inspect_form(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g1")           # loads the form
-    _inspect_form(view).set_values({"positive_prompt": "my edit"})
+    _current_form(view).set_values({"positive_prompt": "my edit"})
 
     view._suppress_history = True
     view._on_thumbnail_clicked("g1")
     view._suppress_history = False
 
-    assert _inspect_form(view).get_values_static()["positive_prompt"] == "my edit"
+    assert _current_form(view).get_values_static()["positive_prompt"] == "my edit"
 
 
-def test_selecting_an_unregistered_thumbnail_leaves_the_inspect_form(qtbot, tmp_path):
+def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, tmp_path):
+    # Selecting an unregistered generation (a different folder) forks a fresh tab
+    # rather than corrupting the one showing a rebuildable generation.
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -1133,11 +1144,15 @@ def test_selecting_an_unregistered_thumbnail_leaves_the_inspect_form(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("reg")
-    before = _inspect_form(view).get_values_static()
+    reg_panel = view._info_tabs.current_config_panel()
+    reg_before = reg_panel._param_form.get_values_static()
 
-    view._on_thumbnail_clicked("unreg")  # not rebuildable → the form is left as it was
+    view._on_thumbnail_clicked("unreg")  # a different folder → a fresh tab
 
-    assert _inspect_form(view).get_values_static() == before
+    # The rebuildable tab keeps its form; the new tab (unregistered) left its own
+    # form as-is but now displays the imported row.
+    assert reg_panel._param_form.get_values_static() == reg_before
+    assert view._info_tabs.current_config_panel()._displayed_row["prompt_id"] == "unreg"
 
 
 def test_selected_folder_returns_current_folder_key(qtbot):
@@ -1321,151 +1336,23 @@ def test_double_clicking_an_unregistered_thumbnail_does_not_reuse(qtbot, tmp_pat
     assert fired == []
 
 
-def _video_resolver(video_path):
-    """A resolve_preview stub: a real video file for video rows, a still else."""
-    def resolve(row, output_dir):
-        if gallery.media_type_of_row(row) == "video":
-            return (video_path, "video")
-        return (Path("C:/out/still.png"), "image")
-    return resolve
-
-
-def test_send_to_evolver_button_shows_only_for_a_video(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._preview.show_media = MagicMock()  # don't start real WMF playback
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
-
-    view._on_thumbnail_clicked("v1")   # a video with a file on disk
-    assert view._evolver_btn.isHidden() is False
-
-    view._on_thumbnail_clicked("i1")   # an image — Evolver is a video pipeline
-    assert view._evolver_btn.isHidden() is True
-
-
-def test_send_to_evolver_button_hidden_when_the_video_file_is_gone(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
-    qtbot.addWidget(view)
-    view.refresh()
-    # No displayable file resolves (the output was deleted): nothing to send.
-    monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
-
-    view._on_thumbnail_clicked("v1")
-    assert view._evolver_btn.isHidden() is True
-
-
-def test_send_to_evolver_copies_the_selected_video_to_the_inbox(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._preview.show_media = MagicMock()  # don't start real WMF playback
-    video_path = Path("C:/out/wan22_i2v_v1.mp4")
-    monkeypatch.setattr(gallery, "resolve_preview", _video_resolver(video_path))
-    export = MagicMock(return_value=EVOLVER_INBOX_DIR / EVOLVER_SOURCE / "wan22_i2v_v1.mp4")
-    monkeypatch.setattr(evolver_export, "export_video", export)
-
-    view._on_thumbnail_clicked("v1")
-    view._on_send_to_evolver()
-
-    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
-    # The send is remembered: persisted on the row and shown on the button.
-    assert view._selected["evolver_exported_at"]
-    assert view._evolver_btn.text() == "Sent to Evolver ✓"
-    assert view._evolver_btn.isEnabled() is False
-
-
-def test_send_to_evolver_button_remembers_an_already_sent_video(qtbot, monkeypatch):
-    # A row already marked exported, as if sent in an earlier session.
-    video = _i2v_video("v1", "styleA")
-    video["evolver_exported_at"] = "2026-07-01T12:00:00"
-    view = GalleryView(FakeDB([video]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._preview.show_media = MagicMock()  # don't start real WMF playback
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
-
-    view._on_thumbnail_clicked("v1")  # selecting it again, later on
-
-    assert view._evolver_btn.isHidden() is False
-    assert view._evolver_btn.text() == "Sent to Evolver ✓"
-    assert view._evolver_btn.isEnabled() is False
-
-
-def test_send_to_evolver_does_not_re_export_an_already_sent_video(qtbot, monkeypatch):
-    video = _i2v_video("v1", "styleA")
-    video["evolver_exported_at"] = "2026-07-01T12:00:00"
-    view = GalleryView(FakeDB([video]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._preview.show_media = MagicMock()
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
-    export = MagicMock()
-    monkeypatch.setattr(evolver_export, "export_video", export)
-
-    view._on_thumbnail_clicked("v1")
-    view._on_send_to_evolver()  # the disabled button shouldn't act if driven anyway
-
-    export.assert_not_called()
-
-
-def test_send_to_evolver_warns_and_survives_a_failed_copy(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._preview.show_media = MagicMock()  # don't start real WMF playback
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        _video_resolver(Path("C:/out/wan22_i2v_v1.mp4")))
-    monkeypatch.setattr(evolver_export, "export_video",
-                        MagicMock(side_effect=OSError("inbox unreachable")))
-    warn = MagicMock()
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
-
-    view._on_thumbnail_clicked("v1")
-    view._on_send_to_evolver()  # must not raise
-
-    warn.assert_called_once()
-
-
-def test_selecting_generation_shows_typical_time_for_its_workflow(qtbot):
+def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
+    # Loading a generation into a config tab seeds its form with the generation's
+    # workflow, whose estimate line then reads that workflow's typical time.
     rows = [
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
         _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(FakeDB(rows), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
+    for panel in view._info_tabs._config_panels():
+        panel._preview.show_media = MagicMock()
 
     view._on_thumbnail_clicked("v1")
-    assert view._estimate_label.text() == "Typical time: ~12 min (based on 3 runs)"
-
-
-def test_clicking_thumbnail_routes_the_row_into_the_metadata_panel(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._meta_panel.show_row = MagicMock()
-
-    view._on_thumbnail_clicked("i1")
-
-    view._meta_panel.show_row.assert_called_once()
-    row = view._meta_panel.show_row.call_args.args[0]
-    assert row["prompt_id"] == "i1"
-
-
-def test_refresh_clears_the_metadata_panel(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._meta_panel.clear = MagicMock()
-
-    view.refresh()
-
-    view._meta_panel.clear.assert_called()
+    estimate = view._info_tabs.current_config_panel()._estimate_label
+    assert estimate.text() == "Typical time: ~12 min (based on 3 runs)"
 
 
 def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
@@ -1552,22 +1439,6 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
     # Its own two runs average 70s (a coarse "~1 min") — the workflow's slow
     # outlier doesn't leak in.
     assert view._avg_label.text() == "Average time: ~1 min (across 2 runs)"
-
-
-def test_emptying_the_gallery_clears_a_stale_estimate(qtbot):
-    rows = [_image("i1", "a cat", 50, 1)]
-    rows[0]["duration_seconds"] = 6.0
-    db = FakeDB(rows)
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-    view._on_thumbnail_clicked("i1")
-    assert view._estimate_label.text()  # estimate is showing
-
-    db._rows.clear()
-    db._by_id.clear()
-    view.refresh()  # no folders, so nothing to preview
-    assert view._estimate_label.text() == ""
 
 
 # --- deletion & undo ------------------------------------------------------

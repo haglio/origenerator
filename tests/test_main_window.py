@@ -115,7 +115,9 @@ def test_close_event_persists_session(qtbot, tmp_path):
 
     reloaded = AppState(path)
     tabs = reloaded.get("generate_tabs")["tabs"]
-    assert [t["config"]["workflow_name"] for t in tabs] == ["wan22_i2v"]
+    # Every tab is captured now (no special/permanent tab): the initial editable
+    # tab plus the one just opened.
+    assert [t["config"]["workflow_name"] for t in tabs] == ["sdxl_t2i", "wan22_i2v"]
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
 
 

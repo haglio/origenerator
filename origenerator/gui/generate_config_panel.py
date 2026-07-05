@@ -2,24 +2,29 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
-    QComboBox, QPushButton, QProgressBar, QScrollArea,
+    QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.completion import extract_completion
 from origenerator.db import Database
 from origenerator.gallery import (
-    build_image_config_index, config_tab_title, media_type_of_row,
-    output_file_reference, resolve_preview, rows_in_settings, settings_signature,
-    source_image_id_for, workflow_output_type,
+    animated_preview_path, build_image_config_index, config_tab_title,
+    find_source_image_id, media_type_of_row, output_file_reference,
+    resolve_preview, rows_in_settings, settings_signature, source_image_id_for,
+    videos_from_source_image, workflow_output_type,
 )
 from origenerator.generation_config import (
-    ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
+    ConfigSnapshot, find_duplicate_generation, merge_denormalized,
+    prepared_params, randomize_seeds,
 )
+from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
@@ -31,9 +36,13 @@ from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.progress import ProgressTracker
 from origenerator.timing import estimate_label, format_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, THUMB_DIR,
+)
 
 logger = logging.getLogger(__name__)
+
+_ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 
 
 class GenerateConfigPanel(QWidget):
@@ -45,21 +54,25 @@ class GenerateConfigPanel(QWidget):
     controls, and this tab's own slim strip of past runs on the right. Clicking a
     strip thumbnail re-emits its prompt id via ``strip_activated`` so a container
     can open (or reuse) a tab for it.
+
+    Below the run controls sits a footer that appears only while the tab is
+    displaying a saved generation (:meth:`show_saved_generation`): for an image,
+    the videos it was animated into; for a video, a link back to its source image;
+    and a Send-to-Evolver button for a video. A blank tab, or one running a fresh
+    job, hides all three.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
+    source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
+    animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
-                 parent=None, *, preview: PreviewWidget | None = None,
-                 show_strip: bool = True, autoshow_recent: bool = True):
+                 parent=None):
         super().__init__(parent)
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._queue = queue                          # serializes jobs across panels; None = run at once
-        self._injected_preview = preview             # the Inspect tab shares the one info-pane preview; None = build our own
-        self._show_strip = show_strip                # the Inspect tab has no per-tab strip (the gallery is its history)
-        self._autoshow_recent = autoshow_recent      # show the newest matching gen when idle; off for the Inspect tab (the controller drives its preview)
         self._client_prompt_id: str | None = None   # our uuid: the DB row key, and the id ComfyUI keys its signals on
         self._submitted_workflow = None              # workflow captured at submit time
         self._prepared: dict | None = None           # a job built but not yet started
@@ -72,6 +85,7 @@ class GenerateConfigPanel(QWidget):
         self._input_image_job: GenerationJob | None = None  # a random-input pre-step, before the main job
         self._last_frame: bytes | None = None         # latest live preview frame, for an external in-flight view
         self._last_progress: tuple[int, int] | None = None  # (cumulative, total) steps, for the running-job bar
+        self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank/generating
         self._build_ui()
         self._connect_signals()
 
@@ -93,12 +107,11 @@ class GenerateConfigPanel(QWidget):
         main_box = QVBoxLayout(main)
         main_box.setContentsMargins(0, 0, 0, 0)
         main_box.setSpacing(8)
-        # The Inspect tab shares the one info-pane preview (so its live frames and
-        # the browsed generation land in the same widget); a standalone config tab
-        # builds and leads with its own.
-        self._preview = self._injected_preview if self._injected_preview is not None else PreviewWidget()
-        if self._injected_preview is None:
-            main_box.addWidget(self._preview, 3)
+        # The live preview leads the column: it mirrors ComfyUI's frames while a job
+        # runs, shows the browsed generation's output when one is loaded, and the
+        # newest matching result otherwise.
+        self._preview = PreviewWidget()
+        main_box.addWidget(self._preview, 3)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = NoWheelComboBox()
@@ -135,23 +148,43 @@ class GenerateConfigPanel(QWidget):
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         main_box.addLayout(btn_row)
+
+        # Footer: shown only while this tab is displaying a saved generation (see
+        # show_saved_generation). A "‹ From source image" link for a video whose
+        # start frame is a known generation; the "Animated in" strip for an image;
+        # Send-to-Evolver for a video. All hidden on a fresh tab.
+        self._source_link = QLabel()
+        self._source_link.setTextFormat(Qt.TextFormat.RichText)
+        self._source_link.setOpenExternalLinks(False)
+        self._source_link.linkActivated.connect(self.source_activated)
+        self._source_link.hide()
+        main_box.addWidget(self._source_link)
+
+        self._animated_strip = AnimatedVideoStrip()
+        self._animated_strip.video_activated.connect(self.animated_activated)
+        main_box.addWidget(self._animated_strip)
+
+        self._evolver_btn = QPushButton("Send to Evolver")
+        self._evolver_btn.setToolTip(
+            "Copy this video into Evolver's inbox for sorting and upscaling."
+        )
+        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
+        self._evolver_btn.hide()  # shown only for a video the tab is displaying
+        main_box.addWidget(self._evolver_btn)
+
         self._panes.addWidget(main)
 
         # Right pane: this tab's own accumulating strip of past runs, kept slim so
         # the whole window can still tile into a monitor third or a portrait half.
-        # Suppressed for the Inspect tab, whose history is the whole gallery.
-        if self._show_strip:
-            self._strip = ThumbnailStrip(self._db)
-            self._strip.thumbnail_activated.connect(self.strip_activated)
-            self._panes.addWidget(self._strip)
-            # The main column grows with the window; the strip holds its width. The
-            # floor stays low enough that the window can still tile narrow.
-            main.setMinimumWidth(230)
-            self._panes.setStretchFactor(0, 1)
-            self._panes.setStretchFactor(1, 0)
-            self._panes.setSizes([500, 150])
-        else:
-            self._strip = None
+        self._strip = ThumbnailStrip(self._db)
+        self._strip.thumbnail_activated.connect(self.strip_activated)
+        self._panes.addWidget(self._strip)
+        # The main column grows with the window; the strip holds its width. The
+        # floor stays low enough that the window can still tile narrow.
+        main.setMinimumWidth(230)
+        self._panes.setStretchFactor(0, 1)
+        self._panes.setStretchFactor(1, 0)
+        self._panes.setSizes([500, 150])
 
         layout.addWidget(self._panes)
 
@@ -357,6 +390,7 @@ class GenerateConfigPanel(QWidget):
             self._generate(wf, params)
             return
         source_row, image_wf = source
+        self._hide_footer()  # a fresh generation starts with the input pre-step
         job = GenerationJob(self._client, image_wf, prepared_params(source_row, image_wf))
         self._input_image_job = job
         job.preview.connect(self._note_frame)  # watch the frame take shape
@@ -496,6 +530,7 @@ class GenerateConfigPanel(QWidget):
         if job is None:
             return
         self._prepared = None
+        self._hide_footer()  # a fresh generation: no longer showing a saved one
         record = job["record"]
         prompt_id = record["prompt_id"]
         self._db.insert_generation(**record)
@@ -615,9 +650,13 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
         completed_id = self._client_prompt_id
-        if self._strip is not None and completed_id not in self._strip_ids:
+        if completed_id not in self._strip_ids:
             self._strip_ids.insert(0, completed_id)  # accumulate; never drops earlier runs
             self._strip.show_generations(self._strip_ids)
+        # The finished output is now what the tab is showing, so the footer (source
+        # link / animations / Evolver) applies to it — re-read the row for the
+        # freshly persisted output files it keys off.
+        self._displayed_row = self._db.get_generation(completed_id)
         self._reset_job()
         self._refresh_estimate()
         self._release_queue_slot()
@@ -694,11 +733,8 @@ class GenerateConfigPanel(QWidget):
     def show_recent_preview(self):
         """When idle, fill the preview with the newest saved generation matching
         this tab's settings instead of the empty 'select a generation' placeholder
-        — the most recent image/video generated with it. A no-op for the Inspect
-        tab (its shared preview shows the browser selection, driven by the gallery's
-        controller) and while a job of this tab's owns the preview."""
-        if not self._autoshow_recent:
-            return
+        — the most recent image/video generated with it. A no-op while a job of
+        this tab's owns the preview."""
         if (self._client_prompt_id is not None or self._prepared is not None
                 or self._input_image_job is not None):
             return  # a job of this tab's is driving the preview
@@ -724,8 +760,7 @@ class GenerateConfigPanel(QWidget):
         longer match the current form, so tweak-and-regenerate stays visible.
         """
         self._strip_ids = list(prompt_ids)
-        if self._strip is not None:
-            self._strip.show_generations(self._strip_ids)
+        self._strip.show_generations(self._strip_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""
@@ -783,3 +818,119 @@ class GenerateConfigPanel(QWidget):
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
             self._param_form.set_image_random(snapshot.image_is_random)
+
+    # --- displaying a saved generation (the browsed selection) ----------------
+
+    def show_saved_generation(self, row: dict, image_rows: list[dict]):
+        """Display a browsed generation in this tab: seed the editable form with
+        its settings, show its output in the preview, and reveal the footer for
+        its media type (an image's animations, a video's source link + Evolver).
+
+        The form is seeded first so its recent-preview autoshow doesn't override
+        the selection's own output. A workflow the app can't rebuild leaves the
+        form as it was but still shows the preview and footer.
+        """
+        self._displayed_row = row
+        workflow_name = row.get("workflow_name", "")
+        if workflow_name in WORKFLOW_REGISTRY:
+            self.prefill(workflow_name, merge_denormalized(row))
+        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is not None:
+            self._preview.show_media(*preview)  # after prefill, so it wins over autoshow
+        else:
+            self._preview.clear()
+        self._show_footer(row, image_rows, preview)
+
+    def _show_footer(self, row: dict, image_rows: list[dict], preview):
+        """Populate and reveal the footer for the generation on display: the
+        animations strip for an image, and the source link + Evolver button for a
+        video. ``preview`` is the already-resolved ``(path, media_type)`` (or
+        ``None``), so the Evolver button keys off the same on-disk lookup."""
+        self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
+        source_id = find_source_image_id(row, image_rows)
+        if source_id is not None:
+            self._source_link.setText(f'<a href="{source_id}">‹ From source image</a>')
+            self._source_link.show()
+        else:
+            self._source_link.hide()
+        self._update_evolver_button(preview)
+
+    def _hide_footer(self):
+        """Drop the saved-generation footer — a blank or generating tab shows none."""
+        self._displayed_row = None
+        self._animated_strip.show_videos([])
+        self._source_link.hide()
+        self._evolver_btn.hide()
+
+    def _animated_items(self, row: dict) -> list[tuple]:
+        """(prompt_id, looping-preview path, still path) for each video an image
+        was animated into — empty for anything but an image with animations."""
+        if media_type_of_row(row) != "image":
+            return []
+        videos = videos_from_source_image(row, self._video_rows())
+        if len(videos) > _ANIMATED_STRIP_LIMIT:
+            logger.info("Image %s has %d animations; showing the first %d",
+                        row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
+        return [
+            (v["prompt_id"], animated_preview_path(v, COMFYUI_OUTPUT_DIR, THUMB_DIR),
+             v.get("thumbnail_path"))
+            for v in videos[:_ANIMATED_STRIP_LIMIT]
+        ]
+
+    def _video_rows(self) -> list[dict]:
+        return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]
+
+    # --- Send to Evolver: hand a displayed video to the sibling pipeline -------
+
+    def _update_evolver_button(self, preview):
+        """Reflect the displayed generation on the Send-to-Evolver button.
+
+        Shown only when the generation is a video with a file on disk; Evolver is
+        a video pipeline, so for an image or a missing file the button is hidden.
+        A video already sent shows a persistent, disabled "Sent ✓" (the flag is
+        read from the row, which the DB persists). ``preview`` is the resolved
+        ``(path, media_type)``, or ``None``."""
+        is_video = preview is not None and preview[1] == "video"
+        self._evolver_btn.setVisible(is_video)
+        if not is_video:
+            return
+        already_sent = bool(self._displayed_row and self._displayed_row.get("evolver_exported_at"))
+        self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
+        self._evolver_btn.setEnabled(not already_sent)
+
+    def _exportable_video_path(self) -> Path | None:
+        """The on-disk video file backing the displayed generation, or ``None``
+        when it isn't a video (or its file is missing). Resolved fresh at send
+        time, so a file deleted since selection is caught."""
+        if not self._displayed_row:
+            return None
+        preview = resolve_preview(self._displayed_row, COMFYUI_OUTPUT_DIR)
+        if preview is None or preview[1] != "video":
+            return None
+        return preview[0]
+
+    def _on_send_to_evolver(self):
+        """Copy the displayed video into Evolver's inbox and remember the send.
+
+        Re-checks the persisted flag (not just the button's disabled state) so the
+        handoff can't be repeated. The copy lands in another app's inbox with no
+        other visible result here, so a failure must surface loudly."""
+        if not self._displayed_row or self._displayed_row.get("evolver_exported_at"):
+            return
+        path = self._exportable_video_path()
+        if path is None:
+            return
+        try:
+            evolver_export.export_video(path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
+        except Exception as e:
+            logger.exception("Failed to send %s to Evolver", path)
+            QMessageBox.warning(
+                self._preview, "Send to Evolver failed",
+                f"Could not send this video to Evolver:\n\n{e}",
+            )
+            return
+        prompt_id = self._displayed_row["prompt_id"]
+        self._db.mark_evolver_exported(prompt_id)
+        # Re-read so the row (and thus the button) reflects the persisted send.
+        self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
+        self._update_evolver_button((path, "video"))

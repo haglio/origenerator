@@ -1,13 +1,16 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from origenerator import gallery
+from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -56,7 +59,7 @@ def test_thumbnail_history_is_the_right_pane(panel):
     assert isinstance(right, ThumbnailStrip)
 
 
-# --- headless variants (the Inspect tab embeds one of these) ----------------
+# --- a read-only gallery (no client) ----------------------------------------
 
 def test_tolerates_a_missing_client(qtbot, tmp_path):
     # A read-only gallery has no ComfyUI client. The panel still builds — the form
@@ -69,31 +72,10 @@ def test_tolerates_a_missing_client(qtbot, tmp_path):
     p.teardown()                          # never connected, so a no-op too
 
 
-def test_uses_an_injected_preview_instead_of_building_one(qtbot, tmp_path):
-    from origenerator.gui.preview_widget import PreviewWidget
-    shared = PreviewWidget(player=MagicMock())
-    qtbot.addWidget(shared)
-    p = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"), preview=shared)
-    qtbot.addWidget(p)
-    assert p._preview is shared
-    assert not _is_descendant(shared, p)  # the shared preview lives outside the panel
-
-
-def test_can_suppress_the_history_strip(qtbot, tmp_path):
-    p = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"), show_strip=False)
-    qtbot.addWidget(p)
-    assert p._strip is None
-    assert p._panes.count() == 1          # just the form column, no strip pane
-
-
 # --- show the newest matching generation instead of the blank placeholder -----
 
 def _wiz_params():
     return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
-
-
-def test_autoshow_recent_is_on_by_default(panel):
-    assert panel._autoshow_recent is True
 
 
 def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
@@ -928,3 +910,251 @@ def test_in_flight_descriptor_reports_a_tab_queued_behind_a_running_one(qtbot, t
     # A waiting tab still has a card, keyed by its staged id, though it isn't yet a
     # live job (nothing to reconnect to) — so active_prompt_id stays None.
     assert desc["key"] and waiting.active_prompt_id() is None
+
+
+# --- displaying a saved generation: the footer folded in from the inspect pane ---
+
+def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
+    """A completed SDXL image whose output file an i2v can name as its source."""
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                  positive_prompt=prompt, seed=1)
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt=prompt, seed=1,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed",
+                         output_files=json.dumps([{"filename": filename, "subfolder": "image"}]))
+    return db.get_generation(prompt_id)
+
+
+def _video_row(db, prompt_id="vid1", input_image=None):
+    """A completed WAN i2v video, optionally built on a named source image."""
+    params = {"positive_prompt": "dance", "seed": 5}
+    if input_image is not None:
+        params["input_image"] = input_image
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
+        positive_prompt="dance", seed=5,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed",
+                         output_files=json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
+    return db.get_generation(prompt_id)
+
+
+@pytest.fixture
+def saved_panel(qtbot, tmp_path):
+    """A panel over a DB with an image and the video animated from it."""
+    db = Database(tmp_path / "t.db")
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    panel._preview.show_media = MagicMock()  # don't start real WMF playback
+    return panel, db
+
+
+def test_a_fresh_tab_shows_no_footer(saved_panel):
+    panel, _db = saved_panel
+    assert panel._displayed_row is None
+    assert panel._animated_strip.isHidden()
+    assert panel._source_link.isHidden()
+    assert panel._evolver_btn.isHidden()
+
+
+def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    _video_row(db, "vid1", input_image="sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "animated_preview_path", lambda r, o, t: None)
+    image_rows = [image]
+
+    panel.show_saved_generation(image, image_rows)
+
+    assert not panel._animated_strip.isHidden()
+    assert len(panel._animated_strip.findChildren(_VideoTile)) == 1
+    assert panel._source_link.isHidden()   # an image has no source-image link
+    assert panel._evolver_btn.isHidden()   # Evolver is for videos
+    assert panel._displayed_row is image
+
+
+def test_showing_an_image_footer_tile_click_emits_animated_activated(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    _video_row(db, "vid1", input_image="sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "animated_preview_path", lambda r, o, t: None)
+    panel.show_saved_generation(image, [image])
+    got = []
+    panel.animated_activated.connect(got.append)
+
+    panel._animated_strip.video_activated.emit("vid1")
+
+    assert got == ["vid1"]
+
+
+def test_showing_a_video_reveals_evolver_and_source_link(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    video = _video_row(db, "vid1", input_image="sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(video, [image])
+
+    assert not panel._evolver_btn.isHidden()   # a video with a file → sendable
+    assert not panel._source_link.isHidden()   # its start frame is a known generation
+    assert 'href="img1"' in panel._source_link.text()
+    assert panel._animated_strip.isHidden()    # a video isn't animated into anything
+
+
+def test_video_source_link_click_emits_source_activated(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    video = _video_row(db, "vid1", input_image="sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(video, [image])
+    got = []
+    panel.source_activated.connect(got.append)
+
+    panel._source_link.linkActivated.emit("img1")
+
+    assert got == ["img1"]
+
+
+def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand_placed.png")  # not a generation
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(video, [])
+
+    assert panel._source_link.isHidden()
+    assert not panel._evolver_btn.isHidden()  # still a sendable video
+
+
+def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="sdxl_img1.png")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(video, [])
+
+    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._param_form.get_values_static()["positive_prompt"] == "dance"
+
+
+def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    db.insert_generation(
+        prompt_id="u1", workflow_name="unknown", workflow_version="imported",
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    db.update_generation("u1", status="completed",
+                         output_files=json.dumps([{"filename": "u1.mp4", "subfolder": "video"}]))
+    row = db.get_generation("u1")
+    before = panel._param_form.get_values_static()
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda r, out: (Path("C:/out/u1.mp4"), "video"))
+
+    panel.show_saved_generation(row, [])
+
+    assert panel._param_form.get_values_static() == before  # form left as-is
+    assert not panel._evolver_btn.isHidden()                # footer still applies
+    assert panel._displayed_row is row
+
+
+def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_panel, monkeypatch):
+    # The form's recent-preview autoshow must not override the selection's output:
+    # show_media's last call is the selection, not the folder's newest match.
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(video, [])
+
+    assert panel._preview.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video")
+
+
+def test_send_to_evolver_copies_the_displayed_video(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    video_path = Path("C:/out/vid1.mp4")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (video_path, "video"))
+    export = MagicMock(return_value=EVOLVER_INBOX_DIR / EVOLVER_SOURCE / "vid1.mp4")
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    panel.show_saved_generation(video, [])
+    panel._on_send_to_evolver()
+
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
+    assert panel._displayed_row["evolver_exported_at"]
+    assert panel._evolver_btn.text() == "Sent to Evolver ✓"
+    assert panel._evolver_btn.isEnabled() is False
+
+
+def test_send_to_evolver_does_not_re_export_an_already_sent_video(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    db.mark_evolver_exported("vid1")
+    video = db.get_generation("vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    export = MagicMock()
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    panel.show_saved_generation(video, [])
+    assert panel._evolver_btn.text() == "Sent to Evolver ✓"
+    panel._on_send_to_evolver()
+
+    export.assert_not_called()
+
+
+def test_send_to_evolver_warns_and_survives_a_failed_copy(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    monkeypatch.setattr(evolver_export, "export_video",
+                        MagicMock(side_effect=OSError("inbox unreachable")))
+    warn = MagicMock()
+    monkeypatch.setattr(gcp_module.QMessageBox, "warning", warn)
+
+    panel.show_saved_generation(video, [])
+    panel._on_send_to_evolver()  # must not raise
+
+    warn.assert_called_once()
+
+
+def test_generating_hides_a_previously_shown_footer(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(video, [])
+    assert not panel._evolver_btn.isHidden()
+    panel._client.submit_job = MagicMock(return_value="x")
+
+    # Switch to an image workflow that needs no input, then run a real generation.
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
+    panel._on_generate()
+
+    assert panel._displayed_row is None
+    assert panel._evolver_btn.isHidden()
+    assert panel._source_link.isHidden()
+
+
+def test_completion_makes_the_finished_row_the_displayed_one(saved_panel):
+    panel, db = saved_panel
+    panel._client.submit_job = MagicMock(return_value="x")
+    panel._param_form.set_values({"seed": 7, "positive_prompt": "a fox"})
+    panel._on_generate()
+    pid = panel._client_prompt_id
+
+    panel._client.job_completed.emit(pid, SDXL_HISTORY)
+
+    assert panel._displayed_row is not None
+    assert panel._displayed_row["prompt_id"] == pid  # the just-finished run

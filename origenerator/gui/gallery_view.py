@@ -16,7 +16,8 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    ConfigSnapshot, filled_params, find_duplicate_generation, randomize_seeds,
+    ConfigSnapshot, filled_params, find_duplicate_generation, merge_denormalized,
+    randomize_seeds,
 )
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tree import FolderTree
@@ -29,7 +30,6 @@ from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.info_pane import InfoPaneController, _is_reusable_workflow
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
@@ -48,6 +48,16 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL_MS = 1500
 _RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
+
+
+def _is_reusable_workflow(workflow_name) -> bool:
+    """Whether the app can rebuild this workflow from its template.
+
+    The single gate for both Reuse Parameters and the gallery re-roll, so the
+    re-roll '+' appears exactly where Reuse works (a re-roll is just Reuse with a
+    random seed).
+    """
+    return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
 def _is_deletable_folder(group) -> bool:
@@ -126,6 +136,7 @@ class GalleryView(QWidget):
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
         self._image_rows: list[dict] = []
+        self._selected_row: dict | None = None  # the saved generation on display in the info pane
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards.
         self._browser = BrowserPane(self)
@@ -290,39 +301,26 @@ class GalleryView(QWidget):
         browser_box.addWidget(self._scroll, 1)
         self._panes.addWidget(browser)
 
-        # Info pane: a tabbed workspace. Tab 0 is the Inspect tab — an editable
-        # generate panel (form + Generate) over the inspect sidebar (preview,
-        # metadata, the "Animated in" strip, Send-to-Evolver) — built by
-        # InfoPaneTabs. Config-tab forks open after it via the "+" or a thumbnail
-        # double-click, all sharing one run queue. The gallery reads the Inspect
-        # tab's sidebar widgets back out to drive them with its InfoPaneController.
+        # Info pane: a tabbed workspace of identical editable generate panels
+        # (form + Generate). No special or permanent tab — the first opens on
+        # construction, and more fork via the "+" or a thumbnail double-click, all
+        # sharing one run queue. Clicking a browser thumbnail loads that generation
+        # into a tab (its output in the preview, its settings in the form, a footer
+        # for its media type). Each panel's source-image link and animation clicks
+        # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db)
-        inspect = self._info_tabs.inspect_panel()
-        self._preview = inspect.preview
-        self._meta_title = inspect.meta_title
-        self._estimate_label = inspect.estimate_label
-        self._meta_panel = inspect.meta_panel
-        self._animated_strip = inspect.animated_strip
-        self._evolver_btn = inspect.evolver_btn
+        self._info_tabs.tab_added.connect(self._wire_config_panel)
+        for panel in self._info_tabs._config_panels():
+            self._wire_config_panel(panel)  # the initial tab predates the connection
         self._panes.addWidget(self._info_tabs)
-        # The Inspect + config tabs feed the Recents shelf and bottom bar their
-        # in-flight Generate cards, and name the running ids the re-roll
-        # reconnection must not re-adopt.
+        # The config tabs feed the Recents shelf and bottom bar their in-flight
+        # Generate cards, and name the running ids the re-roll reconnection must
+        # not re-adopt.
         self._generate_inflight = self._info_tabs.in_flight_items
         self._claimed_ids = self._info_tabs.active_prompt_ids
-        # The controller drives the pane's widgets from the generation on display;
-        # an i2v source link or an animation click surfaces here as a source link,
-        # and a double-click's reuse re-emits as this view's reuse_requested.
-        self._info = InfoPaneController(
-            self._db,
-            preview=self._preview, meta_panel=self._meta_panel, meta_title=self._meta_title,
-            estimate_label=self._estimate_label, animated_strip=self._animated_strip,
-            evolver_btn=self._evolver_btn, parent=self,
-        )
-        self._info.link_activated.connect(self._on_source_link)
-        self._info.reuse_requested.connect(self.reuse_requested)
         # A thumbnail double-click reuses its parameters by forking an editable
-        # config tab in this same pane (a no-op without a client — nothing to run).
+        # config tab in this same pane (a no-op without a client — nothing to run);
+        # the fork's footer links are wired via tab_added like every other tab.
         self.reuse_requested.connect(self._info_tabs.open_config)
 
         # The TOC pane holds its width; the browser and info panes both grow with
@@ -357,6 +355,13 @@ class GalleryView(QWidget):
         btn.setCheckable(checkable)
         (btn.toggled if checkable else btn.clicked).connect(handler)
         return btn
+
+    def _wire_config_panel(self, panel):
+        """Route a config tab's footer links to the gallery: its "from source
+        image" link and an animation-tile click both navigate like any source
+        link. Called for the initial tab and every tab forked afterward."""
+        panel.source_activated.connect(self._on_source_link)
+        panel.animated_activated.connect(self._on_source_link)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -428,7 +433,7 @@ class GalleryView(QWidget):
                 self._title.set_display("")
                 self._avg_label.setText("")
                 self._browser.show_widget(QWidget())
-                self._info.reset_animated_strip()  # nothing selected: no animations
+                self._selected_row = None  # nothing selected
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
@@ -534,10 +539,27 @@ class GalleryView(QWidget):
 
     @property
     def _selected(self) -> dict | None:
-        """The saved generation on display in the info pane, or ``None``. Owned by
-        the info-pane controller; read here for navigation, delete, and the
-        Recents "containing folder" jump."""
-        return self._info.current_row()
+        """The saved generation on display in the info pane, or ``None`` — read
+        here for navigation, delete, and the Recents "containing folder" jump. Set
+        by :meth:`_on_thumbnail_clicked`, cleared when a re-roll or nothing is
+        showing."""
+        return self._selected_row
+
+    @property
+    def _preview(self):
+        """The current config tab's preview — where a selection, a re-roll frame,
+        or a running generation's frames all land. ``None`` only if every tab has
+        been closed."""
+        panel = self._info_tabs.current_config_panel()
+        return panel._preview if panel is not None else None
+
+    def current_params(self) -> dict | None:
+        """The reusable parameters of the generation on display, or ``None`` when
+        nothing reusable is shown (idle, a live re-roll, or a workflow the app
+        can't rebuild)."""
+        if not self._selected_row or not _is_reusable_workflow(self._selected_row.get("workflow_name")):
+            return None
+        return merge_denormalized(self._selected_row) or None
 
     # The folder tree's key→item / prompt→item maps and shelf rows are owned by the
     # GalleryTree renderer; surfaced here for navigation, selection, and rebuild.
@@ -932,17 +954,18 @@ class GalleryView(QWidget):
         """Point the info pane at re-roll ``key`` and show its last frame — or a
         'waiting' note, never the idle 'select a generation' placeholder."""
         self._selected_reroll_key = key
+        self._selected_row = None  # a running re-roll isn't a saved generation
         self._browser.clear_thumbnail_selection()
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(True)
-        self._info.show_generating(self._last_reroll_frame)
+        self._info_tabs.show_reroll_frame(self._last_reroll_frame)
 
     def _on_reroll_preview(self, key: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
         remembering it so it survives the rebuild each stage completion triggers."""
         if key == self._selected_reroll_key:
             self._last_reroll_frame = data
-            self._info.show_frame(data)
+            self._info_tabs.show_reroll_frame(data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -1170,7 +1193,7 @@ class GalleryView(QWidget):
             return
         deleted_ids = {r["prompt_id"] for r in rows}
         if self._selected and self._selected.get("prompt_id") in deleted_ids:
-            self._preview.clear()  # release any file handle before the files move
+            self._info_tabs.clear_current_preview()  # release any file handle before the files move
         try:
             self._actions.delete_rows(rows)
         except Exception as e:
@@ -1189,7 +1212,7 @@ class GalleryView(QWidget):
     def _undo(self):
         if not self._actions.can_undo():
             return
-        self._preview.clear()
+        self._info_tabs.clear_current_preview()
         focus = self._actions.undo()  # a restored generation to return to, if any
         self._browser.clear_selection()
         self.refresh()
@@ -1301,20 +1324,25 @@ class GalleryView(QWidget):
         if group is not None:
             self._delete_folder(group)
 
-    # --- metadata sidebar --------------------------------------------------
+    # --- the selected generation drives a config tab -----------------------
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)
         if not row:
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane
-        self._info.show_generation(row, self._image_rows)
-        # A genuine pick brings the Inspect tab forward and seeds its editable form
-        # with this generation's settings; a suppressed re-selection (a poll/rebuild,
-        # or Back/Forward) leaves the front tab and the form's edits alone.
+        self._selected_row = row
+        # A genuine pick loads the generation into a config tab — its output in the
+        # preview, its settings in the form, a footer for its media type — reusing
+        # the current tab or forking one. A suppressed re-selection (a poll/rebuild,
+        # or Back/Forward) only refreshes the current tab's preview, leaving the
+        # tab set and any edited form alone.
         if not self._suppress_history:
-            self._info_tabs.setCurrentIndex(0)
-            self._load_inspect_form(row)
+            self._info_tabs.load_selection(row, self._image_rows)
+        else:
+            self._info_tabs.show_selection_preview(
+                gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+            )
         self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()
         if shelf_key is not None:
@@ -1326,15 +1354,6 @@ class GalleryView(QWidget):
             # In a folder, each viewed generation — a click, the auto-selected first
             # item, a followed link — is its own browsing step.
             self._record_location(prompt_id)
-
-    def _load_inspect_form(self, row: dict):
-        """Seed the Inspect tab's editable form with ``row``'s settings, so its
-        'editable text' is the generation you're inspecting — tweak and Generate a
-        variation right there. A no-op for a workflow the app can't rebuild, leaving
-        the form as it was."""
-        params = self._info.current_params()
-        if params:
-            self._info_tabs.inspect_panel().config.prefill(row.get("workflow_name", ""), params)
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
@@ -1447,14 +1466,20 @@ class GalleryView(QWidget):
             self._delete_btn.setToolTip("Nothing to delete")
 
     def _clear_metadata(self):
-        self._info.clear()
+        """Drop the info-pane selection: forget the shown generation and empty the
+        current tab's preview."""
+        self._selected_row = None
+        self._info_tabs.clear_current_preview()
         self._browser.sync_containing_folder_button()  # nothing selected: no jump to offer
 
-    def _on_send_to_evolver(self):
-        self._info._on_send_to_evolver()
-
     def _on_reuse(self):
-        self._info._on_reuse()
+        """Reuse the shown generation's parameters — fork a config tab from them.
+
+        Gated on reusability (not just a button state) so the double-click path is
+        inert for a workflow the app can't rebuild."""
+        params = self.current_params()
+        if params:
+            self.reuse_requested.emit(self._selected_row.get("workflow_name", ""), params)
 
 
 def _group_workflow(group) -> str | None:

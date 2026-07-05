@@ -52,6 +52,13 @@ class AutoGenerateController(QObject):
         for key in list(self._active):
             self._end(key)
 
+    def rekey(self, old_key: str, new_key: str) -> None:
+        """Move a running loop to a new folder key — its prompt was voice-edited to
+        settings that belong in a different folder, so the loop follows it there."""
+        if old_key in self._active:
+            self._active.discard(old_key)
+            self._active.add(new_key)
+
     def _end(self, key: str) -> None:
         if key in self._active:
             self._active.discard(key)

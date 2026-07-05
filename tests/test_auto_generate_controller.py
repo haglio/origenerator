@@ -131,6 +131,16 @@ def test_stop_all_ends_every_active_loop(qtbot):
     assert not auto.any_active()
 
 
+def test_rekey_moves_an_active_loop_to_a_new_key(qtbot):
+    launcher = FakeLauncher()
+    auto = AutoGenerateController(launcher)
+    auto.start("old")
+
+    auto.rekey("old", "new")
+
+    assert not auto.is_active("old") and auto.is_active("new")
+
+
 def test_folders_loop_independently(qtbot):
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)

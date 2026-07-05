@@ -2153,17 +2153,25 @@ def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    key = _select_first_leaf(view)
+    _select_first_leaf(view)
 
     view._toggle_auto(True)
     assert view._voice.started
-    view._voice.say({"positive": "a cat, no redacted", "negative": "ugly"})  # rewritten pair
-    job = view._reroll_jobs[key]
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # finishing relaunches
+    (launch_key,) = view._reroll_jobs.keys()  # the folder the first generation lands in
 
-    # the relaunched generation carries both steered prompts
-    assert view._reroll_jobs[key].params["positive_prompt"] == "a cat, no redacted"
-    assert view._reroll_jobs[key].params["negative_prompt"] == "ugly"
+    view._voice.say({"positive": "a cat, no redacted", "negative": "ugly"})  # rewritten pair
+    client.job_completed.emit(view._reroll_jobs[launch_key].prompt_id, _REROLL_HISTORY)
+
+    # the loop re-homed to the new-prompt folder, carrying both steered prompts
+    assert launch_key not in view._reroll_jobs
+    (new_key,) = view._reroll_jobs.keys()
+    assert new_key != launch_key and view._auto.is_active(new_key)
+    assert view._reroll_jobs[new_key].params["positive_prompt"] == "a cat, no redacted"
+    assert view._reroll_jobs[new_key].params["negative_prompt"] == "ugly"
+
+    # completing the re-homed generation makes its folder exist -> the view follows
+    client.job_completed.emit(view._reroll_jobs[new_key].prompt_id, _REROLL_HISTORY)
+    assert view._selected_folder_key() == new_key
 
 
 def test_turning_auto_off_stops_voice(qtbot, tmp_path):

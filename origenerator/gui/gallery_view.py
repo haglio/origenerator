@@ -95,6 +95,7 @@ class GalleryView(QWidget):
         # voice can steer the prompt mid-loop; turning Auto on is voice's "on" and
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
+        self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
         self._voice = VoiceSteering()
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
@@ -607,7 +608,16 @@ class GalleryView(QWidget):
         working = self._auto_working.get(key)
         if working is not None:
             # A voice-steered auto loop launches its (possibly edited) working prompt
-            # with fresh seeds, not the folder's stored rows.
+            # with fresh seeds. If the edit moved it to a different settings folder,
+            # re-home the loop there and remember to open that folder once it exists.
+            target = self._working_folder_key(working)
+            if target != key:
+                self._auto_working[target] = self._auto_working.pop(key)
+                self._auto.rekey(key, target)
+                if self._voice_target_key == key:
+                    self._voice_target_key = target
+                self._pending_auto_key = target
+                key, working = target, self._auto_working[target]
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
             self._reroll.start_prepared(key, working["workflow"], params)
         else:
@@ -636,8 +646,8 @@ class GalleryView(QWidget):
         if self._auto.is_active(key):
             self._voice_target_key = key
             self._voice.start(
-                lambda k=key: self._working_prompts(k),
-                lambda new, k=key: self._steer_prompts(k, new),
+                lambda: self._working_prompts(self._voice_target_key),
+                lambda new: self._steer_prompts(self._voice_target_key, new),
             )
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
@@ -651,6 +661,7 @@ class GalleryView(QWidget):
         if workflow is not None:
             self._auto_working[key] = {
                 "workflow": workflow, "params": filled_params(group.rows[0], workflow),
+                "row": group.rows[0],
             }
 
     def _working_prompts(self, key: str) -> dict:
@@ -665,6 +676,13 @@ class GalleryView(QWidget):
             working["params"]["positive_prompt"] = new_prompts.get("positive", "")
             working["params"]["negative_prompt"] = new_prompts.get("negative", "")
 
+    def _working_folder_key(self, working: dict) -> str:
+        """The settings-folder key the working params now belong to — recomputed as
+        voice edits the prompt, so a steered loop can re-home to the matching folder."""
+        row = {**working["row"], "params_json": json.dumps(working["params"])}
+        return gallery.settings_folder_key(
+            row, gallery.build_image_config_index(self._image_rows))
+
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, cancelled, or failed): drop its
         working params and, if it was the voice target, stop listening."""
@@ -672,6 +690,7 @@ class GalleryView(QWidget):
         if key == self._voice_target_key:
             self._voice.stop()
             self._voice_target_key = None
+            self._pending_auto_key = None
             self._voice_status_timer.stop()
             self._voice_status.hide()
         self._sync_auto_button()
@@ -974,6 +993,13 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
+        # A voice-steered loop that re-homed to a new-prompt folder: open it now that
+        # its first generation has given the folder a node.
+        if self._pending_auto_key is not None:
+            item = self._item_by_key.get(self._pending_auto_key)
+            if item is not None:
+                self._pending_auto_key = None
+                self._tree.setCurrentItem(item)
         # A combine whose brand-new folder we parked off (on Recents) now has a
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:

@@ -805,10 +805,10 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
         assert "safetensors" not in settings.label
 
 
-def test_build_gallery_tree_excludes_rows_that_produced_no_output():
+def test_build_gallery_tree_excludes_failed_rows_that_produced_no_output():
     # A failed generation never wrote a file. The gallery shows results, so a
-    # file-less row must not surface as an empty, output-less entry — not even
-    # the media-type folder it would otherwise create.
+    # file-less error row must not surface as an empty, output-less entry — not
+    # even the media-type folder it would otherwise create.
     rows = [
         _img("i1", "a cat", 50, 1),                          # real result: has a file
         _row(prompt_id="boom", workflow_name="wan22_i2v",
@@ -820,6 +820,34 @@ def test_build_gallery_tree_excludes_rows_that_produced_no_output():
     surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
     assert surfaced == {"i1"}
     assert [m.media_type for m in tree] == ["image"]  # no Videos folder for the dead row
+
+
+def test_build_gallery_tree_includes_in_progress_rows_so_a_new_folder_appears():
+    # A running (or pending) generation has no output yet, but its folder must
+    # appear at once — a tab's Generate into a brand-new settings folder needs a
+    # node to navigate to while it runs. The output-less running row gives that
+    # folder its node; its live card/tile stands in for the missing thumbnail.
+    rows = [
+        _img("i1", "a cat", 50, 1),                          # a finished image
+        _row(prompt_id="run", workflow_name="wan22_i2v",
+             status="running",
+             params_json=json.dumps({"positive_prompt": "dance", "seed": 5}),
+             output_files="[]"),                             # in flight: no file yet
+    ]
+    tree = build_gallery_tree(rows)
+    surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
+    assert surfaced == {"i1", "run"}                         # the running row appears
+    assert {m.media_type for m in tree} == {"image", "video"}  # its Videos folder exists
+
+
+def test_build_gallery_tree_includes_a_pending_row():
+    # "pending" (queued, not yet begun) is in flight too, so its folder appears.
+    rows = [_row(prompt_id="q", workflow_name="sdxl_t2i", status="pending",
+                 params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
+                 output_files="[]")]
+    tree = build_gallery_tree(rows)
+    surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
+    assert surfaced == {"q"}
 
 
 def test_build_gallery_tree_nests_media_then_workflow_then_settings():

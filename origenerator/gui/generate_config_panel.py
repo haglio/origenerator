@@ -66,7 +66,7 @@ class GenerateConfigPanel(QWidget):
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
     source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
     animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
-    generation_started = pyqtSignal(str)    # a job just began (its prompt_id, now a running DB row)
+    generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
                  parent=None):
@@ -307,6 +307,14 @@ class GenerateConfigPanel(QWidget):
         self._progress.setFormat(text)
 
     def _on_generate(self):
+        """Ask the gallery to generate this config — a re-roll of its settings folder.
+
+        A Generate is conceptually a gallery re-roll: it emits the form's workflow
+        and values (a Random seed already re-rolled by :meth:`ParamForm.get_values`)
+        as :attr:`generate_requested`, and the gallery launches the job in the
+        folder's own re-roll slot and navigates there. The panel keeps only the
+        form-level guard that an image workflow has its input picked.
+        """
         if self._client is None:
             return  # a read-only gallery: nothing to run against
         key = self._workflow_combo.currentData()
@@ -314,11 +322,6 @@ class GenerateConfigPanel(QWidget):
             return
         wf = WORKFLOW_REGISTRY[key]
         params = self._param_form.get_values()
-        # Merge in non-form params (checkpoint, vae, etc.) from defaults
-        defaults = wf.default_params()
-        for k, v in defaults.items():
-            if k not in params:
-                params[k] = v
 
         missing_images = [
             pd.label for pd in wf.param_definitions()
@@ -329,13 +332,7 @@ class GenerateConfigPanel(QWidget):
                 f"Select an input image ({', '.join(missing_images)}) before generating."
             )
             return
-
-        # "Random" input image: regenerate a fresh input of the same kind first,
-        # then run the main job on it (the box shows only for a reproducible input).
-        if self._param_form.image_is_random():
-            self._generate_random_input_then_run(wf, params)
-        else:
-            self._generate(wf, params)
+        self.generate_requested.emit(key, params)
 
     def _generate(self, wf, params: dict, *, keep_preview: bool = False):
         """Submit ``wf`` with ``params`` as this tab's main job, warning first if
@@ -552,9 +549,6 @@ class GenerateConfigPanel(QWidget):
             # starts. Show that wait instead of a stuck "Generating… 0%"; the bar
             # flips to running once ComfyUI actually begins our prompt.
             self._show_waiting("Queued on ComfyUI…")
-            # The running row now exists, so its settings folder is resolvable: let a
-            # container (the gallery) jump there and show this generation as it runs.
-            self.generation_started.emit(prompt_id)
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))

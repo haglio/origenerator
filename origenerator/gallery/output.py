@@ -35,11 +35,24 @@ def row_output_files(row: dict) -> list[dict]:
 def produced_output(row: dict) -> bool:
     """True when a row recorded at least one output file.
 
-    The gallery is a gallery of results: a generation that failed (or hasn't
-    finished) wrote no file, so it has nothing to show and is left out of the
-    tree entirely rather than surfacing as an empty, file-less entry.
+    The gallery is a gallery of results: a generation that failed wrote no file,
+    so it has nothing to show. Its folder still appears while it is *in flight*
+    (see :func:`is_in_progress`), represented by a live tile until its output
+    lands; only a terminal file-less row (an error) is left out entirely.
     """
     return bool(row_output_files(row))
+
+
+def is_in_progress(row: dict) -> bool:
+    """True while a row is still running or waiting its turn (queued).
+
+    Such a row has no output file yet, but its settings folder must appear at
+    once — a Generate/re-roll into a brand-new folder needs a node to navigate to
+    while it runs. The tree includes it on this basis and its live tile stands in
+    for the not-yet-existing thumbnail; a terminal row (completed/error) is judged
+    solely by whether it :func:`produced_output`.
+    """
+    return row.get("status") in ("running", "pending")
 
 
 def media_type_of_row(row: dict) -> str:

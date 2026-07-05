@@ -48,6 +48,21 @@ def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
     return db.get_generation(prompt_id)
 
 
+def _submit(panel):
+    """Drive a config panel's own job to a submitted state.
+
+    Clicking Generate now emits :attr:`generate_requested` for the gallery to
+    launch as a re-roll; the panel keeps its job machinery (queue, submit,
+    completion, the in-flight card it reports) for a container to drive. These
+    tests exercise that machinery directly, standing in for the launcher by
+    building the current form's job and beginning it as the old Generate did.
+    """
+    key = panel._workflow_combo.currentData()
+    wf = WORKFLOW_REGISTRY[key]
+    params = dict(wf.default_params(), **panel._param_form.get_values())
+    panel._generate(wf, params)
+
+
 def _strip_ids(tabs):
     strip = tabs.currentWidget()._strip
     return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
@@ -185,13 +200,13 @@ def test_strip_keeps_earlier_runs_after_a_settings_change(tabs):
     panel._client.submit_job = MagicMock(return_value="comfy-A")
 
     panel._param_form.set_values({"positive_prompt": "cat", "seed": 1})
-    panel._on_generate()
+    _submit(panel)
     first = panel._client_prompt_id
     panel._client.job_completed.emit(first, SDXL_HISTORY)
     assert _strip_ids(tabs) == [first]
 
     panel._param_form.set_values({"positive_prompt": "dog", "seed": 2})  # a mod
-    panel._on_generate()
+    _submit(panel)
     second = panel._client_prompt_id
     panel._client.job_completed.emit(second, SDXL_HISTORY)
     # Both runs stay, newest first — the earlier (now-mismatched) one isn't dropped.
@@ -365,8 +380,8 @@ def test_second_generate_is_queued_behind_the_first(tabs):
     tabs._client.submit_job = MagicMock(return_value="comfy-1")
     p1 = tabs.currentWidget()
     p2 = tabs._add_subtab()
-    p1._on_generate()
-    p2._on_generate()
+    _submit(p1)
+    _submit(p2)
     assert tabs._client.submit_job.call_count == 1   # only the first reaches ComfyUI
     assert p1._client_prompt_id is not None           # first is running
     assert "queued" in p2._progress.format().lower()
@@ -376,8 +391,8 @@ def test_closing_running_config_tab_advances_the_queue(tabs):
     tabs._client.submit_job = MagicMock(return_value="comfy-1")
     p1 = tabs.currentWidget()
     p2 = tabs._add_subtab()
-    p1._on_generate()  # running
-    p2._on_generate()  # queued
+    _submit(p1)  # running
+    _submit(p2)  # queued
     tabs._close_subtab(tabs.indexOf(p1))
     assert p2._client_prompt_id is not None           # p2 promoted and started
 
@@ -404,7 +419,7 @@ def test_capture_state_lists_every_tab_and_current(tabs):
 def test_capture_state_records_each_tab_active_prompt_id(tabs):
     panel = tabs.currentWidget()
     panel._client.submit_job = MagicMock(return_value="x")
-    panel._on_generate()
+    _submit(panel)
     state = tabs.capture_state()
     assert state["tabs"][0]["active_prompt_id"] == panel._client_prompt_id
 
@@ -466,7 +481,7 @@ def test_active_prompt_ids_collects_in_flight_tabs(tabs):
     p0 = tabs.currentWidget()
     p0._client.submit_job = MagicMock(return_value="x")
     tabs._add_subtab()  # a second, idle tab
-    p0._on_generate()
+    _submit(p0)
     assert tabs.active_prompt_ids() == {p0._client_prompt_id}
 
 
@@ -479,7 +494,7 @@ def test_in_flight_items_is_empty_when_nothing_is_generating(tabs):
 def test_in_flight_items_reports_a_running_job(tabs):
     tabs._client.submit_job = MagicMock(return_value="x")
     panel = tabs.currentWidget()
-    panel._on_generate()
+    _submit(panel)
     items = tabs.in_flight_items()
     assert len(items) == 1
     assert items[0].key == panel.active_prompt_id()
@@ -490,7 +505,7 @@ def test_in_flight_items_carry_the_tab_media_type(tabs):
     # config tab here runs SDXL, an image pipeline.
     tabs._client.submit_job = MagicMock(return_value="x")
     panel = tabs.currentWidget()
-    panel._on_generate()
+    _submit(panel)
     assert tabs.in_flight_items()[0].media_type == "image"
 
 
@@ -500,35 +515,34 @@ def test_in_flight_items_includes_a_tab_queued_behind_a_running_one(tabs):
     p2 = tabs._add_subtab()
     p1._param_form.set_values({"seed": 1})
     p2._param_form.set_values({"seed": 2})
-    p1._on_generate()   # running
-    p2._on_generate()   # queued behind it — no DB row, but still in flight
+    _submit(p1)   # running
+    _submit(p2)   # queued behind it — no DB row, but still in flight
     assert len(tabs.in_flight_items()) == 2
 
 
-def test_generation_started_surfaces_from_the_initial_tab(tabs):
-    # The tab strip re-emits each tab's generation_started so the gallery can react
-    # to a job launched from any tab — here the initial one.
-    tabs._client.submit_job = MagicMock(return_value="x")
-    started = []
-    tabs.generation_started.connect(started.append)
+def test_generate_requested_surfaces_from_the_initial_tab(tabs):
+    # The tab strip re-emits each tab's Generate so the gallery can launch it as a
+    # re-roll — here from the initial tab. It carries the workflow and form params.
+    requested = []
+    tabs.generate_requested.connect(lambda wf, params: requested.append((wf, params)))
     panel = tabs.currentWidget()
+    panel._param_form.set_values({"positive_prompt": "a cat", "seed": 3})
 
     panel._on_generate()
 
-    assert started == [panel.active_prompt_id()]
+    assert requested == [("sdxl_t2i", panel._param_form.get_values_static())]
 
 
-def test_generation_started_surfaces_from_a_forked_tab(tabs):
-    # A tab forked after construction must also have its generation_started wired,
-    # like title_changed — so a job from any tab reaches the gallery.
-    tabs._client.submit_job = MagicMock(return_value="x")
-    started = []
-    tabs.generation_started.connect(started.append)
+def test_generate_requested_surfaces_from_a_forked_tab(tabs):
+    # A tab forked after construction must also have its Generate wired, like
+    # title_changed — so a Generate from any tab reaches the gallery.
+    requested = []
+    tabs.generate_requested.connect(lambda wf, params: requested.append(wf))
     forked = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
 
     forked._on_generate()
 
-    assert started == [forked.active_prompt_id()]
+    assert requested == ["sdxl_t2i"]
 
 
 def test_revealing_an_item_selects_its_config_tab(tabs):
@@ -536,7 +550,7 @@ def test_revealing_an_item_selects_its_config_tab(tabs):
     first = tabs.currentWidget()
     tabs._add_subtab()  # a second config tab is now current
     assert tabs.currentWidget() is not first
-    first._on_generate()  # the first tab is the one generating
+    _submit(first)  # the first tab is the one generating
     tabs.in_flight_items()[0].reveal()
     assert tabs.currentWidget() is first  # reveal jumped to the generating tab
 

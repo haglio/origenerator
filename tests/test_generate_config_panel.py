@@ -12,7 +12,6 @@ from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -33,6 +32,21 @@ def _combo_index(panel, key):
         if panel._workflow_combo.itemData(i) == key:
             return i
     raise AssertionError(f"workflow {key} not in combo")
+
+
+def _submit(panel):
+    """Drive the panel's own job to a submitted (running) state.
+
+    Clicking Generate now only *emits* :attr:`generate_requested` — the gallery
+    launches the job as a re-roll. The panel keeps its job machinery (submit,
+    progress, completion, cancel, reconnect) for a container to drive; these tests
+    exercise that machinery directly, standing in for the launcher by building the
+    current form's job and beginning it, exactly as the old Generate did inline.
+    """
+    key = panel._workflow_combo.currentData()
+    wf = WORKFLOW_REGISTRY[key]
+    params = dict(wf.default_params(), **panel._param_form.get_values())
+    panel._generate(wf, params)
 
 
 def _is_descendant(widget, ancestor) -> bool:
@@ -134,74 +148,43 @@ def test_preview_over_form_share_the_main_pane(panel):
     assert panel._preview is not main  # nested inside the pane, not the pane itself
 
 
-def test_generate_inserts_row_and_submits(panel):
+def test_generate_emits_generate_requested_with_workflow_and_params(panel):
+    # Clicking Generate no longer runs its own job — it asks the gallery to, by
+    # emitting the workflow and the form's values (which the gallery launches as a
+    # re-roll of the config's folder). Nothing is submitted or recorded here.
+    panel._param_form.set_values({"positive_prompt": "a wizard", "seed": 42})
+    requested = []
+    panel.generate_requested.connect(lambda wf, params: requested.append((wf, params)))
+
     panel._on_generate()
-    rows = panel._db.list_generations()
-    assert len(rows) == 1
-    assert rows[0]["workflow_name"] == "sdxl_t2i"
-    assert rows[0]["status"] == "running"
-    # We submit under the DB row's own id, so ComfyUI's signals key on the same id.
-    assert panel._client_prompt_id == rows[0]["prompt_id"]
+
+    assert len(requested) == 1
+    workflow_name, params = requested[0]
+    assert workflow_name == "sdxl_t2i"
+    assert params["positive_prompt"] == "a wizard"
+    assert params["seed"] == 42
+    assert panel._db.list_generations() == []       # the panel submits nothing itself
+    assert panel._client_prompt_id is None
+
+
+def test_generate_randomizes_a_random_seed_before_emitting(panel):
+    # A Random seed is re-rolled by the form's get_values, so the params carried to
+    # the gallery already hold a concrete fresh seed (never the literal field text).
+    panel._param_form.set_values({"positive_prompt": "a cat"})  # leaves Random checked
+    assert panel._param_form.seed_is_random() is True
+    requested = []
+    panel.generate_requested.connect(lambda wf, params: requested.append(params))
+
+    panel._on_generate()
+
+    assert isinstance(requested[0]["seed"], int)  # a real seed, drawn for this run
 
 
 def _complete_one(panel, seed=12345, prompt="a cat"):
     """Run one generation to completion so a real prior row exists in the DB."""
     panel._param_form.set_values({"seed": seed, "positive_prompt": prompt})
-    panel._on_generate()
+    _submit(panel)
     panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
-
-
-def test_generate_warns_on_exact_duplicate_instead_of_resubmitting(panel, monkeypatch):
-    _complete_one(panel)
-    asked = []
-    monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
-    )
-
-    panel._on_generate()  # identical config, seed not random
-
-    assert asked, "the user should have been warned about the duplicate"
-    assert len(panel._db.list_generations()) == 1  # declined: nothing new submitted
-    assert panel._generate_btn.isEnabled() is True  # button re-enabled, not stuck
-
-
-def test_generate_duplicate_reroll_randomizes_seed_and_checks_random(panel, monkeypatch):
-    _complete_one(panel, seed=12345)
-    monkeypatch.setattr(panel, "_offer_reroll", lambda wf, params: REROLL_VIDEO)
-
-    panel._on_generate()
-
-    rows = panel._db.list_generations()  # newest first
-    assert len(rows) == 2                 # a new job was submitted
-    assert rows[0]["seed"] != 12345       # with a fresh seed, not the duplicate
-    assert panel._param_form.seed_is_random() is True  # Random box now checked
-
-
-def test_generate_with_random_seed_never_warns(panel, monkeypatch):
-    _complete_one(panel, seed=12345)         # an identical prior run exists
-    panel._param_form.set_seed_random(True)  # but the user re-checks Random
-    asked = []
-    monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
-    )
-
-    panel._on_generate()
-
-    assert asked == []  # a random seed can't reproduce a past run
-    assert len(panel._db.list_generations()) == 2
-
-
-def test_generate_does_not_warn_when_no_prior_match(panel, monkeypatch):
-    asked = []
-    monkeypatch.setattr(
-        panel, "_offer_reroll", lambda wf, params: asked.append(wf) or None
-    )
-    panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
-
-    panel._on_generate()
-
-    assert asked == []  # nothing matches: generate without nagging
-    assert len(panel._db.list_generations()) == 1
 
 
 def _seed_source_image(db):
@@ -239,53 +222,6 @@ def test_random_input_box_shows_only_for_a_reproducible_input(qtbot, tmp_path):
     assert not box.isHidden()
 
 
-def test_random_input_generates_a_fresh_image_then_the_video(qtbot, tmp_path):
-    submit = MagicMock(return_value="x")
-    panel, client, db = _i2v_panel(qtbot, tmp_path, submit)
-    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
-    panel._param_form._image_random_checks["input_image"].setChecked(True)
-
-    panel._on_generate()
-
-    # Stage 1: a fresh input image is generating (its own SDXL job), not the video.
-    assert panel._input_image_job is not None
-    assert panel._input_image_job.workflow.name == "sdxl_t2i"
-    assert db.get_generation("img")  # the original source is untouched
-    img_id = panel._input_image_job.prompt_id  # the pre-step's own id ComfyUI runs it under
-
-    client.job_completed.emit(img_id, SDXL_HISTORY)  # the image finishes
-
-    # Stage 2: the fresh image is saved and the video runs on it.
-    assert panel._input_image_job is None
-    fresh = [r for r in db.list_generations()
-             if r["workflow_name"] == "sdxl_t2i" and r["prompt_id"] != "img"]
-    assert len(fresh) == 1
-    assert panel._client_prompt_id is not None  # the video job is now running
-    video = next(r for r in db.list_generations() if r["workflow_name"] == "wan22_i2v")
-    params = json.loads(video["params_json"])
-    assert params["input_image"] == "a.png [output]"  # the fresh image's output, annotated
-    assert params["positive_prompt"] == "dance"
-
-
-def test_i2v_duplicate_image_seed_choice_draws_a_fresh_frame_keeping_the_video_seed(
-    qtbot, tmp_path, monkeypatch
-):
-    # Picking "New Image Seed" on a would-be duplicate i2v regenerates the start
-    # frame (the source image's own SDXL job) instead of re-submitting the video.
-    submit = MagicMock(return_value="x")
-    panel, _client, _db = _i2v_panel(qtbot, tmp_path, submit)
-    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
-    monkeypatch.setattr(gcp_module, "find_duplicate_generation", lambda rows, snap: {"prompt_id": "dup"})
-    monkeypatch.setattr(panel, "_offer_reroll", lambda wf, params: REROLL_IMAGE)
-
-    panel._on_generate()
-
-    assert panel._input_image_job is not None                  # a fresh start frame is drawing
-    assert panel._input_image_job.workflow.name == "sdxl_t2i"
-    assert panel._client_prompt_id is None                     # the video waits for that frame
-    submit.assert_called_once()                                # only the image job, so far
-
-
 def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):
     panel, client, db = _i2v_panel(qtbot, tmp_path, lambda p: "comfy-A")
     panel._param_form.set_values({"input_image": "sdxl_src.png"})  # reproducible → box shows
@@ -301,24 +237,6 @@ def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):
     assert restored._param_form.image_is_random() is True
 
 
-def test_video_stage_keeps_the_input_image_frame_until_the_video_previews(qtbot, tmp_path):
-    # The random-input i2v flow shows the image being generated, then the video.
-    # Starting the video must not clear the image frame — it stays until the video
-    # streams its own first frame — so the preview doesn't blank between stages.
-    submit = MagicMock(return_value="x")
-    panel, client, _db = _i2v_panel(qtbot, tmp_path, submit)
-    panel._param_form.set_values({"input_image": "sdxl_src.png", "positive_prompt": "dance"})
-    panel._param_form._image_random_checks["input_image"].setChecked(True)
-    panel._on_generate()
-    img_id = panel._input_image_job.prompt_id
-    panel._preview.clear = MagicMock()
-
-    client.job_completed.emit(img_id, SDXL_HISTORY)  # image done -> the video stage begins
-
-    assert panel._client_prompt_id is not None       # the video job is running
-    panel._preview.clear.assert_not_called()          # the input image frame is left up
-
-
 def test_plain_generate_clears_the_previous_result(qtbot, tmp_path):
     # A fresh, non-chained job still drops whatever the preview last showed.
     submit = MagicMock(return_value="x")
@@ -326,13 +244,13 @@ def test_plain_generate_clears_the_previous_result(qtbot, tmp_path):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     panel._preview.clear = MagicMock()
 
-    panel._on_generate()
+    _submit(panel)
 
     panel._preview.clear.assert_called_once()
 
 
 def test_completion_only_handled_for_own_prompt_id(panel):
-    panel._on_generate()
+    _submit(panel)
     our_id = panel._client_prompt_id
 
     # A sibling panel's job completing must not touch this panel.
@@ -351,7 +269,7 @@ def test_completion_only_handled_for_own_prompt_id(panel):
 
 
 def test_progress_only_moves_for_own_prompt_id(panel):
-    panel._on_generate()
+    _submit(panel)
     panel._client.progress.emit("comfy-OTHER", 5, 10)
     assert panel._progress.property("barState") == "queued"  # foreign progress ignored
     panel._client.progress.emit(panel._client_prompt_id, 5, 10)
@@ -364,7 +282,7 @@ def test_progress_bar_accumulates_across_sampler_stages(panel):
     # than fill, snap back to 0, and fill again.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_t2i"))
     panel._param_form.set_values({"steps": 20})
-    panel._on_generate()
+    _submit(panel)
 
     pid = panel._client_prompt_id
     panel._client.progress.emit(pid, 10, 10)   # first pass ends (10 of 20)
@@ -382,13 +300,13 @@ def test_bar_stays_queued_until_comfyui_starts_our_prompt(panel):
     # ComfyUI may be busy with a prompt submitted outside Origenerator, so ours
     # can sit in the server's queue before it starts. Until then the bar reads
     # "queued", not a stuck "Generating… 0%".
-    panel._on_generate()
+    _submit(panel)
     assert panel._progress.property("barState") == "queued"
     assert "queued" in panel._progress.format().lower()
 
 
 def test_bar_flips_to_running_when_comfyui_starts_our_prompt(panel):
-    panel._on_generate()
+    _submit(panel)
     panel._client.node_executing.emit(panel._client_prompt_id, "5")  # ComfyUI begins our prompt
     assert panel._progress.property("barState") == "running"
     assert "generating" in panel._progress.format().lower()
@@ -397,13 +315,13 @@ def test_bar_flips_to_running_when_comfyui_starts_our_prompt(panel):
 def test_foreign_prompt_starting_leaves_our_bar_queued(panel):
     # If a sibling job (or outside work) starting flipped us to "running", we'd be
     # back to a bar that claims it's generating while still stuck in the queue.
-    panel._on_generate()
+    _submit(panel)
     panel._client.node_executing.emit("comfy-OTHER", "5")
     assert panel._progress.property("barState") == "queued"
 
 
 def test_error_marks_row_for_own_id_only(panel):
-    panel._on_generate()
+    _submit(panel)
     our_id = panel._client_prompt_id
 
     panel._client.job_error.emit("comfy-OTHER", "boom")
@@ -415,7 +333,7 @@ def test_error_marks_row_for_own_id_only(panel):
 
 
 def test_completion_uses_workflow_captured_at_submit(panel):
-    panel._on_generate()  # submitted with the default workflow, sdxl_t2i
+    _submit(panel)  # submitted with the default workflow, sdxl_t2i
     our_id = panel._client_prompt_id
     # User switches the workflow combo while the job is still running.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
@@ -461,7 +379,7 @@ def test_restore_config_pins_concrete_seed_when_not_random(panel):
 
 
 def test_teardown_stops_handling_signals(panel):
-    panel._on_generate()
+    _submit(panel)
     our_id = panel._client_prompt_id
     panel.teardown()
     panel._client.job_completed.emit(our_id, SDXL_HISTORY)
@@ -487,7 +405,7 @@ def test_generate_submits_when_input_image_present(qtbot, tmp_path):
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     panel._param_form.set_values({"input_image": "start.png"})
-    panel._on_generate()
+    _submit(panel)
     client.submit_job.assert_called_once()
 
 
@@ -499,7 +417,7 @@ def test_i2v_generate_derives_size_in_payload_and_stores_none(qtbot, tmp_path):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     panel._param_form.set_values({"input_image": "start.png"})
 
-    panel._on_generate()
+    _submit(panel)
 
     payload = client.submit_job.call_args[0][0]
     # Size is derived in-graph (scale-to-budget + get-size), not hardcoded...
@@ -525,7 +443,7 @@ def test_reused_lora_survives_to_the_generated_payload(qtbot, tmp_path):
         "lora_high": "custom-high.safetensors",
         "lora_low": "custom-low.safetensors",
     })
-    panel._on_generate()
+    _submit(panel)
 
     payload = client.submit_job.call_args[0][0]
     loras = {
@@ -624,7 +542,7 @@ def test_on_completed_status_shows_actual_time(qtbot):
 
 def test_active_prompt_id_reports_in_flight_then_clears(panel):
     assert panel.active_prompt_id() is None
-    panel._on_generate()
+    _submit(panel)
     assert panel.active_prompt_id() == panel._client_prompt_id
     panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
     assert panel.active_prompt_id() is None
@@ -722,7 +640,7 @@ def _queued_panel(qtbot, tmp_path):
 
 def test_generate_with_queue_defers_submission(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
-    panel._on_generate()
+    _submit(panel)
     assert queue.submitted == [(panel, "sdxl_t2i")]
     client.submit_job.assert_not_called()       # nothing reaches ComfyUI yet
     assert panel._db.list_generations() == []    # and nothing is recorded yet
@@ -732,44 +650,16 @@ def test_generate_with_queue_defers_submission(qtbot, tmp_path):
 
 def test_run_now_begins_the_prepared_job(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
-    panel._on_generate()
+    _submit(panel)
     panel.run_now()
     client.submit_job.assert_called_once()
     rows = panel._db.list_generations()
     assert len(rows) == 1 and rows[0]["status"] == "running"
 
 
-def test_beginning_a_job_emits_generation_started_with_its_prompt_id(qtbot, tmp_path):
-    # Starting a job announces its prompt id, so the gallery can jump to the folder
-    # its (now-inserted) running row belongs to and watch it there.
-    panel, client, queue = _queued_panel(qtbot, tmp_path)
-    started = []
-    panel.generation_started.connect(started.append)
-
-    panel._on_generate()
-    panel.run_now()
-
-    assert started == [panel.active_prompt_id()]  # the running row's id
-    assert panel._db.get_generation(started[0])["status"] == "running"
-
-
-def test_a_failed_submit_does_not_emit_generation_started(qtbot, tmp_path):
-    # If the submit itself throws, no generation actually started, so the signal
-    # must not fire — the row is marked error, not navigated to.
-    panel, client, queue = _queued_panel(qtbot, tmp_path)
-    client.submit_job.side_effect = RuntimeError("boom")
-    started = []
-    panel.generation_started.connect(started.append)
-
-    panel._on_generate()
-    panel.run_now()
-
-    assert started == []
-
-
 def test_completion_releases_queue_slot(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
-    panel._on_generate()
+    _submit(panel)
     panel.run_now()
     panel._on_completed(panel._client_prompt_id, SDXL_HISTORY)
     assert queue.released == [panel]
@@ -814,7 +704,7 @@ def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel):
 # ---- live preview ----
 
 def test_preview_frame_shown_only_for_own_job(panel):
-    panel._on_generate()
+    _submit(panel)
     panel._preview.show_frame = MagicMock()
 
     panel._client.preview_image.emit("comfy-OTHER", b"x")
@@ -828,14 +718,14 @@ def test_preview_frame_shown_only_for_own_job(panel):
 
 def test_cancel_disabled_until_a_job_starts(panel):
     assert panel._cancel_btn.isEnabled() is False
-    panel._on_generate()
+    _submit(panel)
     assert panel._cancel_btn.isEnabled() is True
 
 
 def test_cancel_running_job_interrupts_and_removes_row(panel):
     panel._client.interrupt = MagicMock()
     panel._client.cancel_prompt = MagicMock()
-    panel._on_generate()
+    _submit(panel)
     our_id = panel._client_prompt_id
     panel._client.node_executing.emit(our_id, "5")  # our job is now executing
 
@@ -851,7 +741,7 @@ def test_cancel_running_job_interrupts_and_removes_row(panel):
 def test_cancel_submitted_but_unstarted_job_dequeues(panel):
     panel._client.interrupt = MagicMock()
     panel._client.cancel_prompt = MagicMock()
-    panel._on_generate()  # submitted to ComfyUI but no executing signal yet
+    _submit(panel)  # submitted to ComfyUI but no executing signal yet
     our_id = panel._client_prompt_id
 
     panel._on_cancel()
@@ -863,7 +753,7 @@ def test_cancel_submitted_but_unstarted_job_dequeues(panel):
 
 def test_cancel_while_queued_drops_the_queue_slot(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
-    panel._on_generate()  # queued in the JobQueue, not yet submitted
+    _submit(panel)  # queued in the JobQueue, not yet submitted
 
     panel._on_cancel()
 
@@ -875,7 +765,7 @@ def test_cancel_while_queued_drops_the_queue_slot(qtbot, tmp_path):
 
 def test_completed_job_cannot_be_canceled(panel):
     panel._client.interrupt = MagicMock()
-    panel._on_generate()
+    _submit(panel)
     panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
 
     panel._on_cancel()  # no in-flight job remains
@@ -886,7 +776,7 @@ def test_completed_job_cannot_be_canceled(panel):
 
 def test_cancel_colors_the_bar_yellow(panel):
     panel._client.cancel_prompt = MagicMock()
-    panel._on_generate()
+    _submit(panel)
     panel._on_cancel()
     assert panel._progress.property("barState") == "canceled"
 
@@ -899,7 +789,7 @@ def test_in_flight_descriptor_is_none_when_idle(panel):
 
 def test_in_flight_descriptor_reports_a_running_job_and_mirrors_its_frame(panel):
     panel._param_form.set_values({"positive_prompt": "a cat", "seed": 1})
-    panel._on_generate()  # no queue: submits at once, then waits on ComfyUI
+    _submit(panel)  # no queue: submits at once, then waits on ComfyUI
     desc = panel.in_flight_descriptor()
     assert desc["key"] == panel._client_prompt_id
     assert desc["status"] == "queued"        # submitted, ComfyUI hasn't begun it
@@ -912,7 +802,7 @@ def test_in_flight_descriptor_reports_a_running_job_and_mirrors_its_frame(panel)
 
 
 def test_in_flight_descriptor_clears_when_the_job_finishes(panel):
-    panel._on_generate()
+    _submit(panel)
     panel._client.job_completed.emit(panel._client_prompt_id, SDXL_HISTORY)
     assert panel.in_flight_descriptor() is None
 
@@ -930,8 +820,8 @@ def test_in_flight_descriptor_reports_a_tab_queued_behind_a_running_one(qtbot, t
     running._param_form.set_values({"seed": 1})
     waiting._param_form.set_values({"seed": 2})
 
-    running._on_generate()   # takes the single slot and runs
-    waiting._on_generate()   # sits in the local queue behind it, no DB row yet
+    _submit(running)   # takes the single slot and runs
+    _submit(waiting)   # sits in the local queue behind it, no DB row yet
 
     desc = waiting.in_flight_descriptor()
     assert desc["status"] == "queued"
@@ -1168,7 +1058,7 @@ def test_generating_hides_a_previously_shown_footer(saved_panel, monkeypatch):
     # Switch to an image workflow that needs no input, then run a real generation.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     panel._param_form.set_values({"seed": 999, "positive_prompt": "novel"})
-    panel._on_generate()
+    _submit(panel)
 
     assert panel._displayed_row is None
     assert panel._evolver_btn.isHidden()
@@ -1179,7 +1069,7 @@ def test_completion_makes_the_finished_row_the_displayed_one(saved_panel):
     panel, db = saved_panel
     panel._client.submit_job = MagicMock(return_value="x")
     panel._param_form.set_values({"seed": 7, "positive_prompt": "a fox"})
-    panel._on_generate()
+    _submit(panel)
     pid = panel._client_prompt_id
 
     panel._client.job_completed.emit(pid, SDXL_HISTORY)

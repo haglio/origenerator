@@ -116,10 +116,12 @@ class BrowserPane:
         self._v._sync_delete_button()
         self._v._record_location(RECENTS_KEY)  # so Back can return to the shelf
 
-    def _add_inflight_cards(self, flow, items):
-        """Lead ``flow`` with a live card per in-flight ``item`` and (re)build the
-        card lookups from them. Shared by the Recents shelf and a settings folder,
-        which both surface still-cooking work as cards ahead of finished tiles."""
+    def _render_recents(self):
+        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
+        then the finished thumbnails; a hint when there is neither."""
+        container, flow = self._new_tile_pane()
+        items = self._inflight_items()
+        self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
         for item in items:
@@ -128,14 +130,6 @@ class BrowserPane:
             flow.addWidget(card)
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item
-
-    def _render_recents(self):
-        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails; a hint when there is neither."""
-        container, flow = self._new_tile_pane()
-        items = self._inflight_items()
-        self._inflight_signature = _inflight_signature(items)
-        self._add_inflight_cards(flow, items)
         for row in self._recent_rows:
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
@@ -315,18 +309,15 @@ class BrowserPane:
         # its rows all share the one workflow, so the kind is decided once.
         i2v = bool(group.rows) and gallery.is_image_conditioned(group.rows[0].get("workflow_name"))
         # The re-roll tile leads the flow so it sits beside the newest item
-        # (thumbnails are sorted newest-first).
+        # (thumbnails are sorted newest-first). A generation running in this folder —
+        # a re-roll, which is also what a tab's Generate now is — is this tile: it
+        # shows the live frame, so the running row is left out of the static grid
+        # below rather than drawn as a broken, output-less thumbnail.
         if self._v._can_reroll(group):
             self._v._add_reroll_tile(flow, group)
-        # A generation still running in this folder (a tab's Generate that landed
-        # here) shows as a live card leading the grid, like the Recents shelf's — so
-        # its progress is visible right where it will finish. It's kept out of the
-        # static thumbnails below so it can't appear twice.
-        self._add_inflight_cards(flow, self._folder_inflight_items(group.key))
-        running_ids = set(self._inflight_cards)
         for row in group.rows:
-            if row["prompt_id"] in running_ids:
-                continue  # shown as the live card above, not also a static tile
+            if not gallery.produced_output(row):
+                continue  # still in flight — represented by the RerollTile, not a tile
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
@@ -342,23 +333,6 @@ class BrowserPane:
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         self.show_widget(container)
-
-    def _folder_inflight_items(self, folder_key: str) -> list:
-        """The in-flight generations to show as live cards in this settings folder:
-        every running/pending item whose settings folder is this one, minus the
-        re-roll already represented by the folder's RerollTile (so it isn't doubled).
-        """
-        reroll_job = self._v._reroll.jobs.get(folder_key)
-        reroll_pid = reroll_job.prompt_id if reroll_job is not None else None
-        image_index = gallery.build_image_config_index(self._v._image_rows)
-        items = []
-        for item in self._inflight_items():
-            if item.key == reroll_pid:
-                continue  # the RerollTile already shows this one
-            row = self._v._db.get_generation(item.key)
-            if row is not None and gallery.settings_folder_key(row, image_index) == folder_key:
-                items.append(item)
-        return items
 
     def _seed_reroll_actions(self, row) -> list:
         """The per-seed re-roll hover controls for an i2v item: always the video

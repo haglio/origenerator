@@ -44,7 +44,7 @@ class InfoPaneTabs(QTabWidget):
     """A strip of editable config tabs, all sharing one run queue."""
 
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
-    generation_started = pyqtSignal(str)  # any tab began a job (its running row's prompt_id)
+    generate_requested = pyqtSignal(str, dict)  # any tab's Generate: (workflow_name, params)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -93,7 +93,7 @@ class InfoPaneTabs(QTabWidget):
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
-        panel.generation_started.connect(self.generation_started)  # relay every tab's job start
+        panel.generate_requested.connect(self.generate_requested)  # relay every tab's Generate
         panel.strip_activated.connect(self._on_strip_activated)
         self.setCurrentIndex(index)
         self.tab_added.emit(panel)  # let the view wire its source/animation links
@@ -201,6 +201,17 @@ class InfoPaneTabs(QTabWidget):
             target = self._add_subtab()
         target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
+
+    def show_result_in_current_tab(self, row: dict, image_rows: list[dict]):
+        """Load a just-finished generation into the front tab, replacing its live
+        preview with the saved output and footer.
+
+        The tab in front is the one whose Generate launched this re-roll, so its
+        result lands right there — it ends showing the finished image/video, not the
+        idle placeholder. A no-op if every tab has been closed."""
+        panel = self.current_config_panel()
+        if panel is not None:
+            panel.show_saved_generation(row, image_rows)
 
     def show_selection_preview(self, preview):
         """Point the current tab's preview at ``preview`` (a resolved

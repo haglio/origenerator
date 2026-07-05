@@ -147,9 +147,6 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
-        # A tab's Generate into a brand-new (edited-params) folder likewise has no
-        # node until that row finishes; hold its key so a rebuild drills in then.
-        self._pending_generate_key: str | None = None
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
@@ -315,9 +312,9 @@ class GalleryView(QWidget):
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
-        # A tab's Generate lands its running row in a settings folder: jump the
-        # browser there and show the generation as a live card in it.
-        self._info_tabs.generation_started.connect(self._on_generation_started)
+        # A tab's Generate is a re-roll of its settings folder: launch it in that
+        # folder's own re-roll slot and navigate there, live tile and all.
+        self._info_tabs.generate_requested.connect(self._on_generate_requested)
         self._panes.addWidget(self._info_tabs)
         # The config tabs feed the Recents shelf and bottom bar their in-flight
         # Generate cards, and name the running ids the re-roll reconnection must
@@ -369,27 +366,42 @@ class GalleryView(QWidget):
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
 
-    def _on_generation_started(self, prompt_id: str):
-        """A tab's Generate just inserted a running row: rebuild, then open that
-        generation's settings folder — where ``browser_pane`` shows the run as a
-        live card. No thumbnail is selected; the folder simply becomes the view.
+    def _on_generate_requested(self, workflow_name: str, params: dict):
+        """A tab's Generate: launch it as a re-roll of its settings folder and land
+        the browser there, its live tile showing the run.
 
-        An existing folder (its node built from earlier results) is opened at once.
-        A brand-new folder from edited params has no node yet — a running row alone
-        never enters the results tree — so its key is held until the finished row
-        gives it a node, then the view drills in (like a combine's new folder)."""
-        self.refresh()
-        row = self._db.get_generation(prompt_id)
-        if row is None:
+        Identical in outcome to clicking the folder's re-roll "+": the job runs in
+        that folder's single re-roll slot (its :class:`RerollTile` shows the live
+        frame), so an edited config's brand-new folder appears and is navigated to
+        at once — the running row it inserts gives the folder a tree node
+        immediately (see :func:`build_gallery_tree`). Missing form params are filled
+        from the workflow's defaults, exactly as the old Generate did. A no-op
+        without a client, an unknown workflow, or a folder already generating.
+        """
+        wf = WORKFLOW_REGISTRY.get(workflow_name)
+        if self._client is None or wf is None:
             return
+        params = {**wf.default_params(), **params}  # form values win over defaults
         key = gallery.settings_folder_key(
-            row, gallery.build_image_config_index(self._image_rows)
+            {"workflow_name": workflow_name, "params_json": json.dumps(params)},
+            gallery.build_image_config_index(self._image_rows),
         )
+        if not self._reroll.start_prepared(key, wf, params):
+            return  # no client, or this folder already has a re-roll running
+        self._navigate_to_reroll(key)
+
+    def _navigate_to_reroll(self, key: str):
+        """Open the folder a just-started re-roll runs in and select its live tile.
+
+        The re-roll inserts a running row, so a rebuild gives even a brand-new
+        folder a node (:func:`build_gallery_tree` includes in-flight rows); this
+        rebuilds, then drills into that folder and points the info pane at the tile.
+        """
+        self.refresh()
         item = self._item_by_key.get(key)
         if item is not None:
-            self._tree.setCurrentItem(item)  # existing folder: land in it, live card shows there
-        else:
-            self._pending_generate_key = key  # brand-new: drill in once its row finishes
+            self._tree.setCurrentItem(item)
+            self._select_reroll(key)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -449,12 +461,7 @@ class GalleryView(QWidget):
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()))
         self._clear_metadata()
-        # A tab's Generate into a brand-new folder waits here for its finished row to
-        # give the folder a node, then lands the user in it (a poll rebuild resolves
-        # this the moment the generation completes). It wins over restoring the prior
-        # selection, since the user's fresh generation is what they want to see.
-        pending_generate = self._resolve_pending_generate_key()
-        target = pending_generate or self._item_by_key.get(selected_key) or self._tree_view.default_item()
+        target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
         self._suppress_history = True
@@ -477,17 +484,6 @@ class GalleryView(QWidget):
             if location is not None:
                 self._record_visit(location)
         self._update_running_bar()
-
-    def _resolve_pending_generate_key(self):
-        """The tree item for a pending brand-new generate folder, once its finished
-        row has given it a node — clearing the pending key so the drill happens once.
-        ``None`` while no generate is pending or its folder still has no node."""
-        if self._pending_generate_key is None:
-            return None
-        item = self._item_by_key.get(self._pending_generate_key)
-        if item is not None:
-            self._pending_generate_key = None
-        return item
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -1033,10 +1029,12 @@ class GalleryView(QWidget):
 
     def _on_reroll_finished(self, key: str):
         """A re-roll saved its result (finalized by the controller): drop it as the
-        info-pane source and rebuild so it shows as a normal thumbnail."""
+        info-pane source, rebuild so it shows as a normal thumbnail, and load it into
+        the front tab so a Generate ends on its finished output, not the placeholder."""
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
+        self._show_reroll_result_in_tab(key)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
@@ -1052,6 +1050,18 @@ class GalleryView(QWidget):
             if item is not None:
                 self._tree.setCurrentItem(item)
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
+
+    def _show_reroll_result_in_tab(self, key: str):
+        """After a re-roll finishes, load its result into the front config tab.
+
+        The just-finished generation is the folder's newest row (highest id); the
+        rebuild has already given the folder its node. Loading it leaves the tab
+        showing the finished image/video and its footer — the completed end-state of
+        a Generate — instead of the live-frame placeholder it held while running."""
+        item = self._item_by_key.get(key)
+        group = item.data(0, _GROUP_ROLE) if item is not None else None
+        if isinstance(group, gallery.SettingsGroup) and group.rows:
+            self._info_tabs.show_result_in_current_tab(group.rows[0], self._image_rows)
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if

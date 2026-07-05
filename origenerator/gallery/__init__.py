@@ -39,6 +39,7 @@ from origenerator.gallery.output import (
     media_type_of_row,
     output_disk_files,
     output_file_reference,
+    produced_output,
     resolve_preview,
     row_output_files,
 )

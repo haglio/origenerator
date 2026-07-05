@@ -42,7 +42,7 @@ from origenerator.gallery.labels import (
     settings_label,
     workflow_label,
 )
-from origenerator.gallery.output import media_type_of_row, produced_output
+from origenerator.gallery.output import is_in_progress, media_type_of_row, produced_output
 from origenerator.gallery.signatures import (
     _input_image_config,
     is_image_conditioned,
@@ -336,18 +336,23 @@ def build_gallery_tree(
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
     it to a single "(no LoRA)" folder. The source-image level appears only in the
     Videos tree (a still an image-conditioned workflow output is grouped like any
-    other image). Rows that produced no output file (failed or unfinished
-    generations) are dropped first, so the tree holds only results
-    worth showing. Folders appear
-    in the order their first member appears in ``rows`` (the caller orders rows
-    newest-first); a star never moves a folder — bookmarks are gathered by
-    :func:`starred_folders` instead. ``folder_meta`` (keyed by each folder's
-    stable ``key``) overrides the default label and supplies the star state.
+    other image). A row is included once it has something to place: it either
+    :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
+    running/pending generation whose folder must appear at once, its live tile
+    standing in until its output lands). A terminal file-less row — a failed
+    generation — is dropped. Folders appear in the order their first member
+    appears in ``rows`` (the caller orders rows newest-first); a star never moves
+    a folder — bookmarks are gathered by :func:`starred_folders` instead.
+    ``folder_meta`` (keyed by each folder's stable ``key``) overrides the default
+    label and supplies the star state.
     """
     folder_meta = folder_meta or {}
-    rows = [row for row in rows if produced_output(row)]
+    rows = [row for row in rows if produced_output(row) or is_in_progress(row)]
+    # Only finished images have a file to condition an i2v's frame on, so the
+    # index that keys image-conditioned folders is built from those alone.
     image_index = build_image_config_index(
-        [row for row in rows if media_type_of_row(row) == "image"]
+        [row for row in rows
+         if media_type_of_row(row) == "image" and produced_output(row)]
     )
     tree = []
     for media_type, media_rows in _group_ordered(rows, media_type_of_row):

@@ -201,25 +201,26 @@ def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
     assert effective_min_width <= 704
 
 
-def test_generate_inflight_shows_on_recents_and_reveals_its_tab(qtbot, tmp_path):
-    # The gallery's Recents shelf shows a running config-tab job, and clicking its
-    # card selects that job's config tab in the info pane.
+def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_path):
+    # A tab's Generate launches a re-roll of its settings folder; that in-flight
+    # generation shows as a card on Recents, and clicking the card opens the folder
+    # it runs in (where its live tile shows), just like any re-roll's card.
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
     tabs = gv._info_tabs
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
-    first = tabs._add_subtab()         # a config tab runs a job
-    first._on_generate()
-    pid = first.active_prompt_id()
-    tabs._add_subtab()                 # a second config tab is now current
-    assert tabs.currentWidget() is not first
+    tabs._client.fetch_history = lambda prompt_id: {}  # reconcile finds nothing done
+    panel = tabs.current_config_panel()
+    panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
+    panel._on_generate()               # emits generate_requested -> a folder re-roll
+    (folder_key,) = list(gv._reroll_jobs)
+    pid = gv._reroll_jobs[folder_key].prompt_id
 
-    gv.refresh()                       # the gallery reads the config tabs' in-flight jobs
     gv._tree.setCurrentItem(gv._recents_item)
-    assert pid in gv._inflight_cards   # the job shows as an in-flight card
+    assert pid in gv._inflight_cards   # the running generation shows as a card
 
     gv._on_inflight_clicked(pid)       # click that card
-    assert tabs.currentWidget() is first   # reveal selected the generating config tab
+    assert gv._selected_folder_key() == folder_key  # reveal opened the re-roll's folder
 
 
 def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):

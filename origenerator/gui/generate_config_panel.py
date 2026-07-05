@@ -24,6 +24,7 @@ from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, merge_denormalized,
     prepared_params, randomize_seeds,
 )
+from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.generation_job import GenerationJob, persist_generation
 from origenerator.gui.no_wheel import NoWheelComboBox
@@ -67,6 +68,7 @@ class GenerateConfigPanel(QWidget):
     source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
     animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
+    osr2_drive_toggled = pyqtSignal(bool)   # "Drive OSR2" turned on/off for the shown video
 
     def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
                  parent=None):
@@ -172,6 +174,16 @@ class GenerateConfigPanel(QWidget):
         self._evolver_btn.clicked.connect(self._on_send_to_evolver)
         self._evolver_btn.hide()  # shown only for a video the tab is displaying
         main_box.addWidget(self._evolver_btn)
+
+        # Drive the OSR2 from this video's funscript, in sync with playback. Checkable
+        # and shown only for a displayed video that has a funscript; toggling it is the
+        # explicit opt-in that hands the device to (or releases it from) this tab.
+        self._osr2_btn = QPushButton("Drive OSR2")
+        self._osr2_btn.setCheckable(True)
+        self._osr2_btn.setToolTip("Drive the OSR2 in sync with this video's funscript.")
+        self._osr2_btn.toggled.connect(self._on_osr2_toggled)
+        self._osr2_btn.hide()
+        main_box.addWidget(self._osr2_btn)
 
         self._panes.addWidget(main)
 
@@ -852,6 +864,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._source_link.hide()
         self._update_evolver_button(preview)
+        self._update_osr2_button(preview)
 
     def _hide_footer(self):
         """Drop the saved-generation footer — a blank or generating tab shows none."""
@@ -859,6 +872,9 @@ class GenerateConfigPanel(QWidget):
         self._animated_strip.show_videos([])
         self._source_link.hide()
         self._evolver_btn.hide()
+        if self._osr2_btn.isChecked():
+            self._osr2_btn.setChecked(False)  # a fresh job ends any drive (emits off)
+        self._osr2_btn.hide()
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image
@@ -896,16 +912,57 @@ class GenerateConfigPanel(QWidget):
         self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
         self._evolver_btn.setEnabled(not already_sent)
 
-    def _exportable_video_path(self) -> Path | None:
+    def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
-        when it isn't a video (or its file is missing). Resolved fresh at send
-        time, so a file deleted since selection is caught."""
+        when it isn't a video (or its file is missing). Resolved fresh, so a file
+        deleted since selection is caught. Shared by Send-to-Evolver and OSR2 drive."""
         if not self._displayed_row:
             return None
         preview = resolve_preview(self._displayed_row, COMFYUI_OUTPUT_DIR)
         if preview is None or preview[1] != "video":
             return None
         return preview[0]
+
+    # --- Drive OSR2: stream this video's funscript to the device ---------------
+
+    def _update_osr2_button(self, preview):
+        """Show "Drive OSR2" only for a displayed video that has a funscript.
+
+        Any change of the displayed media first ends a drive in progress — unchecking
+        emits ``osr2_drive_toggled(False)`` so the view stops and parks the device —
+        so enabling is always a fresh, explicit opt-in for the video now on screen."""
+        scripted = (
+            preview is not None and preview[1] == "video"
+            and funscript_path_for(preview[0]).exists()
+        )
+        if self._osr2_btn.isChecked():
+            self._osr2_btn.setChecked(False)
+        self._osr2_btn.setVisible(scripted)
+
+    def _on_osr2_toggled(self, checked: bool):
+        self._osr2_btn.setText("Driving OSR2 — click to stop" if checked else "Drive OSR2")
+        self.osr2_drive_toggled.emit(checked)
+
+    def stop_osr2_drive(self):
+        """Turn Drive OSR2 off if it's on — the off-toggle stops and parks the device.
+
+        Called when the tab is left, so only the front tab's video ever drives."""
+        if self._osr2_btn.isChecked():
+            self._osr2_btn.setChecked(False)
+
+    def osr2_drive_target(self):
+        """``(player, actions)`` to drive the OSR2 from the shown video, or ``None``.
+
+        The view calls this when the tab enables driving: the media player to follow
+        and the funscript actions beside the video. ``None`` if the video or its
+        script has gone since it was shown."""
+        path = self._displayed_video_path()
+        if path is None:
+            return None
+        actions = read_actions(funscript_path_for(path))
+        if not actions:
+            return None
+        return self._preview.player(), actions
 
     def _on_send_to_evolver(self):
         """Copy the displayed video into Evolver's inbox and remember the send.
@@ -915,7 +972,7 @@ class GenerateConfigPanel(QWidget):
         other visible result here, so a failure must surface loudly."""
         if not self._displayed_row or self._displayed_row.get("evolver_exported_at"):
             return
-        path = self._exportable_video_path()
+        path = self._displayed_video_path()
         if path is None:
             return
         try:

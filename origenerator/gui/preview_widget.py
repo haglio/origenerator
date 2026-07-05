@@ -144,6 +144,17 @@ class PreviewWidget(QWidget):
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video
 
+    def player(self) -> QMediaPlayer:
+        """The underlying media player — the OSR2 driver follows its position."""
+        return self._player
+
+    def current_video_path(self):
+        """The on-disk video currently shown, or ``None`` for an image/placeholder/
+        live frame — what a funscript lookup and device driving key off."""
+        if self._media is not None and self._media[1] == "video":
+            return self._media[0]
+        return None
+
     def mouseDoubleClickEvent(self, event) -> None:
         # Open fullscreen, or — when this preview can't (it opted out, e.g. the
         # fullscreen view's own inner preview) — run the double-click callback, so a

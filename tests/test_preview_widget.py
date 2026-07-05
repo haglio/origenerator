@@ -50,6 +50,21 @@ def test_preview_starts_with_placeholder(make_preview):
     assert w._image_label.pixmap().isNull()
 
 
+def test_player_accessor_exposes_the_media_player(make_preview):
+    w = make_preview()
+    assert w.player() is w._player
+
+
+def test_current_video_path_is_the_shown_video_else_none(make_preview, tmp_path):
+    w = make_preview()
+    assert w.current_video_path() is None  # placeholder
+    vid = tmp_path / "clip.mp4"
+    w.show_video(vid)
+    assert w.current_video_path() == vid
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w.current_video_path() is None  # an image isn't a video
+
+
 def test_show_image_displays_scaled_pixmap(make_preview, tmp_path):
     w = make_preview()
     w._image_label.resize(200, 150)

@@ -951,6 +951,80 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
     assert not panel._evolver_btn.isHidden()  # still a sendable video
 
 
+def _script_beside(video_path):
+    from origenerator.funscript import (
+        funscript_path_for, synthesize_actions, write_funscript,
+    )
+    actions = synthesize_actions(2.0, hz=1.0, loop=False)
+    write_funscript(funscript_path_for(video_path), actions)
+    return actions
+
+
+def test_a_scripted_video_reveals_the_drive_osr2_button(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")
+    _script_beside(vpath)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+
+    panel.show_saved_generation(video, [])
+    assert not panel._osr2_btn.isHidden()
+
+
+def test_a_video_without_a_funscript_hides_the_drive_osr2_button(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")  # no .funscript beside it
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+
+    panel.show_saved_generation(video, [])
+    assert panel._osr2_btn.isHidden()
+
+
+def test_enabling_drive_osr2_emits_the_toggle_and_exposes_player_and_actions(
+    saved_panel, monkeypatch, tmp_path
+):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")
+    actions = _script_beside(vpath)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    panel.show_saved_generation(video, [])
+
+    events = []
+    panel.osr2_drive_toggled.connect(events.append)
+    panel._osr2_btn.setChecked(True)
+
+    assert events == [True]
+    player, target_actions = panel.osr2_drive_target()
+    assert player is panel._preview.player()
+    assert target_actions == actions
+
+
+def test_switching_away_from_a_driving_video_stops_the_drive(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")
+    _script_beside(vpath)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    panel.show_saved_generation(video, [])
+    panel._osr2_btn.setChecked(True)
+
+    events = []
+    panel.osr2_drive_toggled.connect(events.append)
+    image = _image_row(db, "img1", filename="i.png")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
+    monkeypatch.setattr(gcp_module, "animated_preview_path", lambda r, o, t: None)
+    panel.show_saved_generation(image, [image])
+
+    assert events == [False]  # loading other media ended the drive
+    assert panel._osr2_btn.isHidden()
+
+
 def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch):
     panel, db = saved_panel
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")

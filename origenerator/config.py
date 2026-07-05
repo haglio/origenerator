@@ -31,6 +31,17 @@ THUMB_SIZE = (256, 256)
 # at this cadence (full strokes per second), phased to the clip's duration/loop.
 STROKE_DEFAULT_HZ = 1.2
 
+# The osr2_broker sibling bridges to the OSR2 device (COM4) and forwards raw
+# T-code sent to this UDP port straight to the device (osr2_broker/session.py).
+# origenerator drives the device by streaming T-code here in sync with a playing
+# video. While it drives, it pauses genau auto-mode by writing "0" to the broker's
+# shared enabled-flag file (and restores the prior value after). All harmless
+# no-ops when the broker isn't running.
+OSR2_BROKER_HOST = "127.0.0.1"
+OSR2_TCODE_UDP_PORT = 50557
+OSR2_STATE_DIR = Path("C:/path/to/suite-root/projects/fun_time/state")
+OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / "genau_enabled.txt"
+
 # --- Voice command → prompt edit ------------------------------------------
 # While a folder auto-generates, the mic listens (always-on); each spoken
 # instruction is transcribed locally (faster-whisper, CPU) and a local LLM

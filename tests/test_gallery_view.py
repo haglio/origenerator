@@ -3666,3 +3666,45 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
 
     tw.drag_ended.emit()
     assert view._combine.video_slot._label.property("dragActive") is False
+
+
+# --- Drive OSR2: one device, following the front tab ------------------------
+
+class _FakeDriver:
+    def __init__(self):
+        self.started = []
+        self.stopped = 0
+
+    def start(self, player, actions):
+        self.started.append((player, actions))
+
+    def stop(self):
+        self.stopped += 1
+
+
+def test_enabling_drive_osr2_starts_the_driver_and_leaving_the_tab_stops_it(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    driver = _FakeDriver()
+    view._osr2_driver = driver
+    panel = view._info_tabs.current_config_panel()
+    panel.osr2_drive_target = lambda: ("the-player", "the-actions")
+
+    panel._osr2_btn.setChecked(True)  # user turns driving on
+    assert driver.started == [("the-player", "the-actions")]
+
+    view._info_tabs._add_subtab()  # move to another tab — the device is handed back
+    assert driver.stopped == 1
+    assert not panel._osr2_btn.isChecked()
+
+
+def test_enabling_drive_with_no_target_does_not_start(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    driver = _FakeDriver()
+    view._osr2_driver = driver
+    panel = view._info_tabs.current_config_panel()
+    panel.osr2_drive_target = lambda: None  # script vanished between show and enable
+
+    panel.osr2_drive_toggled.emit(True)
+    assert driver.started == []

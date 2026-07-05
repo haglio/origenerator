@@ -31,6 +31,7 @@ from origenerator.gui.reroll_prompt import (
 )
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
@@ -312,6 +313,17 @@ class GalleryView(QWidget):
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
+        # One OSR2 driver for the whole view: a tab's "Drive OSR2" hands it that
+        # video's player + funscript, and leaving the tab hands the device back, so
+        # only the front video ever drives.
+        self._osr2_driver = Osr2Driver(parent=self)
+        self._osr2_panel = None  # the tab currently driving, if any
+        self._info_tabs.currentChanged.connect(self._on_info_tab_changed)
+        # Quitting mid-drive still releases the device — park it and restore genau —
+        # so a closed app doesn't leave the OSR2 held and genau silently disabled.
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self._osr2_driver.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
@@ -362,9 +374,30 @@ class GalleryView(QWidget):
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source
-        link. Called for the initial tab and every tab forked afterward."""
+        link, and its "Drive OSR2" toggle drives the shared device. Called for the
+        initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
+        panel.osr2_drive_toggled.connect(
+            lambda on, p=panel: self._on_osr2_drive_toggled(p, on)
+        )
+
+    def _on_osr2_drive_toggled(self, panel, on: bool):
+        """Start or stop driving the OSR2 from ``panel``'s displayed video."""
+        if on:
+            target = panel.osr2_drive_target()
+            if target is None:
+                return  # the video or its script vanished — nothing to drive
+            self._osr2_driver.start(*target)
+            self._osr2_panel = panel
+        else:
+            self._osr2_driver.stop()
+            self._osr2_panel = None
+
+    def _on_info_tab_changed(self, _index):
+        """Leaving a driving tab parks the device — only the front video drives."""
+        if self._osr2_panel is not None:
+            self._osr2_panel.stop_osr2_drive()  # unchecks → _on_osr2_drive_toggled(off)
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a

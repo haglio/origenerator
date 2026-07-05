@@ -209,36 +209,52 @@ class InfoPaneTabs(QTabWidget):
         ]
         return {"tabs": tabs, "current": self.currentIndex()}
 
-    def active_prompt_ids(self) -> set[str]:
-        """Every in-flight job id across the open config tabs.
+    def _inflight_panels(self) -> list[GenerateConfigPanel]:
+        """Every panel that can have a job in flight: the Inspect tab's embedded
+        generate panel plus the open config tabs. Distinct from
+        :meth:`_config_panels` (the closeable/capturable tabs, which excludes the
+        Inspect tab) — the Inspect tab can generate now, so its job must surface in
+        the Recents shelf and bottom bar and be named among the claimed ids too."""
+        return [self._inspect.config, *self._config_panels()]
 
-        Lets the gallery know which running rows a config tab already owns, so its
-        re-roll reconnection doesn't adopt a job a tab is already tracking.
+    def active_prompt_ids(self) -> set[str]:
+        """Every in-flight job id across the Inspect tab and the config tabs.
+
+        Lets the gallery know which running rows a tab already owns, so its re-roll
+        reconnection doesn't adopt a job a tab is already tracking.
         """
         ids = set()
-        for panel in self._config_panels():
+        for panel in self._inflight_panels():
             pid = panel.active_prompt_id()
             if pid:
                 ids.add(pid)
         return ids
 
     def in_flight_items(self) -> list[InFlightItem]:
-        """A card per in-flight config-tab job — running or waiting its turn in the
-        local queue — for the gallery's Recents shelf. Each carries a reveal that
-        brings its tab forward, so clicking the card lands on the panel running it.
+        """A card per in-flight job — running or waiting its turn in the local
+        queue — across the Inspect tab and the config tabs, for the gallery's
+        Recents shelf and bottom bar. Each carries a reveal that brings its tab
+        forward, so clicking the card lands on the panel running it.
         """
         items = []
-        for panel in self._config_panels():
+        for panel in self._inflight_panels():
             desc = panel.in_flight_descriptor()
             if desc is None:
                 continue
             items.append(InFlightItem(
                 key=desc["key"], caption=desc["caption"], status=desc["status"],
-                frame=desc["frame"], reveal=lambda p=panel: self.reveal_config(p),
+                frame=desc["frame"], reveal=self._reveal_for(panel),
                 media_type=desc["media_type"], progress=desc["progress"],
                 cancel=lambda p=panel: p._on_cancel(),
             ))
         return items
+
+    def _reveal_for(self, panel: GenerateConfigPanel):
+        """The reveal for an in-flight panel: tab 0 for the Inspect tab's embedded
+        panel (it isn't a tab of its own), else the config tab holding it."""
+        if panel is self._inspect.config:
+            return lambda: self.setCurrentIndex(0)
+        return lambda p=panel: self.reveal_config(p)
 
     def restore_state(self, state: dict):
         """Rebuild the config tabs from a :meth:`capture_state` snapshot.

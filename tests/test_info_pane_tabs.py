@@ -416,6 +416,43 @@ def test_revealing_an_item_selects_its_config_tab(tabs):
     assert tabs.currentWidget() is first  # reveal jumped to the generating tab
 
 
+# --- the Inspect tab can generate too, so its job is in-flight as well --------
+
+def test_inspect_tab_generation_surfaces_as_in_flight(tabs):
+    tabs._client.submit_job = MagicMock(return_value="x")
+    inspect_config = tabs.inspect_panel().config
+    inspect_config._on_generate()
+    items = tabs.in_flight_items()
+    assert len(items) == 1
+    assert items[0].key == inspect_config.active_prompt_id()
+    assert inspect_config.active_prompt_id() in tabs.active_prompt_ids()
+
+
+def test_revealing_the_inspect_tab_job_selects_tab_0(tabs):
+    tabs._client.submit_job = MagicMock(return_value="x")
+    tabs.inspect_panel().config._on_generate()
+    tabs._add_subtab()  # move onto a config tab
+    assert tabs.currentIndex() != 0
+    tabs.in_flight_items()[0].reveal()
+    assert tabs.currentIndex() == 0  # reveal brings the Inspect tab forward
+
+
+def test_inspect_tab_stays_out_of_capture_even_while_generating(tabs):
+    tabs._client.submit_job = MagicMock(return_value="x")
+    tabs.inspect_panel().config._on_generate()
+    assert tabs.capture_state()["tabs"] == []  # never captured as a config tab
+    assert tabs._config_panels() == []         # nor counted as one
+
+
+def test_inspect_and_config_generation_share_the_queue(tabs):
+    tabs._client.submit_job = MagicMock(return_value="x")
+    tabs.inspect_panel().config._on_generate()  # the Inspect tab runs first
+    config = tabs._add_subtab()
+    config._on_generate()                       # queued behind it
+    assert tabs._client.submit_job.call_count == 1
+    assert "queued" in config._progress.format().lower()
+
+
 def test_restore_state_rebuilds_config_tabs(tabs):
     tabs._add_subtab()  # a pre-existing config tab, to be replaced
     state = {"tabs": [

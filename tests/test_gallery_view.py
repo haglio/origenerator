@@ -3641,7 +3641,7 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
     assert view._combine.video_slot._label.property("dragActive") is False
 
 
-# --- Drive OSR2: one device, following the front tab ------------------------
+# --- Drive OSR2: one global toggle, following whatever video is in front ----
 
 class _FakeDriver:
     def __init__(self):
@@ -3655,29 +3655,56 @@ class _FakeDriver:
         self.stopped += 1
 
 
-def test_enabling_drive_osr2_starts_the_driver_and_leaving_the_tab_stops_it(qtbot):
+def _osr2_view(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
     driver = _FakeDriver()
     view._osr2_driver = driver
-    panel = view._info_tabs.current_config_panel()
-    panel.osr2_drive_target = lambda: ("the-player", "the-actions")
+    return view, driver, view._info_tabs.current_config_panel()
 
-    panel._osr2_btn.setChecked(True)  # user turns driving on
-    assert driver.started == [("the-player", "the-actions")]
 
-    view._info_tabs._add_subtab()  # move to another tab — the device is handed back
+def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+
+    view._osr2_btn.setChecked(True)  # the one global switch, on
+    assert driver.started == [("player-A", "actions-A")]
+
+    view._osr2_btn.setChecked(False)  # off
     assert driver.stopped == 1
-    assert not panel._osr2_btn.isChecked()
 
 
-def test_enabling_drive_with_no_target_does_not_start(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
-    qtbot.addWidget(view)
-    driver = _FakeDriver()
-    view._osr2_driver = driver
-    panel = view._info_tabs.current_config_panel()
-    panel.osr2_drive_target = lambda: None  # script vanished between show and enable
+def test_toggle_on_with_no_video_shown_drives_nothing(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
-    panel.osr2_drive_toggled.emit(True)
+    view._osr2_btn.setChecked(True)
     assert driver.started == []
+
+
+def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    assert driver.started[-1] == ("pA", "aA")
+
+    panel.osr2_drive_target = lambda: ("B.mp4", "pB", "aB")
+    panel.displayed_changed.emit()  # user browsed to another video in the same tab
+    assert driver.started[-1] == ("pB", "aB")  # re-aimed at B
+
+
+def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    assert driver.started
+
+    view._info_tabs._add_subtab()  # a fresh, blank tab comes to the front
+    assert driver.stopped >= 1
+
+
+def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
+    view, _driver, _panel = _osr2_view(qtbot)
+    assert view.osr2_enabled() is False
+    view.set_osr2_enabled(True)
+    assert view.osr2_enabled() is True and view._osr2_btn.isChecked()

@@ -416,30 +416,7 @@ def _script_beside(video_path):
     return actions
 
 
-def test_a_scripted_video_reveals_the_drive_osr2_button(saved_panel, monkeypatch, tmp_path):
-    panel, db = saved_panel
-    video = _video_row(db, "vid1", input_image="hand.png")
-    vpath = tmp_path / "vid1.mp4"
-    vpath.write_bytes(b"v")
-    _script_beside(vpath)
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
-
-    panel.show_saved_generation(video, [])
-    assert not panel._osr2_btn.isHidden()
-
-
-def test_a_video_without_a_funscript_hides_the_drive_osr2_button(saved_panel, monkeypatch, tmp_path):
-    panel, db = saved_panel
-    video = _video_row(db, "vid1", input_image="hand.png")
-    vpath = tmp_path / "vid1.mp4"
-    vpath.write_bytes(b"v")  # no .funscript beside it
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
-
-    panel.show_saved_generation(video, [])
-    assert panel._osr2_btn.isHidden()
-
-
-def test_enabling_drive_osr2_emits_the_toggle_and_exposes_player_and_actions(
+def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
     saved_panel, monkeypatch, tmp_path
 ):
     panel, db = saved_panel
@@ -450,35 +427,44 @@ def test_enabling_drive_osr2_emits_the_toggle_and_exposes_player_and_actions(
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
     panel.show_saved_generation(video, [])
 
-    events = []
-    panel.osr2_drive_toggled.connect(events.append)
-    panel._osr2_btn.setChecked(True)
-
-    assert events == [True]
-    player, target_actions = panel.osr2_drive_target()
-    assert player is panel._preview.player()
-    assert target_actions == actions
+    # The global driver (owned by the view) asks the front panel what to drive.
+    assert panel.osr2_drive_target() == (vpath, panel._preview.player(), actions)
 
 
-def test_switching_away_from_a_driving_video_stops_the_drive(saved_panel, monkeypatch, tmp_path):
+def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")  # no .funscript beside it
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    panel.show_saved_generation(video, [])
+
+    assert panel.osr2_drive_target() is None
+
+
+def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="i.png")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
+    monkeypatch.setattr(gcp_module, "animated_preview_path", lambda r, o, t: None)
+    panel.show_saved_generation(image, [image])
+
+    assert panel.osr2_drive_target() is None
+
+
+def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, tmp_path):
+    # The view reconciles the global driver whenever the front tab's video changes.
     panel, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
     _script_beside(vpath)
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    fired = []
+    panel.displayed_changed.connect(lambda: fired.append(True))
+
     panel.show_saved_generation(video, [])
-    panel._osr2_btn.setChecked(True)
-
-    events = []
-    panel.osr2_drive_toggled.connect(events.append)
-    image = _image_row(db, "img1", filename="i.png")
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
-    monkeypatch.setattr(gcp_module, "animated_preview_path", lambda r, o, t: None)
-    panel.show_saved_generation(image, [image])
-
-    assert events == [False]  # loading other media ended the drive
-    assert panel._osr2_btn.isHidden()
+    assert fired == [True]
 
 
 def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch):

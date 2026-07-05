@@ -71,6 +71,11 @@ def mic_icon() -> QIcon:
     return _two_mode(_draw_mic)
 
 
+def osr2_icon() -> QIcon:
+    """A vertical double-headed arrow — drive the OSR2 along its up/down stroke axis."""
+    return _two_mode(_draw_osr2)
+
+
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
 
@@ -255,6 +260,16 @@ def _draw_slideshow(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(21, 19), QPointF(21, 29), QPointF(30, 24))  # play triangle
+
+
+def _draw_osr2(painter: QPainter, color):
+    """A vertical double-headed arrow — the OSR2's up/down stroke axis."""
+    cx, top, bot = 24, 12, 36
+    painter.drawLine(QPointF(cx, top + 7), QPointF(cx, bot - 7))  # redacted
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawPolygon(QPointF(cx, top), QPointF(cx - 7, top + 9), QPointF(cx + 7, top + 9))
+    painter.drawPolygon(QPointF(cx, bot), QPointF(cx - 7, bot - 9), QPointF(cx + 7, bot - 9))
 
 
 def _draw_mic(painter: QPainter, color):

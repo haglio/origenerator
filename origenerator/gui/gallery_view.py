@@ -268,11 +268,20 @@ class GalleryView(QWidget):
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
         self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
+        # A single global switch: while it's on, whatever scripted video is in the
+        # front tab drives the OSR2. Always visible (it's app-wide), lit when on.
+        self._osr2_btn = self._tool_button(
+            icons.osr2_icon(), "Drive the OSR2 from the video open in the generate tab",
+            self._on_osr2_toggle, checkable=True,
+        )
+        self._osr2_btn.setStyleSheet(
+            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+        )
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
-                       self._slideshow_btn, self._auto_btn, self._delete_btn):
+                       self._slideshow_btn, self._auto_btn, self._osr2_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -305,15 +314,19 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db)
+        # One OSR2 driver for the whole view, steered by a single global toggle
+        # (self._osr2_btn). While it's on, the driver follows whatever scripted video
+        # is in the front tab; switching tabs or videos re-aims it, an image or blank
+        # front tab stops it. self._osr2_driving is the video currently driven (its
+        # identity), so a redundant reconcile doesn't churn the device. Built before
+        # the panels are wired, since wiring connects their displayed_changed here.
+        self._osr2_driver = Osr2Driver(parent=self)
+        self._osr2_enabled = False
+        self._osr2_driving = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
-        # One OSR2 driver for the whole view: a tab's "Drive OSR2" hands it that
-        # video's player + funscript, and leaving the tab hands the device back, so
-        # only the front video ever drives.
-        self._osr2_driver = Osr2Driver(parent=self)
-        self._osr2_panel = None  # the tab currently driving, if any
-        self._info_tabs.currentChanged.connect(self._on_info_tab_changed)
+        self._info_tabs.currentChanged.connect(lambda _index: self._reconcile_osr2())
         # Quitting mid-drive still releases the device — park it and restore genau —
         # so a closed app doesn't leave the OSR2 held and genau silently disabled.
         app = QApplication.instance()
@@ -363,31 +376,45 @@ class GalleryView(QWidget):
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
-        image" link and an animation-tile click both navigate like any source
-        link, and its "Drive OSR2" toggle drives the shared device. Called for the
-        initial tab and every tab forked afterward."""
+        image" link and an animation-tile click both navigate like any source link.
+        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video.
+        Called for the initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
-        panel.osr2_drive_toggled.connect(
-            lambda on, p=panel: self._on_osr2_drive_toggled(p, on)
-        )
+        panel.displayed_changed.connect(self._reconcile_osr2)
 
-    def _on_osr2_drive_toggled(self, panel, on: bool):
-        """Start or stop driving the OSR2 from ``panel``'s displayed video."""
-        if on:
-            target = panel.osr2_drive_target()
-            if target is None:
-                return  # the video or its script vanished — nothing to drive
-            self._osr2_driver.start(*target)
-            self._osr2_panel = panel
-        else:
-            self._osr2_driver.stop()
-            self._osr2_panel = None
+    # --- Drive OSR2: a single global toggle following the front video ----------
 
-    def _on_info_tab_changed(self, _index):
-        """Leaving a driving tab parks the device — only the front video drives."""
-        if self._osr2_panel is not None:
-            self._osr2_panel.stop_osr2_drive()  # unchecks → _on_osr2_drive_toggled(off)
+    def _on_osr2_toggle(self, on: bool):
+        self._osr2_enabled = on
+        self._reconcile_osr2()
+
+    def _reconcile_osr2(self):
+        """Point the one driver at the front tab's video when the toggle is on.
+
+        Idempotent: it (re)starts only when the driven video actually changes, and
+        stops when the toggle is off or the front tab isn't showing a scripted video —
+        so tab switches, browsing, and completions all resolve to the right video
+        without churning the device."""
+        panel = self._info_tabs.current_config_panel()
+        target = panel.osr2_drive_target() if (self._osr2_enabled and panel) else None
+        if target is None:
+            if self._osr2_driving is not None:
+                self._osr2_driver.stop()
+                self._osr2_driving = None
+            return
+        video_path, player, actions = target
+        if self._osr2_driving != video_path:
+            self._osr2_driver.start(player, actions)
+            self._osr2_driving = video_path
+
+    def osr2_enabled(self) -> bool:
+        """Whether the global OSR2 toggle is on (for session persistence)."""
+        return self._osr2_enabled
+
+    def set_osr2_enabled(self, enabled):
+        """Restore the global OSR2 toggle from a saved session."""
+        self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a

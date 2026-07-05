@@ -58,7 +58,7 @@ class GenerateConfigPanel(QWidget):
     source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
     animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
-    osr2_drive_toggled = pyqtSignal(bool)   # "Drive OSR2" turned on/off for the shown video
+    displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -152,16 +152,6 @@ class GenerateConfigPanel(QWidget):
         self._evolver_btn.clicked.connect(self._on_send_to_evolver)
         self._evolver_btn.hide()  # shown only for a video the tab is displaying
         main_box.addWidget(self._evolver_btn)
-
-        # Drive the OSR2 from this video's funscript, in sync with playback. Checkable
-        # and shown only for a displayed video that has a funscript; toggling it is the
-        # explicit opt-in that hands the device to (or releases it from) this tab.
-        self._osr2_btn = QPushButton("Drive OSR2")
-        self._osr2_btn.setCheckable(True)
-        self._osr2_btn.setToolTip("Drive the OSR2 in sync with this video's funscript.")
-        self._osr2_btn.toggled.connect(self._on_osr2_toggled)
-        self._osr2_btn.hide()
-        main_box.addWidget(self._osr2_btn)
 
         self._panes.addWidget(main)
 
@@ -384,6 +374,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview)
+        self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         """Populate and reveal the footer for the generation on display: the
@@ -398,7 +389,6 @@ class GenerateConfigPanel(QWidget):
         else:
             self._source_link.hide()
         self._update_evolver_button(preview)
-        self._update_osr2_button(preview)
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image
@@ -447,46 +437,22 @@ class GenerateConfigPanel(QWidget):
             return None
         return preview[0]
 
-    # --- Drive OSR2: stream this video's funscript to the device ---------------
-
-    def _update_osr2_button(self, preview):
-        """Show "Drive OSR2" only for a displayed video that has a funscript.
-
-        Any change of the displayed media first ends a drive in progress — unchecking
-        emits ``osr2_drive_toggled(False)`` so the view stops and parks the device —
-        so enabling is always a fresh, explicit opt-in for the video now on screen."""
-        scripted = (
-            preview is not None and preview[1] == "video"
-            and funscript_path_for(preview[0]).exists()
-        )
-        if self._osr2_btn.isChecked():
-            self._osr2_btn.setChecked(False)
-        self._osr2_btn.setVisible(scripted)
-
-    def _on_osr2_toggled(self, checked: bool):
-        self._osr2_btn.setText("Driving OSR2 — click to stop" if checked else "Drive OSR2")
-        self.osr2_drive_toggled.emit(checked)
-
-    def stop_osr2_drive(self):
-        """Turn Drive OSR2 off if it's on — the off-toggle stops and parks the device.
-
-        Called when the tab is left, so only the front tab's video ever drives."""
-        if self._osr2_btn.isChecked():
-            self._osr2_btn.setChecked(False)
+    # --- Drive OSR2: what the (global) driver should stream for this tab -------
 
     def osr2_drive_target(self):
-        """``(player, actions)`` to drive the OSR2 from the shown video, or ``None``.
+        """``(video_path, player, actions)`` for the shown video, or ``None``.
 
-        The view calls this when the tab enables driving: the media player to follow
-        and the funscript actions beside the video. ``None`` if the video or its
-        script has gone since it was shown."""
+        The view's single global driver asks the front tab for this whenever driving
+        is on and the shown video changes: the on-disk video (the drive identity), the
+        media player to follow, and the funscript actions beside it. ``None`` when the
+        tab isn't showing a video, or that video has no funscript."""
         path = self._displayed_video_path()
         if path is None:
             return None
         actions = read_actions(funscript_path_for(path))
         if not actions:
             return None
-        return self._preview.player(), actions
+        return path, self._preview.player(), actions
 
     def _on_send_to_evolver(self):
         """Copy the displayed video into Evolver's inbox and remember the send.

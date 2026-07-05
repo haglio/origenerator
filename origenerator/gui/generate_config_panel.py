@@ -14,8 +14,8 @@ from origenerator.completion import extract_completion
 from origenerator.db import Database
 from origenerator.gallery import (
     build_image_config_index, config_tab_title, media_type_of_row,
-    output_file_reference, settings_signature, source_image_id_for,
-    workflow_output_type,
+    output_file_reference, resolve_preview, rows_in_settings, settings_signature,
+    source_image_id_for, workflow_output_type,
 )
 from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
@@ -51,13 +51,14 @@ class GenerateConfigPanel(QWidget):
 
     def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
                  parent=None, *, preview: PreviewWidget | None = None,
-                 show_strip: bool = True):
+                 show_strip: bool = True, autoshow_recent: bool = True):
         super().__init__(parent)
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._queue = queue                          # serializes jobs across panels; None = run at once
         self._injected_preview = preview             # the Inspect tab shares the one info-pane preview; None = build our own
         self._show_strip = show_strip                # the Inspect tab has no per-tab strip (the gallery is its history)
+        self._autoshow_recent = autoshow_recent      # show the newest matching gen when idle; off for the Inspect tab (the controller drives its preview)
         self._client_prompt_id: str | None = None   # our uuid: the DB row key, and the id ComfyUI keys its signals on
         self._submitted_workflow = None              # workflow captured at submit time
         self._prepared: dict | None = None           # a job built but not yet started
@@ -204,6 +205,7 @@ class GenerateConfigPanel(QWidget):
             self._scroll.setWidget(self._param_form)
         self._refresh_estimate()
         self._emit_title()
+        self.show_recent_preview()  # these settings' newest result, not a blank pane
 
     def _emit_title(self):
         self.title_changed.emit(self.title())
@@ -688,6 +690,31 @@ class GenerateConfigPanel(QWidget):
         index = build_image_config_index(self._image_rows())
         return key, settings_signature(key, json.dumps(params), index)
 
+    def show_recent_preview(self):
+        """When idle, fill the preview with the newest saved generation matching
+        this tab's settings instead of the empty 'select a generation' placeholder
+        — the most recent image/video generated with it. A no-op for the Inspect
+        tab (its shared preview shows the browser selection, driven by the gallery's
+        controller) and while a job of this tab's owns the preview."""
+        if not self._autoshow_recent:
+            return
+        if (self._client_prompt_id is not None or self._prepared is not None
+                or self._input_image_job is not None):
+            return  # a job of this tab's is driving the preview
+        row = self._recent_matching_row()
+        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
+        if preview is not None:
+            self._preview.show_media(*preview)
+        else:
+            self._preview.clear()  # nothing generated with these settings yet
+
+    def _recent_matching_row(self) -> dict | None:
+        """The newest saved generation in this tab's settings folder, or None."""
+        rows = self._db.list_generations()  # newest first
+        index = build_image_config_index([r for r in rows if media_type_of_row(r) == "image"])
+        matching = rows_in_settings(rows, self.settings_key(), index)
+        return matching[0] if matching else None
+
     def seed_strip(self, prompt_ids):
         """Seed this tab's strip with a settings folder when it opens from one.
 
@@ -738,6 +765,9 @@ class GenerateConfigPanel(QWidget):
                 break
         if self._param_form:
             self._param_form.set_values(params)
+        # Now that the settings match a real folder, show its newest result (the
+        # workflow may not have changed above, so this doesn't ride on that signal).
+        self.show_recent_preview()
 
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.

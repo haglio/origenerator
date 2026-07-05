@@ -48,3 +48,10 @@ def test_the_forms_own_estimate_is_hidden(qtbot, tmp_path):
 def test_builds_for_a_read_only_gallery_with_no_client(qtbot, tmp_path):
     p = _panel(qtbot, tmp_path, client=False)
     assert p.config._generate_btn.isEnabled() is False  # inspect works, Generate is off
+
+
+def test_leaves_the_shared_preview_to_the_controller(qtbot, tmp_path):
+    # The controller drives the Inspect tab's preview from the browser selection,
+    # so the embedded form must not autoshow its own recent-match over it.
+    p = _panel(qtbot, tmp_path)
+    assert p.config._autoshow_recent is False

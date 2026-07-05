@@ -188,6 +188,25 @@ def _input_image_config(input_image: str | None, image_index: dict | None) -> st
     return entry.signature if entry is not None else name
 
 
+def rows_in_settings(rows, key, image_index=None):
+    """The rows (in the given order) whose settings match ``key`` — a
+    ``(workflow_name, signature)`` pair, as produced by pairing a workflow with
+    :func:`settings_signature`. ``image_index`` positions image rows for the
+    signature (see :func:`build_image_config_index`). Empty for a ``None`` key.
+
+    The shared predicate behind "everything in this settings folder" — the config
+    tabs' seeded history and a tab's most-recent-matching preview both read it.
+    """
+    if key is None:
+        return []
+    workflow_name, signature = key
+    return [
+        row for row in rows
+        if (row.get("workflow_name") or "") == workflow_name
+        and settings_signature(workflow_name, row.get("params_json"), image_index) == signature
+    ]
+
+
 def settings_signature(
     workflow_name: str | None,
     params_json: str | None,

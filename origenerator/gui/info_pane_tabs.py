@@ -26,7 +26,7 @@ from PyQt6.QtCore import Qt
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    build_image_config_index, media_type_of_row, settings_signature,
+    build_image_config_index, media_type_of_row, rows_in_settings, settings_signature,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
@@ -141,19 +141,11 @@ class InfoPaneTabs(QTabWidget):
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""
-        if key is None:
-            return []
-        workflow_name, signature = key
         rows = self._db.list_generations()  # newest first
         index = build_image_config_index(
             [r for r in rows if media_type_of_row(r) == "image"]
         )
-        return [
-            row["prompt_id"]
-            for row in rows
-            if (row.get("workflow_name") or "") == workflow_name
-            and settings_signature(workflow_name, row.get("params_json"), index) == signature
-        ]
+        return [row["prompt_id"] for row in rows_in_settings(rows, key, index)]
 
     def _on_strip_activated(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)

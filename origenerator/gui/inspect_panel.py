@@ -52,7 +52,8 @@ class InspectPanel(QWidget):
         # keeps no strip of its own. Its own estimate is hidden — the inspect
         # estimate above stands in — to avoid two "Typical time" lines.
         self.config = GenerateConfigPanel(
-            client, db, queue=queue, preview=self.preview, show_strip=False
+            client, db, queue=queue, preview=self.preview, show_strip=False,
+            autoshow_recent=False,  # the controller drives the shared preview from the selection
         )
         self.config._estimate_label.hide()
         box.addWidget(self.config, 2)

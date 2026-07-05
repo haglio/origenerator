@@ -47,6 +47,7 @@ from origenerator.gallery.signatures import (
     lora_signature,
     model_signature,
     parse_params,
+    rows_in_settings,
     settings_signature,
     workflow_output_type,
     workflow_param_order,

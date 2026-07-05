@@ -86,6 +86,60 @@ def test_can_suppress_the_history_strip(qtbot, tmp_path):
     assert p._panes.count() == 1          # just the form column, no strip pane
 
 
+# --- show the newest matching generation instead of the blank placeholder -----
+
+def _wiz_params():
+    return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
+
+
+def test_autoshow_recent_is_on_by_default(panel):
+    assert panel._autoshow_recent is True
+
+
+def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="wiz", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
+    )
+    db.insert_generation(  # a different prompt → a different settings folder
+        prompt_id="drg", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a dragon",
+        params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                                    positive_prompt="a dragon")),
+        workflow_json="{}",
+    )
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    panel.prefill("sdxl_t2i", _wiz_params())
+    assert panel._recent_matching_row()["prompt_id"] == "wiz"  # the dragon isn't in this folder
+
+
+def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
+    )
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    shown = []
+    monkeypatch.setattr(panel._preview, "show_media", lambda path, mt: shown.append((path, mt)))
+
+    panel.prefill("sdxl_t2i", _wiz_params())
+
+    assert shown[-1] == ("wiz.png", "image")
+
+
+def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
+    # Nothing generated with these settings yet → the placeholder, no crash.
+    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+    panel.show_recent_preview()
+    assert panel._preview._media is None  # a placeholder, not a resolved file
+
+
 def test_preview_over_form_share_the_main_pane(panel):
     # Preview-over-form: the live preview sits on top of the settings in the left
     # "main" pane, with the progress bar and run buttons under it — beside the slim
@@ -508,8 +562,10 @@ class SpyDB:
     """Records the calls a panel makes, returning canned recent durations.
 
     It stores no rows, so ``get_generation`` (used when the panel re-renders its
-    strip on completion) always returns ``None`` — the strip stays empty, which
-    these duration/status tests don't inspect.
+    strip on completion) always returns ``None`` and ``list_generations`` (queried
+    when the panel shows its settings' most recent result) returns ``[]`` — the
+    strip and the recent-preview stay empty, which these duration/status tests
+    don't inspect.
     """
 
     def __init__(self, durations=None):
@@ -519,6 +575,9 @@ class SpyDB:
 
     def recent_durations(self, workflow_name, limit=10):
         return list(self._durations)
+
+    def list_generations(self):
+        return []
 
     def insert_generation(self, **kwargs):
         self.inserts.append(kwargs)

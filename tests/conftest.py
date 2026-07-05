@@ -1,4 +1,7 @@
+import gc
 import os
+
+import pytest
 
 # Render Qt offscreen for the whole suite. Agents run these GUI tests on every
 # commit; without this, each test that shows a widget throws a real window onto
@@ -12,3 +15,17 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 # Make shared_ui importable for tests regardless of checkout depth.
 ensure_shared_ui_on_path()
+
+
+@pytest.fixture(autouse=True)
+def _collect_widgets_between_tests():
+    """Reap each test's widgets before the next one builds its own.
+
+    The GUI widgets (a config panel's param form, the gallery's panes) form Python
+    reference cycles — a widget owns a signal whose slot closes back over it — so
+    their C++ objects linger until Python's cyclic collector runs. Left to chance,
+    hundreds of galleries' worth pile up across a full run and eventually corrupt
+    the Qt heap. Collecting after each test keeps the live object count flat.
+    """
+    yield
+    gc.collect()

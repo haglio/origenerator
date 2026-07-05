@@ -19,15 +19,13 @@ class ConfigSnapshot:
 
     ``params`` is read without randomizing the seed; ``seed_is_random`` records
     whether the seed's "Random" box is checked (in which case the panel can
-    never match a concrete past generation). ``image_is_random`` records the same
-    for an i2v input image's Random box (regenerate the source frame), so a
-    reopened tab comes back the way it was left.
+    never match a concrete past generation), so a reopened tab comes back the way
+    it was left.
     """
 
     workflow_name: str
     params: dict
     seed_is_random: bool
-    image_is_random: bool = False
 
     def to_dict(self) -> dict:
         """A JSON-serializable view, for persisting an open generate tab."""
@@ -35,7 +33,6 @@ class ConfigSnapshot:
             "workflow_name": self.workflow_name,
             "params": self.params,
             "seed_is_random": self.seed_is_random,
-            "image_is_random": self.image_is_random,
         }
 
     @classmethod
@@ -48,7 +45,6 @@ class ConfigSnapshot:
             workflow_name=str(data.get("workflow_name", "")),
             params=params,
             seed_is_random=bool(data.get("seed_is_random", False)),
-            image_is_random=bool(data.get("image_is_random", False)),
         )
 
 

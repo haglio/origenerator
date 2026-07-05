@@ -48,13 +48,11 @@ def _select_combo_value(combo: QComboBox, value: str):
 
 class ParamForm(QWidget):
     changed = pyqtSignal()          # any field's value changed
-    image_changed = pyqtSignal(str, str)  # an image field's (key, new value)
 
     def __init__(self, param_defs: list[ParamDef], parent=None):
         super().__init__(parent)
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
-        self._image_random_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
@@ -88,10 +86,6 @@ class ParamForm(QWidget):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             self._wire_changed(widget)
-            if pd.type == "image":
-                widget.textChanged.connect(
-                    lambda text, key=pd.key: self.image_changed.emit(key, text)
-                )
             layout.addRow(pd.label, self._field_cell(pd, widget))
         self._build_swap_button(layout)
 
@@ -119,25 +113,12 @@ class ParamForm(QWidget):
             self._randomize_checks[pd.key] = cb
             return cb
         if pd.type == "image":
-            # A "Random" box (regenerate a fresh input of the same kind) sits
-            # before Browse. Hidden until the panel finds the current input is a
-            # reproducible generation — it can't randomize an unknown image.
-            random_cb = CheckBox("Random")
-            random_cb.setChecked(False)
-            random_cb.toggled.connect(self.changed)
-            self._image_random_checks[pd.key] = random_cb
             browse = QPushButton("Browse...")
             browse.clicked.connect(
                 lambda _checked=False, key=pd.key: self._browse_image(key)
             )
             self._browse_buttons[pd.key] = browse
-            holder = QWidget()
-            hb = QHBoxLayout(holder)
-            hb.setContentsMargins(0, 0, 0, 0)
-            hb.addWidget(random_cb)
-            hb.addWidget(browse)
-            random_cb.setVisible(False)
-            return holder
+            return browse
         return None
 
     def _has_param(self, key: str) -> bool:
@@ -307,32 +288,6 @@ class ParamForm(QWidget):
         """
         for cb in self._randomize_checks.values():
             cb.setChecked(is_random)
-
-    def image_is_random(self) -> bool:
-        """True if an image field's Random box is checked (regenerate its input).
-
-        A hidden box is always unchecked, so this reads the checked state alone.
-        """
-        return any(cb.isChecked() for cb in self._image_random_checks.values())
-
-    def set_image_random_available(self, key: str, available: bool):
-        """Show an image field's Random box only when its input is a reproducible
-        generation. When unavailable, hide and clear it — there are no settings to
-        randomize an unknown, hand-picked image against."""
-        cb = self._image_random_checks.get(key)
-        if cb is None:
-            return
-        if not available:
-            cb.setChecked(False)
-        cb.setVisible(available)
-
-    def set_image_random(self, is_random: bool):
-        """Restore an image field's Random state, e.g. a reopened tab. Only a
-        box that's currently available (shown) is set; a hidden one can't
-        randomize an unknown input, so it stays off."""
-        for cb in self._image_random_checks.values():
-            if not cb.isHidden():
-                cb.setChecked(is_random)
 
     def _read_field(self, pd: ParamDef, randomize_seed: bool):
         """One field's current value. A seed with its Random box checked is

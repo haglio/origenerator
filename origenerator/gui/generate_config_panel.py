@@ -248,7 +248,6 @@ class GenerateConfigPanel(QWidget):
             wf = WORKFLOW_REGISTRY[key]
             self._param_form = ParamForm(wf.param_definitions())
             self._param_form.changed.connect(self._emit_title)
-            self._param_form.image_changed.connect(self._on_image_field_changed)
             self._scroll.setWidget(self._param_form)
         self._refresh_estimate()
         self._emit_title()
@@ -444,12 +443,6 @@ class GenerateConfigPanel(QWidget):
 
     def _image_rows(self):
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
-
-    def _on_image_field_changed(self, key: str, value: str):
-        """Show the input's Random box only while it names a reproducible image."""
-        self._param_form.set_image_random_available(
-            key, self._input_image_source(value) is not None
-        )
 
     def _offer_reroll(self, wf, params: dict) -> str | None:
         """Ask whether/how to re-roll a would-be duplicate (shared with the gallery).
@@ -780,7 +773,6 @@ class GenerateConfigPanel(QWidget):
             self._workflow_combo.currentData(),
             self._param_form.get_values_static(),
             self._param_form.seed_is_random(),
-            self._param_form.image_is_random(),
         )
 
     def title(self) -> str:
@@ -818,16 +810,13 @@ class GenerateConfigPanel(QWidget):
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.
 
-        Like :meth:`prefill`, but also restores the seed's and the input image's
-        Random states so a tab comes back the way it was left instead of pinned to
-        the stale values that were in its fields at save time. The image box is set
-        after prefill, once prefill's input value has told the panel whether that
-        box should be available at all.
+        Like :meth:`prefill`, but also restores the seed's Random state so a tab
+        comes back the way it was left instead of pinned to the stale seed that was
+        in its field at save time.
         """
         self.prefill(snapshot.workflow_name, snapshot.params)
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
-            self._param_form.set_image_random(snapshot.image_is_random)
 
     # --- displaying a saved generation (the browsed selection) ----------------
 

@@ -211,32 +211,6 @@ def _i2v_panel(qtbot, tmp_path, submit):
     return panel, client, db
 
 
-def test_random_input_box_shows_only_for_a_reproducible_input(qtbot, tmp_path):
-    panel, _client, _db = _i2v_panel(qtbot, tmp_path, lambda *a: "comfy-A")
-    box = panel._param_form._image_random_checks["input_image"]
-
-    panel._param_form.set_values({"input_image": "hand_placed.png"})  # not a generation
-    assert box.isHidden()
-
-    panel._param_form.set_values({"input_image": "sdxl_src.png"})     # a known generation
-    assert not box.isHidden()
-
-
-def test_random_input_state_survives_capture_and_restore(qtbot, tmp_path):
-    panel, client, db = _i2v_panel(qtbot, tmp_path, lambda p: "comfy-A")
-    panel._param_form.set_values({"input_image": "sdxl_src.png"})  # reproducible → box shows
-    panel._param_form._image_random_checks["input_image"].setChecked(True)
-
-    snapshot = panel.current_config()
-    assert snapshot.image_is_random is True
-
-    restored = GenerateConfigPanel(client, db)
-    qtbot.addWidget(restored)
-    restored.restore_config(snapshot)
-
-    assert restored._param_form.image_is_random() is True
-
-
 def test_plain_generate_clears_the_previous_result(qtbot, tmp_path):
     # A fresh, non-chained job still drops whatever the preview last showed.
     submit = MagicMock(return_value="x")

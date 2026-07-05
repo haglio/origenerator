@@ -15,18 +15,12 @@ def _snapshot(workflow="sdxl_t2i", params=None, seed_is_random=False):
     return ConfigSnapshot(workflow, params or {}, seed_is_random)
 
 
-def test_config_snapshot_round_trips_image_is_random():
-    snap = ConfigSnapshot("wan22_i2v", {"input_image": "x.png"},
-                          seed_is_random=True, image_is_random=True)
+def test_config_snapshot_round_trips_through_dict():
+    snap = ConfigSnapshot("wan22_i2v", {"input_image": "x.png"}, seed_is_random=True)
     restored = ConfigSnapshot.from_dict(snap.to_dict())
-    assert restored.image_is_random is True
+    assert restored.workflow_name == "wan22_i2v"
+    assert restored.params == {"input_image": "x.png"}
     assert restored.seed_is_random is True
-
-
-def test_config_snapshot_defaults_image_is_random_to_false():
-    # An older saved tab (or a plain snapshot) has no image flag.
-    assert ConfigSnapshot.from_dict({"workflow_name": "w", "params": {}}).image_is_random is False
-    assert ConfigSnapshot("w", {}, seed_is_random=False).image_is_random is False
 
 
 def test_prepared_params_fills_defaults_and_rerolls_seeds():

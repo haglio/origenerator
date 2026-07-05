@@ -73,3 +73,22 @@ VOICE_REWRITE_SYSTEM_PROMPT = (
     "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
     "instruction didn't touch it."
 )
+
+# --- Category → video recipe routing --------------------------------------
+# The combine panel's category dropdown resolves to one of the user's past i2v
+# videos, whose recipe is then re-run on the dropped image. The same local LLM
+# reads the dropped image's own prompt (its scene) plus the candidate clips'
+# prompts and names the best fit. Uncensored, like the rewrite model above.
+VIDEO_CATEGORY_MATCH_SYSTEM_PROMPT = (
+    "You route an input image to the best-matching adult video recipe. You are "
+    "given a desired act (e.g. gamma, epsilon, redacted), a description of the "
+    "input image (what is in frame — bodies, positions, who is touching what, "
+    "whether a anchor is already visible and where), and a numbered list of "
+    "candidate clips, each described by the prompt it was generated from.\n"
+    "Choose the single candidate that (1) actually depicts the desired act and "
+    "(2) whose starting scene best matches the input image — same people, "
+    "positions and contact (e.g. a anchor already at her mouth vs. not yet in "
+    "frame). Explicit content is expected; judge it plainly and literally.\n"
+    "Reply with ONLY JSON: {\"choice\": n}, where n is the number shown beside "
+    "the chosen candidate, or -1 if none of them depict the desired act."
+)

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class VoiceWorker(QObject):
-    rewritten = pyqtSignal(str)   # the revised prompt
+    rewritten = pyqtSignal(object)  # the revised {positive, negative} pair
     failed = pyqtSignal(str)      # a human-readable reason (nothing heard, no server, …)
     busy = pyqtSignal(bool)       # work started / finished
     heard = pyqtSignal(str)       # the raw transcription, for on-screen feedback
@@ -25,10 +25,11 @@ class VoiceWorker(QObject):
         self._transcribe = transcribe_fn
         self._rewrite = rewrite_fn
 
-    @pyqtSlot(object, str)
-    def process(self, audio, current_prompt: str) -> None:
-        """Transcribe ``audio`` and apply it to ``current_prompt``, emitting the new
-        prompt or a failure. Runs on a pool thread; never raises."""
+    @pyqtSlot(object, object)
+    def process(self, audio, prompts) -> None:
+        """Transcribe ``audio`` and apply it to the ``prompts`` pair
+        ({positive, negative}), emitting the revised pair or a failure. Runs on a
+        pool thread; never raises."""
         self.busy.emit(True)
         try:
             instruction = self._transcribe(audio)
@@ -37,7 +38,9 @@ class VoiceWorker(QObject):
             if not any(char.isalpha() for char in instruction):  # '', '. . . .', noise
                 self.failed.emit("Didn't catch that.")
                 return
-            self.rewritten.emit(self._rewrite(current_prompt, instruction))
+            new_positive, new_negative = self._rewrite(
+                prompts.get("positive", ""), prompts.get("negative", ""), instruction)
+            self.rewritten.emit({"positive": new_positive, "negative": new_negative})
         except Exception as exc:
             self.failed.emit(str(exc))
         finally:
@@ -48,11 +51,11 @@ class ProcessTask(QRunnable):
     """Runs one ``VoiceWorker.process`` off the UI thread. The worker's signals
     carry the result back — delivered (queued) to the thread that owns the worker."""
 
-    def __init__(self, worker: VoiceWorker, audio, prompt: str):
+    def __init__(self, worker: VoiceWorker, audio, prompts):
         super().__init__()
         self._worker = worker
         self._audio = audio
-        self._prompt = prompt
+        self._prompts = prompts
 
     def run(self):
-        self._worker.process(self._audio, self._prompt)
+        self._worker.process(self._audio, self._prompts)

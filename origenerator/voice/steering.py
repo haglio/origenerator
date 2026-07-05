@@ -36,8 +36,8 @@ class VoiceSteering(QObject):
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
         self._transcriber = None  # set when building the real worker, for preloading
         self._worker = worker if worker is not None else self._build_worker()
-        self._get_prompt = None
-        self._set_prompt = None
+        self._get_prompts = None
+        self._set_prompts = None
         self._listener.utterance.connect(self._on_utterance)
         self._worker.rewritten.connect(self._on_rewritten)
         self._worker.failed.connect(self.error)
@@ -54,10 +54,11 @@ class VoiceSteering(QObject):
             ),
         )
 
-    def start(self, get_prompt, set_prompt) -> None:
-        """Begin listening; each utterance rewrites ``get_prompt()`` via ``set_prompt``."""
-        self._get_prompt = get_prompt
-        self._set_prompt = set_prompt
+    def start(self, get_prompts, set_prompts) -> None:
+        """Begin listening; each utterance rewrites ``get_prompts()`` (a {positive,
+        negative} pair) via ``set_prompts``."""
+        self._get_prompts = get_prompts
+        self._set_prompts = set_prompts
         if self._transcriber is not None:  # warm the model now, not on the 1st command
             threading.Thread(target=self._preload, daemon=True).start()
         try:
@@ -73,21 +74,21 @@ class VoiceSteering(QObject):
 
     def stop(self) -> None:
         self._listener.stop()
-        self._get_prompt = None  # a late utterance after stop is then ignored
-        self._set_prompt = None
+        self._get_prompts = None  # a late utterance after stop is then ignored
+        self._set_prompts = None
 
     def _on_utterance(self, audio) -> None:
-        if self._get_prompt is None:
+        if self._get_prompts is None:
             return
-        prompt = self._get_prompt()
-        logger.info("Voice: processing utterance (current prompt %r)", prompt)
+        prompts = self._get_prompts()
+        logger.info("Voice: processing utterance (positive %r)", prompts.get("positive"))
         if self._async:
-            QThreadPool.globalInstance().start(ProcessTask(self._worker, audio, prompt))
+            QThreadPool.globalInstance().start(ProcessTask(self._worker, audio, prompts))
         else:
-            self._worker.process(audio, prompt)
+            self._worker.process(audio, prompts)
 
-    def _on_rewritten(self, new_prompt: str) -> None:
-        logger.info("Voice: rewrote prompt -> %r", new_prompt)
-        if self._set_prompt is not None:
-            self._set_prompt(new_prompt)
-            self.edited.emit(new_prompt)
+    def _on_rewritten(self, new_prompts) -> None:
+        logger.info("Voice: rewrote -> %r", new_prompts)
+        if self._set_prompts is not None:
+            self._set_prompts(new_prompts)
+            self.edited.emit(new_prompts.get("positive", ""))

@@ -36,8 +36,23 @@ VOICE_VAD_THRESHOLD = 0.008                       # minimum speech floor; the ga
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
 VOICE_REWRITE_SYSTEM_PROMPT = (
-    "You edit image-generation prompts. Given the current prompt and a spoken "
-    "instruction, apply the change and reply with ONLY the full revised prompt — "
-    "no quotes, no explanation, no preamble. Preserve the parts of the prompt the "
-    "instruction doesn't touch."
+    "You edit Stable Diffusion image-generation prompts from short spoken "
+    "instructions. You get the current POSITIVE prompt (what to include) and "
+    "NEGATIVE prompt (what to keep out), plus one instruction. Apply it and return "
+    "BOTH prompts as JSON.\n"
+    "Rules:\n"
+    "- Positive prompts cannot negate. To exclude something (\"no X\", \"without "
+    "X\", \"remove X\"), put the bare term in the NEGATIVE prompt (e.g. \"tan "
+    "lines\") and delete it from the positive if it's there. Never write \"no X\" "
+    "or \"without X\" in the positive prompt.\n"
+    "- Emphasis uses (term:weight). If asked for MORE of something already present, "
+    "raise its weight (big -> (big:1.3); (big:1.2) -> (big:1.4)). If asked for LESS "
+    "of something present, lower it ((big:0.8)) or drop it if already low.\n"
+    "- To add something wanted, place it among related terms (a subject with its "
+    "attributes; style/quality words later), not just tacked on the end.\n"
+    "- Make the smallest change that satisfies the instruction; keep everything "
+    "else intact.\n"
+    "- Reply with ONLY JSON: {\"positive\": \"<full positive>\", \"negative\": "
+    "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
+    "instruction didn't touch it."
 )

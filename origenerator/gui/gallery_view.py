@@ -636,8 +636,8 @@ class GalleryView(QWidget):
         if self._auto.is_active(key):
             self._voice_target_key = key
             self._voice.start(
-                lambda k=key: self._working_prompt(k),
-                lambda new, k=key: self._steer_prompt(k, new),
+                lambda k=key: self._working_prompts(k),
+                lambda new, k=key: self._steer_prompts(k, new),
             )
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
@@ -653,14 +653,17 @@ class GalleryView(QWidget):
                 "workflow": workflow, "params": filled_params(group.rows[0], workflow),
             }
 
-    def _working_prompt(self, key: str) -> str:
-        return self._auto_working.get(key, {}).get("params", {}).get("positive_prompt", "")
+    def _working_prompts(self, key: str) -> dict:
+        params = self._auto_working.get(key, {}).get("params", {})
+        return {"positive": params.get("positive_prompt", ""),
+                "negative": params.get("negative_prompt", "")}
 
-    def _steer_prompt(self, key: str, new_prompt: str):
-        """A voice command rewrote the prompt: the loop's next launches use it."""
+    def _steer_prompts(self, key: str, new_prompts: dict):
+        """A voice command rewrote the prompts: the loop's next launches use them."""
         working = self._auto_working.get(key)
         if working is not None:
-            working["params"]["positive_prompt"] = new_prompt
+            working["params"]["positive_prompt"] = new_prompts.get("positive", "")
+            working["params"]["negative_prompt"] = new_prompts.get("negative", "")
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, cancelled, or failed): drop its

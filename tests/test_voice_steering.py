@@ -1,4 +1,4 @@
-"""VoiceSteering — always-listening: each utterance rewrites the prompt in place.
+"""VoiceSteering — always-listening: each utterance rewrites the prompt pair.
 
 An injected listener (a fake mic) and an inline worker (faked transcribe/rewrite)
 drive the whole flow synchronously, without audio, a model, or a server.
@@ -29,42 +29,42 @@ def _steering(transcribe=None, rewrite=None, listener=None):
     listener = listener if listener is not None else FakeListener()
     worker = VoiceWorker(
         transcribe or (lambda audio: "no redacted"),
-        rewrite or (lambda cur, instr: f"{cur}, {instr}"),
+        rewrite or (lambda pos, neg, instr: (f"{pos}, {instr}", neg)),
     )
     return VoiceSteering(listener=listener, worker=worker), listener
 
 
-def test_an_utterance_rewrites_the_prompt_in_place(qtbot):
+def test_an_utterance_rewrites_the_prompt_pair_in_place(qtbot):
     steering, listener = _steering()
-    holder = {"p": "a woman"}
-    steering.start(lambda: holder["p"], lambda new: holder.__setitem__("p", new))
-    assert listener.started
+    prompts = {"positive": "a woman", "negative": ""}
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
+    assert listener.started
     listener.utterance.emit(object())
 
-    assert holder["p"] == "a woman, no redacted"
+    assert prompts["positive"] == "a woman, no redacted"
 
 
 def test_stop_ends_listening_and_ignores_later_utterances(qtbot):
     steering, listener = _steering()
-    holder = {"p": "a woman"}
-    steering.start(lambda: holder["p"], lambda new: holder.__setitem__("p", new))
+    prompts = {"positive": "a woman", "negative": ""}
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
     steering.stop()
     listener.utterance.emit(object())  # a late callback after stop
 
     assert listener.stopped
-    assert holder["p"] == "a woman"  # ignored
+    assert prompts["positive"] == "a woman"  # ignored
 
 
 def test_a_rewrite_error_surfaces(qtbot):
-    def boom(cur, instr):
+    def boom(pos, neg, instr):
         raise RuntimeError("no LLM server")
 
     steering, listener = _steering(rewrite=boom)
     errors = []
     steering.error.connect(errors.append)
-    steering.start(lambda: "a woman", lambda new: None)
+    steering.start(lambda: {"positive": "a woman", "negative": ""}, lambda new: None)
 
     listener.utterance.emit(object())
 
@@ -85,6 +85,6 @@ def test_a_listener_failure_surfaces(qtbot):
     errors = []
     steering.error.connect(errors.append)
 
-    steering.start(lambda: "a woman", lambda new: None)
+    steering.start(lambda: {"positive": "a woman", "negative": ""}, lambda new: None)
 
     assert errors and "no mic" in errors[0]

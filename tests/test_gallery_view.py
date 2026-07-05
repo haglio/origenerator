@@ -2157,12 +2157,13 @@ def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
 
     view._toggle_auto(True)
     assert view._voice.started
-    view._voice.say("a cat, no redacted")  # a heard + rewritten utterance
+    view._voice.say({"positive": "a cat, no redacted", "negative": "ugly"})  # rewritten pair
     job = view._reroll_jobs[key]
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # finishing relaunches
 
-    # the relaunched generation carries the steered prompt
+    # the relaunched generation carries both steered prompts
     assert view._reroll_jobs[key].params["positive_prompt"] == "a cat, no redacted"
+    assert view._reroll_jobs[key].params["negative_prompt"] == "ugly"
 
 
 def test_turning_auto_off_stops_voice(qtbot, tmp_path):

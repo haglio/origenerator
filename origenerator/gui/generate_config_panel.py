@@ -21,6 +21,7 @@ from origenerator.generation_config import (
     ConfigSnapshot, find_duplicate_generation, prepared_params, randomize_seeds,
 )
 from origenerator.gui.generation_job import GenerationJob, persist_generation
+from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
@@ -100,7 +101,7 @@ class GenerateConfigPanel(QWidget):
             main_box.addWidget(self._preview, 3)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
-        self._workflow_combo = QComboBox()
+        self._workflow_combo = NoWheelComboBox()
         for key, wf in WORKFLOW_REGISTRY.items():
             self._workflow_combo.addItem(wf.display_name, key)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)

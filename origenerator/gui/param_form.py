@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
+from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 
@@ -254,14 +255,14 @@ class ParamForm(QWidget):
             w.setPlaceholderText("64-bit integer seed")
             return w
         if pd.type == "int":
-            w = QSpinBox()
+            w = NoWheelSpinBox()
             w.setMinimum(int(pd.min_val or 0))
             w.setMaximum(int(pd.max_val or 999999))
             w.setSingleStep(int(pd.step or 1))
             w.setValue(int(pd.default))
             return w
         if pd.type == "float":
-            w = QDoubleSpinBox()
+            w = NoWheelDoubleSpinBox()
             w.setMinimum(pd.min_val or 0.0)
             w.setMaximum(pd.max_val or 999999.0)
             w.setSingleStep(pd.step or 0.1)
@@ -269,7 +270,7 @@ class ParamForm(QWidget):
             w.setValue(float(pd.default))
             return w
         if pd.type == "combo":
-            w = QComboBox()
+            w = NoWheelComboBox()
             if pd.options:
                 w.addItems(pd.options)
             _select_combo_value(w, str(pd.default))

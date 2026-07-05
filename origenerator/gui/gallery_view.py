@@ -20,10 +20,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tree import FolderTree
-from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.combine_panel import CombinePanel
-from origenerator.gui.metadata_panel import MetadataPanel
-from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
@@ -293,64 +290,39 @@ class GalleryView(QWidget):
         browser_box.addWidget(self._scroll, 1)
         self._panes.addWidget(browser)
 
-        # Info pane: preview + metadata sidebar
-        info = QWidget()
-        info_box = QVBoxLayout(info)
-        info_box.setContentsMargins(*_PANE_MARGINS)
-        self._meta_title = QLabel("Select a generation")
-        self._meta_title.setWordWrap(True)
-        info_box.addWidget(self._meta_title)
-        self._estimate_label = QLabel()
-        self._estimate_label.setObjectName("estimateLabel")
-        self._estimate_label.setWordWrap(True)
-        info_box.addWidget(self._estimate_label)
-        self._preview = PreviewWidget()
-        info_box.addWidget(self._preview, 3)
-        self._meta_panel = MetadataPanel()
-        info_box.addWidget(self._meta_panel, 2)
-        self._animated_strip = AnimatedVideoStrip()
-        info_box.addWidget(self._animated_strip)
-        self._reuse_btn = QPushButton("Reuse Parameters")
-        self._reuse_btn.setEnabled(False)
-        # A disabled QPushButton receives no hover events, so its own tooltip
-        # never shows; carry the "ask Claude" hint on an enabled wrapper instead.
-        self._reuse_wrap = QWidget()
-        reuse_box = QVBoxLayout(self._reuse_wrap)
-        reuse_box.setContentsMargins(0, 0, 0, 0)
-        reuse_box.addWidget(self._reuse_btn)
-        info_box.addWidget(self._reuse_wrap)
-        # Video-only: copy the selected clip into Evolver's inbox for sorting and
-        # upscaling. Hidden entirely for images (Evolver is a video pipeline)
-        # rather than shown disabled, so it's absent when it can't apply.
-        self._evolver_btn = QPushButton("Send to Evolver")
-        self._evolver_btn.setToolTip(
-            "Copy this video into Evolver's inbox for sorting and upscaling."
-        )
-        self._evolver_btn.hide()
-        info_box.addWidget(self._evolver_btn)
-        # The info pane is a tab widget: this Inspect page is tab 0 — always
-        # present, not closable — and editable config tabs (Reuse Parameters or the
-        # "+") open after it, sharing one run queue.
-        self._info_tabs = InfoPaneTabs(self._client, self._db, info)
+        # Info pane: a tabbed workspace. Tab 0 is the Inspect tab — an editable
+        # generate panel (form + Generate) over the inspect sidebar (preview,
+        # metadata, the "Animated in" strip, Send-to-Evolver) — built by
+        # InfoPaneTabs. Config-tab forks open after it via the "+" or a thumbnail
+        # double-click, all sharing one run queue. The gallery reads the Inspect
+        # tab's sidebar widgets back out to drive them with its InfoPaneController.
+        self._info_tabs = InfoPaneTabs(self._client, self._db)
+        inspect = self._info_tabs.inspect_panel()
+        self._preview = inspect.preview
+        self._meta_title = inspect.meta_title
+        self._estimate_label = inspect.estimate_label
+        self._meta_panel = inspect.meta_panel
+        self._animated_strip = inspect.animated_strip
+        self._evolver_btn = inspect.evolver_btn
         self._panes.addWidget(self._info_tabs)
-        # The config tabs feed the Recents shelf its in-flight Generate cards, and
-        # name the running ids the re-roll reconnection must not re-adopt.
+        # The Inspect + config tabs feed the Recents shelf and bottom bar their
+        # in-flight Generate cards, and name the running ids the re-roll
+        # reconnection must not re-adopt.
         self._generate_inflight = self._info_tabs.in_flight_items
         self._claimed_ids = self._info_tabs.active_prompt_ids
         # The controller drives the pane's widgets from the generation on display;
         # an i2v source link or an animation click surfaces here as a source link,
-        # and Reuse re-emits as this view's reuse_requested.
+        # and a double-click's reuse re-emits as this view's reuse_requested.
         self._info = InfoPaneController(
             self._db,
             preview=self._preview, meta_panel=self._meta_panel, meta_title=self._meta_title,
             estimate_label=self._estimate_label, animated_strip=self._animated_strip,
-            reuse_btn=self._reuse_btn, reuse_wrap=self._reuse_wrap, evolver_btn=self._evolver_btn,
-            parent=self,
+            evolver_btn=self._evolver_btn, parent=self,
         )
         self._info.link_activated.connect(self._on_source_link)
         self._info.reuse_requested.connect(self.reuse_requested)
-        # Reuse Parameters opens an editable config tab in this same pane (a no-op
-        # without a client — nothing could run it).
+        # A thumbnail double-click reuses its parameters by forking an editable
+        # config tab in this same pane (a no-op without a client — nothing to run).
         self.reuse_requested.connect(self._info_tabs.open_config)
 
         # The TOC pane holds its width; the browser and info panes both grow with

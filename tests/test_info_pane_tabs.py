@@ -2,7 +2,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtWidgets import QWidget
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -15,7 +14,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 def tabs(qtbot, tmp_path):
     client = ComfyUIClient()
     db = Database(tmp_path / "test.db")
-    t = InfoPaneTabs(client, db, QWidget())  # a stand-in for the gallery's Inspect page
+    t = InfoPaneTabs(client, db)  # builds its Inspect tab (an InspectPanel) internally
     qtbot.addWidget(t)
     return t
 
@@ -140,7 +139,7 @@ def test_open_config_seeds_the_new_tab_strip(tabs):
 
 def test_open_config_is_a_no_op_without_a_client(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
-    tabs = InfoPaneTabs(None, db, QWidget())  # a read-only gallery: nothing to run
+    tabs = InfoPaneTabs(None, db)  # a read-only gallery: nothing to run
     qtbot.addWidget(tabs)
     assert tabs.open_config("sdxl_t2i", {}) is None
     assert tabs.count() == 1  # only Inspect
@@ -338,7 +337,7 @@ def test_restore_reconnects_a_still_running_tab(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     _running_row(db, "run-1")
     client = ComfyUIClient()
-    tabs = InfoPaneTabs(client, db, QWidget())
+    tabs = InfoPaneTabs(client, db)
     qtbot.addWidget(tabs)
 
     tabs.restore_state(_restore_tab_state("run-1"))
@@ -356,7 +355,7 @@ def test_restore_does_not_reconnect_a_finished_job(qtbot, tmp_path):
     _running_row(db, "done")
     db.update_generation("done", status="completed")
     client = ComfyUIClient()
-    tabs = InfoPaneTabs(client, db, QWidget())
+    tabs = InfoPaneTabs(client, db)
     qtbot.addWidget(tabs)
 
     tabs.restore_state(_restore_tab_state("done"))
@@ -465,7 +464,7 @@ def test_capture_restore_round_trips_config_and_custom_title(tabs, qtbot):
     tabs._config_panels()[1].set_custom_title("My Fox")
     captured = tabs.capture_state()
 
-    fresh = InfoPaneTabs(tabs._client, tabs._db, QWidget())
+    fresh = InfoPaneTabs(tabs._client, tabs._db)
     qtbot.addWidget(fresh)
     fresh.restore_state(captured)
 

@@ -1,15 +1,18 @@
 """The gallery's info pane as a tabbed workspace.
 
-Tab 0 is the always-present Inspect view — the gallery builds it and hands it in
-here — and the tabs after it are editable per-configuration panels
-(:class:`GenerateConfigPanel`) opened by Reuse Parameters or the "+" button. This
-owns the config tabs' lifecycle — add, close, rename, session capture/restore, the
-one-generation-at-a-time run queue, and the in-flight reporting the Recents shelf
-reads — while the Inspect tab stays the gallery's concern. Clicking a config tab's
-history-strip thumbnail opens (or reuses) a tab for that generation.
+Tab 0 is the always-present Inspect tab — an editable generate panel
+(:class:`InspectPanel`) built here — and the tabs after it are editable
+per-configuration panels (:class:`GenerateConfigPanel`) forked by the "+" button
+or a thumbnail double-click. This owns every tab's lifecycle — add, close, rename,
+session capture/restore, the one-generation-at-a-time run queue shared across the
+Inspect tab and the config tabs, and the in-flight reporting the Recents shelf and
+bottom bar read. The Inspect tab's sidebar widgets are exposed via
+:meth:`inspect_panel` so the gallery's InfoPaneController drives them. Clicking a
+config tab's history-strip thumbnail opens (or reuses) a tab for that generation.
 
 Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
-test) the "+" is hidden and :meth:`open_config` is a no-op, so only Inspect shows.
+test) the "+" is hidden and :meth:`open_config` is a no-op, so only Inspect shows —
+and its embedded form shows for inspection with Generate disabled.
 """
 
 import json
@@ -29,6 +32,7 @@ from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.inflight_card import InFlightItem
+from origenerator.gui.inspect_panel import InspectPanel
 from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -36,13 +40,11 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 class InfoPaneTabs(QTabWidget):
     """A permanent Inspect tab (index 0) over editable config tabs."""
 
-    def __init__(self, client: ComfyUIClient | None, db: Database, inspect_page,
-                 parent=None):
+    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
         self._client = client
         self._db = db
-        self._inspect_page = inspect_page
-        self._queue = JobQueue(db)  # one generation at a time across the config tabs
+        self._queue = JobQueue(db)  # one generation at a time across Inspect + config tabs
         # Install the eliding bar before setTabsClosable: swapping the bar
         # afterwards drops that setting (it doesn't carry to a new bar).
         self.setTabBar(ElidingTabBar())
@@ -55,9 +57,14 @@ class InfoPaneTabs(QTabWidget):
         self._add_btn.clicked.connect(lambda: self._add_subtab())
         self._add_btn.setVisible(client is not None)  # nothing to run without a client
         self.setCornerWidget(self._add_btn, Qt.Corner.TopRightCorner)
-        # Tab 0: the gallery's Inspect page — always present, never closable, so
-        # strip its close button (either side, whichever the style draws).
-        self.addTab(inspect_page, "Inspect")
+        # Tab 0: the Inspect tab — an editable generate panel over the inspect
+        # sidebar, sharing this widget's one-at-a-time queue. Always present and
+        # never closable, so strip its close button (either side, whichever the
+        # style draws). It's an InspectPanel, not a GenerateConfigPanel, so
+        # _config_panels() excludes it from capture/close for free.
+        self._inspect = InspectPanel(client, db, queue=self._queue)
+        self._inspect_page = self._inspect  # legacy name for tab 0's page widget
+        self.addTab(self._inspect, "Inspect")
         bar = self.tabBar()
         bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
         bar.setTabButton(0, QTabBar.ButtonPosition.LeftSide, None)
@@ -65,6 +72,11 @@ class InfoPaneTabs(QTabWidget):
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
+
+    def inspect_panel(self) -> InspectPanel:
+        """The Inspect tab (tab 0). The gallery reads its preview/metadata/animated/
+        evolver widgets back out to build the InfoPaneController that drives them."""
+        return self._inspect
 
     # --- config tabs -------------------------------------------------------
 

@@ -1252,29 +1252,6 @@ def test_double_clicking_an_unregistered_thumbnail_does_not_reuse(qtbot, tmp_pat
     assert fired == []
 
 
-def test_reuse_disabled_for_unregistered_workflow_with_hint(qtbot, tmp_path):
-    db = Database(tmp_path / "t.db")
-    db.insert_generation(
-        prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
-        positive_prompt="a cat", params_json=json.dumps({"steps": 20}),
-        workflow_json="{}",
-    )
-    db.insert_generation(
-        prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
-        params_json=json.dumps({"steps": 20}), workflow_json="{}",
-    )
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-
-    view._on_thumbnail_clicked("reg")  # a built-in workflow → reusable
-    assert view._reuse_btn.isEnabled() is True
-
-    view._on_thumbnail_clicked("unreg")  # no template for it → greyed out
-    assert view._reuse_btn.isEnabled() is False
-    # The hint rides on the wrapper, since a disabled button shows no tooltip.
-    assert "claude" in view._reuse_wrap.toolTip().lower()
-
-
 def _video_resolver(video_path):
     """A resolve_preview stub: a real video file for video rows, a still else."""
     def resolve(row, output_dir):

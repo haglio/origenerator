@@ -1,14 +1,15 @@
 """Drives the gallery's info pane — the right-hand column that shows the selected
 generation: its preview, metadata, the videos an image was animated into, and the
-Reuse / Send-to-Evolver actions.
+Send-to-Evolver action.
 
 Holds references to the pane's widgets (the GalleryView builds and lays them out)
 and owns the row on display plus everything that populates it, so that concern
 lives here rather than in the view. It reports the two things the view must act on
 as signals: a source link the user followed (``link_activated``) and a request to
-reuse the selection's parameters (``reuse_requested``). A running re-roll borrows
-the pane through :meth:`show_generating` / :meth:`show_frame`; a saved generation
-takes it back through :meth:`show_generation`.
+reuse the selection's parameters (``reuse_requested`` — now raised by a thumbnail
+double-click, which forks a config tab, rather than a button). A running re-roll
+borrows the pane through :meth:`show_generating` / :meth:`show_frame`; a saved
+generation takes it back through :meth:`show_generation`.
 """
 
 import logging
@@ -46,7 +47,7 @@ class InfoPaneController(QObject):
     reuse_requested = pyqtSignal(str, dict)   # workflow_name, params to rebuild
 
     def __init__(self, db, *, preview, meta_panel, meta_title, estimate_label,
-                 animated_strip, reuse_btn, reuse_wrap, evolver_btn, parent=None):
+                 animated_strip, evolver_btn, parent=None):
         super().__init__(parent)
         self._db = db
         self._preview = preview
@@ -54,8 +55,6 @@ class InfoPaneController(QObject):
         self._meta_title = meta_title
         self._estimate_label = estimate_label
         self._animated_strip = animated_strip
-        self._reuse_btn = reuse_btn
-        self._reuse_wrap = reuse_wrap
         self._evolver_btn = evolver_btn
         self._row: dict | None = None  # the saved generation on display, if any
         self._strip_pid: str | None = None  # generation whose animations the strip shows
@@ -63,7 +62,6 @@ class InfoPaneController(QObject):
         # the video it names. Both surface as a source link the view follows.
         meta_panel.link_activated.connect(self.link_activated)
         animated_strip.video_activated.connect(self.link_activated)
-        reuse_btn.clicked.connect(self._on_reuse)
         evolver_btn.clicked.connect(self._on_send_to_evolver)
 
     def current_row(self) -> dict | None:
@@ -75,13 +73,6 @@ class InfoPaneController(QObject):
         """Fill the pane with a saved generation: its preview, metadata, the videos
         it was animated into, and the Reuse/Evolver buttons' state."""
         self._row = row
-        reusable = _is_reusable_workflow(row.get("workflow_name"))
-        self._reuse_btn.setEnabled(reusable)
-        self._reuse_wrap.setToolTip(
-            "" if reusable else
-            "This workflow isn't built into the app yet — ask Claude to "
-            "implement it if you want to reuse its parameters."
-        )
         # Resolve the preview once and share it: both the player and the
         # Send-to-Evolver button key off the same on-disk file.
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
@@ -98,8 +89,6 @@ class InfoPaneController(QObject):
     def clear(self):
         """Reset the pane to its idle 'select a generation' state."""
         self._row = None
-        self._reuse_btn.setEnabled(False)
-        self._reuse_wrap.setToolTip("")
         self._update_evolver_button(None)
         self._meta_title.setText("Select a generation")
         self._estimate_label.clear()
@@ -117,8 +106,6 @@ class InfoPaneController(QObject):
         """Point the pane at a running re-roll: its last ``frame`` (or a 'waiting'
         note, never the idle placeholder), with the saved-generation actions off."""
         self._row = None
-        self._reuse_btn.setEnabled(False)
-        self._reuse_wrap.setToolTip("")
         self._update_evolver_button(None)  # a running re-roll isn't a saved video
         self._meta_title.setText("Generating a new variation…")
         self._estimate_label.clear()

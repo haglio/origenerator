@@ -6,8 +6,8 @@ advancing. Playback order is random — the items are shuffled into a pass, and 
 fresh shuffle starts each time the pass wraps — with the shuffle injectable so
 the order is deterministic under test. Videos aren't dwell-timed: they play once
 and the view advances when they end, so :meth:`dwell_ms` returns ``None`` for
-them. Keeping this a plain object (like ``job_queue.pending_etas``) lets the
-policy be unit-tested without a window or a clock.
+them. Keeping this a plain, Qt-free object lets the policy be unit-tested
+without a window or a clock.
 """
 
 import random

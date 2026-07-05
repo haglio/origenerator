@@ -25,9 +25,8 @@ logger = logging.getLogger(__name__)
 def insert_generation_row(db, job):
     """Insert a :class:`GenerationJob`'s config as a new row (status ``pending``).
 
-    The shared first step of persisting a run. A job tracked from submit inserts
-    its row up front (the gallery re-roll, so a restart can find it); a job
-    persisted only once done inserts here too, via :func:`persist_generation`.
+    A re-roll tracked from submit inserts its row up front so a restart mid-run can
+    find it and reconnect; it's finished with :func:`mark_generation_completed`.
     """
     params = job.params
     db.insert_generation(
@@ -53,17 +52,6 @@ def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
     if duration is not None:
         fields["duration_seconds"] = duration
     db.update_generation(prompt_id, **fields)
-
-
-def persist_generation(db, job, files, thumb_path, duration):
-    """Insert a finished :class:`GenerationJob`'s row and mark it completed.
-
-    For a job persisted only once it's done — the Generate tab's random-input
-    pre-step. A job tracked from submit inserts its row up front instead (the
-    gallery re-roll) and finishes it with :func:`mark_generation_completed`.
-    """
-    insert_generation_row(db, job)
-    mark_generation_completed(db, job.prompt_id, files, thumb_path, duration)
 
 
 class GenerationJob(QObject):

@@ -17,7 +17,6 @@ from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
-from origenerator.gui.inflight_card import InFlightItem
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -2338,18 +2337,6 @@ def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
     assert view._reroll_jobs == {}
 
 
-def test_reconnect_skips_a_reroll_claimed_by_a_generate_tab(qtbot, tmp_path):
-    db = _seeded_db(tmp_path)
-    _insert_running_reroll(db, "rr")
-    view = GalleryView(db, client=_reroll_client())
-    view._claimed_ids = lambda: {"rr"}  # a config tab already owns this running job
-    qtbot.addWidget(view)
-
-    view.reconnect_running_rerolls()
-
-    assert view._reroll_jobs == {}  # a config tab owns it; the gallery leaves it
-
-
 def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
     # A re-roll persists a running row the moment it's submitted, so a restart
     # mid-generation can find it again (reconnect) instead of losing all trace.
@@ -3026,11 +3013,6 @@ def _png_bytes():
     return buf.getvalue()
 
 
-def _inflight_item(key="j1", caption="SDXL › x", status="running", frame=None, reveal=None):
-    return InFlightItem(key=key, caption=caption, status=status, frame=frame,
-                        reveal=reveal or (lambda: None))
-
-
 class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
@@ -3058,20 +3040,19 @@ def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
                 status="running", output_files="[]")
 
 
-def test_recents_shows_generate_inflight_cards_above_finished_items(qtbot):
-    revealed = []
-    provider = lambda: [_inflight_item(key="gen1", reveal=lambda: revealed.append("gen1"))]
-    view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]))
-    view._generate_inflight = provider
+def test_recents_shows_an_inflight_card_above_finished_items(qtbot):
+    # An in-flight generation (a running DB row, as a re-roll inserts) shows as a
+    # card on Recents; the finished item still lists below it, and the output-less
+    # running row is never counted among the finished thumbnails.
+    db = FakeDB([_image("done", "a cat", 50, 1)])
+    db.add(_running_row("gen1", prompt="a dog"))
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
 
-    # A card for the in-flight Generate job; the finished item still lists below it.
     assert "gen1" in view._inflight_cards
     assert view.visible_prompt_ids() == ["done"]          # cards aren't finished items
-    view._on_inflight_clicked("gen1")                     # clicking routes to its tab
-    assert revealed == ["gen1"]
 
 
 def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
@@ -3170,57 +3151,48 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     assert "rr1" not in view._inflight_cards
 
 
-def test_a_newly_queued_generate_tab_appears_on_recents_via_poll(qtbot):
-    # A Generate tab queued behind another has no DB row, so only a poll of the
-    # provider (not a DB fingerprint change) can surface it.
-    items = []
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    view._generate_inflight = lambda: list(items)
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_recents(view)
-    assert view._inflight_cards == {}
-
-    items.append(_inflight_item(key="gen1"))
-    view._poll()  # no DB change, but the provider now reports a job
-    assert "gen1" in view._inflight_cards
-
-
 def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
-    frame = {"data": None}
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    view._generate_inflight = lambda: [_inflight_item(key="gen1", frame=frame["data"])]
+    # A tracked re-roll's live frame is pushed into its existing card between
+    # rebuilds, without re-rendering the whole shelf.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_row("rr1", prompt="a cat"))
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
+    folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
+    view._reroll_jobs[folder_key] = job
     _open_recents(view)
-    card = view._inflight_cards["gen1"]
+    card = view._inflight_cards["rr1"]
 
-    frame["data"] = _png_bytes()  # a live frame arrives
+    job.last_preview = _png_bytes()  # a live frame arrives on the tracked re-roll
     view._poll()
-    assert view._inflight_cards["gen1"] is card       # same card object — no re-render
+    assert view._inflight_cards["rr1"] is card       # same card object — no re-render
     assert not card._image.pixmap().isNull()          # now showing the frame
 
 
-def test_recents_shelf_appears_for_a_first_generation_before_any_folder(qtbot):
-    # No finished generation yet (empty tree), but a job is running: the Recents
-    # shelf still appears and the gallery lands on it, so the job is visible.
-    view = GalleryView(FakeDB([]))
-    view._generate_inflight = lambda: [_inflight_item(key="gen1")]
+def test_recents_shelf_appears_for_a_running_generation(qtbot):
+    # A generation is running (a running DB row, no output yet): the Recents shelf
+    # appears and lists it as an in-flight card.
+    view = GalleryView(FakeDB([_running_row("gen1")]))
     qtbot.addWidget(view)
     view.refresh()
 
     assert "Recents" in _top_level(view._tree)
-    assert "Starred" not in _top_level(view._tree)   # nothing to bookmark yet
+    _open_recents(view)
     assert "gen1" in view._inflight_cards
 
 
 def test_inflight_running_cards_sort_before_queued(qtbot):
-    provider = lambda: [
-        _inflight_item(key="waiting", status="queued"),
-        _inflight_item(key="going", status="running"),
-    ]
-    view = GalleryView(FakeDB([]))
-    view._generate_inflight = provider
+    # Running generations sort before queued ones on the shelf, regardless of the
+    # order their in-flight rows come back from the database.
+    db = FakeDB([
+        _row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
+             status="pending", output_files="[]"),
+        _row("going", "sdxl_t2i", {"positive_prompt": "g"}, "going.png",
+             status="running", output_files="[]"),
+    ])
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
@@ -3230,8 +3202,9 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
 def test_running_bar_shows_the_active_job_then_blanks_when_idle(qtbot):
     # The slim bottom bar surfaces the one in-flight job from anywhere in the view,
     # then blanks once nothing runs — keeping its slot so the panes never shift.
-    view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]))
-    view._generate_inflight = lambda: [_inflight_item(key="gen1", caption="my job")]
+    db = FakeDB([_image("done", "a cat", 50, 1)])
+    db.add(_running_row("gen1", prompt="a dog"))
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.show()
     qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the bar
@@ -3239,7 +3212,7 @@ def test_running_bar_shows_the_active_job_then_blanks_when_idle(qtbot):
     assert view._running_bar.isVisible()
     assert view._running_bar._item.key == "gen1"
 
-    view._generate_inflight = lambda: []
+    db.delete_generation("gen1")   # the job ends, its running row gone
     view._poll()
     assert view._running_bar.isVisible()      # still holding its slot
     assert view._running_bar._item is None    # but blank

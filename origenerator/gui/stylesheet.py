@@ -5,7 +5,7 @@ ensure_shared_ui_on_path()
 from shared_ui.colors import (
     BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
-    BORDER_SUBTLE, BORDER_PANEL, BLUE, GREEN, RED, STATUS_SKIP, ORANGE,
+    BORDER_SUBTLE, BORDER_PANEL, BLUE,
 )
 
 
@@ -97,18 +97,6 @@ def build_stylesheet() -> str:
     }}
     QProgressBar::chunk {{
         background-color: {_h(BLUE)};
-    }}
-    QProgressBar[barState="queued"]::chunk {{
-        background-color: {_h(STATUS_SKIP)};
-    }}
-    QProgressBar[barState="done"]::chunk {{
-        background-color: {_h(GREEN)};
-    }}
-    QProgressBar[barState="error"]::chunk {{
-        background-color: {_h(RED)};
-    }}
-    QProgressBar[barState="canceled"]::chunk {{
-        background-color: {_h(ORANGE)};
     }}
     QScrollArea {{
         border: none;

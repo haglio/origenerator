@@ -1,12 +1,9 @@
-import pytest
-
 from origenerator.timing import (
     average_label,
     average_seconds,
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
-    format_duration,
 )
 
 
@@ -41,19 +38,6 @@ def test_estimate_is_median_resistant_to_outliers():
 
 def test_estimate_none_when_no_history():
     assert estimate_seconds([]) is None
-
-
-@pytest.mark.parametrize("seconds,expected", [
-    (8, "8 sec"),
-    (9.5, "10 sec"),
-    (65, "1 min 5 sec"),
-    (120, "2 min"),
-    (905, "15 min 5 sec"),
-    (3600, "1 hr"),
-    (3725, "1 hr 2 min"),
-])
-def test_format_duration(seconds, expected):
-    assert format_duration(seconds) == expected
 
 
 def test_estimate_label_no_data():

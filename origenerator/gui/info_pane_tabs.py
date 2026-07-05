@@ -1,11 +1,15 @@
 """The gallery's info pane as a tabbed workspace of editable generate tabs.
 
 Every tab is the same plain, editable :class:`GenerateConfigPanel` — pick a
-workflow, set params, run a job — with no special or permanent tab. New tabs fork
-via the "+" button or a thumbnail double-click; the first one is created on
-construction. This owns every tab's lifecycle — add, close, rename, session
-capture/restore, the one-generation-at-a-time run queue shared across all tabs,
-and the in-flight reporting the Recents shelf and bottom bar read.
+workflow and set params — with no special or permanent tab. New tabs fork via the
+"+" button or a thumbnail double-click; the first one is created on construction.
+This owns every tab's lifecycle — add, close, rename, and session capture/restore
+of each tab's configuration.
+
+A tab's Generate doesn't run a job here; it emits :attr:`generate_requested`, which
+this relays for the gallery to launch as a re-roll of the config's settings folder.
+The gallery owns every in-flight job (a re-roll) and reconnects any left running
+after a restart, so the tabs carry no job state.
 
 Clicking a browser thumbnail loads that generation into the current tab (reusing
 it for the same settings folder, or forking a new tab for a different one), where
@@ -19,7 +23,6 @@ test) the "+" is hidden and :meth:`open_config` is a no-op — but a tab still s
 its form up for inspection with Generate disabled.
 """
 
-import json
 import time
 
 from PyQt6.QtWidgets import (
@@ -35,13 +38,11 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.inflight_card import InFlightItem
-from origenerator.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 class InfoPaneTabs(QTabWidget):
-    """A strip of editable config tabs, all sharing one run queue."""
+    """A strip of editable config tabs; each tab's Generate becomes a gallery re-roll."""
 
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
     generate_requested = pyqtSignal(str, dict)  # any tab's Generate: (workflow_name, params)
@@ -50,7 +51,6 @@ class InfoPaneTabs(QTabWidget):
         super().__init__(parent)
         self._client = client
         self._db = db
-        self._queue = JobQueue(db)  # one generation at a time across every tab
         # Install the eliding bar before setTabsClosable: swapping the bar
         # afterwards drops that setting (it doesn't carry to a new bar).
         self.setTabBar(ElidingTabBar())
@@ -90,7 +90,7 @@ class InfoPaneTabs(QTabWidget):
         disabled. The tab's strip / source-link / animation signals are wired so a
         click in any of them reaches the gallery.
         """
-        panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
+        panel = GenerateConfigPanel(self._client, self._db)
         index = self.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
         panel.generate_requested.connect(self.generate_requested)  # relay every tab's Generate
@@ -132,7 +132,6 @@ class InfoPaneTabs(QTabWidget):
         panel = self.widget(index)
         if not isinstance(panel, GenerateConfigPanel):
             return
-        self._queue.cancel(panel)  # drop its slot, advancing the queue if it was running
         self.removeTab(index)
         panel.teardown()
         panel.deleteLater()
@@ -244,66 +243,22 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel._preview.clear()
 
-    def reveal_config(self, panel: GenerateConfigPanel):
-        """Bring a config tab forward — landing a Recents-card click on the panel
-        running its job (the info pane is always on screen, so this just selects it)."""
-        index = self.indexOf(panel)
-        if index >= 0:
-            self.setCurrentIndex(index)
-
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.
 
-        Each carries its configuration, any user-set custom title, and the id of its
-        in-flight job (if any) — so a tab whose generation is still running when the
-        app closes reconnects to it rather than coming back idle. ``current`` is the
-        active tab, so the same tab reopens focused.
+        Each carries its configuration and any user-set custom title; ``current``
+        is the active tab, so the same tab reopens focused. A tab owns no job (a
+        Generate is a gallery re-roll), so nothing job-related is captured — the
+        gallery reconnects any still-running re-roll itself.
         """
         tabs = [
             {
                 "config": panel.current_config().to_dict(),
                 "title": panel.custom_title(),
-                "active_prompt_id": panel.active_prompt_id(),
             }
             for panel in self._config_panels()
         ]
         return {"tabs": tabs, "current": self.currentIndex()}
-
-    def _inflight_panels(self) -> list[GenerateConfigPanel]:
-        """Every panel that can have a job in flight — all the config tabs."""
-        return self._config_panels()
-
-    def active_prompt_ids(self) -> set[str]:
-        """Every in-flight job id across the tabs.
-
-        Lets the gallery know which running rows a tab already owns, so its re-roll
-        reconnection doesn't adopt a job a tab is already tracking.
-        """
-        ids = set()
-        for panel in self._inflight_panels():
-            pid = panel.active_prompt_id()
-            if pid:
-                ids.add(pid)
-        return ids
-
-    def in_flight_items(self) -> list[InFlightItem]:
-        """A card per in-flight job — running or waiting its turn in the local
-        queue — across the tabs, for the gallery's Recents shelf and bottom bar.
-        Each carries a reveal that brings its tab forward, so clicking the card
-        lands on the panel running it.
-        """
-        items = []
-        for panel in self._inflight_panels():
-            desc = panel.in_flight_descriptor()
-            if desc is None:
-                continue
-            items.append(InFlightItem(
-                key=desc["key"], caption=desc["caption"], status=desc["status"],
-                frame=desc["frame"], reveal=lambda p=panel: self.reveal_config(p),
-                media_type=desc["media_type"], progress=desc["progress"],
-                cancel=lambda p=panel: p._on_cancel(),
-            ))
-        return items
 
     def restore_state(self, state: dict):
         """Rebuild the tabs from a :meth:`capture_state` snapshot.
@@ -326,40 +281,17 @@ class InfoPaneTabs(QTabWidget):
             restored.append((
                 snapshot,
                 title if isinstance(title, str) and title.strip() else None,
-                entry.get("active_prompt_id"),
             ))
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
         while self.count() > 0:  # clear every tab before rebuilding from the snapshot
             self._discard_subtab(self.count() - 1)
-        for snapshot, title, active_prompt_id in restored:
+        for snapshot, title in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
             panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
-            self._reconnect_if_running(panel, active_prompt_id)
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self.count():
             self.setCurrentIndex(current)
-
-    def _reconnect_if_running(self, panel: GenerateConfigPanel, active_prompt_id):
-        """Rebind a restored tab to its job if that job is still running.
-
-        The row's stored payload sizes the panel's progress ramp. A job that has
-        since finished or gone (reconciled at startup) is no longer 'running', so
-        the tab simply comes back idle.
-        """
-        if not active_prompt_id:
-            return
-        row = self._db.get_generation(active_prompt_id)
-        if not row or row.get("status") not in ("running", "pending"):
-            return
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        if workflow is None:
-            return
-        try:
-            payload = json.loads(row.get("workflow_json") or "{}")
-        except (json.JSONDecodeError, TypeError):
-            payload = {}
-        panel.reconnect(active_prompt_id, workflow, payload)

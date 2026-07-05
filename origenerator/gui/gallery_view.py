@@ -83,11 +83,6 @@ class GalleryView(QWidget):
         super().__init__(parent)
         self._db = db
         self._client = client
-        # The info pane's config tabs are the source of in-flight Generate work and
-        # the ids the re-roll reconnection must not re-adopt; wired in _build_ui once
-        # the tabs exist. Default to empty until then.
-        self._claimed_ids = lambda: set()
-        self._generate_inflight = lambda: []
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
@@ -328,11 +323,6 @@ class GalleryView(QWidget):
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
         self._panes.addWidget(self._info_tabs)
-        # The config tabs feed the Recents shelf and bottom bar their in-flight
-        # Generate cards, and name the running ids the re-roll reconnection must
-        # not re-adopt.
-        self._generate_inflight = self._info_tabs.in_flight_items
-        self._claimed_ids = self._info_tabs.active_prompt_ids
         # A thumbnail double-click reuses its parameters by forking an editable
         # config tab in this same pane (a no-op without a client — nothing to run);
         # the fork's footer links are wired via tab_added like every other tab.
@@ -486,9 +476,8 @@ class GalleryView(QWidget):
             self._fingerprint = fingerprint
             self._rebuild(rows, meta)
         elif self._browser.showing_recents():
-            # No DB change, but in-flight cards still need their live frames pushed
-            # and a re-render when a locally-queued config tab appears/vanishes
-            # (it carries no DB row to move the fingerprint).
+            # No DB change, but the in-flight cards still need each running re-roll's
+            # live frame pushed in — it advances between rebuilds.
             self._browser.refresh_inflight()
         # The bottom bar is always on screen, so refresh the active job every tick —
         # its live frame and progress advance between rebuilds.
@@ -1063,8 +1052,9 @@ class GalleryView(QWidget):
     def reconnect_running_rerolls(self):
         """Rebind live jobs to any re-rolls left running by a previous session, so
         each shows live progress and records its completion again. Called once at
-        startup, after the Generate tabs have claimed their own jobs."""
-        self._reroll.reconnect_running(self._claimed_ids())
+        startup; a tab's Generate is itself a re-roll, so every still-running row is
+        the re-roll controller's to reconnect."""
+        self._reroll.reconnect_running()
 
     def _cancel_reroll(self, key: str):
         self._auto.stop(key)  # cancelling the in-flight job ends the loop too
@@ -1203,9 +1193,9 @@ class GalleryView(QWidget):
         return self._info_tabs.capture_state()
 
     def restore_config_tabs(self, state):
-        """Reopen the config tabs saved from a previous session, reconnecting any
-        whose job is still running — done before :meth:`reconnect_running_rerolls`
-        so a tab reclaims its own job before the gallery adopts the rest."""
+        """Reopen the config tabs saved from a previous session — their
+        configurations only; any still-running re-roll is reconnected separately by
+        :meth:`reconnect_running_rerolls`."""
         self._info_tabs.restore_state(state)
 
     # --- selection ---------------------------------------------------------

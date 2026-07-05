@@ -153,10 +153,10 @@ class BrowserPane:
                 and self._v._tree.currentItem() is self._v._recents_item)
 
     def refresh_inflight(self):
-        """Between rebuilds, keep the in-flight cards live: push each job's latest
-        frame into its card, and re-render only when the *set* of in-flight jobs
-        changes — one ends, or a Generate tab is queued behind another with no DB
-        row to move the fingerprint."""
+        """Between rebuilds, keep the in-flight cards live: push each tracked
+        re-roll's latest frame into its card, and re-render only when the *set* of
+        in-flight jobs changes (a defensive guard — a started or finished re-roll
+        normally moves the DB fingerprint and forces a full rebuild anyway)."""
         items = self._inflight_items()
         if _inflight_signature(items) != self._inflight_signature:
             self._render_recents()
@@ -171,27 +171,20 @@ class BrowserPane:
         """Every queued/running generation as a card model, running ones first.
 
         The database's running/pending rows are the source of truth for what's in
-        flight — a Generate tab's job or a gallery re-roll — so a card shows even
-        when no live job object is tracking a row (after a restart that hasn't
-        re-adopted it, say). Live frames and tab-routing are grafted on from the
-        tracking objects when present: a Generate tab's own job carries them, and
-        a re-roll's frame comes from its :class:`GenerationJob`. A Generate tab
-        still waiting its turn in the local queue has no row yet, so those are
-        added straight from the provider.
+        flight — every generation is a gallery re-roll (a tab's Generate launches
+        one too) — so a card shows even when no live job object is tracking a row
+        (after a restart that hasn't re-adopted it, say). A re-roll tracked this
+        session grafts on its live frame, progress and cancel from its
+        :class:`GenerationJob`; an untracked running row shows a plain card.
         """
-        generate = {it.key: it for it in self._v._generate_inflight()}
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, job in self._v._reroll.jobs.items()}
         image_index = None  # built lazily, only to place an untracked row's folder
-        items, seen = [], set()
+        items = []
         for row in self._v._db.list_generations():
             if row.get("status") not in ("running", "pending"):
                 continue
             pid = row["prompt_id"]
-            seen.add(pid)
-            if pid in generate:
-                items.append(generate[pid])  # a Generate tab's job: its own frame + reveal
-                continue
             tracked = reroll_by_pid.get(pid)
             if tracked is not None:
                 folder_key, job = tracked
@@ -214,10 +207,6 @@ class BrowserPane:
                 progress=progress,
                 cancel=cancel,
             ))
-        # A Generate tab queued behind another carries no DB row yet — add it too.
-        for pid, item in generate.items():
-            if pid not in seen:
-                items.append(item)
         items.sort(key=lambda it: it.status != "running")  # stable: running first
         return items
 

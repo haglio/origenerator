@@ -224,10 +224,10 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
 
 
 def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
-    # The reported bug: a config tab's job left running by a prior session (here an
-    # i2v video), with the gallery restored onto Recents. It must show as an
-    # in-flight card — the shelf reads the database's running rows, so a card
-    # appears whether or not the reconnected tab is tracking the job this instant.
+    # The reported bug: a generation left running by a prior session (here an i2v
+    # video), with the gallery restored onto Recents. It must show as an in-flight
+    # card — the shelf reads the database's running rows, so a card appears whether
+    # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="x", input_image="img.png")
@@ -239,7 +239,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
         {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
-         "title": None, "active_prompt_id": "vid_run"},
+         "title": None},
     ], "current": 1})
     state.set("gallery_folder", "__recents__")
     win = _window(qtbot, tmp_path, state)

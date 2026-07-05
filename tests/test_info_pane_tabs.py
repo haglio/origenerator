@@ -48,21 +48,6 @@ def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
     return db.get_generation(prompt_id)
 
 
-def _submit(panel):
-    """Drive a config panel's own job to a submitted state.
-
-    Clicking Generate now emits :attr:`generate_requested` for the gallery to
-    launch as a re-roll; the panel keeps its job machinery (queue, submit,
-    completion, the in-flight card it reports) for a container to drive. These
-    tests exercise that machinery directly, standing in for the launcher by
-    building the current form's job and beginning it as the old Generate did.
-    """
-    key = panel._workflow_combo.currentData()
-    wf = WORKFLOW_REGISTRY[key]
-    params = dict(wf.default_params(), **panel._param_form.get_values())
-    panel._generate(wf, params)
-
-
 def _strip_ids(tabs):
     strip = tabs.currentWidget()._strip
     return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
@@ -75,9 +60,6 @@ def _has_ancestor(widget, ancestor) -> bool:
             return True
         node = node.parent()
     return False
-
-
-SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "x.png", "subfolder": ""}]}}}
 
 
 # --- every tab is a plain editable config tab -------------------------------
@@ -192,25 +174,6 @@ def test_tab_text_follows_gallery_folder_name(tabs):
     tabs.open_config("sdxl_t2i", {"positive_prompt": "a dragon"})
     idx = tabs.currentIndex()
     assert tabs.tabText(idx) == "SDXL Text-to-Image › a dragon"
-
-
-def test_strip_keeps_earlier_runs_after_a_settings_change(tabs):
-    # The reported bug: changing params and regenerating must NOT wipe the strip.
-    panel = tabs.currentWidget()
-    panel._client.submit_job = MagicMock(return_value="comfy-A")
-
-    panel._param_form.set_values({"positive_prompt": "cat", "seed": 1})
-    _submit(panel)
-    first = panel._client_prompt_id
-    panel._client.job_completed.emit(first, SDXL_HISTORY)
-    assert _strip_ids(tabs) == [first]
-
-    panel._param_form.set_values({"positive_prompt": "dog", "seed": 2})  # a mod
-    _submit(panel)
-    second = panel._client_prompt_id
-    panel._client.job_completed.emit(second, SDXL_HISTORY)
-    # Both runs stay, newest first — the earlier (now-mismatched) one isn't dropped.
-    assert _strip_ids(tabs) == [second, first]
 
 
 def test_strip_click_opens_new_tab_when_settings_differ(tabs):
@@ -374,29 +337,6 @@ def test_double_clicking_close_does_not_open_rename(tabs, monkeypatch):
     assert opened == []
 
 
-# --- the one-generation-at-a-time queue ------------------------------------
-
-def test_second_generate_is_queued_behind_the_first(tabs):
-    tabs._client.submit_job = MagicMock(return_value="comfy-1")
-    p1 = tabs.currentWidget()
-    p2 = tabs._add_subtab()
-    _submit(p1)
-    _submit(p2)
-    assert tabs._client.submit_job.call_count == 1   # only the first reaches ComfyUI
-    assert p1._client_prompt_id is not None           # first is running
-    assert "queued" in p2._progress.format().lower()
-
-
-def test_closing_running_config_tab_advances_the_queue(tabs):
-    tabs._client.submit_job = MagicMock(return_value="comfy-1")
-    p1 = tabs.currentWidget()
-    p2 = tabs._add_subtab()
-    _submit(p1)  # running
-    _submit(p2)  # queued
-    tabs._close_subtab(tabs.indexOf(p1))
-    assert p2._client_prompt_id is not None           # p2 promoted and started
-
-
 # --- session capture / restore ---------------------------------------------
 
 def _config_tab(workflow_name, params=None, seed_is_random=True, title=None):
@@ -414,110 +354,6 @@ def test_capture_state_lists_every_tab_and_current(tabs):
     workflows = [tab["config"]["workflow_name"] for tab in state["tabs"]]
     assert workflows == ["sdxl_t2i", "wan22_i2v"]
     assert state["current"] == 1
-
-
-def test_capture_state_records_each_tab_active_prompt_id(tabs):
-    panel = tabs.currentWidget()
-    panel._client.submit_job = MagicMock(return_value="x")
-    _submit(panel)
-    state = tabs.capture_state()
-    assert state["tabs"][0]["active_prompt_id"] == panel._client_prompt_id
-
-
-def test_capture_state_active_prompt_id_is_none_when_idle(tabs):
-    state = tabs.capture_state()
-    assert state["tabs"][0]["active_prompt_id"] is None
-
-
-def _running_row(db, prompt_id="run-1"):
-    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
-    payload = wf.build_api_payload(wf.default_params())
-    db.insert_generation(
-        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v",
-        params_json=json.dumps(_sdxl_full()), workflow_json=json.dumps(payload),
-    )
-    db.update_generation(prompt_id, status="running")
-
-
-def _restore_tab_state(active_prompt_id):
-    return {"tabs": [{
-        "config": {"workflow_name": "sdxl_t2i", "params": _sdxl_full(),
-                   "seed_is_random": False},
-        "title": None, "active_prompt_id": active_prompt_id,
-    }], "current": 0}
-
-
-def test_restore_reconnects_a_still_running_tab(qtbot, tmp_path):
-    db = Database(tmp_path / "t.db")
-    _running_row(db, "run-1")
-    client = ComfyUIClient()
-    tabs = InfoPaneTabs(client, db)
-    qtbot.addWidget(tabs)
-
-    tabs.restore_state(_restore_tab_state("run-1"))
-
-    panel = tabs._config_panels()[0]
-    assert panel.active_prompt_id() == "run-1"  # reconnected to the running job
-    assert panel._cancel_btn.isEnabled() is True
-    # its completion now flows back into the restored tab
-    client.job_completed.emit("run-1", SDXL_HISTORY)
-    assert db.get_generation("run-1")["status"] == "completed"
-
-
-def test_restore_does_not_reconnect_a_finished_job(qtbot, tmp_path):
-    db = Database(tmp_path / "t.db")
-    _running_row(db, "done")
-    db.update_generation("done", status="completed")
-    client = ComfyUIClient()
-    tabs = InfoPaneTabs(client, db)
-    qtbot.addWidget(tabs)
-
-    tabs.restore_state(_restore_tab_state("done"))
-
-    assert tabs._config_panels()[0].active_prompt_id() is None
-
-
-def test_active_prompt_ids_collects_in_flight_tabs(tabs):
-    p0 = tabs.currentWidget()
-    p0._client.submit_job = MagicMock(return_value="x")
-    tabs._add_subtab()  # a second, idle tab
-    _submit(p0)
-    assert tabs.active_prompt_ids() == {p0._client_prompt_id}
-
-
-# --- in-flight items: the cards the gallery's Recents shelf reads from here ---
-
-def test_in_flight_items_is_empty_when_nothing_is_generating(tabs):
-    assert tabs.in_flight_items() == []
-
-
-def test_in_flight_items_reports_a_running_job(tabs):
-    tabs._client.submit_job = MagicMock(return_value="x")
-    panel = tabs.currentWidget()
-    _submit(panel)
-    items = tabs.in_flight_items()
-    assert len(items) == 1
-    assert items[0].key == panel.active_prompt_id()
-
-
-def test_in_flight_items_carry_the_tab_media_type(tabs):
-    # The Recents card badges a job image-or-video from its tab's workflow; the
-    # config tab here runs SDXL, an image pipeline.
-    tabs._client.submit_job = MagicMock(return_value="x")
-    panel = tabs.currentWidget()
-    _submit(panel)
-    assert tabs.in_flight_items()[0].media_type == "image"
-
-
-def test_in_flight_items_includes_a_tab_queued_behind_a_running_one(tabs):
-    tabs._client.submit_job = MagicMock(return_value="x")
-    p1 = tabs.currentWidget()
-    p2 = tabs._add_subtab()
-    p1._param_form.set_values({"seed": 1})
-    p2._param_form.set_values({"seed": 2})
-    _submit(p1)   # running
-    _submit(p2)   # queued behind it — no DB row, but still in flight
-    assert len(tabs.in_flight_items()) == 2
 
 
 def test_generate_requested_surfaces_from_the_initial_tab(tabs):
@@ -543,16 +379,6 @@ def test_generate_requested_surfaces_from_a_forked_tab(tabs):
     forked._on_generate()
 
     assert requested == ["sdxl_t2i"]
-
-
-def test_revealing_an_item_selects_its_config_tab(tabs):
-    tabs._client.submit_job = MagicMock(return_value="x")
-    first = tabs.currentWidget()
-    tabs._add_subtab()  # a second config tab is now current
-    assert tabs.currentWidget() is not first
-    _submit(first)  # the first tab is the one generating
-    tabs.in_flight_items()[0].reveal()
-    assert tabs.currentWidget() is first  # reveal jumped to the generating tab
 
 
 def test_restore_state_rebuilds_config_tabs(tabs):

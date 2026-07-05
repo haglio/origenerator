@@ -196,13 +196,13 @@ class RerollController(QObject):
         job.failed.connect(lambda msg, k=key: self._on_failed(k, msg))
         job.preview.connect(lambda data, k=key: self.preview.emit(k, data))
 
-    def reconnect_running(self, claimed_ids: set):
+    def reconnect_running(self):
         """Rebind live jobs to any re-rolls left running by a previous session.
 
-        Each still-in-flight row this app doesn't already own (a Generate tab owns
-        its own jobs) is picked back up so its completion is recorded and its tile
-        shows live progress again — even for a folder the user hasn't opened yet.
-        Called once at startup, after the Generate tabs have claimed their jobs.
+        Every still-in-flight row is picked back up so its completion is recorded
+        and its tile shows live progress again — even for a folder the user hasn't
+        opened yet. A tab's Generate is itself a re-roll, so no in-flight row is
+        owned elsewhere. Called once at startup.
         """
         if self._client is None:
             return
@@ -210,7 +210,7 @@ class RerollController(QObject):
         # (which would populate the view's image rows) hasn't run yet at startup.
         index = self._image_config_index()
         for row in self._db.list_generations():
-            if row.get("status") in ("running", "pending") and row["prompt_id"] not in claimed_ids:
+            if row.get("status") in ("running", "pending"):
                 self._reconnect(row, index)
         self.changed.emit()
 

@@ -4,8 +4,7 @@ from unittest.mock import MagicMock
 from PIL import Image
 
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.db import Database
-from origenerator.gui.generation_job import GenerationJob, persist_generation
+from origenerator.gui.generation_job import GenerationJob
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -33,21 +32,6 @@ def _started_job(tmp_path):
     job.prompt_id = "comfy-A"  # pin our id so the client-signal emits below match
     job.start()
     return job, client
-
-
-def test_persist_generation_saves_a_completed_row_with_its_outputs(qtbot, tmp_path):
-    db = Database(tmp_path / "t.db")
-    job = GenerationJob(_client(), SDXL, dict(_params(), positive_prompt="a cat", seed=9))
-    files = [{"filename": "a.png", "subfolder": "image"}]
-
-    persist_generation(db, job, files, thumb_path="/thumbs/a.jpg", duration=12.5)
-
-    row = db.get_generation(job.prompt_id)
-    assert row["status"] == "completed"
-    assert row["workflow_name"] == "sdxl_t2i"
-    assert "a.png" in row["output_files"]
-    assert row["seed"] == 9
-    assert row["duration_seconds"] == 12.5
 
 
 def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):

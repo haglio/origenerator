@@ -47,23 +47,6 @@ def average_seconds(durations: list[float]) -> float | None:
     return statistics.fmean(durations)
 
 
-def format_duration(seconds: float) -> str:
-    """Render a duration as a compact human string, e.g. ``"15 min 5 sec"``.
-
-    Shows the two largest non-zero units (hr+min, or min+sec), dropping a
-    trailing zero unit so whole values read cleanly (``"2 min"``, ``"1 hr"``).
-    """
-    total = round(seconds)
-    if total < 60:
-        return f"{total} sec"
-    if total < 3600:
-        minutes, secs = divmod(total, 60)
-        return f"{minutes} min {secs} sec" if secs else f"{minutes} min"
-    hours, remainder = divmod(total, 3600)
-    minutes = remainder // 60
-    return f"{hours} hr {minutes} min" if minutes else f"{hours} hr"
-
-
 def _coarse_duration(seconds: float) -> str:
     """A single-unit rounding for estimates, so they don't imply false precision."""
     if seconds < 60:

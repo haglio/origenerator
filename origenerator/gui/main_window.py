@@ -44,8 +44,9 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._gallery_view)
 
         self._restore_session()
-        # After the config tabs have reclaimed their own running jobs, adopt
-        # whatever in-flight re-rolls remain from the previous session.
+        # Reconnect to any generation left running by the previous session. A tab's
+        # Generate is itself a re-roll, so every in-flight row is the gallery's to
+        # re-adopt — the tabs restore their configs only, owning no jobs.
         self._gallery_view.reconnect_running_rerolls()
 
     def _restore_session(self):

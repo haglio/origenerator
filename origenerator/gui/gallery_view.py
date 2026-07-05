@@ -366,6 +366,17 @@ class GalleryView(QWidget):
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
 
+    def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
+        """True when launching ``workflow`` with ``params`` would re-create a
+        byte-identical past generation — the cue to warn before wasting a slot.
+
+        Callers pass params whose seed is already concrete (the form randomizes a
+        Random seed before emitting; a combine reads the stored one), so the seed
+        is taken as pinned here; a genuinely random seed would simply never match.
+        """
+        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
+        return find_duplicate_generation(self._db.list_generations(), snapshot) is not None
+
     def _on_generate_requested(self, workflow_name: str, params: dict):
         """A tab's Generate: launch it as a re-roll of its settings folder and land
         the browser there, its live tile showing the run.
@@ -386,6 +397,15 @@ class GalleryView(QWidget):
             {"workflow_name": workflow_name, "params_json": json.dumps(params)},
             gallery.build_image_config_index(self._image_rows),
         )
+        # A pinned seed that would reproduce a past run gets the shared "already
+        # generated" dialog rather than silently launching a copy — the guard the
+        # re-roll "+" and combine paths (see :meth:`_generate_combination`) use too.
+        # Declining launches nothing; accepting re-rolls the seed into a fresh
+        # variation of the same folder.
+        if self._would_reproduce_a_completed_run(wf, params):
+            if offer_reroll(self, wf, can_reroll_image=False) is None:
+                return  # let the user change something rather than duplicate it
+            params = randomize_seeds(params, wf.seed_keys())
         if not self._reroll.start_prepared(key, wf, params):
             return  # no client, or this folder already has a re-roll running
         self._navigate_to_reroll(key)
@@ -919,8 +939,7 @@ class GalleryView(QWidget):
             {**dict(video_row), "params_json": json.dumps(params)},
             gallery.build_image_config_index(self._image_rows),
         )
-        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
-        if find_duplicate_generation(self._db.list_generations(), snapshot):
+        if self._would_reproduce_a_completed_run(workflow, params):
             image_workflow = WORKFLOW_REGISTRY.get(image_row.get("workflow_name") or "")
             can_reroll_image = (
                 image_workflow is not None

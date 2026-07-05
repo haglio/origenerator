@@ -3464,6 +3464,55 @@ def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path,
     assert json.loads(view._db.get_generation(job.prompt_id)["params_json"])["seed"] != 1
 
 
+def test_generate_request_duplicate_declined_launches_nothing(qtbot, tmp_path, monkeypatch):
+    # Regression: a tab's Generate with a pinned seed that reproduces a past run
+    # must warn via the shared dialog, not silently re-launch identical copies.
+    # Declining launches nothing — the same guard the re-roll and combine paths use.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: None)
+
+    view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
+
+    assert view._reroll_jobs == {}              # declined: nothing launched
+    view._client.submit_job.assert_not_called()
+
+
+def test_generate_request_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeypatch):
+    # Accepting the dialog re-rolls the seed, so the config launched is a fresh
+    # variation the folder can run without reproducing the duplicate.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
+
+    view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "sdxl_t2i"
+    assert job.params["seed"] != 42            # a fresh seed, not the duplicate's
+
+
+def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_path, monkeypatch):
+    # A config that hasn't been generated before must launch with no dialog at all.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda *a, **k: pytest.fail("no dialog for a novel config"))
+
+    view._on_generate_requested("sdxl_t2i", {"seed": 999, "positive_prompt": "a novel prompt"})
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["seed"] == 999           # launched exactly as asked, unprompted
+
+
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     db.insert_generation(prompt_id="vx", workflow_name="mystery", workflow_version="v",

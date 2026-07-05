@@ -142,6 +142,7 @@ class GalleryView(QWidget):
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
+        self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
@@ -488,6 +489,7 @@ class GalleryView(QWidget):
             self._browser.show_starred_overview()
             return
         group = current.data(0, _GROUP_ROLE)
+        self._note_folder_visit(group.key if group is not None else None)
         self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         if isinstance(group, gallery.SettingsGroup):
@@ -496,6 +498,16 @@ class GalleryView(QWidget):
             self._browser.show_folder_tiles(gallery.child_groups(group))
         self._select_first_item(group)
         self._sync_delete_button()
+
+    def _note_folder_visit(self, key: str | None):
+        """Record a folder the user opened, so a delete can return to the most
+        recent one still standing. Skipped while a rebuild or Back/Forward is
+        re-selecting (suppressed), and consecutive repeats collapse, so it stays a
+        genuine visit trail rather than a poll-driven pile-up."""
+        if self._suppress_history or key is None:
+            return
+        if not self._folder_history or self._folder_history[-1] != key:
+            self._folder_history.append(key)
 
     def _select_first_item(self, group):
         """Immediately preview the first generation under the chosen folder."""
@@ -1148,13 +1160,38 @@ class GalleryView(QWidget):
         plural = "s" if len(rows) != 1 else ""
         if not self._confirm(f"Delete “{group.label}” and its {len(rows)} item{plural}?"):
             return
-        # Land on the parent folder after the rebuild rather than jumping to the
-        # top of the tree, so the view stays where the user was working.
-        item = self._item_by_key.get(group.key)
-        parent = item.parent() if item is not None else None
-        if parent is not None:
-            self._tree.setCurrentItem(parent)
+        # Return to the most recent folder we were in that survives this delete;
+        # fall back to the deleted folder's parent (not the top of the tree) when
+        # history offers no survivor, so the view stays where the user was working.
+        target = self._post_delete_target(group)
+        if target is not None:
+            self._tree.setCurrentItem(target)
         self._delete_rows(rows)
+
+    def _post_delete_target(self, group):
+        """The tree item to select after deleting ``group``: the most recently
+        visited folder that isn't inside the deleted subtree, else its parent."""
+        doomed = self._keys_under(group)
+        for key in reversed(self._folder_history):
+            if key not in doomed and (item := self._item_by_key.get(key)) is not None:
+                return item
+        item = self._item_by_key.get(group.key)
+        return item.parent() if item is not None else None
+
+    def _keys_under(self, group) -> set[str]:
+        """``group``'s key plus every folder key nested under it in the tree — the
+        folders a delete of ``group`` removes, so a return target can avoid them."""
+        item = self._item_by_key.get(group.key)
+        if item is None:
+            return {group.key}
+        keys, stack = set(), [item]
+        while stack:
+            node = stack.pop()
+            node_group = node.data(0, _GROUP_ROLE)
+            if node_group is not None:
+                keys.add(node_group.key)
+            stack.extend(node.child(i) for i in range(node.childCount()))
+        return keys
 
     def _delete_rows(self, rows):
         if not rows:

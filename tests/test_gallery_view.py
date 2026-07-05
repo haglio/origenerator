@@ -1756,6 +1756,42 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     assert isinstance(current, gallery.LoraGroup)
 
 
+def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp_path):
+    db = Database(tmp_path / "g.db")
+    out = tmp_path / "output"
+    out.mkdir()
+    for pid, prompt in [("i1", "a cat"), ("i2", "a dog")]:  # two settings folders
+        db.insert_generation(
+            prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v1",
+            positive_prompt=prompt,
+            params_json=json.dumps({"positive_prompt": prompt, "steps": 20}),
+            workflow_json="{}",
+        )
+        (out / f"sdxl_t2i_{pid}.png").write_bytes(b"x")
+        db.update_generation(
+            pid, status="completed",
+            output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png", "subfolder": ""}]),
+        )
+    actions = GalleryActions(db, out, Trash(tmp_path / "trash"))
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # the (no LoRA) folder
+    first_leaf, second_leaf = lora.child(0), lora.child(1)
+    first_key = first_leaf.data(0, _GROUP_ROLE).key
+    view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
+    view._tree.setCurrentItem(second_leaf)  # then the second (now current)
+    view._confirm = lambda text: True
+
+    view._delete_selection()  # deletes the second folder
+
+    # Return to the first — the most recent folder we were in that still exists —
+    # rather than the deleted folder's parent.
+    current = view._tree.currentItem().data(0, _GROUP_ROLE)
+    assert isinstance(current, gallery.SettingsGroup)
+    assert current.key == first_key
+
+
 def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)

@@ -26,8 +26,10 @@ class FullscreenPreview(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # This preview *is* the fullscreen view, so it opts out of opening another.
-        self._preview = PreviewWidget(player=player, allow_fullscreen=False)
+        # This preview *is* the fullscreen view, so it opts out of opening another —
+        # and a double-click on it (the media fills the window) dismisses the view.
+        self._preview = PreviewWidget(player=player, allow_fullscreen=False,
+                                      on_double_click=self.close)
         layout.addWidget(self._preview, 1)
         self._preview.show_media(media[0], media[1])
 

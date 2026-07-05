@@ -234,3 +234,14 @@ def test_a_preview_that_opted_out_never_opens_fullscreen(qtbot, tmp_path):
     qtbot.addWidget(w)
     w.show_image(_make_png(tmp_path / "p.png"))
     assert w.open_fullscreen() is None
+
+
+def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
+    # The fullscreen view's inner preview opts out of opening another, so a
+    # double-click there runs the callback (which closes the view) instead.
+    called = []
+    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
+                      on_double_click=lambda: called.append(True))
+    qtbot.addWidget(w)
+    w.mouseDoubleClickEvent(None)
+    assert called == [True]

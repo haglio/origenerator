@@ -41,11 +41,13 @@ def test_escape_closes_it(qtbot, tmp_path):
     assert not win.isVisible()
 
 
-def test_double_click_closes_it(qtbot, tmp_path):
+def test_double_click_on_the_media_closes_it(qtbot, tmp_path):
+    # The click lands on the inner preview (the media fills the window), not the
+    # window itself — the reported bug was that only Escape closed it.
     win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
     qtbot.addWidget(win)
     win.showFullScreen()
-    win.mouseDoubleClickEvent(None)
+    win._preview.mouseDoubleClickEvent(None)
     assert not win.isVisible()
 
 

@@ -23,7 +23,8 @@ class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 loop_videos: bool = True, allow_fullscreen: bool = True):
+                 loop_videos: bool = True, allow_fullscreen: bool = True,
+                 on_double_click=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -33,6 +34,10 @@ class PreviewWidget(QWidget):
         self._media: tuple | None = None
         self._allow_fullscreen = allow_fullscreen  # a slideshow / the fullscreen view opts out
         self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
+        # A double-click that doesn't open fullscreen (this preview opted out) runs
+        # this instead — the fullscreen view uses it so a second double-click, which
+        # lands here on its inner preview, dismisses it.
+        self._on_double_click = on_double_click
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self._stack = QStackedLayout(self)
@@ -140,7 +145,11 @@ class PreviewWidget(QWidget):
         return self._stack.currentWidget() is self._video
 
     def mouseDoubleClickEvent(self, event) -> None:
-        self.open_fullscreen()
+        # Open fullscreen, or — when this preview can't (it opted out, e.g. the
+        # fullscreen view's own inner preview) — run the double-click callback, so a
+        # second double-click that lands here closes the fullscreen view.
+        if self.open_fullscreen() is None and self._on_double_click is not None:
+            self._on_double_click()
 
     def open_fullscreen(self):
         """Pop the current media open fullscreen (Escape or a double-click closes

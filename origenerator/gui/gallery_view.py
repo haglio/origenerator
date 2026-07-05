@@ -9,10 +9,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
-from origenerator import gallery, timing
+from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
+    LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_CATEGORY_MATCH_SYSTEM_PROMPT,
+)
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
@@ -270,6 +273,7 @@ class GalleryView(QWidget):
             self._combine_accepts_image, self._combine_accepts_video, self._combine_preview
         )
         self._combine.generate_requested.connect(self._generate_combination)
+        self._combine.category_requested.connect(self._generate_category)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
         self._panes.addWidget(toc)
@@ -949,15 +953,20 @@ class GalleryView(QWidget):
             and gallery.output_file_reference(gallery.row_output_files(row)) is not None
         )
 
-    def _combine_accepts_video(self, prompt_id: str) -> bool:
-        """Whether the video slot accepts a dropped generation: a video whose i2v
-        recipe the app can rebuild — so its settings can be re-run on a new image.
-        (``is_image_conditioned`` already implies the workflow is registered.)"""
-        row = self._db.get_generation(prompt_id)
+    def _is_rebuildable_video_row(self, row) -> bool:
+        """Whether ``row`` is a video whose i2v recipe the app can rebuild — so its
+        settings can be re-run on a new image. (``is_image_conditioned`` already
+        implies the workflow is registered.) The shared gate behind both the video
+        drop slot and the category dropdown's candidate pool."""
         return bool(
             row and gallery.media_type_of_row(row) == "video"
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
         )
+
+    def _combine_accepts_video(self, prompt_id: str) -> bool:
+        """Whether the video slot accepts a dropped generation (see
+        :meth:`_is_rebuildable_video_row`)."""
+        return self._is_rebuildable_video_row(self._db.get_generation(prompt_id))
 
     def _combine_preview(self, prompt_id: str) -> tuple[str | None, str | None]:
         """A dropped item's (thumbnail, looping-preview) paths for its slot: a video
@@ -981,6 +990,16 @@ class GalleryView(QWidget):
             self._combine.image_slot.set_item(image_id)
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
+
+    def selected_category(self) -> str:
+        """The combine panel's picked act (or "") — for session save."""
+        return self._combine.selected_category()
+
+    def restore_selected_category(self, saved) -> None:
+        """Re-pick the combine category from a saved value, ignoring anything that
+        isn't a known act (an unknown/blank value just leaves the dropdown empty)."""
+        if isinstance(saved, str):
+            self._combine.set_category(saved)
 
     def _on_thumbnail_drag_started(self, prompt_id: str):
         """A gallery thumbnail began dragging: light the combine slot it fits, so
@@ -1042,6 +1061,45 @@ class GalleryView(QWidget):
                 return
         if self._reroll.start_prepared(key, workflow, params):
             self._reveal_combination(key)
+
+    def _category_candidates(self) -> list:
+        """Completed, rebuildable i2v videos — the pool the category router matches a
+        dropped image against (each carries the prompt it was made from)."""
+        return [
+            row for row in self._db.list_generations()
+            if row.get("status") == "completed" and self._is_rebuildable_video_row(row)
+        ]
+
+    def _generate_category(self, image_id: str, category: str):
+        """Find a fitting past video for ``category`` and run its recipe on the
+        dropped image — the category dropdown's counterpart to a dropped video.
+
+        Gathers the user's completed, rebuildable i2v recipes and lets the local LLM
+        choose the best fit for this image's own prompt (its scene, taken as read),
+        then hands off to the shared combine launch. A no-op — with a hint — when no
+        past video of that act fits, so a click never silently does nothing.
+        """
+        image_row = self._db.get_generation(image_id)
+        if image_row is None:
+            return
+        candidates = self._category_candidates()
+        video_id = recipe_match.choose_recipe(
+            category, image_row.get("positive_prompt") or "", candidates,
+            base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+            system_prompt=VIDEO_CATEGORY_MATCH_SYSTEM_PROMPT,
+        )
+        logger.info(
+            "combine: category=%s image=%s -> exemplar=%s (%d candidates)",
+            category, image_id, video_id, len(candidates),
+        )
+        if video_id is None:
+            QMessageBox.information(
+                self, "No recipe yet",
+                f"No past “{category}” video to learn from yet — make one first, "
+                "or drop a specific video instead.",
+            )
+            return
+        self._generate_combination(image_id, video_id)
 
     def _reveal_combination(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already

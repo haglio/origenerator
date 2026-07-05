@@ -349,3 +349,17 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     assert reopened._gallery_view._combine.image_slot.current_id() == "img"
     assert reopened._gallery_view._combine.video_slot.current_id() == "vid"
+
+
+def test_selected_category_survives_close_and_reopen(qtbot, tmp_path):
+    # The category dropdown is part of the combine panel's state, so a picked act
+    # comes back on the next launch just like the dropped-item slots do.
+    _seed_combine_db(tmp_path)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._combine.set_category("gamma")
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert reopened._gallery_view._combine.selected_category() == "gamma"

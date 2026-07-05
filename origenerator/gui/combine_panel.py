@@ -1,24 +1,29 @@
 """The gallery's image + video combine panel, sitting under the TOC folder tree.
 
-Drop an image into the top slot and an i2v video into the bottom slot, then click
-Generate to re-run that video's recipe on the dropped image. The panel is pure UI:
-it holds the two :class:`DropSlot`s and a Generate button, and reports the chosen
-pair through :attr:`generate_requested` — the view owns the database, the predicates
-that gate each slot, and the generation itself.
+Drop an image into the top slot, then supply a *recipe* one of two ways: drop a
+specific i2v video, or pick an act from the category dropdown and let the app find
+a fitting past video for you. Either way, Generate re-runs that recipe on the
+dropped image. The panel is pure UI: it holds the two :class:`DropSlot`s, the
+category dropdown and a Generate button, and reports the request through
+:attr:`generate_requested` (a dropped video) or :attr:`category_requested` (a
+picked act) — the view owns the database, the predicates that gate each slot, the
+category→recipe routing, and the generation itself.
 """
 
 from collections.abc import Callable
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox
 from PyQt6.QtCore import pyqtSignal
 
 from origenerator.gui.drop_slot import DropSlot
+from origenerator.recipe_match import CATEGORIES
 
 
 class CombinePanel(QWidget):
-    """Two kind-gated drop slots and a Generate button; emits the chosen pair."""
+    """Image slot + a recipe (dropped video or picked category) + Generate."""
 
-    generate_requested = pyqtSignal(str, str)  # image prompt_id, video prompt_id
+    generate_requested = pyqtSignal(str, str)   # (image prompt_id, video prompt_id): a dropped recipe
+    category_requested = pyqtSignal(str, str)   # (image prompt_id, category): let the app find the recipe
 
     def __init__(
         self,
@@ -33,6 +38,19 @@ class CombinePanel(QWidget):
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._sync)
 
+        # The video part's fast path: pick an act and the view finds a fitting past
+        # video for you. Blank by default (index -1), so a dropped video still leads
+        # when no act is picked. Takes the top half of the video part, the slot below.
+        self._category = QComboBox()
+        self._category.addItems(CATEGORIES)
+        self._category.setPlaceholderText("Pick a move…")
+        self._category.setCurrentIndex(-1)
+        self._category.setToolTip(
+            "Pick an act and Generate — the app reuses a fitting past video's recipe "
+            "on the dropped image. Leave blank to use a dropped video instead."
+        )
+        self._category.currentIndexChanged.connect(self._sync)
+
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
 
@@ -41,13 +59,24 @@ class CombinePanel(QWidget):
         heading = QLabel("Combine")
         heading.setObjectName("combineHeading")
         heading.setToolTip(
-            "Re-run the dropped video's recipe on the dropped image, then Generate."
+            "Re-run a video's recipe on the dropped image: drop a video, or pick an act."
         )
         layout.addWidget(heading)
         layout.addWidget(self.image_slot)
+        layout.addWidget(self._category)
         layout.addWidget(self.video_slot)
         layout.addWidget(self._generate_btn)
         self._sync()
+
+    # --- category ---------------------------------------------------------
+
+    def selected_category(self) -> str:
+        """The picked act, or "" when the dropdown is blank."""
+        return self._category.currentText() if self._category.currentIndex() >= 0 else ""
+
+    def set_category(self, category: str):
+        """Select ``category`` (a member of ``CATEGORIES``); clear to blank otherwise."""
+        self._category.setCurrentIndex(self._category.findText(category))
 
     def show_drop_candidates(self, prompt_id: str):
         """Light whichever slot accepts a now-dragging item, so its target is
@@ -61,12 +90,17 @@ class CombinePanel(QWidget):
         self.video_slot.set_candidate(False)
 
     def _sync(self):
-        """Generate is live only once both a source image and a recipe video sit."""
-        self._generate_btn.setEnabled(
-            bool(self.image_slot.current_id() and self.video_slot.current_id())
-        )
+        """Generate is live once a source image sits and a recipe is chosen — either
+        by picking an act or by dropping a video."""
+        has_recipe = bool(self.selected_category() or self.video_slot.current_id())
+        self._generate_btn.setEnabled(bool(self.image_slot.current_id()) and has_recipe)
 
     def _emit(self):
-        image_id, video_id = self.image_slot.current_id(), self.video_slot.current_id()
-        if image_id and video_id:
-            self.generate_requested.emit(image_id, video_id)
+        image_id = self.image_slot.current_id()
+        if not image_id:
+            return
+        category = self.selected_category()
+        if category:  # a picked act takes precedence over any dropped video
+            self.category_requested.emit(image_id, category)
+        elif self.video_slot.current_id():
+            self.generate_requested.emit(image_id, self.video_slot.current_id())

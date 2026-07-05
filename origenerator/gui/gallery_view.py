@@ -187,10 +187,11 @@ class GalleryView(QWidget):
 
     def _handle_escape(self) -> bool:
         """Esc stops the physical device and any running loop, wherever focus is: it
-        turns off OSR2 driving and ends auto-generate. It yields to an open dialog or
-        popup, though, so Esc can still close a combo dropdown or cancel a dialog
-        instead of being swallowed. Returns whether it acted."""
-        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+        turns off OSR2 driving and ends auto-generate. It yields, though, when
+        another window owns the keystroke — an open dialog/popup, so Esc still closes
+        a combo dropdown, or an active fullscreen preview/slideshow, which close on
+        Esc themselves. Returns whether it acted."""
+        if self._other_window_owns_keys():
             return False
         handled = False
         if self._osr2_enabled:
@@ -201,17 +202,29 @@ class GalleryView(QWidget):
             handled = True
         return handled
 
+    def _other_window_owns_keys(self) -> bool:
+        """True when a keystroke belongs to something other than the gallery: an open
+        modal dialog or popup, or a separate top-level window that's active — a
+        fullscreen preview or the slideshow, both of which close on Esc. The
+        gallery's filter is installed on the application, so it sees those windows'
+        keys first and has to hand them back."""
+        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+            return True
+        active = QApplication.activeWindow()
+        return active is not None and active is not self.window()
+
     def _gallery_owns_keys(self) -> bool:
         """True when a gallery key (Delete/Undo) should act, not pass through.
 
-        Only while the view is on screen, no dialog/menu is up, the focus isn't in
-        a text field (so renaming and any editor keep their keys), and the focus
-        isn't inside the info-pane config tabs — a config form's combos and buttons
-        aren't text fields, so editing one must not let Delete wipe a thumbnail.
+        Only while the view is on screen, nothing else owns the keystroke (no
+        dialog/popup and no other active window), the focus isn't in a text field
+        (so renaming and any editor keep their keys), and the focus isn't inside the
+        info-pane config tabs — a config form's combos and buttons aren't text
+        fields, so editing one must not let Delete wipe a thumbnail.
         """
         if not self.isVisible():
             return False
-        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+        if self._other_window_owns_keys():
             return False
         focus = QApplication.focusWidget()
         if focus is not None and self._info_tabs.isAncestorOf(focus):

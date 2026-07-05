@@ -3753,3 +3753,33 @@ def test_osr2_button_tooltip_hints_esc_stops_it(qtbot):
     # The only place the Esc shortcut is discoverable, so keep the hint on the toggle.
     view, _driver, _panel = _osr2_view(qtbot)
     assert "Esc" in view._osr2_btn.toolTip()
+
+
+def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
+    # A fullscreen preview or the slideshow is a separate top-level window that uses
+    # Esc to close. The gallery's app-wide filter sees Esc first, so it must defer
+    # when another window is active rather than swallow Esc to stop the OSR2.
+    from PyQt6.QtWidgets import QApplication, QWidget
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    fullscreen = QWidget()
+    qtbot.addWidget(fullscreen)
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: fullscreen))
+
+    handled = _press_escape(view)
+
+    assert handled is False and driver.stopped == 0  # Esc left for the other window
+
+
+def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
+    # The shared guard behind both Esc and Delete: when a separate top-level window
+    # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
+    from PyQt6.QtWidgets import QApplication, QWidget
+    view, _driver, _panel = _osr2_view(qtbot)
+    assert view._other_window_owns_keys() is False  # only the gallery is up
+
+    other = QWidget()
+    qtbot.addWidget(other)
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
+    assert view._other_window_owns_keys() is True

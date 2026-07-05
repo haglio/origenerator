@@ -1309,10 +1309,12 @@ class GalleryView(QWidget):
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._info.show_generation(row, self._image_rows)
-        # A genuine pick brings the Inspect tab forward; a suppressed re-selection
-        # (a poll/rebuild, or Back/Forward) leaves whatever tab is in front alone.
+        # A genuine pick brings the Inspect tab forward and seeds its editable form
+        # with this generation's settings; a suppressed re-selection (a poll/rebuild,
+        # or Back/Forward) leaves the front tab and the form's edits alone.
         if not self._suppress_history:
             self._info_tabs.setCurrentIndex(0)
+            self._load_inspect_form(row)
         self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()
         if shelf_key is not None:
@@ -1324,6 +1326,15 @@ class GalleryView(QWidget):
             # In a folder, each viewed generation — a click, the auto-selected first
             # item, a followed link — is its own browsing step.
             self._record_location(prompt_id)
+
+    def _load_inspect_form(self, row: dict):
+        """Seed the Inspect tab's editable form with ``row``'s settings, so its
+        'editable text' is the generation you're inspecting — tweak and Generate a
+        variation right there. A no-op for a workflow the app can't rebuild, leaving
+        the form as it was."""
+        params = self._info.current_params()
+        if params:
+            self._info_tabs.inspect_panel().config.prefill(row.get("workflow_name", ""), params)
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a

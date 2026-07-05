@@ -1071,6 +1071,75 @@ def test_a_suppressed_reselection_leaves_the_active_tab_alone(qtbot):
     assert view._info_tabs.currentIndex() == 1  # stayed on the config tab
 
 
+def _inspect_form(view):
+    return view._info_tabs.inspect_panel().config._param_form
+
+
+def test_selecting_a_thumbnail_loads_its_params_into_the_inspect_form(qtbot, tmp_path):
+    # The Inspect tab is an editable generate panel: picking a generation seeds its
+    # form with that generation's settings, ready to tweak and re-run.
+    db = Database(tmp_path / "t.db")
+    params = dict(_SDXL.default_params(), positive_prompt="a wizard", seed=123)
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a wizard", seed=123,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    view = GalleryView(db, client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_thumbnail_clicked("g1")
+
+    values = _inspect_form(view).get_values_static()
+    assert values["positive_prompt"] == "a wizard"
+    assert values["seed"] == 123
+
+
+def test_a_suppressed_reselection_does_not_reload_the_inspect_form(qtbot, tmp_path):
+    # A poll/rebuild re-selects the current generation with history suppressed; that
+    # must not wipe edits the user has made in the Inspect form.
+    db = Database(tmp_path / "t.db")
+    params = dict(_SDXL.default_params(), positive_prompt="a wizard")
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
+    )
+    view = GalleryView(db, client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g1")           # loads the form
+    _inspect_form(view).set_values({"positive_prompt": "my edit"})
+
+    view._suppress_history = True
+    view._on_thumbnail_clicked("g1")
+    view._suppress_history = False
+
+    assert _inspect_form(view).get_values_static()["positive_prompt"] == "my edit"
+
+
+def test_selecting_an_unregistered_thumbnail_leaves_the_inspect_form(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="reg", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", params_json=json.dumps(dict(_SDXL.default_params())),
+        workflow_json="{}",
+    )
+    db.insert_generation(
+        prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
+        params_json=json.dumps({"steps": 20}), workflow_json="{}",
+    )
+    view = GalleryView(db, client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("reg")
+    before = _inspect_form(view).get_values_static()
+
+    view._on_thumbnail_clicked("unreg")  # not rebuildable → the form is left as it was
+
+    assert _inspect_form(view).get_values_static() == before
+
+
 def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

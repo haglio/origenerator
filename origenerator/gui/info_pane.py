@@ -69,6 +69,14 @@ class InfoPaneController(QObject):
         re-roll frame rather than a saved generation)."""
         return self._row
 
+    def current_params(self) -> dict | None:
+        """The reusable parameters of the generation on display, for seeding the
+        Inspect tab's editable form. ``None`` when nothing reusable is shown — idle,
+        a live re-roll, or a workflow the app can't rebuild."""
+        if not self._row or not _is_reusable_workflow(self._row.get("workflow_name")):
+            return None
+        return merge_denormalized(self._row) or None
+
     def show_generation(self, row: dict, image_rows: list[dict]):
         """Fill the pane with a saved generation: its preview, metadata, the videos
         it was animated into, and the Reuse/Evolver buttons' state."""

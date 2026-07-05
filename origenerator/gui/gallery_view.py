@@ -1337,6 +1337,10 @@ class GalleryView(QWidget):
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane
         self._info.show_generation(row, self._image_rows)
+        # A genuine pick brings the Inspect tab forward; a suppressed re-selection
+        # (a poll/rebuild, or Back/Forward) leaves whatever tab is in front alone.
+        if not self._suppress_history:
+            self._info_tabs.setCurrentIndex(0)
         self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()
         if shelf_key is not None:

@@ -1046,6 +1046,31 @@ def test_info_pane_is_a_tab_widget_with_an_inspect_tab(qtbot):
     assert view._info_tabs.widget(0).isAncestorOf(view._preview)
 
 
+def test_selecting_a_thumbnail_activates_the_inspect_tab(qtbot):
+    # Picking an item in the browser brings the Inspect tab forward, even when a
+    # config tab was in front.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view._info_tabs._add_subtab()  # a config tab, now current at index 1
+    assert view._info_tabs.currentIndex() == 1
+
+    view._on_thumbnail_clicked("i1")
+
+    assert view._info_tabs.currentIndex() == 0  # Inspect came forward
+
+
+def test_a_suppressed_reselection_leaves_the_active_tab_alone(qtbot):
+    # A poll/rebuild re-selects the current generation with history suppressed; that
+    # must not yank the user off a config tab they're editing.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view._info_tabs._add_subtab()  # config tab at index 1, current
+    view._suppress_history = True
+    view._on_thumbnail_clicked("i1")
+    view._suppress_history = False
+    assert view._info_tabs.currentIndex() == 1  # stayed on the config tab
+
+
 def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

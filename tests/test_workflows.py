@@ -39,6 +39,15 @@ def test_workflows_declare_the_params_that_identify_their_lora():
     assert Wan22T2iWorkflow().lora_keys == ()
 
 
+def test_only_the_flf2v_workflow_declares_itself_looping():
+    # The funscript synthesized alongside a video tiles seamlessly only for a clip
+    # that returns to its start, so the loop workflow marks itself looping and the
+    # others (a one-shot i2v, the still-image workflows) don't.
+    assert Wan22Flf2vLoopWorkflow().looping is True
+    assert Wan22I2vWorkflow().looping is False
+    assert SdxlT2iWorkflow().looping is False
+
+
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # The WAN video workflows pick their LoRA from the installed files, like the
     # SDXL Model dropdown: a combo per high/low LoRA, its options led by "None"

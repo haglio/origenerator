@@ -1,0 +1,65 @@
+"""One-shot: synthesize a funscript beside every already-generated video.
+
+New videos get a funscript at completion (see ``completion.py``); this sweeps the
+videos that predate that. It's GPU-free (the script is authored from each clip's
+duration, not measured) and idempotent — a video that already has a sidecar is
+left untouched — so it's safe to re-run.
+
+    python -m origenerator.funscript_backfill
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from origenerator.config import COMFYUI_OUTPUT_DIR, DB_PATH, STROKE_DEFAULT_HZ
+from origenerator.db import Database
+from origenerator.funscript import ensure_funscript, funscript_path_for
+from origenerator.gallery import media_type_of_row, resolve_preview
+from origenerator.workflows import WORKFLOW_REGISTRY
+
+logger = logging.getLogger(__name__)
+
+
+def backfill(db, output_dir: Path = COMFYUI_OUTPUT_DIR, *, hz: float = STROKE_DEFAULT_HZ,
+             ensure=ensure_funscript, resolve=resolve_preview) -> dict:
+    """Script every video generation missing a sidecar. Returns a counts summary.
+
+    ``ensure``/``resolve`` are injectable so the sweep logic can be tested without
+    real videos. The loop flag for each row comes from its workflow, so loop clips
+    get a seamlessly-tiling script.
+    """
+    result = {"written": 0, "skipped": 0, "missing": 0, "failed": 0}
+    for row in db.list_generations():
+        if media_type_of_row(row) != "video":
+            continue
+        preview = resolve(row, output_dir)
+        if preview is None or preview[1] != "video":
+            result["missing"] += 1
+            continue
+        path = preview[0]
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+        existed = funscript_path_for(path).exists()
+        dest = ensure(path, loop=bool(workflow and workflow.looping), hz=hz)
+        if dest is None:
+            result["failed"] += 1
+        elif existed:
+            result["skipped"] += 1
+        else:
+            result["written"] += 1
+    return result
+
+
+def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    result = backfill(Database(DB_PATH))
+    logger.info(
+        "Funscript backfill: %d written, %d already present, %d missing file, %d failed",
+        result["written"], result["skipped"], result["missing"], result["failed"],
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

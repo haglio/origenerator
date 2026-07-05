@@ -25,6 +25,12 @@ EVOLVER_SOURCE = "origenerator"
 
 THUMB_SIZE = (256, 256)
 
+# --- Funscript / OSR2 -------------------------------------------------------
+# Each generated video gets a funscript synthesized alongside it (see
+# funscript.py). The motion isn't measured from the video — it's a steady stroke
+# at this cadence (full strokes per second), phased to the clip's duration/loop.
+STROKE_DEFAULT_HZ = 1.2
+
 # --- Voice command → prompt edit ------------------------------------------
 # While a folder auto-generates, the mic listens (always-on); each spoken
 # instruction is transcribed locally (faster-whisper, CPU) and a local LLM

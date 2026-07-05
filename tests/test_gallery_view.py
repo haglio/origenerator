@@ -2251,7 +2251,6 @@ def test_esc_stops_auto_generate(qtbot, tmp_path):
     key = _select_first_leaf(view)
     view._toggle_auto(True)
     assert view._auto.is_active(key)
-    view._gallery_owns_keys = lambda: True  # pretend the gallery holds key focus
 
     handled = view.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
@@ -3708,3 +3707,49 @@ def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
     assert view.osr2_enabled() is False
     view.set_osr2_enabled(True)
     assert view.osr2_enabled() is True and view._osr2_btn.isChecked()
+
+
+def _press_escape(view):
+    return view.eventFilter(
+        view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+    )
+
+
+def test_esc_stops_osr2_driving(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)  # driving the device
+    assert driver.started
+
+    handled = _press_escape(view)
+
+    assert handled is True
+    assert view.osr2_enabled() is False and not view._osr2_btn.isChecked()
+    assert driver.stopped >= 1
+
+
+def test_esc_stops_osr2_even_without_gallery_key_focus(qtbot):
+    # The driven video usually lives in the focused info-pane tab, where the gallery
+    # doesn't own Delete/Undo — Esc must still reach the device from there.
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    view._gallery_owns_keys = lambda: False  # focus is inside a config tab
+
+    handled = _press_escape(view)
+
+    assert handled is True and driver.stopped >= 1
+
+
+def test_esc_passes_through_when_nothing_is_running(qtbot):
+    # OSR2 off and no auto loop: Esc isn't swallowed, so it can still close a
+    # dropdown or cancel an edit elsewhere.
+    view, _driver, _panel = _osr2_view(qtbot)
+
+    assert _press_escape(view) is False
+
+
+def test_osr2_button_tooltip_hints_esc_stops_it(qtbot):
+    # The only place the Esc shortcut is discoverable, so keep the hint on the toggle.
+    view, _driver, _panel = _osr2_view(qtbot)
+    assert "Esc" in view._osr2_btn.toolTip()

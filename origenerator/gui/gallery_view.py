@@ -166,21 +166,40 @@ class GalleryView(QWidget):
         self._poll_timer.start()
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.KeyPress and self._gallery_owns_keys():
-            # Delete removes the selection. Insert does too: some keyboards send
-            # Insert where Delete is expected, and the gallery has no other use
-            # for it (diagnosed from a real Delete press arriving as Key_Insert).
-            if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
-                self._delete_selection()
+        if event.type() == QEvent.Type.KeyPress:
+            # Esc is a panic-stop, handled from anywhere — not gated on gallery key
+            # focus. The driven video usually sits in the focused info-pane tab, so
+            # Esc has to reach the device (and any auto loop) from there too.
+            if event.key() == Qt.Key.Key_Escape and self._handle_escape():
                 return True
-            if event.key() == Qt.Key.Key_Escape and self._auto.any_active():
-                self._auto.stop_all()  # Esc ends auto-generate
-                return True
-            if (event.key() == Qt.Key.Key_Z
-                    and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                self._undo()
-                return True
+            if self._gallery_owns_keys():
+                # Delete removes the selection. Insert does too: some keyboards send
+                # Insert where Delete is expected, and the gallery has no other use
+                # for it (diagnosed from a real Delete press arriving as Key_Insert).
+                if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
+                    self._delete_selection()
+                    return True
+                if (event.key() == Qt.Key.Key_Z
+                        and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+                    self._undo()
+                    return True
         return super().eventFilter(obj, event)
+
+    def _handle_escape(self) -> bool:
+        """Esc stops the physical device and any running loop, wherever focus is: it
+        turns off OSR2 driving and ends auto-generate. It yields to an open dialog or
+        popup, though, so Esc can still close a combo dropdown or cancel a dialog
+        instead of being swallowed. Returns whether it acted."""
+        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+            return False
+        handled = False
+        if self._osr2_enabled:
+            self._osr2_btn.setChecked(False)  # untoggling stops the driver
+            handled = True
+        if self._auto.any_active():
+            self._auto.stop_all()
+            handled = True
+        return handled
 
     def _gallery_owns_keys(self) -> bool:
         """True when a gallery key (Delete/Undo) should act, not pass through.
@@ -271,7 +290,8 @@ class GalleryView(QWidget):
         # A single global switch: while it's on, whatever scripted video is in the
         # front tab drives the OSR2. Always visible (it's app-wide), lit when on.
         self._osr2_btn = self._tool_button(
-            icons.osr2_icon(), "Drive the OSR2 from the video open in the generate tab",
+            icons.osr2_icon(),
+            "Drive the OSR2 from the video open in the generate tab (Esc to stop)",
             self._on_osr2_toggle, checkable=True,
         )
         self._osr2_btn.setStyleSheet(

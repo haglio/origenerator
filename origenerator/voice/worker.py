@@ -32,7 +32,7 @@ class VoiceWorker(QObject):
         try:
             instruction = self._transcribe(audio)
             logger.info("Voice: transcribed %r", instruction)
-            if not instruction.strip():
+            if not any(char.isalpha() for char in instruction):  # '', '. . . .', noise
                 self.failed.emit("Didn't catch that.")
                 return
             self.rewritten.emit(self._rewrite(current_prompt, instruction))

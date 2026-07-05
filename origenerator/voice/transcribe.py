@@ -33,7 +33,9 @@ class Transcriber:
         peak = float(np.max(np.abs(audio))) if audio.size else 0.0
         if peak > 1e-4:
             audio = audio / peak * 0.95  # boost a faint mic so whisper can read it
-        segments, _info = self._load().transcribe(audio, language="en")
+        # vad_filter uses the bundled Silero VAD to isolate speech within the clip,
+        # which helps whisper find words in a noisy capture.
+        segments, _info = self._load().transcribe(audio, language="en", vad_filter=True)
         # Whisper segments carry their own leading/trailing spaces; normalise to a
         # single space between non-empty pieces.
         parts = (segment.text.strip() for segment in segments)

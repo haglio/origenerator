@@ -28,6 +28,18 @@ def test_an_empty_transcription_is_a_failure_not_a_rewrite(qtbot):
     assert rewrites == [] and len(fails) == 1
 
 
+def test_a_punctuation_only_transcription_is_a_failure(qtbot):
+    # Whisper emits '. . . .' on noise; that must not trigger a (garbling) rewrite.
+    worker = VoiceWorker(lambda audio: ". . . .", lambda cur, instr: "should not run")
+    fails, rewrites = [], []
+    worker.failed.connect(fails.append)
+    worker.rewritten.connect(rewrites.append)
+
+    worker.process(object(), "a cat")
+
+    assert rewrites == [] and len(fails) == 1
+
+
 def test_a_rewrite_error_is_reported_not_raised(qtbot):
     def boom(cur, instr):
         raise RuntimeError("no LLM server")

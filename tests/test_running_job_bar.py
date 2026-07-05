@@ -20,9 +20,14 @@ def _item(key="j1", caption="SDXL › x", status="running", frame=None,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel)
 
 
-def test_hidden_when_nothing_is_in_flight(bar):
+def test_keeps_its_slot_when_idle(bar):
+    # The bar's space is reserved even when nothing runs, so a job appearing
+    # doesn't shove the panes up. It stays laid out but blank.
     bar.set_items([])
-    assert not bar.isVisible()
+    assert bar.isVisible()
+    assert bar._caption.text() == ""
+    assert not bar._cancel.isVisible()
+    assert not bar._progress.isVisible()
 
 
 def test_shows_the_active_job(bar):
@@ -77,8 +82,18 @@ def test_cancel_button_hidden_when_the_job_cannot_be_cancelled(bar):
     assert not bar._cancel.isVisible()
 
 
-def test_switching_from_a_job_to_idle_hides_the_bar(bar):
+def test_switching_from_a_job_to_idle_keeps_the_slot(bar):
     bar.set_items([_item()])
-    assert bar.isVisible()
+    assert bar._progress.isVisible()
     bar.set_items([])
-    assert not bar.isVisible()
+    assert bar.isVisible()            # still holding its slot
+    assert bar._caption.text() == ""  # but blanked
+
+
+def test_idle_and_active_have_the_same_footprint(bar):
+    # Reserving the slot means the bar is the same height idle or active, so the
+    # layout never shifts when a job starts or ends.
+    bar.set_items([])
+    idle = bar.sizeHint().height()
+    bar.set_items([_item()])
+    assert bar.sizeHint().height() == idle

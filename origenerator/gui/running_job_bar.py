@@ -5,7 +5,9 @@ ComfyUI runs a single job at a time, so at most one generation is ever executing
 that job from anywhere in the app — a small live preview, its caption, a progress
 bar, a "+N queued" count, and a cancel — so you can watch or stop it without
 leaving whatever folder or config tab you're on. Clicking the bar reveals the job
-(its config tab or re-roll folder); the ✕ cancels it. It hides when nothing runs.
+(its config tab or re-roll folder); the ✕ cancels it. When nothing runs it keeps
+its slot but blanks — reserving the space so a job appearing never shifts the
+panes above it.
 
 It's fed the same in-flight view-models the Recents shelf uses
 (:class:`InFlightItem`), running-first, refreshed on every poll so its preview and
@@ -75,27 +77,38 @@ class RunningJobBar(QWidget):
         for child in (self._preview, self._caption, self._progress, self._queued):
             child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
-        self.hide()  # nothing in flight yet
+        self._show_idle()  # nothing in flight yet — hold the slot, but blank
 
     def set_items(self, items: list):
-        """Show the active job and hide when there's nothing in flight.
+        """Show the active job, or blank the bar (keeping its slot) when idle.
 
         ``items`` is every in-flight generation, running-first; the first is the
         one to display and any others become a "+N queued" count.
         """
         self._item = items[0] if items else None
         if self._item is None:
-            self.hide()
+            self._show_idle()
             return
         self._render(self._item, queued=len(items) - 1)
-        self.show()
+
+    def _show_idle(self):
+        """Blank the bar but keep its slot, so a job appearing doesn't shift the
+        panes. The fixed-size preview holds the height; everything else clears."""
+        self._caption.clear()
+        self._preview.clear()
+        self._queued.clear()
+        self._progress.hide()
+        self._cancel.hide()
+        self.setCursor(Qt.CursorShape.ArrowCursor)  # nothing to reveal on click
 
     def _render(self, item, queued: int):
         self._caption.setText(item.caption)
         self._render_preview(item.frame)
+        self._progress.show()
         self._render_progress(item)
         self._queued.setText(f"+{queued} queued" if queued > 0 else "")
         self._cancel.setVisible(item.cancel is not None)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def _render_preview(self, frame):
         pixmap = QPixmap()

@@ -3114,9 +3114,9 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
     assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
 
 
-def test_running_bar_shows_the_active_job_and_hides_when_idle(qtbot):
+def test_running_bar_shows_the_active_job_then_blanks_when_idle(qtbot):
     # The slim bottom bar surfaces the one in-flight job from anywhere in the view,
-    # then disappears once nothing is running.
+    # then blanks once nothing runs — keeping its slot so the panes never shift.
     view = GalleryView(FakeDB([_image("done", "a cat", 50, 1)]))
     view._generate_inflight = lambda: [_inflight_item(key="gen1", caption="my job")]
     qtbot.addWidget(view)
@@ -3128,7 +3128,8 @@ def test_running_bar_shows_the_active_job_and_hides_when_idle(qtbot):
 
     view._generate_inflight = lambda: []
     view._poll()
-    assert not view._running_bar.isVisible()
+    assert view._running_bar.isVisible()      # still holding its slot
+    assert view._running_bar._item is None    # but blank
 
 
 def _finished_row_db(tmp_path):

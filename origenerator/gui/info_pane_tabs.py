@@ -44,6 +44,7 @@ class InfoPaneTabs(QTabWidget):
     """A strip of editable config tabs, all sharing one run queue."""
 
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
+    generation_started = pyqtSignal(str)  # any tab began a job (its running row's prompt_id)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -92,6 +93,7 @@ class InfoPaneTabs(QTabWidget):
         panel = GenerateConfigPanel(self._client, self._db, queue=self._queue)
         index = self.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
+        panel.generation_started.connect(self.generation_started)  # relay every tab's job start
         panel.strip_activated.connect(self._on_strip_activated)
         self.setCurrentIndex(index)
         self.tab_added.emit(panel)  # let the view wire its source/animation links

@@ -147,6 +147,9 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
+        # A tab's Generate into a brand-new (edited-params) folder likewise has no
+        # node until that row finishes; hold its key so a rebuild drills in then.
+        self._pending_generate_key: str | None = None
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
@@ -312,6 +315,9 @@ class GalleryView(QWidget):
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
+        # A tab's Generate lands its running row in a settings folder: jump the
+        # browser there and show the generation as a live card in it.
+        self._info_tabs.generation_started.connect(self._on_generation_started)
         self._panes.addWidget(self._info_tabs)
         # The config tabs feed the Recents shelf and bottom bar their in-flight
         # Generate cards, and name the running ids the re-roll reconnection must
@@ -362,6 +368,28 @@ class GalleryView(QWidget):
         link. Called for the initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
+
+    def _on_generation_started(self, prompt_id: str):
+        """A tab's Generate just inserted a running row: rebuild, then open that
+        generation's settings folder — where ``browser_pane`` shows the run as a
+        live card. No thumbnail is selected; the folder simply becomes the view.
+
+        An existing folder (its node built from earlier results) is opened at once.
+        A brand-new folder from edited params has no node yet — a running row alone
+        never enters the results tree — so its key is held until the finished row
+        gives it a node, then the view drills in (like a combine's new folder)."""
+        self.refresh()
+        row = self._db.get_generation(prompt_id)
+        if row is None:
+            return
+        key = gallery.settings_folder_key(
+            row, gallery.build_image_config_index(self._image_rows)
+        )
+        item = self._item_by_key.get(key)
+        if item is not None:
+            self._tree.setCurrentItem(item)  # existing folder: land in it, live card shows there
+        else:
+            self._pending_generate_key = key  # brand-new: drill in once its row finishes
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -421,7 +449,12 @@ class GalleryView(QWidget):
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()))
         self._clear_metadata()
-        target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
+        # A tab's Generate into a brand-new folder waits here for its finished row to
+        # give the folder a node, then lands the user in it (a poll rebuild resolves
+        # this the moment the generation completes). It wins over restoring the prior
+        # selection, since the user's fresh generation is what they want to see.
+        pending_generate = self._resolve_pending_generate_key()
+        target = pending_generate or self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
         self._suppress_history = True
@@ -444,6 +477,17 @@ class GalleryView(QWidget):
             if location is not None:
                 self._record_visit(location)
         self._update_running_bar()
+
+    def _resolve_pending_generate_key(self):
+        """The tree item for a pending brand-new generate folder, once its finished
+        row has given it a node — clearing the pending key so the drill happens once.
+        ``None`` while no generate is pending or its folder still has no node."""
+        if self._pending_generate_key is None:
+            return None
+        item = self._item_by_key.get(self._pending_generate_key)
+        if item is not None:
+            self._pending_generate_key = None
+        return item
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -473,7 +517,6 @@ class GalleryView(QWidget):
             self._browser.show_thumbnails(group)
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group))
-        self._select_first_item(group)
         self._sync_delete_button()
 
     def _note_folder_visit(self, key: str | None):
@@ -485,12 +528,6 @@ class GalleryView(QWidget):
             return
         if not self._folder_history or self._folder_history[-1] != key:
             self._folder_history.append(key)
-
-    def _select_first_item(self, group):
-        """Immediately preview the first generation under the chosen folder."""
-        rows = gallery.rows_under(group)
-        if rows:
-            self._on_thumbnail_clicked(rows[0]["prompt_id"])
 
     def _update_folder_average(self, group):
         """Show the mean generation time for this folder.
@@ -1351,8 +1388,8 @@ class GalleryView(QWidget):
             # stop (stepping through each preview would bury where you came from).
             self._shelf_selection[shelf_key] = prompt_id
         else:
-            # In a folder, each viewed generation — a click, the auto-selected first
-            # item, a followed link — is its own browsing step.
+            # In a folder, each viewed generation — a click or a followed link —
+            # is its own browsing step.
             self._record_location(prompt_id)
 
     def _animated_preview(self, row: dict) -> str | None:
@@ -1370,9 +1407,9 @@ class GalleryView(QWidget):
 
     def _show_generation(self, prompt_id: str):
         """Select a generation and its folder without recording — the move
-        Back/Forward and a link both make. Switching folders auto-selects the
-        folder's first item on the way; suppressing keeps that off the history,
-        and a recording caller (a link) adds the real target itself afterward."""
+        Back/Forward and a link both make. Opens the target's folder, then clicks
+        the generation itself; suppressing keeps that off the history, and a
+        recording caller (a link) adds the real target itself afterward."""
         self._suppress_history = True
         try:
             leaf = self._leaf_by_id.get(prompt_id)

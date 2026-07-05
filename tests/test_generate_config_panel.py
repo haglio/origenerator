@@ -739,6 +739,34 @@ def test_run_now_begins_the_prepared_job(qtbot, tmp_path):
     assert len(rows) == 1 and rows[0]["status"] == "running"
 
 
+def test_beginning_a_job_emits_generation_started_with_its_prompt_id(qtbot, tmp_path):
+    # Starting a job announces its prompt id, so the gallery can jump to the folder
+    # its (now-inserted) running row belongs to and watch it there.
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    started = []
+    panel.generation_started.connect(started.append)
+
+    panel._on_generate()
+    panel.run_now()
+
+    assert started == [panel.active_prompt_id()]  # the running row's id
+    assert panel._db.get_generation(started[0])["status"] == "running"
+
+
+def test_a_failed_submit_does_not_emit_generation_started(qtbot, tmp_path):
+    # If the submit itself throws, no generation actually started, so the signal
+    # must not fire — the row is marked error, not navigated to.
+    panel, client, queue = _queued_panel(qtbot, tmp_path)
+    client.submit_job.side_effect = RuntimeError("boom")
+    started = []
+    panel.generation_started.connect(started.append)
+
+    panel._on_generate()
+    panel.run_now()
+
+    assert started == []
+
+
 def test_completion_releases_queue_slot(qtbot, tmp_path):
     panel, client, queue = _queued_panel(qtbot, tmp_path)
     panel._on_generate()

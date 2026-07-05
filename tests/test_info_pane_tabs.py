@@ -505,6 +505,32 @@ def test_in_flight_items_includes_a_tab_queued_behind_a_running_one(tabs):
     assert len(tabs.in_flight_items()) == 2
 
 
+def test_generation_started_surfaces_from_the_initial_tab(tabs):
+    # The tab strip re-emits each tab's generation_started so the gallery can react
+    # to a job launched from any tab — here the initial one.
+    tabs._client.submit_job = MagicMock(return_value="x")
+    started = []
+    tabs.generation_started.connect(started.append)
+    panel = tabs.currentWidget()
+
+    panel._on_generate()
+
+    assert started == [panel.active_prompt_id()]
+
+
+def test_generation_started_surfaces_from_a_forked_tab(tabs):
+    # A tab forked after construction must also have its generation_started wired,
+    # like title_changed — so a job from any tab reaches the gallery.
+    tabs._client.submit_job = MagicMock(return_value="x")
+    started = []
+    tabs.generation_started.connect(started.append)
+    forked = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
+
+    forked._on_generate()
+
+    assert started == [forked.active_prompt_id()]
+
+
 def test_revealing_an_item_selects_its_config_tab(tabs):
     tabs._client.submit_job = MagicMock(return_value="x")
     first = tabs.currentWidget()

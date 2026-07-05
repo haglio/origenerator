@@ -637,20 +637,24 @@ def test_folders_start_collapsed(qtbot):
     assert images.child(0).isExpanded() is False
 
 
-def test_selecting_a_folder_auto_selects_its_first_item(qtbot):
+def test_opening_a_folder_shows_its_grid_but_selects_nothing(qtbot):
+    # Opening a folder used to auto-load its first item; now it shows the grid and
+    # selects nothing, so the info pane's tab is left alone until an explicit click.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Selecting a branch folder immediately previews its first item...
+    # A branch folder shows its child tiles but auto-selects no generation...
     workflow = _top_level(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
-    assert view._selected["prompt_id"] == "i1"
+    assert view._selected is None
 
-    # ...and so does selecting a leaf folder (workflow -> model -> "(no LoRA)" -> settings).
-    view._tree.setCurrentItem(workflow.child(0).child(0).child(0))
-    assert view._selected["prompt_id"] == "i1"
+    # ...and a leaf folder shows its thumbnails but likewise selects nothing.
+    leaf = workflow.child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # the grid is shown
+    assert view._selected is None                          # but nothing is picked
 
 
 def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
@@ -824,19 +828,21 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     view.refresh()
 
     view._tree.setCurrentItem(view._leaf_by_id["a"])  # the folder holding "a"
+    view._thumbnail_clicked("a")                       # viewing it
+    assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
     view._delete_folder(view._current_deletable_folder())
     assert db.get_generation("a") is None
-    assert view._selected["prompt_id"] != "a"          # navigated off the emptied folder
+    assert view._selected is None                       # navigated off the emptied folder
 
     view._undo()
     assert db.get_generation("a") is not None            # restored
     assert view._selected["prompt_id"] == "a"            # and back where we deleted from
 
 
-def test_back_after_following_a_link_returns_to_the_initial_view(qtbot):
-    # The gallery opens on a generation the user never "clicked"; Back must still
-    # return there after their first move is following a link.
+def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
+    # Viewing a generation, then following its source link, records both as history
+    # stops; Back returns to the one we were looking at before the link.
     image = _image("img1", "a cat", 50, 1)
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -845,12 +851,14 @@ def test_back_after_following_a_link_returns_to_the_initial_view(qtbot):
     view = GalleryView(FakeDB([video, image]))
     qtbot.addWidget(view)
     view.refresh()
-    assert view._selected["prompt_id"] == "vid1"  # opened here, unprompted
+    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._thumbnail_clicked("vid1")               # viewing the video
+    assert view._selected["prompt_id"] == "vid1"
 
-    view._on_source_link("img1")                  # first move: follow the link
+    view._on_source_link("img1")                  # follow its source-image link
     assert view._selected["prompt_id"] == "img1"
     view._go_back()
-    assert view._selected["prompt_id"] == "vid1"  # Back to where it opened
+    assert view._selected["prompt_id"] == "vid1"  # Back to where we were
 
 
 def test_history_spans_folder_navigation(qtbot):
@@ -858,11 +866,13 @@ def test_history_spans_folder_navigation(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["v1"])  # browse to the video folder
+    view._thumbnail_clicked("v1")                      # view its item
     view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then to the image folder
+    view._thumbnail_clicked("i1")                      # view its item
     assert view._selected["prompt_id"] == "i1"
 
     view._go_back()
-    assert view._selected["prompt_id"] == "v1"  # Back walks folder moves, not just clicks
+    assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
 
 def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
@@ -894,6 +904,7 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
 
     view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
     view._drill_into(view.visible_folder_keys()[0])      # into the dog folder
+    view._thumbnail_clicked("i2")                        # view an item there
     assert view._tree.currentItem() is not view._starred_item
 
     view._go_back()
@@ -923,7 +934,9 @@ def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    landing = view.selected_generation()                 # opened on a folder's item
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # land on a folder's item
+    view._thumbnail_clicked("i1")
+    landing = view.selected_generation()
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
     view._thumb_widgets["i1"].clicked.emit("i1")         # browse a couple of previews
     view._thumb_widgets["i2"].clicked.emit("i2")
@@ -2124,6 +2137,60 @@ def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
     assert view._auto_btn.isHidden()
 
 
+# --- a tab's Generate lands the user in its folder, showing a live card -------
+
+def _generate_in_current_tab(view, positive_prompt, seed):
+    """Prefill the front config tab with a full, non-duplicate sdxl config and
+    click Generate, returning the settings folder its running row belongs to."""
+    panel = view._info_tabs.current_config_panel()
+    params = dict(_SDXL.default_params(), positive_prompt=positive_prompt, seed=seed)
+    panel.prefill("sdxl_t2i", params)
+    panel._param_form.set_seed_random(False)  # a fixed seed, so the config is concrete
+    panel._on_generate()
+    row = view._db.get_generation(panel.active_prompt_id())
+    return gallery.settings_folder_key(row, gallery.build_image_config_index(view._image_rows))
+
+
+def test_generate_navigates_to_the_configs_existing_folder(qtbot, tmp_path):
+    # Change 1: Generate in a tab whose settings match an existing folder lands the
+    # browser in that folder (a fresh seed, so it's not a duplicate of 'orig').
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    orig_folder = _select_first_leaf(view)      # the folder 'orig' already lives in
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # navigate away first
+
+    folder = _generate_in_current_tab(view, positive_prompt="a cat", seed=123)
+
+    assert folder == orig_folder                # same settings folder as 'orig'
+    assert view._selected_folder_key() == folder  # and the view jumped there
+
+
+def test_generate_navigates_to_a_brand_new_folder_for_edited_params(qtbot, tmp_path):
+    # Change 2: edited params make a settings folder that has no node yet — a running
+    # row alone stays out of the results tree — so the view holds the key and drills
+    # in once the finished row gives the folder a node.
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    before = set(view._item_by_key)
+
+    folder = _generate_in_current_tab(view, positive_prompt="a totally new prompt", seed=5)
+    assert folder not in before                     # a brand-new folder, no node yet
+    assert view._selected_folder_key() != folder    # so the view can't be in it yet
+    running_id = view._info_tabs.current_config_panel().active_prompt_id()
+
+    # The generation finishes: its row gains an output file, so the next poll's
+    # rebuild gives the folder a node and the view drills into it.
+    db.update_generation(running_id, status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_new.png", "subfolder": ""}]))
+    view._poll()
+
+    assert folder in view._item_by_key              # the rebuild gave it a node
+    assert view._selected_folder_key() == folder    # and the view drilled in
+
+
 # --- voice steering: Auto is voice's "on"; utterances steer the loop's prompt --
 
 def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
@@ -3012,6 +3079,71 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     # Clicking the re-roll card opens the folder it runs in (its tile shows there).
     view._on_inflight_clicked("rr1")
     assert view._selected_folder_key() == folder_key
+
+
+def _running_in_folder(prompt_id, prompt, steps, seed):
+    """A running sdxl row sharing the settings folder of _image(prompt, steps, …) —
+    same settings, fresh seed, no output — as a tab's Generate inserts up front."""
+    return _row(prompt_id, "sdxl_t2i",
+                {"positive_prompt": prompt, "steps": steps, "seed": seed},
+                f"{prompt_id}.png", status="running", output_files="[]")
+
+
+def test_open_folder_shows_a_running_generation_as_a_live_card(qtbot):
+    # A tab's Generate into an existing folder: its running row shares that folder,
+    # so opening the folder shows it as a live in-flight card leading the grid, fed
+    # its live frame, and the running row is not also a (blank) static thumbnail.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_in_folder("run1", "a cat", 50, 2))  # same folder as i1, still running
+    view = GalleryView(db)
+    view._generate_inflight = lambda: [
+        _inflight_item(key="run1", frame=_png_bytes(), status="running")
+    ]
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # open i1's settings folder
+
+    assert "run1" in view._inflight_cards                       # shown as a live card...
+    assert not view._inflight_cards["run1"]._image.pixmap().isNull()  # ...with its frame
+    assert view.visible_prompt_ids() == ["i1"]                  # run1 isn't a static tile
+    # The live card leads the grid, ahead of the finished thumbnail.
+    layout = view._scroll.widget().layout()
+    from origenerator.gui.inflight_card import InFlightCard
+    assert isinstance(layout.itemAt(0).widget(), InFlightCard)
+
+
+def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
+    # Even a running row that carries an output file (a race between the file landing
+    # and the completed status) must not double up: it shows only as the live card,
+    # never as a static thumbnail below it.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    running = _running_in_folder("run1", "a cat", 50, 2)
+    running["output_files"] = json.dumps([{"filename": "run1.png", "subfolder": ""}])  # has a file
+    db.add(running)
+    view = GalleryView(db)
+    view._generate_inflight = lambda: [_inflight_item(key="run1", status="running")]
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+
+    assert "run1" in view._inflight_cards          # the live card
+    assert "run1" not in view.visible_prompt_ids()  # and not a static thumbnail too
+
+
+def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path):
+    # A gallery re-roll running in a folder is already led by its RerollTile; its
+    # running row must not ALSO appear as a separate in-flight card in that folder.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key, job = _running_reroll(view)            # a real re-roll running in the folder
+
+    view._rerender_current_leaf()               # redraw the open folder with its live tile
+
+    assert _reroll_tile(view) is not None       # the RerollTile leads it...
+    assert job.prompt_id not in view._inflight_cards  # ...and no duplicate in-flight card
 
 
 def test_a_reroll_finishing_drops_its_inflight_card(qtbot):

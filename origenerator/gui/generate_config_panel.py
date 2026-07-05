@@ -66,6 +66,7 @@ class GenerateConfigPanel(QWidget):
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
     source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
     animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
+    generation_started = pyqtSignal(str)    # a job just began (its prompt_id, now a running DB row)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, queue=None,
                  parent=None):
@@ -551,6 +552,9 @@ class GenerateConfigPanel(QWidget):
             # starts. Show that wait instead of a stuck "Generating… 0%"; the bar
             # flips to running once ComfyUI actually begins our prompt.
             self._show_waiting("Queued on ComfyUI…")
+            # The running row now exists, so its settings folder is resolvable: let a
+            # container (the gallery) jump there and show this generation as it runs.
+            self.generation_started.emit(prompt_id)
         except Exception as e:
             logger.error("Failed to submit job: %s", e)
             self._db.update_generation(prompt_id, status="error", error_message=str(e))

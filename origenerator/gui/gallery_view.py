@@ -12,7 +12,10 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
+    LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
+)
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
@@ -1058,16 +1061,38 @@ class GalleryView(QWidget):
             if row.get("status") == "completed" and self._is_rebuildable_video_row(row)
         ]
 
+    def _start_scene(self, video_row: dict, image_prompts: dict) -> str:
+        """The prompt of ``video_row``'s start frame (its input image) — where the
+        situation to match lives — resolved from ``image_prompts`` (prompt_id → prompt,
+        built once from the in-memory image rows, so no per-video query). Falls back to
+        the video's own prompt when the start frame can't be resolved (e.g. an import)."""
+        source_id = gallery.find_source_image_id(video_row, self._image_rows)
+        if source_id and (image_prompts.get(source_id) or "").strip():
+            return image_prompts[source_id]
+        return video_row.get("positive_prompt") or ""
+
     def _generate_category(self, image_id: str, category: str):
-        """Run ``category``'s best recipe on the dropped image — the category
+        """Run the recipe that fits ``category`` on the dropped image — the category
         dropdown's counterpart to a dropped video.
 
-        The recipe is the most-used model+params among the user's videos of that act
-        (see :func:`recipe_match.best_recipe`); its exemplar hands off to the shared
-        combine launch. A no-op — with a hint — when the gallery holds no video of the
-        act, so a click never silently does nothing.
+        The local LLM picks the recipe whose starting scene matches this image's
+        situation (:func:`recipe_match.smart_recipe`); if it's unreachable or finds no
+        fit, it falls back to the act's most-used recipe
+        (:func:`recipe_match.best_recipe`). Either way the chosen exemplar hands off to
+        the shared combine launch. A no-op — with a hint — when the gallery holds no
+        video of the act, so a click never silently does nothing.
         """
-        video_id = recipe_match.best_recipe(category, self._category_candidates())
+        image_row = self._db.get_generation(image_id)
+        if image_row is None:
+            return
+        image_prompts = {r.get("prompt_id"): r.get("positive_prompt") or "" for r in self._image_rows}
+        candidates = [{**row, "start_scene": self._start_scene(row, image_prompts)}
+                      for row in self._category_candidates()]
+        video_id = recipe_match.smart_recipe(
+            category, image_row.get("positive_prompt") or "", candidates,
+            base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+            system_prompt=VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
+        ) or recipe_match.best_recipe(category, candidates)
         logger.info("combine: category=%s image=%s -> recipe from %s",
                     category, image_id, video_id)
         if video_id is None:

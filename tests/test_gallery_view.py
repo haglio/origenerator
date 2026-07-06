@@ -3514,36 +3514,62 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     assert view._reroll_jobs == {}
 
 
-def test_category_routes_the_best_recipe_into_a_combine(qtbot, tmp_path, monkeypatch):
+def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     seen = {}
 
-    def fake_best(category, candidates):
-        seen.update(category=category, ids=[r.get("prompt_id") for r in candidates])
-        return "vid"  # the act's best recipe
+    def fake_smart(category, image_scene, candidates, **kw):
+        seen.update(category=category, image_scene=image_scene,
+                    scened=all("start_scene" in c for c in candidates),
+                    ids=[c.get("prompt_id") for c in candidates])
+        return "vid"  # the recipe whose starting scene fits this image
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", fake_smart)
 
     view._generate_category("img", "gamma")
 
     assert seen["category"] == "gamma"
-    assert seen["ids"] == ["vid"]  # only the rebuildable i2v video is a candidate (not the image)
+    assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
+    assert seen["scened"]                    # candidates enriched with each recipe's start scene
+    assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
     assert job.params["seed"] == 42                               # recipe's seed, reused via the combine path
 
 
-def test_category_launches_the_gallerys_best_recipe_for_the_act(qtbot, tmp_path):
-    # End to end with the real resolver: the combine DB's one i2v video has the prompt
-    # "dance", so the "dancing" act finds it and runs its recipe on the dropped image.
+def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    called = {}
+
+    def fake_best(category, candidates):
+        called["category"] = category
+        return "vid"
+
+    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
+
+    view._generate_category("img", "gamma")
+
+    assert called["category"] == "gamma"   # model unavailable → the act's most-used recipe
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["input_image"] == "sdxl_pick.png [output]"
+
+
+def test_category_launches_a_real_recipe_via_the_fallback(qtbot, tmp_path, monkeypatch):
+    # No live model in tests, so force the deterministic fallback: real best_recipe then
+    # finds the combine DB's one "dance" clip for the "dancing" act and runs it.
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
 
     view._generate_category("img", "dancing")
 
@@ -3557,6 +3583,7 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))

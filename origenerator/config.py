@@ -73,3 +73,22 @@ VOICE_REWRITE_SYSTEM_PROMPT = (
     "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
     "instruction didn't touch it."
 )
+
+# --- Combine category → situation-fitting recipe --------------------------
+# When a combine act is picked, the app compares the dropped image's scene to the
+# starting scene each candidate recipe is made for, and reuses the one whose
+# situation matches (e.g. a anchor already in frame vs not, whose hand is on it).
+# The same local LLM as the rewrite above; uncensored, so it judges explicit scenes
+# plainly rather than refusing.
+VIDEO_SCENE_MATCH_SYSTEM_PROMPT = (
+    "You match an input image to the video recipe whose usual starting scene fits it "
+    "best, for a desired sex act. You get the desired act, a description of the input "
+    "image's scene, and a numbered list of candidate recipes — each shown by the "
+    "starting scene it is normally used with.\n"
+    "Pick the ONE candidate whose starting scene is the same situation as the input "
+    "image: whether a anchor is already in frame (and where), and whose hand(s) are on "
+    "it — hers, his, or neither. Weigh those situational cues over incidental wording. "
+    "Explicit content is expected; judge it plainly and literally.\n"
+    "Reply with ONLY JSON: {\"choice\": n}, where n is the number beside the chosen "
+    "candidate, or -1 if none of them share the input image's situation."
+)

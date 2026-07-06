@@ -66,3 +66,76 @@ def test_best_recipe_reads_the_act_from_the_prompt_per_category():
     assert recipe_match.best_recipe("alpha", rows) == "c1"
     assert recipe_match.best_recipe("dancing", rows) == "d1"
     assert recipe_match.best_recipe("epsilon", rows) is None  # nothing depicts this act
+
+
+# --- smart_recipe: LLM picks the situation-fitting variant within an act ------
+
+
+def _scene_video(pid, prompt, start_scene, created, **params):
+    """An act video plus the starting scene it's made for (its input image's prompt)."""
+    return {
+        "prompt_id": pid,
+        "workflow_name": "wan22_i2v",
+        "positive_prompt": prompt,
+        "start_scene": start_scene,
+        "created_at": created,
+        "params_json": json.dumps({"positive_prompt": prompt, **params}),
+    }
+
+
+def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_pick(monkeypatch):
+    rows = [
+        _scene_video("x1", "a gamma", "she kneels", "2026-01-01", lora_high="X"),
+        _scene_video("x2", "a gamma", "his anchor already at her lips", "2026-01-02", lora_high="X"),
+        _scene_video("y1", "a gamma", "she waits, no anchor in frame", "2026-01-03", lora_high="Y"),
+    ]
+    seen = {}
+
+    def fake_post(base_url, model, messages, timeout):
+        seen["user"] = messages[1]["content"]
+        return {"choices": [{"message": {"content": '{"choice": 0}'}}]}
+
+    monkeypatch.setattr(recipe_match, "_post_chat", fake_post)
+    got = recipe_match.smart_recipe(
+        "gamma", "an redacted anchor in the frame", rows,
+        base_url="x", model="m", system_prompt="S", timeout=1,
+    )
+    # recipe X is one option (its most-recent member x2 represents it), recipe Y another.
+    assert got == "x2"                                     # choice 0 → recipe X's representative
+    assert "his anchor already at her lips" in seen["user"]  # X shown by x2's start scene, not x1's
+    assert "she waits, no anchor in frame" in seen["user"]   # Y is offered too
+
+
+def test_smart_recipe_returns_none_without_a_video_of_the_act(monkeypatch):
+    monkeypatch.setattr(recipe_match, "_post_chat",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call the model")))
+    rows = [_scene_video("h1", "a epsilon", "her hand on it", "2026-01-01", lora_high="Z")]
+    assert recipe_match.smart_recipe("gamma", "x", rows,
+                                     base_url="x", model="m", system_prompt="S", timeout=1) is None
+
+
+def test_smart_recipe_ignores_members_lacking_a_start_scene(monkeypatch):
+    rows = [
+        _scene_video("x1", "a gamma", "", "2026-01-01", lora_high="X"),          # no scene to match on
+        _scene_video("y1", "a gamma", "anchor in frame", "2026-01-02", lora_high="Y"),
+    ]
+    monkeypatch.setattr(recipe_match, "_post_chat",
+                        lambda *a, **k: {"choices": [{"message": {"content": '{"choice": 0}'}}]})
+    assert recipe_match.smart_recipe("gamma", "x", rows,
+                                     base_url="x", model="m", system_prompt="S", timeout=1) == "y1"
+
+
+def test_smart_recipe_returns_none_when_the_llm_finds_no_fit(monkeypatch):
+    rows = [_scene_video("x1", "a gamma", "she kneels", "2026-01-01", lora_high="X")]
+    monkeypatch.setattr(recipe_match, "_post_chat",
+                        lambda *a, **k: {"choices": [{"message": {"content": '{"choice": -1}'}}]})
+    assert recipe_match.smart_recipe("gamma", "x", rows,
+                                     base_url="x", model="m", system_prompt="S", timeout=1) is None
+
+
+def test_smart_recipe_returns_none_when_the_llm_errors(monkeypatch):
+    rows = [_scene_video("x1", "a gamma", "she kneels", "2026-01-01", lora_high="X")]
+    monkeypatch.setattr(recipe_match, "_post_chat",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("model down")))
+    assert recipe_match.smart_recipe("gamma", "x", rows,
+                                     base_url="x", model="m", system_prompt="S", timeout=1) is None

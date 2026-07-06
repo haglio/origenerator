@@ -18,6 +18,10 @@ from PyQt6.QtCore import pyqtSignal
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.recipe_match import CATEGORIES
 
+# The dropdown's leading neutral option: no act chosen, so a dropped video is used
+# instead. Selecting it clears a previously-picked act (there is no other way back).
+_NO_CATEGORY_LABEL = "Pick a move…"
+
 
 class CombinePanel(QWidget):
     """Image slot + a recipe (dropped video or picked category) + Generate."""
@@ -39,15 +43,16 @@ class CombinePanel(QWidget):
         self.video_slot.changed.connect(self._sync)
 
         # The video part's fast path: pick an act and the view finds a fitting past
-        # video for you. Blank by default (index -1), so a dropped video still leads
-        # when no act is picked.
+        # video for you. A selectable neutral option leads the list (index 0, the
+        # default), so no act is forced — and picking it again is how you clear an act
+        # and bring the video slot back (see _sync).
         self._category = QComboBox()
+        self._category.addItem(_NO_CATEGORY_LABEL)
         self._category.addItems(CATEGORIES)
-        self._category.setPlaceholderText("Pick a move…")
-        self._category.setCurrentIndex(-1)
         self._category.setToolTip(
             "Pick an act and Generate — the app reuses a fitting past video's recipe "
-            "on the dropped image. Leave blank to use a dropped video instead."
+            f"on the dropped image. Leave it on “{_NO_CATEGORY_LABEL}” to drop a "
+            "specific video instead."
         )
         self._category.currentIndexChanged.connect(self._sync)
 
@@ -81,12 +86,15 @@ class CombinePanel(QWidget):
     # --- category ---------------------------------------------------------
 
     def selected_category(self) -> str:
-        """The picked act, or "" when the dropdown is blank."""
-        return self._category.currentText() if self._category.currentIndex() >= 0 else ""
+        """The picked act, or "" when the neutral option (index 0) is selected."""
+        index = self._category.currentIndex()
+        return self._category.currentText() if index >= 1 else ""
 
     def set_category(self, category: str):
-        """Select ``category`` (a member of ``CATEGORIES``); clear to blank otherwise."""
-        self._category.setCurrentIndex(self._category.findText(category))
+        """Select ``category`` (a member of ``CATEGORIES``), or the neutral option
+        for anything else."""
+        index = self._category.findText(category)
+        self._category.setCurrentIndex(index if index >= 1 else 0)
 
     def show_drop_candidates(self, prompt_id: str):
         """Light whichever slot accepts a now-dragging item, so its target is

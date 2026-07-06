@@ -17,7 +17,6 @@ _CONFIG_TABS_KEY = "generate_tabs"
 _GALLERY_FOLDER_KEY = "gallery_folder"
 _GALLERY_SELECTION_KEY = "gallery_selection"
 _GALLERY_COMBINE_KEY = "gallery_combine"
-_GALLERY_CATEGORY_KEY = "gallery_category"
 _GEOMETRY_KEY = "window_geometry"
 _OSR2_ENABLED_KEY = "osr2_enabled"
 
@@ -68,7 +67,6 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.select_folder(self._app_state.get(_GALLERY_FOLDER_KEY))
         self._gallery_view.select_generation(self._app_state.get(_GALLERY_SELECTION_KEY))
         self._gallery_view.restore_combine_selection(self._app_state.get(_GALLERY_COMBINE_KEY))
-        self._gallery_view.restore_selected_category(self._app_state.get(_GALLERY_CATEGORY_KEY))
         self._gallery_view.set_osr2_enabled(self._app_state.get(_OSR2_ENABLED_KEY))
 
     def _restore_geometry(self):
@@ -92,7 +90,6 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())
         self._app_state.set(_GALLERY_COMBINE_KEY, self._gallery_view.combine_selection())
-        self._app_state.set(_GALLERY_CATEGORY_KEY, self._gallery_view.selected_category())
         self._app_state.set(_OSR2_ENABLED_KEY, self._gallery_view.osr2_enabled())
         self._app_state.set(
             _GEOMETRY_KEY,

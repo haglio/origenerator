@@ -53,11 +53,24 @@ def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     assert panel.video_slot._label.property("dragActive") is False
 
 
-def test_video_part_offers_every_category_blank_by_default(qtbot):
+def test_video_part_offers_every_act_after_a_neutral_default(qtbot):
     panel = _panel(qtbot)
-    assert panel.selected_category() == ""  # nothing pre-selected
+    assert panel.selected_category() == ""  # neutral by default: no act forced, the video slot stays
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
-    assert items == list(recipe_match.CATEGORIES)
+    assert items[1:] == list(recipe_match.CATEGORIES)  # the six acts sit below a neutral first option
+    assert items[0]                                     # ...which carries a label (the "clear" choice)
+
+
+def test_the_neutral_option_clears_the_act_and_restores_the_video_slot(qtbot):
+    # Regression: without a selectable neutral option, once an act is picked (or
+    # restored) the video slot hides with no way back — "no place to drop the video".
+    panel = _panel(qtbot)
+    panel.set_category("alpha")
+    assert panel.video_slot.isHidden()
+
+    panel._category.setCurrentIndex(0)  # the neutral first option — what a user picks to go back
+    assert panel.selected_category() == ""
+    assert not panel.video_slot.isHidden()  # the drop area is available again
 
 
 def test_dropdown_is_grouped_inside_the_video_part_not_the_image(qtbot):

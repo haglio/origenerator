@@ -991,16 +991,6 @@ class GalleryView(QWidget):
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
 
-    def selected_category(self) -> str:
-        """The combine panel's picked act (or "") — for session save."""
-        return self._combine.selected_category()
-
-    def restore_selected_category(self, saved) -> None:
-        """Re-pick the combine category from a saved value, ignoring anything that
-        isn't a known act (an unknown/blank value just leaves the dropdown empty)."""
-        if isinstance(saved, str):
-            self._combine.set_category(saved)
-
     def _on_thumbnail_drag_started(self, prompt_id: str):
         """A gallery thumbnail began dragging: light the combine slot it fits, so
         the drop target is obvious from the very start of the gesture."""

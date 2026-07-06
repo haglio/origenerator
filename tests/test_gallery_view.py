@@ -3514,37 +3514,49 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     assert view._reroll_jobs == {}
 
 
-def test_category_routes_the_chosen_exemplar_into_a_combine(qtbot, tmp_path, monkeypatch):
+def test_category_routes_the_best_recipe_into_a_combine(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     seen = {}
 
-    def fake_choose(category, image_prompt, candidates, **kw):
-        seen.update(category=category, image_prompt=image_prompt,
-                    ids=[r.get("prompt_id") for r in candidates])
-        return "vid"  # the LLM's pick among the candidates
+    def fake_best(category, candidates):
+        seen.update(category=category, ids=[r.get("prompt_id") for r in candidates])
+        return "vid"  # the act's best recipe
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "choose_recipe", fake_choose)
+    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
 
     view._generate_category("img", "gamma")
 
     assert seen["category"] == "gamma"
-    assert seen["image_prompt"] == "a dog"   # routed off the dropped image's own prompt
-    assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
+    assert seen["ids"] == ["vid"]  # only the rebuildable i2v video is a candidate (not the image)
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
-    assert job.params["input_image"] == "sdxl_pick.png [output]"  # exemplar's recipe on the dropped image
-    assert job.params["seed"] == 42                               # exemplar's seed, reused via the combine path
+    assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
+    assert job.params["seed"] == 42                               # recipe's seed, reused via the combine path
 
 
-def test_category_noop_and_hints_when_no_recipe_fits(qtbot, tmp_path, monkeypatch):
+def test_category_launches_the_gallerys_best_recipe_for_the_act(qtbot, tmp_path):
+    # End to end with the real resolver: the combine DB's one i2v video has the prompt
+    # "dance", so the "dancing" act finds it and runs its recipe on the dropped image.
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "choose_recipe", lambda *a, **k: None)
+
+    view._generate_category("img", "dancing")
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "wan22_i2v"
+    assert job.params["input_image"] == "sdxl_pick.png [output]"
+
+
+def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no alpha recipe exists
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))

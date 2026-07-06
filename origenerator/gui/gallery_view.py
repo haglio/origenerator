@@ -12,10 +12,7 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
-    LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_CATEGORY_MATCH_SYSTEM_PROMPT,
-)
+from origenerator.config import COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
@@ -1053,39 +1050,30 @@ class GalleryView(QWidget):
             self._reveal_combination(key)
 
     def _category_candidates(self) -> list:
-        """Completed, rebuildable i2v videos — the pool the category router matches a
-        dropped image against (each carries the prompt it was made from)."""
+        """Completed, rebuildable i2v videos — the pool :func:`recipe_match.best_recipe`
+        mines for an act's recipe (each carries the prompt it was made from, which
+        names its act)."""
         return [
             row for row in self._db.list_generations()
             if row.get("status") == "completed" and self._is_rebuildable_video_row(row)
         ]
 
     def _generate_category(self, image_id: str, category: str):
-        """Find a fitting past video for ``category`` and run its recipe on the
-        dropped image — the category dropdown's counterpart to a dropped video.
+        """Run ``category``'s best recipe on the dropped image — the category
+        dropdown's counterpart to a dropped video.
 
-        Gathers the user's completed, rebuildable i2v recipes and lets the local LLM
-        choose the best fit for this image's own prompt (its scene, taken as read),
-        then hands off to the shared combine launch. A no-op — with a hint — when no
-        past video of that act fits, so a click never silently does nothing.
+        The recipe is the most-used model+params among the user's videos of that act
+        (see :func:`recipe_match.best_recipe`); its exemplar hands off to the shared
+        combine launch. A no-op — with a hint — when the gallery holds no video of the
+        act, so a click never silently does nothing.
         """
-        image_row = self._db.get_generation(image_id)
-        if image_row is None:
-            return
-        candidates = self._category_candidates()
-        video_id = recipe_match.choose_recipe(
-            category, image_row.get("positive_prompt") or "", candidates,
-            base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-            system_prompt=VIDEO_CATEGORY_MATCH_SYSTEM_PROMPT,
-        )
-        logger.info(
-            "combine: category=%s image=%s -> exemplar=%s (%d candidates)",
-            category, image_id, video_id, len(candidates),
-        )
+        video_id = recipe_match.best_recipe(category, self._category_candidates())
+        logger.info("combine: category=%s image=%s -> recipe from %s",
+                    category, image_id, video_id)
         if video_id is None:
             QMessageBox.information(
                 self, "No recipe yet",
-                f"No past “{category}” video to learn from yet — make one first, "
+                f"No past “{category}” video to base a recipe on yet — make one first, "
                 "or drop a specific video instead.",
             )
             return

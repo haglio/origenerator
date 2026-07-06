@@ -1,136 +1,68 @@
-"""recipe_match: category-driven routing of a dropped image to an exemplar recipe.
+"""recipe_match: pick the one best recipe for a dropdown act from the gallery.
 
-Pure (Qt-free, no live LLM): the HTTP boundary is one seam the tests stub, so
-candidate-building, prefiltering, message-building, response parsing and the
-deterministic fallback are all exercised without a server.
+Each act maps to a single recipe — the most-used model+params among the user's
+videos of that act — resolved fresh from the gallery rows. Pure and Qt-free, so the
+grouping and act-membership logic is exercised without a database or a widget.
 """
 
-import pytest
+import json
 
 from origenerator import recipe_match
 
 
-def _row(pid, prompt, **extra):
-    return {"prompt_id": pid, "positive_prompt": prompt, **extra}
+def _video(pid, prompt, created, **params):
+    """A completed i2v row: its prompt (act membership), created_at (recency), and
+    the params that define its recipe."""
+    return {
+        "prompt_id": pid,
+        "workflow_name": "wan22_i2v",
+        "positive_prompt": prompt,
+        "created_at": created,
+        "params_json": json.dumps({"positive_prompt": prompt, **params}),
+    }
 
 
-def _completion(content):
-    """A minimal OpenAI-style chat completion carrying ``content``."""
-    return {"choices": [{"message": {"content": content}}]}
-
-
-def test_build_candidates_reads_id_and_prompt_dropping_useless_rows():
+def test_best_recipe_picks_the_most_used_recipe_for_the_act():
     rows = [
-        _row("v1", "she gives a slow gamma"),
-        _row("v2", ""),                    # empty prompt: nothing to match on
-        _row("v3", None),                  # no prompt at all
-        {"positive_prompt": "orphan"},     # no id: cannot be launched
+        _video("a1", "a slow gamma", "2026-01-01", lora_high="X", steps=20),
+        _video("a2", "redacted him off", "2026-01-02", lora_high="X", steps=20),  # same recipe as a1
+        _video("b1", "an oral scene", "2026-01-03", lora_high="Y", steps=20),    # a rarer recipe
+        _video("h1", "a epsilon", "2026-01-09", lora_high="Z", steps=20),        # a different act
     ]
-    cands = recipe_match.build_candidates(rows)
-    assert [(c.prompt_id, c.prompt) for c in cands] == [("v1", "she gives a slow gamma")]
+    # recipe X (used twice) beats recipe Y (once); its most-recent member represents it.
+    assert recipe_match.best_recipe("gamma", rows) == "a2"
 
 
-def test_deterministic_choice_picks_category_match_with_best_overlap():
-    image = "a woman kneeling, anchor near her mouth, blue room"
-    cands = recipe_match.build_candidates([
-        _row("bj_far", "gamma, plain background"),                                 # right act, no scene overlap
-        _row("bj_near", "gamma, woman kneeling, anchor near mouth, blue room"),     # right act + best scene match
-        _row("hj", "epsilon, woman kneeling, anchor, blue room"),                     # high overlap but wrong act
-    ])
-    assert recipe_match.deterministic_choice("gamma", image, cands) == "bj_near"
+def test_best_recipe_returns_none_without_a_video_of_that_act():
+    rows = [_video("h1", "a epsilon", "2026-01-01", lora_high="Z")]
+    assert recipe_match.best_recipe("gamma", rows) is None
 
 
-def test_deterministic_choice_returns_none_without_a_category_match():
-    cands = recipe_match.build_candidates([_row("hj", "a epsilon scene, anchor near mouth")])
-    assert recipe_match.deterministic_choice("gamma", "anchor near mouth", cands) is None
+def test_best_recipe_groups_ignoring_prompt_seed_and_input_image():
+    rows = [
+        _video("a1", "gamma one", "2026-01-01", lora_high="X", seed=1, noise_seed=9, input_image="i1.png"),
+        _video("a2", "gamma two", "2026-01-02", lora_high="X", seed=2, noise_seed=8, input_image="i2.png"),
+        _video("b1", "gamma three", "2026-01-03", lora_high="Y", seed=3, input_image="i3.png"),
+    ]
+    # a1 and a2 differ only in prompt/seed/frame — one recipe, used twice — so it wins.
+    assert recipe_match.best_recipe("gamma", rows) == "a2"
 
 
-def test_prefilter_floats_category_matches_up_and_caps_at_k():
-    image = "anchor near her mouth"
-    cands = recipe_match.build_candidates([
-        _row("other1", "a mountain landscape"),
-        _row("bj1", "gamma, anchor near mouth"),   # act match + best overlap
-        _row("other2", "a sleeping cat"),
-        _row("bj2", "gamma, standing"),            # act match, no scene overlap
-    ])
-    top = recipe_match.prefilter("gamma", image, cands, 3)
-    assert [c.prompt_id for c in top[:2]] == ["bj1", "bj2"]  # act matches first, best overlap leads
-    assert len(top) == 3                                     # capped at k, padded with the rest
+def test_best_recipe_breaks_count_ties_by_recency():
+    rows = [
+        _video("a1", "a gamma", "2026-01-01", lora_high="X"),  # a recipe used once, older
+        _video("b1", "oral", "2026-01-05", lora_high="Y"),       # a recipe used once, newer
+    ]
+    assert recipe_match.best_recipe("gamma", rows) == "b1"
 
 
-def test_build_messages_carries_category_image_and_numbered_candidates():
-    cands = [recipe_match.Candidate("v0", "gamma A"), recipe_match.Candidate("v1", "gamma B")]
-    msgs = recipe_match.build_messages("gamma", "anchor near mouth", cands, "SYSTEM RULES")
-    assert msgs[0] == {"role": "system", "content": "SYSTEM RULES"}
-    assert msgs[1]["role"] == "user"
-    user = msgs[1]["content"]
-    assert "gamma" in user                       # the desired act
-    assert "anchor near mouth" in user              # the image description to match against
-    assert "0" in user and "gamma A" in user     # candidates numbered from 0 (the choice index)
-    assert "1" in user and "gamma B" in user
-    assert "choice" in user                        # the JSON reply contract
-
-
-def test_parse_choice_maps_index_to_prompt_id():
-    cands = [recipe_match.Candidate("v0", "a"), recipe_match.Candidate("v1", "b")]
-    assert recipe_match.parse_choice(_completion('{"choice": 1}'), cands) == "v1"
-
-
-def test_parse_choice_none_for_negative_or_out_of_range():
-    cands = [recipe_match.Candidate("v0", "a")]
-    assert recipe_match.parse_choice(_completion('{"choice": -1}'), cands) is None  # "none fit"
-    assert recipe_match.parse_choice(_completion('{"choice": 9}'), cands) is None   # hallucinated index
-
-
-def test_parse_choice_tolerates_fenced_json():
-    cands = [recipe_match.Candidate("v0", "a"), recipe_match.Candidate("v1", "b")]
-    reply = 'Sure!\n```json\n{"choice": 0}\n```'
-    assert recipe_match.parse_choice(_completion(reply), cands) == "v0"
-
-
-def test_parse_choice_raises_on_unusable_reply():
-    # No JSON at all: the caller catches this and falls back to the deterministic pick.
-    with pytest.raises(Exception):
-        recipe_match.parse_choice(_completion("I couldn't decide"), [recipe_match.Candidate("v0", "a")])
-
-
-def test_choose_recipe_returns_the_llms_pick(monkeypatch):
-    rows = [_row("bj1", "gamma, anchor near mouth"), _row("hj1", "epsilon scene")]
-    seen = {}
-
-    def fake_post(base_url, model, messages, timeout):
-        seen["messages"] = messages
-        return _completion('{"choice": 0}')  # index into the prefiltered list (bj1 leads)
-
-    monkeypatch.setattr(recipe_match, "_post_chat", fake_post)
-    got = recipe_match.choose_recipe(
-        "gamma", "anchor near mouth", rows,
-        base_url="http://x", model="m", system_prompt="SYS", timeout=1,
-    )
-    assert got == "bj1"
-    assert "anchor near mouth" in seen["messages"][1]["content"]  # it really consulted the model
-
-
-def test_choose_recipe_falls_back_to_deterministic_when_the_model_errors(monkeypatch):
-    rows = [_row("bj_near", "gamma, anchor near mouth"), _row("bj_far", "gamma, standing")]
-
-    def boom(*a, **k):
-        raise OSError("model down")
-
-    monkeypatch.setattr(recipe_match, "_post_chat", boom)
-    got = recipe_match.choose_recipe(
-        "gamma", "anchor near mouth", rows,
-        base_url="http://x", model="m", system_prompt="SYS", timeout=1,
-    )
-    assert got == "bj_near"  # deterministic: the act match with the best scene overlap
-
-
-def test_choose_recipe_none_when_no_candidates(monkeypatch):
-    def must_not_call(*a, **k):
-        raise AssertionError("no candidates: must not hit the model")
-
-    monkeypatch.setattr(recipe_match, "_post_chat", must_not_call)
-    assert recipe_match.choose_recipe(
-        "gamma", "anything", [],
-        base_url="http://x", model="m", system_prompt="SYS", timeout=1,
-    ) is None
+def test_best_recipe_reads_the_act_from_the_prompt_per_category():
+    rows = [
+        _video("f1", "hardcore redacted, doggy", "2026-01-01", lora_high="X"),
+        _video("c1", "a big alpha on her chest", "2026-01-02", lora_high="Y"),
+        _video("d1", "she is dancing and twerking", "2026-01-03", lora_high="Z"),
+    ]
+    assert recipe_match.best_recipe("redacted", rows) == "f1"
+    assert recipe_match.best_recipe("alpha", rows) == "c1"
+    assert recipe_match.best_recipe("dancing", rows) == "d1"
+    assert recipe_match.best_recipe("epsilon", rows) is None  # nothing depicts this act

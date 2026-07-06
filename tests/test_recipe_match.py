@@ -48,6 +48,22 @@ def test_best_recipe_groups_ignoring_prompt_seed_and_input_image():
     assert recipe_match.best_recipe("gamma", rows) == "a2"
 
 
+def test_recipe_grouping_ignores_derived_size_and_length_params():
+    # Same model+LoRA, but different output size (derived from the input image), clip
+    # length, and sampler split points — none of which define the recipe.
+    rows = [
+        _video("a1", "a gamma", "2026-01-01", lora_high="X", steps=20,
+               width=512, height=768, frame_count=81, start_at_step=10, end_at_step=10000, frame_rate=16.0),
+        _video("a2", "a gamma", "2026-01-02", lora_high="X", steps=20,
+               width=1024, height=576, frame_count=121, start_at_step=10, end_at_step=20, frame_rate=24.0),
+        _video("b1", "a gamma", "2026-01-03", lora_high="Y", steps=20),  # a real difference: the LoRA
+    ]
+    # a1 and a2 are one recipe (used twice) despite differing size/length → it wins,
+    # represented by the most recent (a2). Without the exclusions they'd each be a
+    # singleton and the newest overall (b1) would win instead.
+    assert recipe_match.best_recipe("gamma", rows) == "a2"
+
+
 def test_best_recipe_breaks_count_ties_by_recency():
     rows = [
         _video("a1", "a gamma", "2026-01-01", lora_high="X"),  # a recipe used once, older

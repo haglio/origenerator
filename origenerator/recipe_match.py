@@ -42,12 +42,17 @@ _CATEGORY_KEYWORDS = {
     "dancing": ("dancing", "dance", "twerk", "striptease", "strip tease", "stripping"),
 }
 
-# Params that vary run-to-run within one recipe: the free-text prompt, the start
-# frame, the seeds, and bookkeeping. Excluded from the recipe signature so the same
-# model+settings used on different images/prompts groups as a single recipe.
+# Params that don't define a recipe: the free-text prompt, the start frame, the
+# seeds and bookkeeping — plus values that are incidental or derived, not deliberate
+# recipe choices: the output size (derived in-graph from the input image), the clip
+# length, and the dual-sampler split points (derived from ``steps``). Excluding them
+# keeps the signature on the real levers (model, LoRA, sampler regime) so the same
+# setup on different frames/lengths groups as one recipe instead of fragmenting.
 _RECIPE_EXCLUDE = frozenset((
     "positive_prompt", "negative_prompt", "input_image",
     "seed", "noise_seed", "filename_prefix", "batch_size",
+    "width", "height", "length", "frame_count", "frame_rate",
+    "start_at_step", "end_at_step",
 ))
 
 

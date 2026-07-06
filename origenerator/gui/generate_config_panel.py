@@ -275,13 +275,19 @@ class GenerateConfigPanel(QWidget):
     def show_recent_preview(self):
         """Fill the preview with the newest saved generation matching this tab's
         settings, or the empty 'select a generation' placeholder when nothing has
-        been generated with them yet."""
+        been generated with them yet.
+
+        The shown generation becomes ``_displayed_row``, so an idle autoshow of a
+        scripted video arms the OSR2 drive exactly like a browsed selection — the
+        drive follows whatever video is actually on screen, however it got there."""
         row = self._recent_matching_row()
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
         if preview is not None:
             self._preview.show_media(*preview)
+            self._displayed_row = row
         else:
             self._preview.clear()  # nothing generated with these settings yet
+            self._displayed_row = None
 
     def _recent_matching_row(self) -> dict | None:
         """The newest saved generation in this tab's settings folder, or None."""
@@ -364,10 +370,12 @@ class GenerateConfigPanel(QWidget):
         the selection's own output. A workflow the app can't rebuild leaves the
         form as it was but still shows the preview and footer.
         """
-        self._displayed_row = row
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))
+        # Prefill's autoshow just set _displayed_row to this tab's recent result; the
+        # browsed selection is what's actually on display, so it wins.
+        self._displayed_row = row
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
             self._preview.show_media(*preview)  # after prefill, so it wins over autoshow
@@ -429,7 +437,11 @@ class GenerateConfigPanel(QWidget):
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
         when it isn't a video (or its file is missing). Resolved fresh, so a file
-        deleted since selection is caught. Shared by Send-to-Evolver and OSR2 drive."""
+        deleted since selection is caught. Shared by Send-to-Evolver and OSR2 drive.
+
+        ``_displayed_row`` is whatever the preview is showing — a browsed selection
+        or this tab's idle autoshow — so a scripted video on screen arms the drive
+        either way."""
         if not self._displayed_row:
             return None
         preview = resolve_preview(self._displayed_row, COMFYUI_OUTPUT_DIR)

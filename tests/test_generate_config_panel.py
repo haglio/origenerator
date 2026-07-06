@@ -452,6 +452,26 @@ def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
     assert panel.osr2_drive_target() is None
 
 
+def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
+    saved_panel, monkeypatch, tmp_path
+):
+    # A tab auto-showing its newest result (show_recent_preview) — not an explicit
+    # browsed selection — must still arm the drive: the scripted video is right there
+    # on screen, so the OSR2 follows it. This closed the "the strip shows a script
+    # but nothing drives" gap.
+    panel, db = saved_panel
+    vpath = tmp_path / "auto.mp4"
+    vpath.write_bytes(b"v")
+    actions = _script_beside(vpath)
+    monkeypatch.setattr(panel, "_recent_matching_row",
+                        lambda: {"prompt_id": "v", "workflow_name": "wan22_i2v"})
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+
+    panel.show_recent_preview()  # the idle-autoshow path, not show_saved_generation
+
+    assert panel.osr2_drive_target() == (vpath, panel._preview.player(), actions)
+
+
 def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, tmp_path):
     # The view reconciles the global driver whenever the front tab's video changes.
     panel, db = saved_panel

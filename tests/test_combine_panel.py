@@ -60,6 +60,15 @@ def test_video_part_offers_every_category_blank_by_default(qtbot):
     assert items == list(recipe_match.CATEGORIES)
 
 
+def test_dropdown_is_grouped_inside_the_video_part_not_the_image(qtbot):
+    panel = _panel(qtbot)
+    # The dropdown configures the *video* recipe, so it lives inside the video part
+    # alongside the video slot — not as a panel-level peer of the image slot, where
+    # it would read as belonging equally to both.
+    assert panel._category.parent() is panel.video_slot.parent()
+    assert panel.image_slot.parent() is not panel.video_slot.parent()
+
+
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
@@ -70,6 +79,18 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
 
     panel.set_category("")                       # back to blank
     assert not panel._generate_btn.isEnabled()
+
+
+def test_picking_a_category_hides_the_now_unused_video_slot(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    assert not panel.video_slot.isHidden()  # a dropped video shows while it's in play
+
+    panel.set_category("gamma")
+    assert panel.video_slot.isHidden()      # a picked act supersedes it — so it drops out of view
+
+    panel.set_category("")                   # blank again: the dropped video is usable, so it returns
+    assert not panel.video_slot.isHidden()
 
 
 def test_generate_emits_category_and_it_wins_over_a_dropped_video(qtbot):

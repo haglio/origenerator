@@ -40,7 +40,7 @@ class CombinePanel(QWidget):
 
         # The video part's fast path: pick an act and the view finds a fitting past
         # video for you. Blank by default (index -1), so a dropped video still leads
-        # when no act is picked. Takes the top half of the video part, the slot below.
+        # when no act is picked.
         self._category = QComboBox()
         self._category.addItems(CATEGORIES)
         self._category.setPlaceholderText("Pick a move…")
@@ -50,6 +50,16 @@ class CombinePanel(QWidget):
             "on the dropped image. Leave blank to use a dropped video instead."
         )
         self._category.currentIndexChanged.connect(self._sync)
+
+        # The video part: both ways to supply the recipe, kept in one container so the
+        # dropdown reads as belonging to the video side (not the image) — pick an act,
+        # or drop a video below it. A picked act hides the slot (see _sync).
+        self._video_part = QWidget()
+        video_box = QVBoxLayout(self._video_part)
+        video_box.setContentsMargins(0, 0, 0, 0)
+        video_box.setSpacing(2)  # the dropdown hugs its slot as one unit
+        video_box.addWidget(self._category)
+        video_box.addWidget(self.video_slot)
 
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
@@ -63,8 +73,8 @@ class CombinePanel(QWidget):
         )
         layout.addWidget(heading)
         layout.addWidget(self.image_slot)
-        layout.addWidget(self._category)
-        layout.addWidget(self.video_slot)
+        layout.addSpacing(8)  # set the video part apart from the image slot above it
+        layout.addWidget(self._video_part)
         layout.addWidget(self._generate_btn)
         self._sync()
 
@@ -91,8 +101,11 @@ class CombinePanel(QWidget):
 
     def _sync(self):
         """Generate is live once a source image sits and a recipe is chosen — either
-        by picking an act or by dropping a video."""
-        has_recipe = bool(self.selected_category() or self.video_slot.current_id())
+        by picking an act or by dropping a video. A picked act supersedes any dropped
+        video, so the now-unused slot is hidden while an act is selected."""
+        category = self.selected_category()
+        self.video_slot.setVisible(not category)
+        has_recipe = bool(category or self.video_slot.current_id())
         self._generate_btn.setEnabled(bool(self.image_slot.current_id()) and has_recipe)
 
     def _emit(self):

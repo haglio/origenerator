@@ -102,6 +102,25 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
 
 
+def test_set_placeholder_updates_the_empty_prompt_live(qtbot):
+    slot = _slot(qtbot, placeholder="Drop here")
+    assert slot._label.text() == "Drop here"
+
+    slot.set_placeholder("use custom action from video")
+
+    assert slot._label.text() == "use custom action from video"
+
+
+def test_set_placeholder_leaves_a_held_item_untouched(qtbot):
+    slot = _slot(qtbot)
+    _drop(slot, "img1")  # preview is (None, None): the held state shows a check, not a prompt
+
+    slot.set_placeholder("something else")
+
+    assert slot.current_id() == "img1"          # still held
+    assert slot._label.text() != "something else"  # the new prompt only applies once empty
+
+
 def test_set_candidate_lights_and_clears_the_slot(qtbot):
     slot = _slot(qtbot)
 

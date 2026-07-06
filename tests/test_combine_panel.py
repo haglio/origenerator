@@ -1,5 +1,7 @@
 """CombinePanel: two drop slots + a Generate button for the image+video combine."""
 
+from PyQt6.QtWidgets import QHBoxLayout
+
 from origenerator import recipe_match
 from origenerator.gui.combine_panel import CombinePanel
 
@@ -53,33 +55,21 @@ def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     assert panel.video_slot._label.property("dragActive") is False
 
 
-def test_video_part_offers_every_act_after_a_neutral_default(qtbot):
+def test_neutral_option_is_a_dash_leading_the_acts(qtbot):
     panel = _panel(qtbot)
-    assert panel.selected_category() == ""  # neutral by default: no act forced, the video slot stays
+    assert panel.selected_category() == ""  # neutral by default
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
-    assert items[1:] == list(recipe_match.CATEGORIES)  # the six acts sit below a neutral first option
-    assert items[0]                                     # ...which carries a label (the "clear" choice)
+    assert items[0] == "-"                              # the neutral choice is a dash, not a prompt
+    assert items[1:] == list(recipe_match.CATEGORIES)   # the six acts follow it
 
 
-def test_the_neutral_option_clears_the_act_and_restores_the_video_slot(qtbot):
-    # Regression: without a selectable neutral option, once an act is picked (or
-    # restored) the video slot hides with no way back — "no place to drop the video".
+def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):
     panel = _panel(qtbot)
-    panel.set_category("alpha")
-    assert panel.video_slot.isHidden()
-
-    panel._category.setCurrentIndex(0)  # the neutral first option — what a user picks to go back
-    assert panel.selected_category() == ""
-    assert not panel.video_slot.isHidden()  # the drop area is available again
-
-
-def test_dropdown_is_grouped_inside_the_video_part_not_the_image(qtbot):
-    panel = _panel(qtbot)
-    # The dropdown configures the *video* recipe, so it lives inside the video part
-    # alongside the video slot — not as a panel-level peer of the image slot, where
-    # it would read as belonging equally to both.
+    # The dropdown configures the *video* recipe, so it shares one container with the
+    # video slot — laid out side by side, not stacked, and not a peer of the image.
     assert panel._category.parent() is panel.video_slot.parent()
     assert panel.image_slot.parent() is not panel.video_slot.parent()
+    assert isinstance(panel._category.parent().layout(), QHBoxLayout)
 
 
 def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
@@ -90,35 +80,51 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel.set_category("gamma")
     assert panel._generate_btn.isEnabled()      # a category is a recipe — no video needed
 
-    panel.set_category("")                       # back to blank
+    panel.set_category("")                       # back to neutral
     assert not panel._generate_btn.isEnabled()
 
 
-def test_picking_a_category_hides_the_now_unused_video_slot(qtbot):
+def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
-    assert not panel.video_slot.isHidden()  # a dropped video shows while it's in play
 
     panel.set_category("gamma")
-    assert panel.video_slot.isHidden()      # a picked act supersedes it — so it drops out of view
 
-    panel.set_category("")                   # blank again: the dropped video is usable, so it returns
-    assert not panel.video_slot.isHidden()
+    assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
+    assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
 
 
-def test_generate_emits_category_and_it_wins_over_a_dropped_video(qtbot):
+def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
+    panel = _panel(qtbot)
+    panel.set_category("redacted")
+
+    panel.video_slot.set_item("vid1")
+
+    assert panel.selected_category() == ""          # a dropped video wipes the act back to "-"
+    assert panel.video_slot.current_id() == "vid1"  # ...and the video is what's kept
+
+
+def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
+    panel = _panel(qtbot)
+    assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral prompt
+
+    panel.set_category("zeta")
+    assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
+
+    panel.set_category("")
+    assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral again
+
+
+def test_generate_emits_the_picked_act(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")   # a video is also sitting there
     panel.set_category("redacted")
-    cats, vids = [], []
+    cats = []
     panel.category_requested.connect(lambda i, c: cats.append((i, c)))
-    panel.generate_requested.connect(lambda i, v: vids.append((i, v)))
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "redacted")]  # the picked act takes precedence
-    assert vids == []                     # the dropped video is not used
+    assert cats == [("img1", "redacted")]
 
 
 def test_clearing_a_slot_disables_generate_again(qtbot):

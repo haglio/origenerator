@@ -71,6 +71,13 @@ class DropSlot(QWidget):
         self._render()
         self.changed.emit()
 
+    def set_placeholder(self, text: str):
+        """Change the prompt shown while the slot is empty, re-rendering if nothing
+        is held (a filled slot keeps its preview until cleared)."""
+        self._placeholder = text
+        if self._current_id is None:
+            self._render()
+
     def clear(self):
         """Empty the slot back to its placeholder; a no-op when already empty."""
         if self._current_id is None:

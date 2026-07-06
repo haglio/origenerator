@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from origenerator.funscript import (
-    ensure_funscript, funscript_path_for, read_actions, synthesize_actions,
-    write_funscript,
+    ensure_funscript, funscript_path_for, heatmap_colors, read_actions,
+    synthesize_actions, write_funscript,
 )
 
 
@@ -77,3 +77,26 @@ def test_ensure_funscript_returns_none_without_a_duration(tmp_path):
     video.write_bytes(b"v")
     assert ensure_funscript(video, loop=False, hz=1.0, duration_provider=lambda _p: None) is None
     assert not funscript_path_for(video).exists()
+
+
+# --- heatmap: funscript actions -> one color per time bucket ----------------
+
+def test_heatmap_colors_empty_without_actions_or_buckets():
+    assert heatmap_colors([], 10) == []
+    assert heatmap_colors(synthesize_actions(2.0, hz=1.0, loop=False), 0) == []
+
+
+def test_heatmap_colors_returns_one_rgb_per_bucket():
+    colors = heatmap_colors(synthesize_actions(2.0, hz=1.0, loop=False), 8)
+    assert len(colors) == 8
+    for c in colors:
+        assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
+
+
+def test_heatmap_colors_run_hotter_with_stroke_speed():
+    # A whole stroke crammed into 100 ms reads "fast" (red-dominant); the same
+    # stroke spread over a second reads "slow" (blue-dominant). One bucket each.
+    fast = heatmap_colors([{"at": 0, "pos": 0}, {"at": 100, "pos": 100}], 1)[0]
+    slow = heatmap_colors([{"at": 0, "pos": 0}, {"at": 1000, "pos": 100}], 1)[0]
+    assert fast[0] > fast[2]  # red > blue
+    assert slow[2] > slow[0]  # blue > red

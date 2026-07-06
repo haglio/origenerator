@@ -10,11 +10,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QStackedLayout, QLabel, QSizePolicy, QApplication
+from PyQt6.QtWidgets import (
+    QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
+)
 from PyQt6.QtGui import QPixmap, QMovie, QImageReader
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
+
+from origenerator.funscript import funscript_path_for, read_actions
+from origenerator.gui.funscript_strip import FunscriptStrip
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -24,7 +29,7 @@ class PreviewWidget(QWidget):
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
-                 on_double_click=None):
+                 show_funscript_strip: bool = False, on_double_click=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -40,7 +45,14 @@ class PreviewWidget(QWidget):
         self._on_double_click = on_double_click
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        self._stack = QStackedLayout(self)
+        # The media (image/video) fills the pane; an optional funscript strip rides
+        # along its bottom edge, so a scripted clip shows its stroke motion at a glance.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        media_host = QWidget()
+        outer.addWidget(media_host, 1)
+        self._stack = QStackedLayout(media_host)
         self._stack.setContentsMargins(0, 0, 0, 0)
 
         self._image_label = QLabel(_PLACEHOLDER)
@@ -69,6 +81,13 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
+        # Opt-in funscript heatmap along the bottom edge (the info-pane and fullscreen
+        # previews use it); hidden until a scripted video is shown.
+        self._strip = FunscriptStrip() if show_funscript_strip else None
+        if self._strip is not None:
+            outer.addWidget(self._strip)
+            self._strip.hide()
+
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test
         # players don't touch the backend and don't need (or want) this hook.
@@ -96,6 +115,7 @@ class PreviewWidget(QWidget):
             self._pixmap = QPixmap(str(path))
             self._rescale()
         self._stack.setCurrentWidget(self._image_label)
+        self._hide_strip()  # an image carries no stroke script
 
     def show_video(self, path) -> None:
         self._set_movie(None)
@@ -105,6 +125,7 @@ class PreviewWidget(QWidget):
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
         self._player.play()
+        self._update_strip(path)
 
     def show_frame(self, data: bytes) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
@@ -123,6 +144,7 @@ class PreviewWidget(QWidget):
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
+        self._hide_strip()  # a live in-progress frame has no script yet
 
     def show_message(self, text: str) -> None:
         """Show a plain text message in place of any media.
@@ -136,6 +158,7 @@ class PreviewWidget(QWidget):
         self._pixmap = None
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
+        self._hide_strip()
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
@@ -147,6 +170,22 @@ class PreviewWidget(QWidget):
     def player(self) -> QMediaPlayer:
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
+
+    def _update_strip(self, video_path) -> None:
+        """Aim the funscript strip at ``video_path``'s sidecar, showing it only when
+        one exists — so the strip's presence is itself the "this clip has a script"
+        cue (the same script the OSR2 drive would read for this video)."""
+        if self._strip is None:
+            return
+        actions = read_actions(funscript_path_for(video_path)) if video_path else None
+        self._strip.set_actions(actions or [])
+        self._strip.setVisible(bool(actions))
+
+    def _hide_strip(self) -> None:
+        """Drop the strip whenever the pane isn't showing a video."""
+        if self._strip is not None:
+            self._strip.set_actions([])
+            self._strip.hide()
 
     def current_video_path(self):
         """The on-disk video currently shown, or ``None`` for an image/placeholder/

@@ -8,7 +8,15 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtMultimedia import QMediaPlayer
 
 import origenerator.gui.fullscreen_preview as fullscreen_preview
+from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.preview_widget import PreviewWidget
+
+
+def _scripted_video(tmp_path, name="clip.mp4"):
+    """A temp video path with a real funscript sidecar written beside it."""
+    vid = tmp_path / name
+    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    return vid
 
 
 def _make_png(path):
@@ -260,3 +268,45 @@ def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
     qtbot.addWidget(w)
     w.mouseDoubleClickEvent(None)
     assert called == [True]
+
+
+# --- funscript strip: proof a shown video carries a stroke script -----------
+
+def _strip_preview(qtbot):
+    w = PreviewWidget(player=MagicMock(), show_funscript_strip=True)
+    qtbot.addWidget(w)
+    return w
+
+
+def test_no_strip_unless_opted_in(make_preview, tmp_path):
+    w = make_preview()  # the default (slideshow/plain) preview has no strip
+    assert w._strip is None
+    w.show_video(_scripted_video(tmp_path))  # still works without one
+
+
+def test_scripted_video_shows_its_heatmap_strip(qtbot, tmp_path):
+    w = _strip_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    assert w._strip.has_script() is True
+    assert not w._strip.isHidden()
+
+
+def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):
+    w = _strip_preview(qtbot)
+    w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written
+    assert w._strip.has_script() is False
+    assert w._strip.isHidden()
+
+
+def test_showing_an_image_hides_the_strip(qtbot, tmp_path):
+    w = _strip_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w._strip.isHidden()
+
+
+def test_clearing_hides_the_strip(qtbot, tmp_path):
+    w = _strip_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    w.clear()
+    assert w._strip.isHidden()

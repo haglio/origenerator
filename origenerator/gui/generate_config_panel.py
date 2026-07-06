@@ -92,7 +92,7 @@ class GenerateConfigPanel(QWidget):
         # The preview leads the column: it mirrors a running re-roll's frames (driven
         # from outside), shows the browsed generation's output when one is loaded, and
         # the newest matching result otherwise.
-        self._preview = PreviewWidget()
+        self._preview = PreviewWidget(show_funscript_strip=True)
         main_box.addWidget(self._preview, 3)
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))

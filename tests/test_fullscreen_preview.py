@@ -4,6 +4,7 @@ from PIL import Image
 from PyQt6.QtCore import Qt, QUrl, QEvent
 from PyQt6.QtGui import QKeyEvent
 
+from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.fullscreen_preview import FullscreenPreview
 
 
@@ -63,3 +64,12 @@ def test_the_fullscreen_preview_does_not_nest_another(qtbot, tmp_path):
     win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
     qtbot.addWidget(win)
     assert win._preview.open_fullscreen() is None
+
+
+def test_watching_a_scripted_video_fullscreen_shows_its_strip(qtbot, tmp_path):
+    vid = tmp_path / "c.mp4"
+    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    win = FullscreenPreview((vid, "video"), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win._preview._strip is not None
+    assert win._preview._strip.has_script() is True

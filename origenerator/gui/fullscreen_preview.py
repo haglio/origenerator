@@ -29,6 +29,7 @@ class FullscreenPreview(QWidget):
         # This preview *is* the fullscreen view, so it opts out of opening another —
         # and a double-click on it (the media fills the window) dismisses the view.
         self._preview = PreviewWidget(player=player, allow_fullscreen=False,
+                                      show_funscript_strip=True,
                                       on_double_click=self.close)
         layout.addWidget(self._preview, 1)
         self._preview.show_media(media[0], media[1])

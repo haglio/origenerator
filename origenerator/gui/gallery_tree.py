@@ -34,6 +34,7 @@ class GalleryTree:
         self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
         self._filter = ""                       # active filter query, lowercased
         self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
+        self.seed_matches: dict[str, list[str]] = {}  # leaf key -> prompt_ids the query hit by seed
 
     def populate(self, tree_model, expanded_keys, *, show_recents: bool):
         """Rebuild the tree from ``tree_model``, restoring the folders in
@@ -129,14 +130,17 @@ class GalleryTree:
 
     def apply_filter(self, query: str) -> None:
         """Narrow the tree to rows matching ``query`` (case-insensitive substring
-        over the row label), keeping each match's ancestors so its path shows and
-        expanding down to it; a matched folder keeps its whole subtree. An empty
-        query restores every row and the expansion the user had before filtering."""
+        over the row label, or a settings leaf's generation seed), keeping each
+        match's ancestors so its path shows and expanding down to it; a matched
+        folder keeps its whole subtree. Seed hits are recorded in
+        :attr:`seed_matches` for the view to jump to. An empty query restores
+        every row and the expansion the user had before filtering."""
         query = (query or "").strip().lower()
         if not query:
             if self._filter:
                 self._restore_from_filter()
             self._filter = ""
+            self.seed_matches = {}
             return
         if not self._filter:  # entering a filter: remember the user's expansion
             self._pre_filter_expanded = self.expanded_keys()
@@ -150,23 +154,43 @@ class GalleryTree:
             self._run_filter()
 
     def _run_filter(self) -> None:
+        self.seed_matches = {}
         root = self._tree.invisibleRootItem()
         for i in range(root.childCount()):
             self._filter_item(root.child(i), self._filter, ancestor_match=False)
 
     def _filter_item(self, item, query, *, ancestor_match: bool) -> bool:
-        """Hide ``item`` unless it, an ancestor, or a descendant matches; expand the
-        path down to any descendant match. Returns whether it stays visible."""
+        """Hide ``item`` unless it, an ancestor, a descendant, or (for a settings
+        leaf) one of its generations' seeds matches; expand the path down to any
+        descendant match. Returns whether it stays visible."""
         match = ancestor_match or query in item.text(0).lower()
+        seed_ids = self._seed_hits(item, query)
         descendant_match = False
         for i in range(item.childCount()):
             if self._filter_item(item.child(i), query, ancestor_match=match):
                 descendant_match = True
-        visible = match or descendant_match
+        visible = match or descendant_match or bool(seed_ids)
         item.setHidden(not visible)
         if descendant_match:
             item.setExpanded(True)
+        if seed_ids:
+            self.seed_matches[item.data(0, GROUP_ROLE).key] = seed_ids
         return visible
+
+    def _seed_hits(self, item, query) -> list[str]:
+        """The prompt_ids in a settings leaf whose seed contains ``query``. Seeds
+        ride on the generations, not on any folder label, so this is the only way
+        the filter can pin down one specific item by its seed."""
+        group = item.data(0, GROUP_ROLE)
+        if not isinstance(group, gallery.SettingsGroup):
+            return []
+        hits = []
+        for row in group.rows:
+            params = gallery.parse_params(row.get("params_json"))
+            seeds = (params.get("seed"), params.get("noise_seed"))
+            if any(s is not None and query in str(s).lower() for s in seeds):
+                hits.append(row["prompt_id"])
+        return hits
 
     def _restore_from_filter(self) -> None:
         keys = self._pre_filter_expanded or set()

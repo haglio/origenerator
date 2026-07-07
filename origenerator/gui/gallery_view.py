@@ -648,6 +648,20 @@ class GalleryView(QWidget):
 
     def _on_filter_changed(self, text: str):
         self._tree_view.apply_filter(text)
+        self._focus_seed_match()
+
+    def _focus_seed_match(self):
+        """When the filter pinned down exactly one generation by its seed, open its
+        folder and select it — the one case where filtering navigates on its own,
+        since a seed lives on an item, not a folder the user could click to."""
+        matches = self._tree_view.seed_matches
+        if sum(len(ids) for ids in matches.values()) != 1:
+            return
+        (key, prompt_ids), = matches.items()
+        item = self._item_by_key.get(key)
+        if item is not None:
+            self._tree.setCurrentItem(item)  # opens the folder's thumbnails
+            self._reselect_generation(prompt_ids[0])
 
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf

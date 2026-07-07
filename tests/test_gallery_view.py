@@ -391,6 +391,43 @@ def test_toc_pane_holds_a_filter_field_above_the_tree(qtbot):
     assert layout.indexOf(view._filter_edit) < layout.indexOf(view._tree)
 
 
+def test_toc_filter_matches_a_generation_by_its_seed(qtbot):
+    # The two seed variants collapse into one "a cat" leaf; "a dog" is a sibling.
+    rows = [
+        _image("i1", "a cat", 50, 778899),
+        _image("i2", "a cat", 50, 112233),
+        _image("i3", "a dog", 50, 445566),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    leaves = _children_by_label(lora)
+
+    view._filter_edit.setText("778899")     # a seed, carried by no folder label
+
+    assert not leaves["a cat"].isHidden()   # the folder holding that seed stays
+    assert leaves["a dog"].isHidden()       # every other folder drops out
+
+
+def test_a_unique_seed_filter_jumps_to_that_generation(qtbot):
+    rows = [
+        _image("i1", "a cat", 50, 778899),
+        _image("i2", "a cat", 50, 112233),
+        _image("i3", "a dog", 50, 445566),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._filter_edit.setText("778899")
+
+    # Filtering opened the folder and selected the one item with that seed.
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # its folder is showing
+    assert view.selected_generation() == "i1"
+
+
 def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)

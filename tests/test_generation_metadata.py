@@ -54,18 +54,6 @@ def test_every_output_file_gets_its_own_row():
     assert files == ["a.png", "b.png"]
 
 
-def test_details_holds_only_status_and_source():
-    assert _items(build_sections(_row()), "Details") == {
-        "Status": "completed", "Source": "generated",
-    }
-
-
-def test_source_defaults_to_generated_when_absent():
-    row = _row()
-    del row["source"]
-    assert _items(build_sections(row), "Details")["Source"] == "generated"
-
-
 # --- Parameters: only what the form has no field for -----------------------
 
 def test_parameters_shows_only_params_the_form_has_no_field_for():
@@ -82,9 +70,11 @@ def test_parameters_section_absent_when_every_param_is_in_the_form():
     assert "Parameters" not in [s.title for s in build_sections(row)]
 
 
-def test_sections_run_basic_then_parameters_then_details():
+def test_sections_run_basic_then_parameters_no_details():
+    # The Details block (status/source) was dropped as not useful; what's left is
+    # the output facts and any param the form can't show.
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
-    assert [s.title for s in build_sections(row)] == ["Basic", "Parameters", "Details"]
+    assert [s.title for s in build_sections(row)] == ["Basic", "Parameters"]
 
 
 def test_an_unknown_workflow_shows_all_its_params_here():

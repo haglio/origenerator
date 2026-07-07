@@ -396,7 +396,7 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert panel._evolver_btn.isHidden()
 
 
-def test_showing_a_generation_reveals_its_file_created_status_and_source(saved_panel):
+def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
 
@@ -405,8 +405,8 @@ def test_showing_a_generation_reveals_its_file_created_status_and_source(saved_p
     assert not panel._metadata_block.isHidden()
     texts = _metadata_texts(panel)
     assert "image/sdxl_img1.png" in texts   # the filename — the reported regression
-    assert "completed" in texts             # status
-    assert "generated" in texts             # source
+    assert "completed" not in texts         # Details (status/source) dropped as not useful
+    assert "generated" not in texts
 
 
 def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monkeypatch):

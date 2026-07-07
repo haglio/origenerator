@@ -5,9 +5,9 @@ The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`: it
 renders the prompts and every parameter the workflow lays out as fields you can
 change. Repeating those read-only would be the duplication the merged tab set out
 to remove, so they are deliberately absent here. What the form has no field for —
-the output file, when the run happened, its status and source, and any parameter
-the workflow doesn't lay out (an import's extras, hidden passthrough like vae or
-clip) — is gathered into titled sections for a compact block under the form.
+the output file, when the run happened, and any parameter the workflow doesn't lay
+out (an import's extras, hidden passthrough like vae or clip) — is gathered into
+titled sections for a compact block above the form.
 
 Kept Qt-free so the section/item model is unit-testable directly;
 ``gui/metadata_block.py`` does the rendering.
@@ -89,13 +89,6 @@ def _parameters(row: dict) -> MetaSection | None:
     return MetaSection("Parameters", items) if items else None
 
 
-def _details(row: dict) -> MetaSection:
-    return MetaSection("Details", [
-        MetaItem("Status", str(row.get("status", ""))),
-        MetaItem("Source", str(row.get("source", "generated"))),
-    ])
-
-
 def build_sections(row: dict) -> list[MetaSection]:
-    sections = [_basic(row), _parameters(row), _details(row)]
+    sections = [_basic(row), _parameters(row)]
     return [s for s in sections if s is not None]

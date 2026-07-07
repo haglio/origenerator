@@ -31,13 +31,13 @@ def _texts(block):
     return [lbl.text().replace("​", "") for lbl in block.findChildren(QLabel)]
 
 
-def test_shows_file_created_status_and_source(block):
+def test_shows_file_and_created(block):
     block.show_row(_row())
     texts = _texts(block)
     assert "image/out.png" in texts   # the file the tab is looking at — the regression
     assert "2026-07-01" in texts
-    assert "completed" in texts
-    assert "generated" in texts
+    assert "completed" not in texts   # Details (status/source) dropped as not useful
+    assert "generated" not in texts
 
 
 def test_copy_button_copies_just_the_filename(block):

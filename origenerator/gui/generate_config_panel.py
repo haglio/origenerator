@@ -242,9 +242,14 @@ class GenerateConfigPanel(QWidget):
     def _install_form(self, form: ParamForm):
         """Swap the workflow's ParamForm into the form host inside the scroll,
         discarding the previous one. The form lives in the shared scroll so it moves
-        with the info above it, not boxed in a separate scroll of its own."""
+        with the info above it, not boxed in a separate scroll of its own.
+
+        The old form is detached from its parent at once (not just scheduled for
+        deletion), so it leaves the screen immediately instead of lingering under
+        the new form until the event loop next spins."""
         if self._param_form is not None:
             self._form_host_box.removeWidget(self._param_form)
+            self._param_form.setParent(None)
             self._param_form.deleteLater()
         self._param_form = form
         self._param_form.changed.connect(self._emit_title)

@@ -104,6 +104,20 @@ def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     assert bank.indexOf(panel._cancel_btn) != -1
 
 
+def test_switching_workflow_detaches_the_old_form_at_once(panel):
+    # Changing workflow must remove the previous form from the host immediately, not
+    # leave it parented (and painting) under the new form until deleteLater runs.
+    from origenerator.gui.param_form import ParamForm
+    old_form = panel._param_form
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+
+    assert panel._param_form is not old_form   # a new form is installed
+    assert old_form.parent() is None           # the old one is detached at once
+    live = [f for f in panel._form_host.findChildren(ParamForm)
+            if f.parent() is panel._form_host]
+    assert live == [panel._param_form]         # exactly one form in the host
+
+
 # --- a read-only gallery (no client) ----------------------------------------
 
 def test_tolerates_a_missing_client(qtbot, tmp_path):

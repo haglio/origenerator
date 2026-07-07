@@ -822,11 +822,11 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     assert _top_level(view._tree)["Images"].child(0).text(0) == "Favorites"
 
 
-def _source_link(view):
-    return view._info_tabs.current_config_panel()._source_link
+def _source_tile(view):
+    return view._info_tabs.current_config_panel()._source_tile
 
 
-def test_video_source_link_points_to_its_image_and_navigates(qtbot):
+def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -838,18 +838,18 @@ def test_video_source_link_points_to_its_image_and_navigates(qtbot):
     for panel in view._info_tabs._config_panels():
         panel._preview.show_media = MagicMock()  # don't start WMF playback
 
-    # Viewing the video shows a footer link back to the image it was built from.
+    # Viewing the video shows a tile pointing back to the image it was built from.
     view._on_thumbnail_clicked("vid1")
-    assert not _source_link(view).isHidden()
-    assert 'href="img1"' in _source_link(view).text()
+    assert not _source_tile(view).isHidden()
+    assert _source_tile(view)._prompt_id == "img1"
 
-    # Activating that link navigates the gallery to the source image.
-    _source_link(view).linkActivated.emit("img1")
+    # Clicking that tile navigates the gallery to the source image.
+    _source_tile(view).activated.emit("img1")
     assert "img1" in view.visible_prompt_ids()
     assert view._selected["prompt_id"] == "img1"
-    # The image itself has no source image, so no link shows.
+    # The image itself has no source image, so no tile shows.
     view._on_thumbnail_clicked("img1")
-    assert _source_link(view).isHidden()
+    assert _source_tile(view).isHidden()
 
 
 def test_back_and_forward_walk_the_viewed_generations(qtbot):

@@ -13,8 +13,8 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
     animated_preview_path, build_image_config_index, config_tab_title,
-    find_source_image_id, media_type_of_row, resolve_preview, rows_in_settings,
-    settings_signature, videos_from_source_image,
+    find_source_image_id, media_type_of_row, resolve_preview, row_output_files,
+    rows_in_settings, settings_signature, videos_from_source_image,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.funscript import funscript_path_for, read_actions
@@ -23,6 +23,7 @@ from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -40,26 +41,27 @@ class GenerateConfigPanel(QWidget):
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
     for the gallery to launch as a re-roll of this config's settings folder. The
-    panel lays out two resizable panes itself — a main column with the preview over
-    the settings and the Generate button, and this tab's own slim strip of past
-    runs on the right. Clicking a strip thumbnail re-emits its prompt id via
-    ``strip_activated`` so a container can open (or reuse) a tab for it. The preview
-    is driven from outside: a browsed selection's output, a running re-roll's live
-    frames, or this config's newest matching result when idle.
+    panel lays out two resizable panes itself — a main column beside this tab's own
+    slim strip of past runs. The main column stacks a fixed preview on top, then one
+    scroll holding the read-only info above the editable form, then a status line and
+    a single button bank (Send-to-Evolver, Cancel, Generate). Clicking a strip
+    thumbnail re-emits its prompt id via ``strip_activated`` so a container can open
+    (or reuse) a tab for it. The preview is driven from outside: a browsed selection's
+    output, a running re-roll's live frames, or this config's newest matching result
+    when idle.
 
-    Below the Generate button sits a footer that appears only while the tab is
-    displaying a saved generation (:meth:`show_saved_generation`): a read-only
-    metadata block (the output file, when it was made, its status and source, and
-    any param the form has no field for), then for an image the videos it was
-    animated into; for a video a link back to its source image, a Send-to-Evolver
-    button, and a Drive-OSR2 toggle (when it has a funscript). A blank tab, or one
-    showing a bare autoshow, hides them all.
+    The info at the top of the scroll appears only while the tab is displaying a
+    saved generation (:meth:`show_saved_generation`): a read-only metadata block (the
+    output file, when it was made, and any param the form has no field for), then for
+    an image the videos it was animated into, or for a video a clickable source-image
+    tile. Send-to-Evolver (in the button bank) and the Drive-OSR2 toggle apply to a
+    video. A blank tab, or one showing a bare autoshow, hides them all.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
-    source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
-    animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
+    source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
+    animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
@@ -98,6 +100,32 @@ class GenerateConfigPanel(QWidget):
         # the newest matching result otherwise.
         self._preview = PreviewWidget(show_funscript_strip=True)
         main_box.addWidget(self._preview, 3)
+        # One scroll under the preview holds everything else: the read-only info on
+        # top, the editable form below it, so they scroll together. This replaces the
+        # old split — a cramped form-only scroll above a separate, non-scrolling info
+        # footer — that buried the form (width/height, the swap button) out of reach.
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        body_host = QWidget()
+        body = QVBoxLayout(body_host)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(8)
+
+        # Info, above the editable stuff and shown only while displaying a saved
+        # generation: the output file + when it was made, then a source-image tile
+        # for a video, or the "animated in" strip for an image.
+        self._metadata_block = MetadataBlock()
+        self._metadata_block.hide()
+        body.addWidget(self._metadata_block)
+        self._source_tile = SourceImageTile()
+        self._source_tile.activated.connect(self.source_activated)
+        body.addWidget(self._source_tile)
+        self._animated_strip = AnimatedVideoStrip()
+        self._animated_strip.video_activated.connect(self.animated_activated)
+        body.addWidget(self._animated_strip)
+
+        # Editable: the workflow picker, its typical-time estimate, and the param
+        # form (swapped into _form_host whenever the workflow changes).
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = NoWheelComboBox()
@@ -112,13 +140,19 @@ class GenerateConfigPanel(QWidget):
         )
         self._workflow_combo.setMinimumContentsLength(12)
         header.addWidget(self._workflow_combo, 1)
-        main_box.addLayout(header)
+        body.addLayout(header)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
-        main_box.addWidget(self._estimate_label)
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        main_box.addWidget(self._scroll, 2)
+        body.addWidget(self._estimate_label)
+        self._form_host = QWidget()
+        self._form_host_box = QVBoxLayout(self._form_host)
+        self._form_host_box.setContentsMargins(0, 0, 0, 0)
+        body.addWidget(self._form_host)
+        body.addStretch(1)  # pack info + form to the top; the scroll takes the slack
+
+        self._scroll.setWidget(body_host)
+        main_box.addWidget(self._scroll, 4)
+
         # A slim status line: the ComfyUI connection state, and the form-level guard
         # when a Generate is blocked. It never shows a running job's progress — that
         # lives in the gallery's re-roll tile and bottom bar, which own the run.
@@ -126,10 +160,18 @@ class GenerateConfigPanel(QWidget):
         self._progress.setTextVisible(True)
         main_box.addWidget(self._progress)
         self._show_ready()
+
+        # One button bank, fixed under the scroll so Generate is always reachable.
+        # Send-to-Evolver shows only while displaying a saved video; Cancel only
+        # while a run this tab launched is in flight (the gallery owns the job and
+        # drives set_generating), stopping it from the tab like the folder's tile.
         btn_row = QHBoxLayout()
-        # Cancel sits beside Generate but shows only while a run this tab launched is
-        # in flight (the gallery owns the job and drives set_generating); it stops
-        # that run from the tab, mirroring the folder's re-roll tile.
+        self._evolver_btn = QPushButton("Send to Evolver")
+        self._evolver_btn.setToolTip(
+            "Copy this video into Evolver's inbox for sorting and upscaling."
+        )
+        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
+        self._evolver_btn.hide()  # shown only for a video the tab is displaying
         self._cancel_btn = QPushButton("Cancel")
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
@@ -138,38 +180,10 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.setObjectName("generateBtn")
         self._generate_btn.clicked.connect(self._on_generate)
         btn_row.addStretch()
+        btn_row.addWidget(self._evolver_btn)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         main_box.addLayout(btn_row)
-
-        # Footer: shown only while this tab is displaying a saved generation (see
-        # show_saved_generation). A read-only metadata block (the output file,
-        # when it was made, its status and source, plus any param the form has no
-        # field for) leads; then a "‹ From source image" link for a video whose
-        # start frame is a known generation; the "Animated in" strip for an image;
-        # Send-to-Evolver and Drive-OSR2 for a video. All hidden on a fresh tab.
-        self._metadata_block = MetadataBlock()
-        self._metadata_block.hide()  # shown only for a saved generation
-        main_box.addWidget(self._metadata_block)
-
-        self._source_link = QLabel()
-        self._source_link.setTextFormat(Qt.TextFormat.RichText)
-        self._source_link.setOpenExternalLinks(False)
-        self._source_link.linkActivated.connect(self.source_activated)
-        self._source_link.hide()
-        main_box.addWidget(self._source_link)
-
-        self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.animated_activated)
-        main_box.addWidget(self._animated_strip)
-
-        self._evolver_btn = QPushButton("Send to Evolver")
-        self._evolver_btn.setToolTip(
-            "Copy this video into Evolver's inbox for sorting and upscaling."
-        )
-        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
-        self._evolver_btn.hide()  # shown only for a video the tab is displaying
-        main_box.addWidget(self._evolver_btn)
 
         self._panes.addWidget(main)
 
@@ -220,12 +234,21 @@ class GenerateConfigPanel(QWidget):
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
-            self._param_form = ParamForm(wf.param_definitions())
-            self._param_form.changed.connect(self._emit_title)
-            self._scroll.setWidget(self._param_form)
+            self._install_form(ParamForm(wf.param_definitions()))
         self._refresh_estimate()
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
+
+    def _install_form(self, form: ParamForm):
+        """Swap the workflow's ParamForm into the form host inside the scroll,
+        discarding the previous one. The form lives in the shared scroll so it moves
+        with the info above it, not boxed in a separate scroll of its own."""
+        if self._param_form is not None:
+            self._form_host_box.removeWidget(self._param_form)
+            self._param_form.deleteLater()
+        self._param_form = form
+        self._param_form.changed.connect(self._emit_title)
+        self._form_host_box.addWidget(self._param_form)
 
     def _emit_title(self):
         self.title_changed.emit(self.title())
@@ -406,12 +429,12 @@ class GenerateConfigPanel(QWidget):
 
     def show_saved_generation(self, row: dict, image_rows: list[dict]):
         """Display a browsed generation in this tab: seed the editable form with
-        its settings, show its output in the preview, and reveal the footer for
-        its media type (an image's animations, a video's source link + Evolver).
+        its settings, show its output in the preview, and reveal the info for its
+        media type (an image's animations, a video's source-image tile + Evolver).
 
         The form is seeded first so its recent-preview autoshow doesn't override
         the selection's own output. A workflow the app can't rebuild leaves the
-        form as it was but still shows the preview and footer.
+        form as it was but still shows the preview and info.
         """
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
@@ -428,29 +451,40 @@ class GenerateConfigPanel(QWidget):
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
     def _hide_footer(self):
-        """Hide every footer element — the state of a blank tab, or one whose
-        preview is a bare autoshow rather than an explicit selection."""
+        """Hide every info/action element that belongs only to a saved generation —
+        the state of a blank tab, or one whose preview is a bare autoshow rather than
+        an explicit selection."""
         self._metadata_block.hide()
-        self._source_link.hide()
+        self._source_tile.clear()
         self._animated_strip.hide()
         self._evolver_btn.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
-        """Populate and reveal the footer for the generation on display: the
-        read-only metadata block for every selection, the animations strip for an
-        image, and the source link + Evolver + Drive-OSR2 for a video. ``preview``
-        is the already-resolved ``(path, media_type)`` (or ``None``), so those
-        buttons key off the same on-disk lookup."""
+        """Reveal the info and actions for the generation on display: the read-only
+        metadata block for every selection, the source-image tile + Evolver for a
+        video, and the animations strip for an image. ``preview`` is the already-
+        resolved ``(path, media_type)`` (or ``None``), so Evolver keys off the same
+        on-disk lookup."""
         self._metadata_block.show_row(row)
         self._metadata_block.show()
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
-        source_id = find_source_image_id(row, image_rows)
-        if source_id is not None:
-            self._source_link.setText(f'<a href="{source_id}">‹ From source image</a>')
-            self._source_link.show()
-        else:
-            self._source_link.hide()
+        self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)
+
+    def _show_source_tile(self, row: dict, image_rows: list[dict]):
+        """Reveal the source-image tile when this row is a video built on a known
+        image generation, else hide it. The tile shows that image's thumbnail and
+        filename and navigates to it on click."""
+        source_id = find_source_image_id(row, image_rows)
+        source_row = next(
+            (r for r in image_rows if r.get("prompt_id") == source_id), None
+        ) if source_id else None
+        if source_row is None:
+            self._source_tile.clear()
+            return
+        files = row_output_files(source_row)
+        filename = files[0]["filename"] if files else ""
+        self._source_tile.show_source(source_id, source_row.get("thumbnail_path"), filename)
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image

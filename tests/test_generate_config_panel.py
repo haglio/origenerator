@@ -65,6 +65,45 @@ def test_preview_over_form_share_the_main_pane(panel):
     assert panel._preview is not main  # nested inside the pane, not the pane itself
 
 
+def _layout_containing(root, widget):
+    """DFS a layout tree for the layout directly holding ``widget``."""
+    for i in range(root.count()):
+        item = root.itemAt(i)
+        if item.widget() is widget:
+            return root
+        sub = item.layout()
+        if sub is not None and (found := _layout_containing(sub, widget)) is not None:
+            return found
+    return None
+
+
+def test_info_and_form_share_one_scroll(panel):
+    # The read-only info and the editable form live in one scroll, so they move
+    # together — not the form boxed in its own cramped scroll while the info sits in
+    # a separate static footer.
+    for widget in (panel._metadata_block, panel._source_tile,
+                   panel._animated_strip, panel._param_form):
+        assert _is_descendant(widget, panel._scroll)
+
+
+def test_info_sits_above_the_editable_form(panel):
+    body = panel._scroll.widget().layout()
+    form_at = body.indexOf(panel._form_host)
+    assert body.indexOf(panel._metadata_block) < form_at
+    assert body.indexOf(panel._source_tile) < form_at
+    assert body.indexOf(panel._animated_strip) < form_at
+
+
+def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
+    # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
+    # same row as Cancel and Generate.
+    main = panel._panes.widget(0)
+    bank = _layout_containing(main.layout(), panel._generate_btn)
+    assert bank is not None
+    assert bank.indexOf(panel._evolver_btn) != -1
+    assert bank.indexOf(panel._cancel_btn) != -1
+
+
 # --- a read-only gallery (no client) ----------------------------------------
 
 def test_tolerates_a_missing_client(qtbot, tmp_path):
@@ -392,7 +431,7 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert panel._displayed_row is None
     assert panel._metadata_block.isHidden()
     assert panel._animated_strip.isHidden()
-    assert panel._source_link.isHidden()
+    assert panel._source_tile.isHidden()
     assert panel._evolver_btn.isHidden()
 
 
@@ -421,7 +460,7 @@ def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monk
     panel.show_recent_preview()
 
     assert panel._metadata_block.isHidden()
-    assert panel._source_link.isHidden()
+    assert panel._source_tile.isHidden()
     assert panel._evolver_btn.isHidden()
 
 
@@ -436,7 +475,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
 
     assert not panel._animated_strip.isHidden()
     assert len(panel._animated_strip.findChildren(_VideoTile)) == 1
-    assert panel._source_link.isHidden()   # an image has no source-image link
+    assert panel._source_tile.isHidden()   # an image has no source-image tile
     assert panel._evolver_btn.isHidden()   # Evolver is for videos
     assert panel._displayed_row is image
 
@@ -455,7 +494,7 @@ def test_showing_an_image_footer_tile_click_emits_animated_activated(saved_panel
     assert got == ["vid1"]
 
 
-def test_showing_a_video_reveals_evolver_and_source_link(saved_panel, monkeypatch):
+def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
@@ -465,12 +504,13 @@ def test_showing_a_video_reveals_evolver_and_source_link(saved_panel, monkeypatc
     panel.show_saved_generation(video, [image])
 
     assert not panel._evolver_btn.isHidden()   # a video with a file → sendable
-    assert not panel._source_link.isHidden()   # its start frame is a known generation
-    assert 'href="img1"' in panel._source_link.text()
+    assert not panel._source_tile.isHidden()   # its start frame is a known generation
+    assert panel._source_tile._prompt_id == "img1"   # the tile points at that image
+    assert "sdxl_img1.png" in panel._source_tile._filename.text()  # and names its file
     assert panel._animated_strip.isHidden()    # a video isn't animated into anything
 
 
-def test_video_source_link_click_emits_source_activated(saved_panel, monkeypatch):
+def test_video_source_tile_click_emits_source_activated(saved_panel, monkeypatch):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
@@ -480,7 +520,7 @@ def test_video_source_link_click_emits_source_activated(saved_panel, monkeypatch
     got = []
     panel.source_activated.connect(got.append)
 
-    panel._source_link.linkActivated.emit("img1")
+    panel._source_tile.activated.emit("img1")   # what a click on the tile does
 
     assert got == ["img1"]
 
@@ -493,7 +533,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
 
     panel.show_saved_generation(video, [])
 
-    assert panel._source_link.isHidden()
+    assert panel._source_tile.isHidden()
     assert not panel._evolver_btn.isHidden()  # still a sendable video
 
 

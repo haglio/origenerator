@@ -1,6 +1,6 @@
 import pytest
 
-from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from origenerator.workflows.base import ParamDef
 from origenerator.gui.stylesheet import build_stylesheet
@@ -67,6 +67,50 @@ def test_seed_random_control_is_the_ticked_checkbox(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     assert isinstance(form._randomize_checks["seed"], CheckBox)
+
+
+# --- copy buttons: the prompt/seed convenience the old inspect pane had ----
+
+def test_seed_field_has_a_copy_button_that_copies_its_value(qtbot):
+    QApplication.clipboard().clear()
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 12345})
+
+    form._copy_buttons["seed"].click()
+
+    assert QApplication.clipboard().text() == "12345"
+
+
+def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
+    QApplication.clipboard().clear()
+    form = ParamForm([
+        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+    ])
+    qtbot.addWidget(form)
+    form._widgets["positive_prompt"].setPlainText("a red fox in snow")
+
+    form._copy_buttons["positive_prompt"].click()
+
+    assert QApplication.clipboard().text() == "a red fox in snow"
+
+
+def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
+    form = ParamForm([
+        ParamDef("steps", "Steps", "int", 20),
+        ParamDef("cfg", "CFG", "float", 7.0),
+        ParamDef("name", "Name", "str", ""),          # single-line str: retype-able
+        ParamDef("input_image", "Input Image", "image", ""),
+    ])
+    qtbot.addWidget(form)
+    assert form._copy_buttons == {}
+
+
+def test_seed_keeps_its_random_checkbox_beside_the_copy_button(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    assert "seed" in form._randomize_checks   # the Random control survives
+    assert "seed" in form._copy_buttons        # and gains a copy button alongside
 
 
 def _dimension_defs():

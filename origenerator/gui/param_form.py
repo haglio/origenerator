@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
+from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
@@ -30,6 +31,13 @@ def _clean_image_ref(value: str) -> str:
     surrounding whitespace stripped, so a value that looks right actually
     resolves against ComfyUI's input folder (or as an absolute path)."""
     return value.translate(_INVISIBLE).strip()
+
+
+def _is_copyable(pd: ParamDef) -> bool:
+    """Which fields earn a copy-to-clipboard button: the seeds (the value most
+    often lifted to reproduce a result) and the prompts (long multiline text).
+    The plain scalars — steps, cfg, dimensions — are quick enough to retype."""
+    return pd.type == "seed" or (pd.type == "str" and pd.multiline)
 
 
 def _select_combo_value(combo: QComboBox, value: str):
@@ -54,6 +62,10 @@ class ParamForm(QWidget):
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
+        # Copy-to-clipboard buttons on the fields worth lifting whole — the prompts
+        # and the seeds, the read-only inspect pane's copy targets before it merged
+        # into this editable form.
+        self._copy_buttons: dict[str, CopyButton] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
         # when absent, so callers can tell whether the control exists. It floats
@@ -90,36 +102,56 @@ class ParamForm(QWidget):
         self._build_swap_button(layout)
 
     def _field_cell(self, pd: ParamDef, widget: QWidget):
-        """The input, optionally paired with a trailing control.
+        """The input, optionally paired with trailing controls.
 
-        Seeds carry a Random checkbox and image fields a Browse button; each
-        sits to the right of the input in a shared cell so the label column
-        stays aligned across every row.
+        Seeds carry a Random checkbox and image fields a Browse button; prompts
+        and seeds also carry a copy-to-clipboard button. Each sits to the right of
+        the input in a shared cell so the label column stays aligned across every
+        row. The copy button hugs the top, so it sits at the corner of a tall
+        multiline prompt rather than floating at its middle.
         """
-        extra = self._make_extra(pd)
-        if extra is None:
+        extras = self._make_extras(pd)
+        if not extras:
             return widget
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
         cell.addWidget(widget, 1)
-        cell.addWidget(extra)
+        for extra in extras:
+            if isinstance(extra, CopyButton):
+                cell.addWidget(extra, 0, Qt.AlignmentFlag.AlignTop)
+            else:
+                cell.addWidget(extra)
         return cell
 
-    def _make_extra(self, pd: ParamDef) -> QWidget | None:
+    def _make_extras(self, pd: ParamDef) -> list[QWidget]:
+        extras: list[QWidget] = []
         if pd.type == "seed":
             cb = CheckBox("Random")
             cb.setChecked(True)
             cb.toggled.connect(self.changed)
             self._randomize_checks[pd.key] = cb
-            return cb
+            extras.append(cb)
         if pd.type == "image":
             browse = QPushButton("Browse...")
             browse.clicked.connect(
                 lambda _checked=False, key=pd.key: self._browse_image(key)
             )
             self._browse_buttons[pd.key] = browse
-            return browse
-        return None
+            extras.append(browse)
+        if _is_copyable(pd):
+            copy = CopyButton(lambda key=pd.key: self._field_text(key))
+            self._copy_buttons[pd.key] = copy
+            extras.append(copy)
+        return extras
+
+    def _field_text(self, key: str) -> str:
+        """The field's current on-screen text, for its copy button — a live read
+        at click time, so a just-typed prompt or seed is what lands on the
+        clipboard."""
+        w = self._widgets[key]
+        if isinstance(w, QPlainTextEdit):
+            return w.toPlainText()
+        return w.text()
 
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)

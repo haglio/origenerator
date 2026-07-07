@@ -297,6 +297,100 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
 
 
+def _children_by_label(item):
+    return {item.child(i).text(0): item.child(i) for i in range(item.childCount())}
+
+
+def test_toc_filter_hides_folders_whose_label_does_not_match(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    images = _top_level(view._tree)["Images"]
+    lora = images.child(0).child(0).child(0)  # "(no LoRA)"
+    leaves = _children_by_label(lora)
+
+    view._filter_edit.setText("cat")
+
+    assert not leaves["a cat"].isHidden()   # the match stays
+    assert leaves["a dog"].isHidden()       # the non-match drops out
+    # its ancestors stay visible and expand, so the match is actually on screen.
+    assert not lora.isHidden() and lora.isExpanded()
+    assert not images.isHidden() and images.isExpanded()
+
+
+def test_toc_filter_match_on_a_folder_keeps_its_whole_subtree(qtbot):
+    rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    model = _top_level(view._tree)["Videos"].child(0).child(0)
+    loras = _children_by_label(model)
+    style_a = next(v for k, v in loras.items() if "styleA" in k)
+    style_b = next(v for k, v in loras.items() if "styleB" in k)
+
+    view._filter_edit.setText("styleA")
+
+    assert style_b.isHidden()               # the sibling LoRA drops out
+    assert not style_a.isHidden()
+    # matching the LoRA folder keeps everything beneath it (source image -> settings).
+    source = style_a.child(0)
+    assert not source.isHidden()
+    assert not source.child(0).isHidden()   # the settings leaf under it
+
+
+def test_clearing_the_toc_filter_restores_visibility_and_prior_expansion(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    images = _top_level(view._tree)["Images"]
+    images.setExpanded(True)                 # a folder the user had open...
+    workflow = images.child(0)               # ...its child left collapsed
+    lora = workflow.child(0).child(0)
+    dog = _children_by_label(lora)["a dog"]
+
+    view._filter_edit.setText("cat")
+    assert dog.isHidden()
+    assert workflow.isExpanded()             # the filter opened the path to the match
+
+    view._filter_edit.setText("")            # clear the filter
+    assert not dog.isHidden()                # everything is back
+    assert images.isExpanded()               # the folder the user had open stays open
+    assert not workflow.isExpanded()         # the path the filter opened collapses back
+
+
+def test_toc_filter_stays_applied_across_a_rebuild(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._filter_edit.setText("cat")
+    db.add(_image("i3", "a bird", 50, 9))    # a new generation lands...
+    view.refresh()                           # ...triggering a rebuild
+
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    leaves = _children_by_label(lora)
+    assert not leaves["a cat"].isHidden()
+    assert leaves["a dog"].isHidden()        # still filtered after the rebuild
+    assert leaves["a bird"].isHidden()       # and the newcomer is filtered too
+
+
+def test_toc_pane_holds_a_filter_field_above_the_tree(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    toc = view._panes.widget(0)
+    assert isinstance(view._filter_edit, QLineEdit)
+    assert toc.isAncestorOf(view._filter_edit)
+    # it leads the pane, above the folder tree it filters.
+    layout = toc.layout()
+    assert layout.indexOf(view._filter_edit) < layout.indexOf(view._tree)
+
+
 def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)

@@ -32,6 +32,8 @@ class GalleryTree:
         self.leaf_by_id: dict[str, QTreeWidgetItem] = {}   # prompt_id -> its settings row
         self.recents_item: QTreeWidgetItem | None = None   # the "Recents" shelf row
         self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
+        self._filter = ""                       # active filter query, lowercased
+        self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
 
     def populate(self, tree_model, expanded_keys, *, show_recents: bool):
         """Rebuild the tree from ``tree_model``, restoring the folders in
@@ -116,6 +118,62 @@ class GalleryTree:
 
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}
+
+    def persisted_expanded_keys(self) -> set[str]:
+        """The expansion a rebuild should save. While a filter is active that is
+        the user's pre-filter set — the branches the filter opened to reveal a
+        match are transient and must not stick once the filter clears."""
+        if self._filter:
+            return set(self._pre_filter_expanded or ())
+        return self.expanded_keys()
+
+    def apply_filter(self, query: str) -> None:
+        """Narrow the tree to rows matching ``query`` (case-insensitive substring
+        over the row label), keeping each match's ancestors so its path shows and
+        expanding down to it; a matched folder keeps its whole subtree. An empty
+        query restores every row and the expansion the user had before filtering."""
+        query = (query or "").strip().lower()
+        if not query:
+            if self._filter:
+                self._restore_from_filter()
+            self._filter = ""
+            return
+        if not self._filter:  # entering a filter: remember the user's expansion
+            self._pre_filter_expanded = self.expanded_keys()
+        self._filter = query
+        self._run_filter()
+
+    def reapply_filter(self) -> None:
+        """Re-narrow a freshly rebuilt tree to the active filter — ``populate``
+        rebuilds every row un-hidden, so the filter has to run again after it."""
+        if self._filter:
+            self._run_filter()
+
+    def _run_filter(self) -> None:
+        root = self._tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            self._filter_item(root.child(i), self._filter, ancestor_match=False)
+
+    def _filter_item(self, item, query, *, ancestor_match: bool) -> bool:
+        """Hide ``item`` unless it, an ancestor, or a descendant matches; expand the
+        path down to any descendant match. Returns whether it stays visible."""
+        match = ancestor_match or query in item.text(0).lower()
+        descendant_match = False
+        for i in range(item.childCount()):
+            if self._filter_item(item.child(i), query, ancestor_match=match):
+                descendant_match = True
+        visible = match or descendant_match
+        item.setHidden(not visible)
+        if descendant_match:
+            item.setExpanded(True)
+        return visible
+
+    def _restore_from_filter(self) -> None:
+        keys = self._pre_filter_expanded or set()
+        for key, item in self.item_by_key.items():
+            item.setHidden(False)
+            item.setExpanded(key in keys)
+        self._pre_filter_expanded = None
 
     def selected_folder_key(self) -> str | None:
         item = self._tree.currentItem()

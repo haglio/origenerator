@@ -267,6 +267,14 @@ class GalleryView(QWidget):
         toc = QWidget()
         toc_box = QVBoxLayout(toc)
         toc_box.setContentsMargins(*_PANE_MARGINS)
+        # A filter over the tree: type a folder name (prompt / model / LoRA /
+        # workflow) to narrow it to matching branches, or a seed to jump straight
+        # to that one generation. Sits above the tree so it reads as its search box.
+        self._filter_edit = QLineEdit()
+        self._filter_edit.setPlaceholderText("Filter…")
+        self._filter_edit.setClearButtonEnabled(True)
+        self._filter_edit.textChanged.connect(self._on_filter_changed)
+        toc_box.addWidget(self._filter_edit)
         toc_box.addWidget(self._tree, 1)  # the tree takes the height; combine sits below
         # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
         # on the image. Needs a client to generate, so it hides without one.
@@ -589,7 +597,7 @@ class GalleryView(QWidget):
         self._update_running_bar()
 
     def _rebuild(self, rows, meta):
-        expanded = self._tree_view.expanded_keys()
+        expanded = self._tree_view.persisted_expanded_keys()
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._tree_view.selected_folder_key() or self._pending_key
         selected_gen = self.selected_generation()
@@ -607,6 +615,7 @@ class GalleryView(QWidget):
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()))
+        self._tree_view.reapply_filter()  # populate rebuilds un-filtered; re-narrow it
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
@@ -636,6 +645,9 @@ class GalleryView(QWidget):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
         if prompt_id and prompt_id in self._browser.visible_prompt_ids():
             self._on_thumbnail_clicked(prompt_id)
+
+    def _on_filter_changed(self, text: str):
+        self._tree_view.apply_filter(text)
 
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf

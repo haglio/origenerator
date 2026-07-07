@@ -380,10 +380,47 @@ def saved_panel(qtbot, tmp_path):
     return panel, db
 
 
+def _metadata_texts(panel):
+    """Every label in the panel's metadata block, minus the wrapping zero-widths."""
+    from PyQt6.QtWidgets import QLabel
+    return [lbl.text().replace("​", "")
+            for lbl in panel._metadata_block.findChildren(QLabel)]
+
+
 def test_a_fresh_tab_shows_no_footer(saved_panel):
     panel, _db = saved_panel
     assert panel._displayed_row is None
+    assert panel._metadata_block.isHidden()
     assert panel._animated_strip.isHidden()
+    assert panel._source_link.isHidden()
+    assert panel._evolver_btn.isHidden()
+
+
+def test_showing_a_generation_reveals_its_file_created_status_and_source(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+
+    panel.show_saved_generation(image, [image])
+
+    assert not panel._metadata_block.isHidden()
+    texts = _metadata_texts(panel)
+    assert "image/sdxl_img1.png" in texts   # the filename — the reported regression
+    assert "completed" in texts             # status
+    assert "generated" in texts             # source
+
+
+def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monkeypatch):
+    # An idle autoshow is a peek, not an explicit selection: it must not leave a
+    # prior selection's metadata (a different file's name) stranded on screen.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    panel.show_saved_generation(image, [image])
+    assert not panel._metadata_block.isHidden()
+
+    monkeypatch.setattr(panel, "_recent_matching_row", lambda: None)
+    panel.show_recent_preview()
+
+    assert panel._metadata_block.isHidden()
     assert panel._source_link.isHidden()
     assert panel._evolver_btn.isHidden()
 

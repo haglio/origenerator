@@ -19,7 +19,7 @@ from shared_ui.check_box import CheckBox
 _SEED_MAX = (1 << 63) - 1
 
 # Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
-# The metadata panel inserts zero-width spaces into displayed paths for on-screen
+# The metadata block inserts zero-width spaces into displayed paths for on-screen
 # wrapping, so text copied from there carries them; none belongs in a real path.
 # U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 word-joiner, U+FEFF BOM.
 _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)

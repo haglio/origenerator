@@ -19,6 +19,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
@@ -47,10 +48,12 @@ class GenerateConfigPanel(QWidget):
     frames, or this config's newest matching result when idle.
 
     Below the Generate button sits a footer that appears only while the tab is
-    displaying a saved generation (:meth:`show_saved_generation`): for an image,
-    the videos it was animated into; for a video, a link back to its source image,
-    a Send-to-Evolver button, and a Drive-OSR2 toggle (when it has a funscript). A
-    blank tab hides them all.
+    displaying a saved generation (:meth:`show_saved_generation`): a read-only
+    metadata block (the output file, when it was made, its status and source, and
+    any param the form has no field for), then for an image the videos it was
+    animated into; for a video a link back to its source image, a Send-to-Evolver
+    button, and a Drive-OSR2 toggle (when it has a funscript). A blank tab, or one
+    showing a bare autoshow, hides them all.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
@@ -140,9 +143,15 @@ class GenerateConfigPanel(QWidget):
         main_box.addLayout(btn_row)
 
         # Footer: shown only while this tab is displaying a saved generation (see
-        # show_saved_generation). A "‹ From source image" link for a video whose
+        # show_saved_generation). A read-only metadata block (the output file,
+        # when it was made, its status and source, plus any param the form has no
+        # field for) leads; then a "‹ From source image" link for a video whose
         # start frame is a known generation; the "Animated in" strip for an image;
         # Send-to-Evolver and Drive-OSR2 for a video. All hidden on a fresh tab.
+        self._metadata_block = MetadataBlock()
+        self._metadata_block.hide()  # shown only for a saved generation
+        main_box.addWidget(self._metadata_block)
+
         self._source_link = QLabel()
         self._source_link.setTextFormat(Qt.TextFormat.RichText)
         self._source_link.setOpenExternalLinks(False)
@@ -309,7 +318,11 @@ class GenerateConfigPanel(QWidget):
 
         The shown generation becomes ``_displayed_row``, so an idle autoshow of a
         scripted video arms the OSR2 drive exactly like a browsed selection — the
-        drive follows whatever video is actually on screen, however it got there."""
+        drive follows whatever video is actually on screen, however it got there.
+
+        The footer stays hidden: an autoshow is a peek, not an explicit selection,
+        so it shows the preview alone and never a prior selection's metadata."""
+        self._hide_footer()
         row = self._recent_matching_row()
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
         if preview is not None:
@@ -414,11 +427,22 @@ class GenerateConfigPanel(QWidget):
         self._show_footer(row, image_rows, preview)
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
+    def _hide_footer(self):
+        """Hide every footer element — the state of a blank tab, or one whose
+        preview is a bare autoshow rather than an explicit selection."""
+        self._metadata_block.hide()
+        self._source_link.hide()
+        self._animated_strip.hide()
+        self._evolver_btn.hide()
+
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         """Populate and reveal the footer for the generation on display: the
-        animations strip for an image, and the source link + Evolver + Drive-OSR2
-        for a video. ``preview`` is the already-resolved ``(path, media_type)`` (or
-        ``None``), so those buttons key off the same on-disk lookup."""
+        read-only metadata block for every selection, the animations strip for an
+        image, and the source link + Evolver + Drive-OSR2 for a video. ``preview``
+        is the already-resolved ``(path, media_type)`` (or ``None``), so those
+        buttons key off the same on-disk lookup."""
+        self._metadata_block.show_row(row)
+        self._metadata_block.show()
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         source_id = find_source_image_id(row, image_rows)
         if source_id is not None:

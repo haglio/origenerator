@@ -77,6 +77,59 @@ def test_tolerates_a_missing_client(qtbot, tmp_path):
     p.teardown()                          # never connected, so a no-op too
 
 
+# --- Cancel the in-flight run from the tab -----------------------------------
+
+def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
+    # A Cancel shares the Generate button's row so the run a tab launched can be
+    # stopped from the tab, not only the folder's tile. It's hidden until the
+    # gallery marks the tab generating.
+    from PyQt6.QtWidgets import QPushButton
+    assert isinstance(panel._cancel_btn, QPushButton)
+    assert _is_descendant(panel._cancel_btn, panel._panes.widget(0))  # the main pane
+    assert panel._cancel_btn.parent() is panel._generate_btn.parent()  # same button row host
+    assert panel._cancel_btn.isHidden()
+
+
+def test_set_generating_swaps_generate_for_cancel(panel):
+    # While the tab's run is in flight the gallery marks it generating: Cancel
+    # appears and Generate greys out (no relaunching over a running slot).
+    panel.set_generating(True)
+    assert panel._cancel_btn.isHidden() is False
+    assert panel._generate_btn.isEnabled() is False
+    panel.set_generating(False)
+    assert panel._cancel_btn.isHidden() is True
+    assert panel._generate_btn.isEnabled() is True
+
+
+def test_set_generating_false_keeps_generate_disabled_without_a_client(qtbot, tmp_path):
+    # A read-only tab (no client) can never launch, so clearing the generating flag
+    # must not re-enable Generate.
+    p = GenerateConfigPanel(None, Database(tmp_path / "t.db"))
+    qtbot.addWidget(p)
+    p.set_generating(False)
+    assert p._generate_btn.isEnabled() is False
+
+
+def test_cancel_button_click_emits_cancel_requested(panel):
+    # The tab doesn't cancel the job itself (the gallery owns it) — it relays the
+    # click, which the gallery turns into the folder's re-roll cancel.
+    got = []
+    panel.cancel_requested.connect(lambda: got.append(True))
+    panel.set_generating(True)
+    panel._cancel_btn.click()
+    assert got == [True]
+
+
+def test_use_random_seed_switches_the_seed_to_random(panel):
+    # After the user accepts "use a random seed", the choice sticks on the tab: the
+    # seed switches to Random, so a later Generate draws a fresh seed rather than
+    # reproducing the pinned one and re-asking.
+    panel.prefill("sdxl_t2i", {"seed": 99})
+    assert panel._param_form.seed_is_random() is False
+    panel.use_random_seed()
+    assert panel._param_form.seed_is_random() is True
+
+
 # --- Generate emits a request; the gallery runs it as a re-roll --------------
 
 def test_generate_emits_generate_requested_with_workflow_and_params(panel):

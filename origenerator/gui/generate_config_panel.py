@@ -58,6 +58,7 @@ class GenerateConfigPanel(QWidget):
     source_activated = pyqtSignal(str)      # the "from source image" link (prompt_id)
     animated_activated = pyqtSignal(str)    # a footer animation tile (prompt_id)
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
+    cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
@@ -123,10 +124,18 @@ class GenerateConfigPanel(QWidget):
         main_box.addWidget(self._progress)
         self._show_ready()
         btn_row = QHBoxLayout()
+        # Cancel sits beside Generate but shows only while a run this tab launched is
+        # in flight (the gallery owns the job and drives set_generating); it stops
+        # that run from the tab, mirroring the folder's re-roll tile.
+        self._cancel_btn = QPushButton("Cancel")
+        self._cancel_btn.setObjectName("cancelBtn")
+        self._cancel_btn.clicked.connect(self.cancel_requested)
+        self._cancel_btn.hide()
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.setObjectName("generateBtn")
         self._generate_btn.clicked.connect(self._on_generate)
         btn_row.addStretch()
+        btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         main_box.addLayout(btn_row)
 
@@ -252,6 +261,27 @@ class GenerateConfigPanel(QWidget):
             )
             return
         self.generate_requested.emit(key, params)
+
+    def set_generating(self, generating: bool):
+        """Reflect whether a run of this config's folder is in flight.
+
+        While it is, Cancel shows and Generate greys out so the tab can stop the
+        run (the gallery owns the job) without relaunching over it; when it ends,
+        Generate returns — still disabled in a read-only gallery with no client.
+        """
+        self._cancel_btn.setVisible(generating)
+        self._generate_btn.setEnabled(not generating and self._client is not None)
+
+    def use_random_seed(self):
+        """Switch this config's seed(s) to Random.
+
+        Called when the user accepts the "already generated" dialog's offer of a
+        fresh seed: the choice to stop pinning that seed sticks, so a re-Generate
+        (even after cancelling the first attempt) draws a new seed instead of
+        reproducing the old one and re-asking.
+        """
+        if self._param_form is not None:
+            self._param_form.set_seed_random(True)
 
     def _image_rows(self):
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]

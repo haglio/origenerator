@@ -90,6 +90,7 @@ class GalleryView(QWidget):
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
         self._reroll.changed.connect(self._rerender_current_leaf)
+        self._reroll.changed.connect(self._reconcile_generating)
         self._reroll.preview.connect(self._on_reroll_preview)
         self._reroll.finished.connect(self._on_reroll_finished)
         self._reroll.failed.connect(self._on_reroll_failed)
@@ -363,7 +364,7 @@ class GalleryView(QWidget):
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
-        self._info_tabs.currentChanged.connect(lambda _index: self._reconcile_osr2())
+        self._info_tabs.currentChanged.connect(self._on_front_tab_changed)
         # Quitting mid-drive still releases the device — park it and restore genau —
         # so a closed app doesn't leave the OSR2 held and genau silently disabled.
         app = QApplication.instance()
@@ -414,11 +415,13 @@ class GalleryView(QWidget):
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link.
-        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video.
-        Called for the initial tab and every tab forked afterward."""
+        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video,
+        and its Cancel stops the re-roll running in the tab's folder. Called for the
+        initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
         panel.displayed_changed.connect(self._reconcile_osr2)
+        panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
 
     # --- Drive OSR2: a single global toggle following the front video ----------
 
@@ -445,6 +448,12 @@ class GalleryView(QWidget):
             self._osr2_driver.start(player, actions)
             self._osr2_driving = video_path
 
+    def _on_front_tab_changed(self, _index):
+        """The front config tab changed: re-aim the OSR2 drive at its video, and
+        re-evaluate whether that tab's folder is generating (its Cancel button)."""
+        self._reconcile_osr2()
+        self._reconcile_generating()
+
     def osr2_enabled(self) -> bool:
         """Whether the global OSR2 toggle is on (for session persistence)."""
         return self._osr2_enabled
@@ -452,6 +461,37 @@ class GalleryView(QWidget):
     def set_osr2_enabled(self, enabled):
         """Restore the global OSR2 toggle from a saved session."""
         self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
+
+    def _folder_key_for(self, workflow_name: str, params: dict) -> str:
+        """The settings-folder key a config lands in — the key the re-roll
+        controller tracks its job under, and the tree leaf it groups into. Shared by
+        the Generate launch and the front-tab generating/cancel reconcile so a tab
+        matches the very job its own Generate started."""
+        return gallery.settings_folder_key(
+            {"workflow_name": workflow_name, "params_json": json.dumps(params)},
+            gallery.build_image_config_index(self._image_rows),
+        )
+
+    def _panel_reroll_key(self, panel) -> str:
+        """The settings-folder key the config in ``panel`` would run in."""
+        config = panel.current_config()
+        return self._folder_key_for(config.workflow_name, config.params)
+
+    def _reconcile_generating(self):
+        """Show the front config tab's Cancel button while a re-roll of its settings
+        folder is in flight, so the run it launched (or any re-roll of that folder)
+        can be stopped from the tab, not only the folder's tile. Idempotent — driven
+        by every re-roll lifecycle change and by switching the front tab."""
+        panel = self._info_tabs.current_config_panel()
+        if panel is not None:
+            panel.set_generating(self._panel_reroll_key(panel) in self._reroll_jobs)
+
+    def _cancel_panel_reroll(self, panel):
+        """Cancel the re-roll running in ``panel``'s settings folder — the tab's
+        Cancel button, the same stop the folder's re-roll tile performs."""
+        key = self._panel_reroll_key(panel)
+        if key in self._reroll_jobs:
+            self._cancel_reroll(key)
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
@@ -480,19 +520,20 @@ class GalleryView(QWidget):
         if self._client is None or wf is None:
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
-        key = gallery.settings_folder_key(
-            {"workflow_name": workflow_name, "params_json": json.dumps(params)},
-            gallery.build_image_config_index(self._image_rows),
-        )
+        key = self._folder_key_for(workflow_name, params)
         # A pinned seed that would reproduce a past run gets the shared "already
         # generated" dialog rather than silently launching a copy — the guard the
         # re-roll "+" and combine paths (see :meth:`_generate_combination`) use too.
         # Declining launches nothing; accepting re-rolls the seed into a fresh
-        # variation of the same folder.
+        # variation and switches the front tab to a Random seed, so the choice
+        # sticks — a re-Generate (even after cancelling this one) won't re-ask.
         if self._would_reproduce_a_completed_run(wf, params):
             if offer_reroll(self, wf, can_reroll_image=False) is None:
                 return  # let the user change something rather than duplicate it
             params = randomize_seeds(params, wf.seed_keys())
+            panel = self._info_tabs.current_config_panel()
+            if panel is not None:
+                panel.use_random_seed()
         if not self._reroll.start_prepared(key, wf, params):
             return  # no client, or this folder already has a re-roll running
         self._navigate_to_reroll(key)
@@ -1182,6 +1223,7 @@ class GalleryView(QWidget):
         self._reroll.cancel(key)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
+        self._reconcile_generating()  # the front tab's folder may have stopped running
 
     def _abandon_reroll_preview(self, key: str):
         """Empty the info pane if it was mirroring a re-roll that has ended with no
@@ -1212,6 +1254,7 @@ class GalleryView(QWidget):
             item = self._item_by_key.get(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
+        self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
 
     def _show_reroll_result_in_tab(self, key: str):
@@ -1232,6 +1275,7 @@ class GalleryView(QWidget):
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
+        self._reconcile_generating()  # the run ended: the front tab drops its Cancel
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

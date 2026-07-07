@@ -3485,6 +3485,110 @@ def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_
     assert job.params["seed"] == 999           # launched exactly as asked, unprompted
 
 
+# --- cancel the front tab's run, and remember an accepted random-seed choice ---
+
+def _front_panel(view):
+    return view._info_tabs.current_config_panel()
+
+
+def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
+    # A Generate launched from a tab makes that tab offer to cancel it: Cancel
+    # shows and Generate greys, mirroring the folder's live re-roll tile.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+
+    panel._on_generate()
+
+    assert view._reroll_jobs                          # a run is in flight
+    assert panel._cancel_btn.isHidden() is False      # the tab offers to cancel it
+    assert panel._generate_btn.isEnabled() is False
+
+
+def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
+    # When the run ends the tab drops Cancel and Generate returns.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel._on_generate()
+    job = next(iter(view._reroll_jobs.values()))
+    assert panel._cancel_btn.isHidden() is False
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert view._reroll_jobs == {}
+    assert panel._cancel_btn.isHidden() is True
+    assert panel._generate_btn.isEnabled() is True
+
+
+def test_canceling_from_the_front_tab_stops_the_reroll(qtbot, tmp_path):
+    # The tab's Cancel stops the folder's re-roll exactly as the folder tile's does:
+    # the job goes and its abandoned running row is dropped.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel._on_generate()
+    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+    assert view._db.get_generation(prompt_id) is not None
+
+    panel.cancel_requested.emit()
+
+    assert view._reroll_jobs == {}
+    assert view._db.get_generation(prompt_id) is None
+    assert panel._cancel_btn.isHidden() is True
+
+
+def test_duplicate_accepted_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path, monkeypatch):
+    # Accepting the "already generated" dialog doesn't just re-roll this one launch —
+    # it switches the front tab's seed to Random, so the choice sticks on the tab.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
+    assert panel.current_config().seed_is_random is False   # pinned to the duplicate seed
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
+
+    panel._on_generate()
+
+    assert panel.current_config().seed_is_random is True
+
+
+def test_random_seed_choice_survives_a_cancel_so_re_generate_does_not_re_ask(qtbot, tmp_path, monkeypatch):
+    # The user's scenario: agree to a random seed, cancel that first attempt, then
+    # Generate again — the choice stuck, so there's no second "already generated"
+    # dialog and it launches a fresh variation straight away.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
+    prompts = []
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda *a, **k: prompts.append(1) or REROLL_VIDEO)
+
+    panel._on_generate()                 # duplicate → asks once → accept
+    assert prompts == [1]
+    key = next(iter(view._reroll_jobs))
+    view._cancel_reroll(key)             # cancel the first attempt
+    assert view._reroll_jobs == {}
+
+    panel._on_generate()                 # Generate again
+
+    assert prompts == [1]                # not re-asked — the choice was preserved
+    assert view._reroll_jobs             # a fresh variation launched
+
+
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     db.insert_generation(prompt_id="vx", workflow_name="mystery", workflow_version="v",

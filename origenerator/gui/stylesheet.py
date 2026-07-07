@@ -80,6 +80,17 @@ def build_stylesheet() -> str:
         font-weight: bold;
         padding: 10px 24px;
     }}
+    /* While a run is in flight Generate greys out beside the active Cancel; the id
+       selector above out-specifies the base :disabled rule, so restate it here. */
+    QPushButton#generateBtn:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+        color: {_h(TEXT_MUTED)};
+    }}
+    /* Cancel is the secondary (grey) partner of Generate, sized to match so the
+       pair sits level in the button row. */
+    QPushButton#cancelBtn {{
+        padding: 10px 24px;
+    }}
     QToolButton {{
         background-color: {_h(BG_BUTTON)};
         color: {_h(TEXT_PRIMARY)};

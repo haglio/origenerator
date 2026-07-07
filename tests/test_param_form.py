@@ -113,6 +113,28 @@ def test_seed_keeps_its_random_checkbox_beside_the_copy_button(qtbot):
     assert "seed" in form._copy_buttons        # and gains a copy button alongside
 
 
+def _field_cell_of(form, key):
+    """The QHBoxLayout holding a field's input and its trailing controls."""
+    from PyQt6.QtWidgets import QFormLayout
+    fl = form.layout()
+    for r in range(fl.rowCount()):
+        item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
+        if item is not None and item.layout() is not None:
+            if item.layout().indexOf(form._widgets[key]) != -1:
+                return item.layout()
+    return None
+
+
+def test_seed_copy_button_sits_left_of_the_random_checkbox(qtbot):
+    # The seed row reads [field] [copy] [Random ☐] — copy before the checkbox.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    cell = _field_cell_of(form, "seed")
+    copy_i = cell.indexOf(form._copy_buttons["seed"])
+    random_i = cell.indexOf(form._randomize_checks["seed"])
+    assert 0 <= copy_i < random_i
+
+
 def _dimension_defs():
     return [
         ParamDef("width", "Width", "int", 1280, min_val=64, max_val=4096, step=64),

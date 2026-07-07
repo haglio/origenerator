@@ -104,11 +104,11 @@ class ParamForm(QWidget):
     def _field_cell(self, pd: ParamDef, widget: QWidget):
         """The input, optionally paired with trailing controls.
 
-        Seeds carry a Random checkbox and image fields a Browse button; prompts
-        and seeds also carry a copy-to-clipboard button. Each sits to the right of
-        the input in a shared cell so the label column stays aligned across every
-        row. The copy button hugs the top, so it sits at the corner of a tall
-        multiline prompt rather than floating at its middle.
+        The copy button leads (just right of the input), then the Random checkbox
+        (seed) or Browse button (image). Each sits in a shared cell so the label
+        column stays aligned across every row. Next to a tall multiline prompt the
+        copy button hugs the top corner; next to a single-line seed it centers so
+        it lines up with the checkbox beside it.
         """
         extras = self._make_extras(pd)
         if not extras:
@@ -116,15 +116,21 @@ class ParamForm(QWidget):
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
         cell.addWidget(widget, 1)
+        multiline = isinstance(widget, QPlainTextEdit)
         for extra in extras:
-            if isinstance(extra, CopyButton):
+            if isinstance(extra, CopyButton) and multiline:
                 cell.addWidget(extra, 0, Qt.AlignmentFlag.AlignTop)
             else:
                 cell.addWidget(extra)
         return cell
 
     def _make_extras(self, pd: ParamDef) -> list[QWidget]:
+        # Copy leads so it reads [field] [copy] [Random]/[Browse].
         extras: list[QWidget] = []
+        if _is_copyable(pd):
+            copy = CopyButton(lambda key=pd.key: self._field_text(key))
+            self._copy_buttons[pd.key] = copy
+            extras.append(copy)
         if pd.type == "seed":
             cb = CheckBox("Random")
             cb.setChecked(True)
@@ -138,10 +144,6 @@ class ParamForm(QWidget):
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
-        if _is_copyable(pd):
-            copy = CopyButton(lambda key=pd.key: self._field_text(key))
-            self._copy_buttons[pd.key] = copy
-            extras.append(copy)
         return extras
 
     def _field_text(self, key: str) -> str:

@@ -10,12 +10,13 @@ copy-to-clipboard button when its item declares copyable text (a filename).
 """
 
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 )
-from PyQt6.QtCore import Qt, QSize, QRectF
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QFontMetrics
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics
 
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
+from origenerator.gui.copy_button import CopyButton
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -108,7 +109,7 @@ def _build_item(item: MetaItem, label_width: int) -> QWidget:
     layout.addWidget(_label_widget(item.label, label_width))
     layout.addWidget(_value_widget(item), 1)
     if item.copy is not None:
-        layout.addWidget(_copy_button(item.copy), 0, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(CopyButton(item.copy), 0, Qt.AlignmentFlag.AlignTop)
     return row
 
 
@@ -142,56 +143,3 @@ def _wrappable(text: str) -> str:
     no width so the visible text is unchanged, and copy buttons still carry the
     original value — only on-screen wrapping is affected."""
     return "".join(ch + "​" if ch in _BREAK_AFTER else ch for ch in text)
-
-
-def _copy_button(text: str) -> QPushButton:
-    """A small copy-icon button that puts ``text`` on the clipboard."""
-    button = QPushButton()
-    button.setObjectName("copyButton")
-    button.setIcon(_copy_icon())
-    button.setIconSize(QSize(14, 14))
-    button.setToolTip("Copy to clipboard")
-    button.setStyleSheet("padding: 2px 6px;")
-    button.setCursor(Qt.CursorShape.PointingHandCursor)
-    button.clicked.connect(lambda: QApplication.clipboard().setText(text))
-    return button
-
-
-def _copy_icon() -> QIcon:
-    """The familiar two-overlapping-sheets copy glyph."""
-    icon = QIcon()
-    icon.addPixmap(_draw_copy_sheets(TEXT_SECONDARY), QIcon.Mode.Normal)
-    return icon
-
-
-def _draw_copy_sheets(color) -> QPixmap:
-    """Stroke the two sheets in ``color``. Both are outlines; a gap is cleared
-    around the front sheet so it reads as sitting in front of the back one where
-    they overlap."""
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    pen = QPen(color)
-    pen.setWidthF(6)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-
-    back = QRectF(24, 8, 28, 32)    # peeks out up and to the right
-    front = QRectF(12, 24, 28, 32)  # sits in front, down and to the left
-    radius = 6
-
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(back, radius, radius)
-
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(Qt.GlobalColor.black)
-    painter.drawRoundedRect(front.adjusted(-4, -4, 4, 4), radius + 3, radius + 3)
-
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(front, radius, radius)
-    painter.end()
-    return pixmap

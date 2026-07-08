@@ -88,6 +88,25 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
     }}
+    /* A collapsible param-form section header: a flat, full-width divider row,
+       not a raised button. Left-aligned with its fold arrow, and it must not
+       flash the primary blue on click the way the base :pressed rule would. */
+    QPushButton#sectionHeader {{
+        background-color: transparent;
+        color: {_h(TEXT_PRIMARY)};
+        border: none;
+        border-bottom: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 0;
+        text-align: left;
+        font-weight: 600;
+        padding: 4px 2px;
+    }}
+    QPushButton#sectionHeader:hover {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    QPushButton#sectionHeader:pressed {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
     QToolButton {{
         background-color: {_h(BG_BUTTON)};
         color: {_h(TEXT_PRIMARY)};

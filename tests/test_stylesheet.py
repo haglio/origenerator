@@ -24,3 +24,11 @@ def test_stylesheet_styles_tooltips():
     # A global QWidget background rule leaves QToolTip unreadable/blank unless it's
     # styled explicitly, so the toolbar buttons' tooltips never appear on hover.
     assert "QToolTip" in build_stylesheet()
+
+
+def test_stylesheet_styles_collapsible_section_headers():
+    # The param form's section headers are flat QPushButtons; without their own
+    # rule they'd render as raised buttons and flash blue when toggled.
+    qss = build_stylesheet()
+    assert "QPushButton#sectionHeader" in qss
+    assert "QPushButton#sectionHeader:pressed" in qss

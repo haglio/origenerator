@@ -3,8 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QUrl
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import QUrl, QSize
+from PyQt6.QtGui import QResizeEvent
+from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtMultimedia import QMediaPlayer
 
 import origenerator.gui.fullscreen_preview as fullscreen_preview
@@ -25,8 +26,8 @@ def _make_png(path):
 
 
 def _make_tall_png(path):
-    """A tall image whose aspect ratio doesn't match a wide pane, so fit vs fill
-    scale it to visibly different sizes."""
+    """A tall image whose aspect ratio doesn't match a wide pane, so a correct
+    fit touches the short edges and leaves the long ones letterboxed."""
     Image.new("RGB", (24, 60), (10, 120, 200)).save(path, "PNG")
     return path
 
@@ -90,26 +91,32 @@ def test_show_image_displays_scaled_pixmap(make_preview, tmp_path):
     assert w.is_showing_video() is False
 
 
-def test_fill_mode_scales_the_image_to_cover_the_pane(qtbot, tmp_path):
-    # A tall image in a wide pane: fill mode covers the whole pane (cropping the
-    # overflow) instead of fitting inside it with black bars on the sides.
-    w = PreviewWidget(player=MagicMock(), fill=True)
-    qtbot.addWidget(w)
-    w._image_label.resize(400, 300)
-    w.show_image(_make_tall_png(tmp_path / "tall.png"))
-    pm = w._image_label.pixmap()
-    assert pm.width() >= 400 and pm.height() >= 300  # covers the pane, no black bars
-
-
-def test_default_mode_fits_the_image_inside_the_pane(qtbot, tmp_path):
-    # The inline preview stays fit-to-pane: the same tall image is contained, so it
-    # letterboxes rather than cropping.
+def test_show_image_fits_the_pane_without_clipping(qtbot, tmp_path):
+    # A tall image in a wide pane is scaled as large as it fits with no part clipped:
+    # it touches one edge pair and stays within the other — letterboxed, never cropped.
     w = PreviewWidget(player=MagicMock())
     qtbot.addWidget(w)
     w._image_label.resize(400, 300)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
     pm = w._image_label.pixmap()
-    assert pm.width() <= 400 and pm.height() <= 300  # fits inside, letterboxed
+    assert pm.width() <= 400 and pm.height() <= 300           # nothing clipped off
+    assert pm.width() == 400 or pm.height() == 300            # as large as it fits
+
+
+def test_image_refits_when_the_pane_grows(qtbot, tmp_path):
+    # Regression: the image was scaled once at the label's tiny pre-fullscreen size
+    # and never again, so on the full screen it sat small with black on all four
+    # sides. A later resize of the label must refit it to the new size.
+    w = PreviewWidget(player=MagicMock())
+    qtbot.addWidget(w)
+    w._image_label.resize(80, 240)
+    w.show_image(_make_tall_png(tmp_path / "tall.png"))
+    old = w._image_label.size()
+    w._image_label.resize(600, 500)                           # pane grows to fullscreen
+    QApplication.sendEvent(w._image_label, QResizeEvent(QSize(600, 500), old))
+    pm = w._image_label.pixmap()
+    assert pm.width() <= 600 and pm.height() <= 500           # still nothing clipped
+    assert pm.width() == 600 or pm.height() == 500            # refit as large as it fits
 
 
 def test_show_image_stops_any_playing_video(make_preview, tmp_path):

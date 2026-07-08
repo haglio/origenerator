@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
 from PyQt6.QtGui import QPixmap, QMovie, QImageReader
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QUrl, QEvent, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -29,16 +29,11 @@ class PreviewWidget(QWidget):
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
-                 show_funscript_strip: bool = False, on_double_click=None,
-                 fill: bool = False):
+                 show_funscript_strip: bool = False, on_double_click=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
         self._movie_native = None
-        # Fit-to-pane (letterbox) by default; fill mode instead scales the media to
-        # cover the whole pane, cropping the overflow — the fullscreen view uses it so
-        # a smaller image blows up edge-to-edge with no black surround.
-        self._fill = fill
         # The current on-disk media as (path, media_type), or None while showing a
         # placeholder or a live frame — what a double-click pops open fullscreen.
         self._media: tuple | None = None
@@ -66,6 +61,9 @@ class PreviewWidget(QWidget):
         # Let the placeholder wrap so its text width doesn't set a wide minimum
         # on the preview pane (and thus the whole window).
         self._image_label.setWordWrap(True)
+        # Rescale the media whenever the label itself resizes — see eventFilter for
+        # why this can't ride on the widget's own resizeEvent.
+        self._image_label.installEventFilter(self)
         self._stack.addWidget(self._image_label)
 
         self._video = QVideoWidget()
@@ -247,17 +245,12 @@ class PreviewWidget(QWidget):
             self._scale_movie()
             movie.start()
 
-    def _aspect_mode(self) -> Qt.AspectRatioMode:
-        """Fit inside the pane (letterbox) normally; cover it (crop overflow) in fill
-        mode. A covering pixmap overflows the centered label, which clips it to its
-        own bounds — so the media fills the pane with no black surround."""
-        return (Qt.AspectRatioMode.KeepAspectRatioByExpanding if self._fill
-                else Qt.AspectRatioMode.KeepAspectRatio)
-
     def _scale_movie(self) -> None:
         if self._movie is None or self._movie_native is None or not self._movie_native.isValid():
             return
-        target = self._movie_native.scaled(self._image_label.size(), self._aspect_mode())
+        target = self._movie_native.scaled(
+            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio
+        )
         if not target.isEmpty():
             self._movie.setScaledSize(target)
 
@@ -270,14 +263,21 @@ class PreviewWidget(QWidget):
         self._image_label.setPixmap(
             self._pixmap.scaled(
                 self._image_label.size(),
-                self._aspect_mode(),
+                Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if self._movie is not None:
-            self._scale_movie()
-        elif self._pixmap is not None:
-            self._rescale()
+    def eventFilter(self, obj, event):
+        # Refit the media to the label's *own* size whenever the label resizes, rather
+        # than reacting to this widget's resizeEvent. Going fullscreen resizes the
+        # label a beat after the widget, so scaling to the widget's not-yet-grown size
+        # left the image scaled small and then centered on the full screen — black on
+        # all four sides. Keying off the label's resize fits it to the real pane every
+        # time that changes, initial fullscreen included.
+        if obj is self._image_label and event.type() == QEvent.Type.Resize:
+            if self._movie is not None:
+                self._scale_movie()
+            elif self._pixmap is not None:
+                self._rescale()
+        return super().eventFilter(obj, event)

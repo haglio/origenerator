@@ -1,8 +1,9 @@
 from unittest.mock import MagicMock
 
 from PIL import Image
-from PyQt6.QtCore import Qt, QUrl, QEvent
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import Qt, QUrl, QEvent, QSize
+from PyQt6.QtGui import QKeyEvent, QResizeEvent
+from PyQt6.QtWidgets import QApplication
 
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.fullscreen_preview import FullscreenPreview
@@ -14,8 +15,8 @@ def _make_png(path):
 
 
 def _make_tall_png(path):
-    """A tall image whose aspect ratio doesn't match a wide screen, so fit vs fill
-    scale it to visibly different sizes."""
+    """A tall image whose aspect ratio doesn't match a wide screen, so a correct
+    fit touches the short edges and leaves the long ones letterboxed."""
     Image.new("RGB", (24, 60), (10, 120, 200)).save(path, "PNG")
     return path
 
@@ -34,17 +35,20 @@ def test_shows_the_image(qtbot, tmp_path):
     assert win._preview.is_showing_video() is False
 
 
-def test_scales_the_image_to_fill_the_screen(qtbot, tmp_path):
-    # A tall image on a wide screen fills the whole surface (cropping the overflow)
-    # rather than fitting inside it with black bars — the reported "black space
-    # around all sides" was fit-to-screen letterboxing.
+def test_fits_the_image_to_the_screen_without_clipping(qtbot, tmp_path):
+    # The image shows as large as it fits the screen with nothing clipped off, and
+    # refits when the window grows to fullscreen — the reported "black on all four
+    # sides" was the image left scaled at its tiny pre-show size on the full screen.
     win = FullscreenPreview((_make_tall_png(tmp_path / "tall.png"), "image"),
                             player=MagicMock())
     qtbot.addWidget(win)
-    win._preview._image_label.resize(400, 300)  # stand in for the fullscreen surface
-    win._preview._rescale()
-    pm = win._preview._image_label.pixmap()
-    assert pm.width() >= 400 and pm.height() >= 300  # covers the screen, no surround
+    label = win._preview._image_label
+    old = label.size()
+    label.resize(600, 500)  # stand in for the screen the window grows to
+    QApplication.sendEvent(label, QResizeEvent(QSize(600, 500), old))
+    pm = label.pixmap()
+    assert pm.width() <= 600 and pm.height() <= 500        # nothing clipped off
+    assert pm.width() == 600 or pm.height() == 500         # as large as it fits
 
 
 def test_plays_the_video(qtbot, tmp_path):

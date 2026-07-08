@@ -2,9 +2,9 @@
 preview. Escape or another double-click closes it.
 
 Reuses :class:`PreviewWidget` (looping, like the inline preview) for the actual
-rendering, in fill mode: an image is scaled to cover the whole screen — blown up
-edge-to-edge, cropping any overflow — so a smaller image has no black surround. A
-video still letterboxes over the solid black background. Opened by
+rendering, over a solid black surround. The media is scaled as large as it fits
+the screen without cropping, so a shape that doesn't match the screen letterboxes
+on two sides at most — never stranded small with black on all four. Opened by
 :meth:`PreviewWidget.open_fullscreen`; the opening preview keeps the reference
 alive, mirroring how the gallery holds its slideshow window.
 """
@@ -30,11 +30,9 @@ class FullscreenPreview(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         # This preview *is* the fullscreen view, so it opts out of opening another —
         # and a double-click on it (the media fills the window) dismisses the view.
-        # It fills the screen (cropping overflow) rather than fitting inside it, so a
-        # smaller image blows up edge-to-edge with no black surround.
         self._preview = PreviewWidget(player=player, allow_fullscreen=False,
                                       show_funscript_strip=True,
-                                      on_double_click=self.close, fill=True)
+                                      on_double_click=self.close)
         layout.addWidget(self._preview, 1)
         self._preview.show_media(media[0], media[1])
 

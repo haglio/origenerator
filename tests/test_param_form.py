@@ -113,6 +113,43 @@ def test_seed_keeps_its_random_checkbox_beside_the_copy_button(qtbot):
     assert "seed" in form._copy_buttons        # and gains a copy button alongside
 
 
+def _readonly_texts(form):
+    return {lbl.text() for lbl in form.findChildren(QLabel)
+            if lbl.objectName() == "readonlyParamValue"}
+
+
+def test_passthrough_params_render_as_readonly_rows(qtbot):
+    # A param the workflow lays out no field for (vae) shows as a read-only row in
+    # the form itself — merged with the editable params, not hidden or in a
+    # separate block — and still round-trips on read-back.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 5, "vae": "sdxl.vae.safetensors"})
+
+    assert "sdxl.vae.safetensors" in _readonly_texts(form)
+    labels = {lbl.text() for lbl in form.findChildren(QLabel)}
+    assert "vae" in labels  # the key labels the row
+    assert form.get_values_static()["vae"] == "sdxl.vae.safetensors"
+
+
+def test_readonly_rows_are_replaced_not_stacked(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 5, "vae": "a.safetensors"})
+    form.set_values({"seed": 5, "clip": "b.safetensors"})
+
+    values = _readonly_texts(form)
+    assert "b.safetensors" in values
+    assert "a.safetensors" not in values  # the prior extra row is gone, not stacked
+
+
+def test_no_readonly_rows_when_every_param_has_a_field(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 5})
+    assert _readonly_texts(form) == set()
+
+
 def _field_cell_of(form, key):
     """The QHBoxLayout holding a field's input and its trailing controls."""
     from PyQt6.QtWidgets import QFormLayout

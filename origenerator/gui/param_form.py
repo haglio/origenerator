@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QFormLayout, QHBoxLayout,
+    QWidget, QFormLayout, QHBoxLayout, QLabel,
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
     QComboBox, QPushButton, QFileDialog,
 )
@@ -74,10 +74,12 @@ class ParamForm(QWidget):
         self._width_label: QWidget | None = None
         self._height_label: QWidget | None = None
         # Params a config carries but this form has no widget for — the workflow's
-        # remaining hidden settings (VAE, CLIP, batch size…). The form has no field
-        # to edit them, but must round-trip whatever value it was given so reusing
-        # a generation reproduces them exactly rather than falling back to defaults.
+        # remaining hidden settings (VAE, CLIP…), or an import's extras. The form
+        # has no field to edit them, but round-trips whatever value it was given (so
+        # reusing a generation reproduces them) and shows them as read-only rows
+        # merged below the editable fields — the same information, just not editable.
         self._passthrough: dict = {}
+        self._readonly_values: list[QLabel] = []  # the value labels of those rows
         self._param_defs = param_defs
         self._build(param_defs)
 
@@ -376,9 +378,27 @@ class ParamForm(QWidget):
         return result
 
     def set_values(self, params: dict):
-        # Retain any params without a field so they survive the read-back; the
-        # rest are applied to their widgets below.
+        # Retain any params without a field so they survive the read-back, and show
+        # them as read-only rows below the editable fields; the rest are applied to
+        # their widgets.
         self._passthrough = {k: v for k, v in params.items() if k not in self._widgets}
+        self._render_readonly_rows(self._passthrough)
         for pd in self._param_defs:
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
+
+    def _render_readonly_rows(self, extras: dict):
+        """Show each param the form has no field for as a read-only ``key: value``
+        row, appended below the editable fields. Replaces any rows a prior
+        ``set_values`` added, so switching generations never stacks them."""
+        layout = self.layout()
+        for value_label in self._readonly_values:
+            layout.removeRow(value_label)  # drops the whole row (its key label too)
+        self._readonly_values = []
+        for key, value in extras.items():
+            display = QLabel(str(value))
+            display.setObjectName("readonlyParamValue")
+            display.setWordWrap(True)
+            display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            layout.addRow(key, display)
+            self._readonly_values.append(display)

@@ -1,13 +1,11 @@
-"""The read-only facts about one generation that the editable form does *not*
-already show.
+"""The read-only facts about one generation that belong with neither the params
+nor the form: the output file and when the run happened.
 
-The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`: it
-renders the prompts and every parameter the workflow lays out as fields you can
-change. Repeating those read-only would be the duplication the merged tab set out
-to remove, so they are deliberately absent here. What the form has no field for —
-the output file, when the run happened, and any parameter the workflow doesn't lay
-out (an import's extras, hidden passthrough like vae or clip) — is gathered into
-titled sections for a compact block above the form.
+The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`. It renders
+the prompts and every parameter as fields (the ones the workflow lays out are
+editable; the rest — an import's extras, hidden passthrough like vae or clip — show
+as read-only rows in the same form). So the only things left for this block are the
+output file and its timestamp, shown as a compact ``Basic`` section above the form.
 
 Kept Qt-free so the section/item model is unit-testable directly;
 ``gui/metadata_block.py`` does the rendering.
@@ -16,11 +14,6 @@ Kept Qt-free so the section/item model is unit-testable directly;
 from dataclasses import dataclass
 
 from origenerator import gallery
-
-# Parameter keys that hold a reproducibility seed. A seed shown here earns a copy
-# button — it's the value most often lifted to reproduce a result. Only reachable
-# for an unknown workflow, since a registered one puts its seed in the form.
-_SEED_KEYS = ("seed", "noise_seed")
 
 
 @dataclass
@@ -64,31 +57,5 @@ def _basic(row: dict) -> MetaSection:
     return MetaSection("Basic", items)
 
 
-def _extra_param_keys(params: dict, workflow_name: str | None) -> list[str]:
-    """The row's param keys the workflow lays out no field for, in stored order.
-
-    The editable form renders every key the workflow defines, so those are shown
-    there, not repeated here. What's left — hidden passthrough (vae, clip), an
-    import's extras — has no field, making this read-only block its only home. An
-    unknown workflow lays out nothing, so all of its params surface here rather
-    than being dropped. Empty for a row whose every param the form already covers.
-    """
-    laid_out = set(gallery.workflow_param_order(workflow_name))
-    return [key for key in params if key not in laid_out]
-
-
-def _param_item(key: str, value) -> MetaItem:
-    copy = str(value) if key in _SEED_KEYS else None
-    return MetaItem(key, str(value), copy=copy)
-
-
-def _parameters(row: dict) -> MetaSection | None:
-    params = gallery.parse_params(row.get("params_json"))
-    keys = _extra_param_keys(params, row.get("workflow_name"))
-    items = [_param_item(key, params[key]) for key in keys]
-    return MetaSection("Parameters", items) if items else None
-
-
 def build_sections(row: dict) -> list[MetaSection]:
-    sections = [_basic(row), _parameters(row)]
-    return [s for s in sections if s is not None]
+    return [_basic(row)]

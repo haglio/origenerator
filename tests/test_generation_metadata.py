@@ -54,41 +54,8 @@ def test_every_output_file_gets_its_own_row():
     assert files == ["a.png", "b.png"]
 
 
-# --- Parameters: only what the form has no field for -----------------------
-
-def test_parameters_shows_only_params_the_form_has_no_field_for():
-    # seed and positive_prompt are sdxl_t2i form fields (shown in the editable
-    # form); vae is hidden passthrough with no field, so only it lands here.
-    row = _row(params_json=json.dumps(
-        {"seed": 7, "positive_prompt": "a cat", "vae": "sdxl.vae.safetensors"}
-    ))
-    assert _items(build_sections(row), "Parameters") == {"vae": "sdxl.vae.safetensors"}
-
-
-def test_parameters_section_absent_when_every_param_is_in_the_form():
-    row = _row(params_json=json.dumps({"seed": 7, "positive_prompt": "a cat"}))
-    assert "Parameters" not in [s.title for s in build_sections(row)]
-
-
-def test_sections_run_basic_then_parameters_no_details():
-    # The Details block (status/source) was dropped as not useful; what's left is
-    # the output facts and any param the form can't show.
+def test_basic_is_the_only_section():
+    # Params — editable or read-only passthrough — now live in the form itself, so
+    # this block is just the output file and its date; there's no Parameters section.
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
-    assert [s.title for s in build_sections(row)] == ["Basic", "Parameters"]
-
-
-def test_an_unknown_workflow_shows_all_its_params_here():
-    # An import with no registered template has no form to render its params, so
-    # this read-only block becomes their only home — none are dropped.
-    row = _row(workflow_name="imported_thing",
-               params_json=json.dumps({"steps": 20, "cfg": 7.5}))
-    assert _items(build_sections(row), "Parameters") == {"steps": "20", "cfg": "7.5"}
-
-
-def test_a_seed_keyed_extra_param_is_copyable():
-    # Only reachable for an unknown workflow (a known one puts seed in its form),
-    # but when a seed does surface here it earns a copy button like it used to.
-    row = _row(workflow_name="imported_thing", params_json=json.dumps({"seed": 42}))
-    item = next(i for i in _section(build_sections(row), "Parameters").items
-                if i.label == "seed")
-    assert item.copy == "42"
+    assert [s.title for s in build_sections(row)] == ["Basic"]

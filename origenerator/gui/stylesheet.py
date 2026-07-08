@@ -75,21 +75,18 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_MUTED)};
         border: 1px solid {_h(BORDER_SUBTLE)};
     }}
+    /* Generate is set apart by colour and weight only, not size, so it sits the
+       same height as the other buttons in its row (Go-to-folder, Send-to-Evolver,
+       Cancel) — one consistent button size, not a taller primary. */
     QPushButton#generateBtn {{
         background-color: {_h(BLUE)};
         font-weight: bold;
-        padding: 10px 24px;
     }}
     /* While a run is in flight Generate greys out beside the active Cancel; the id
        selector above out-specifies the base :disabled rule, so restate it here. */
     QPushButton#generateBtn:disabled {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
-    }}
-    /* Cancel is the secondary (grey) partner of Generate, sized to match so the
-       pair sits level in the button row. */
-    QPushButton#cancelBtn {{
-        padding: 10px 24px;
     }}
     QToolButton {{
         background-color: {_h(BG_BUTTON)};

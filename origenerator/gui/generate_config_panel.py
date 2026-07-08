@@ -185,7 +185,6 @@ class GenerateConfigPanel(QWidget):
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
-        self._generate_btn.setMinimumWidth(150)  # a bit wider — it's also the progress bar
         self._generate_btn.clicked.connect(self._on_generate)
         btn_row.addStretch()
         btn_row.addWidget(self._folder_btn)

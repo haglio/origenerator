@@ -428,6 +428,7 @@ class GalleryView(QWidget):
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
+        panel.containing_folder_requested.connect(self._browser.open_in_containing_folder)
         panel.displayed_changed.connect(self._reconcile_osr2)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
 

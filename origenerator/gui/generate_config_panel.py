@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
-    QComboBox, QPushButton, QProgressBar, QScrollArea, QMessageBox,
+    QComboBox, QPushButton, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -19,6 +19,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
@@ -43,25 +44,28 @@ class GenerateConfigPanel(QWidget):
     for the gallery to launch as a re-roll of this config's settings folder. The
     panel lays out two resizable panes itself — a main column beside this tab's own
     slim strip of past runs. The main column stacks a fixed preview on top, then one
-    scroll holding the read-only info above the editable form, then a status line and
-    a single button bank (Send-to-Evolver, Cancel, Generate). Clicking a strip
-    thumbnail re-emits its prompt id via ``strip_activated`` so a container can open
-    (or reuse) a tab for it. The preview is driven from outside: a browsed selection's
-    output, a running re-roll's live frames, or this config's newest matching result
-    when idle.
+    scroll holding the File/Created block above the editable form and, at its bottom,
+    the displayed generation's related media, then a single button bank
+    (Go-to-folder, Send-to-Evolver, Cancel, Generate). There's no status line —
+    Generate itself doubles as the progress bar, filling as a run advances. Clicking a
+    strip thumbnail re-emits its prompt id via ``strip_activated`` so a container can
+    open (or reuse) a tab for it. The preview is driven from outside: a browsed
+    selection's output, a running re-roll's live frames, or this config's newest
+    matching result when idle.
 
-    The info at the top of the scroll appears only while the tab is displaying a
-    saved generation (:meth:`show_saved_generation`): a read-only metadata block (the
-    output file, when it was made, and any param the form has no field for), then for
-    an image the videos it was animated into, or for a video a clickable source-image
-    tile. Send-to-Evolver (in the button bank) and the Drive-OSR2 toggle apply to a
-    video. A blank tab, or one showing a bare autoshow, hides them all.
+    The info appears only while the tab is displaying a saved generation
+    (:meth:`show_saved_generation`): a File/Created block above the form, and at the
+    bottom of the scroll the videos an image was animated into, or a clickable
+    source-image tile for a video. Go-to-folder (any saved generation), Send-to-
+    Evolver (a video), and the Drive-OSR2 toggle key off the displayed row. A blank
+    tab, or one showing a bare autoshow, hides them all.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
+    containing_folder_requested = pyqtSignal(str)  # "Go to folder" clicked (prompt_id)
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
@@ -73,6 +77,7 @@ class GenerateConfigPanel(QWidget):
         self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
+        self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         self._build_ui()
         self._connect_signals()
@@ -158,19 +163,17 @@ class GenerateConfigPanel(QWidget):
         self._scroll.setWidget(body_host)
         main_box.addWidget(self._scroll, 4)
 
-        # A slim status line: the ComfyUI connection state, and the form-level guard
-        # when a Generate is blocked. It never shows a running job's progress — that
-        # lives in the gallery's re-roll tile and bottom bar, which own the run.
-        self._progress = QProgressBar()
-        self._progress.setTextVisible(True)
-        main_box.addWidget(self._progress)
-        self._show_ready()
-
         # One button bank, fixed under the scroll so Generate is always reachable.
-        # Send-to-Evolver shows only while displaying a saved video; Cancel only
-        # while a run this tab launched is in flight (the gallery owns the job and
-        # drives set_generating), stopping it from the tab like the folder's tile.
+        # Go-to-folder and Send-to-Evolver show only while displaying a saved
+        # generation (Evolver only for a video); Cancel only while a run this tab
+        # launched is in flight (the gallery owns the job and drives set_generating),
+        # stopping it from the tab like the folder's tile. Generate itself doubles as
+        # the progress bar — it fills as the run advances — so there's no status line.
         btn_row = QHBoxLayout()
+        self._folder_btn = QPushButton("Go to folder")
+        self._folder_btn.setToolTip("Open this generation's folder in the gallery.")
+        self._folder_btn.clicked.connect(self._on_go_to_folder)
+        self._folder_btn.hide()  # shown only while displaying a saved generation
         self._evolver_btn = QPushButton("Send to Evolver")
         self._evolver_btn.setToolTip(
             "Copy this video into Evolver's inbox for sorting and upscaling."
@@ -181,10 +184,11 @@ class GenerateConfigPanel(QWidget):
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
-        self._generate_btn = QPushButton("Generate")
-        self._generate_btn.setObjectName("generateBtn")
+        self._generate_btn = GenerateButton()
+        self._generate_btn.setMinimumWidth(150)  # a bit wider — it's also the progress bar
         self._generate_btn.clicked.connect(self._on_generate)
         btn_row.addStretch()
+        btn_row.addWidget(self._folder_btn)
         btn_row.addWidget(self._evolver_btn)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
@@ -213,27 +217,29 @@ class GenerateConfigPanel(QWidget):
     def _connect_signals(self):
         if self._client is None:
             return  # a read-only gallery: no client to track
-        self._client.connected.connect(self._on_connected)
-        self._client.disconnected.connect(self._on_disconnected)
+        # Mirror the running job's step progress onto the Generate button.
+        self._client.progress.connect(self._on_progress)
 
     def teardown(self):
         """Disconnect from the shared client before the panel is destroyed."""
         if self._client is None:
             return  # never connected
-        for signal, slot in (
-            (self._client.connected, self._on_connected),
-            (self._client.disconnected, self._on_disconnected),
-        ):
-            try:
-                signal.disconnect(slot)
-            except TypeError:
-                pass
+        try:
+            self._client.progress.disconnect(self._on_progress)
+        except TypeError:
+            pass
 
-    def _on_connected(self):
-        self._show_ready("Connected to ComfyUI")
+    def _on_progress(self, prompt_id: str, value: int, max_val: int):
+        """Fill the Generate button with the run's progress while this tab's re-roll
+        is in flight. Generation is serial (one GPU), so the running job is this
+        tab's whenever it's the one marked generating."""
+        if self._generating:
+            self._generate_btn.set_progress(value, max_val)
 
-    def _on_disconnected(self):
-        self._show_ready("Disconnected")
+    def _on_go_to_folder(self):
+        """Ask the gallery to open the displayed generation's own folder."""
+        if self._displayed_row:
+            self.containing_folder_requested.emit(self._displayed_row["prompt_id"])
 
     def _on_workflow_changed(self):
         key = self._workflow_combo.currentData()
@@ -270,12 +276,6 @@ class GenerateConfigPanel(QWidget):
         durations = self._db.recent_durations(wf.name) if wf else []
         self._estimate_label.setText(f"Typical time: {estimate_label(durations)}")
 
-    def _show_ready(self, text: str = "Ready"):
-        """Show a status message on the slim bar (connection state or a form guard)."""
-        self._progress.setRange(0, 1)
-        self._progress.setValue(0)
-        self._progress.setFormat(text)
-
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
 
@@ -285,8 +285,8 @@ class GenerateConfigPanel(QWidget):
         folder's own re-roll slot and navigates there. The panel keeps only the
         form-level guard that an image workflow has its input picked.
         """
-        if self._client is None:
-            return  # a read-only gallery: nothing to run against
+        if self._client is None or self._generating:
+            return  # nothing to run against, or a run is already in flight
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
             return
@@ -298,8 +298,8 @@ class GenerateConfigPanel(QWidget):
             if pd.type == "image" and not str(params.get(pd.key, "")).strip()
         ]
         if missing_images:
-            self._show_ready(
-                f"Select an input image ({', '.join(missing_images)}) before generating."
+            self._generate_btn.flash_guard(
+                f"Select an input image ({', '.join(missing_images)})"
             )
             return
         self.generate_requested.emit(key, params)
@@ -307,12 +307,16 @@ class GenerateConfigPanel(QWidget):
     def set_generating(self, generating: bool):
         """Reflect whether a run of this config's folder is in flight.
 
-        While it is, Cancel shows and Generate greys out so the tab can stop the
-        run (the gallery owns the job) without relaunching over it; when it ends,
+        While it is, Cancel shows and the Generate button switches to progress mode
+        (filling as the run advances) so it can't be relaunched over; when it ends,
         Generate returns — still disabled in a read-only gallery with no client.
         """
+        self._generating = generating
         self._cancel_btn.setVisible(generating)
-        self._generate_btn.setEnabled(not generating and self._client is not None)
+        if generating:
+            self._generate_btn.start()
+        else:
+            self._generate_btn.finish(enabled=self._client is not None)
 
     def use_random_seed(self):
         """Switch this config's seed(s) to Random.
@@ -467,6 +471,7 @@ class GenerateConfigPanel(QWidget):
         self._metadata_block.hide()
         self._source_tile.clear()
         self._animated_strip.hide()
+        self._folder_btn.hide()
         self._evolver_btn.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
@@ -477,6 +482,7 @@ class GenerateConfigPanel(QWidget):
         on-disk lookup."""
         self._metadata_block.show_row(row)
         self._metadata_block.show()
+        self._folder_btn.show()  # any saved generation has a containing folder to open
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)

@@ -60,7 +60,6 @@ def test_preview_over_form_share_the_main_pane(panel):
     # history strip. The preview is no longer its own splitter pane.
     main = panel._panes.widget(0)
     assert _is_descendant(panel._preview, main)
-    assert _is_descendant(panel._progress, main)
     assert _is_descendant(panel._generate_btn, main)
     assert panel._preview is not main  # nested inside the pane, not the pane itself
 
@@ -102,6 +101,7 @@ def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     main = panel._panes.widget(0)
     bank = _layout_containing(main.layout(), panel._generate_btn)
     assert bank is not None
+    assert bank.indexOf(panel._folder_btn) != -1
     assert bank.indexOf(panel._evolver_btn) != -1
     assert bank.indexOf(panel._cancel_btn) != -1
 
@@ -229,7 +229,7 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
     panel._on_generate()
 
     assert requested == []                            # nothing asked of the gallery
-    assert "image" in panel._progress.format().lower()  # the guard shows on the status bar
+    assert "image" in panel._generate_btn.text().lower()  # the guard flashes on the button
     assert panel._db.list_generations() == []         # nothing recorded
 
 
@@ -448,7 +448,31 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert panel._metadata_block.isHidden()
     assert panel._animated_strip.isHidden()
     assert panel._source_tile.isHidden()
+    assert panel._folder_btn.isHidden()
     assert panel._evolver_btn.isHidden()
+
+
+def test_go_to_folder_shows_for_a_saved_generation_and_emits_its_id(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    panel.show_saved_generation(image, [image])
+    assert not panel._folder_btn.isHidden()   # any saved gen has a folder to open
+    got = []
+    panel.containing_folder_requested.connect(got.append)
+
+    panel._folder_btn.click()
+
+    assert got == ["img1"]
+
+
+def test_generate_button_fills_with_run_progress_only_while_generating(panel):
+    panel.set_generating(True)
+    panel._on_progress("pid", 3, 12)
+    assert panel._generate_btn._fraction == 0.25   # the run's step progress
+
+    panel.set_generating(False)                    # run ended: back to the idle button
+    panel._on_progress("pid", 9, 12)               # a stray later event is ignored
+    assert panel._generate_btn._fraction is None
 
 
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
@@ -522,7 +546,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     assert not panel._evolver_btn.isHidden()   # a video with a file → sendable
     assert not panel._source_tile.isHidden()   # its start frame is a known generation
     assert panel._source_tile._prompt_id == "img1"   # the tile points at that image
-    assert "sdxl_img1.png" in panel._source_tile._filename.text()  # and names its file
+    assert panel._source_tile._filename.toolTip() == "sdxl_img1.png"  # names its file (caption may elide)
     assert panel._animated_strip.isHidden()    # a video isn't animated into anything
 
 

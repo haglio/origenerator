@@ -6,18 +6,20 @@ filename, under a "From source image" heading. Clicking anywhere on it emits
 the same jump the old bare text link made, now with a real thumbnail.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-_THUMB = 96
+_THUMB = 120
 
 
 class SourceImageTile(QWidget):
-    """A clickable thumbnail + filename for a video's source image.
+    """A clickable thumbnail with its filename beneath, for a video's source image.
 
-    ``show_source`` fills and reveals it; ``clear`` hides it and forgets the id so
-    a stale click can't navigate. A left click emits ``activated(prompt_id)``.
+    Laid out like the gallery's other thumbnail tiles — the caption sits under the
+    image, not beside it. ``show_source`` fills and reveals it; ``clear`` hides it
+    and forgets the id so a stale click can't navigate. A left click emits
+    ``activated(prompt_id)``.
     """
 
     activated = pyqtSignal(str)
@@ -34,20 +36,14 @@ class SourceImageTile(QWidget):
         heading.setStyleSheet("font-weight: 600;")
         box.addWidget(heading)
 
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(8)
         self._thumb = QLabel()
         self._thumb.setFixedSize(_THUMB, _THUMB)
         self._thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        row.addWidget(self._thumb)
+        box.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
         self._filename = QLabel()
         self._filename.setWordWrap(True)
-        self._filename.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        row.addWidget(self._filename, 1)
-        box.addLayout(row)
+        self._filename.setMaximumWidth(_THUMB * 2)  # wrap under the thumbnail, not across the pane
+        box.addWidget(self._filename, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.hide()
 

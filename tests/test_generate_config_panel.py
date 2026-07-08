@@ -86,12 +86,14 @@ def test_info_and_form_share_one_scroll(panel):
         assert _is_descendant(widget, panel._scroll)
 
 
-def test_info_sits_above_the_editable_form(panel):
+def test_file_info_above_form_related_media_below(panel):
+    # File/Created sits above the form; the source-image tile and animated-in strip
+    # sit below it, at the bottom of the scroll just above the buttons.
     body = panel._scroll.widget().layout()
     form_at = body.indexOf(panel._form_host)
     assert body.indexOf(panel._metadata_block) < form_at
-    assert body.indexOf(panel._source_tile) < form_at
-    assert body.indexOf(panel._animated_strip) < form_at
+    assert body.indexOf(panel._source_tile) > form_at
+    assert body.indexOf(panel._animated_strip) > form_at
 
 
 def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):

@@ -111,18 +111,12 @@ class GenerateConfigPanel(QWidget):
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(8)
 
-        # Info, above the editable stuff and shown only while displaying a saved
-        # generation: the output file + when it was made, then a source-image tile
-        # for a video, or the "animated in" strip for an image.
+        # The output file + when it was made, at the top of the scroll (shown only
+        # while displaying a saved generation). Params — editable or read-only — all
+        # live in the form below now, so this block carries only those two facts.
         self._metadata_block = MetadataBlock()
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
-        self._source_tile = SourceImageTile()
-        self._source_tile.activated.connect(self.source_activated)
-        body.addWidget(self._source_tile)
-        self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.animated_activated)
-        body.addWidget(self._animated_strip)
 
         # Editable: the workflow picker, its typical-time estimate, and the param
         # form (swapped into _form_host whenever the workflow changes).
@@ -148,7 +142,18 @@ class GenerateConfigPanel(QWidget):
         self._form_host_box = QVBoxLayout(self._form_host)
         self._form_host_box.setContentsMargins(0, 0, 0, 0)
         body.addWidget(self._form_host)
-        body.addStretch(1)  # pack info + form to the top; the scroll takes the slack
+        body.addStretch(1)  # push the related-media tiles below to the bottom
+
+        # The displayed generation's related media, at the bottom of the scroll just
+        # above the buttons: a clickable source-image tile for a video, or the
+        # "animated in" strip for an image. Mutually exclusive; both hidden when the
+        # tab isn't showing a saved generation.
+        self._source_tile = SourceImageTile()
+        self._source_tile.activated.connect(self.source_activated)
+        body.addWidget(self._source_tile)
+        self._animated_strip = AnimatedVideoStrip()
+        self._animated_strip.video_activated.connect(self.animated_activated)
+        body.addWidget(self._animated_strip)
 
         self._scroll.setWidget(body_host)
         main_box.addWidget(self._scroll, 4)

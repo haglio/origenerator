@@ -2,15 +2,17 @@ import random
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QFormLayout, QHBoxLayout, QLabel,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
     QComboBox, QPushButton, QFileDialog,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
+from origenerator.gui import param_sections
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 
@@ -55,6 +57,17 @@ def _select_combo_value(combo: QComboBox, value: str):
 
 
 class ParamForm(QWidget):
+    """The editable settings for one workflow, grouped into collapsible sections.
+
+    A workflow's :meth:`~origenerator.workflows.base.WorkflowTemplate.
+    param_definitions` gives the fields; they're laid out by the canonical order
+    in :mod:`origenerator.gui.param_sections` — not the workflow's own declaration
+    order — so every workflow presents the same kinds of settings in the same
+    sections, in the same place. Params a config carries but this workflow lays no
+    field for (its hidden VAE/CLIP, an import's extras) round-trip untouched and
+    show as read-only rows dropped into the matching section.
+    """
+
     changed = pyqtSignal()          # any field's value changed
 
     def __init__(self, param_defs: list[ParamDef], parent=None):
@@ -68,40 +81,80 @@ class ParamForm(QWidget):
         self._copy_buttons: dict[str, CopyButton] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
-        # when absent, so callers can tell whether the control exists. It floats
-        # as a free child, centered between the two labels below.
+        # when absent, so callers can tell whether the control exists. It floats as
+        # a free child of the Dimensions section, so it folds away with it.
         self._swap_dimensions_btn: QPushButton | None = None
         self._width_label: QWidget | None = None
         self._height_label: QWidget | None = None
         # Params a config carries but this form has no widget for — the workflow's
         # remaining hidden settings (VAE, CLIP…), or an import's extras. The form
-        # has no field to edit them, but round-trips whatever value it was given (so
-        # reusing a generation reproduces them) and shows them as read-only rows
-        # merged below the editable fields — the same information, just not editable.
+        # round-trips whatever value it was given (so reusing a generation
+        # reproduces them) and shows them as read-only rows in the matching section.
         self._passthrough: dict = {}
-        self._readonly_values: list[QLabel] = []  # the value labels of those rows
+        # The read-only rows currently rendered: (section title, key, value label),
+        # so a later set_values can drop them cleanly and re-place the new ones.
+        self._readonly_rows: list[tuple[str, str, QLabel]] = []
+        # Every section, in display order, built up front (even those a fresh form
+        # leaves empty) so a passthrough-only section still appears in its fixed
+        # place once a config supplies it.
+        self._sections: dict[str, CollapsibleSection] = {}
+        self._section_order: list[str] = []
+        # The keys currently occupying each section, in row order — editable fields
+        # plus any read-only rows — so a passthrough row inserts at its canonical
+        # slot rather than merely appending after the editable fields.
+        self._present_keys: dict[str, list[str]] = {}
         self._param_defs = param_defs
         self._build(param_defs)
 
     def _build(self, defs: list[ParamDef]):
-        layout = QFormLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-        layout.setLabelAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
-        )
-        # Let the label column size itself to the widest label (at the app's
-        # font) and the inputs take the rest, so no text is clipped.
-        layout.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
-        )
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(10)
 
-        for pd in defs:
+        specs = [(s.title, s.collapsed) for s in param_sections.SECTIONS]
+        specs.append((param_sections.OTHER_TITLE, param_sections.OTHER_COLLAPSED))
+        for title, collapsed in specs:
+            section = CollapsibleSection(title, collapsed=collapsed)
+            section.toggled.connect(self._position_swap_button)
+            self._sections[title] = section
+            self._present_keys[title] = []
+            self._section_order.append(title)
+            outer.addWidget(section)
+        outer.addStretch(1)  # collect any slack at the bottom, not between sections
+
+        # Fields in canonical order, so the workflow's own declaration order can't
+        # reshuffle where a setting lands.
+        for pd in sorted(defs, key=lambda d: param_sections.key_rank(d.key)):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             self._wire_changed(widget)
-            layout.addRow(pd.label, self._field_cell(pd, widget))
-        self._build_swap_button(layout)
+            self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
+        self._build_swap_button()
+        self._refresh_section_visibility()
+
+    def _add_row(self, key: str, label: str, field):
+        """Insert one row (a field cell or a read-only value) into its section at
+        the canonical position among the rows already there. ``field`` is a
+        ``QWidget`` or a ``QLayout`` (a field paired with its trailing controls)."""
+        title = param_sections.section_title(key)
+        keys = self._present_keys[title]
+        index = self._insert_index(keys, key)
+        self._sections[title].content_form().insertRow(index, label, field)
+        keys.insert(index, key)
+
+    @staticmethod
+    def _insert_index(present: list[str], key: str) -> int:
+        """The row index ``key`` belongs at among ``present`` (kept in canonical
+        order): the count of present keys that rank before it."""
+        rank = param_sections.key_rank(key)
+        return sum(1 for k in present if param_sections.key_rank(k) < rank)
+
+    def _refresh_section_visibility(self):
+        """Show a section iff it holds any row; empty ones take no space. Then
+        re-place the swap button, since the sections above it may have moved."""
+        for title, section in self._sections.items():
+            section.setVisible(bool(self._present_keys[title]))
+        self._position_swap_button()
 
     def _field_cell(self, pd: ParamDef, widget: QWidget):
         """The input, optionally paired with trailing controls.
@@ -160,31 +213,38 @@ class ParamForm(QWidget):
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)
 
-    def _build_swap_button(self, layout: QFormLayout):
+    def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
 
         It floats to the left of the two labels, midway between their rows, so it
         reads as linking the pair rather than trailing either field. As a free
-        child (not a form cell) it needs manual placement — see
+        child of the Dimensions section's content (not a form cell) it folds away
+        with the section and needs manual placement — see
         :meth:`_position_swap_button`. Absent for a workflow that derives its size
         in-graph (i2v) and so has no dimensions to swap.
         """
         if not (self._has_param("width") and self._has_param("height")):
             return
-        btn = QPushButton("⇅", self)  # ⇅ up/down arrows: swap the stacked pair
+        content = self._sections["Dimensions"].content()
+        btn = QPushButton("⇅", content)  # ⇅ up/down arrows: swap the stacked pair
         btn.setToolTip("Swap width and height")
         btn.clicked.connect(self.swap_dimensions)
         btn.adjustSize()
         self._swap_dimensions_btn = btn
-        self._width_label = layout.labelForField(self._widgets["width"])
-        self._height_label = layout.labelForField(self._widgets["height"])
+        form = self._sections["Dimensions"].content_form()
+        self._width_label = form.labelForField(self._widgets["width"])
+        self._height_label = form.labelForField(self._widgets["height"])
+        # The section's content lays its rows out on its own resize/show; follow
+        # those so the free-floating button tracks them even when it unfolds.
+        content.installEventFilter(self)
 
     def _position_swap_button(self):
         """Center the swap button between the width and height rows, just left of
-        their labels. Called on every resize/show since a free child gets no help
-        from the layout."""
+        their labels — in the Dimensions content's coordinates, its parent. Called
+        on every resize/show/toggle since a free child gets no help from the
+        layout; a no-op while the section is folded (the button hides with it)."""
         btn = self._swap_dimensions_btn
-        if btn is None:
+        if btn is None or self._sections["Dimensions"].is_collapsed():
             return
         btn.adjustSize()
         top = self._widgets["width"].geometry()
@@ -201,6 +261,13 @@ class ParamForm(QWidget):
         x = max(0, text_left - btn.width() - 6)
         btn.move(x, y)
         btn.raise_()
+
+    def eventFilter(self, obj, event):
+        # Installed on the Dimensions content: re-place the swap button whenever
+        # that content relays out (unfolding, or the form growing wider).
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            self._position_swap_button()
+        return super().eventFilter(obj, event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -379,7 +446,7 @@ class ParamForm(QWidget):
 
     def set_values(self, params: dict):
         # Retain any params without a field so they survive the read-back, and show
-        # them as read-only rows below the editable fields; the rest are applied to
+        # them as read-only rows in the matching section; the rest are applied to
         # their widgets.
         self._passthrough = {k: v for k, v in params.items() if k not in self._widgets}
         self._render_readonly_rows(self._passthrough)
@@ -389,16 +456,17 @@ class ParamForm(QWidget):
 
     def _render_readonly_rows(self, extras: dict):
         """Show each param the form has no field for as a read-only ``key: value``
-        row, appended below the editable fields. Replaces any rows a prior
-        ``set_values`` added, so switching generations never stacks them."""
-        layout = self.layout()
-        for value_label in self._readonly_values:
-            layout.removeRow(value_label)  # drops the whole row (its key label too)
-        self._readonly_values = []
-        for key, value in extras.items():
-            display = QLabel(str(value))
+        row, dropped into its section at its canonical position. Replaces any rows
+        a prior ``set_values`` added, so switching generations never stacks them."""
+        for title, key, value_label in self._readonly_rows:
+            self._sections[title].content_form().removeRow(value_label)
+            self._present_keys[title].remove(key)
+        self._readonly_rows = []
+        for key in sorted(extras, key=param_sections.key_rank):
+            display = QLabel(str(extras[key]))
             display.setObjectName("readonlyParamValue")
             display.setWordWrap(True)
             display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            layout.addRow(key, display)
-            self._readonly_values.append(display)
+            self._add_row(key, key, display)
+            self._readonly_rows.append((param_sections.section_title(key), key, display))
+        self._refresh_section_visibility()

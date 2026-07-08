@@ -3,7 +3,10 @@ import pytest
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from origenerator.workflows.base import ParamDef
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui import param_sections
+from origenerator.gui.collapsible_section import CollapsibleSection
 from shared_ui.check_box import CheckBox
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from origenerator.gui.param_form import ParamForm
@@ -24,6 +27,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
+    form._sections["Model & LoRA"].set_collapsed(False)  # its section starts folded
     form.show()
     qtbot.waitExposed(form)
 
@@ -151,14 +155,18 @@ def test_no_readonly_rows_when_every_param_has_a_field(qtbot):
 
 
 def _field_cell_of(form, key):
-    """The QHBoxLayout holding a field's input and its trailing controls."""
+    """The QHBoxLayout holding a field's input and its trailing controls.
+
+    Fields live in per-section form layouts now, so search every ``QFormLayout``
+    under the form, not one top-level one.
+    """
     from PyQt6.QtWidgets import QFormLayout
-    fl = form.layout()
-    for r in range(fl.rowCount()):
-        item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
-        if item is not None and item.layout() is not None:
-            if item.layout().indexOf(form._widgets[key]) != -1:
-                return item.layout()
+    for fl in form.findChildren(QFormLayout):
+        for r in range(fl.rowCount()):
+            item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
+            if item is not None and item.layout() is not None:
+                if item.layout().indexOf(form._widgets[key]) != -1:
+                    return item.layout()
     return None
 
 
@@ -218,6 +226,7 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_fields(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
+    form._sections["Dimensions"].set_collapsed(False)  # unfold so its rows lay out
     form.resize(400, 320)
     form.show()
     qtbot.waitExposed(form)
@@ -432,3 +441,114 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
     form.set_values({"input_image": wrapped})
 
     assert form.get_values()["input_image"] == "image/sdxl_t2i_00792_.png"
+
+
+# --- collapsible sections: consistent grouping across workflows -------------
+
+def _display_order(form):
+    """Every field/row key in the order it renders, flattened across sections."""
+    return [k for t in form._section_order for k in form._present_keys[t]]
+
+
+def test_fields_are_grouped_into_collapsible_sections(qtbot):
+    form = ParamForm([
+        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("seed", "Seed", "seed", 0),
+        ParamDef("steps", "Steps", "int", 20),
+    ])
+    qtbot.addWidget(form)
+    assert isinstance(form._sections["Prompts"], CollapsibleSection)
+    assert "positive_prompt" in form._present_keys["Prompts"]
+    assert "seed" in form._present_keys["Seed"]
+    assert "steps" in form._present_keys["Sampling"]
+
+
+def test_empty_sections_are_hidden(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+    assert form._sections["Seed"].isHidden() is False       # has the one field
+    assert form._sections["Prompts"].isHidden() is True     # no prompt → no header
+    assert form._sections["Frames"].isHidden() is True
+
+
+def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
+    qtbot.addWidget(form)
+    assert form._sections["Prompts"].is_collapsed() is False
+    assert form._sections["Seed"].is_collapsed() is False
+    assert form._sections["Model & LoRA"].is_collapsed() is True
+    assert form._sections["Sampling"].is_collapsed() is True
+    assert form._sections["Frames"].is_collapsed() is True
+    assert form._sections["Output"].is_collapsed() is True
+
+
+def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
+    # Requirement: the form presents params in one fixed order regardless of the
+    # order the workflow happens to declare them, so switching workflows never
+    # reshuffles where a kind of setting sits.
+    defs = WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()
+    form = ParamForm(defs)
+    qtbot.addWidget(form)
+    assert _display_order(form) == sorted(
+        (d.key for d in defs), key=param_sections.key_rank
+    )
+    # Not vacuous: sdxl declares model-before-seed and dims-before-sampling, which
+    # the canonical order reshuffles — so the two orders genuinely differ.
+    assert _display_order(form) != [d.key for d in defs]
+
+
+def test_shared_sections_appear_in_the_same_order_across_workflows(qtbot):
+    def section_sequence(name):
+        form = ParamForm(WORKFLOW_REGISTRY[name].param_definitions())
+        qtbot.addWidget(form)
+        return [t for t in form._section_order if form._present_keys[t]]
+
+    sdxl = section_sequence("sdxl_t2i")
+    i2v = section_sequence("wan22_i2v")
+    # The sections each workflow shows are a subsequence of the one canonical
+    # order — so any two workflows list their common sections identically.
+    shared = [t for t in sdxl if t in i2v]
+    assert [t for t in i2v if t in sdxl] == shared
+
+
+def test_passthrough_row_lands_in_its_section_at_the_canonical_position(qtbot):
+    # flux lays out steps and guidance but leaves cfg as a read-only passthrough;
+    # cfg belongs between them in Sampling, so it must insert there, not append.
+    form = ParamForm([
+        ParamDef("steps", "Steps", "int", 20),
+        ParamDef("guidance", "Guidance", "float", 4.5),
+    ])
+    qtbot.addWidget(form)
+    form.set_values(
+        {"steps": 20, "guidance": 4.5, "cfg": 1.0, "vae": "ae.safetensors"}
+    )
+    assert form._present_keys["Sampling"] == ["steps", "cfg", "guidance"]
+    assert form._present_keys["Model & LoRA"] == ["vae"]
+
+
+def test_clearing_passthrough_restores_the_editable_only_order(qtbot):
+    form = ParamForm([
+        ParamDef("steps", "Steps", "int", 20),
+        ParamDef("guidance", "Guidance", "float", 4.5),
+    ])
+    qtbot.addWidget(form)
+    form.set_values({"cfg": 1.0})
+    assert form._present_keys["Sampling"] == ["steps", "cfg", "guidance"]
+    form.set_values({})  # a config carrying no passthrough
+    assert form._present_keys["Sampling"] == ["steps", "guidance"]
+
+
+def test_a_passthrough_only_section_appears_when_a_config_supplies_it(qtbot):
+    # wan22_t2i lays out no model field (the UNETs are passthrough). A fresh form
+    # has no Model & LoRA section; loading a config with the UNETs reveals it.
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_t2i"].param_definitions())
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+    assert form._sections["Model & LoRA"].isHidden() is True
+
+    form.set_values({"unet_high": "hi.safetensors", "unet_low": "lo.safetensors"})
+    assert form._sections["Model & LoRA"].isHidden() is False
+    assert form._present_keys["Model & LoRA"] == ["unet_high", "unet_low"]

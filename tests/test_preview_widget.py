@@ -24,6 +24,13 @@ def _make_png(path):
     return path
 
 
+def _make_tall_png(path):
+    """A tall image whose aspect ratio doesn't match a wide pane, so fit vs fill
+    scale it to visibly different sizes."""
+    Image.new("RGB", (24, 60), (10, 120, 200)).save(path, "PNG")
+    return path
+
+
 def _png_bytes():
     buf = BytesIO()
     Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
@@ -81,6 +88,28 @@ def test_show_image_displays_scaled_pixmap(make_preview, tmp_path):
     assert not pm.isNull()
     assert pm.width() <= 200 and pm.height() <= 150
     assert w.is_showing_video() is False
+
+
+def test_fill_mode_scales_the_image_to_cover_the_pane(qtbot, tmp_path):
+    # A tall image in a wide pane: fill mode covers the whole pane (cropping the
+    # overflow) instead of fitting inside it with black bars on the sides.
+    w = PreviewWidget(player=MagicMock(), fill=True)
+    qtbot.addWidget(w)
+    w._image_label.resize(400, 300)
+    w.show_image(_make_tall_png(tmp_path / "tall.png"))
+    pm = w._image_label.pixmap()
+    assert pm.width() >= 400 and pm.height() >= 300  # covers the pane, no black bars
+
+
+def test_default_mode_fits_the_image_inside_the_pane(qtbot, tmp_path):
+    # The inline preview stays fit-to-pane: the same tall image is contained, so it
+    # letterboxes rather than cropping.
+    w = PreviewWidget(player=MagicMock())
+    qtbot.addWidget(w)
+    w._image_label.resize(400, 300)
+    w.show_image(_make_tall_png(tmp_path / "tall.png"))
+    pm = w._image_label.pixmap()
+    assert pm.width() <= 400 and pm.height() <= 300  # fits inside, letterboxed
 
 
 def test_show_image_stops_any_playing_video(make_preview, tmp_path):

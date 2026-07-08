@@ -13,6 +13,13 @@ def _make_png(path):
     return path
 
 
+def _make_tall_png(path):
+    """A tall image whose aspect ratio doesn't match a wide screen, so fit vs fill
+    scale it to visibly different sizes."""
+    Image.new("RGB", (24, 60), (10, 120, 200)).save(path, "PNG")
+    return path
+
+
 def _escape(win):
     win.keyPressEvent(
         QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
@@ -25,6 +32,19 @@ def test_shows_the_image(qtbot, tmp_path):
     qtbot.addWidget(win)
     assert win._preview._media == (png, "image")
     assert win._preview.is_showing_video() is False
+
+
+def test_scales_the_image_to_fill_the_screen(qtbot, tmp_path):
+    # A tall image on a wide screen fills the whole surface (cropping the overflow)
+    # rather than fitting inside it with black bars — the reported "black space
+    # around all sides" was fit-to-screen letterboxing.
+    win = FullscreenPreview((_make_tall_png(tmp_path / "tall.png"), "image"),
+                            player=MagicMock())
+    qtbot.addWidget(win)
+    win._preview._image_label.resize(400, 300)  # stand in for the fullscreen surface
+    win._preview._rescale()
+    pm = win._preview._image_label.pixmap()
+    assert pm.width() >= 400 and pm.height() >= 300  # covers the screen, no surround
 
 
 def test_plays_the_video(qtbot, tmp_path):

@@ -29,11 +29,16 @@ class PreviewWidget(QWidget):
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
-                 show_funscript_strip: bool = False, on_double_click=None):
+                 show_funscript_strip: bool = False, on_double_click=None,
+                 fill: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
         self._movie_native = None
+        # Fit-to-pane (letterbox) by default; fill mode instead scales the media to
+        # cover the whole pane, cropping the overflow — the fullscreen view uses it so
+        # a smaller image blows up edge-to-edge with no black surround.
+        self._fill = fill
         # The current on-disk media as (path, media_type), or None while showing a
         # placeholder or a live frame — what a double-click pops open fullscreen.
         self._media: tuple | None = None
@@ -242,12 +247,17 @@ class PreviewWidget(QWidget):
             self._scale_movie()
             movie.start()
 
+    def _aspect_mode(self) -> Qt.AspectRatioMode:
+        """Fit inside the pane (letterbox) normally; cover it (crop overflow) in fill
+        mode. A covering pixmap overflows the centered label, which clips it to its
+        own bounds — so the media fills the pane with no black surround."""
+        return (Qt.AspectRatioMode.KeepAspectRatioByExpanding if self._fill
+                else Qt.AspectRatioMode.KeepAspectRatio)
+
     def _scale_movie(self) -> None:
         if self._movie is None or self._movie_native is None or not self._movie_native.isValid():
             return
-        target = self._movie_native.scaled(
-            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio
-        )
+        target = self._movie_native.scaled(self._image_label.size(), self._aspect_mode())
         if not target.isEmpty():
             self._movie.setScaledSize(target)
 
@@ -260,7 +270,7 @@ class PreviewWidget(QWidget):
         self._image_label.setPixmap(
             self._pixmap.scaled(
                 self._image_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
+                self._aspect_mode(),
                 Qt.TransformationMode.SmoothTransformation,
             )
         )

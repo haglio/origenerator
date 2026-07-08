@@ -22,11 +22,11 @@ def test_starts_hidden(tile):
 
 
 def test_show_source_reveals_the_heading_and_filename(tile):
-    tile.show_source("img1", None, "sdxl_img1.png")
+    tile.show_source("img1", None, "a_rather_long_source_filename.png")
     assert not tile.isHidden()
-    labels = _labels(tile)
-    assert "sdxl_img1.png" in labels
-    assert any("source image" in t.lower() for t in labels)  # the heading
+    # The caption may middle-elide to fit the tile, but the full name is the tooltip.
+    assert tile._filename.toolTip() == "a_rather_long_source_filename.png"
+    assert any("source image" in t.lower() for t in _labels(tile))  # the heading
 
 
 def test_clicking_the_tile_emits_activated_with_the_source_id(tile, qtbot):

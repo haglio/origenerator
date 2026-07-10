@@ -7,18 +7,21 @@ two are mutually exclusive: picking an act clears a dropped video (and relabels 
 slot as the override path), and dropping a video wipes the dropdown back to "-".
 Either way, Generate re-runs the chosen recipe on the dropped image.
 
+Acts the gallery holds no video of are greyed out (:meth:`CombinePanel.set_available_categories`),
+so the dropdown only ever offers what a recipe can actually be mined for.
+
 The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown and
 a Generate button, and reports the request through :attr:`generate_requested` (a
 dropped video) or :attr:`category_requested` (a picked act) — the view owns the
 database, the slot predicates, the category→recipe routing, and the generation.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.recipe_match import CATEGORIES
@@ -100,6 +103,21 @@ class CombinePanel(QWidget):
         for anything else."""
         index = self._category.findText(category)
         self._category.setCurrentIndex(index if index >= 1 else 0)
+
+    def set_available_categories(self, available: Collection[str]):
+        """Grey out every act the gallery holds no video of — there's no recipe to mine
+        for it, so offering it could only ever answer "no recipe yet". A disabled item
+        says why on hover. The neutral "-" is never greyed."""
+        model = self._category.model()
+        for index in range(1, self._category.count()):
+            act = self._category.itemText(index)
+            usable = act in available
+            model.item(index).setEnabled(usable)
+            self._category.setItemData(
+                index,
+                "" if usable else f"No past “{act}” video to base a recipe on yet",
+                Qt.ItemDataRole.ToolTipRole,
+            )
 
     def show_drop_candidates(self, prompt_id: str):
         """Light whichever slot accepts a now-dragging item, so its target is

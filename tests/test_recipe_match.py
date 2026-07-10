@@ -38,6 +38,20 @@ def test_best_recipe_returns_none_without_a_video_of_that_act():
     assert recipe_match.best_recipe("gamma", rows) is None
 
 
+def test_available_categories_are_those_with_a_video_to_mine():
+    rows = [
+        _video("h1", "a epsilon", "2026-01-01", lora_high="Z"),
+        _video("c1", "redacted on her face", "2026-01-02", lora_high="Z"),
+    ]
+    # Only the acts the gallery can actually build a recipe for; the rest have nothing
+    # to mine, so the panel greys them out.
+    assert recipe_match.available_categories(rows) == {"epsilon", "alpha"}
+
+
+def test_available_categories_is_empty_without_any_video():
+    assert recipe_match.available_categories([]) == set()
+
+
 def test_best_recipe_groups_ignoring_prompt_seed_and_input_image():
     rows = [
         _video("a1", "gamma one", "2026-01-01", lora_high="X", seed=1, noise_seed=9, input_image="i1.png"),

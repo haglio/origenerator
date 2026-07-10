@@ -1,9 +1,12 @@
 """CombinePanel: two drop slots + a Generate button for the image+video combine."""
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout
 
 from origenerator import recipe_match
 from origenerator.gui.combine_panel import CombinePanel
+
+TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
 
 def _panel(qtbot):
@@ -61,6 +64,39 @@ def test_neutral_option_is_a_dash_leading_the_acts(qtbot):
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
     assert items[0] == "-"                              # the neutral choice is a dash, not a prompt
     assert items[1:] == list(recipe_match.CATEGORIES)   # the six acts follow it
+
+
+def _enabled(panel, text) -> bool:
+    return panel._category.model().item(panel._category.findText(text)).isEnabled()
+
+
+def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
+    panel = _panel(qtbot)
+
+    panel.set_available_categories({"epsilon", "alpha"})
+
+    assert _enabled(panel, "epsilon") and _enabled(panel, "alpha")
+    assert not _enabled(panel, "zeta")  # nothing in the gallery to build a recipe from
+    assert not _enabled(panel, "dancing")
+    assert _enabled(panel, "-")            # the neutral option always stays pickable
+
+
+def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
+    panel = _panel(qtbot)
+    panel.set_available_categories(set())
+    assert not _enabled(panel, "dancing")
+
+    panel.set_available_categories({"dancing"})  # the user just made one
+
+    assert _enabled(panel, "dancing")
+
+
+def test_a_greyed_act_explains_itself(qtbot):
+    panel = _panel(qtbot)
+    panel.set_available_categories({"epsilon"})
+    index = panel._category.findText("zeta")
+    assert "no past" in panel._category.itemData(index, TOOLTIP).lower()
+    assert not panel._category.itemData(panel._category.findText("epsilon"), TOOLTIP)
 
 
 def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):

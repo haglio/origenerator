@@ -3813,6 +3813,19 @@ def test_category_launches_a_real_recipe_via_the_fallback(qtbot, tmp_path, monke
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
 
+def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+
+    view.refresh()
+
+    combo = view._combine._category
+    enabled = {combo.itemText(i) for i in range(1, combo.count())
+               if combo.model().item(i).isEnabled()}
+    assert enabled == {"dancing"}  # the only act the gallery can build a recipe for
+
+
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)  # its one video is a "dance" clip — no alpha recipe exists
     view = GalleryView(db, client=_reroll_client())

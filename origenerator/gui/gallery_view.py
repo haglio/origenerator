@@ -610,6 +610,11 @@ class GalleryView(QWidget):
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
+        # An act with no video behind it has no recipe to mine, so grey it out rather
+        # than let it be picked only to answer "no recipe yet".
+        self._combine.set_available_categories(
+            recipe_match.available_categories(self._rebuildable_videos(rows))
+        )
         tree_model = gallery.build_gallery_tree(rows, meta)
         self._browser.set_model(
             gallery.recent_generations(rows, _RECENTS_LIMIT), gallery.starred_folders(tree_model)
@@ -1120,14 +1125,17 @@ class GalleryView(QWidget):
         if self._reroll.start_prepared(key, workflow, params):
             self._reveal_combination(key)
 
+    def _rebuildable_videos(self, rows: list[dict]) -> list[dict]:
+        """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
+        recipe is mined from (each carries the prompt it was made from, which names
+        its act)."""
+        return [row for row in rows
+                if row.get("status") == "completed" and self._is_rebuildable_video_row(row)]
+
     def _category_candidates(self) -> list:
-        """Completed, rebuildable i2v videos — the pool :func:`recipe_match.best_recipe`
-        mines for an act's recipe (each carries the prompt it was made from, which
-        names its act)."""
-        return [
-            row for row in self._db.list_generations()
-            if row.get("status") == "completed" and self._is_rebuildable_video_row(row)
-        ]
+        """The recipe pool, read fresh at generate time rather than from the last
+        rebuild — the gallery may have gained a video since."""
+        return self._rebuildable_videos(self._db.list_generations())
 
     def _start_scene(self, video_row: dict, image_prompts: dict) -> str:
         """The prompt of ``video_row``'s start frame (its input image) — where the

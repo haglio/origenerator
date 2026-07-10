@@ -57,6 +57,11 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
         selection-background-color: {_h(BLUE)};
     }}
+    QComboBox QAbstractItemView::item:disabled {{
+        /* The rule above colours every item, disabled ones included, so an
+           unpickable entry would look exactly as pickable as the rest. Mute it. */
+        color: {_h(TEXT_MUTED)};
+    }}
     QPushButton {{
         background-color: {_h(BG_BUTTON)};
         color: {_h(TEXT_PRIMARY)};

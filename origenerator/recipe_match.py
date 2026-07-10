@@ -12,6 +12,8 @@ on a dropped image via the gallery's combine launch.
   start-frame property — and picks the recipe that fits.
 - :func:`best_recipe` (fallback, when the model is unreachable or finds no fit) is
   the act's most-used recipe, image-independent.
+- :func:`available_categories` reports which acts have any video at all, so the
+  dropdown can grey out the ones neither tier could answer.
 
 The LLM boundary is one function, so the grouping and act-membership logic stays
 unit-testable without a live model, a database, or a widget.
@@ -101,6 +103,14 @@ def _act_recipe_groups(category: str, video_rows, *, require_scene: bool = False
             continue
         groups[_recipe_signature(row)].append(row)
     return groups
+
+
+def available_categories(video_rows) -> set[str]:
+    """The acts ``video_rows`` holds at least one video of — the ones a recipe can be
+    mined for. The panel greys out the rest, so an act that could only ever answer
+    "no recipe yet" is never offered."""
+    return {c for c in CATEGORIES
+            if any(_matches_category(c, row.get("positive_prompt")) for row in video_rows)}
 
 
 def best_recipe(category: str, video_rows) -> str | None:

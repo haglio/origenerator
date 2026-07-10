@@ -20,6 +20,12 @@ def test_stylesheet_greys_disabled_buttons():
     assert "QPushButton:disabled" in build_stylesheet()
 
 
+def test_stylesheet_greys_disabled_dropdown_items():
+    # The popup view sets an unconditional item colour, which a disabled item would
+    # otherwise inherit — leaving an unpickable act looking perfectly pickable.
+    assert "QComboBox QAbstractItemView::item:disabled" in build_stylesheet()
+
+
 def test_stylesheet_styles_tooltips():
     # A global QWidget background rule leaves QToolTip unreadable/blank unless it's
     # styled explicitly, so the toolbar buttons' tooltips never appear on hover.

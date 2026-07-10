@@ -42,7 +42,11 @@ SECTIONS: tuple[Section, ...] = (
     ), collapsed=True),
     Section("Sampling", (
         "steps", "cfg", "guidance", "sampler_name", "scheduler",
-        "shift_high", "shift_low", "denoise",
+        "shift", "shift_high", "shift_low", "denoise",
+    ), collapsed=True),
+    Section("Stroke", (
+        "stroke_hz", "stroke_x", "stroke_top", "stroke_bottom",
+        "anchor_x", "anchor_y",
     ), collapsed=True),
     Section("Dimensions", ("width", "height", "length"), collapsed=True),
     Section("Frames", ("frame_count", "frame_rate"), collapsed=True),

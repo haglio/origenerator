@@ -492,6 +492,109 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
 
+# ---- WAN 2.1 ATI (stroke-tracked image-to-video) ----
+
+def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
+    # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
+    # video on a stroke track built from the stroke params, so the pixels follow
+    # the track instead of the track guessing at pixels. The track is ATI's
+    # fixed 121-point/24fps convention: a 3-point cluster riding the authored
+    # sine between stroke_top and stroke_bottom, plus one static point holding
+    # the anchor (e.g. a redacted base) in place.
+    import json as _json
+
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
+
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    assert wf.__class__ is Wan21AtiI2vWorkflow
+    assert wf.output_type == "video"
+    assert wf.looping is False
+    assert wf.model_keys == ("unet",)
+
+    params = dict(
+        wf.default_params(),
+        positive_prompt="slow steady stroking",
+        input_image="start.png",
+        seed=7,
+        audio_seed=8,
+        stroke_hz=1.0,
+        stroke_x=200,
+        stroke_top=400,
+        stroke_bottom=600,
+        anchor_x=180,
+        anchor_y=700,
+    )
+    payload = wf.build_api_payload(params)
+
+    track_node = _find_node(payload, "WanTrackToVideo")
+    assert track_node is not None
+    assert _find_node(payload, "WanImageToVideo") is None
+    assert track_node["inputs"]["width"] == params["width"]
+    assert track_node["inputs"]["height"] == params["height"]
+    assert track_node["inputs"]["length"] == params["frame_count"]
+
+    tracks = _json.loads(track_node["inputs"]["tracks"])
+    assert len(tracks) == 4                      # 3 stroke points + 1 static anchor
+    assert all(len(t) == 121 for t in tracks)    # ATI's fixed track convention
+    cluster = tracks[:3]
+    ys = [pt["y"] for pt in cluster[1]]          # the centered stroke point
+    assert min(ys) == pytest.approx(400, abs=1)  # reaches stroke_top...
+    assert max(ys) == pytest.approx(600, abs=1)  # ...and stroke_bottom
+    assert ys[0] == pytest.approx(400, abs=1)    # starts at the top of the stroke
+    anchor = tracks[3]
+    assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
+
+    # Single-stage 2.1 sampling: one KSampler on the ATI UNET, no dual-noise pair.
+    samplers = [n for n in payload.values() if n["class_type"] == "KSampler"]
+    assert len(samplers) == 1
+    assert samplers[0]["inputs"]["seed"] == 7
+    assert _find_node(payload, "KSamplerAdvanced") is None
+    unet = _find_node(payload, "UNETLoader")
+    assert unet["inputs"]["unet_name"] == params["unet"]
+
+    # The foley pass rides the decoded frames and CreateVideo muxes it, exactly
+    # like the other video workflows.
+    sampler_id = _node_id(payload, "HunyuanFoleySampler")
+    decode_id = _node_id(payload, "VAEDecode")
+    assert payload[sampler_id]["inputs"]["image"] == [decode_id, 0]
+    assert payload[sampler_id]["inputs"]["seed"] == 8
+    assert _find_node(payload, "CreateVideo")["inputs"]["audio"] == [sampler_id, 0]
+
+
+def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
+    # The funscript is the track: alternating extremes at the authored cadence,
+    # starting at the top (the cluster's sine starts there), mapped onto video
+    # time — the 121-point track always spans 5.0s of track time stretched over
+    # the clip's real duration. No pixel measurement anywhere.
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), stroke_hz=1.2, frame_count=81, frame_rate=16.0)
+    actions = wf.authored_actions(params)
+
+    assert actions[0] == {"at": 0, "pos": 100}
+    assert actions[1]["pos"] == 0
+    scale = (81 / 16.0) / 5.0
+    assert actions[1]["at"] == pytest.approx(0.5 / 1.2 * scale * 1000, abs=1)
+    assert actions[-1]["at"] <= 81 / 16.0 * 1000
+    positions = [a["pos"] for a in actions]
+    assert positions == [100 if i % 2 == 0 else 0 for i in range(len(positions))]
+
+    # Workflows without an authored track say so with None, keeping the
+    # metronome fallback for them.
+    assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
+
+
+def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
+    # ComfyUI's track resampler faults at exactly 121 frames (length-1=120 hits
+    # its off-by-one), so the form's range stops at 113 on the same /4 stride
+    # the other video workflows use.
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    fc = next(pd for pd in wf.param_definitions() if pd.key == "frame_count")
+    assert fc.default == 81
+    assert fc.max_val == 113
+    assert fc.min_val == 5
+    assert fc.step == 4
+
+
 # ---- WAN 2.2 T2I (dual-noise text-to-image) ----
 
 def test_wan22_t2i_is_registered_as_an_image_workflow():

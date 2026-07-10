@@ -227,7 +227,8 @@ class GenerationJob(QObject):
         # Thumbnail and duration are best-effort inside extract_completion — a
         # failure in either yields None rather than stranding a real completion.
         files, thumb, duration = extract_completion(
-            self.workflow, history_data, self._output_dir, self._thumb_dir, self.prompt_id
+            self.workflow, history_data, self._output_dir, self._thumb_dir,
+            self.prompt_id, params=self.params,
         )
         self._state = "finished"
         self.finished.emit(files, thumb, duration)

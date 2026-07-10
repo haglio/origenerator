@@ -96,6 +96,31 @@ def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypa
     assert calls == [True]  # the loop workflow → a seamlessly-tiling script
 
 
+def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_path, monkeypatch):
+    # A workflow that authored its motion (ATI) knows the exact stroke, so its
+    # sidecar comes straight from authored_actions — the metronome synthesizer
+    # must not run for it, or the script would drift from the pixels.
+    from origenerator.funscript import read_actions
+
+    ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    out = tmp_path / "out"
+    (out / "video").mkdir(parents=True)
+    (out / "video" / "wan21_ati_i2v_00001_.mp4").write_bytes(b"v")
+    metronome = []
+    monkeypatch.setattr(
+        "origenerator.completion.ensure_funscript",
+        lambda *a, **k: metronome.append((a, k)),
+    )
+    params = dict(ati.default_params(), stroke_hz=1.5)
+    extract_completion(
+        ati, _video_history("15", "images", "wan21_ati_i2v_00001_.mp4"),
+        out, tmp_path / "thumbs", "n1", params=params,
+    )
+    written = read_actions(out / "video" / "wan21_ati_i2v_00001_.funscript")
+    assert written == ati.authored_actions(params)
+    assert metronome == []
+
+
 def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
     Image.new("RGB", (8, 8), (1, 2, 3)).save(tmp_path / "a.png")
     calls = []

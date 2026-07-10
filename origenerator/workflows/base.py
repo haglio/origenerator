@@ -61,6 +61,15 @@ class WorkflowTemplate(ABC):
     def build_api_payload(self, params: dict) -> dict:
         """Build the ComfyUI API-format prompt dict from user params."""
 
+    def authored_actions(self, params: dict) -> list[dict] | None:
+        """The funscript actions this generation's motion was AUTHORED to, or
+        ``None`` when the workflow doesn't condition motion on a track.
+
+        A track-conditioned workflow (ATI) knows its stroke exactly, so its
+        funscript comes from here — completion prefers it over the synthesized
+        metronome, which remains the fallback for pixels-only workflows."""
+        return None
+
     @staticmethod
     def lora_model_input(node_id: str, model_ref, lora_name, strength):
         """The optional model-only LoRA node to add to a payload, and the model

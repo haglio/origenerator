@@ -153,6 +153,14 @@ def test_settings_signature_ignores_seeds_but_keeps_other_params():
     assert settings_signature(None, a) != settings_signature(None, c)
 
 
+def test_settings_signature_ignores_the_audio_seed_like_the_sampler_seeds():
+    # The foley pass's audio_seed varies per run exactly like the sampler seeds
+    # (a variation re-rolls all three), so it must not split a settings folder.
+    a = json.dumps({"positive_prompt": "a wave", "audio_seed": 1})
+    b = json.dumps({"positive_prompt": "a wave", "audio_seed": 2})
+    assert settings_signature("wan22_i2v", a, {}) == settings_signature("wan22_i2v", b, {})
+
+
 def test_settings_signature_drops_input_image_for_an_unknown_workflow():
     # With no registered workflow the grouping can't tell an i2v from anything
     # else, so it falls back to dropping input_image (instance-level, like the

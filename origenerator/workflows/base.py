@@ -88,6 +88,57 @@ class WorkflowTemplate(ABC):
         }
         return node, [node_id, 0]
 
+    @staticmethod
+    def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):
+        """The HunyuanVideo-Foley subgraph that scores a video's frames, and the
+        AUDIO ref the output node should mux.
+
+        Returns ``({three foley nodes}, [sampler_id, 0])`` — a dict to merge into
+        the payload, and the ref to feed the video writer's ``audio`` input.
+        ``frames_ref`` is the decoded frames the sampler watches, so the audio
+        follows the motion actually rendered. The sampler's duration is derived
+        from the same frame_count/frame_rate the video nodes use (the model's
+        floor is 1s, so shorter clips get a trailing sliver of extra audio
+        rather than a rejected prompt).
+        """
+        duration = max(1.0, params["frame_count"] / params["frame_rate"])
+        nodes = {
+            model_id: {
+                "class_type": "HunyuanModelLoader",
+                "inputs": {
+                    "model_name": params["foley_model"],
+                    "precision": "bf16",
+                    "quantization": "auto",
+                },
+            },
+            deps_id: {
+                "class_type": "HunyuanDependenciesLoader",
+                "inputs": {
+                    "vae_name": params["foley_vae"],
+                    "synchformer_name": params["foley_synchformer"],
+                },
+            },
+            sampler_id: {
+                "class_type": "HunyuanFoleySampler",
+                "inputs": {
+                    "hunyuan_model": [model_id, 0],
+                    "hunyuan_deps": [deps_id, 0],
+                    "image": frames_ref,
+                    "frame_rate": params["frame_rate"],
+                    "duration": duration,
+                    "prompt": params["audio_prompt"],
+                    "negative_prompt": params["audio_negative_prompt"],
+                    "cfg_scale": 4.5,
+                    "steps": 50,
+                    "sampler": "euler",
+                    "batch_size": 1,
+                    "seed": params["audio_seed"],
+                    "force_offload": True,
+                },
+            },
+        }
+        return nodes, [sampler_id, 0]
+
     def extract_output_info(self, history_data: dict) -> list[dict]:
         """Find this workflow's saved files in a ComfyUI /history response.
 

@@ -22,7 +22,11 @@ from origenerator.workflows.model_files import is_no_lora
 # the raw filename keeps a video with its own re-rolls; the *configuration* that
 # produced the frame is added back by :func:`settings_signature` so videos built
 # from differently configured frames still split. See :func:`_input_image_config`.
-INSTANCE_KEYS = frozenset({"seed", "noise_seed", "input_image"})
+# This static set serves only rows with no registered workflow (imports), where
+# there's no template to ask; a registered row's instance keys are derived from
+# its declared seed params instead (:func:`_workflow_instance_keys`), so a
+# workflow growing a seed can't silently start splitting folders by it.
+INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
 _TYPE_ANNOTATION = frozenset({"[output]", "[input]", "[temp]"})
@@ -50,6 +54,15 @@ def _registered(workflow_name: str | None):
     return WORKFLOW_REGISTRY.get(workflow_name or "")
 
 
+@lru_cache(maxsize=None)
+def _workflow_instance_keys(workflow_name: str) -> frozenset:
+    """A registered workflow's per-instance keys: every seed param it declares
+    (sampler and foley alike — a variation re-rolls them all) plus the start
+    frame. Cached because ``seed_keys()`` walks ``param_definitions()``, which
+    scans the model directories."""
+    return frozenset(_registered(workflow_name).seed_keys()) | {"input_image"}
+
+
 def is_image_conditioned(workflow_name: str | None) -> bool:
     """True when a workflow drives its output from an ``input_image`` — an i2v
     whose start frame is itself (usually) a generation with its own settings."""
@@ -73,10 +86,11 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
     wf = _registered(workflow_name)
     if wf is None:
         return settings_only(params)
+    instance_keys = _workflow_instance_keys(workflow_name)
     return {
         key: params.get(key, default)
         for key, default in wf.default_params().items()
-        if key not in INSTANCE_KEYS
+        if key not in instance_keys
     }
 
 

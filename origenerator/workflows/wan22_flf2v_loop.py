@@ -7,11 +7,15 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
 
     The output resolution is derived in-graph from the input image (see
     :meth:`build_api_payload`): it keeps the image's aspect ratio at a fixed
-    pixel budget rather than a hardcoded resolution.
+    pixel budget rather than a hardcoded resolution. The decoded frames also
+    drive a HunyuanVideo-Foley pass (:meth:`~WorkflowTemplate.foley_audio_nodes`),
+    whose synced audio ``VHS_VideoCombine`` muxes into the file — though a
+    player restarting the loop restarts the track with it; only the frames
+    loop seamlessly.
     """
 
     name = "wan22_flf2v_loop"
-    version = "v005"
+    version = "v006"
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     looping = True
@@ -46,6 +50,12 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "unet_low": "wan22EnhancedNSFWSVICamera_nolightningSVICfFp8L.safetensors",
             "lora_high": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
             "lora_low": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+            "audio_prompt": "",
+            "audio_negative_prompt": "noisy, harsh",
+            "audio_seed": 0,
+            "foley_model": "hunyuanvideo_foley_fp8_e4m3fn.safetensors",
+            "foley_vae": "vae_128d_48k_fp16.safetensors",
+            "foley_synchformer": "synchformer_state_dict_fp16.safetensors",
         }
 
     def param_definitions(self) -> list[ParamDef]:
@@ -56,8 +66,11 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
             ParamDef("input_image", "Input Image", "image", ""),
+            ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
+            ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
+            ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("frame_count", "Frames", "int", 21, min_val=5, max_val=81, step=4),
             ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
@@ -83,7 +96,9 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         lora_low, model_low = self.lora_model_input(
             "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
         )
+        foley, audio_ref = self.foley_audio_nodes("19", "20", "21", ["15", 0], params)
         return {
+            **foley,
             "1": {
                 "class_type": "CLIPLoader",
                 "inputs": {
@@ -207,6 +222,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                 "class_type": "VHS_VideoCombine",
                 "inputs": {
                     "images": ["15", 0],
+                    "audio": audio_ref,
                     "frame_rate": params["frame_rate"],
                     "loop_count": 0,
                     "filename_prefix": params["filename_prefix"],

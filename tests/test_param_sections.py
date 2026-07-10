@@ -8,7 +8,7 @@ def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
         "Prompts", "Seed", "Model & LoRA", "Sampling",
-        "Dimensions", "Frames", "Output",
+        "Dimensions", "Frames", "Audio", "Output",
     ]
 
 
@@ -25,6 +25,9 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("width") == "Dimensions"
     assert ps.section_title("frame_count") == "Frames"
     assert ps.section_title("frame_rate") == "Frames"
+    assert ps.section_title("audio_prompt") == "Audio"
+    assert ps.section_title("audio_seed") == "Audio"
+    assert ps.section_title("foley_model") == "Audio"       # passthrough model file
     assert ps.section_title("filename_prefix") == "Output"
 
 

@@ -46,6 +46,10 @@ SECTIONS: tuple[Section, ...] = (
     ), collapsed=True),
     Section("Dimensions", ("width", "height", "length"), collapsed=True),
     Section("Frames", ("frame_count", "frame_rate"), collapsed=True),
+    Section("Audio", (
+        "audio_prompt", "audio_negative_prompt", "audio_seed",
+        "foley_model", "foley_vae", "foley_synchformer",
+    ), collapsed=True),
     Section("Output", ("batch_size", "crf", "filename_prefix"), collapsed=True),
 )
 

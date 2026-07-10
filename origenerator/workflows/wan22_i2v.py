@@ -12,11 +12,13 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     native ``CreateVideo`` + ``SaveVideo`` nodes. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
-    hardcoded size.
+    hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
+    (:meth:`~WorkflowTemplate.foley_audio_nodes`), whose synced audio
+    ``CreateVideo`` muxes into the file.
     """
 
     name = "wan22_i2v"
-    version = "v002"
+    version = "v003"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     model_keys = ("unet_high", "unet_low")
@@ -49,6 +51,12 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "unet_low": "split_files\\diffusion_models\\wan2.2_i2v_low_noise_14B_fp16.safetensors",
             "lora_high": "wan22-f4c3spl4sh-100epoc-high-k3nk.safetensors",
             "lora_low": "wan22-f4c3spl4sh-154epoc-low-k3nk.safetensors",
+            "audio_prompt": "",
+            "audio_negative_prompt": "noisy, harsh",
+            "audio_seed": 0,
+            "foley_model": "hunyuanvideo_foley_fp8_e4m3fn.safetensors",
+            "foley_vae": "vae_128d_48k_fp16.safetensors",
+            "foley_synchformer": "synchformer_state_dict_fp16.safetensors",
         }
 
     def param_definitions(self) -> list[ParamDef]:
@@ -59,8 +67,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
             ParamDef("input_image", "Input Image", "image", ""),
+            ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
+            ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
+            ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("frame_count", "Frames", "int", 121, min_val=5, max_val=161, step=4),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
@@ -86,7 +97,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         lora_low, model_low = self.lora_model_input(
             "7", ["5", 0], params["lora_low"], params["lora_strength_low"]
         )
+        foley, audio_ref = self.foley_audio_nodes("22", "23", "24", ["17", 0], params)
         return {
+            **foley,
             "1": {
                 "class_type": "CLIPLoader",
                 "inputs": {
@@ -214,7 +227,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             },
             "18": {
                 "class_type": "CreateVideo",
-                "inputs": {"images": ["17", 0], "fps": params["frame_rate"]},
+                "inputs": {
+                    "images": ["17", 0],
+                    "fps": params["frame_rate"],
+                    "audio": audio_ref,
+                },
             },
             "19": {
                 "class_type": "SaveVideo",

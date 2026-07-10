@@ -1,3 +1,5 @@
+import pytest
+
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
@@ -155,10 +157,29 @@ def test_wan_video_workflows_group_all_models_then_all_loras():
 
 
 def test_workflows_expose_their_seed_param_keys():
-    # A variation re-rolls exactly these; dual-noise video workflows have two.
+    # A variation re-rolls exactly these. The video workflows carry a third
+    # seed for the foley pass, so a variation re-scores its audio too — the
+    # motion changed, so the old track couldn't fit anyway.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
-    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed")
-    assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed")
+    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed", "audio_seed")
+    assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed", "audio_seed")
+
+
+def test_wan_video_workflows_expose_editable_audio_params():
+    # The audio prompt/negative/seed are ordinary editable fields (the foley
+    # model files stay read-only passthroughs, like clip_name/vae_name): a run
+    # can steer what the clip sounds like, or leave the prompt blank to let the
+    # foley model score the frames on its own.
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        by_key = {pd.key: pd for pd in wf.param_definitions()}
+        prompt = by_key["audio_prompt"]
+        assert prompt.type == "str" and prompt.multiline
+        assert prompt.default == ""
+        negative = by_key["audio_negative_prompt"]
+        assert negative.type == "str" and negative.multiline
+        assert negative.default == "noisy, harsh"
+        assert by_key["audio_seed"].type == "seed"
+        assert "foley_model" not in by_key
 
 
 def test_sdxl_t2i_default_params_has_required_keys():
@@ -276,6 +297,44 @@ def test_wan22_build_api_payload_structure():
     assert payload["12"]["inputs"]["length"] == params["frame_count"]
 
 
+def test_wan22_flf2v_payload_generates_synced_foley_audio():
+    # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
+    # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``
+    # input. (The track won't loop seamlessly the way the frames do — players
+    # restart it each cycle — but the clip itself is scored to its motion.)
+    wf = Wan22Flf2vLoopWorkflow()
+    params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)
+    payload = wf.build_api_payload(params)
+
+    sampler_id = _node_id(payload, "HunyuanFoleySampler")
+    sampler = payload[sampler_id]["inputs"]
+    decode_id = _node_id(payload, "VAEDecode")
+    assert sampler["image"] == [decode_id, 0]
+    assert sampler["frame_rate"] == params["frame_rate"]
+    assert sampler["prompt"] == "wet rhythmic slapping"
+    assert sampler["seed"] == 3
+    assert _find_node(payload, "HunyuanModelLoader") is not None
+    assert _find_node(payload, "HunyuanDependenciesLoader") is not None
+
+    combine = _find_node(payload, "VHS_VideoCombine")
+    assert combine["inputs"]["audio"] == [sampler_id, 0]
+
+
+def test_foley_duration_never_undercuts_the_models_one_second_floor():
+    # HunyuanFoley rejects sub-second durations, so a clip shorter than 1s (the
+    # default 21-frame loop at 16fps is 1.3s, but 5 frames is 0.2s) asks for a
+    # clamped 1s of audio; the mux just carries the sliver of overhang.
+    wf = Wan22Flf2vLoopWorkflow()
+    params = dict(wf.default_params(), frame_count=5, frame_rate=16.0)
+    payload = wf.build_api_payload(params)
+    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == 1.0
+
+    params = dict(wf.default_params(), frame_count=21, frame_rate=16.0)
+    payload = wf.build_api_payload(params)
+    sampler = _find_node(payload, "HunyuanFoleySampler")
+    assert sampler["inputs"]["duration"] == pytest.approx(21 / 16.0)
+
+
 def test_wan22_extract_output_info():
     wf = Wan22Flf2vLoopWorkflow()
     history = {
@@ -372,6 +431,47 @@ def test_wan22_i2v_build_api_payload_structure():
     assert _find_node(payload, "CreateVideo") is not None
     assert _find_node(payload, "SaveVideo") is not None
     assert _find_node(payload, "VHS_VideoCombine") is None
+
+
+def test_wan22_i2v_payload_generates_synced_foley_audio():
+    # Every i2v render carries a HunyuanVideo-Foley pass: the decoded frames
+    # drive the foley sampler (so the audio follows the on-screen motion), and
+    # its output is muxed into the file by CreateVideo's audio input. The
+    # sampler's duration must equal the video's, derived from the same
+    # frame_count/frame_rate the video nodes use, or the tracks drift.
+    wf = Wan22I2vWorkflow()
+    params = dict(
+        wf.default_params(),
+        audio_prompt="skin slapping, redacted",
+        audio_negative_prompt="music",
+        audio_seed=7,
+    )
+    payload = wf.build_api_payload(params)
+
+    sampler_id = _node_id(payload, "HunyuanFoleySampler")
+    sampler = payload[sampler_id]["inputs"]
+    decode_id = _node_id(payload, "VAEDecode")
+    assert sampler["image"] == [decode_id, 0]
+    assert sampler["frame_rate"] == params["frame_rate"]
+    assert sampler["duration"] == pytest.approx(params["frame_count"] / params["frame_rate"])
+    assert sampler["prompt"] == "skin slapping, redacted"
+    assert sampler["negative_prompt"] == "music"
+    assert sampler["seed"] == 7
+
+    # The foley model and its deps are loaded from the params' file names, so a
+    # generation records exactly which audio model scored it.
+    model_id = _node_id(payload, "HunyuanModelLoader")
+    deps_id = _node_id(payload, "HunyuanDependenciesLoader")
+    assert sampler["hunyuan_model"] == [model_id, 0]
+    assert sampler["hunyuan_deps"] == [deps_id, 0]
+    assert payload[model_id]["inputs"]["model_name"] == params["foley_model"]
+    assert payload[deps_id]["inputs"]["vae_name"] == params["foley_vae"]
+    assert payload[deps_id]["inputs"]["synchformer_name"] == params["foley_synchformer"]
+
+    # Slot 0 is audio_first — the single generated track — and CreateVideo
+    # muxes it, so the SaveVideo output is a video WITH sound.
+    create = _find_node(payload, "CreateVideo")
+    assert create["inputs"]["audio"] == [sampler_id, 0]
 
 
 def test_wan22_i2v_extract_output_info_uses_images_key():

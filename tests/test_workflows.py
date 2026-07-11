@@ -668,11 +668,11 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
 
 
 def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
-    # The funscript is a dense sampling of the SAME waveform the track
-    # conditions the pixels on — pointwise, a track sample's normalized stroke
-    # depth IS the funscript pos at that instant, mapped onto video time (the
-    # 121-point track always spans 5.0s of track time stretched over the clip's
-    # real duration). No pixel measurement anywhere.
+    # The funscript is the track's own reversal points — the exact turnarounds
+    # the pixel track eases between — mapped onto video time (the 121-point
+    # track always spans 5.0s of track time stretched over the clip's real
+    # duration) and normalized to stroke depth. Each top-of-stroke action must
+    # land where the track's y actually crests. No pixel measurement anywhere.
     import json as _json
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
@@ -682,29 +682,49 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
     ys = [pt["y"] for pt in tracks[1]]           # the centered cluster point
     top, bottom = params["stroke_top"], params["stroke_bottom"]
+    depth = bottom - top
 
     assert actions[0] == {"at": 0, "pos": 100}   # the stroke starts at its top
-    assert len(actions) > 50                     # dense, not a bare triangle
     assert actions[-1]["at"] <= 81 / 16.0 * 1000
     assert all(0 <= a["pos"] <= 100 for a in actions)
     scale = (81 / 16.0) / 5.0
-    by_at = {a["at"]: a["pos"] for a in actions}
-    for i in (0, 24, 48, 72, 96, 120):           # spot-check the pointwise lock
-        at = round(i / 24.0 * scale * 1000)
-        if at in by_at:
-            expected = 100 * (bottom - ys[i]) / (bottom - top)
-            assert by_at[at] == pytest.approx(expected, abs=1.5)
+    pos = [a["pos"] for a in actions]
+    crests = [
+        i for i in range(1, len(actions) - 1)
+        if pos[i] > pos[i - 1] and pos[i] >= pos[i + 1] and pos[i] >= 75
+    ]
+    assert crests, "the script must reach the top of the stroke repeatedly"
+    for i in crests:                             # a top-of-stroke reversal
+        s = round(actions[i]["at"] / 1000 / scale * 24)  # nearest track sample
+        window = ys[max(0, s - 1):s + 2]
+        assert min(window) <= top + 0.20 * depth  # the track crests there too
 
     # Workflows without an authored track say so with None, keeping the
     # metronome fallback for them.
     assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
 
 
-def test_wan21_ati_i2v_stroke_eases_into_reversals_and_wobbles_like_a_hand():
-    # Organic, not metronomic: motion decelerates into every reversal (cosine
-    # easing — near a turnaround the per-sample movement is a fraction of the
-    # mid-stroke speed), and each half-stroke's pace wobbles slightly, seeded
-    # by the generation seed: deterministic per run, re-rolled with it.
+def test_wan21_ati_i2v_funscript_is_sparse_enough_for_the_osr2_driver():
+    # The OSR2 driver re-sends "next action, time until it" on a 50ms poll, so
+    # a dense script becomes a new target every tick and the device spasms
+    # (user-reported: "unusably spastic... going to break my OSR2"). Actions
+    # are reversals plus at most one shaping point per half-stroke, so every
+    # gap stays far above the poll period at the default cadence.
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), seed=42)
+    actions = wf.authored_actions(params)
+    gaps = [b["at"] - a["at"] for a, b in zip(actions, actions[1:])]
+    assert min(gaps) >= 120
+    strokes = 1.2 * (81 / 16.0)                  # authored strokes in the clip
+    assert len(actions) <= 2 * strokes * 2 + 2   # reversals + shaping, no more
+
+
+def test_wan21_ati_i2v_stroke_decelerates_into_reversals_and_wobbles_like_a_hand():
+    # Organic, not metronomic: each long-enough half-stroke carries a shaping
+    # point at 55% time / 82% travel, so the device covers most of the distance
+    # early and decelerates into the reversal; and the pacing wobbles per
+    # half-stroke, seeded by the generation seed — deterministic per run,
+    # re-rolled with it.
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), seed=42)
     actions = wf.authored_actions(params)
@@ -712,18 +732,26 @@ def test_wan21_ati_i2v_stroke_eases_into_reversals_and_wobbles_like_a_hand():
     assert actions != wf.authored_actions(dict(params, seed=43))    # seed re-rolls it
 
     pos = [a["pos"] for a in actions]
-    steps = [abs(b - a) for a, b in zip(pos, pos[1:])]
-    reversals = [
+    ats = [a["at"] for a in actions]
+    reversal_idx = [
         i for i in range(1, len(pos) - 1)
         if (pos[i] - pos[i - 1]) * (pos[i + 1] - pos[i]) < 0
     ]
-    assert reversals, "the stroke must actually reverse"
-    slowest_near_reversals = max(max(steps[r - 1], steps[r]) for r in reversals)
-    assert max(steps) >= 2.5 * slowest_near_reversals
+    assert reversal_idx, "the stroke must actually reverse"
+    # Deceleration: between reversals, the leg INTO the reversal moves less
+    # distance per millisecond than the leg leaving the previous one.
+    decelerating = 0
+    for i in reversal_idx:
+        if i >= 2:
+            speed_in = abs(pos[i] - pos[i - 1]) / max(1, ats[i] - ats[i - 1])
+            speed_out = abs(pos[i - 1] - pos[i - 2]) / max(1, ats[i - 1] - ats[i - 2])
+            if speed_in < speed_out:
+                decelerating += 1
+    assert decelerating >= len(reversal_idx) // 2
 
     # Human wobble: the spacing between successive top-of-stroke peaks varies.
-    peaks = [actions[i]["at"] for i in reversals if pos[i] > 80]
-    gaps = {round((b - a) / 10) for a, b in zip(peaks, peaks[1:])}
+    peaks = [ats[i] for i in reversal_idx if pos[i] > 75]
+    gaps = {round((b - a) / 25) for a, b in zip(peaks, peaks[1:])}
     assert len(gaps) > 1
 
 

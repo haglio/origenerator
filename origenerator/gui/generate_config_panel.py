@@ -341,7 +341,14 @@ class GenerateConfigPanel(QWidget):
         While it is, Cancel shows and the Generate button switches to progress mode
         (filling as the run advances) so it can't be relaunched over; when it ends,
         Generate returns — still disabled in a read-only gallery with no client.
+
+        Idempotent: only an actual change flips the button, because ``start`` resets
+        the fill to zero. The gallery re-asserts this state on every rebuild (so a
+        reconnected run lights the right tab's button), and re-entering progress mode
+        on each of those would keep snapping a filling bar back to empty.
         """
+        if generating == self._generating:
+            return
         self._generating = generating
         self._cancel_btn.setVisible(generating)
         if generating:

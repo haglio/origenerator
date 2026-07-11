@@ -141,6 +141,38 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
     assert key in win._gallery_view._reroll_jobs
 
 
+def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
+    # The reported gap: after a restart the bottom bar resumed but the Generate
+    # button on the matching tab stayed idle. An i2v folder key depends on its start
+    # frame's config, which the view can only resolve once its image rows are rebuilt
+    # on show — so the button's generating state must be re-asserted then, not only at
+    # reconnect time (when the image rows are still empty and the key can't match).
+    db = Database(tmp_path / "t.db")
+    img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                      seed=1, positive_prompt="a face")
+    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
+                         positive_prompt="a face", seed=1,
+                         params_json=json.dumps(img_params), workflow_json="{}")
+    db.update_generation("img", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_t2i_img.png"}]))
+    vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
+                      seed=7, positive_prompt="", input_image="sdxl_t2i_img.png [output]")
+    db.insert_generation(prompt_id="rr", workflow_name="wan22_i2v", workflow_version="v",
+                         positive_prompt="", seed=7,
+                         params_json=json.dumps(vid_params), workflow_json="{}")
+    db.update_generation("rr", status="running")
+    state = AppState(tmp_path / "ui.json")
+    state.set("generate_tabs", {"tabs": [
+        {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
+         "title": None},
+    ], "current": 0})
+    win = _window(qtbot, tmp_path, state)
+    win.show()  # showEvent -> refresh rebuilds the image rows, then lights the button
+
+    panel = win._gallery_view._info_tabs.current_config_panel()
+    assert panel._generating is True
+
+
 def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_folder", "image/sdxl_t2i")

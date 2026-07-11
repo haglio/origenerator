@@ -539,6 +539,18 @@ def test_generate_button_fills_with_run_progress_only_while_generating(panel):
     assert panel._generate_btn._fraction is None
 
 
+def test_set_generating_true_again_keeps_the_fill(panel):
+    # The gallery re-asserts the generating state on every rebuild, so re-marking an
+    # already-running tab must NOT snap its filling button back to empty — otherwise
+    # a reconnected run's bar would reset to 0 on each poll instead of advancing.
+    panel.set_generating(True)
+    panel._on_progress("pid", 6, 12)               # filled to halfway
+    assert panel._generate_btn._fraction == 0.5
+
+    panel.set_generating(True)                     # redundant re-assert on a rebuild
+    assert panel._generate_btn._fraction == 0.5    # still halfway, not reset to 0
+
+
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")

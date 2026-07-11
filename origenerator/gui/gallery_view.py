@@ -682,6 +682,11 @@ class GalleryView(QWidget):
             if location is not None:
                 self._record_visit(location)
         self._update_running_bar()
+        # Re-assert the front tab's Generate-as-progress state against the live jobs.
+        # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
+        # light its tab's button after a restart: at reconnect time the view's image
+        # rows aren't built yet, so an i2v folder key wouldn't match then; here it does.
+        self._reconcile_generating()
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""

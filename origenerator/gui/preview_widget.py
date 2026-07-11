@@ -2,8 +2,9 @@
 
 The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
 static images are scaled to fit (and rescaled on resize), animated images
-(animated WebP/GIF) loop via ``QMovie``, and videos auto-play muted on a loop so
-selecting one gives an immediate moving preview without stealing audio.
+(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
+default, so selecting one gives an immediate moving preview without stealing audio,
+while the fullscreen view opts in to sound.
 """
 
 from __future__ import annotations
@@ -26,10 +27,12 @@ _PLACEHOLDER = "Select a generation to preview"
 
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
+    fullscreen_opened = pyqtSignal(object)  # popped a FullscreenPreview open (drive cue)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
-                 show_funscript_strip: bool = False, on_double_click=None):
+                 show_funscript_strip: bool = False, mute_audio: bool = True,
+                 on_double_click=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -68,7 +71,7 @@ class PreviewWidget(QWidget):
 
         self._video = QVideoWidget()
         self._audio = QAudioOutput(self)
-        self._audio.setMuted(True)
+        self._audio.setMuted(mute_audio)
         # The player is injectable so unit tests can drive playback intent
         # without spinning up the real (WMF) backend, which deadlocks at exit.
         self._player = player if player is not None else QMediaPlayer(self)
@@ -216,6 +219,9 @@ class PreviewWidget(QWidget):
         from origenerator.gui.fullscreen_preview import FullscreenPreview
         self._fullscreen = FullscreenPreview(self._media)
         self._fullscreen.showFullScreen()
+        # The view listens for this to drive the OSR2 off the fullscreen video for as
+        # long as it's up — independently of the global Drive-OSR2 toggle.
+        self.fullscreen_opened.emit(self._fullscreen)
         return self._fullscreen
 
     def _on_media_status(self, status) -> None:

@@ -17,11 +17,11 @@ from origenerator.gallery import (
     rows_in_settings, settings_signature, videos_from_source_image,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
-from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.source_image_tile import SourceImageTile
@@ -69,6 +69,7 @@ class GenerateConfigPanel(QWidget):
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
+    fullscreen_opened = pyqtSignal(object)  # the preview popped a video open fullscreen
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -104,6 +105,7 @@ class GenerateConfigPanel(QWidget):
         # from outside), shows the browsed generation's output when one is loaded, and
         # the newest matching result otherwise.
         self._preview = PreviewWidget(show_funscript_strip=True)
+        self._preview.fullscreen_opened.connect(self.fullscreen_opened)  # → view drives it
         main_box.addWidget(self._preview, 3)
         # One scroll under the preview holds everything else: the read-only info on
         # top, the editable form below it, so they scroll together. This replaces the
@@ -586,13 +588,7 @@ class GenerateConfigPanel(QWidget):
         is on and the shown video changes: the on-disk video (the drive identity), the
         media player to follow, and the funscript actions beside it. ``None`` when the
         tab isn't showing a video, or that video has no funscript."""
-        path = self._displayed_video_path()
-        if path is None:
-            return None
-        actions = read_actions(funscript_path_for(path))
-        if not actions:
-            return None
-        return path, self._preview.player(), actions
+        return drive_target_for(self._displayed_video_path(), self._preview.player())
 
     def _on_send_to_evolver(self):
         """Copy the displayed video into Evolver's inbox and remember the send.

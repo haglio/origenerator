@@ -157,6 +157,13 @@ def test_video_preview_is_muted(make_preview):
     assert w._audio.isMuted() is True
 
 
+def test_audio_plays_when_not_muted(qtbot):
+    # The fullscreen view opts in to sound; the inline preview stays muted (above).
+    w = PreviewWidget(player=MagicMock(), mute_audio=False)
+    qtbot.addWidget(w)
+    assert w._audio.isMuted() is False
+
+
 def test_show_media_routes_to_video(make_preview, tmp_path):
     w = make_preview()
     w.show_media(tmp_path / "c.mp4", "video")
@@ -273,6 +280,24 @@ def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path, m
     assert opened["media"] == (png, "image")
     assert opened.get("shown") is True
     assert w._fullscreen is win
+
+
+def test_opening_fullscreen_announces_it(make_preview, tmp_path, monkeypatch):
+    # The gallery listens for this to drive the OSR2 off the fullscreen video.
+    class Fake(QWidget):
+        def __init__(self, media, **kwargs):
+            super().__init__()
+
+        def showFullScreen(self):
+            pass
+
+    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", Fake)
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    announced = []
+    w.fullscreen_opened.connect(announced.append)
+    win = w.open_fullscreen()
+    assert announced == [win]
 
 
 def test_open_fullscreen_is_a_no_op_without_media(make_preview):

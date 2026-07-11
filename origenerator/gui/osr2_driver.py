@@ -16,11 +16,29 @@ from PyQt6.QtCore import QObject, QTimer
 from origenerator.config import (
     OSR2_BROKER_HOST, OSR2_GENAU_ENABLED_FILE, OSR2_TCODE_UDP_PORT,
 )
+from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.osr2 import Osr2Broker
 
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 50
+
+
+def drive_target_for(video_path, player):
+    """Bundle a video with the player showing it into the driver's input —
+    ``(video_path, player, actions)`` — or ``None`` when there's nothing to drive:
+    no video, or a video with no funscript beside it.
+
+    The one driver can follow either of two foreground surfaces — the front config
+    tab's preview or an open fullscreen view — so both describe their target through
+    this, keeping the ``(path, player, actions)`` contract in a single place.
+    """
+    if video_path is None:
+        return None
+    actions = read_actions(funscript_path_for(video_path))
+    if not actions:
+        return None
+    return video_path, player, actions
 
 
 class Osr2Driver(QObject):

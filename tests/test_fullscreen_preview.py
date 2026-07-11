@@ -97,3 +97,44 @@ def test_watching_a_scripted_video_fullscreen_shows_its_strip(qtbot, tmp_path):
     qtbot.addWidget(win)
     assert win._preview._strip is not None
     assert win._preview._strip.has_script() is True
+
+
+def test_plays_audio_unlike_the_muted_inline_preview(qtbot, tmp_path):
+    # Double-clicking a clip to watch it fullscreen is deliberate, so it's heard.
+    win = FullscreenPreview((tmp_path / "c.mp4", "video"), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win._preview._audio.isMuted() is False
+
+
+def test_emits_closed_when_dismissed(qtbot, tmp_path):
+    # The gallery listens for this to hand the OSR2 back when the view goes away.
+    win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    closed = []
+    win.closed.connect(lambda: closed.append(True))
+    win.close()
+    assert closed == [True]
+
+
+def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
+    vid = tmp_path / "c.mp4"
+    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    player = MagicMock()
+    win = FullscreenPreview((vid, "video"), player=player)
+    qtbot.addWidget(win)
+    target = win.osr2_drive_target()
+    assert target is not None
+    path, tgt_player, actions = target
+    assert path == vid and tgt_player is player and actions
+
+
+def test_osr2_drive_target_is_none_for_an_image(qtbot, tmp_path):
+    win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win.osr2_drive_target() is None
+
+
+def test_osr2_drive_target_is_none_for_an_unscripted_video(qtbot, tmp_path):
+    win = FullscreenPreview((tmp_path / "c.mp4", "video"), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win.osr2_drive_target() is None

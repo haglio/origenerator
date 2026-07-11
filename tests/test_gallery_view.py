@@ -3983,6 +3983,18 @@ class _FakeDriver:
         self.stopped += 1
 
 
+class _FakeFullscreen(QObject):
+    """Stand-in for a FullscreenPreview: a settable drive target and a closed signal."""
+    closed = pyqtSignal()
+
+    def __init__(self, target):
+        super().__init__()
+        self._target = target
+
+    def osr2_drive_target(self):
+        return self._target
+
+
 def _osr2_view(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
@@ -4036,6 +4048,57 @@ def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
     assert view.osr2_enabled() is False
     view.set_osr2_enabled(True)
     assert view.osr2_enabled() is True and view._osr2_btn.isChecked()
+
+
+def test_watching_a_video_fullscreen_drives_it_with_the_toggle_off(qtbot):
+    # Double-clicking a clip to fullscreen drives the device even though the global
+    # Drive-OSR2 toggle is off — watching it IS the intent to feel it.
+    view, driver, _panel = _osr2_view(qtbot)
+    assert not view._osr2_btn.isChecked()
+
+    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+
+    assert driver.started[-1] == ("pF", "aF")
+
+
+def test_closing_the_fullscreen_stops_driving_when_the_toggle_is_off(qtbot):
+    view, driver, _panel = _osr2_view(qtbot)
+    fs = _FakeFullscreen(("F.mp4", "pF", "aF"))
+    view._on_fullscreen_opened(fs)
+    assert driver.started
+
+    fs.closed.emit()
+
+    assert driver.stopped >= 1
+
+
+def test_the_fullscreen_video_overrides_the_toggle_target_then_hands_back(qtbot):
+    # With the toggle already driving the front-tab video, opening a fullscreen clip
+    # re-aims the one device at the fullscreen player; closing hands it back.
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    assert driver.started[-1] == ("pA", "aA")
+
+    fs = _FakeFullscreen(("F.mp4", "pF", "aF"))
+    view._on_fullscreen_opened(fs)
+    assert driver.started[-1] == ("pF", "aF")
+
+    fs.closed.emit()
+    assert driver.started[-1] == ("pA", "aA")  # back to the toggle's video
+
+
+def test_a_fullscreen_image_leaves_the_toggle_driving(qtbot):
+    # A fullscreen with no scripted video (an image) has no target, so the toggle's
+    # front-tab video keeps driving uninterrupted — no restart, no stop.
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    view._osr2_btn.setChecked(True)
+    assert driver.started == [("pA", "aA")]
+
+    view._on_fullscreen_opened(_FakeFullscreen(None))
+
+    assert driver.started == [("pA", "aA")] and driver.stopped == 0
 
 
 def _press_escape(view):

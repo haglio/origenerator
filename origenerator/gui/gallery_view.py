@@ -360,15 +360,19 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db)
-        # One OSR2 driver for the whole view, steered by a single global toggle
-        # (self._osr2_btn). While it's on, the driver follows whatever scripted video
-        # is in the front tab; switching tabs or videos re-aims it, an image or blank
-        # front tab stops it. self._osr2_driving is the video currently driven (its
-        # identity), so a redundant reconcile doesn't churn the device. Built before
-        # the panels are wired, since wiring connects their displayed_changed here.
+        # One OSR2 driver for the whole view. It follows whichever video is foreground:
+        # an open fullscreen view (which drives regardless of the toggle — watching a
+        # clip IS the intent to feel it), else — only while the global toggle
+        # (self._osr2_btn) is on — whatever scripted video is in the front tab.
+        # Switching tabs/videos or opening/closing the fullscreen view re-aims it; with
+        # nothing to drive it stops. self._osr2_driving is the (video, player) currently
+        # driven, so a redundant reconcile doesn't churn the device. Built before the
+        # panels are wired, since wiring connects their displayed_changed and
+        # fullscreen_opened here.
         self._osr2_driver = Osr2Driver(parent=self)
         self._osr2_enabled = False
         self._osr2_driving = None
+        self._fullscreen_preview = None  # the open fullscreen view, top drive priority
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -424,12 +428,14 @@ class GalleryView(QWidget):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video,
+        its ``fullscreen_opened`` hands the drive to a video popped open fullscreen,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
         panel.containing_folder_requested.connect(self._browser.open_in_containing_folder)
         panel.displayed_changed.connect(self._reconcile_osr2)
+        panel.fullscreen_opened.connect(self._on_fullscreen_opened)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
 
     # --- Drive OSR2: a single global toggle following the front video ----------
@@ -439,23 +445,53 @@ class GalleryView(QWidget):
         self._reconcile_osr2()
 
     def _reconcile_osr2(self):
-        """Point the one driver at the front tab's video when the toggle is on.
+        """Point the one driver at whichever video is foreground.
 
-        Idempotent: it (re)starts only when the driven video actually changes, and
-        stops when the toggle is off or the front tab isn't showing a scripted video —
-        so tab switches, browsing, and completions all resolve to the right video
-        without churning the device."""
-        panel = self._info_tabs.current_config_panel()
-        target = panel.osr2_drive_target() if (self._osr2_enabled and panel) else None
+        Idempotent: it (re)starts only when the driven ``(video, player)`` actually
+        changes and stops when nothing should drive — so tab switches, browsing,
+        completions, and opening or closing the fullscreen view all resolve to the
+        right video without churning the device."""
+        target = self._osr2_drive_source()
         if target is None:
             if self._osr2_driving is not None:
                 self._osr2_driver.stop()
                 self._osr2_driving = None
             return
         video_path, player, actions = target
-        if self._osr2_driving != video_path:
+        driving = (video_path, player)  # same clip, new player (fullscreen) still re-aims
+        if self._osr2_driving != driving:
             self._osr2_driver.start(player, actions)
-            self._osr2_driving = video_path
+            self._osr2_driving = driving
+
+    def _osr2_drive_source(self):
+        """The drive target the device should follow, or ``None``. A fullscreen view
+        wins when it's showing a scripted video (it drives regardless of the toggle);
+        otherwise the front tab's video, but only while the toggle is on."""
+        fullscreen = self._fullscreen_preview
+        if fullscreen is not None:
+            target = fullscreen.osr2_drive_target()
+            if target is not None:
+                return target
+        panel = self._info_tabs.current_config_panel()
+        if self._osr2_enabled and panel is not None:
+            return panel.osr2_drive_target()
+        return None
+
+    def _on_fullscreen_opened(self, fullscreen):
+        """A double-click popped a video open fullscreen. It drives the OSR2 for its
+        lifetime — regardless of the global toggle — then hands the device back when it
+        closes. (An image or unscripted video simply has no target, so nothing drives
+        and the toggle's video, if any, keeps going.)"""
+        self._fullscreen_preview = fullscreen
+        fullscreen.closed.connect(lambda: self._on_fullscreen_closed(fullscreen))
+        self._reconcile_osr2()
+
+    def _on_fullscreen_closed(self, fullscreen):
+        """The fullscreen view closed: drop it and re-aim at the toggle's video, or
+        stop. Guarded so a superseded view's late close can't clear a newer one."""
+        if self._fullscreen_preview is fullscreen:
+            self._fullscreen_preview = None
+            self._reconcile_osr2()
 
     def _on_front_tab_changed(self, _index):
         """The front config tab changed: re-aim the OSR2 drive at its video, and

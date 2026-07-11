@@ -2,7 +2,7 @@ import json
 import math
 
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 
 # ATI's track convention is fixed regardless of the clip: 121 points sampled at
 # 24fps (5.0s of "track time"), which ComfyUI's WanTrackToVideo resamples onto
@@ -34,10 +34,11 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan21_ati_i2v"
-    version = "v001"
+    version = "v002"
     display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
     output_type = "video"
     model_keys = ("unet",)
+    lora_keys = ("lora",)
     output_node_id = "15"
 
     def default_params(self) -> dict:
@@ -73,6 +74,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "vae_name": "wan_2.1_vae.safetensors",
             "clip_vision_name": "clip_vision_h.safetensors",
             "unet": "Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors",
+            "lora": NO_LORA,
+            "lora_strength": 1.0,
         }
 
     def param_definitions(self) -> list[ParamDef]:
@@ -97,6 +100,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet", "Model", "combo", defaults["unet"], options=models),
+            ParamDef("lora", "LoRA", "combo", defaults["lora"], options=list_lora_files([])),
+            ParamDef("lora_strength", "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("width", "Width", "int", 480, min_val=64, max_val=2048, step=16),
             ParamDef("height", "Height", "int", 864, min_val=64, max_val=2048, step=16),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
@@ -145,8 +150,14 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     def build_api_payload(self, params: dict) -> dict:
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
+        # Optional 2.1-compatible LoRA: "None" omits the loader and the base
+        # ATI model runs unmodified (WorkflowTemplate.lora_model_input).
+        lora, model_ref = self.lora_model_input(
+            "10", ["4", 0], params["lora"], params["lora_strength"]
+        )
         return {
             **foley,
+            **lora,
             "1": {
                 "class_type": "CLIPLoader",
                 "inputs": {
@@ -169,7 +180,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             },
             "5": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": ["4", 0], "shift": params["shift"]},
+                "inputs": {"model": model_ref, "shift": params["shift"]},
             },
             "6": {
                 "class_type": "CLIPTextEncode",

@@ -583,6 +583,44 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
 
 
+def test_wan21_ati_i2v_offers_an_optional_lora(monkeypatch):
+    # The 2.1 base carries none of the motion vocabulary the 2.2 NSFW LoRAs
+    # taught, so the workflow exposes a LoRA slot for 2.1-compatible LoRAs —
+    # optional exactly like the 2.2 workflows' slots: "None" omits the loader
+    # node and the base model runs unmodified.
+    import origenerator.workflows.wan21_ati_i2v as ati_module
+    from origenerator.workflows.model_files import NO_LORA
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
+
+    options = [NO_LORA, "hand.safetensors"]
+    monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback: options)
+
+    wf = Wan21AtiI2vWorkflow()
+    assert wf.lora_keys == ("lora",)
+    picker = {pd.key: pd for pd in wf.param_definitions()}["lora"]
+    assert picker.type == "combo"
+    assert picker.options == options
+    assert picker.default == NO_LORA
+
+    def lora_nodes(payload):
+        return [n for n in payload.values() if n["class_type"] == "LoraLoaderModelOnly"]
+
+    bypassed = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
+    assert lora_nodes(bypassed) == []
+
+    params = dict(wf.default_params(), lora="hand.safetensors", lora_strength=0.8)
+    payload = wf.build_api_payload(params)
+    (loader,) = lora_nodes(payload)
+    assert loader["inputs"]["lora_name"] == "hand.safetensors"
+    assert loader["inputs"]["strength_model"] == 0.8
+    # The shift node reads the LoRA'd model, so the sampler runs it.
+    unet_id = _node_id(payload, "UNETLoader")
+    lora_id = _node_id(payload, "LoraLoaderModelOnly")
+    shift = _find_node(payload, "ModelSamplingSD3")
+    assert loader["inputs"]["model"] == [unet_id, 0]
+    assert shift["inputs"]["model"] == [lora_id, 0]
+
+
 def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
     # ComfyUI's track resampler faults at exactly 121 frames (length-1=120 hits
     # its off-by-one), so the form's range stops at 113 on the same /4 stride

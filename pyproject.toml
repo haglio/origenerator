@@ -9,6 +9,12 @@ dependencies = [
     "opencv-python>=4.8",
     "websockets",
     "numpy",
+    # Auto-aiming the ATI stroke track: a censor-detection YOLO finds the redacted
+    # in a start frame so the user never places coordinates by hand
+    # (workflows/stroke_aim). onnxruntime executes it; huggingface_hub fetches
+    # and caches its weights.
+    "onnxruntime",
+    "huggingface_hub",
 ]
 
 [project.scripts]

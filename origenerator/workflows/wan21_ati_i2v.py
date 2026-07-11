@@ -3,8 +3,11 @@ import math
 import random
 
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
-from origenerator.workflows.derived_size import measure_derived_size, override_size
+from origenerator.workflows.derived_size import (
+    measure_derived_size, override_size, resolve_input_image_path,
+)
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
+from origenerator.workflows.stroke_aim import detect_grip_aim
 
 # ATI's track convention is fixed regardless of the clip: 121 points sampled at
 # 24fps (5.0s of "track time"), which ComfyUI's WanTrackToVideo resamples onto
@@ -118,6 +121,32 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
             ParamDef("filename_prefix", "Output Prefix", "str", "video/wan21_ati_i2v"),
         ]
+
+    # The aim params auto-detection may fill; leaving ALL of them untouched is
+    # what opts a run into detection, and editing ANY is the manual override.
+    _AIM_KEYS = ("stroke_x", "stroke_top", "stroke_bottom", "anchor_x", "anchor_y")
+
+    def _auto_aim_params(self, params: dict) -> dict:
+        """``params`` with the stroke aimed at the detected redacted, when the user
+        left every aim coordinate at its default and the start frame yields a
+        detection — choosing where in the frame a thing is shouldn't be the
+        user's job. Any edited coordinate, or no detection, leaves the given
+        numbers exactly as they are. Fractions from the detector land in the
+        reference frame, where all aim coordinates live."""
+        defaults = self.default_params()
+        if any(params[k] != defaults[k] for k in self._AIM_KEYS):
+            return params
+        aim = detect_grip_aim(resolve_input_image_path(params.get("input_image")))
+        if aim is None:
+            return params
+        return {
+            **params,
+            "stroke_x": round(aim["stroke_x"] * REFERENCE_WIDTH),
+            "anchor_x": round(aim["anchor_x"] * REFERENCE_WIDTH),
+            "stroke_top": round(aim["stroke_top"] * REFERENCE_HEIGHT),
+            "stroke_bottom": round(aim["stroke_bottom"] * REFERENCE_HEIGHT),
+            "anchor_y": round(aim["anchor_y"] * REFERENCE_HEIGHT),
+        }
 
     @staticmethod
     def _stroke_reversals(params: dict) -> list[tuple[float, float]]:
@@ -260,7 +289,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         # ATI can't derive its size in-graph (its WanTrackToVideo needs the
         # integer size AND a track whose coordinates share that space), so both
         # are built here: the size is the input image's derived size (or the
-        # unlocked override) and the authored stroke is rescaled into it.
+        # unlocked override) and the authored stroke — auto-aimed at the
+        # detected redacted unless the user placed it — is rescaled into it.
+        params = self._auto_aim_params(params)
         width, height = self._output_size(params)
         stroke_params = self._scaled_stroke_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)

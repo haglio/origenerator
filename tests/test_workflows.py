@@ -872,6 +872,52 @@ def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():
         assert by_key[key].max_val == REFERENCE_HEIGHT
 
 
+def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
+    # Choosing where in the frame a thing is doesn't scale, so when the stroke
+    # coordinates are all still at their defaults, payload build detects the
+    # redacted in the start frame and aims the track at it (converted into the
+    # 480x864 reference frame, then scaled like any manual aim). Any edited
+    # coordinate switches detection off entirely — the user's numbers win.
+    # The funscript is unaffected either way: pos is normalized depth, so the
+    # same seed yields the same actions no matter where the track points.
+    import json as _json
+
+    import origenerator.workflows.wan21_ati_i2v as ati
+    from origenerator.workflows.wan21_ati_i2v import (
+        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
+    )
+
+    aim = {"stroke_x": 0.5, "stroke_top": 0.25, "stroke_bottom": 0.5,
+           "anchor_x": 0.45, "anchor_y": 0.6}
+    calls = []
+    monkeypatch.setattr(ati, "detect_grip_aim", lambda path: (calls.append(path), aim)[1])
+
+    wf = Wan21AtiI2vWorkflow()
+    params = dict(wf.default_params(), input_image="start.png", seed=9)
+    payload = wf.build_api_payload(params)
+    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
+    # Missing image file -> reference-size fallback (scale 1.0), so the track
+    # lands exactly at the detected fractions of the reference frame.
+    assert tracks[1][0]["x"] == pytest.approx(round(0.5 * REFERENCE_WIDTH) + 3)  # cluster x-offset
+    assert tracks[1][0]["y"] == pytest.approx(round(0.25 * REFERENCE_HEIGHT))    # starts at stroke top
+    assert tracks[3][0] == {"x": float(round(0.45 * REFERENCE_WIDTH)),
+                            "y": float(round(0.6 * REFERENCE_HEIGHT))}
+    assert len(calls) == 1
+
+    # The funscript ignores aim entirely: same seed, same actions, aimed or not.
+    assert wf.authored_actions(params) == wf.authored_actions(
+        dict(params, stroke_x=10, stroke_top=20, stroke_bottom=400, anchor_x=5, anchor_y=500)
+    )
+
+    # An edited coordinate is a manual override: no detection, the numbers rule.
+    calls.clear()
+    edited = dict(params, stroke_top=300)
+    payload = wf.build_api_payload(edited)
+    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
+    assert calls == []
+    assert tracks[1][0]["y"] == pytest.approx(300)
+
+
 def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
     # ComfyUI's track resampler faults at exactly 121 frames (length-1=120 hits
     # its off-by-one), so the form's range stops at 113 on the same /4 stride

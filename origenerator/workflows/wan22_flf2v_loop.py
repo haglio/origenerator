@@ -98,8 +98,15 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
         )
         foley, audio_ref = self.foley_audio_nodes("19", "20", "21", ["15", 0], params)
+        # Size the loop off the input image: derived in-graph by default, or scaled
+        # to the user's explicit WxH when the derived size was unlocked. Both
+        # endpoints read the same scaled image.
+        size_nodes, frame_ref, width_ref, height_ref = self.image_size_nodes(
+            "17", "18", ["11", 0], params
+        )
         return {
             **foley,
+            **size_nodes,
             "1": {
                 "class_type": "CLIPLoader",
                 "inputs": {
@@ -148,33 +155,16 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
-            # Derive the output resolution from the input image: scale it to a
-            # fixed pixel budget on WAN's /16 stride (keeping aspect), then read
-            # the resulting size back to drive the video node — so a portrait or
-            # widescreen still yields a proportional loop without a hardcoded WxH.
-            "17": {
-                "class_type": "ImageScaleToTotalPixels",
-                "inputs": {
-                    "image": ["11", 0],
-                    "upscale_method": "lanczos",
-                    "megapixels": 0.4,
-                    "resolution_steps": 16,
-                },
-            },
-            "18": {
-                "class_type": "GetImageSize",
-                "inputs": {"image": ["17", 0]},
-            },
             "12": {
                 "class_type": "WanFirstLastFrameToVideo",
                 "inputs": {
                     "positive": ["9", 0],
                     "negative": ["10", 0],
                     "vae": ["2", 0],
-                    "start_image": ["17", 0],
-                    "end_image": ["17", 0],
-                    "width": ["18", 0],
-                    "height": ["18", 1],
+                    "start_image": frame_ref,
+                    "end_image": frame_ref,
+                    "width": width_ref,
+                    "height": height_ref,
                     "length": params["frame_count"],
                     "batch_size": params["batch_size"],
                 },

@@ -3,7 +3,7 @@ import math
 import random
 
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
-from origenerator.workflows.derived_size import measure_derived_size
+from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 
 # ATI's track convention is fixed regardless of the clip: 121 points sampled at
@@ -152,8 +152,15 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ys.append(y0 + (y1 - y0) * eased)
         return ys
 
+    def _output_size(self, params: dict) -> tuple[int, int]:
+        """The size this run renders at: the user's explicit width/height when the
+        derived size was unlocked and overridden, else the size derived from the
+        input image (:meth:`_derived_size`). The stroke track is then rescaled into
+        whichever size wins, so it stays in the same relative place either way."""
+        return override_size(params) or self._derived_size(params)
+
     def _derived_size(self, params: dict) -> tuple[int, int]:
-        """The output size for this run: the input image measured and scaled to
+        """The output size derived from the input image: measured and scaled to
         the shared pixel budget (:func:`~origenerator.workflows.derived_size.
         measure_derived_size`), or the reference size when the image is missing or
         unreadable — so payload build never crashes on a stale or hand-typed
@@ -224,9 +231,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     def build_api_payload(self, params: dict) -> dict:
         # ATI can't derive its size in-graph (its WanTrackToVideo needs the
         # integer size AND a track whose coordinates share that space), so both
-        # are built here: the size is measured from the input image and the
-        # authored stroke is rescaled into it.
-        width, height = self._derived_size(params)
+        # are built here: the size is the input image's derived size (or the
+        # unlocked override) and the authored stroke is rescaled into it.
+        width, height = self._output_size(params)
         stroke_params = self._scaled_stroke_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
         # Optional 2.1-compatible LoRA: "None" omits the loader and the base

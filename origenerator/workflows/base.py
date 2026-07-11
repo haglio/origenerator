@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from origenerator.workflows.derived_size import measure_derived_size
+from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.model_files import is_no_lora
 
 
@@ -118,6 +118,54 @@ class WorkflowTemplate(ABC):
             }
         }
         return node, [node_id, 0]
+
+    @staticmethod
+    def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict):
+        """The subgraph that sizes an i2v run off its input image, and the refs a
+        video node reads for its scaled start image and its width/height.
+
+        Returns ``(nodes, scaled_image_ref, width_ref, height_ref)`` to merge into
+        the payload. By default the image is scaled to the shared pixel budget
+        in-graph (``ImageScaleToTotalPixels`` on a /16 stride) and the size read
+        back off it (``GetImageSize``), so a portrait or widescreen yields a
+        proportional video without a hardcoded WxH. When the user has unlocked the
+        derived size and set an explicit ``width``/``height`` (see
+        :func:`~origenerator.workflows.derived_size.override_size`), the image is
+        instead scaled to that exact size (``ImageScale``) and the literal
+        width/height drive the video node — ``size_id`` is then unused.
+        """
+        override = override_size(params)
+        if override is not None:
+            width, height = override
+            nodes = {
+                scale_id: {
+                    "class_type": "ImageScale",
+                    "inputs": {
+                        "image": image_ref,
+                        "upscale_method": "lanczos",
+                        "width": width,
+                        "height": height,
+                        "crop": "disabled",
+                    },
+                },
+            }
+            return nodes, [scale_id, 0], width, height
+        nodes = {
+            scale_id: {
+                "class_type": "ImageScaleToTotalPixels",
+                "inputs": {
+                    "image": image_ref,
+                    "upscale_method": "lanczos",
+                    "megapixels": 0.4,
+                    "resolution_steps": 16,
+                },
+            },
+            size_id: {
+                "class_type": "GetImageSize",
+                "inputs": {"image": [scale_id, 0]},
+            },
+        }
+        return nodes, [scale_id, 0], [size_id, 0], [size_id, 1]
 
     @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):

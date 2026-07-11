@@ -2,7 +2,8 @@
 
 import origenerator.workflows.derived_size as ds
 from origenerator.workflows.derived_size import (
-    measure_derived_size, resolve_input_image_path, scale_to_total_pixels,
+    measure_derived_size, override_size, resolve_input_image_path,
+    scale_to_total_pixels,
 )
 
 
@@ -65,6 +66,22 @@ def test_measure_derived_size_scales_the_measured_image(tmp_path, monkeypatch):
     _write_image(tmp_path / "square.png", (1024, 1024))
     assert measure_derived_size("square.png") == scale_to_total_pixels(1024, 1024)
     assert measure_derived_size("square.png") == (640, 640)
+
+
+def test_override_size_reads_an_explicit_width_and_height():
+    assert override_size({"width": 1024, "height": 576}) == (1024, 576)
+    assert override_size({"width": "720", "height": "480"}) == (720, 480)
+
+
+def test_override_size_is_none_without_a_complete_valid_pair():
+    # The locked (default) case carries no width/height, and a half-filled or
+    # non-positive/garbage value falls back to derivation rather than a bad size.
+    assert override_size({}) is None
+    assert override_size({"width": 1024}) is None
+    assert override_size({"height": 576}) is None
+    assert override_size({"width": 0, "height": 576}) is None
+    assert override_size({"width": 1024, "height": None}) is None
+    assert override_size({"width": 1024, "height": "abc"}) is None
 
 
 def test_measure_derived_size_is_none_when_unmeasurable(tmp_path, monkeypatch):

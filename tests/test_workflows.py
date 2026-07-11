@@ -348,6 +348,59 @@ def test_wan22_build_api_payload_structure():
     assert payload["12"]["inputs"]["length"] == params["frame_count"]
 
 
+def test_wan22_i2v_size_override_replaces_the_in_graph_derivation():
+    # Unlocking the derived size and setting an explicit WxH swaps the in-graph
+    # ImageScaleToTotalPixels/GetImageSize derivation for a plain ImageScale to
+    # that exact size, whose scaled image and literal width/height drive the video.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    params = dict(wf.default_params(), input_image="x.png", width=1024, height=576)
+    payload = wf.build_api_payload(params)
+
+    assert _find_node(payload, "ImageScaleToTotalPixels") is None
+    assert _find_node(payload, "GetImageSize") is None
+    scale_id = _node_id(payload, "ImageScale")
+    assert payload[scale_id]["inputs"] == {
+        "image": ["12", 0], "upscale_method": "lanczos",
+        "width": 1024, "height": 576, "crop": "disabled",
+    }
+    video = payload["14"]["inputs"]
+    assert video["start_image"] == [scale_id, 0]
+    assert video["width"] == 1024 and video["height"] == 576
+
+
+def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
+    wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+    params = dict(wf.default_params(), input_image="x.png", width=848, height=480)
+    payload = wf.build_api_payload(params)
+
+    assert _find_node(payload, "ImageScaleToTotalPixels") is None
+    scale_id = _node_id(payload, "ImageScale")
+    frame = payload["12"]["inputs"]
+    # Both loop endpoints read the one explicitly scaled image.
+    assert frame["start_image"] == [scale_id, 0]
+    assert frame["end_image"] == [scale_id, 0]
+    assert frame["width"] == 848 and frame["height"] == 480
+
+
+def test_wan21_ati_i2v_honors_an_unlocked_size_override():
+    # An explicit WxH wins over the input image's derived size, and the stroke is
+    # rescaled into the overridden space — so an unlock overrides derivation even
+    # when the (here nonexistent) image would otherwise be measured or fall back.
+    from origenerator.workflows.wan21_ati_i2v import REFERENCE_HEIGHT, REFERENCE_WIDTH
+
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), input_image="whatever.png", width=720, height=480)
+    track = _find_node(wf.build_api_payload(params), "WanTrackToVideo")
+
+    assert track["inputs"]["width"] == 720
+    assert track["inputs"]["height"] == 480
+    sx, sy = 720 / REFERENCE_WIDTH, 480 / REFERENCE_HEIGHT
+    anchor = json.loads(track["inputs"]["tracks"])[3][0]
+    assert anchor == pytest.approx(
+        {"x": params["anchor_x"] * sx, "y": params["anchor_y"] * sy}
+    )
+
+
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
     # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
     # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``

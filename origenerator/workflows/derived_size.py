@@ -72,6 +72,22 @@ def resolve_input_image_path(input_image: str | None) -> Path | None:
     return path if path.is_file() else None
 
 
+def override_size(params: dict) -> tuple[int, int] | None:
+    """The explicit ``(width, height)`` the user set by unlocking the derived
+    Dimensions field, or ``None`` when the size should be derived — the usual
+    case, where the fields stay locked and ``params`` carry no width/height.
+
+    Both must be present and positive; a lone or non-numeric value is ignored as
+    if absent, so a half-filled or malformed override falls back to derivation
+    rather than feeding a bad size into the graph.
+    """
+    try:
+        width, height = int(params["width"]), int(params["height"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (width, height) if width > 0 and height > 0 else None
+
+
 def measure_derived_size(input_image: str | None) -> tuple[int, int] | None:
     """The output size derived from ``input_image``: its file measured and scaled
     to the shared budget (:func:`scale_to_total_pixels`), or ``None`` when the

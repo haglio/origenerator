@@ -1,12 +1,9 @@
 import json
 import math
 import random
-from pathlib import Path
 
-from PIL import Image
-
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 
 # ATI's track convention is fixed regardless of the clip: 121 points sampled at
@@ -20,58 +17,11 @@ TRACK_SECONDS = 5.0
 # the PoC): enough spread to read as a hand, not so much it smears the patch.
 _CLUSTER_OFFSETS = ((-5.0, -30.0), (3.0, 0.0), (-3.0, 30.0))
 
-# The output size is derived from the input image at the SAME pixel budget and
-# stride the WAN 2.2 workflows scale to in-graph (ImageScaleToTotalPixels at
-# 0.4 MP on a /16 stride), so an image yields the same proportions across every
-# i2v workflow. ATI just can't do it in-graph — its WanTrackToVideo needs the
-# integer size AND a track whose coordinates live in that space, both built here.
-TARGET_MEGAPIXELS = 0.4
-RESOLUTION_STEPS = 16
 # The reference frame the stored stroke coordinates are authored in. They're
 # rescaled from here into the derived output space (see ``_scaled_stroke_params``),
 # and this doubles as the fallback size when the input image can't be measured.
 REFERENCE_WIDTH = 480
 REFERENCE_HEIGHT = 864
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]"
-# (the same convention gallery/signatures.py strips); an unannotated value names
-# a file in the input dir.
-_OUTPUT_TAG = "[output]"
-_INPUT_TAG = "[input]"
-
-
-def _scale_to_total_pixels(src_width: int, src_height: int) -> tuple[int, int]:
-    """The output size for a ``src_width``×``src_height`` image, replicating
-    ComfyUI's ``ImageScaleToTotalPixels`` (0.4 MP, /16 stride) exactly so the
-    size matches what the in-graph WAN 2.2 workflows produce for the same image.
-
-    Mirrors the node's ``round(dim * sqrt(total / area) / steps) * steps`` (with
-    Python's banker's rounding, as ComfyUI uses). The only addition is a floor at
-    one stride, so a degenerate aspect ratio can't round a side to zero and crash
-    the track node — a no-op for any realistic image.
-    """
-    total = TARGET_MEGAPIXELS * 1024 * 1024
-    scale = math.sqrt(total / (src_width * src_height))
-    width = round(src_width * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    height = round(src_height * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    return max(RESOLUTION_STEPS, width), max(RESOLUTION_STEPS, height)
-
-
-def _resolve_input_image_path(input_image: str) -> Path | None:
-    """The on-disk file a LoadImage value names, or ``None`` when it's empty or
-    absent. A ``"name [output]"`` value lives under the ComfyUI output dir and an
-    ``"[input]"`` (or unannotated) one under the input dir — matching how
-    ComfyUI's LoadImage routes the reference."""
-    ref = (input_image or "").strip()
-    if not ref:
-        return None
-    stem, _, tag = ref.rpartition(" ")
-    if stem and tag == _OUTPUT_TAG:
-        path = COMFYUI_OUTPUT_DIR / stem
-    elif stem and tag == _INPUT_TAG:
-        path = COMFYUI_INPUT_DIR / stem
-    else:
-        path = COMFYUI_INPUT_DIR / ref
-    return path if path.is_file() else None
 
 
 class Wan21AtiI2vWorkflow(WorkflowTemplate):
@@ -98,6 +48,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     version = "v004"
     display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
     output_type = "video"
+    derives_size_from_input = True
     model_keys = ("unet",)
     lora_keys = ("lora",)
     output_node_id = "15"
@@ -203,17 +154,15 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     def _derived_size(self, params: dict) -> tuple[int, int]:
         """The output size for this run: the input image measured and scaled to
-        the shared pixel budget (:func:`_scale_to_total_pixels`), or the reference
-        size when the image is missing or unreadable — so payload build never
-        crashes on a stale or hand-typed filename, it just uses the default."""
-        path = _resolve_input_image_path(params.get("input_image", ""))
-        if path is not None:
-            try:
-                with Image.open(path) as img:
-                    return _scale_to_total_pixels(*img.size)
-            except (OSError, ValueError):
-                pass
-        return REFERENCE_WIDTH, REFERENCE_HEIGHT
+        the shared pixel budget (:func:`~origenerator.workflows.derived_size.
+        measure_derived_size`), or the reference size when the image is missing or
+        unreadable — so payload build never crashes on a stale or hand-typed
+        filename, it just uses the default. Unlike the WAN 2.2 pair ATI can't defer
+        this to the graph: its track's pixel coordinates must be built here."""
+        return measure_derived_size(params.get("input_image", "")) or (
+            REFERENCE_WIDTH,
+            REFERENCE_HEIGHT,
+        )
 
     @staticmethod
     def _scaled_stroke_params(params: dict, width: int, height: int) -> dict:

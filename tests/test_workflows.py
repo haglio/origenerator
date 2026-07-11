@@ -275,6 +275,45 @@ def test_i2v_workflows_have_no_manual_width_height_controls():
         assert "width" not in params and "height" not in params, wf.name
 
 
+def test_every_input_image_workflow_derives_its_size():
+    # The size-derivation flag and the input-image param travel together: every
+    # i2v workflow derives its output size from the image (so the form shows it
+    # locked), and no manual-size workflow claims to.
+    for wf in WORKFLOW_REGISTRY.values():
+        takes_image = "input_image" in wf.default_params()
+        assert wf.derives_size_from_input == takes_image, wf.name
+
+
+def test_derived_display_size_measures_the_input_image(tmp_path, monkeypatch):
+    # The form reads the derived width/height to show from here: the picked image
+    # measured and scaled exactly as the run will size it.
+    import origenerator.workflows.derived_size as ds
+    from origenerator.workflows.derived_size import scale_to_total_pixels
+
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    _write_image(tmp_path / "wide.png", (1920, 1080))
+
+    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+        wf = WORKFLOW_REGISTRY[name]
+        params = dict(wf.default_params(), input_image="wide.png")
+        assert wf.derived_display_size(params) == scale_to_total_pixels(1920, 1080), name
+
+
+def test_derived_display_size_is_none_when_not_derived_or_unmeasurable():
+    # A manual-size workflow reports no derived size; a deriving one with no
+    # measurable image reports None too, so the form shows nothing until an image
+    # resolves rather than a misleading guess.
+    manual = WORKFLOW_REGISTRY["sdxl_t2i"]
+    assert manual.derives_size_from_input is False
+    assert manual.derived_display_size(manual.default_params()) is None
+
+    i2v = WORKFLOW_REGISTRY["wan22_i2v"]
+    assert i2v.derived_display_size(dict(i2v.default_params(), input_image="")) is None
+    assert i2v.derived_display_size(
+        dict(i2v.default_params(), input_image="does_not_exist.png")
+    ) is None
+
+
 def test_wan22_build_api_payload_structure():
     wf = Wan22Flf2vLoopWorkflow()
     params = wf.default_params()
@@ -673,24 +712,6 @@ def test_wan21_ati_i2v_offers_an_optional_lora(monkeypatch):
     assert shift["inputs"]["model"] == [lora_id, 0]
 
 
-def test_wan21_ati_scale_to_total_pixels_matches_comfyui_rounding():
-    # The ATI workflow can't derive its size in-graph (its track's pixel space
-    # must be known app-side), so it replicates ComfyUI's ImageScaleToTotalPixels
-    # exactly — round(dim * sqrt(0.4MP / area) / 16) * 16 — so the size it picks
-    # for an image equals what the in-graph WAN 2.2 workflows produce for it.
-    from origenerator.workflows.wan21_ati_i2v import _scale_to_total_pixels
-
-    # Values computed straight from ComfyUI's formula (0.4 MP, /16 stride).
-    assert _scale_to_total_pixels(1920, 1080) == (864, 480)
-    assert _scale_to_total_pixels(1080, 1920) == (480, 864)
-    assert _scale_to_total_pixels(864, 1536) == (480, 864)   # the old manual default's aspect
-    assert _scale_to_total_pixels(1024, 1024) == (640, 640)
-    assert _scale_to_total_pixels(768, 1344) == (496, 864)
-    # A degenerate aspect never yields a zero dimension (which would crash the
-    # track node); the side that would round to 0 floors at the /16 stride.
-    assert _scale_to_total_pixels(10000, 1) == (64768, 16)
-
-
 def _write_image(path, size):
     from PIL import Image
 
@@ -703,19 +724,20 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_stroke(tmp_path, monkeypatc
     # stroke coordinates — authored in the 480×864 reference frame — are rescaled
     # into that derived space so the track lands in the same relative place
     # regardless of the image's aspect ratio.
-    import origenerator.workflows.wan21_ati_i2v as ati
+    import origenerator.workflows.derived_size as ds
+    from origenerator.workflows.derived_size import scale_to_total_pixels
     from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow, _scale_to_total_pixels,
+        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
     )
 
-    monkeypatch.setattr(ati, "COMFYUI_INPUT_DIR", tmp_path)
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "square.png", (1024, 1024))
 
     wf = Wan21AtiI2vWorkflow()
     params = dict(wf.default_params(), input_image="square.png")
     payload = wf.build_api_payload(params)
 
-    derived_w, derived_h = _scale_to_total_pixels(1024, 1024)
+    derived_w, derived_h = scale_to_total_pixels(1024, 1024)
     assert (derived_w, derived_h) == (640, 640)
     track_node = _find_node(payload, "WanTrackToVideo")
     assert track_node["inputs"]["width"] == derived_w
@@ -752,31 +774,6 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
         assert track_node["inputs"]["height"] == REFERENCE_HEIGHT
         anchor = json.loads(track_node["inputs"]["tracks"])[3][0]
         assert anchor == {"x": float(params["anchor_x"]), "y": float(params["anchor_y"])}
-
-
-def test_wan21_ati_resolve_input_image_routes_by_annotation(tmp_path, monkeypatch):
-    # A LoadImage value resolves to a real file: a plain name (or "[input]") under
-    # the ComfyUI input dir, a "name [output]" under the output dir — the same
-    # routing ComfyUI's LoadImage does. Anything unresolvable is None, so the
-    # caller can fall back rather than crash.
-    import origenerator.workflows.wan21_ati_i2v as ati
-    from origenerator.workflows.wan21_ati_i2v import _resolve_input_image_path
-
-    in_dir, out_dir = tmp_path / "input", tmp_path / "output"
-    in_dir.mkdir()
-    out_dir.mkdir()
-    monkeypatch.setattr(ati, "COMFYUI_INPUT_DIR", in_dir)
-    monkeypatch.setattr(ati, "COMFYUI_OUTPUT_DIR", out_dir)
-    (in_dir / "frame.png").write_bytes(b"x")
-    (out_dir / "gen.png").write_bytes(b"x")
-
-    assert _resolve_input_image_path("frame.png") == in_dir / "frame.png"
-    assert _resolve_input_image_path("frame.png [input]") == in_dir / "frame.png"
-    assert _resolve_input_image_path("gen.png [output]") == out_dir / "gen.png"
-    assert _resolve_input_image_path("gen.png") is None       # not in the input dir
-    assert _resolve_input_image_path("missing.png") is None
-    assert _resolve_input_image_path("") is None
-    assert _resolve_input_image_path(None) is None
 
 
 def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():

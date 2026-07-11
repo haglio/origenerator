@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.model_files import is_no_lora
 
 
@@ -27,6 +28,13 @@ class WorkflowTemplate(ABC):
     # funscript synthesized alongside it is tiled to repeat seamlessly. Only the
     # first-last-frame loop workflow sets this; a one-shot video leaves it False.
     looping: bool = False
+    # True when the output size is derived from the input image (kept at its
+    # aspect ratio on a fixed pixel budget) rather than set by hand. The i2v
+    # workflows set this; the Generate form then shows the derived width/height in
+    # a locked Dimensions field the user can unlock to override. Width/height stay
+    # out of ``default_params`` (the size isn't a stored recipe setting), so an
+    # override never splits a gallery folder from an otherwise identical run.
+    derives_size_from_input: bool = False
     # The param key(s) whose values identify which model produced an output.
     # The gallery groups a workflow's generations into model folders by these.
     model_keys: tuple[str, ...] = ()
@@ -48,6 +56,20 @@ class WorkflowTemplate(ABC):
     @abstractmethod
     def param_definitions(self) -> list[ParamDef]:
         """Return ordered list of ParamDef for the UI form builder."""
+
+    def derived_display_size(self, params: dict) -> tuple[int, int] | None:
+        """The width×height this run's input image derives, for the form to show
+        in its locked Dimensions field, or ``None`` when the size isn't derived
+        (a manual-size workflow) or the image can't be measured yet (none picked,
+        missing, unreadable) — the form then shows no size until one resolves.
+
+        Measured app-side (:func:`~origenerator.workflows.derived_size.
+        measure_derived_size`) to exactly match what the in-graph WAN 2.2 scaling
+        produces, so the number shown is the number the run will use.
+        """
+        if not self.derives_size_from_input:
+            return None
+        return measure_derived_size(params.get("input_image", ""))
 
     def seed_keys(self) -> tuple[str, ...]:
         """Param keys whose type is ``seed`` — the seed(s) a variation re-rolls.

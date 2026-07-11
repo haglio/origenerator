@@ -1,5 +1,6 @@
 import json
 import math
+import random
 from pathlib import Path
 
 from PIL import Image
@@ -94,7 +95,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan21_ati_i2v"
-    version = "v003"
+    version = "v004"
     display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
     output_type = "video"
     model_keys = ("unet",)
@@ -168,10 +169,37 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         ]
 
     @staticmethod
-    def _stroke_phase(params: dict, t_track: float) -> float:
-        """The authored sine at track-time ``t_track``, in [-1, 1]; -1 is the
-        stroke top (where the cluster starts), +1 the bottom."""
-        return math.sin(2 * math.pi * params["stroke_hz"] * t_track - math.pi / 2)
+    def _stroke_series(params: dict) -> list[float]:
+        """The authored stroke as its 121 track-time samples (y per sample).
+
+        Alternating half-strokes with cosine easing into every reversal — the
+        hand decelerates into each turnaround instead of bouncing off it — and
+        a seeded wobble in each half-stroke's pace (±12%) and landing depth
+        (up to 10% short), so the rhythm reads human rather than metronomic.
+        Seeded by the generation seed: deterministic per run, re-rolled by a
+        variation. This one series drives both the pixel track and the
+        funscript, which is what keeps them locked."""
+        rng = random.Random(params["seed"])
+        top = float(params["stroke_top"])
+        bottom = float(params["stroke_bottom"])
+        depth = bottom - top
+        half = 0.5 / params["stroke_hz"]
+        reversals = [(0.0, top)]
+        t, going_down = 0.0, True
+        while t <= TRACK_SECONDS:
+            t += half * rng.uniform(0.88, 1.12)
+            short = depth * rng.uniform(0.0, 0.10)
+            reversals.append((t, bottom - short if going_down else top + short))
+            going_down = not going_down
+        ys, seg = [], 0
+        for f in range(TRACK_POINTS):
+            tt = f / 24.0
+            while reversals[seg + 1][0] < tt:
+                seg += 1
+            (t0, y0), (t1, y1) = reversals[seg], reversals[seg + 1]
+            eased = (1 - math.cos(math.pi * (tt - t0) / (t1 - t0))) / 2
+            ys.append(y0 + (y1 - y0) * eased)
+        return ys
 
     def _derived_size(self, params: dict) -> tuple[int, int]:
         """The output size for this run: the input image measured and scaled to
@@ -207,36 +235,41 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     def _stroke_tracks(self, params: dict) -> str:
         """The tracks JSON: three staggered points riding the authored stroke
-        between ``stroke_top`` and ``stroke_bottom``, plus one static point
-        pinning the anchor. 121 points at 24fps, ATI's fixed convention."""
-        center = (params["stroke_top"] + params["stroke_bottom"]) / 2
+        series, plus one static point pinning the anchor. 121 points at 24fps,
+        ATI's fixed convention."""
         amplitude = (params["stroke_bottom"] - params["stroke_top"]) / 2
+        series = self._stroke_series(params)
         tracks = []
         for x_off, y_off in _CLUSTER_OFFSETS:
             spread = min(abs(y_off), amplitude * 0.4) * (1 if y_off >= 0 else -1)
-            pts = []
-            for f in range(TRACK_POINTS):
-                y = center + spread + amplitude * self._stroke_phase(params, f / 24.0)
-                pts.append({"x": float(params["stroke_x"] + x_off), "y": float(y)})
-            tracks.append(pts)
+            tracks.append([
+                {"x": float(params["stroke_x"] + x_off), "y": float(y + spread)}
+                for y in series
+            ])
         tracks.append(
             [{"x": float(params["anchor_x"]), "y": float(params["anchor_y"])}] * TRACK_POINTS
         )
         return json.dumps(tracks)
 
     def authored_actions(self, params: dict) -> list[dict]:
-        """The funscript for the authored stroke: alternating top/bottom
-        extremes at the authored cadence, mapped from track time onto the
-        clip's real duration — the same mapping WanTrackToVideo applies to the
-        track, so script and pixels stay locked."""
+        """The funscript for the authored stroke: the same 121-sample series
+        the track rides, each sample mapped from track time onto the clip's
+        real duration (the mapping WanTrackToVideo applies) and normalized to
+        stroke depth — 100 at the top of the stroke, 0 at the bottom. Dense
+        samples rather than bare extremes, so the device eases into reversals
+        exactly as the pixels do."""
+        top = float(params["stroke_top"])
+        bottom = float(params["stroke_bottom"])
+        depth = (bottom - top) or 1.0
         video_s = params["frame_count"] / params["frame_rate"]
         scale = video_s / TRACK_SECONDS
-        half_period_ms = 500.0 / params["stroke_hz"] * scale
         actions = []
-        i = 0
-        while (ms := round(i * half_period_ms)) <= video_s * 1000:
-            actions.append({"at": int(ms), "pos": 100 if i % 2 == 0 else 0})
-            i += 1
+        for f, y in enumerate(self._stroke_series(params)):
+            ms = round(f / 24.0 * scale * 1000)
+            pos = max(0, min(100, round(100 * (bottom - y) / depth)))
+            if actions and actions[-1]["at"] == ms:
+                continue
+            actions.append({"at": int(ms), "pos": pos})
         return actions
 
     def build_api_payload(self, params: dict) -> dict:

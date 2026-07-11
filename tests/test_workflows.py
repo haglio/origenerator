@@ -552,9 +552,9 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     assert all(len(t) == 121 for t in tracks)    # ATI's fixed track convention
     cluster = tracks[:3]
     ys = [pt["y"] for pt in cluster[1]]          # the centered stroke point
-    assert min(ys) == pytest.approx(400, abs=1)  # reaches stroke_top...
-    assert max(ys) == pytest.approx(600, abs=1)  # ...and stroke_bottom
     assert ys[0] == pytest.approx(400, abs=1)    # starts at the top of the stroke
+    assert min(ys) == pytest.approx(400, abs=2)  # tops ride near stroke_top...
+    assert 575 <= max(ys) <= 601                 # ...bottoms near stroke_bottom
     anchor = tracks[3]
     assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
 
@@ -576,25 +576,63 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
 
 
 def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
-    # The funscript is the track: alternating extremes at the authored cadence,
-    # starting at the top (the cluster's sine starts there), mapped onto video
-    # time — the 121-point track always spans 5.0s of track time stretched over
-    # the clip's real duration. No pixel measurement anywhere.
-    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), stroke_hz=1.2, frame_count=81, frame_rate=16.0)
-    actions = wf.authored_actions(params)
+    # The funscript is a dense sampling of the SAME waveform the track
+    # conditions the pixels on — pointwise, a track sample's normalized stroke
+    # depth IS the funscript pos at that instant, mapped onto video time (the
+    # 121-point track always spans 5.0s of track time stretched over the clip's
+    # real duration). No pixel measurement anywhere.
+    import json as _json
 
-    assert actions[0] == {"at": 0, "pos": 100}
-    assert actions[1]["pos"] == 0
-    scale = (81 / 16.0) / 5.0
-    assert actions[1]["at"] == pytest.approx(0.5 / 1.2 * scale * 1000, abs=1)
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), stroke_hz=1.2, frame_count=81, frame_rate=16.0, seed=42)
+    actions = wf.authored_actions(params)
+    payload = wf.build_api_payload(params)
+    tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
+    ys = [pt["y"] for pt in tracks[1]]           # the centered cluster point
+    top, bottom = params["stroke_top"], params["stroke_bottom"]
+
+    assert actions[0] == {"at": 0, "pos": 100}   # the stroke starts at its top
+    assert len(actions) > 50                     # dense, not a bare triangle
     assert actions[-1]["at"] <= 81 / 16.0 * 1000
-    positions = [a["pos"] for a in actions]
-    assert positions == [100 if i % 2 == 0 else 0 for i in range(len(positions))]
+    assert all(0 <= a["pos"] <= 100 for a in actions)
+    scale = (81 / 16.0) / 5.0
+    by_at = {a["at"]: a["pos"] for a in actions}
+    for i in (0, 24, 48, 72, 96, 120):           # spot-check the pointwise lock
+        at = round(i / 24.0 * scale * 1000)
+        if at in by_at:
+            expected = 100 * (bottom - ys[i]) / (bottom - top)
+            assert by_at[at] == pytest.approx(expected, abs=1.5)
 
     # Workflows without an authored track say so with None, keeping the
     # metronome fallback for them.
     assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
+
+
+def test_wan21_ati_i2v_stroke_eases_into_reversals_and_wobbles_like_a_hand():
+    # Organic, not metronomic: motion decelerates into every reversal (cosine
+    # easing — near a turnaround the per-sample movement is a fraction of the
+    # mid-stroke speed), and each half-stroke's pace wobbles slightly, seeded
+    # by the generation seed: deterministic per run, re-rolled with it.
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), seed=42)
+    actions = wf.authored_actions(params)
+    assert actions == wf.authored_actions(dict(params))             # deterministic
+    assert actions != wf.authored_actions(dict(params, seed=43))    # seed re-rolls it
+
+    pos = [a["pos"] for a in actions]
+    steps = [abs(b - a) for a, b in zip(pos, pos[1:])]
+    reversals = [
+        i for i in range(1, len(pos) - 1)
+        if (pos[i] - pos[i - 1]) * (pos[i + 1] - pos[i]) < 0
+    ]
+    assert reversals, "the stroke must actually reverse"
+    slowest_near_reversals = max(max(steps[r - 1], steps[r]) for r in reversals)
+    assert max(steps) >= 2.5 * slowest_near_reversals
+
+    # Human wobble: the spacing between successive top-of-stroke peaks varies.
+    peaks = [actions[i]["at"] for i in reversals if pos[i] > 80]
+    gaps = {round((b - a) / 10) for a, b in zip(peaks, peaks[1:])}
+    assert len(gaps) > 1
 
 
 def test_wan21_ati_i2v_offers_an_optional_lora(monkeypatch):
@@ -690,8 +728,12 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_stroke(tmp_path, monkeypatc
         {"x": params["anchor_x"] * sx, "y": params["anchor_y"] * sy}
     )
     ys = [pt["y"] for pt in tracks[1]]                       # centered stroke point
+    # The organic stroke starts exactly at the (scaled) top and lands within its
+    # humanized shortfall of the (scaled) bottom — never beyond either bound.
+    scaled_depth = (params["stroke_bottom"] - params["stroke_top"]) * sy
     assert min(ys) == pytest.approx(params["stroke_top"] * sy, abs=1)
-    assert max(ys) == pytest.approx(params["stroke_bottom"] * sy, abs=1)
+    assert params["stroke_bottom"] * sy - 0.12 * scaled_depth <= max(ys)
+    assert max(ys) <= params["stroke_bottom"] * sy + 1
 
 
 def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkeypatch):

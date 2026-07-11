@@ -54,6 +54,24 @@ def test_every_output_file_gets_its_own_row():
     assert files == ["a.png", "b.png"]
 
 
+def test_file_item_reveals_the_absolute_output_path():
+    # The File row carries the on-disk path (output folder + subfolder + name) so
+    # a Show-in-Explorer button can reveal it, while its value stays the short
+    # displayed path.
+    from origenerator.config import COMFYUI_OUTPUT_DIR
+
+    row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
+    file_item = _section(build_sections(row), "Basic").items[0]
+    assert file_item.reveal == str(COMFYUI_OUTPUT_DIR / "video" / "clip.mp4")
+
+
+def test_created_row_carries_no_reveal_path():
+    # Only the output file is a real thing on disk; the date has nothing to reveal.
+    created = _section(build_sections(_row()), "Basic").items[1]
+    assert created.label == "Created"
+    assert created.reveal is None
+
+
 def test_basic_is_the_only_section():
     # Params — editable or read-only passthrough — now live in the form itself, so
     # this block is just the output file and its date; there's no Parameters section.

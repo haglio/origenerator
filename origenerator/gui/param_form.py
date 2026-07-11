@@ -14,7 +14,6 @@ from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui import param_sections
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.reveal import show_in_explorer
 from origenerator.workflows.base import ParamDef
 
 ensure_shared_ui_on_path()
@@ -76,10 +75,6 @@ class ParamForm(QWidget):
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
-        # "Show in Explorer" buttons, one per image field, to reveal the chosen
-        # file selected in Windows Explorer. Each stays disabled until its field
-        # names a file that exists on disk.
-        self._reveal_buttons: dict[str, QPushButton] = {}
         # Copy-to-clipboard buttons on the fields worth lifting whole — the prompts
         # and the seeds, the read-only inspect pane's copy targets before it merged
         # into this editable form.
@@ -204,24 +199,7 @@ class ParamForm(QWidget):
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
-            extras.append(self._make_reveal_button(pd.key))
         return extras
-
-    def _make_reveal_button(self, key: str) -> QPushButton:
-        """A "Show in Explorer" button for an image field: reveals the current
-        file selected in Explorer, and greys out while the field names no file
-        that exists (an empty path or a stale name)."""
-        reveal = QPushButton("Show in Explorer")
-        reveal.clicked.connect(
-            lambda _checked=False, key=key: self._reveal_image(key)
-        )
-        self._reveal_buttons[key] = reveal
-        # The field already holds its default; track edits so enablement stays live.
-        self._widgets[key].textChanged.connect(
-            lambda _text=None, key=key: self._sync_reveal_enabled(key)
-        )
-        self._sync_reveal_enabled(key)
-        return reveal
 
     def _field_text(self, key: str) -> str:
         """The field's current on-screen text, for its copy button — a live read
@@ -322,51 +300,19 @@ class ParamForm(QWidget):
         if path:
             self._widgets[key].setText(path)
 
-    def _reveal_image(self, key: str):
-        """Show the field's file selected in Explorer. A no-op when the field
-        names nothing on disk — the button is disabled then, but a stray call
-        (e.g. a keyboard activation mid-edit) must not spawn a stray window."""
-        resolved = self._resolve_existing_file(self._widgets[key].text())
-        if resolved is not None:
-            show_in_explorer(resolved)
-
-    def _sync_reveal_enabled(self, key: str):
-        """Enable Show-in-Explorer only while the field resolves to a real file;
-        a greyed-out button with a hint beats one that opens the wrong place."""
-        resolved = self._resolve_existing_file(self._widgets[key].text())
-        btn = self._reveal_buttons[key]
-        btn.setEnabled(resolved is not None)
-        btn.setToolTip(
-            f"Show {resolved} in Explorer" if resolved is not None
-            else "Enter or browse to an image file first"
-        )
-
     @staticmethod
     def _initial_browse_path(current: str) -> str:
         """Where the file dialog opens: the current value's own location when it
         points at a real file (a full path, or a bare name from ComfyUI's input
         folder), else the input folder as a sensible home."""
-        resolved = ParamForm._resolve_existing_file(current)
-        return str(resolved) if resolved is not None else str(COMFYUI_INPUT_DIR)
-
-    @staticmethod
-    def _resolve_existing_file(current: str) -> Path | None:
-        """The existing file a ``LoadImage`` value points at, or ``None``.
-
-        Resolves the way ComfyUI does: a full path taken as-is, else a bare name
-        against ComfyUI's input folder. ``None`` when the field is empty or names
-        nothing on disk — used both to open Browse in the right place and to
-        gate the Show-in-Explorer button."""
-        current = _clean_image_ref(current)
-        if not current:
-            return None
-        full = Path(current)
-        if full.is_file():
-            return full
-        in_input = COMFYUI_INPUT_DIR / current
-        if in_input.is_file():
-            return in_input
-        return None
+        if current:
+            full = Path(current)
+            if full.is_file():
+                return str(full)
+            in_input = COMFYUI_INPUT_DIR / current
+            if in_input.is_file():
+                return str(in_input)
+        return str(COMFYUI_INPUT_DIR)
 
     def _wire_changed(self, widget: QWidget):
         """Re-emit ``changed`` whenever this input's value changes."""

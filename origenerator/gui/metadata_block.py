@@ -9,8 +9,10 @@ Each section is a titled block of ``label: value`` rows; a row gains a
 copy-to-clipboard button when its item declares copyable text (a filename).
 """
 
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics
@@ -18,6 +20,7 @@ from PyQt6.QtGui import QFontMetrics
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.gui.copy_button import CopyButton
 from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.reveal import show_in_explorer
 
 ensure_shared_ui_on_path()
 
@@ -110,7 +113,24 @@ def _build_item(item: MetaItem, label_width: int) -> QWidget:
     layout.addWidget(_value_widget(item), 1)
     if item.copy is not None:
         layout.addWidget(CopyButton(item.copy), 0, Qt.AlignmentFlag.AlignTop)
+    if item.reveal is not None:
+        layout.addWidget(_reveal_button(item.reveal), 0, Qt.AlignmentFlag.AlignTop)
     return row
+
+
+def _reveal_button(target: str) -> QPushButton:
+    """A "Show in Explorer" button revealing the output file selected in the OS
+    file manager. Greyed out (with a hint) when the file is no longer on disk —
+    trashed or moved — so it never opens the wrong place."""
+    btn = QPushButton("Show in Explorer")
+    btn.setObjectName("revealButton")
+    btn.setStyleSheet("padding: 2px 6px;")
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    exists = Path(target).exists()
+    btn.setEnabled(exists)
+    btn.setToolTip("Show this file in Explorer" if exists else "File not found on disk")
+    btn.clicked.connect(lambda _checked=False: show_in_explorer(Path(target)))
+    return btn
 
 
 def _label_widget(text: str, width: int) -> QLabel:

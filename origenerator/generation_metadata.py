@@ -14,6 +14,7 @@ Kept Qt-free so the section/item model is unit-testable directly;
 from dataclasses import dataclass
 
 from origenerator import gallery
+from origenerator.config import COMFYUI_OUTPUT_DIR
 
 
 @dataclass
@@ -21,12 +22,15 @@ class MetaItem:
     """One line in a section, rendered as ``label: value``.
 
     ``copy`` drives a copy-to-clipboard button: ``None`` shows no button, a
-    non-empty string is what the button copies.
+    non-empty string is what the button copies. ``reveal`` drives a
+    Show-in-Explorer button: ``None`` shows no button, otherwise the absolute
+    path on disk the button reveals (selected in the OS file manager).
     """
 
     label: str
     value: str
     copy: str | None = None
+    reveal: str | None = None
 
 
 @dataclass
@@ -42,13 +46,17 @@ def _output_path(file: dict) -> str:
 
 
 def _output_items(row: dict) -> list[MetaItem]:
-    """One labeled item per output file; each copies just its filename, dropping
-    the image/ or video/ subfolder the displayed path carries."""
-    return [
-        MetaItem("File", _output_path(f), copy=f["filename"])
-        for f in gallery.row_output_files(row)
-        if f.get("filename")
-    ]
+    """One labeled item per output file. Each copies just its filename (dropping
+    the image/ or video/ subfolder the displayed path carries) and reveals its
+    absolute location under ComfyUI's output folder in the OS file manager."""
+    items = []
+    for f in gallery.row_output_files(row):
+        filename = f.get("filename")
+        if not filename:
+            continue
+        full = COMFYUI_OUTPUT_DIR / (f.get("subfolder") or "") / filename
+        items.append(MetaItem("File", _output_path(f), copy=filename, reveal=str(full)))
+    return items
 
 
 def _basic(row: dict) -> MetaSection:

@@ -146,6 +146,44 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     assert values["stroke_hz"] == ati_defaults["stroke_hz"]
 
 
+def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
+    # Selecting an i2v workflow hands its form the size deriver, so the Dimensions
+    # section shows the input-image size in a locked, unlockable field.
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    form = panel._param_form
+    assert form._size_deriver is not None
+    assert "width" in form._present_keys["Dimensions"]
+    assert form._widgets["width"].isEnabled() is False   # locked by default
+    assert form._unlock_check is not None
+
+
+def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path, monkeypatch):
+    # End to end: the panel hands the real derived_display_size to the form, which
+    # measures the picked image and shows its scaled size in the locked field.
+    import origenerator.workflows.derived_size as ds
+    from PIL import Image
+    from origenerator.workflows.derived_size import scale_to_total_pixels
+
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    panel._param_form._widgets["input_image"].setText("wide.png")
+
+    width, height = scale_to_total_pixels(1920, 1080)
+    assert panel._param_form._widgets["width"].value() == width
+    assert panel._param_form._widgets["height"].value() == height
+
+
+def test_manual_size_workflow_form_has_no_deriver(panel):
+    # A text-to-image workflow sizes by hand, so its form gets no deriver and keeps
+    # its own editable width/height (and the swap button), nothing to unlock.
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
+    form = panel._param_form
+    assert form._size_deriver is None
+    assert form._unlock_check is None
+
+
 # --- a read-only gallery (no client) ----------------------------------------
 
 def test_tolerates_a_missing_client(qtbot, tmp_path):

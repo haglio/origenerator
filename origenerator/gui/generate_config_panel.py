@@ -248,7 +248,12 @@ class GenerateConfigPanel(QWidget):
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
             edited = self._edited_form_values()
-            self._install_form(ParamForm(wf.param_definitions()))
+            # An i2v workflow derives its output size from the input image; hand
+            # the form that deriver so it can show the size in a locked, unlockable
+            # Dimensions field. A manual-size workflow passes None and lays out its
+            # own width/height as usual.
+            deriver = wf.derived_display_size if wf.derives_size_from_input else None
+            self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {

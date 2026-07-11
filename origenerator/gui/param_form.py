@@ -1,5 +1,6 @@
 import random
 from pathlib import Path
+from typing import Callable
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -15,11 +16,18 @@ from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoW
 from origenerator.gui import param_sections
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
+from origenerator.workflows.derived_size import override_size
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
 
 _SEED_MAX = (1 << 63) - 1
+
+# The locked-dimension spinboxes span from a stride floor up past any realistic
+# derived or overridden size; 0 is reserved as "no size known yet" (shown as the
+# em dash) for a workflow whose input image can't be measured.
+_DIMENSION_MAX = 8192
+_DIMENSION_STEP = 16
 
 # Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
 # The metadata block inserts zero-width spaces into displayed paths for on-screen
@@ -70,8 +78,24 @@ class ParamForm(QWidget):
 
     changed = pyqtSignal()          # any field's value changed
 
-    def __init__(self, param_defs: list[ParamDef], parent=None):
+    def __init__(
+        self,
+        param_defs: list[ParamDef],
+        parent=None,
+        *,
+        size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
+    ):
         super().__init__(parent)
+        # When set (an i2v workflow), the output size is derived from the input
+        # image: the form shows a locked width/height pair filled from this
+        # callable, which the user can unlock to override. ``None`` for a
+        # manual-size or size-less workflow, leaving the Dimensions section to the
+        # workflow's own width/height params (if any).
+        self._size_deriver = size_deriver
+        # The unlock checkbox and hint for the derived-size pair, built only in
+        # derived mode. ``None`` otherwise.
+        self._unlock_check: CheckBox | None = None
+        self._dimensions_hint: QLabel | None = None
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
@@ -130,6 +154,7 @@ class ParamForm(QWidget):
             self._wire_changed(widget)
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
         self._build_swap_button()
+        self._build_derived_dimensions()
         self._refresh_section_visibility()
 
     def _add_row(self, key: str, label: str, field):
@@ -283,6 +308,95 @@ class ParamForm(QWidget):
         w, h = width.value(), height.value()
         width.setValue(h)
         height.setValue(w)
+
+    # --- derived dimensions: the input-image size, shown locked & unlockable ---
+
+    def _build_derived_dimensions(self):
+        """For a size-deriving workflow, add a locked width/height pair to the
+        Dimensions section: the fields show the size derived from the input image
+        (kept live as it changes) but start disabled, with an Unlock checkbox that
+        makes them editable so the user can override the derived size. A no-op for
+        a workflow that sets its size by hand (its own width/height params already
+        fill this section) or has none.
+        """
+        if self._size_deriver is None:
+            return
+        for key in ("width", "height"):
+            box = NoWheelSpinBox()
+            box.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
+            box.setMaximum(_DIMENSION_MAX)
+            box.setSingleStep(_DIMENSION_STEP)
+            box.setSpecialValueText("—")
+            box.setEnabled(False)
+            box.valueChanged.connect(self.changed)
+            self._widgets[key] = box
+        self._unlock_check = CheckBox("Unlock")
+        self._unlock_check.setToolTip("Override the size derived from the input image")
+        self._unlock_check.toggled.connect(self._on_dimensions_unlock_toggled)
+        # The unlock control trails the width field; one lock governs the pair.
+        width_cell = QHBoxLayout()
+        width_cell.setContentsMargins(0, 0, 0, 0)
+        width_cell.addWidget(self._widgets["width"], 1)
+        width_cell.addWidget(self._unlock_check)
+        self._add_row("width", "Width", width_cell)
+        self._add_row("height", "Height", self._widgets["height"])
+        self._dimensions_hint = QLabel("Sized from the input image. Unlock to override.")
+        self._dimensions_hint.setObjectName("dimensionsHint")
+        self._dimensions_hint.setWordWrap(True)
+        self._sections["Dimensions"].content_form().addRow(self._dimensions_hint)
+        # Recompute the shown size whenever the input image changes, and seed it now.
+        image = self._widgets.get("input_image")
+        if image is not None:
+            image.textChanged.connect(self._update_derived_display)
+        self._update_derived_display()
+
+    def _dimensions_unlocked(self) -> bool:
+        """True when the user has unlocked the derived size to override it."""
+        return self._unlock_check is not None and self._unlock_check.isChecked()
+
+    def _on_dimensions_unlock_toggled(self, unlocked: bool):
+        """Enable the dimension fields for editing, or re-lock them back onto the
+        derived size. Announces the change so the panel refreshes with it."""
+        self._widgets["width"].setEnabled(unlocked)
+        self._widgets["height"].setEnabled(unlocked)
+        if not unlocked:
+            self._update_derived_display()
+        self.changed.emit()
+
+    def _update_derived_display(self):
+        """Fill the locked width/height with the size the current input image
+        derives (0 → em dash when none can be measured). A no-op while unlocked,
+        so it never clobbers a value the user is editing."""
+        if self._size_deriver is None or self._dimensions_unlocked():
+            return
+        size = self._size_deriver(self.get_values_static())
+        for key, value in zip(("width", "height"), size or (0, 0)):
+            box = self._widgets[key]
+            blocked = box.blockSignals(True)  # a display refresh isn't a user edit
+            box.setValue(value)
+            box.blockSignals(blocked)
+
+    def _override_dimensions(self) -> dict:
+        """The explicit width/height to emit — only when the pair is unlocked and
+        holds a real size. Locked (the default), the form emits nothing so the
+        payload derives the size in the usual way."""
+        if not self._dimensions_unlocked():
+            return {}
+        width = self._widgets["width"].value()
+        height = self._widgets["height"].value()
+        return {"width": width, "height": height} if width > 0 and height > 0 else {}
+
+    def _apply_dimension_values(self, params: dict):
+        """Reflect a loaded config's size in the derived pair: an explicit
+        width/height (a saved override) unlocks and shows them; their absence
+        re-locks the pair onto the derived size."""
+        override = override_size(params)
+        self._unlock_check.setChecked(override is not None)
+        if override is not None:
+            self._widgets["width"].setValue(override[0])
+            self._widgets["height"].setValue(override[1])
+        else:
+            self._update_derived_display()
 
     def _browse_image(self, key: str):
         """Pick an input image anywhere on disk via the native file dialog.
@@ -438,10 +552,12 @@ class ParamForm(QWidget):
 
     def _collect(self, randomize_seed: bool) -> dict:
         # Start from the hidden params (disjoint from the widget keys), then lay
-        # the live field values on top.
+        # the live field values on top, then any unlocked size override — which is
+        # absent (so the payload derives the size) unless the user set one.
         result = dict(self._passthrough)
         for pd in self._param_defs:
             result[pd.key] = self._read_field(pd, randomize_seed)
+        result.update(self._override_dimensions())
         return result
 
     def set_values(self, params: dict):
@@ -453,6 +569,11 @@ class ParamForm(QWidget):
         for pd in self._param_defs:
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
+        # The derived width/height aren't declared params, so apply them here:
+        # a saved override unlocks and shows, its absence re-locks onto the size
+        # the just-applied input image derives.
+        if self._size_deriver is not None:
+            self._apply_dimension_values(params)
 
     def _render_readonly_rows(self, extras: dict):
         """Show each param the form has no field for as a read-only ``key: value``

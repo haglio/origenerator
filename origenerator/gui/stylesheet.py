@@ -25,6 +25,9 @@ def build_stylesheet() -> str:
     QLabel#estimateLabel {{
         color: {_h(TEXT_MUTED)};
     }}
+    QLabel#dimensionsHint {{
+        color: {_h(TEXT_MUTED)};
+    }}
     QToolTip {{
         /* QToolTip is a QWidget, so the global QWidget rule above paints it but
            leaves it borderless and hard to read; style it explicitly so the

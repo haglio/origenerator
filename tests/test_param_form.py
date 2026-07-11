@@ -241,6 +241,107 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_fields(qtbot):
     assert btn.right() <= width.left()
 
 
+# --- derived dimensions: the input-image size, shown locked & unlockable ----
+
+def _image_def():
+    return ParamDef("input_image", "Input Image", "image", "")
+
+
+def _sized_form(qtbot, size=(864, 480)):
+    """A form for a size-deriving workflow: the deriver reports ``size`` once an
+    input image is set, else None (nothing to measure yet)."""
+    form = ParamForm(
+        [_image_def()],
+        size_deriver=lambda params: size if params.get("input_image") else None,
+    )
+    qtbot.addWidget(form)
+    return form
+
+
+def test_derived_size_workflow_shows_a_locked_width_height_pair(qtbot):
+    form = _sized_form(qtbot)
+    # Both fields exist, in the Dimensions section, and start disabled (locked).
+    assert "width" in form._present_keys["Dimensions"]
+    assert "height" in form._present_keys["Dimensions"]
+    assert form._widgets["width"].isEnabled() is False
+    assert form._widgets["height"].isEnabled() is False
+    assert form._unlock_check is not None
+    assert form._dimensions_hint is not None
+    # No image yet → no size to show (the spinbox sits at its em-dash zero).
+    assert form._widgets["width"].value() == 0
+
+
+def test_derived_dimensions_track_the_input_image(qtbot):
+    form = _sized_form(qtbot, size=(864, 480))
+    form._widgets["input_image"].setText("frame.png")
+    assert form._widgets["width"].value() == 864
+    assert form._widgets["height"].value() == 480
+
+
+def test_locked_derived_dimensions_stay_out_of_the_values(qtbot):
+    # Locked, the form emits no width/height, so the payload derives the size the
+    # usual way — the displayed number is informational only.
+    form = _sized_form(qtbot)
+    form._widgets["input_image"].setText("frame.png")
+    values = form.get_values()
+    assert "width" not in values and "height" not in values
+
+
+def test_unlocking_lets_the_user_override_the_size(qtbot):
+    form = _sized_form(qtbot)
+    form._widgets["input_image"].setText("frame.png")
+    fired = []
+    form.changed.connect(lambda: fired.append(True))
+
+    form._unlock_check.setChecked(True)
+    assert fired                                  # the unlock announces itself
+    assert form._widgets["width"].isEnabled() is True
+    form._widgets["width"].setValue(1024)
+    form._widgets["height"].setValue(576)
+
+    values = form.get_values()
+    assert values["width"] == 1024 and values["height"] == 576
+
+
+def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
+    form = _sized_form(qtbot, size=(864, 480))
+    form._widgets["input_image"].setText("frame.png")
+    form._unlock_check.setChecked(True)
+    form._widgets["width"].setValue(1024)
+    form._widgets["height"].setValue(576)
+
+    form._unlock_check.setChecked(False)
+    assert "width" not in form.get_values()       # back to deriving
+    assert form._widgets["width"].value() == 864   # showing the derived size again
+
+
+def test_set_values_with_a_size_override_unlocks_and_shows_it(qtbot):
+    # Reopening a saved override comes back unlocked with its exact size.
+    form = _sized_form(qtbot)
+    form.set_values({"input_image": "frame.png", "width": 720, "height": 400})
+    assert form._dimensions_unlocked() is True
+    assert form._widgets["width"].value() == 720
+    assert form.get_values()["height"] == 400
+
+
+def test_set_values_without_an_override_relocks_onto_the_derived_size(qtbot):
+    form = _sized_form(qtbot, size=(864, 480))
+    form.set_values({"input_image": "frame.png", "width": 720, "height": 400})
+    form.set_values({"input_image": "other.png"})   # a plain config, no override
+    assert form._dimensions_unlocked() is False
+    assert "width" not in form.get_values()
+    assert form._widgets["width"].value() == 864
+
+
+def test_manual_size_workflow_has_no_unlock_control(qtbot):
+    # A workflow with real width/height params fills the Dimensions section itself
+    # (and gets the swap button); there's nothing to unlock.
+    form = ParamForm(_dimension_defs())
+    qtbot.addWidget(form)
+    assert form._unlock_check is None
+    assert form._swap_dimensions_btn is not None
+
+
 @pytest.fixture
 def sample_defs():
     return [

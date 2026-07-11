@@ -1,4 +1,27 @@
 import sys
+import uuid
+
+# The persisted ComfyUI client id lives under this key in the UI state file.
+_CLIENT_ID_KEY = "comfyui_client_id"
+
+
+def resolve_comfyui_client_id(app_state) -> str:
+    """The stable ComfyUI client id for this install: minted once, then persisted.
+
+    ComfyUI routes a running prompt's progress, preview and completion messages
+    only to the websocket client id that submitted it. Reusing the same id every
+    launch is what lets a restart mid-generation reconnect to the job still running
+    in ComfyUI and see its live progress again — without it, each launch's fresh id
+    leaves the reconnected job's bar spinning forever because those messages are
+    still being sent to the previous session's id.
+    """
+    stored = app_state.get(_CLIENT_ID_KEY)
+    if isinstance(stored, str) and stored:
+        return stored
+    client_id = str(uuid.uuid4())
+    app_state.set(_CLIENT_ID_KEY, client_id)
+    app_state.save()
+    return client_id
 
 
 def _init_windows_taskbar_identity() -> None:
@@ -133,8 +156,17 @@ def main():
     except Exception as e:
         logger.warning("Trash sweep failed: %s", e)
 
+    # One AppState for the whole app: it holds the persisted ComfyUI client id the
+    # client reconnects under, and is handed to the window for the rest of the
+    # session state (open tabs, gallery folder, geometry).
+    from origenerator.app_state import AppState
+    app_state = AppState(UI_STATE_PATH)
+
     from origenerator.comfyui_client import ComfyUIClient
-    client = ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT)
+    client = ComfyUIClient(
+        host=COMFYUI_HOST, port=COMFYUI_PORT,
+        client_id=resolve_comfyui_client_id(app_state),
+    )
 
     status("Reconnecting to running generations...")
     # Resolve any generation left mid-run by a previous session against ComfyUI
@@ -239,9 +271,8 @@ def main():
     client.start()
 
     status("Building the interface...")
-    from origenerator.app_state import AppState
     from origenerator.gui.main_window import OrigeneratorWindow
-    window = OrigeneratorWindow(client, db, AppState(UI_STATE_PATH))
+    window = OrigeneratorWindow(client, db, app_state)
     window.show()
 
     loading.close()

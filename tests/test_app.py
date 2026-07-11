@@ -7,9 +7,50 @@ from origenerator.app import (
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
     main,
+    resolve_comfyui_client_id,
 )
+from origenerator.app_state import AppState
+from origenerator.comfyui_client import ComfyUIClient
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+
+
+def test_resolve_client_id_mints_and_persists_when_absent(tmp_path):
+    # First launch: no id yet, so one is minted and written to the state file, so the
+    # next launch reads it back rather than minting a different one.
+    path = tmp_path / "ui.json"
+    client_id = resolve_comfyui_client_id(AppState(path))
+
+    assert client_id
+    assert AppState(path).get("comfyui_client_id") == client_id
+
+
+def test_resolve_client_id_reuses_the_persisted_value(tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("comfyui_client_id", "existing-id")
+
+    assert resolve_comfyui_client_id(state) == "existing-id"
+
+
+def test_resolve_client_id_replaces_a_non_string_value(tmp_path):
+    # A corrupt/hand-edited state value must not become a bad clientId; mint instead.
+    state = AppState(tmp_path / "ui.json")
+    state.set("comfyui_client_id", 12345)
+
+    client_id = resolve_comfyui_client_id(state)
+
+    assert isinstance(client_id, str) and client_id
+
+
+def test_client_id_is_stable_across_launches(tmp_path, qtbot):
+    # The crux of restart recovery: two launches (two AppStates over the same file)
+    # give ComfyUIClients the same id, so ComfyUI keeps routing a running job's live
+    # progress/preview/completion messages to the reconnecting session.
+    path = tmp_path / "ui.json"
+    first = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)))
+    second = ComfyUIClient(client_id=resolve_comfyui_client_id(AppState(path)))
+
+    assert first.client_id == second.client_id
 
 
 def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
@@ -92,6 +133,7 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
          patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
@@ -118,6 +160,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.gui.loading_screen.LoadingScreen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
          patch("origenerator.reconcile.reconcile_in_flight",
@@ -142,6 +185,7 @@ def test_main_sweeps_stale_trash_on_startup(qapp):
          patch("origenerator.gui.loading_screen.LoadingScreen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
@@ -154,3 +198,28 @@ def test_main_sweeps_stale_trash_on_startup(qapp):
             main()
 
     trash.sweep.assert_called_once()
+
+
+def test_main_connects_the_client_under_the_persisted_id(qapp):
+    # The client must connect under the id persisted across launches, so a restart
+    # reconnects to the job ComfyUI is still running (it targets that job's live
+    # messages at this id). Without it, each launch's fresh id leaves the
+    # reconnected job's progress bar spinning forever.
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
+         patch("origenerator.app.resolve_comfyui_client_id", return_value="persisted-id"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
+         patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient") as mock_client, \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main()
+
+    assert mock_client.call_args.kwargs["client_id"] == "persisted-id"

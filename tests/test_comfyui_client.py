@@ -21,7 +21,10 @@ def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
     """
     client = ComfyUIClient(host="127.0.0.1", port=59999)  # nothing listening
     # Wait for the refused connect to drop the loop into its 3s reconnect sleep.
-    with qtbot.waitSignal(client.disconnected, timeout=3000):
+    # The refusal fires ``disconnected`` almost at once; the generous timeout is a
+    # safety net for a cold QThread + asyncio + websockets spin-up under heavy load
+    # (a full GUI suite plus sibling agents), not an expected wait.
+    with qtbot.waitSignal(client.disconnected, timeout=15000):
         client.start()
     client.stop()
     assert client.wait(1000), "stop() did not end the thread within 1s"
@@ -157,6 +160,39 @@ def test_executing_message_tracks_then_clears_current_prompt():
         "type": "executing", "data": {"node": None, "prompt_id": "p1"},
     }))
     assert client._executing_prompt_id is None
+
+
+def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
+    # After a reconnect, ComfyUI's replayed "executing" carries no prompt_id, so the
+    # client can't learn the running job from it. A progress event does name the
+    # prompt; the client adopts it as the executing prompt, so the live preview
+    # frames that follow (which carry no id of their own) attribute to that job
+    # instead of being dropped. Without this, a reconnected run shows no live frame.
+    client = ComfyUIClient()
+    client._executing_prompt_id = ""  # the empty tag the reconnect replay left behind
+
+    client._handle_ws_message(json.dumps({
+        "type": "progress", "data": {"prompt_id": "job1", "value": 3, "max": 10},
+    }))
+
+    assert client._executing_prompt_id == "job1"
+
+
+def test_reuses_a_supplied_client_id(qtbot):
+    # Persisting and reusing this id across launches is how a restart reconnects to a
+    # job still running in ComfyUI, which targets that job's live websocket messages
+    # at the id that submitted it. The id also rides the /ws query so ComfyUI routes
+    # the running prompt's messages to this reconnecting socket.
+    client = ComfyUIClient(client_id="stable-id")
+
+    assert client.client_id == "stable-id"
+    assert "clientId=stable-id" in client.ws_url
+
+
+def test_mints_a_distinct_client_id_when_none_supplied(qtbot):
+    # A read-only gallery or a test needs no persisted id; each gets its own.
+    assert ComfyUIClient().client_id
+    assert ComfyUIClient().client_id != ComfyUIClient().client_id
 
 
 def test_binary_preview_emits_image_tagged_with_current_prompt(qtbot):

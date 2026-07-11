@@ -72,11 +72,18 @@ class ComfyUIClient(QThread):
     queue_status = pyqtSignal(int)  # queue_remaining
     preview_image = pyqtSignal(str, bytes)  # executing prompt_id, image bytes
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8188, parent=None):
+    def __init__(self, host: str = "127.0.0.1", port: int = 8188,
+                 client_id: str | None = None, parent=None):
         super().__init__(parent)
         self.host = host
         self.port = port
-        self.client_id = str(uuid.uuid4())
+        # A stable client id is what lets a relaunch reconnect to a job still
+        # running in ComfyUI: ComfyUI routes that job's progress, preview and
+        # completion messages only to the websocket client id that submitted it, so
+        # reusing the persisted id — rather than minting a fresh one each launch —
+        # keeps those live updates flowing to the reconnected session. A fresh uuid
+        # is minted when none is supplied (a read-only gallery, or a test).
+        self.client_id = client_id or str(uuid.uuid4())
         self._running = False
         self._loop = None  # the thread's asyncio loop, for cross-thread wakeups
         self._task = None  # the running _ws_loop task, so stop() can cancel it
@@ -166,11 +173,15 @@ class ComfyUIClient(QThread):
                 self._on_node_executing(prompt_id, node_id)
 
         elif msg_type == "progress":
-            self.progress.emit(
-                data.get("prompt_id", ""),
-                data.get("value", 0),
-                data.get("max", 0),
-            )
+            prompt_id = data.get("prompt_id", "")
+            # A progress event names the prompt currently executing. Adopt it as the
+            # executing prompt so preview frames (which carry no id of their own)
+            # attribute to the right job — in particular right after a reconnect,
+            # where ComfyUI's replayed "executing" arrives with no prompt_id and so
+            # can't set this itself.
+            if prompt_id:
+                self._executing_prompt_id = prompt_id
+            self.progress.emit(prompt_id, data.get("value", 0), data.get("max", 0))
 
         elif msg_type == "execution_error":
             self.job_error.emit(

@@ -258,23 +258,30 @@ def _sized_form(qtbot, size=(864, 480)):
     return form
 
 
-def test_derived_size_workflow_shows_a_locked_width_height_pair(qtbot):
-    from PyQt6.QtWidgets import QAbstractSpinBox
-
+def test_locked_dimensions_render_as_plain_values_not_input_boxes(qtbot):
+    # Locked, each dimension shows as a plain value (a readonlyParamValue label,
+    # like "batch_size 1"), not a spinbox — the stack sits on its label page.
     form = _sized_form(qtbot)
-    # Both fields exist, in the Dimensions section, and render as uneditable —
-    # read-only (not greyed-out disabled) with no spin buttons.
     assert "width" in form._present_keys["Dimensions"]
     assert "height" in form._present_keys["Dimensions"]
-    for key in ("width", "height"):
-        box = form._widgets[key]
-        assert box.isReadOnly() is True
-        assert box.isEnabled() is True          # readable, not greyed out
-        assert box.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
     assert form._unlock_btn is not None
     assert form._dimensions_hint is not None
-    # No image yet → no size to show (the spinbox sits at its em-dash zero).
-    assert form._widgets["width"].value() == 0
+    for key in ("width", "height"):
+        stack = form._dim_stacks[key]
+        assert stack.currentIndex() == 0                       # the value label, not the box
+        assert stack.currentWidget() is form._dim_value_labels[key]
+        assert form._dim_value_labels[key].objectName() == "readonlyParamValue"
+    # No image yet → no size to show; the value reads as an em dash.
+    assert form._dim_value_labels["width"].text() == "—"
+
+
+def test_unlocking_swaps_the_plain_value_for_an_editable_box(qtbot):
+    form = _sized_form(qtbot)
+    form._unlock_btn.setChecked(True)
+    for key in ("width", "height"):
+        stack = form._dim_stacks[key]
+        assert stack.currentIndex() == 1                       # now the editable spinbox
+        assert stack.currentWidget() is form._widgets[key]
 
 
 def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
@@ -289,34 +296,44 @@ def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
 
 def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
     # The toggle is a free child of the Dimensions content (like the swap button),
-    # not stuffed into the width field's cell — so neither field is smooshed to
-    # make room. Both fields are added as plain rows, sharing no cell with it.
+    # not stuffed into a field's cell — so neither field is smooshed to make room.
     form = _sized_form(qtbot)
     assert form._unlock_btn.parent() is form._sections["Dimensions"].content()
     assert _field_cell_of(form, "width") is None    # a plain field, no trailing cell
     assert _field_cell_of(form, "height") is None
 
 
-def test_unlock_toggle_sits_between_the_dimension_rows(qtbot):
-    # Like the swap button: vertically midway between the width and height rows,
-    # off to the left rather than trailing (and shrinking) either field.
+def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
+    # Vertically midway between the width and height rows, and entirely within the
+    # reserved left gutter — so it never sits on top of the "Width"/"Height" labels.
     form = _sized_form(qtbot)
+    form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     form._sections["Dimensions"].set_collapsed(False)
-    form.resize(400, 360)
+    form.resize(420, 380)
     form.show()
     qtbot.waitExposed(form)
 
     btn = form._unlock_btn.geometry()
-    width = form._widgets["width"].geometry()
-    height = form._widgets["height"].geometry()
-    assert width.center().y() < btn.center().y() < height.center().y()
-    assert btn.right() <= width.left()
+    top = form._dim_stacks["width"].geometry()
+    bottom = form._dim_stacks["height"].geometry()
+    assert top.center().y() < btn.center().y() < bottom.center().y()
+
+    dim_form = form._sections["Dimensions"].content_form()
+    width_label = dim_form.labelForField(form._dim_stacks["width"])
+    height_label = dim_form.labelForField(form._dim_stacks["height"])
+    # The button is clear of both the labels and the fields — no overlap.
+    assert btn.right() <= width_label.geometry().left()
+    assert btn.right() <= height_label.geometry().left()
+    assert btn.right() <= top.left()
 
 
 def test_derived_dimensions_track_the_input_image(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
     form._widgets["input_image"].setText("frame.png")
+    # Both the plain locked value and the spinbox behind it follow the image.
+    assert form._dim_value_labels["width"].text() == "864"
+    assert form._dim_value_labels["height"].text() == "480"
     assert form._widgets["width"].value() == 864
     assert form._widgets["height"].value() == 480
 
@@ -338,7 +355,7 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
 
     form._unlock_btn.setChecked(True)
     assert fired                                  # the unlock announces itself
-    assert form._widgets["width"].isReadOnly() is False   # now editable
+    assert form._dim_stacks["width"].currentIndex() == 1   # editable box now showing
     form._widgets["width"].setValue(1024)
     form._widgets["height"].setValue(576)
 
@@ -355,7 +372,8 @@ def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
 
     form._unlock_btn.setChecked(False)
     assert "width" not in form.get_values()       # back to deriving
-    assert form._widgets["width"].value() == 864   # showing the derived size again
+    assert form._dim_stacks["width"].currentIndex() == 0   # plain value again
+    assert form._dim_value_labels["width"].text() == "864"  # showing the derived size
 
 
 def test_set_values_with_a_size_override_unlocks_and_shows_it(qtbot):

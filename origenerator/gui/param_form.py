@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Callable
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
+    QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
     QComboBox, QPushButton, QToolButton, QFileDialog,
 )
 from PyQt6.QtCore import Qt, QEvent, pyqtSignal
@@ -32,6 +32,9 @@ _DIMENSION_STEP = 16
 # open one once the user has unlocked it to override.
 _LOCK_CLOSED = "🔒"
 _LOCK_OPEN = "🔓"
+# The padlock renders at this point size regardless of the form's (larger) font,
+# so it stays a compact icon toggle and its width is predictable.
+_UNLOCK_FONT_PT = 11
 
 # Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
 # The metadata block inserts zero-width spaces into displayed paths for on-screen
@@ -102,6 +105,10 @@ class ParamForm(QWidget):
         # either field.
         self._unlock_btn: QToolButton | None = None
         self._dimensions_hint: QLabel | None = None
+        # Per derived dimension: the editable spinbox (in ``_widgets``), the plain
+        # value label shown while locked, and the stack that swaps between them.
+        self._dim_value_labels: dict[str, QLabel] = {}
+        self._dim_stacks: dict[str, QStackedWidget] = {}
         self._widgets: dict[str, QWidget] = {}
         self._randomize_checks: dict[str, CheckBox] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
@@ -327,17 +334,17 @@ class ParamForm(QWidget):
     # --- derived dimensions: the input-image size, shown locked & unlockable ---
 
     def _build_derived_dimensions(self):
-        """For a size-deriving workflow, add a read-only width/height pair to the
-        Dimensions section: the fields show the size derived from the input image
-        (kept live as it changes) but can't be edited, with a floating padlock
-        toggle — centered between the two rows so it links the pair without
-        shrinking either field — that unlocks them to override the derived size. A
-        no-op for a workflow that sets its size by hand (its own width/height params
-        already fill this section) or has none.
+        """For a size-deriving workflow, add a width/height pair to the Dimensions
+        section that reads as plain values while locked (like the read-only
+        passthrough rows — "864", not an input box) and turns into editable
+        spinboxes when unlocked. A floating padlock toggle, centered between the
+        two rows in a reserved left gutter so it clears the labels, does the
+        unlocking. A no-op for a workflow that sets its size by hand (its own
+        width/height params already fill this section) or has none.
         """
         if self._size_deriver is None:
             return
-        for key in ("width", "height"):
+        for key, label_text in (("width", "Width"), ("height", "Height")):
             box = NoWheelSpinBox()
             box.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
             box.setMaximum(_DIMENSION_MAX)
@@ -345,9 +352,16 @@ class ParamForm(QWidget):
             box.setSpecialValueText("—")
             box.valueChanged.connect(self.changed)
             self._widgets[key] = box
-        self._add_row("width", "Width", self._widgets["width"])
-        self._add_row("height", "Height", self._widgets["height"])
-        self._lock_dimension_fields(True)  # start locked: read-only, no spin buttons
+            value_label = QLabel("—")
+            value_label.setObjectName("readonlyParamValue")  # match the passthrough rows
+            self._dim_value_labels[key] = value_label
+            # A stack so locking swaps the plain value for the spinbox in place,
+            # keeping the row's height and position steady.
+            stack = QStackedWidget()
+            stack.addWidget(value_label)   # index 0: locked, a plain value
+            stack.addWidget(box)           # index 1: unlocked, editable
+            self._dim_stacks[key] = stack
+            self._add_row(key, label_text, stack)
         self._dimensions_hint = QLabel("Sized from the input image. Unlock to override.")
         self._dimensions_hint.setObjectName("dimensionsHint")
         self._dimensions_hint.setWordWrap(True)
@@ -360,12 +374,14 @@ class ParamForm(QWidget):
         btn.setCheckable(True)
         btn.setText(_LOCK_CLOSED)
         btn.setToolTip("Unlock to override the size derived from the input image")
+        # Pin a compact font so the padlock stays a small icon under the form's
+        # larger heading font, keeping its width predictable for the gutter.
+        lock_font = btn.font()
+        lock_font.setPointSize(_UNLOCK_FONT_PT)
+        btn.setFont(lock_font)
         btn.toggled.connect(self._on_dimensions_unlock_toggled)
         btn.adjustSize()
         self._unlock_btn = btn
-        form = self._sections["Dimensions"].content_form()
-        self._width_label = form.labelForField(self._widgets["width"])
-        self._height_label = form.labelForField(self._widgets["height"])
         content.installEventFilter(self)  # follow the section's own relayouts
         # Recompute the shown size whenever the input image changes, and seed it now.
         image = self._widgets.get("input_image")
@@ -373,37 +389,29 @@ class ParamForm(QWidget):
             image.textChanged.connect(self._update_derived_display)
         self._update_derived_display()
 
-    def _lock_dimension_fields(self, locked: bool):
-        """Render the width/height pair read-only (a plain, uneditable value with
-        no spin buttons) when locked, or a normal editable spinbox when not."""
-        symbols = (
-            QAbstractSpinBox.ButtonSymbols.NoButtons if locked
-            else QAbstractSpinBox.ButtonSymbols.UpDownArrows
-        )
-        for key in ("width", "height"):
-            box = self._widgets[key]
-            box.setReadOnly(locked)
-            box.setButtonSymbols(symbols)
-
     def _position_unlock_button(self):
         """Center the unlock toggle vertically between the width and height rows,
-        just left of their labels — the swap button's spot, in the Dimensions
-        content's coordinates. A no-op while the section is folded (the toggle
-        hides with it) or on a manual-size form (no toggle)."""
+        inside a left gutter reserved for it so it sits clear of the "Width"/
+        "Height" labels. The gutter is the section's left margin, sized to the
+        button here (the button's final width isn't known until its font and
+        stylesheet apply, after construction). In the Dimensions content's
+        coordinates (the toggle's parent). A no-op while the section is folded (the
+        toggle hides with it) or on a manual-size form."""
         btn = self._unlock_btn
         if btn is None or self._sections["Dimensions"].is_collapsed():
             return
         btn.adjustSize()
-        top = self._widgets["width"].geometry()
-        bottom = self._widgets["height"].geometry()
+        gutter = btn.width() + 10  # room for the button plus a small gap to the labels
+        form = self._sections["Dimensions"].content_form()
+        if form.contentsMargins().left() != gutter:
+            # Push the labels over to open the gutter; the relayout re-invokes us
+            # with the rows in their new positions.
+            form.setContentsMargins(gutter, 2, 0, 4)
+            return
+        top = self._dim_stacks["width"].geometry()
+        bottom = self._dim_stacks["height"].geometry()
         y = (top.center().y() + bottom.center().y()) // 2 - btn.height() // 2
-        label = self._width_label.geometry()
-        fm = self._width_label.fontMetrics()
-        text_left = label.right() - max(
-            fm.horizontalAdvance(self._width_label.text()),
-            fm.horizontalAdvance(self._height_label.text()),
-        )
-        x = max(0, text_left - btn.width() - 6)
+        x = max(0, (gutter - btn.width()) // 2)
         btn.move(x, y)
         btn.raise_()
 
@@ -412,15 +420,16 @@ class ParamForm(QWidget):
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
-        """Flip the padlock, make the dimension fields editable or read-only to
-        match, and re-lock them back onto the derived size. Announces the change so
-        the panel refreshes with it."""
+        """Flip the padlock and swap each dimension between its plain locked value
+        and its editable spinbox, re-locking back onto the derived size. Announces
+        the change so the panel refreshes with it."""
         self._unlock_btn.setText(_LOCK_OPEN if unlocked else _LOCK_CLOSED)
         self._unlock_btn.setToolTip(
             "Re-lock to the size derived from the input image" if unlocked
             else "Unlock to override the size derived from the input image"
         )
-        self._lock_dimension_fields(not unlocked)
+        for stack in self._dim_stacks.values():
+            stack.setCurrentIndex(1 if unlocked else 0)
         if not unlocked:
             self._update_derived_display()
         self._position_unlock_button()  # the glyph swap can change the button's width
@@ -428,8 +437,9 @@ class ParamForm(QWidget):
 
     def _update_derived_display(self):
         """Fill the locked width/height with the size the current input image
-        derives (0 → em dash when none can be measured). A no-op while unlocked,
-        so it never clobbers a value the user is editing."""
+        derives — the plain value label and the spinbox behind it both, so
+        unlocking starts from that value (0 → em dash when none can be measured).
+        A no-op while unlocked, so it never clobbers a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():
             return
         size = self._size_deriver(self.get_values_static())
@@ -438,6 +448,7 @@ class ParamForm(QWidget):
             blocked = box.blockSignals(True)  # a display refresh isn't a user edit
             box.setValue(value)
             box.blockSignals(blocked)
+            self._dim_value_labels[key].setText(str(value) if value else "—")
 
     def _override_dimensions(self) -> dict:
         """The explicit width/height to emit — only when the pair is unlocked and

@@ -153,7 +153,7 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
     form = panel._param_form
     assert form._size_deriver is not None
     assert "width" in form._present_keys["Dimensions"]
-    assert form._widgets["width"].isReadOnly() is True   # locked (read-only) by default
+    assert form._dim_stacks["width"].currentIndex() == 0   # locked: a plain value, not a box
     assert form._unlock_btn is not None
 
 
@@ -171,8 +171,8 @@ def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path,
     panel._param_form._widgets["input_image"].setText("wide.png")
 
     width, height = scale_to_total_pixels(1920, 1080)
-    assert panel._param_form._widgets["width"].value() == width
-    assert panel._param_form._widgets["height"].value() == height
+    assert panel._param_form._dim_value_labels["width"].text() == str(width)
+    assert panel._param_form._dim_value_labels["height"].text() == str(height)
 
 
 def test_manual_size_workflow_form_has_no_deriver(panel):

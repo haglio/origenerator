@@ -132,7 +132,7 @@ def build_stylesheet() -> str:
     /* The derived-size padlock: a compact toggle floating between the width and
        height rows. It lights blue while unlocked (the fields are overridable). */
     QToolButton#dimensionUnlock {{
-        padding: 3px 5px;
+        padding: 2px 4px;
     }}
     QToolButton#dimensionUnlock:checked {{
         background-color: {_h(BLUE)};

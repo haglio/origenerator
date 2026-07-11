@@ -1,6 +1,10 @@
 import json
 import math
+from pathlib import Path
 
+from PIL import Image
+
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 
@@ -15,6 +19,59 @@ TRACK_SECONDS = 5.0
 # the PoC): enough spread to read as a hand, not so much it smears the patch.
 _CLUSTER_OFFSETS = ((-5.0, -30.0), (3.0, 0.0), (-3.0, 30.0))
 
+# The output size is derived from the input image at the SAME pixel budget and
+# stride the WAN 2.2 workflows scale to in-graph (ImageScaleToTotalPixels at
+# 0.4 MP on a /16 stride), so an image yields the same proportions across every
+# i2v workflow. ATI just can't do it in-graph — its WanTrackToVideo needs the
+# integer size AND a track whose coordinates live in that space, both built here.
+TARGET_MEGAPIXELS = 0.4
+RESOLUTION_STEPS = 16
+# The reference frame the stored stroke coordinates are authored in. They're
+# rescaled from here into the derived output space (see ``_scaled_stroke_params``),
+# and this doubles as the fallback size when the input image can't be measured.
+REFERENCE_WIDTH = 480
+REFERENCE_HEIGHT = 864
+# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]"
+# (the same convention gallery/signatures.py strips); an unannotated value names
+# a file in the input dir.
+_OUTPUT_TAG = "[output]"
+_INPUT_TAG = "[input]"
+
+
+def _scale_to_total_pixels(src_width: int, src_height: int) -> tuple[int, int]:
+    """The output size for a ``src_width``×``src_height`` image, replicating
+    ComfyUI's ``ImageScaleToTotalPixels`` (0.4 MP, /16 stride) exactly so the
+    size matches what the in-graph WAN 2.2 workflows produce for the same image.
+
+    Mirrors the node's ``round(dim * sqrt(total / area) / steps) * steps`` (with
+    Python's banker's rounding, as ComfyUI uses). The only addition is a floor at
+    one stride, so a degenerate aspect ratio can't round a side to zero and crash
+    the track node — a no-op for any realistic image.
+    """
+    total = TARGET_MEGAPIXELS * 1024 * 1024
+    scale = math.sqrt(total / (src_width * src_height))
+    width = round(src_width * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
+    height = round(src_height * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
+    return max(RESOLUTION_STEPS, width), max(RESOLUTION_STEPS, height)
+
+
+def _resolve_input_image_path(input_image: str) -> Path | None:
+    """The on-disk file a LoadImage value names, or ``None`` when it's empty or
+    absent. A ``"name [output]"`` value lives under the ComfyUI output dir and an
+    ``"[input]"`` (or unannotated) one under the input dir — matching how
+    ComfyUI's LoadImage routes the reference."""
+    ref = (input_image or "").strip()
+    if not ref:
+        return None
+    stem, _, tag = ref.rpartition(" ")
+    if stem and tag == _OUTPUT_TAG:
+        path = COMFYUI_OUTPUT_DIR / stem
+    elif stem and tag == _INPUT_TAG:
+        path = COMFYUI_INPUT_DIR / stem
+    else:
+        path = COMFYUI_INPUT_DIR / ref
+    return path if path.is_file() else None
+
 
 class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """WAN 2.1 ATI image-to-video: the video follows an authored stroke track.
@@ -26,15 +83,18 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     source, exact by construction, no pixel measurement. The decoded frames
     still get the HunyuanVideo-Foley scoring pass, muxed by ``CreateVideo``.
 
-    Unlike the WAN 2.2 workflows the output size is explicit (``width`` /
-    ``height``): the track's pixel coordinates and the conditioning must agree
-    on one space, so deriving the size in-graph would leave the track blind.
-    Frame count stops at 113 because ComfyUI's track resampler faults at
-    exactly 121 frames (its length-1=120 off-by-one).
+    The output size is derived from the input image like the WAN 2.2 workflows,
+    but app-side rather than in-graph (see :meth:`build_api_payload`): its
+    ``WanTrackToVideo`` needs the integer size *and* a track whose coordinates
+    share that space, and an in-graph ``GetImageSize`` couldn't feed the track,
+    which is built here. The stroke is authored in a fixed 480×864 reference
+    frame and rescaled into the derived size, so one authored track fits any
+    aspect ratio. Frame count stops at 113 because ComfyUI's track resampler
+    faults at exactly 121 frames (its length-1=120 off-by-one).
     """
 
     name = "wan21_ati_i2v"
-    version = "v002"
+    version = "v003"
     display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
     output_type = "video"
     model_keys = ("unet",)
@@ -55,8 +115,6 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "shift": 8.0,
             "frame_rate": 16.0,
-            "width": 480,
-            "height": 864,
             "stroke_hz": 1.2,
             "stroke_x": 255,
             "stroke_top": 490,
@@ -90,11 +148,14 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("stroke_hz", "Stroke Rate (Hz)", "float", 1.2, min_val=0.2, max_val=4.0, step=0.1),
-            ParamDef("stroke_x", "Stroke X", "int", 255, min_val=0, max_val=4096),
-            ParamDef("stroke_top", "Stroke Top Y", "int", 490, min_val=0, max_val=4096),
-            ParamDef("stroke_bottom", "Stroke Bottom Y", "int", 650, min_val=0, max_val=4096),
-            ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=4096),
-            ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=4096),
+            # Stroke coordinates are authored in the 480×864 reference frame and
+            # rescaled into the derived output size at payload build, so their
+            # ranges are the reference frame's bounds (width for X, height for Y).
+            ParamDef("stroke_x", "Stroke X", "int", 255, min_val=0, max_val=REFERENCE_WIDTH),
+            ParamDef("stroke_top", "Stroke Top Y", "int", 490, min_val=0, max_val=REFERENCE_HEIGHT),
+            ParamDef("stroke_bottom", "Stroke Bottom Y", "int", 650, min_val=0, max_val=REFERENCE_HEIGHT),
+            ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=REFERENCE_WIDTH),
+            ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Frames", "int", 81, min_val=5, max_val=113, step=4),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
@@ -102,8 +163,6 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("unet", "Model", "combo", defaults["unet"], options=models),
             ParamDef("lora", "LoRA", "combo", defaults["lora"], options=list_lora_files([])),
             ParamDef("lora_strength", "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("width", "Width", "int", 480, min_val=64, max_val=2048, step=16),
-            ParamDef("height", "Height", "int", 864, min_val=64, max_val=2048, step=16),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
             ParamDef("filename_prefix", "Output Prefix", "str", "video/wan21_ati_i2v"),
         ]
@@ -113,6 +172,38 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         """The authored sine at track-time ``t_track``, in [-1, 1]; -1 is the
         stroke top (where the cluster starts), +1 the bottom."""
         return math.sin(2 * math.pi * params["stroke_hz"] * t_track - math.pi / 2)
+
+    def _derived_size(self, params: dict) -> tuple[int, int]:
+        """The output size for this run: the input image measured and scaled to
+        the shared pixel budget (:func:`_scale_to_total_pixels`), or the reference
+        size when the image is missing or unreadable — so payload build never
+        crashes on a stale or hand-typed filename, it just uses the default."""
+        path = _resolve_input_image_path(params.get("input_image", ""))
+        if path is not None:
+            try:
+                with Image.open(path) as img:
+                    return _scale_to_total_pixels(*img.size)
+            except (OSError, ValueError):
+                pass
+        return REFERENCE_WIDTH, REFERENCE_HEIGHT
+
+    @staticmethod
+    def _scaled_stroke_params(params: dict, width: int, height: int) -> dict:
+        """``params`` with the stroke coordinates rescaled from the 480×864
+        reference frame into the derived ``width``×``height`` space, so a track
+        authored once lands in the same relative place whatever the input image's
+        aspect ratio. X coordinates scale by the width ratio, Y by the height
+        ratio; everything else (the rate, the seeds, …) passes through."""
+        sx = width / REFERENCE_WIDTH
+        sy = height / REFERENCE_HEIGHT
+        return {
+            **params,
+            "stroke_x": params["stroke_x"] * sx,
+            "anchor_x": params["anchor_x"] * sx,
+            "stroke_top": params["stroke_top"] * sy,
+            "stroke_bottom": params["stroke_bottom"] * sy,
+            "anchor_y": params["anchor_y"] * sy,
+        }
 
     def _stroke_tracks(self, params: dict) -> str:
         """The tracks JSON: three staggered points riding the authored stroke
@@ -149,6 +240,12 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         return actions
 
     def build_api_payload(self, params: dict) -> dict:
+        # ATI can't derive its size in-graph (its WanTrackToVideo needs the
+        # integer size AND a track whose coordinates share that space), so both
+        # are built here: the size is measured from the input image and the
+        # authored stroke is rescaled into it.
+        width, height = self._derived_size(params)
+        stroke_params = self._scaled_stroke_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
         # Optional 2.1-compatible LoRA: "None" omits the loader and the base
         # ATI model runs unmodified (WorkflowTemplate.lora_model_input).
@@ -208,9 +305,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
                     "positive": ["6", 0],
                     "negative": ["7", 0],
                     "vae": ["2", 0],
-                    "tracks": self._stroke_tracks(params),
-                    "width": params["width"],
-                    "height": params["height"],
+                    "tracks": self._stroke_tracks(stroke_params),
+                    "width": width,
+                    "height": height,
                     "length": params["frame_count"],
                     "batch_size": params["batch_size"],
                     "temperature": 220.0,

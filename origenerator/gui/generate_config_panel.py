@@ -125,6 +125,7 @@ class GenerateConfigPanel(QWidget):
 
         # Editable: the workflow picker, its typical-time estimate, and the param
         # form (swapped into _form_host whenever the workflow changes).
+        self._form_workflow_key = None  # which workflow the installed form belongs to
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = NoWheelComboBox()
@@ -244,10 +245,34 @@ class GenerateConfigPanel(QWidget):
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
+            edited = self._edited_form_values()
             self._install_form(ParamForm(wf.param_definitions()))
+            self._form_workflow_key = key
+            defaults = wf.default_params()
+            carried = {
+                k: v for k, v in edited.items()
+                if k in defaults and v != defaults[k]
+            }
+            if carried:
+                self._param_form.set_values(carried)
         self._refresh_estimate()
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
+
+    def _edited_form_values(self) -> dict:
+        """What the user changed on the installed form: its values minus the keys
+        still sitting at its own workflow's defaults. Switching workflows carries
+        these over (where the new workflow shares the param), so a typed prompt or
+        picked image survives the switch — while the departing workflow's defaults
+        never leak into the next one's."""
+        prior = WORKFLOW_REGISTRY.get(self._form_workflow_key or "")
+        if self._param_form is None or prior is None:
+            return {}
+        defaults = prior.default_params()
+        return {
+            k: v for k, v in self._param_form.get_values_static().items()
+            if k not in defaults or v != defaults[k]
+        }
 
     def _install_form(self, form: ParamForm):
         """Swap the workflow's ParamForm into the form host inside the scroll,

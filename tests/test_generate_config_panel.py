@@ -120,6 +120,32 @@ def test_switching_workflow_detaches_the_old_form_at_once(panel):
     assert live == [panel._param_form]         # exactly one form in the host
 
 
+def test_switching_workflow_carries_over_the_users_edits(panel):
+    # Changing workflow must not wipe what the user already set up: any value
+    # they EDITED away from the departing workflow's defaults carries into the
+    # new form wherever the new workflow shares the param. Values still at the
+    # old defaults don't leak — flf2v's 4-step lightning default must not
+    # follow the user into a workflow tuned for 20.
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
+    panel._param_form.set_values({
+        "positive_prompt": "slow epsilon",
+        "input_image": "start.png",
+        "audio_prompt": "wet stroking",
+        "steps": 7,  # an edit — flf2v's default is 4
+    })
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+
+    values = panel._param_form.get_values_static()
+    assert values["positive_prompt"] == "slow epsilon"
+    assert values["input_image"] == "start.png"
+    assert values["audio_prompt"] == "wet stroking"
+    assert values["steps"] == 7
+    ati_defaults = WORKFLOW_REGISTRY["wan21_ati_i2v"].default_params()
+    assert values["cfg"] == ati_defaults["cfg"]        # flf2v's 1.0 didn't leak
+    assert values["stroke_hz"] == ati_defaults["stroke_hz"]
+
+
 # --- a read-only gallery (no client) ----------------------------------------
 
 def test_tolerates_a_missing_client(qtbot, tmp_path):

@@ -153,8 +153,8 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
     form = panel._param_form
     assert form._size_deriver is not None
     assert "width" in form._present_keys["Dimensions"]
-    assert form._widgets["width"].isEnabled() is False   # locked by default
-    assert form._unlock_check is not None
+    assert form._widgets["width"].isReadOnly() is True   # locked (read-only) by default
+    assert form._unlock_btn is not None
 
 
 def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path, monkeypatch):
@@ -181,7 +181,7 @@ def test_manual_size_workflow_form_has_no_deriver(panel):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     form = panel._param_form
     assert form._size_deriver is None
-    assert form._unlock_check is None
+    assert form._unlock_btn is None
 
 
 # --- a read-only gallery (no client) ----------------------------------------

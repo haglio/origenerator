@@ -247,6 +247,45 @@ def test_reconnect_attaches_without_submitting(qtbot, tmp_path):
     assert len(finished) == 1
 
 
+def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
+    # What gets persisted on the running row: a JSON-able snapshot of where the ramp
+    # is, so a restart can resume it.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    job = GenerationJob(_client(), wf, {**wf.default_params(), "steps": 20},
+                        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
+    job.prompt_id = "pid"
+    job._on_progress("pid", 10, 10)   # first pass done
+    job._on_progress("pid", 3, 10)    # second pass at 3 -> 13/20
+
+    state = job.progress_state()
+    assert state["last_progress"] == [13, 20]
+
+
+def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
+    # The payoff: a reconnected job shows its last position at once, and the restored
+    # tracker carries the multi-pass ramp forward rather than restarting from the
+    # pass it reconnects into.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    state = {"last_progress": [13, 20],
+             "tracker": {"total": 20, "banked": 10, "stage_max": 10, "last_value": 3}}
+    job = GenerationJob.reconnect(
+        _client(), wf, {**wf.default_params(), "steps": 20}, "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs", progress_state=state,
+    )
+    assert job.last_progress == (13, 20)     # bar resumes at its last spot immediately
+
+    job._on_progress("pid", 4, 10)           # next real tick from ComfyUI
+    assert job.last_progress == (14, 20)     # carries on, not back to 4/20
+
+
+def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
+    job = GenerationJob.reconnect(
+        _client(), SDXL, _params(), "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    assert job.last_progress == (0, 0)  # nothing persisted yet -> indeterminate, as before
+
+
 def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     job.detach()

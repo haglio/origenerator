@@ -92,19 +92,47 @@ class GenerationJob(QObject):
     def last_preview(self) -> bytes | None:
         return self._last_preview
 
+    def progress_state(self) -> dict:
+        """A JSON-able snapshot of this job's live progress, to persist on its row.
+
+        Restored on :meth:`reconnect` so a restart mid-run resumes the bar at its
+        last position. Carries the displayed ``(cumulative, total)`` and the tracker's
+        internal ramp, so even a job with no recognized sampler (raw per-node numbers,
+        no ramp) still restores its last shown value.
+        """
+        return {
+            "last_progress": list(self._last_progress),
+            "tracker": self._progress_tracker.snapshot(),
+        }
+
+    def _restore_progress(self, state: dict) -> None:
+        """Seed ``_last_progress`` and the tracker from a persisted snapshot."""
+        tracker = state.get("tracker")
+        if isinstance(tracker, dict):
+            self._progress_tracker.restore(tracker)
+        last = state.get("last_progress")
+        if isinstance(last, (list, tuple)) and len(last) == 2:
+            self._last_progress = (int(last[0]), int(last[1]))
+
     # --- lifecycle ---------------------------------------------------------
 
     @classmethod
-    def reconnect(cls, client, workflow, params, prompt_id, **kwargs):
+    def reconnect(cls, client, workflow, params, prompt_id, *, progress_state=None, **kwargs):
         """Rebind to a job already running in ComfyUI under ``prompt_id``.
 
         Used after a restart to pick a re-roll back up from its persisted running
         row without re-submitting it: the job attaches to the client's signals and
         reports as running, so its progress, preview and completion flow through
         exactly as they would for a job started this session.
+
+        ``progress_state`` (a :meth:`progress_state` snapshot persisted while the job
+        last ran) seeds the resumed job's progress, so the bar shows its last position
+        at once instead of an indeterminate spin until ComfyUI's next per-step push.
         """
         job = cls(client, workflow, params, **kwargs)
         job.prompt_id = prompt_id
+        if progress_state:
+            job._restore_progress(progress_state)
         job._attach()
         job._state = "running"
         return job

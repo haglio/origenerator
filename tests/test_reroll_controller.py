@@ -204,3 +204,64 @@ def test_start_reroll_from_image_is_a_noop_when_the_folder_is_already_running(qt
 
     assert again is False
     client.submit_job.assert_called_once()
+
+
+def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
+    # A running job's live progress is written to its row, so a restart can resume
+    # the bar where it was instead of spinning until ComfyUI's next per-step push.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    key = "video/wf/deadbeef"
+    controller.start_prepared(key, _I2V, _params(steps=20, seed=3, noise_seed=9))
+    job = controller.jobs[key]
+
+    client.progress.emit(job.prompt_id, 5, 10)  # a live sampler step
+
+    state = json.loads(db.get_generation(job.prompt_id)["progress_json"])
+    assert state["last_progress"] == list(job.last_progress)
+
+
+def test_progress_persistence_is_throttled(qtbot, tmp_path):
+    # Ticks fire per step (sub-second for images); only the first of a burst is
+    # written, so the disk isn't hammered — the value stays recent enough to resume.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    key = "video/wf/deadbeef"
+    controller.start_prepared(key, _I2V, _params(steps=20))
+    pid = controller.jobs[key].prompt_id
+
+    client.progress.emit(pid, 5, 10)                       # first tick -> written
+    first = db.get_generation(pid)["progress_json"]
+    client.progress.emit(pid, 6, 10)                       # same second -> throttled
+    assert db.get_generation(pid)["progress_json"] == first
+
+
+def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
+    # On restart the reconnected job comes back already showing its last position.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    db.insert_generation(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
+                         positive_prompt="x", seed=1,
+                         params_json=json.dumps({**wf.default_params(), "seed": 1}),
+                         workflow_json="{}")
+    db.update_generation("rr", status="running", progress_json=json.dumps(
+        {"last_progress": [30, 50],
+         "tracker": {"total": 50, "banked": 0, "stage_max": 50, "last_value": 30}}))
+
+    controller.reconnect_running()
+
+    job = next(j for j in controller.jobs.values() if j.prompt_id == "rr")
+    assert job.last_progress == (30, 50)
+
+
+def test_parse_progress_state_tolerates_absent_or_corrupt():
+    from origenerator.gui.reroll_controller import _parse_progress_state
+    assert _parse_progress_state(None) is None
+    assert _parse_progress_state("") is None
+    assert _parse_progress_state("not json") is None
+    assert _parse_progress_state("[1, 2]") is None          # valid JSON, but not a dict
+    assert _parse_progress_state('{"total": 20}') == {"total": 20}

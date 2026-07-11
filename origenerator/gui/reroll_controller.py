@@ -13,7 +13,9 @@ actions (:meth:`start`, :meth:`cancel`) let their sole caller drive the follow-u
 UI directly; the signals carry the events that arrive asynchronously from a job.
 """
 
+import json
 import logging
+import time
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -25,6 +27,22 @@ from origenerator.gui.generation_job import (
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
+
+# How often a running job's live progress is written to its row. Throttled because
+# progress ticks fire per sampler step (sub-second for images); the persisted value
+# only needs to be recent enough that a restart resumes the bar near where it was.
+_PROGRESS_PERSIST_INTERVAL_S = 1.0
+
+
+def _parse_progress_state(raw):
+    """The persisted progress snapshot for a row, or ``None`` when absent/corrupt."""
+    if not raw:
+        return None
+    try:
+        state = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return state if isinstance(state, dict) else None
 
 
 class RerollController(QObject):
@@ -42,6 +60,7 @@ class RerollController(QObject):
         self._db = db
         self._client = client
         self._jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
+        self._progress_persist_at: dict[str, float] = {}  # prompt_id -> last-write time
 
     @property
     def jobs(self) -> dict:
@@ -195,6 +214,22 @@ class RerollController(QObject):
         )
         job.failed.connect(lambda msg, k=key: self._on_failed(k, msg))
         job.preview.connect(lambda data, k=key: self.preview.emit(k, data))
+        # Persist the job's live progress onto its row so a restart mid-run can resume
+        # the bar at its last position (see GenerationJob.reconnect(progress_state=…)).
+        job.progress.connect(lambda value, mx, j=job: self._persist_progress(j))
+
+    def _persist_progress(self, job: GenerationJob):
+        """Write a running job's progress to its row, throttled to spare the disk."""
+        now = time.monotonic()
+        if now - self._progress_persist_at.get(job.prompt_id, 0.0) < _PROGRESS_PERSIST_INTERVAL_S:
+            return
+        self._progress_persist_at[job.prompt_id] = now
+        try:
+            self._db.update_generation(
+                job.prompt_id, progress_json=json.dumps(job.progress_state())
+            )
+        except Exception as e:  # a persistence hiccup must never disrupt a live run
+            logger.debug("Could not persist progress for %s: %s", job.prompt_id, e)
 
     def reconnect_running(self):
         """Rebind live jobs to any re-rolls left running by a previous session.
@@ -232,7 +267,10 @@ class RerollController(QObject):
             return
         params = gallery.parse_params(row.get("params_json"))
         try:
-            job = GenerationJob.reconnect(self._client, workflow, params, row["prompt_id"])
+            job = GenerationJob.reconnect(
+                self._client, workflow, params, row["prompt_id"],
+                progress_state=_parse_progress_state(row.get("progress_json")),
+            )
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
             return

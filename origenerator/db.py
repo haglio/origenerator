@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS generations (
     output_files    TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
+    -- Last live progress of a still-running job (a ProgressTracker snapshot), so a
+    -- restart mid-generation can resume the bar at its last position instead of an
+    -- indeterminate spin while ComfyUI's next per-step push is awaited.
+    progress_json   TEXT,
     duration_seconds REAL,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     completed_at    TEXT,
@@ -43,8 +47,8 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
-    "output_files", "thumbnail_path", "error_message", "duration_seconds",
-    "created_at", "completed_at", "evolver_exported_at",
+    "output_files", "thumbnail_path", "error_message", "progress_json",
+    "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
 )
 
 
@@ -71,6 +75,8 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
         if "evolver_exported_at" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
+        if "progress_json" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN progress_json TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -110,7 +116,7 @@ class Database:
     def update_generation(self, prompt_id: str, **fields):
         allowed = {
             "status", "output_files", "thumbnail_path",
-            "error_message", "completed_at", "duration_seconds",
+            "error_message", "completed_at", "duration_seconds", "progress_json",
         }
         to_set = {k: v for k, v in fields.items() if k in allowed}
         if not to_set:

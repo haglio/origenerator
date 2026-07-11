@@ -167,10 +167,29 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
          "title": None},
     ], "current": 0})
     win = _window(qtbot, tmp_path, state)
-    win.show()  # showEvent -> refresh rebuilds the image rows, then lights the button
+    win._gallery_view.refresh()  # rebuilds the image rows, then re-asserts the button
 
     panel = win._gallery_view._info_tabs.current_config_panel()
     assert panel._generating is True
+
+
+def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_path):
+    # The user-visible payoff of persisting progress: after a restart the running-job
+    # bar (fed by the in-flight items) resumes at the saved position, rather than an
+    # indeterminate spin until ComfyUI's next per-step push.
+    db = Database(tmp_path / "t.db")
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), seed=1, positive_prompt="a cat")
+    db.insert_generation(prompt_id="rr", workflow_name="sdxl_t2i", workflow_version="v",
+                         positive_prompt="a cat", seed=1,
+                         params_json=json.dumps(params), workflow_json="{}")
+    db.update_generation("rr", status="running", progress_json=json.dumps(
+        {"last_progress": [30, 50],
+         "tracker": {"total": 50, "banked": 0, "stage_max": 50, "last_value": 30}}))
+
+    win = _window(qtbot, tmp_path)
+
+    item = next(it for it in win._gallery_view._inflight_items() if it.key == "rr")
+    assert item.progress == (30, 50)
 
 
 def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):

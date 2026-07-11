@@ -70,6 +70,40 @@ class ProgressTracker:
         self._stage_max = 0       # this pass's step count (its reported max)
         self._last_value = None   # last value seen in this pass, to spot a restart
 
+    def snapshot(self) -> dict:
+        """The tracker's resumable state, small enough to persist each progress tick.
+
+        Paired with :meth:`restore`, this lets a job's ramp survive an app restart:
+        the banked passes and the current pass's position come back intact, so a
+        reconnected multi-stage job continues its 0-to-total ramp from where it was
+        rather than restarting the count from the pass it reconnects into.
+        """
+        return {
+            "total": self._total,
+            "banked": self._banked,
+            "stage_max": self._stage_max,
+            "last_value": self._last_value,
+        }
+
+    def restore(self, snapshot: dict) -> None:
+        """Reload a :meth:`snapshot` so the ramp resumes where it left off."""
+        self._total = int(snapshot.get("total", self._total))
+        self._banked = int(snapshot.get("banked", 0))
+        self._stage_max = int(snapshot.get("stage_max", 0))
+        last_value = snapshot.get("last_value")
+        self._last_value = None if last_value is None else int(last_value)
+
+    def current(self) -> tuple[int, int]:
+        """The last ``(cumulative, total)`` this tracker would report right now.
+
+        Used to seed a reconnected job's displayed progress from a restored snapshot,
+        so the bar shows its last position immediately instead of a blank ramp.
+        ``(0, 0)`` when the total is unknown (no recognized sampler).
+        """
+        if self._total <= 0:
+            return 0, 0
+        return min(self._banked + (self._last_value or 0), self._total), self._total
+
     def update(self, value: int, max_val: int) -> tuple[int, int]:
         if self._total <= 0:
             return value, max_val  # unknown total: fall back to raw per-node numbers

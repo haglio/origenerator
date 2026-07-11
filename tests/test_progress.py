@@ -58,3 +58,33 @@ def test_tracker_for_payload_sizes_itself_from_the_workflow():
     # Second pass continues from 10, proving it measured the full 20-step run.
     tracker.update(10, 10)
     assert tracker.update(1, 10) == (11, 20)
+
+
+def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
+    # The persistence path: a two-pass job (10 + 10) part-way through its SECOND
+    # pass. Snapshotting and restoring into a fresh tracker (an app restart) must
+    # continue the ramp — the next tick reads 14/20, not 4/20 as a tracker that
+    # forgot the banked first pass would.
+    tracker = ProgressTracker(20)
+    tracker.update(10, 10)          # first pass done -> banks 10
+    tracker.update(3, 10)           # second pass at 3 -> 13/20
+    assert tracker.current() == (13, 20)
+
+    resumed = ProgressTracker(20)
+    resumed.restore(tracker.snapshot())
+    assert resumed.current() == (13, 20)         # seeds the bar at its last spot
+    assert resumed.update(4, 10) == (14, 20)     # and carries on, not back to 4/20
+
+
+def test_snapshot_is_json_serializable():
+    import json
+    tracker = ProgressTracker(20)
+    tracker.update(10, 10)
+    tracker.update(3, 10)
+    snap = tracker.snapshot()
+    assert json.loads(json.dumps(snap)) == snap  # it rides on the row as text
+
+
+def test_current_is_zero_when_total_is_unknown():
+    # No recognized sampler: nothing to seed a percentage from.
+    assert ProgressTracker(0).current() == (0, 0)

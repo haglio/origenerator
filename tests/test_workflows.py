@@ -650,11 +650,12 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     anchor = tracks[3]
     assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
 
-    # Single-stage 2.1 sampling: one KSampler on the ATI UNET, no dual-noise pair.
-    samplers = [n for n in payload.values() if n["class_type"] == "KSampler"]
-    assert len(samplers) == 1
-    assert samplers[0]["inputs"]["seed"] == 7
-    assert _find_node(payload, "KSamplerAdvanced") is None
+    # Two-stage sampling on the single ATI UNET (the high/low LoRA split; see
+    # test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras), seeded once.
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    assert len(samplers) == 2
+    assert all(n["inputs"]["noise_seed"] == 7 for n in samplers)
+    assert _find_node(payload, "KSampler") is None
     unet = _find_node(payload, "UNETLoader")
     assert unet["inputs"]["unet_name"] == params["unet"]
 
@@ -755,42 +756,83 @@ def test_wan21_ati_i2v_stroke_decelerates_into_reversals_and_wobbles_like_a_hand
     assert len(gaps) > 1
 
 
-def test_wan21_ati_i2v_offers_an_optional_lora(monkeypatch):
-    # The 2.1 base carries none of the motion vocabulary the 2.2 NSFW LoRAs
-    # taught, so the workflow exposes a LoRA slot for 2.1-compatible LoRAs —
-    # optional exactly like the 2.2 workflows' slots: "None" omits the loader
-    # node and the base model runs unmodified.
+def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
+    # The LoRA ecosystem ships high/low-noise pairs, so the ATI workflow takes
+    # one of each like the 2.2 workflows do — emulated on its single 2.1 base
+    # by splitting the denoise into two KSamplerAdvanced stages at steps//2:
+    # the high-noise LoRA patches the early-step model, the low-noise LoRA the
+    # late-step one, both branching off the one UNET. Each slot is optional
+    # ("None" omits its loader; that stage runs the base model unmodified).
     import origenerator.workflows.wan21_ati_i2v as ati_module
     from origenerator.workflows.model_files import NO_LORA
     from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
-    options = [NO_LORA, "hand.safetensors"]
+    options = [NO_LORA, "hand_high.safetensors", "hand_low.safetensors"]
     monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback: options)
 
     wf = Wan21AtiI2vWorkflow()
-    assert wf.lora_keys == ("lora",)
-    picker = {pd.key: pd for pd in wf.param_definitions()}["lora"]
-    assert picker.type == "combo"
-    assert picker.options == options
-    assert picker.default == NO_LORA
+    assert wf.lora_keys == ("lora_high", "lora_low")
+    by_key = {pd.key: pd for pd in wf.param_definitions()}
+    for level in ("high", "low"):
+        picker = by_key[f"lora_{level}"]
+        assert picker.type == "combo"
+        assert picker.options == options
+        assert picker.default == NO_LORA
 
     def lora_nodes(payload):
-        return [n for n in payload.values() if n["class_type"] == "LoraLoaderModelOnly"]
+        return {nid: n for nid, n in payload.items()
+                if n["class_type"] == "LoraLoaderModelOnly"}
 
-    bypassed = wf.build_api_payload(dict(wf.default_params(), lora=NO_LORA))
-    assert lora_nodes(bypassed) == []
+    def stages(payload):
+        samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+        assert _find_node(payload, "KSampler") is None
+        assert len(samplers) == 2
+        early = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+        late = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+        return early, late
 
-    params = dict(wf.default_params(), lora="hand.safetensors", lora_strength=0.8)
+    # Both bypassed: two stages, no LoRA loaders, both stages on the base model.
+    params = dict(wf.default_params(), seed=5, steps=20)
     payload = wf.build_api_payload(params)
-    (loader,) = lora_nodes(payload)
-    assert loader["inputs"]["lora_name"] == "hand.safetensors"
-    assert loader["inputs"]["strength_model"] == 0.8
-    # The shift node reads the LoRA'd model, so the sampler runs it.
+    early, late = stages(payload)
+    assert lora_nodes(payload) == {}
+    assert early["inputs"]["end_at_step"] == 10
+    assert late["inputs"]["start_at_step"] == 10
+    assert early["inputs"]["noise_seed"] == 5
+    # Stage two refines stage one's latent.
+    early_id = next(k for k, v in payload.items() if v is early)
+    assert late["inputs"]["latent_image"] == [early_id, 0]
+
+    # Both set: each stage's model chain runs its own LoRA off the shared UNET.
+    payload = wf.build_api_payload(dict(
+        params, lora_high="hand_high.safetensors", lora_strength_high=0.8,
+        lora_low="hand_low.safetensors", lora_strength_low=0.6,
+    ))
+    early, late = stages(payload)
+    loaders = lora_nodes(payload)
+    assert len(loaders) == 2
     unet_id = _node_id(payload, "UNETLoader")
-    lora_id = _node_id(payload, "LoraLoaderModelOnly")
-    shift = _find_node(payload, "ModelSamplingSD3")
-    assert loader["inputs"]["model"] == [unet_id, 0]
-    assert shift["inputs"]["model"] == [lora_id, 0]
+
+    def chain_lora(sampler):
+        shift = payload[sampler["inputs"]["model"][0]]
+        assert shift["class_type"] == "ModelSamplingSD3"
+        loader = payload[shift["inputs"]["model"][0]]
+        assert loader["class_type"] == "LoraLoaderModelOnly"
+        assert loader["inputs"]["model"] == [unet_id, 0]
+        return loader["inputs"]
+
+    assert chain_lora(early)["lora_name"] == "hand_high.safetensors"
+    assert chain_lora(early)["strength_model"] == 0.8
+    assert chain_lora(late)["lora_name"] == "hand_low.safetensors"
+    assert chain_lora(late)["strength_model"] == 0.6
+
+    # One set, one bypassed: exactly one loader; the bypassed stage's shift
+    # reads the UNET directly.
+    payload = wf.build_api_payload(dict(params, lora_high="hand_high.safetensors"))
+    early, late = stages(payload)
+    assert len(lora_nodes(payload)) == 1
+    late_shift = payload[late["inputs"]["model"][0]]
+    assert late_shift["inputs"]["model"] == [unet_id, 0]
 
 
 def _write_image(path, size):

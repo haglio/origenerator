@@ -745,6 +745,23 @@ def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch
     assert panel._param_form.get_values_static()["positive_prompt"] == "dance"
 
 
+def test_completed_result_shows_output_and_footer_without_touching_the_form(saved_panel):
+    # The reported bug: while a Generate runs the user keeps typing the next
+    # prompt; when the run finishes, its result must land in the tab — output in
+    # the preview, footer revealed — WITHOUT re-seeding the form. The tab already
+    # holds the settings that produced the result, so re-seeding only clobbers the
+    # in-progress edit (here "a wizard mid-edit" would snap back to the row's "a cat").
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat", filename="sdxl_img1.png")
+    panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
+
+    panel.show_completed_result(image, [image])
+
+    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
+    assert panel._displayed_row is image          # the finished output is on display
+    assert not panel._metadata_block.isHidden()   # with its footer
+
+
 def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, monkeypatch):
     panel, db = saved_panel
     db.insert_generation(

@@ -492,11 +492,30 @@ class GenerateConfigPanel(QWidget):
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))
         # Prefill's autoshow just set _displayed_row to this tab's recent result; the
-        # browsed selection is what's actually on display, so it wins.
+        # browsed selection is what's actually on display, so _display_result (below)
+        # overrides it.
+        self._display_result(row, image_rows)
+
+    def show_completed_result(self, row: dict, image_rows: list[dict]):
+        """Show a generation this tab's own Generate just produced: swap the live
+        preview for the saved output and reveal its footer, leaving the form exactly
+        as the user left it.
+
+        Unlike :meth:`show_saved_generation`, the form is not re-seeded — the tab
+        already holds the settings that made this result, and the user may have kept
+        editing the next prompt while the run was in flight. Re-seeding here would
+        wipe those edits, so the completed result touches only the preview and info.
+        """
+        self._display_result(row, image_rows)
+
+    def _display_result(self, row: dict, image_rows: list[dict]):
+        """Point the preview and footer at ``row`` — the shared tail of showing a
+        generation, whether freshly browsed or just completed. The form is left
+        untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
         self._displayed_row = row
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
-            self._preview.show_media(*preview)  # after prefill, so it wins over autoshow
+            self._preview.show_media(*preview)  # after any prefill, so it wins over autoshow
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview)

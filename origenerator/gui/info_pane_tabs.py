@@ -207,10 +207,12 @@ class InfoPaneTabs(QTabWidget):
 
         The tab in front is the one whose Generate launched this re-roll, so its
         result lands right there — it ends showing the finished image/video, not the
-        idle placeholder. A no-op if every tab has been closed."""
+        idle placeholder. The form is left as the user left it (they may have kept
+        typing the next prompt while it ran), so only the preview and footer update.
+        A no-op if every tab has been closed."""
         panel = self.current_config_panel()
         if panel is not None:
-            panel.show_saved_generation(row, image_rows)
+            panel.show_completed_result(row, image_rows)
 
     def show_selection_preview(self, preview):
         """Point the current tab's preview at ``preview`` (a resolved

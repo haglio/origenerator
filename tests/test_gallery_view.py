@@ -2666,7 +2666,7 @@ def test_finishing_a_selected_reroll_clears_the_reroll_selection(qtbot, tmp_path
 
 def test_finishing_a_reroll_loads_its_result_into_the_front_tab(qtbot, tmp_path):
     # Change 4: a Generate ends on its result. When the re-roll it launched finishes,
-    # the just-saved generation loads into the front config tab (show_saved_generation),
+    # the just-saved generation loads into the front config tab (show_completed_result),
     # so the tab shows the finished item — not the live-frame or idle placeholder.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
@@ -2679,6 +2679,23 @@ def test_finishing_a_reroll_loads_its_result_into_the_front_tab(qtbot, tmp_path)
     panel = view._info_tabs.current_config_panel()
     assert panel._displayed_row is not None
     assert panel._displayed_row["prompt_id"] == job.prompt_id  # the just-finished result
+
+
+def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
+    # The reported bug, end to end: the user keeps typing the next prompt while a
+    # Generate runs; when it finishes, loading its result into the front tab must
+    # not re-seed the form and wipe what they typed.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    panel = view._info_tabs.current_config_panel()
+    panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
+
+    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
 
 
 def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):

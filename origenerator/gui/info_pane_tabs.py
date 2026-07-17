@@ -214,17 +214,21 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel.show_completed_result(row, image_rows)
 
-    def show_selection_preview(self, preview):
+    def show_selection_preview(self, preview, prompt_id: str):
         """Point the current tab's preview at ``preview`` (a resolved
         ``(path, media_type)``, or ``None``) without touching its form or the tab
-        set — the light-touch update a suppressed poll/rebuild re-selection makes."""
+        set — the light-touch update a suppressed poll/rebuild re-selection makes.
+
+        ``prompt_id`` is the shown generation, so its preview can still be dragged
+        onto a combine slot after a Back/Forward that never re-seeded the form."""
         panel = self.current_config_panel()
         if panel is None:
             return
         if preview is None:
-            panel._preview.clear()
+            panel._preview.clear()  # nothing to show disarms the drag itself
         else:
             panel._preview.show_media(*preview)
+            panel._preview.set_draggable_id(prompt_id)
 
     def show_reroll_frame(self, frame: bytes | None):
         """Mirror a running re-roll's live frame into the current tab's preview —

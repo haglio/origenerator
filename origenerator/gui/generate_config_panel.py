@@ -70,6 +70,8 @@ class GenerateConfigPanel(QWidget):
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     fullscreen_opened = pyqtSignal(object)  # the preview popped a video open fullscreen
+    preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
+    preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -106,6 +108,10 @@ class GenerateConfigPanel(QWidget):
         # the newest matching result otherwise.
         self._preview = PreviewWidget(show_funscript_strip=True)
         self._preview.fullscreen_opened.connect(self.fullscreen_opened)  # → view drives it
+        # Dragging the shown generation out of the preview onto a combine slot, like a
+        # gallery thumbnail: relay the drag start/end so the view can light the slots.
+        self._preview.drag_started.connect(self.preview_drag_started)
+        self._preview.drag_ended.connect(self.preview_drag_ended)
         main_box.addWidget(self._preview, 3)
         # One scroll under the preview holds everything else: the read-only info on
         # top, the editable form below it, so they scroll together. This replaces the
@@ -402,6 +408,7 @@ class GenerateConfigPanel(QWidget):
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
         if preview is not None:
             self._preview.show_media(*preview)
+            self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
             self._displayed_row = row
         else:
             self._preview.clear()  # nothing generated with these settings yet
@@ -516,6 +523,7 @@ class GenerateConfigPanel(QWidget):
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
             self._preview.show_media(*preview)  # after any prefill, so it wins over autoshow
+            self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview)

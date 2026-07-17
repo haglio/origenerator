@@ -3,14 +3,18 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QUrl, QSize
-from PyQt6.QtGui import QResizeEvent
+from PyQt6.QtCore import QUrl, QSize, QPointF, QEvent
+from PyQt6.QtGui import QResizeEvent, QMouseEvent
 from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtMultimedia import QMediaPlayer
 
 import origenerator.gui.fullscreen_preview as fullscreen_preview
+import origenerator.gui.preview_widget as preview_widget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
+
+from PyQt6.QtCore import Qt
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):
@@ -371,3 +375,115 @@ def test_clearing_hides_the_strip(qtbot, tmp_path):
     w.show_video(_scripted_video(tmp_path))
     w.clear()
     assert w._strip.isHidden()
+
+
+# --- dragging the shown generation out to a combine slot --------------------
+
+class _FakeDrag:
+    """Stands in for QDrag so a test can drive the drag path without the modal,
+    blocking QDrag.exec (and without a real drag loop)."""
+
+    last = None
+
+    def __init__(self, source):
+        self.mime = None
+        self.pixmap = None
+        _FakeDrag.last = self
+
+    def setMimeData(self, mime):
+        self.mime = mime
+
+    def setPixmap(self, pixmap):
+        self.pixmap = pixmap
+
+    def exec(self, *args, **kwargs):
+        return None
+
+
+def _press(w, x=0, y=0):
+    w.mousePressEvent(QMouseEvent(
+        QEvent.Type.MouseButtonPress, QPointF(x, y), QPointF(x, y),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    ))
+
+
+def _move(w, x, y, button=Qt.MouseButton.LeftButton):
+    w.mouseMoveEvent(QMouseEvent(
+        QEvent.Type.MouseMove, QPointF(x, y), QPointF(x, y),
+        Qt.MouseButton.NoButton, button, Qt.KeyboardModifier.NoModifier,
+    ))
+
+
+def _drag_out(w):
+    """Press then move far enough past the start-drag threshold to begin a drag."""
+    _press(w, 0, 0)
+    _move(w, 200, 200)
+
+
+def test_showing_media_alone_does_not_arm_a_drag(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert w._draggable_id is None  # the owner must arm it with the shown generation
+
+
+def test_set_draggable_id_arms_the_drag(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_draggable_id("gen1")
+    assert w._draggable_id == "gen1"
+
+
+@pytest.mark.parametrize("transient", [
+    lambda w: w.show_frame(_png_bytes()),      # a live in-progress frame
+    lambda w: w.show_message("Waiting…"),      # a transient note
+    lambda w: w.clear(),                        # back to the placeholder
+])
+def test_a_transient_view_disarms_the_drag(make_preview, transient):
+    w = make_preview()
+    w.set_draggable_id("gen1")
+    transient(w)
+    assert w._draggable_id is None  # nothing saved to drag out of a transient view
+
+
+def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_path, monkeypatch):
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_draggable_id("gen1")
+    started, ended = [], []
+    w.drag_started.connect(started.append)
+    w.drag_ended.connect(lambda: ended.append(True))
+
+    _drag_out(w)
+
+    assert started == ["gen1"]      # announced so a combine slot lights at drag start
+    assert ended == [True]          # and cleared when the gesture ends
+    assert bytes(_FakeDrag.last.mime.data(GENERATION_MIME)).decode() == "gen1"
+
+
+def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, monkeypatch):
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    _FakeDrag.last = None
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))  # shown, but never armed
+    started = []
+    w.drag_started.connect(started.append)
+
+    _drag_out(w)
+
+    assert started == []
+    assert _FakeDrag.last is None  # no QDrag was ever built
+
+
+def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch):
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    _FakeDrag.last = None
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_draggable_id("gen1")
+
+    _press(w, 0, 0)
+    _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
+
+    assert _FakeDrag.last is None

@@ -460,6 +460,10 @@ class GalleryView(QWidget):
         panel.displayed_changed.connect(self._reconcile_osr2)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
+        # Dragging the tab's preview out lights the combine slot it fits, like a
+        # browser thumbnail (see :meth:`_on_generation_drag_started`).
+        panel.preview_drag_started.connect(self._on_generation_drag_started)
+        panel.preview_drag_ended.connect(self._on_generation_drag_ended)
 
     # --- Drive OSR2: a single global toggle following the front video ----------
 
@@ -1131,12 +1135,13 @@ class GalleryView(QWidget):
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
 
-    def _on_thumbnail_drag_started(self, prompt_id: str):
-        """A gallery thumbnail began dragging: light the combine slot it fits, so
-        the drop target is obvious from the very start of the gesture."""
+    def _on_generation_drag_started(self, prompt_id: str):
+        """A generation began dragging — from a browser thumbnail or a generate tab's
+        preview: light the combine slot it fits, so the drop target is obvious from
+        the very start of the gesture."""
         self._combine.show_drop_candidates(prompt_id)
 
-    def _on_thumbnail_drag_ended(self):
+    def _on_generation_drag_ended(self):
         self._combine.clear_drop_candidates()
 
     def _combined_params(self, image_id: str, video_id: str):
@@ -1759,7 +1764,7 @@ class GalleryView(QWidget):
             self._info_tabs.load_selection(row, self._image_rows)
         else:
             self._info_tabs.show_selection_preview(
-                gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+                gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR), prompt_id
             )
         self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()

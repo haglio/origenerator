@@ -272,10 +272,20 @@ def test_show_selection_preview_updates_only_the_current_preview(tabs):
     panel._preview.show_media = MagicMock()
     panel.prefill = MagicMock()
 
-    tabs.show_selection_preview(("x.png", "image"))
+    tabs.show_selection_preview(("x.png", "image"), "g1")
 
     panel._preview.show_media.assert_called_once_with("x.png", "image")
     panel.prefill.assert_not_called()  # no form change
+    assert panel._preview._draggable_id == "g1"  # its preview drags onto combine
+
+
+def test_show_selection_preview_of_nothing_disarms_the_drag(tabs):
+    panel = tabs.currentWidget()
+    panel._preview.set_draggable_id("stale")  # a prior selection left it armed
+
+    tabs.show_selection_preview(None, "g1")  # the file is gone: clear the preview
+
+    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
 
 
 def test_show_reroll_frame_shows_a_waiting_note_without_a_frame(tabs):

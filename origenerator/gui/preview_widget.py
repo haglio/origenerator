@@ -14,13 +14,14 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
-from PyQt6.QtGui import QPixmap, QMovie, QImageReader
-from PyQt6.QtCore import Qt, QUrl, QEvent, pyqtSignal
+from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
+from PyQt6.QtCore import Qt, QUrl, QPoint, QEvent, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.funscript_strip import FunscriptStrip
+from origenerator.gui.generation_drag import generation_mime
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -28,6 +29,8 @@ _PLACEHOLDER = "Select a generation to preview"
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
     fullscreen_opened = pyqtSignal(object)  # popped a FullscreenPreview open (drive cue)
+    drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
+    drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
@@ -46,6 +49,12 @@ class PreviewWidget(QWidget):
         # this instead — the fullscreen view uses it so a second double-click, which
         # lands here on its inner preview, dismisses it.
         self._on_double_click = on_double_click
+        # The shown generation's prompt_id when the owner has armed the preview to be
+        # dragged out onto a combine slot (like a gallery thumbnail), else None; a
+        # transient view (a live frame, a message) disarms it. _drag_origin holds the
+        # left-press point while measuring whether a move is a drag or just a click.
+        self._draggable_id: str | None = None
+        self._drag_origin: QPoint | None = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
@@ -67,9 +76,14 @@ class PreviewWidget(QWidget):
         # Rescale the media whenever the label itself resizes — see eventFilter for
         # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
+        # Let mouse events fall through to this widget, so a press/drag/double-click
+        # over the media is handled here (drag-out, open-fullscreen) rather than being
+        # swallowed by the label or the video surface.
+        self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._image_label)
 
         self._video = QVideoWidget()
+        self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._audio = QAudioOutput(self)
         self._audio.setMuted(mute_audio)
         # The player is injectable so unit tests can drive playback intent
@@ -146,6 +160,7 @@ class PreviewWidget(QWidget):
             return
         self._player.stop()
         self._media = None  # a transient live frame, not a file to open fullscreen
+        self._draggable_id = None  # nor a saved generation to drag out
         self._set_movie(None)
         self._pixmap = pixmap
         self._rescale()
@@ -160,6 +175,7 @@ class PreviewWidget(QWidget):
         """
         self._player.stop()
         self._media = None  # a message, not a file to open fullscreen
+        self._draggable_id = None  # nor a saved generation to drag out
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(text)
@@ -176,6 +192,15 @@ class PreviewWidget(QWidget):
     def player(self) -> QMediaPlayer:
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
+
+    def set_draggable_id(self, prompt_id: str | None) -> None:
+        """Arm (or disarm) dragging the shown media out as a generation.
+
+        The owner passes the displayed generation's prompt_id so the preview can be
+        dragged onto a combine slot exactly like a gallery thumbnail; ``None`` leaves
+        it undraggable. A transient view (a live frame or a message) disarms itself,
+        so this only ever needs re-arming when a saved generation is shown."""
+        self._draggable_id = prompt_id
 
     def _update_strip(self, video_path) -> None:
         """Aim the funscript strip at ``video_path``'s sidecar, showing it only when
@@ -199,6 +224,44 @@ class PreviewWidget(QWidget):
         if self._media is not None and self._media[1] == "video":
             return self._media[0]
         return None
+
+    def mousePressEvent(self, event) -> None:
+        # The media children are transparent to the mouse, so a press over the
+        # image or video lands here. Note the origin for a possible drag of the
+        # shown generation; a plain click still falls through to the double-click.
+        if event.button() == Qt.MouseButton.LeftButton and self._draggable_id is not None:
+            self._drag_origin = event.position().toPoint()
+
+    def mouseMoveEvent(self, event) -> None:
+        # Drag the shown generation out to a combine slot, but only once the press
+        # has travelled far enough to read as a drag rather than a click — so a
+        # plain click still just opens fullscreen on the following double-click.
+        if self._drag_origin is None or not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
+        if self._draggable_id is None:
+            return
+        moved = (event.position().toPoint() - self._drag_origin).manhattanLength()
+        if moved < QApplication.startDragDistance():
+            return
+        prompt_id = self._draggable_id
+        self._drag_origin = None
+        self._start_drag(prompt_id)
+
+    def _start_drag(self, prompt_id: str) -> None:
+        """Carry the shown generation out under the shared drag type, so a combine
+        slot can read its prompt_id — the same payload a gallery thumbnail drags."""
+        drag = QDrag(self)
+        drag.setMimeData(generation_mime(prompt_id))
+        pixmap = self._image_label.pixmap()
+        if pixmap is not None and not pixmap.isNull():
+            drag.setPixmap(pixmap)  # the shown still trails the cursor
+        # Announce the drag so a combine slot can light the moment it starts —
+        # QDrag.exec is modal, so the highlight is on for the whole gesture.
+        self.drag_started.emit(prompt_id)
+        try:
+            drag.exec(Qt.DropAction.CopyAction)
+        finally:
+            self.drag_ended.emit()
 
     def mouseDoubleClickEvent(self, event) -> None:
         # Open fullscreen, or — when this preview can't (it opted out, e.g. the

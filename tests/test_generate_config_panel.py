@@ -345,6 +345,23 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
     qtbot.addWidget(panel)
     panel.show_recent_preview()
     assert panel._preview._media is None  # a placeholder, not a resolved file
+    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
+
+
+def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v",
+        positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
+    )
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    monkeypatch.setattr(panel._preview, "show_media", lambda path, mt: None)
+
+    panel.prefill("sdxl_t2i", _wiz_params())  # autoshows the folder's newest result
+
+    assert panel._preview._draggable_id == "g1"  # its preview can be dragged onto combine
 
 
 # --- config snapshot / prefill / restore ------------------------------------
@@ -527,6 +544,38 @@ def test_go_to_folder_shows_for_a_saved_generation_and_emits_its_id(saved_panel)
     panel._folder_btn.click()
 
     assert got == ["img1"]
+
+
+def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("img1.png", "image"))
+    image = _image_row(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._preview._draggable_id == "img1"  # drag its preview onto combine
+
+
+def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: None)  # file gone
+    image = _image_row(db, "img1")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._preview._draggable_id is None  # nothing on screen to drag
+
+
+def test_panel_forwards_the_preview_drag_signals(panel):
+    started, ended = [], []
+    panel.preview_drag_started.connect(started.append)
+    panel.preview_drag_ended.connect(lambda: ended.append(True))
+
+    panel._preview.drag_started.emit("gen9")
+    panel._preview.drag_ended.emit()
+
+    assert started == ["gen9"]  # relayed for the view to light the combine slot
+    assert ended == [True]
 
 
 def test_generate_button_fills_with_run_progress_only_while_generating(panel):

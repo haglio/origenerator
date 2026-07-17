@@ -372,8 +372,8 @@ class BrowserPane:
 
     def _wire_drag(self, tw: ThumbnailWidget):
         """Light the combine slot a tile fits while it's being dragged out."""
-        tw.drag_started.connect(self._v._on_thumbnail_drag_started)
-        tw.drag_ended.connect(self._v._on_thumbnail_drag_ended)
+        tw.drag_started.connect(self._v._on_generation_drag_started)
+        tw.drag_ended.connect(self._v._on_generation_drag_ended)
 
     def _drill_into(self, key: str):
         item = self._v._item_by_key.get(key)

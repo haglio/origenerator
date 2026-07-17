@@ -4180,6 +4180,21 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
     assert view._combine.video_slot._label.property("dragActive") is False
 
 
+def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
+    # The front generate tab's preview drags onto combine like a browser thumbnail.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+
+    panel.preview_drag_started.emit("vid")  # the drag begins — before reaching a slot
+    assert view._combine.video_slot._label.property("dragActive") is True
+    assert view._combine.image_slot._label.property("dragActive") is False
+
+    panel.preview_drag_ended.emit()
+    assert view._combine.video_slot._label.property("dragActive") is False
+
+
 # --- Drive OSR2: one global toggle, following whatever video is in front ----
 
 class _FakeDriver:

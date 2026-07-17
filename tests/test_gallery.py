@@ -973,6 +973,34 @@ def test_recent_generations_caps_at_the_limit():
     assert [r["prompt_id"] for r in recent_generations(rows, 3)] == ["i0", "i1", "i2"]
 
 
+def test_recent_generations_filters_to_the_selected_media_types():
+    # The shelf's media-type checkboxes narrow it: with only "video" selected the
+    # images drop out, and with only "image" the videos do.
+    rows = [_i2v("v2", "styleA", seed=2), _img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
+    assert [r["prompt_id"] for r in recent_generations(rows, 10, {"video"})] == ["v2", "v1"]
+    assert [r["prompt_id"] for r in recent_generations(rows, 10, {"image"})] == ["i1"]
+
+
+def test_recent_generations_defaults_to_every_media_type():
+    # No filter argument keeps both, unchanged from the pre-filter behavior.
+    rows = [_i2v("v1", "styleA", seed=1), _img("i1", "a cat", 50, 1)]
+    assert [r["prompt_id"] for r in recent_generations(rows, 10)] == ["v1", "i1"]
+
+
+def test_recent_generations_filters_before_applying_the_limit():
+    # The limit counts survivors of the filter, so selecting one type yields up to
+    # `limit` of it — not "that type among the newest `limit` rows". Here the only
+    # video is the last row; a limit-then-filter order would drop it, keeping none.
+    rows = [_img(f"i{n}", "a cat", 50, n) for n in range(5)] + [_i2v("v1", "styleA", seed=9)]
+    assert [r["prompt_id"] for r in recent_generations(rows, 3, {"video"})] == ["v1"]
+
+
+def test_recent_generations_with_no_media_types_selected_is_empty():
+    # Unchecking both boxes selects nothing, so the shelf clears.
+    rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
+    assert recent_generations(rows, 10, set()) == []
+
+
 def test_child_groups_and_rows_under_walk_the_tree():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a cat", 50, 2),
             _img("i3", "a dog", 50, 1)]

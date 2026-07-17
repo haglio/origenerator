@@ -652,6 +652,58 @@ def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
     assert view._tree.currentItem().text(0) == "Recents"
 
 
+def test_recents_media_filter_checkboxes_default_on_and_only_show_on_the_shelf(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    # Both boxes start checked, so the shelf opens listing every media type.
+    assert view._recents_image_cb.isChecked()
+    assert view._recents_video_cb.isChecked()
+
+    # The filter belongs to the Recents shelf: hidden on a media folder...
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+    assert view._recents_filter_bar.isHidden()
+    # ...and shown the moment the shelf is open.
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    assert not view._recents_filter_bar.isHidden()
+
+
+def test_recents_media_filter_hides_the_unchecked_media_type(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # both by default
+
+    view._recents_video_cb.setChecked(False)          # hide videos
+    assert view.visible_prompt_ids() == ["i1"]
+
+    view._recents_video_cb.setChecked(True)
+    view._recents_image_cb.setChecked(False)          # hide images instead
+    assert view.visible_prompt_ids() == ["v1"]
+
+    view._recents_video_cb.setChecked(False)          # both off: nothing to show
+    assert view.visible_prompt_ids() == []
+
+
+def test_recents_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
+    # The filter narrows the whole shelf, so an in-flight card of a hidden type
+    # drops out alongside the finished thumbnails.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_row("rr1", workflow="wan22_i2v"))  # a running video
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    assert "rr1" in view._inflight_cards               # shown by default
+
+    view._recents_video_cb.setChecked(False)           # hide videos
+    assert "rr1" not in view._inflight_cards
+
+
 def _write_looping_webp(path, size=(64, 48)):
     """A tiny two-frame looping WebP standing in for a video's moving preview."""
     from PIL import Image as _Image

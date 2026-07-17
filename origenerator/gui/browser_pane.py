@@ -60,6 +60,13 @@ class BrowserPane:
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
 
+    def set_recent_rows(self, recent_rows):
+        """Replace just the finished-items list the Recents shelf lists and, if that
+        shelf is open, redraw it — the media-type filter changing between rebuilds."""
+        self._recent_rows = recent_rows
+        if self.showing_recents():
+            self._render_recents()
+
     # --- folder-tile overview ----------------------------------------------
 
     def show_widget(self, widget: QWidget):
@@ -118,9 +125,10 @@ class BrowserPane:
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails; a hint when there is neither."""
+        then the finished thumbnails; a hint when the media-type filter leaves
+        neither. Both the cards and the thumbnails obey that filter."""
         container, flow = self._new_tile_pane()
-        items = self._inflight_items()
+        items = self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
@@ -144,10 +152,27 @@ class BrowserPane:
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self.show_widget(container if (items or self._recent_rows) else self._empty_state(
-            "No recent generations yet.\n\nItems you make — from a Generate tab or a "
-            "gallery re-roll — collect here, newest first."
-        ))
+        self.show_widget(container if (items or self._recent_rows)
+                         else self._empty_state(self._recents_empty_hint()))
+
+    def _visible_inflight_items(self) -> list:
+        """The in-flight items the shelf's media-type filter keeps on screen. The
+        full set still decides whether the shelf exists at all (so its filter stays
+        reachable); this narrows only what the shelf draws."""
+        media_types = self._v._recents_media_types()
+        return [it for it in self._inflight_items() if it.media_type in media_types]
+
+    def _recents_empty_hint(self) -> str:
+        """The teaching hint for an empty shelf, worded for the current filter —
+        which media types (if any) it's looking for."""
+        media_types = self._v._recents_media_types()
+        if not media_types:
+            return ("No media types selected.\n\nCheck Images or Videos above to "
+                    "list your recent generations.")
+        noun = "generations" if len(media_types) == 2 else (
+            "images" if "image" in media_types else "videos")
+        return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
+                "gallery re-roll — collect here, newest first.")
 
     def showing_recents(self) -> bool:
         return (self._v._recents_item is not None
@@ -158,7 +183,7 @@ class BrowserPane:
         re-roll's latest frame into its card, and re-render only when the *set* of
         in-flight jobs changes (a defensive guard — a started or finished re-roll
         normally moves the DB fingerprint and forces a full rebuild anyway)."""
-        items = self._inflight_items()
+        items = self._visible_inflight_items()
         if _inflight_signature(items) != self._inflight_signature:
             self._render_recents()
             return

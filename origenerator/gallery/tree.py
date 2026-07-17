@@ -196,7 +196,9 @@ def starred_folders(tree: list[MediaGroup]) -> list:
     return found
 
 
-def recent_generations(rows: list[dict], limit: int) -> list[dict]:
+def recent_generations(
+    rows: list[dict], limit: int, media_types: set[str] | None = None
+) -> list[dict]:
     """The most recently generated rows, newest first — the Recents shelf's list.
 
     "Generated" means this app produced the row, from a Generate tab or a gallery
@@ -206,10 +208,17 @@ def recent_generations(rows: list[dict], limit: int) -> list[dict]:
     in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
     (the caller lists them by descending id), so the first ``limit`` survivors are
     the most recent.
+
+    ``media_types`` is the shelf's image/video filter (its checkboxes): a set of
+    the ``media_type_of_row`` values to keep, applied *before* the limit so
+    selecting one type yields up to ``limit`` of it rather than that type among the
+    newest ``limit`` rows of every type. ``None`` (the default) keeps every type;
+    an empty set keeps none.
     """
     generated = [
         row for row in rows
         if (row.get("source") or "generated") == "generated" and produced_output(row)
+        and (media_types is None or media_type_of_row(row) in media_types)
     ]
     return generated[:limit]
 

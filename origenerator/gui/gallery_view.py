@@ -44,8 +44,12 @@ from origenerator.gui.gallery_tree import (
     STARRED_KEY as _STARRED_KEY,
 )
 from origenerator.navigation import NavigationHistory
+from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
+
+ensure_shared_ui_on_path()
+from shared_ui.check_box import CheckBox
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +338,23 @@ class GalleryView(QWidget):
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
         browser_box.addLayout(header)
+        # The Recents shelf's image/video filter: two checkboxes choosing which
+        # media types it lists, both on so the shelf opens showing everything. The
+        # bar rides just under the header and appears only while that shelf is open.
+        self._recents_image_cb = CheckBox("Images")
+        self._recents_video_cb = CheckBox("Videos")
+        for checkbox in (self._recents_image_cb, self._recents_video_cb):
+            checkbox.setChecked(True)
+            checkbox.toggled.connect(self._on_recents_filter_changed)
+        self._recents_filter_bar = QWidget()
+        filter_row = QHBoxLayout(self._recents_filter_bar)
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.addWidget(QLabel("Show:"))
+        filter_row.addWidget(self._recents_image_cb)
+        filter_row.addWidget(self._recents_video_cb)
+        filter_row.addStretch(1)
+        self._recents_filter_bar.hide()  # shown only on the Recents shelf
+        browser_box.addWidget(self._recents_filter_bar)
         # Shown only while a Recents item is previewed: that item's generation lives
         # in a folder other than the shelf on screen, so this jumps the browser to
         # it. Left-aligned at its natural width, and it collapses away when hidden.
@@ -655,7 +676,8 @@ class GalleryView(QWidget):
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
         self._browser.set_model(
-            gallery.recent_generations(rows, _RECENTS_LIMIT), gallery.starred_folders(tree_model)
+            gallery.recent_generations(rows, _RECENTS_LIMIT, self._recents_media_types()),
+            gallery.starred_folders(tree_model),
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()))
@@ -715,6 +737,8 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
+        # The image/video filter belongs to the Recents shelf alone.
+        self._recents_filter_bar.setVisible(current is self._recents_item)
         if current is None:
             self._title.set_display("")
             self._avg_label.setText("")
@@ -1412,6 +1436,24 @@ class GalleryView(QWidget):
 
     def _showing_recents(self) -> bool:
         return self._browser.showing_recents()
+
+    def _recents_media_types(self) -> set[str]:
+        """The media types the Recents shelf's checkboxes currently include —
+        the filter :func:`gallery.recent_generations` and the in-flight cards honor.
+        Both on (the default) means every type; both off means none."""
+        types = set()
+        if self._recents_image_cb.isChecked():
+            types.add("image")
+        if self._recents_video_cb.isChecked():
+            types.add("video")
+        return types
+
+    def _on_recents_filter_changed(self, _checked=False):
+        """A media-type checkbox toggled: re-list the shelf under the new filter.
+        Lightweight — re-derives the recent rows and redraws, with no tree rebuild."""
+        self._browser.set_recent_rows(gallery.recent_generations(
+            self._db.list_generations(), _RECENTS_LIMIT, self._recents_media_types()
+        ))
 
     def _drill_into(self, key: str):
         self._browser._drill_into(key)

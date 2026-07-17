@@ -5,15 +5,18 @@ side in the video part: pick an act from the category dropdown and let the app f
 a fitting past video for you, or drop a specific i2v video for a custom action. The
 two are mutually exclusive: picking an act clears a dropped video (and relabels the
 slot as the override path), and dropping a video wipes the dropdown back to "-".
-Either way, Generate re-runs the chosen recipe on the dropped image.
+Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
+image now, while Open in generator hands it to a generate tab to edit before running.
 
 Acts the gallery holds no video of are greyed out (:meth:`CombinePanel.set_available_categories`),
 so the dropdown only ever offers what a recipe can actually be mined for.
 
 The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown and
-a Generate button, and reports the request through :attr:`generate_requested` (a
-dropped video) or :attr:`category_requested` (a picked act) — the view owns the
-database, the slot predicates, the category→recipe routing, and the generation.
+the two buttons, and reports the request through one of four signals — a dropped
+video versus a picked act, crossed with run-now (:attr:`generate_requested` /
+:attr:`category_requested`) versus edit-first (:attr:`open_requested` /
+:attr:`open_category_requested`). The view owns the database, the slot predicates,
+the category→recipe routing, and both the generation and the generator tab.
 """
 
 from collections.abc import Callable, Collection
@@ -39,6 +42,9 @@ class CombinePanel(QWidget):
 
     generate_requested = pyqtSignal(str, str)   # (image prompt_id, video prompt_id): a dropped recipe
     category_requested = pyqtSignal(str, str)   # (image prompt_id, category): let the app find the recipe
+    # The same two recipe sources, but bound for the generator to edit rather than to run.
+    open_requested = pyqtSignal(str, str)           # (image prompt_id, video prompt_id): a dropped recipe
+    open_category_requested = pyqtSignal(str, str)  # (image prompt_id, category): let the app find the recipe
 
     def __init__(
         self,
@@ -74,8 +80,15 @@ class CombinePanel(QWidget):
         video_box.addWidget(self._category, 1)  # each takes half the video part's width
         video_box.addWidget(self.video_slot, 1)
 
+        # Two ways to act on the same chosen recipe: run it now, or open it in the
+        # generator to tweak first. Both gate on the same "image + recipe" readiness.
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
+        self._open_btn = QPushButton("Open in generator")
+        self._open_btn.setToolTip(
+            "Load this combination into a generate tab to edit before running it."
+        )
+        self._open_btn.clicked.connect(self._emit_open)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 0)
@@ -89,6 +102,7 @@ class CombinePanel(QWidget):
         layout.addSpacing(8)  # set the video part apart from the image slot above it
         layout.addWidget(self._video_part)
         layout.addWidget(self._generate_btn)
+        layout.addWidget(self._open_btn)
         self._sync()
 
     # --- category ---------------------------------------------------------
@@ -149,18 +163,30 @@ class CombinePanel(QWidget):
         self._sync()
 
     def _sync(self):
-        """Generate is live once a source image sits and a recipe is chosen — either
-        by picking an act or by dropping a video. The video part keeps its size
-        throughout; neither control ever hides the other."""
+        """Both actions go live once a source image sits and a recipe is chosen —
+        either by picking an act or by dropping a video. The video part keeps its
+        size throughout; neither control ever hides the other."""
         has_recipe = bool(self.selected_category() or self.video_slot.current_id())
-        self._generate_btn.setEnabled(bool(self.image_slot.current_id()) and has_recipe)
+        ready = bool(self.image_slot.current_id()) and has_recipe
+        self._generate_btn.setEnabled(ready)
+        self._open_btn.setEnabled(ready)
 
     def _emit(self):
+        """Generate: run the chosen recipe on the dropped image now."""
+        self._dispatch(self.generate_requested, self.category_requested)
+
+    def _emit_open(self):
+        """Open in generator: hand the chosen recipe to a generate tab to edit first."""
+        self._dispatch(self.open_requested, self.open_category_requested)
+
+    def _dispatch(self, video_signal, category_signal):
+        """Emit the chosen recipe on the pair of signals for the requested action: a
+        picked act on ``category_signal``, else a dropped video on ``video_signal``."""
         image_id = self.image_slot.current_id()
         if not image_id:
             return
         category = self.selected_category()
         if category:
-            self.category_requested.emit(image_id, category)
+            category_signal.emit(image_id, category)
         elif self.video_slot.current_id():
-            self.generate_requested.emit(image_id, self.video_slot.current_id())
+            video_signal.emit(image_id, self.video_slot.current_id())

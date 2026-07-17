@@ -3504,6 +3504,71 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
     view._client.submit_job.assert_called_once()
 
 
+def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_path):
+    # "Open in generator" builds the same combination Generate would, but hands it to
+    # an editable tab to tweak first — so no job runs and the form is prefilled.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._open_combination("img", "vid")
+
+    assert view._reroll_jobs == {}                 # opened for editing, not launched
+    view._client.submit_job.assert_not_called()
+    config = view._info_tabs.current_config_panel().current_config()
+    assert config.workflow_name == "wan22_i2v"
+    assert config.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
+    assert config.params["seed"] == 42                               # the video's seed, carried in
+
+
+def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+
+    view._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
+
+    assert view._reroll_jobs == {}                 # opened for editing, not launched
+    view._client.submit_job.assert_not_called()
+    config = view._info_tabs.current_config_panel().current_config()
+    assert config.workflow_name == "wan22_i2v"
+    assert config.params["input_image"] == "sdxl_pick.png [output]"  # recipe on the dropped image
+
+
+def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no alpha recipe exists
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    tabs_before = view._info_tabs.count()
+    shown = []
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
+                        lambda *a, **k: shown.append(a))
+
+    view._open_category("img", "alpha")
+
+    assert view._info_tabs.count() == tabs_before  # no recipe to open: no tab forked
+    assert shown                                   # but tell the user why
+
+
+def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
+    # The panel's two "Open in generator" signals reach the view's open handlers, so
+    # clicking Open with a dropped video (or a picked act) opens an editable tab.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine.open_requested.emit("img", "vid")
+
+    assert view._reroll_jobs == {}
+    config = view._info_tabs.current_config_panel().current_config()
+    assert config.workflow_name == "wan22_i2v"
+    assert config.params["input_image"] == "sdxl_pick.png [output]"
+
+
 def _insert_completed_video(db, prompt_id, params, filename):
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",

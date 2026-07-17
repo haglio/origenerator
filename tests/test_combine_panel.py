@@ -42,6 +42,43 @@ def test_clicking_generate_emits_the_two_ids(qtbot):
     assert got == [("img1", "vid1")]
 
 
+def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
+    # "Open in generator" needs the same ingredients as Generate — a source image
+    # and a recipe — so it lights and dims in lockstep with the Generate button.
+    panel = _panel(qtbot)
+    assert not panel._open_btn.isEnabled()
+
+    panel.image_slot.set_item("img1")
+    assert not panel._open_btn.isEnabled()  # image alone, no recipe yet
+
+    panel.video_slot.set_item("vid1")
+    assert panel._open_btn.isEnabled()       # both filled: ready to open
+
+
+def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+    opened = []
+    panel.open_requested.connect(lambda i, v: opened.append((i, v)))
+
+    panel._open_btn.click()
+
+    assert opened == [("img1", "vid1")]  # same pair Generate would, but bound for the generator
+
+
+def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.set_category("redacted")
+    opened = []
+    panel.open_category_requested.connect(lambda i, c: opened.append((i, c)))
+
+    panel._open_btn.click()
+
+    assert opened == [("img1", "redacted")]
+
+
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     panel = _panel(qtbot)  # image slot accepts img*, video slot accepts vid*
 

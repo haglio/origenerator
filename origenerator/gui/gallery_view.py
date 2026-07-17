@@ -283,6 +283,8 @@ class GalleryView(QWidget):
         )
         self._combine.generate_requested.connect(self._generate_combination)
         self._combine.category_requested.connect(self._generate_category)
+        self._combine.open_requested.connect(self._open_combination)
+        self._combine.open_category_requested.connect(self._open_category)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
         self._panes.addWidget(toc)
@@ -1113,6 +1115,38 @@ class GalleryView(QWidget):
     def _on_thumbnail_drag_ended(self):
         self._combine.clear_drop_candidates()
 
+    def _combined_params(self, image_id: str, video_id: str):
+        """The ``(workflow, params, video_row, image_row)`` for re-running
+        ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
+        seed with only the input image swapped to the dropped one.
+
+        ``None`` when the pair can't be combined: either row is gone, the video
+        isn't a rebuildable image-conditioned recipe, or the image has no output
+        file to seed from. Shared by the Generate and Open-in-generator paths.
+        """
+        image_row = self._db.get_generation(image_id)
+        video_row = self._db.get_generation(video_id)
+        if not image_row or not video_row:
+            return None
+        workflow_name = video_row.get("workflow_name") or ""
+        workflow = WORKFLOW_REGISTRY.get(workflow_name)
+        if workflow is None or not gallery.is_image_conditioned(workflow_name):
+            return None  # the video must be a rebuildable, image-conditioned recipe
+        params = gallery.combined_params(video_row, image_row, workflow)
+        if params is None:
+            return None  # the dropped image has no output file to seed from
+        return workflow, params, video_row, image_row
+
+    def _open_combination(self, image_id: str, video_id: str):
+        """Open a dropped image + video's recipe as an editable generate tab instead
+        of running it — the combine panel's "Open in generator" path. The tab is
+        prefilled with the same combination Generate would launch, ready to tweak."""
+        built = self._combined_params(image_id, video_id)
+        if built is None:
+            return
+        workflow, params, _video_row, _image_row = built
+        self._info_tabs.open_config(workflow.name, params)
+
     def _generate_combination(self, image_id: str, video_id: str):
         """Generate a new video from a dropped image + a dropped video's recipe.
 
@@ -1126,17 +1160,10 @@ class GalleryView(QWidget):
         rebuildable image-conditioned recipe, the image has no output file, or that
         folder is already generating.
         """
-        image_row = self._db.get_generation(image_id)
-        video_row = self._db.get_generation(video_id)
-        if not image_row or not video_row:
+        built = self._combined_params(image_id, video_id)
+        if built is None:
             return
-        workflow_name = video_row.get("workflow_name") or ""
-        workflow = WORKFLOW_REGISTRY.get(workflow_name)
-        if workflow is None or not gallery.is_image_conditioned(workflow_name):
-            return  # the video must be a rebuildable, image-conditioned recipe
-        params = gallery.combined_params(video_row, image_row, workflow)
-        if params is None:
-            return  # the dropped image has no output file to seed from
+        workflow, params, video_row, image_row = built
         # The frame is re-buildable independently of the video seed, so the key —
         # which groups by the image's config, not its filename — is the same one
         # whether we re-roll the seed, the frame, or both.
@@ -1188,20 +1215,19 @@ class GalleryView(QWidget):
             return image_prompts[source_id]
         return video_row.get("positive_prompt") or ""
 
-    def _generate_category(self, image_id: str, category: str):
-        """Run the recipe that fits ``category`` on the dropped image — the category
-        dropdown's counterpart to a dropped video.
+    def _resolve_category(self, image_id: str, category: str) -> str | None:
+        """The recipe (a rebuildable video's ``prompt_id``) that fits ``category`` for
+        the dropped image — the category dropdown's counterpart to a dropped video.
 
         The local LLM picks the recipe whose starting scene matches this image's
         situation (:func:`recipe_match.smart_recipe`); if it's unreachable or finds no
         fit, it falls back to the act's most-used recipe
-        (:func:`recipe_match.best_recipe`). Either way the chosen exemplar hands off to
-        the shared combine launch. A no-op — with a hint — when the gallery holds no
-        video of the act, so a click never silently does nothing.
+        (:func:`recipe_match.best_recipe`). Returns ``None`` — with a hint — when the
+        gallery holds no video of the act, so a click never silently does nothing.
         """
         image_row = self._db.get_generation(image_id)
         if image_row is None:
-            return
+            return None
         image_prompts = {r.get("prompt_id"): r.get("positive_prompt") or "" for r in self._image_rows}
         candidates = [{**row, "start_scene": self._start_scene(row, image_prompts)}
                       for row in self._category_candidates()]
@@ -1218,8 +1244,21 @@ class GalleryView(QWidget):
                 f"No past “{category}” video to base a recipe on yet — make one first, "
                 "or drop a specific video instead.",
             )
-            return
-        self._generate_combination(image_id, video_id)
+        return video_id
+
+    def _generate_category(self, image_id: str, category: str):
+        """Run the recipe that fits ``category`` on the dropped image, handing the
+        chosen exemplar off to the shared combine launch."""
+        video_id = self._resolve_category(image_id, category)
+        if video_id is not None:
+            self._generate_combination(image_id, video_id)
+
+    def _open_category(self, image_id: str, category: str):
+        """Open the recipe that fits ``category`` as an editable generate tab — the
+        Open-in-generator counterpart to :meth:`_generate_category`."""
+        video_id = self._resolve_category(image_id, category)
+        if video_id is not None:
+            self._open_combination(image_id, video_id)
 
     def _reveal_combination(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already

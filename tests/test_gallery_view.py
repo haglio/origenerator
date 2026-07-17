@@ -4210,15 +4210,23 @@ class _FakeDriver:
 
 
 class _FakeFullscreen(QObject):
-    """Stand-in for a FullscreenPreview: a settable drive target and a closed signal."""
+    """Stand-in for a FullscreenPreview: a settable drive target, a closed signal,
+    a media_changed signal (paging), and a recorded playlist arming."""
     closed = pyqtSignal()
+    media_changed = pyqtSignal()
 
     def __init__(self, target):
         super().__init__()
         self._target = target
+        self.playlist = None       # the items set_playlist was armed with, if any
+        self.playlist_index = None
 
     def osr2_drive_target(self):
         return self._target
+
+    def set_playlist(self, items, index):
+        self.playlist = list(items)
+        self.playlist_index = index
 
 
 def _osr2_view(qtbot):
@@ -4274,6 +4282,41 @@ def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
     assert view.osr2_enabled() is False
     view.set_osr2_enabled(True)
     assert view.osr2_enabled() is True and view._osr2_btn.isChecked()
+
+
+def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeypatch):
+    # Left/Right in fullscreen page through the folder: the view is armed with the
+    # visible items' media, starting on the one already shown.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    monkeypatch.setattr(
+        gallery, "resolve_preview",
+        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"),
+    )
+    view.refresh()
+    _open_leaf(view)
+    view._on_thumbnail_clicked("i2")  # i2 is the shown/selected item
+
+    fs = _FakeFullscreen(None)
+    view._on_fullscreen_opened(fs)
+
+    order = view._browser.visible_prompt_ids()
+    assert fs.playlist == [(f"{pid}.png", "image") for pid in order]
+    assert fs.playlist_index == order.index("i2")  # opened on the shown item
+
+
+def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
+    # Paging to another clip re-aims the one device at the newly shown video.
+    view, driver, _panel = _osr2_view(qtbot)
+    fs = _FakeFullscreen(("A.mp4", "pA", "aA"))
+    view._on_fullscreen_opened(fs)
+    assert driver.started[-1] == ("pA", "aA")
+
+    fs._target = ("B.mp4", "pB", "aB")
+    fs.media_changed.emit()  # Left/Right landed on another clip
+    assert driver.started[-1] == ("pB", "aB")
 
 
 def test_watching_a_video_fullscreen_drives_it_with_the_toggle_off(qtbot):

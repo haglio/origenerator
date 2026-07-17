@@ -24,10 +24,15 @@ from origenerator.gui.preview_widget import PreviewWidget
 
 class FullscreenPreview(QWidget):
     closed = pyqtSignal()  # the view was dismissed (Esc, a double-click, or close)
+    media_changed = pyqtSignal()  # paged to a different item (re-aim the OSR2 drive)
 
     def __init__(self, media: tuple, *, player=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Preview")
+        # The navigable folder: a lone item until set_playlist arms Left/Right to
+        # page across the folder the view was opened from.
+        self._items: list[tuple] = [media]
+        self._index = 0
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround behind the media
         palette = self.palette()
@@ -45,6 +50,16 @@ class FullscreenPreview(QWidget):
         layout.addWidget(self._preview, 1)
         self._preview.show_media(media[0], media[1])
 
+    def set_playlist(self, items: list[tuple], index: int) -> None:
+        """Arm Left/Right to page across the folder the view was opened from.
+
+        ``items`` is the folder's media in shown order as ``(path, media_type)``;
+        ``index`` is the one already on screen. Until this is called the view holds
+        a lone item and paging is inert.
+        """
+        self._items = list(items)
+        self._index = index
+
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
         an image or a video with no funscript — mirrors the config panel's target so
@@ -52,10 +67,23 @@ class FullscreenPreview(QWidget):
         return drive_target_for(self._preview.current_video_path(), self._preview.player())
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
+        key = event.key()
+        if key == Qt.Key.Key_Escape:
             self.close()
+        elif key == Qt.Key.Key_Left:
+            self._step(-1)
+        elif key == Qt.Key.Key_Right:
+            self._step(1)
         else:
             super().keyPressEvent(event)
+
+    def _step(self, delta: int) -> None:
+        """Page ``delta`` items through the folder, wrapping at either end."""
+        if len(self._items) <= 1:
+            return
+        self._index = (self._index + delta) % len(self._items)
+        self._preview.show_media(*self._items[self._index])
+        self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     def mouseDoubleClickEvent(self, event):
         self.close()  # a second double-click dismisses the fullscreen view

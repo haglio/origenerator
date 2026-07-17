@@ -508,10 +508,40 @@ class GalleryView(QWidget):
         """A double-click popped a video open fullscreen. It drives the OSR2 for its
         lifetime — regardless of the global toggle — then hands the device back when it
         closes. (An image or unscripted video simply has no target, so nothing drives
-        and the toggle's video, if any, keeps going.)"""
+        and the toggle's video, if any, keeps going.)
+
+        It's also armed to page Left/Right through the folder it was opened from, and
+        each such page re-aims the device at whatever clip it lands on."""
         self._fullscreen_preview = fullscreen
         fullscreen.closed.connect(lambda: self._on_fullscreen_closed(fullscreen))
+        fullscreen.media_changed.connect(self._reconcile_osr2)
+        self._arm_fullscreen_navigation(fullscreen)
         self._reconcile_osr2()
+
+    def _arm_fullscreen_navigation(self, fullscreen):
+        """Give the fullscreen view the visible folder's media so Left/Right page
+        through it, starting on the item already on screen. Skipped for a lone item."""
+        items, index = self._folder_media_playlist()
+        if len(items) > 1:
+            fullscreen.set_playlist(items, index)
+
+    def _folder_media_playlist(self):
+        """The visible folder's resolvable media in shown order, and the index of
+        the currently-shown item — the playlist a fullscreen view pages through.
+
+        Returns an empty list when the shown item isn't among them, so an armed
+        playlist's starting item always matches what's already on screen."""
+        selected_pid = self._selected["prompt_id"] if self._selected else None
+        items, index, found = [], 0, False
+        for pid in self._browser.visible_prompt_ids():
+            row = self._db.get_generation(pid)
+            preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
+            if preview is None:
+                continue  # in-flight or output-less: nothing to show fullscreen
+            if pid == selected_pid:
+                index, found = len(items), True
+            items.append(preview)
+        return (items, index) if found else ([], 0)
 
     def _on_fullscreen_closed(self, fullscreen):
         """The fullscreen view closed: drop it and re-aim at the toggle's video, or

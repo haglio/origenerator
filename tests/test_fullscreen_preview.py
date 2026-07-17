@@ -27,6 +27,10 @@ def _escape(win):
     )
 
 
+def _press(win, key):
+    win.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier))
+
+
 def test_shows_the_image(qtbot, tmp_path):
     png = _make_png(tmp_path / "p.png")
     win = FullscreenPreview((png, "image"), player=MagicMock())
@@ -138,3 +142,55 @@ def test_osr2_drive_target_is_none_for_an_unscripted_video(qtbot, tmp_path):
     win = FullscreenPreview((tmp_path / "c.mp4", "video"), player=MagicMock())
     qtbot.addWidget(win)
     assert win.osr2_drive_target() is None
+
+
+def test_left_right_page_through_the_folder(qtbot, tmp_path):
+    a = _make_png(tmp_path / "a.png")
+    b = _make_png(tmp_path / "b.png")
+    c = _make_png(tmp_path / "c.png")
+    items = [(a, "image"), (b, "image"), (c, "image")]
+    win = FullscreenPreview(items[1], player=MagicMock())  # opened on the middle item
+    qtbot.addWidget(win)
+    win.set_playlist(items, 1)
+
+    _press(win, Qt.Key.Key_Right)
+    assert win._preview._media == (c, "image")
+    _press(win, Qt.Key.Key_Left)
+    assert win._preview._media == (b, "image")
+    _press(win, Qt.Key.Key_Left)
+    assert win._preview._media == (a, "image")
+
+
+def test_paging_wraps_around_the_ends(qtbot, tmp_path):
+    a = _make_png(tmp_path / "a.png")
+    b = _make_png(tmp_path / "b.png")
+    items = [(a, "image"), (b, "image")]
+    win = FullscreenPreview(items[0], player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_playlist(items, 0)
+
+    _press(win, Qt.Key.Key_Left)   # from the first, wrap back to the last
+    assert win._preview._media == (b, "image")
+    _press(win, Qt.Key.Key_Right)  # and forward off the last, wrap to the first
+    assert win._preview._media == (a, "image")
+
+
+def test_paging_is_inert_without_a_playlist(qtbot, tmp_path):
+    a = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((a, "image"), player=MagicMock())  # a lone item, never armed
+    qtbot.addWidget(win)
+    _press(win, Qt.Key.Key_Right)
+    assert win._preview._media == (a, "image")
+
+
+def test_paging_emits_media_changed_to_re_aim_the_osr2(qtbot, tmp_path):
+    a = _make_png(tmp_path / "a.png")
+    b = _make_png(tmp_path / "b.png")
+    win = FullscreenPreview((a, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_playlist([(a, "image"), (b, "image")], 0)
+    changed = []
+    win.media_changed.connect(lambda: changed.append(True))
+
+    _press(win, Qt.Key.Key_Right)
+    assert changed == [True]

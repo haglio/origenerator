@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS generations (
     output_files    TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
+    -- The user's per-item bookmark: a starred image or video, independent of the
+    -- folder-level star in folder_meta.
+    starred         INTEGER NOT NULL DEFAULT 0,
     -- Last live progress of a still-running job (a ProgressTracker snapshot), so a
     -- restart mid-generation can resume the bar at its last position instead of an
     -- indeterminate spin while ComfyUI's next per-step push is awaited.
@@ -47,7 +50,7 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
-    "output_files", "thumbnail_path", "error_message", "progress_json",
+    "output_files", "thumbnail_path", "error_message", "starred", "progress_json",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
 )
 
@@ -77,6 +80,10 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
         if "progress_json" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN progress_json TEXT")
+        if "starred" not in existing:
+            conn.execute(
+                "ALTER TABLE generations ADD COLUMN starred INTEGER NOT NULL DEFAULT 0"
+            )
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -151,6 +158,18 @@ class Database:
             conn.execute(
                 "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
                 (params_json, prompt_id),
+            )
+
+    def set_generation_starred(self, prompt_id: str, starred: bool):
+        """Star (or unstar) one generation — the user's per-item bookmark.
+
+        Deliberately separate from update_generation, whose allowlist covers a
+        job's lifecycle fields rather than a user gesture like this.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET starred = ? WHERE prompt_id = ?",
+                (1 if starred else 0, prompt_id),
             )
 
     def mark_evolver_exported(self, prompt_id: str):

@@ -188,6 +188,57 @@ def test_set_params_json_rewrites_row_params(tmp_path):
     assert json.loads(row["params_json"])["lora_high"] == "x.safetensors"
 
 
+def test_star_generation_round_trips_across_reopen(tmp_path):
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    db.insert_generation(
+        prompt_id="s-001", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}",
+    )
+    assert not db.get_generation("s-001")["starred"]  # unstarred by default
+
+    db.set_generation_starred("s-001", True)
+    # Reopening the file (a fresh app session) still remembers the star.
+    assert Database(db_path).get_generation("s-001")["starred"]
+
+    db.set_generation_starred("s-001", False)
+    assert not db.get_generation("s-001")["starred"]
+
+
+def test_opening_db_without_starred_column_migrates_it(tmp_path):
+    db_path = tmp_path / "old.db"
+    # Faithful pre-starred schema: the table as it was before this column.
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE generations ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " prompt_id TEXT NOT NULL UNIQUE,"
+        " source TEXT NOT NULL DEFAULT 'generated',"
+        " workflow_name TEXT NOT NULL,"
+        " workflow_version TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'pending',"
+        " positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
+        " params_json TEXT NOT NULL,"
+        " workflow_json TEXT NOT NULL,"
+        " output_files TEXT, thumbnail_path TEXT, error_message TEXT,"
+        " duration_seconds REAL,"
+        " created_at TEXT NOT NULL DEFAULT (datetime('now')),"
+        " completed_at TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO generations"
+        " (prompt_id, workflow_name, workflow_version, params_json, workflow_json)"
+        " VALUES ('old-001', 'sdxl_t2i', 'v002', '{}', '{}')"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(db_path)
+    assert not db.get_generation("old-001")["starred"]  # migrated in, defaulting off
+    db.set_generation_starred("old-001", True)
+    assert db.get_generation("old-001")["starred"]
+
+
 def _add_completed(db, prompt_id, workflow_name, duration):
     db.insert_generation(
         prompt_id=prompt_id,

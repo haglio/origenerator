@@ -45,9 +45,10 @@ class PreviewWidget(QWidget):
         self._media: tuple | None = None
         self._allow_fullscreen = allow_fullscreen  # a slideshow / the fullscreen view opts out
         self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
-        # A double-click that doesn't open fullscreen (this preview opted out) runs
-        # this instead — the fullscreen view uses it so a second double-click, which
-        # lands here on its inner preview, dismisses it.
+        # A double-click that doesn't open fullscreen (this preview opted out, was
+        # gated off, or has nothing to open) runs this instead — the fullscreen view
+        # uses it so a second double-click dismisses it, and the info-pane preview
+        # uses it to open the auto-generate montage.
         self._on_double_click = on_double_click
         # The shown generation's prompt_id when the owner has armed the preview to be
         # dragged out onto a combine slot (like a gallery thumbnail), else None; a
@@ -55,6 +56,10 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self._drag_origin: QPoint | None = None
+        # An optional veto on opening the plain fullscreen view: the info-pane preview
+        # gates it off while a montage should open instead, so the double-click falls
+        # through to _on_double_click even when a finished file is on screen.
+        self._fullscreen_gate = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
@@ -270,13 +275,22 @@ class PreviewWidget(QWidget):
         if self.open_fullscreen() is None and self._on_double_click is not None:
             self._on_double_click()
 
+    def set_fullscreen_gate(self, gate) -> None:
+        """Install a predicate that must return True for open_fullscreen to open the
+        plain view; when it returns False the double-click falls through to the
+        callback instead (the gallery opens its auto-generate montage there)."""
+        self._fullscreen_gate = gate
+
     def open_fullscreen(self):
         """Pop the current media open fullscreen (Escape or a double-click closes
         it). A no-op when this preview opted out (a slideshow, or the fullscreen
-        view itself) or nothing displayable is on screen — a placeholder, a
-        message, or a live in-progress frame with no file behind it yet."""
+        view itself), a gate vetoes it, or nothing displayable is on screen — a
+        placeholder, a message, or a live in-progress frame with no file behind it
+        yet."""
         if not self._allow_fullscreen or self._media is None:
             return None
+        if self._fullscreen_gate is not None and not self._fullscreen_gate():
+            return None  # gated off — the caller's double-click callback takes over
         # Imported here, not at module scope: fullscreen_preview builds a
         # PreviewWidget, so a top-level import would be circular.
         from origenerator.gui.fullscreen_preview import FullscreenPreview

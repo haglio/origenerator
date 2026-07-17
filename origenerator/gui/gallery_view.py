@@ -26,6 +26,7 @@ from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
+from origenerator.gui.auto_generate_view import AutoGenerateView
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.voice.steering import VoiceSteering
@@ -396,6 +397,10 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
+        # The live auto-generate montage (double-click the preview while a folder
+        # loops), and the folder key it follows — None while none is open.
+        self._auto_montage = None
+        self._auto_montage_key_open: str | None = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -459,6 +464,10 @@ class GalleryView(QWidget):
         panel.containing_folder_requested.connect(self._browser.open_in_containing_folder)
         panel.displayed_changed.connect(self._reconcile_osr2)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
+        panel.preview_double_clicked.connect(self._on_preview_double_clicked)
+        # While the open folder is auto-generating, a preview double-click opens the
+        # live montage instead of the plain fullscreen view (which this gate vetoes).
+        panel.set_fullscreen_gate(self._plain_fullscreen_allowed)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
         # Dragging the tab's preview out lights the combine slot it fits, like a
         # browser thumbnail (see :meth:`_on_generation_drag_started`).
@@ -549,6 +558,100 @@ class GalleryView(QWidget):
         if self._fullscreen_preview is fullscreen:
             self._fullscreen_preview = None
             self._reconcile_osr2()
+
+    # --- the live auto-generate montage (double-click the preview while looping) ---
+
+    def _plain_fullscreen_allowed(self) -> bool:
+        """Whether a preview double-click opens the plain fullscreen view — it does
+        unless the open folder is auto-generating, when the montage opens instead."""
+        return self._auto_montage_key() is None
+
+    def _auto_montage_key(self) -> str | None:
+        """The auto-generate loop a montage should follow: the open folder's loop
+        when one is running, else ``None``."""
+        key = self._selected_folder_key()
+        return key if key is not None and self._auto.is_active(key) else None
+
+    def _make_auto_montage(self) -> AutoGenerateView:
+        """Build the montage window (a seam so tests can inject a stub player)."""
+        return AutoGenerateView()
+
+    def _on_preview_double_clicked(self):
+        """A preview double-click that opened no plain fullscreen: open the live
+        montage when the folder is looping, otherwise do nothing."""
+        key = self._auto_montage_key()
+        if key is not None:
+            self._open_auto_montage(key)
+
+    def _open_auto_montage(self, key: str):
+        """Open the fullscreen montage following folder ``key``'s loop: seed it with
+        the items generated so far (oldest first, so the newest lands nearest the
+        centre) and the current live frame, then wire its curation keys."""
+        montage = self._make_auto_montage()
+        self._auto_montage = montage
+        self._auto_montage_key_open = key
+        montage.closed.connect(self._on_auto_montage_closed)
+        montage.cancel_requested.connect(lambda: self._skip_auto_current(key))
+        montage.star_requested.connect(lambda: self._star_auto_current(key))
+        group = self._group_for_key(key)
+        if isinstance(group, gallery.SettingsGroup):
+            for row in reversed(group.rows):
+                if gallery.produced_output(row):
+                    montage.add_thumbnail(row.get("thumbnail_path"))
+        job = self._reroll.job_for(key)
+        if job is not None and job.last_preview is not None:
+            montage.show_live_frame(job.last_preview)
+        montage.showFullScreen()
+
+    def _on_auto_montage_closed(self):
+        """The montage was dismissed (Esc/close): forget it — the loop keeps running."""
+        self._auto_montage = None
+        self._auto_montage_key_open = None
+
+    def _feed_montage_preview(self, key: str, data: bytes):
+        """Mirror a loop's live frame into the montage centre while it's open."""
+        if self._auto_montage is not None and key == self._auto_montage_key_open:
+            self._auto_montage.show_live_frame(data)
+
+    def _feed_montage_finished(self, key: str):
+        """A loop item finished: push its thumbnail out to the montage's sides and
+        show its result in the centre until the next one starts streaming."""
+        if self._auto_montage is None or key != self._auto_montage_key_open:
+            return
+        group = self._group_for_key(key)
+        if not (isinstance(group, gallery.SettingsGroup) and group.rows):
+            return
+        row = group.rows[0]  # the just-finished item is the folder's newest
+        self._auto_montage.add_thumbnail(row.get("thumbnail_path"))
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is not None:
+            self._auto_montage.show_center_media(*preview)
+
+    def _skip_auto_current(self, key: str):
+        """Montage Up: abandon the generation on screen but keep looping — cancel the
+        in-flight job, then launch the next as if this one had finished."""
+        self._drop_reroll(key)
+        self._auto.note_finished(key)  # still looping → launch the next
+
+    def _star_auto_current(self, key: str):
+        """Montage Down: star the item on screen — the in-flight generation if one is
+        running, else the folder's newest finished item — and confirm it on screen."""
+        job = self._reroll.job_for(key)
+        pid = job.prompt_id if job is not None else self._newest_prompt_id(key)
+        if pid is not None:
+            self._db.set_generation_starred(pid, True)
+            if self._auto_montage is not None:
+                self._auto_montage.set_center_starred(True)
+
+    def _newest_prompt_id(self, key: str) -> str | None:
+        group = self._group_for_key(key)
+        if isinstance(group, gallery.SettingsGroup) and group.rows:
+            return group.rows[0].get("prompt_id")
+        return None
+
+    def _group_for_key(self, key: str):
+        item = self._item_by_key.get(key)
+        return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
         """The front config tab changed: re-aim the OSR2 drive at its video, and
@@ -1372,10 +1475,12 @@ class GalleryView(QWidget):
 
     def _on_reroll_preview(self, key: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
-        remembering it so it survives the rebuild each stage completion triggers."""
+        remembering it so it survives the rebuild each stage completion triggers.
+        A live montage of this folder's loop mirrors the same frame."""
         if key == self._selected_reroll_key:
             self._last_reroll_frame = data
             self._info_tabs.show_reroll_frame(data)
+        self._feed_montage_preview(key, data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -1394,6 +1499,12 @@ class GalleryView(QWidget):
 
     def _cancel_reroll(self, key: str):
         self._auto.stop(key)  # cancelling the in-flight job ends the loop too
+        self._drop_reroll(key)
+
+    def _drop_reroll(self, key: str):
+        """Cancel a folder's in-flight re-roll and redraw without it — shared by the
+        tile's Cancel and the montage's skip, which differ only in whether the loop
+        stops or launches the next around this."""
         self._reroll.cancel(key)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
@@ -1413,6 +1524,7 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
+        self._feed_montage_finished(key)  # a live montage gains this item's thumbnail
         self._show_reroll_result_in_tab(key)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.

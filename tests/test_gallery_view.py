@@ -15,6 +15,7 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.auto_generate_view import AutoGenerateView
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.media_badge import MediaBadge
@@ -4317,6 +4318,118 @@ def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
     fs._target = ("B.mp4", "pB", "aB")
     fs.media_changed.emit()  # Left/Right landed on another clip
     assert driver.started[-1] == ("pB", "aB")
+
+
+# --- the live auto-generate montage -----------------------------------------
+
+def _auto_montage_view(qtbot, monkeypatch, rows):
+    """A gallery on a settings leaf whose loop reports active, with the montage
+    built on a stubbed player so no real media backend spins up."""
+    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_make_auto_montage",
+                        lambda: AutoGenerateView(player=MagicMock()))
+    view.refresh()
+    _open_leaf(view)
+    key = view._selected_folder_key()
+    monkeypatch.setattr(view._auto, "is_active", lambda k: k == key)
+    return view, key
+
+
+def test_auto_montage_key_follows_the_open_folders_loop(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    key = view._selected_folder_key()
+    assert view._auto_montage_key() is None           # not looping → no montage
+    monkeypatch.setattr(view._auto, "is_active", lambda k: k == key)
+    assert view._auto_montage_key() == key
+    assert view._plain_fullscreen_allowed() is False  # montage pre-empts fullscreen
+
+
+def test_the_preview_double_click_is_gated_while_looping(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    panel = view._info_tabs.current_config_panel()
+    # The gate is wired to the gallery, and vetoes the plain fullscreen while looping.
+    assert panel._preview._fullscreen_gate == view._plain_fullscreen_allowed
+    assert panel._preview._fullscreen_gate() is False
+
+
+def test_double_clicking_the_preview_while_looping_opens_the_montage(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    assert view._auto_montage is None
+    view._on_preview_double_clicked()
+    assert isinstance(view._auto_montage, AutoGenerateView)
+    view._auto_montage.close()
+
+
+def test_the_montage_seeds_with_the_items_generated_so_far(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view, key = _auto_montage_view(qtbot, monkeypatch, rows)
+    view._open_auto_montage(key)
+    montage = view._auto_montage
+    assert len(montage._left_thumbs) + len(montage._right_thumbs) == 2
+    montage.close()
+
+
+def test_a_live_frame_feeds_the_open_montage(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    montage = view._auto_montage
+    seen = []
+    monkeypatch.setattr(montage, "show_live_frame", lambda d: seen.append(d))
+    view._on_reroll_preview(key, b"frame-bytes")
+    assert seen == [b"frame-bytes"]
+    montage.close()
+
+
+def test_a_finished_item_adds_a_thumbnail_to_the_montage(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    montage = view._auto_montage
+    before = len(montage._left_thumbs) + len(montage._right_thumbs)
+    view._feed_montage_finished(key)
+    assert len(montage._left_thumbs) + len(montage._right_thumbs) == before + 1
+    montage.close()
+
+
+def test_closing_the_montage_forgets_it(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    view._auto_montage.close()
+    assert view._auto_montage is None
+
+
+def test_up_in_the_montage_skips_the_current_and_keeps_looping(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    cancelled, relaunched = [], []
+    monkeypatch.setattr(view._reroll, "cancel", lambda k: cancelled.append(k))
+    monkeypatch.setattr(view._auto, "note_finished", lambda k: relaunched.append(k))
+    view._skip_auto_current(key)
+    assert cancelled == [key]   # the in-flight job is abandoned...
+    assert relaunched == [key]  # ...but the loop launches the next
+
+
+def test_down_in_the_montage_stars_the_in_flight_item(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    job = MagicMock()
+    job.prompt_id = "i1"
+    monkeypatch.setattr(view._reroll, "job_for", lambda k: job)
+    view._star_auto_current(key)
+    assert view._db.get_generation("i1")["starred"]
+    assert not view._auto_montage._star.isHidden()  # confirmed on screen
+    view._auto_montage.close()
+
+
+def test_down_stars_the_newest_finished_item_when_none_is_in_flight(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    monkeypatch.setattr(view._reroll, "job_for", lambda k: None)  # nothing generating
+    view._star_auto_current(key)
+    assert view._db.get_generation("i1")["starred"]  # the folder's newest item
+    view._auto_montage.close()
 
 
 def test_watching_a_video_fullscreen_drives_it_with_the_toggle_off(qtbot):

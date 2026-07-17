@@ -533,6 +533,59 @@ def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
     assert view.visible_prompt_ids() == []
 
 
+def test_starred_shelf_collects_starred_items_as_thumbnails(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    db = FakeDB(rows)
+    db.set_generation_starred("i2", True)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = _top_level(view._tree)["Starred"]
+    view._tree.setCurrentItem(shelf)
+    assert view.visible_prompt_ids() == ["i2"]  # the starred item, on the shelf
+    assert view._thumb_widgets["i2"].is_starred() is True
+
+
+def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    db = FakeDB(rows)
+    db.set_generation_starred("i1", True)  # a starred item
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    dog_key = _key(lora.child(1))
+    view._toggle_star(dog_key)  # and a starred folder
+
+    shelf = _top_level(view._tree)["Starred"]
+    view._tree.setCurrentItem(shelf)
+    assert view.visible_prompt_ids() == ["i1"]      # the item
+    assert view.visible_folder_keys() == [dog_key]  # the folder
+
+
+def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1)]
+    db = FakeDB(rows)
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = _top_level(view._tree)["Starred"]
+    view._tree.setCurrentItem(shelf)
+    assert view.visible_prompt_ids() == ["i1"]
+    # Right-click the shelf tile → Unstar (the menu's first entry).
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
+    )
+    view._thumbnail_context_menu("i1", QPoint(0, 0))
+
+    assert not db.get_generation("i1")["starred"]
+    assert view.visible_prompt_ids() == []  # gone from the shelf after the rebuild
+
+
 def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

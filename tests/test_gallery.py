@@ -23,6 +23,7 @@ from origenerator.gallery import (
     output_disk_files,
     output_file_reference,
     recent_generations,
+    starred_generations,
     resolve_preview,
     row_output_files,
     rows_under,
@@ -460,12 +461,13 @@ def test_find_source_image_returns_none_without_a_match():
     assert find_source_image_id(unmatched, [image]) is None
 
 
-def _img(prompt_id, prompt, steps, seed):
+def _img(prompt_id, prompt, steps, seed, **extra):
     return _row(
         prompt_id=prompt_id,
         workflow_name="sdxl_t2i",
         params_json=json.dumps({"positive_prompt": prompt, "steps": steps, "seed": seed}),
         output_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png"}]),
+        **extra,
     )
 
 
@@ -985,6 +987,26 @@ def test_recent_generations_defaults_to_every_media_type():
     # No filter argument keeps both, unchanged from the pre-filter behavior.
     rows = [_i2v("v1", "styleA", seed=1), _img("i1", "a cat", 50, 1)]
     assert [r["prompt_id"] for r in recent_generations(rows, 10)] == ["v1", "i1"]
+
+
+def test_starred_generations_collects_starred_items_newest_first():
+    rows = [_img("i3", "c", 50, 3, starred=1), _img("i2", "b", 50, 2),
+            _img("i1", "a", 50, 1, starred=1)]
+    assert [r["prompt_id"] for r in starred_generations(rows)] == ["i3", "i1"]
+
+
+def test_starred_generations_includes_imported_files_unlike_recents():
+    # Unlike the Recents shelf, a bookmark is a bookmark: an imported image the user
+    # starred belongs on the Starred shelf.
+    imported = _row(prompt_id="imp", source="imported", starred=1,
+                    output_files=json.dumps([{"filename": "imp.png"}]))
+    assert [r["prompt_id"] for r in starred_generations([imported])] == ["imp"]
+
+
+def test_starred_generations_excludes_rows_with_no_output():
+    # A starred row that produced nothing (in-flight/failed) has nothing to show.
+    starred_wip = _row(prompt_id="wip", starred=1, output_files=None)
+    assert starred_generations([starred_wip]) == []
 
 
 def test_recent_generations_filters_before_applying_the_limit():

@@ -54,11 +54,13 @@ class BrowserPane:
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
         self._recent_rows: list[dict] = []  # recently generated rows, newest first
         self._starred_groups: list = []     # folders the Starred shelf collects
+        self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
 
-    def set_model(self, recent_rows, starred_groups):
+    def set_model(self, recent_rows, starred_groups, starred_rows):
         """Take the newly rebuilt gallery model the shelves render from."""
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
+        self._starred_rows = starred_rows
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
@@ -139,21 +141,28 @@ class BrowserPane:
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item
         for row in self._recent_rows:
-            tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-                movie_path=self._v._animated_preview(row),  # videos loop; images stay still
-                starred=bool(row.get("starred")),
-            )
-            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
-            tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
-            self._wire_drag(tw)
-            flow.addWidget(tw)
-            self._visible_ids.append(row["prompt_id"])
-            self._thumb_widgets[row["prompt_id"]] = tw
+            self._add_shelf_thumbnail(flow, row)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         self.show_widget(container if (items or self._recent_rows)
                          else self._empty_state(self._recents_empty_hint()))
+
+    def _add_shelf_thumbnail(self, flow, row):
+        """Build one finished-item tile for a shelf (Recents/Starred): preview it
+        here on a click, open its own folder on a double-click, drag it to a combine
+        slot. Returns the tile so a caller can add a shelf-specific action."""
+        tw = ThumbnailWidget(
+            row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
+            media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+            starred=bool(row.get("starred")),
+        )
+        tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
+        tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
+        self._wire_drag(tw)
+        flow.addWidget(tw)
+        self._visible_ids.append(row["prompt_id"])
+        self._thumb_widgets[row["prompt_id"]] = tw
+        return tw
 
     def _visible_inflight_items(self) -> list:
         """The in-flight items the shelf's media-type filter keeps on screen. The
@@ -272,30 +281,35 @@ class BrowserPane:
             self.showing_recents() and self._v._selected is not None
         )
 
-    # --- the Starred shelf: every bookmarked folder, gathered in one place ---
+    # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
     def show_starred_overview(self):
-        """Render the Starred shelf: one tile per bookmarked folder, each captioned
-        with its breadcrumb so identically-named folders stay tellable apart. Like
-        a branch folder it lists sub-folders rather than a single generation, so the
-        info pane clears instead of previewing one folder's first item."""
+        """Render the Starred shelf: the individual starred images and videos as
+        thumbnails, then one tile per bookmarked folder (each captioned with its
+        breadcrumb so identically-named folders stay tellable apart). A starred
+        item previews here on click and opens its own folder on double-click; a
+        folder tile lists its sub-folders."""
         self._v._title.set_display(_STARRED_TITLE)
         self._v._avg_label.setText("")
         self._v._clear_metadata()
-        self._show_starred_tiles(self._starred_groups)
+        self._show_starred(self._starred_groups, self._starred_rows)
         self._v._sync_delete_button()
         self._v._record_location(STARRED_KEY)  # so Back can return to the shelf
 
-    def _show_starred_tiles(self, groups):
+    def _show_starred(self, groups, rows):
         container, flow = self._new_tile_pane()
+        for row in rows:
+            tw = self._add_shelf_thumbnail(flow, row)
+            # Right-click to unstar (or delete) the item, straight from the shelf.
+            tw.context_requested.connect(self._thumbnail_context_menu)
         for group in groups:
             item = self._v._item_by_key.get(group.key)
             context = self._v._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
             self._add_folder_tile(flow, group, starred=False, context=context)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self.show_widget(container if groups else self._empty_state(
-            "No starred folders yet.\n\nHover a folder in the list and click its "
-            "star, or right-click a folder and choose Star, to collect it here."
+        self.show_widget(container if (rows or groups) else self._empty_state(
+            "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
+            "or star a folder from the list, to collect them here."
         ))
 
     @staticmethod

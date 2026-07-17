@@ -223,6 +223,17 @@ def recent_generations(
     return generated[:limit]
 
 
+def starred_generations(rows: list[dict]) -> list[dict]:
+    """Every starred image or video that produced an output, newest first — the
+    individual bookmarks the Starred shelf collects alongside starred folders.
+
+    Any produced row the user starred qualifies, imported files included (unlike
+    the Recents shelf, which is app-made results only). ``rows`` arrive newest-first
+    (the caller lists them by descending id), so the result is too.
+    """
+    return [row for row in rows if row.get("starred") and produced_output(row)]
+
+
 def _build_settings_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[SettingsGroup]:

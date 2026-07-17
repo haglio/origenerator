@@ -67,4 +67,5 @@ from origenerator.gallery.tree import (
     recent_generations,
     settings_folder_key,
     starred_folders,
+    starred_generations,
 )

@@ -815,6 +815,7 @@ class GalleryView(QWidget):
         self._browser.set_model(
             gallery.recent_generations(rows, _RECENTS_LIMIT, self._recents_media_types()),
             gallery.starred_folders(tree_model),
+            gallery.starred_generations(rows),
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()))

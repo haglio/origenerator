@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QPoint, QSize, QMimeData, QByteArray, QEvent, pyqtS
 
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.star_badge import StarBadge
 
 _IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
 
@@ -62,12 +63,13 @@ class ThumbnailWidget(QWidget):
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
-                 movie_path: str | None = None,
+                 movie_path: str | None = None, starred: bool = False,
                  corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
         self._highlighted = False
+        self._starred = starred
         self._corner_buttons: list[QPushButton] = []
         self._press_pos: QPoint | None = None  # left-press origin, for drag detection
         self.setObjectName("thumbnailTile")
@@ -124,6 +126,11 @@ class ThumbnailWidget(QWidget):
         if media_type:
             MediaBadge(media_type, self)
 
+        # A gold star in the opposite (top-right) corner marks a bookmarked item,
+        # shown only while starred so an unstarred tile stays clean.
+        self._star_badge = StarBadge(self)
+        self._star_badge.setVisible(self._starred)
+
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.
         self._build_corner_actions(corner_actions or [])
@@ -137,6 +144,16 @@ class ThumbnailWidget(QWidget):
             return  # idempotent: skip restyling thumbnails a click didn't move
         self._selected = selected
         self._apply_styles()
+
+    def is_starred(self) -> bool:
+        return self._starred
+
+    def set_starred(self, starred: bool):
+        """Show or hide the corner star as the item's bookmark is toggled."""
+        if starred == self._starred:
+            return
+        self._starred = starred
+        self._star_badge.setVisible(starred)
 
     def is_highlighted(self) -> bool:
         return self._highlighted

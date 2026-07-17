@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QApplication
 import origenerator.gui.thumbnail_widget as tw_module
 from origenerator.gui import icons
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
 
@@ -185,6 +186,31 @@ def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
     tw._corner_buttons[1].click()
 
     assert fired == [("p1", "image")]  # carries the tile's id and the chosen action
+
+
+def test_star_badge_shows_only_when_starred(qtbot):
+    # An unstarred tile carries the badge widget but keeps it hidden...
+    plain = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(plain)
+    assert plain.is_starred() is False
+    assert all(b.isHidden() for b in plain.findChildren(StarBadge))
+    # ...a starred one reveals it (a gold star in the corner).
+    starred = ThumbnailWidget("p2", None, "label", starred=True)
+    qtbot.addWidget(starred)
+    assert starred.is_starred() is True
+    badges = starred.findChildren(StarBadge)
+    assert len(badges) == 1 and not badges[0].isHidden()
+
+
+def test_set_starred_toggles_the_badge_live(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    (badge,) = tw.findChildren(StarBadge)
+    assert badge.isHidden()
+    tw.set_starred(True)
+    assert tw.is_starred() is True and not badge.isHidden()
+    tw.set_starred(False)
+    assert tw.is_starred() is False and badge.isHidden()
 
 
 def test_thumbnail_starts_unselected(qtbot):

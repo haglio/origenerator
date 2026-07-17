@@ -1499,6 +1499,13 @@ class GalleryView(QWidget):
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
         self._browser._thumbnail_context_menu(prompt_id, global_pos)
 
+    def set_items_starred(self, prompt_ids, starred: bool):
+        """Star or unstar the given generations, then rebuild so their tiles pick
+        up (or drop) the corner star — mirroring how a folder star refreshes."""
+        for pid in prompt_ids:
+            self._db.set_generation_starred(pid, starred)
+        self.refresh()
+
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked."""
         if self._browser.selected_ids:

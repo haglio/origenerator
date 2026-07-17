@@ -144,6 +144,11 @@ class FakeDB:
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(starred)
 
+    def set_generation_starred(self, prompt_id, starred):
+        row = self._by_id.get(prompt_id)
+        if row is not None:
+            row["starred"] = 1 if starred else 0
+
     def delete_generation(self, prompt_id):
         self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
         self._by_id.pop(prompt_id, None)
@@ -1807,6 +1812,78 @@ def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, mon
     qtbot.mouseClick(view._thumb_widgets["i3"], Qt.MouseButton.RightButton)
 
     assert set(view.selected_prompt_ids()) == {"i1", "i3"}
+
+
+def test_a_starred_row_renders_a_starred_tile(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    db.set_generation_starred("i2", True)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    assert view._thumb_widgets["i1"].is_starred() is False
+    assert view._thumb_widgets["i2"].is_starred() is True
+
+
+def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    # The menu's first entry is Star/Unstar (Delete is last).
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
+    )
+
+    view._thumbnail_context_menu("i1", QPoint(0, 0))
+
+    assert db.get_generation("i1")["starred"]           # persisted
+    assert view._thumb_widgets["i1"].is_starred() is True  # tile updated on rebuild
+
+
+def test_right_click_unstar_clears_a_starred_thumbnail(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1)]
+    db = FakeDB(rows)
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    labels = []
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda self, *a: (labels.append(self.actions()[0].text()), self.actions()[0])[1],
+    )
+
+    view._thumbnail_context_menu("i1", QPoint(0, 0))
+
+    assert labels == ["Unstar 1 item"]                 # a starred item offers Unstar
+    assert not db.get_generation("i1")["starred"]      # cleared
+
+
+def test_right_click_star_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3)]
+    db = FakeDB(rows)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._apply_selection("i3", _CTRL)  # i1 + i3 selected
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
+    )
+
+    view._thumbnail_context_menu("i3", QPoint(0, 0))
+
+    assert db.get_generation("i1")["starred"]
+    assert db.get_generation("i3")["starred"]
+    assert not db.get_generation("i2").get("starred")  # untouched
 
 
 def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):

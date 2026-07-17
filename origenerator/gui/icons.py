@@ -115,6 +115,31 @@ def media_type_badge(media_type: str) -> QPixmap:
     )
 
 
+_STAR_GLYPH = AMBER  # a starred item's gold star, on the same translucent chip
+
+
+@lru_cache(maxsize=None)
+def star_badge() -> QPixmap:
+    """A corner badge marking a starred image or video.
+
+    A filled gold star on the translucent dark chip the media-type badges use, so
+    a bookmarked item reads at a glance over a thumbnail of any color. Cached and
+    pre-scaled — the one badge decorates every starred tile."""
+    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_BADGE_CHIP)
+    painter.drawRoundedRect(QRectF(4, 4, _SIZE - 8, _SIZE - 8), 11, 11)
+    _draw_star(painter, _STAR_GLYPH, filled=True)
+    painter.end()
+    return pixmap.scaled(
+        _BADGE_DISPLAY, _BADGE_DISPLAY,
+        Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+    )
+
+
 _REROLL_GLYPH = QColor(255, 255, 255)
 
 

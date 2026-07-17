@@ -135,6 +135,7 @@ class BrowserPane:
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+                starred=bool(row.get("starred")),
             )
             tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
             tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
@@ -310,6 +311,7 @@ class BrowserPane:
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+                starred=bool(row.get("starred")),
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
@@ -421,16 +423,29 @@ class BrowserPane:
         return [pid for pid in self._visible_ids if pid in self._selected_ids]
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        """Right-click menu for a thumbnail: delete the picked item(s).
+        """Right-click menu for a thumbnail: star/unstar or delete the picked item(s).
 
         Right-clicking a tile that isn't part of the current selection first
-        selects just it, so the menu always acts on something visible.
+        selects just it, so the menu always acts on something visible. The star
+        entry reads Unstar only when every picked item is already starred, and
+        toggles the whole selection to the opposite state.
         """
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
             self._v._on_thumbnail_clicked(prompt_id)
-        count = len(self._selected_ids)
+        ids = self.selected_prompt_ids()
+        count = len(ids)
+        suffix = f" {count} item{'s' if count != 1 else ''}"
+        all_starred = all(self._is_starred(pid) for pid in ids)
         menu = QMenu(self._v)
-        delete_action = menu.addAction(f"Delete {count} item{'s' if count != 1 else ''}")
-        if menu.exec(global_pos) is delete_action:
+        star_action = menu.addAction(("Unstar" if all_starred else "Star") + suffix)
+        delete_action = menu.addAction("Delete" + suffix)
+        chosen = menu.exec(global_pos)
+        if chosen is delete_action:
             self._v._delete_selection()
+        elif chosen is star_action:
+            self._v.set_items_starred(ids, not all_starred)
+
+    def _is_starred(self, prompt_id: str) -> bool:
+        row = self._v._db.get_generation(prompt_id)
+        return bool(row and row.get("starred"))

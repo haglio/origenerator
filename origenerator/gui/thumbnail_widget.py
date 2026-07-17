@@ -2,8 +2,9 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
 from PyQt6.QtGui import QPixmap, QDrag, QCursor
-from PyQt6.QtCore import Qt, QPoint, QSize, QMimeData, QByteArray, QEvent, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, QEvent, pyqtSignal
 
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.star_badge import StarBadge
@@ -19,17 +20,6 @@ _CORNER_BUTTON_CSS = (
     "QPushButton { background: rgba(0,0,0,0.55); border: none; border-radius: 6px; }"
     "QPushButton:hover { background: rgba(48,128,224,0.9); }"
 )
-
-# A dragged thumbnail carries its generation's prompt_id under this type, which the
-# gallery's combine drop slots read to know which image or video was dropped.
-GENERATION_MIME = "application/x-origenerator-generation"
-
-
-def generation_mime(prompt_id: str) -> QMimeData:
-    """The drag payload naming a generation by prompt_id, for a drop slot to read."""
-    mime = QMimeData()
-    mime.setData(GENERATION_MIME, QByteArray(prompt_id.encode("utf-8")))
-    return mime
 
 # A selected thumbnail lightens its whole tile — behind both the image and the
 # caption — the way a file browser highlights a picked item. Two things make

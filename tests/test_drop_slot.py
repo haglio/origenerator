@@ -7,7 +7,7 @@ from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QMovie
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.thumbnail_widget import generation_mime
+from origenerator.gui.generation_drag import generation_mime
 
 
 def _slot(qtbot, kind="image", accepts=lambda pid: True,

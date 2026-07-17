@@ -17,7 +17,7 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.thumbnail_widget import GENERATION_MIME
+from origenerator.gui.generation_drag import GENERATION_MIME
 
 _PREVIEW_SIZE = 96  # the dropped thumbnail fits this box; small enough for a 120px pane
 

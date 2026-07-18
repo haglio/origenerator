@@ -366,6 +366,54 @@ def test_list_generations_ordered_newest_first(tmp_path):
     assert rows[2]["prompt_id"] == "list-000"
 
 
+def test_opening_db_without_experiment_verdict_column_migrates_it(tmp_path):
+    db_path = tmp_path / "old.db"
+    # Faithful pre-experiment schema: the table as it was before this column.
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE generations ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " prompt_id TEXT NOT NULL UNIQUE,"
+        " source TEXT NOT NULL DEFAULT 'generated',"
+        " workflow_name TEXT NOT NULL,"
+        " workflow_version TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'pending',"
+        " positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
+        " params_json TEXT NOT NULL,"
+        " workflow_json TEXT NOT NULL,"
+        " output_files TEXT, thumbnail_path TEXT, error_message TEXT,"
+        " starred INTEGER NOT NULL DEFAULT 0,"
+        " progress_json TEXT,"
+        " duration_seconds REAL,"
+        " created_at TEXT NOT NULL DEFAULT (datetime('now')),"
+        " completed_at TEXT, evolver_exported_at TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO generations"
+        " (prompt_id, workflow_name, workflow_version, params_json, workflow_json)"
+        " VALUES ('old-001', 'sdxl_t2i', 'v002', '{}', '{}')"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(db_path)
+    db.set_experiment_verdict("old-001", "up")
+    assert db.get_generation("old-001")["experiment_verdict"] == "up"
+
+
+def test_experiment_verdict_round_trips(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="exp-001", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json="{}", workflow_json="{}", source="experiment",
+    )
+    assert db.get_generation("exp-001")["experiment_verdict"] is None
+    db.set_experiment_verdict("exp-001", "up")
+    assert db.get_generation("exp-001")["experiment_verdict"] == "up"
+    db.set_experiment_verdict("exp-001", "down")
+    assert db.get_generation("exp-001")["experiment_verdict"] == "down"
+
+
 def test_delete_generation_removes_row(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

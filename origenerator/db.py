@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS generations (
     -- restart mid-generation can resume the bar at its last position instead of an
     -- indeterminate spin while ComfyUI's next per-step push is awaited.
     progress_json   TEXT,
+    -- The user's review of a background experiment (source 'experiment'):
+    -- 'up' admits it to the gallery, 'down' rejects it, NULL awaits review.
+    experiment_verdict TEXT,
     duration_seconds REAL,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     completed_at    TEXT,
@@ -51,7 +54,8 @@ _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
     "output_files", "thumbnail_path", "error_message", "starred", "progress_json",
-    "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
+    "experiment_verdict", "duration_seconds", "created_at", "completed_at",
+    "evolver_exported_at",
 )
 
 
@@ -84,6 +88,8 @@ class Database:
             conn.execute(
                 "ALTER TABLE generations ADD COLUMN starred INTEGER NOT NULL DEFAULT 0"
             )
+        if "experiment_verdict" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN experiment_verdict TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -170,6 +176,19 @@ class Database:
             conn.execute(
                 "UPDATE generations SET starred = ? WHERE prompt_id = ?",
                 (1 if starred else 0, prompt_id),
+            )
+
+    def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
+        """Record the user's review of a background experiment: ``'up'`` (keep),
+        ``'down'`` (reject), or ``None`` (back to unreviewed — an undone verdict).
+
+        Deliberately separate from update_generation, whose allowlist covers a
+        job's lifecycle fields rather than a user gesture like this.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET experiment_verdict = ? WHERE prompt_id = ?",
+                (verdict, prompt_id),
             )
 
     def mark_evolver_exported(self, prompt_id: str):

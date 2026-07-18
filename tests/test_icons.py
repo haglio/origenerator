@@ -53,3 +53,20 @@ def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
         size = QSize(24, 24)
         assert not icon.pixmap(size, QIcon.Mode.Normal).isNull()
         assert not icon.pixmap(size, QIcon.Mode.Disabled).isNull()
+
+
+def test_experiment_icons_render_and_verdicts_differ(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+
+    # The Experiments shelf marker draws in both modes like the other shelves'.
+    flask = icons.flask_icon()
+    size = QSize(24, 24)
+    assert not flask.pixmap(size, QIcon.Mode.Normal).isNull()
+    assert not flask.pixmap(size, QIcon.Mode.Disabled).isNull()
+    # The review hover controls: keep and reject, non-blank and visibly distinct.
+    keep = icons.experiment_verdict_icon("up")
+    reject = icons.experiment_verdict_icon("down")
+    assert not keep.pixmap(size).isNull()
+    assert not reject.pixmap(size).isNull()
+    assert keep.pixmap(size).toImage() != reject.pixmap(size).toImage()

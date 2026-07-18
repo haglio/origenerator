@@ -30,6 +30,7 @@ from origenerator.gallery import (
     settings_signature,
     source_image_id_for,
     starred_folders,
+    unreviewed_experiments,
     videos_from_source_image,
 )
 
@@ -858,6 +859,47 @@ def test_build_gallery_tree_includes_a_pending_row():
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
     assert surfaced == {"q"}
+
+
+def test_build_gallery_tree_admits_experiments_only_once_approved():
+    # A background experiment stays out of the tree — completed or still in
+    # flight — until the user reviews it up; a rejected one never appears. The
+    # main gallery stays curated, with unvetted output confined to its shelf.
+    def _experiment(prompt_id, verdict, **kw):
+        kw.setdefault("status", "completed")
+        kw.setdefault("output_files", json.dumps([{"filename": f"{prompt_id}.png"}]))
+        return _row(prompt_id=prompt_id, source="experiment",
+                    experiment_verdict=verdict,
+                    params_json=json.dumps({"positive_prompt": "x", "seed": 1}), **kw)
+
+    rows = [
+        _img("mine", "a cat", 50, 1),
+        _experiment("approved", "up"),
+        _experiment("unreviewed", None),
+        _experiment("rejected", "down"),
+        _experiment("cooking", None, status="running", output_files="[]"),
+    ]
+    tree = build_gallery_tree(rows)
+    surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
+    assert surfaced == {"mine", "approved"}
+
+
+def test_unreviewed_experiments_lists_only_finished_unjudged_results():
+    rows = [
+        _row(prompt_id="mine", status="completed",
+             output_files=json.dumps([{"filename": "mine.png"}])),
+        _row(prompt_id="await-1", source="experiment", status="completed",
+             experiment_verdict=None,
+             output_files=json.dumps([{"filename": "a.png"}])),
+        _row(prompt_id="judged", source="experiment", status="completed",
+             experiment_verdict="up",
+             output_files=json.dumps([{"filename": "b.png"}])),
+        _row(prompt_id="failed", source="experiment", status="error",
+             experiment_verdict=None, output_files=None),
+        _row(prompt_id="cooking", source="experiment", status="running",
+             experiment_verdict=None, output_files="[]"),
+    ]
+    assert [r["prompt_id"] for r in unreviewed_experiments(rows)] == ["await-1"]
 
 
 def test_build_gallery_tree_nests_media_then_workflow_then_settings():

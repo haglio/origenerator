@@ -69,6 +69,34 @@ class GalleryActions:
                     files.append(path)
         return files
 
+    def reject_experiment(self, row: dict) -> None:
+        """Reject a background experiment: trash its files and clear their
+        references, keeping the row itself — its params and down-verdict are what
+        the experiment policy learns from. One undoable step: undo restores the
+        files and returns the item to the review shelf (verdict cleared).
+
+        The verdict is recorded here, with the file cleanup, so the whole
+        rejection is one reversible unit rather than half in the view.
+        """
+        prompt_id = row["prompt_id"]
+        batch = self._trash.store(self._files_for_rows([row]))
+        self._db.set_experiment_verdict(prompt_id, "down")
+        self._db.update_generation(
+            prompt_id, output_files=None, thumbnail_path=None
+        )
+
+        def undo() -> str | None:
+            batch.restore()
+            self._db.set_experiment_verdict(prompt_id, None)
+            self._db.update_generation(
+                prompt_id,
+                output_files=row.get("output_files"),
+                thumbnail_path=row.get("thumbnail_path"),
+            )
+            return None  # back on the review shelf, not in any folder
+
+        self._push(_UndoEntry("Reject experiment", undo, batch.purge))
+
     # --- rename ------------------------------------------------------------
 
     def rename_folder(self, key: str, name: str | None) -> None:

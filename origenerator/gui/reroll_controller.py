@@ -52,7 +52,10 @@ class RerollController(QObject):
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
-    finished = pyqtSignal(str)        # (folder key) a re-roll finished and was saved
+    # (folder key, prompt_id) a re-roll finished and was saved. The prompt_id
+    # tells the view whose completion this is — a user re-roll gets loaded into
+    # the front tab, a background experiment leaves the tabs alone.
+    finished = pyqtSignal(str, str)
     failed = pyqtSignal(str)          # (folder key) a re-roll failed
 
     def __init__(self, db, client, parent=None):
@@ -74,18 +77,20 @@ class RerollController(QObject):
     def has(self, key: str) -> bool:
         return key in self._jobs
 
-    def start_prepared(self, key: str, workflow, params: dict) -> bool:
+    def start_prepared(self, key: str, workflow, params: dict, *,
+                       source: str = "generated") -> bool:
         """Launch a job with already-built ``params`` under folder ``key``.
 
         Unlike :meth:`start`, the caller owns the params — no defaults are filled
-        and no seed is re-rolled. This is the gallery's image+video combine, which
-        reuses the recipe video's exact seed. Returns ``True`` once the job is
-        tracked; ``False`` when there's no client, a job for ``key`` is already
-        running, or the submit failed (``_launch`` drops the job in that case).
+        and no seed is re-rolled. This is the gallery's image+video combine (which
+        reuses the recipe video's exact seed) and the background experimenter,
+        which tags its rows with ``source="experiment"``. Returns ``True`` once
+        the job is tracked; ``False`` when there's no client, a job for ``key`` is
+        already running, or the submit failed (``_launch`` drops the job then).
         """
         if self._client is None or key in self._jobs:
             return False
-        self._launch(key, workflow, params, self._on_finished)
+        self._launch(key, workflow, params, self._on_finished, source=source)
         return key in self._jobs
 
     def start_reroll_from_image(self, key: str, image_row: dict, image_workflow,
@@ -183,7 +188,7 @@ class RerollController(QObject):
         workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
         return (source, workflow) if workflow is not None else None
 
-    def _launch(self, key, workflow, params, on_finished):
+    def _launch(self, key, workflow, params, on_finished, *, source="generated"):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
 
@@ -196,7 +201,7 @@ class RerollController(QObject):
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             return
         self._register(key, job, on_finished)
-        insert_generation_row(self._db, job)
+        insert_generation_row(self._db, job, source=source)
         try:
             job.start()
             self._db.update_generation(job.prompt_id, status="running")
@@ -301,7 +306,7 @@ class RerollController(QObject):
     def _on_finished(self, key, job, files, thumb_path, duration):
         self._jobs.pop(key, None)
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
-        self.finished.emit(key)
+        self.finished.emit(key, job.prompt_id)
 
     def _on_failed(self, key, message):
         job = self._jobs.pop(key, None)

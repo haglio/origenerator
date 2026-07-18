@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 _TICK_INTERVAL_MS = 20_000
 # After a failure, wait 2**failures ticks (capped) before trying again.
 _MAX_BACKOFF_TICKS = 30
+# After the user cancels an experiment (its row vanishes), sit out this many
+# further ticks beyond the one that noticed (~a minute all told): the cancel said
+# "not now", so don't spawn the next one in their face — but it's no failure, so
+# no exponential streak builds either.
+_CANCEL_BREATHER_TICKS = 2
 
 
 class ExperimentRunner(QObject):
@@ -103,14 +108,15 @@ class ExperimentRunner(QObject):
 
     def _resolve_last_outcome(self) -> None:
         """Settle the row our last launch created: a completed experiment clears
-        the failure streak, a failed one lengthens the next cooldown. A row the
-        user already deleted (or one still in flight) just leaves things as they
-        are."""
+        the failure streak, a failed one lengthens the next cooldown, and one the
+        user cancelled (its row deleted) earns a short breather. A row still in
+        flight leaves things as they are."""
         if self._pending_prompt_id is None:
             return
         row = self._db.get_generation(self._pending_prompt_id)
         if row is None:
             self._pending_prompt_id = None
+            self._cooldown_ticks = max(self._cooldown_ticks, _CANCEL_BREATHER_TICKS)
         elif row.get("status") == "completed":
             self._pending_prompt_id = None
             self._failures = 0

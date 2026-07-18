@@ -46,12 +46,17 @@ class FakeActions:
     def __init__(self):
         self.deleted = []   # each entry is one delete batch (list of rows)
         self.renamed = []   # (key, name) pairs
+        self.rejected = []  # experiment rows handed to reject_experiment
         self.undo_count = 0
         self._label = None
 
     def delete_rows(self, rows):
         self.deleted.append(list(rows))
         self._label = f"Delete {len(rows)} items"
+
+    def reject_experiment(self, row):
+        self.rejected.append(row)
+        self._label = "Reject experiment"
 
     def rename_folder(self, key, name):
         self.renamed.append((key, name))
@@ -150,6 +155,11 @@ class FakeDB:
         if row is not None:
             row["starred"] = 1 if starred else 0
 
+    def set_experiment_verdict(self, prompt_id, verdict):
+        row = self._by_id.get(prompt_id)
+        if row is not None:
+            row["experiment_verdict"] = verdict
+
     def delete_generation(self, prompt_id):
         self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
         self._by_id.pop(prompt_id, None)
@@ -220,7 +230,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"Recents", "Starred", "Images", "Videos"}
+    assert set(top) == {"Recents", "Starred", "Experiments", "Images", "Videos"}
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
@@ -503,6 +513,110 @@ def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
     # chevron-width to the right of them.
     assert shelf.text(0) == "Starred"
     assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
+
+
+def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, **extra):
+    return _row(prompt_id, "sdxl_t2i",
+                {"positive_prompt": prompt, "steps": steps, "seed": seed},
+                f"sdxl_t2i_{prompt_id}.png",
+                source="experiment", experiment_verdict=verdict, **extra)
+
+
+def test_experiments_shelf_is_always_reachable(qtbot):
+    # The shelf hosts the feature's on/off switch, so it must exist before any
+    # experiment does — an empty gallery included.
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = _top_level(view._tree)["Experiments"]
+    assert shelf.text(0) == "Experiments"
+    assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
+
+
+def test_experiments_shelf_label_counts_the_unreviewed(qtbot):
+    rows = [
+        _image("i1", "a cat", 50, 1),
+        _experiment_row("e1"),
+        _experiment_row("e2", seed=10),
+        _experiment_row("e3", verdict="up", seed=11),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert _top_level(view._tree)["Experiments (2)"] is not None
+
+
+def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
+    view = GalleryView(FakeDB([_experiment_row("e1")]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._experiments_item)
+    assert view.visible_prompt_ids() == ["e1"]
+    tile = view._thumb_widgets["e1"]
+    tooltips = [b.toolTip() for b in tile._corner_buttons]
+    assert any("Keep" in t for t in tooltips)
+    assert any("Reject" in t for t in tooltips)
+
+
+def test_keeping_an_experiment_admits_it_to_the_gallery(qtbot):
+    db = FakeDB([_experiment_row("e1")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    # Unreviewed: on the shelf, not in the tree.
+    assert "Images" not in _top_level(view._tree)
+
+    view._on_experiment_verdict("e1", "keep")
+
+    assert db.get_generation("e1")["experiment_verdict"] == "up"
+    view._tree.setCurrentItem(view._experiments_item)
+    assert view.visible_prompt_ids() == []          # reviewed: off the shelf...
+    assert "Images" in _top_level(view._tree)       # ...and into the gallery tree
+
+
+def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
+    db = FakeDB([_experiment_row("e1")])
+    actions = FakeActions()
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_experiment_verdict("e1", "reject")
+
+    assert [r["prompt_id"] for r in actions.rejected] == ["e1"]
+    assert view._undo_btn.isEnabled()
+
+
+def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch):
+    db = FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    shown = []
+    monkeypatch.setattr(view, "_show_reroll_result_in_tab", shown.append)
+
+    view._on_reroll_finished("some-key", "e1")   # a background experiment landing
+    assert shown == []                           # the user's tab is left alone
+
+    view._on_reroll_finished("some-key", "i1")   # the user's own re-roll landing
+    assert shown == ["some-key"]
+
+
+def test_the_experiments_switch_drives_and_reports_the_runner(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert view.experiments_enabled() is False
+
+    view.set_experiments_enabled(True)           # a restored session turns it on
+    assert view.experiments_enabled() is True
+    assert view._experiments_cb.isChecked()      # the shelf's switch reflects it
+
+    view._on_experiments_toggled(False)          # the user clicks it off
+    assert view.experiments_enabled() is False
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
@@ -859,13 +973,14 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Images"}
+    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments", "Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Images", "Videos"}
+    assert set(_top_level(view._tree)) == {
+        "Recents", "Starred", "Experiments", "Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):

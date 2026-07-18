@@ -22,7 +22,10 @@ from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight_card import InFlightCard, InFlightItem
-from origenerator.gui.gallery_tree import RECENTS_KEY, RECENTS_LABEL, STARRED_KEY, STARRED_LABEL
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
+    RECENTS_KEY, RECENTS_LABEL, STARRED_KEY, STARRED_LABEL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +58,14 @@ class BrowserPane:
         self._recent_rows: list[dict] = []  # recently generated rows, newest first
         self._starred_groups: list = []     # folders the Starred shelf collects
         self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
+        self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
 
-    def set_model(self, recent_rows, starred_groups, starred_rows):
+    def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows):
         """Take the newly rebuilt gallery model the shelves render from."""
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
         self._starred_rows = starred_rows
+        self._experiment_rows = experiment_rows
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
@@ -146,15 +151,18 @@ class BrowserPane:
         self.show_widget(container if (items or self._recent_rows)
                          else self._empty_state(self._recents_empty_hint()))
 
-    def _add_shelf_thumbnail(self, flow, row):
-        """Build one finished-item tile for a shelf (Recents/Starred): preview it
-        here on a click, open its own folder on a double-click, drag it to a combine
-        slot. Returns the tile so a caller can add a shelf-specific action."""
+    def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
+        """Build one finished-item tile for a shelf (Recents/Starred/Experiments):
+        preview it here on a click, open its own folder on a double-click, drag it
+        to a combine slot. Returns the tile so a caller can add a shelf-specific
+        action; ``corner_actions`` become the tile's hover controls (a review's
+        keep/reject)."""
         tw = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
+            corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
         tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
@@ -280,6 +288,51 @@ class BrowserPane:
         self._v._containing_folder_btn.setVisible(
             self.showing_recents() and self._v._selected is not None
         )
+
+    # --- the Experiments shelf: unreviewed background experiments ------------
+
+    def show_experiments_overview(self):
+        """Render the Experiments shelf: what the background experimenter has come
+        up with since the user last looked, newest first, each tile wearing
+        keep/reject hover controls. A kept item joins the gallery proper; a
+        rejected one is trashed and teaches the policy what to avoid. Clicking
+        previews the item right here, like the other shelves."""
+        self._v._title.set_display(EXPERIMENTS_LABEL)
+        self._v._avg_label.setText("")
+        self._v._clear_metadata()
+        self._render_experiments()
+        self._v._sync_delete_button()
+        self._v._record_location(EXPERIMENTS_KEY)  # so Back can return to the shelf
+
+    def _render_experiments(self):
+        container, flow = self._new_tile_pane()
+        actions = [
+            ("keep", icons.experiment_verdict_icon("up"),
+             "Keep — add it to the gallery"),
+            ("reject", icons.experiment_verdict_icon("down"),
+             "Reject — trash it and steer future experiments away"),
+        ]
+        for row in self._experiment_rows:
+            tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
+            tw.corner_action_triggered.connect(self._v._on_experiment_verdict)
+            tw.context_requested.connect(self._thumbnail_context_menu)
+        self.show_widget(container if self._experiment_rows
+                         else self._empty_state(self._experiments_empty_hint()))
+
+    def _experiments_empty_hint(self) -> str:
+        if self._v.experiments_enabled():
+            return ("Nothing to review yet.\n\nWhile the GPU is idle, variations "
+                    "of your own generations are tried in the background and "
+                    "collect here for your verdict.")
+        return ("Background experiments are off.\n\nTurn them on above and idle "
+                "GPU time will be spent trying variations of your work — new "
+                "prompts on proven settings, nudged parameters, other models. "
+                "Results collect here; your keep/reject verdicts steer what gets "
+                "tried next.")
+
+    def showing_experiments(self) -> bool:
+        return (self._v._experiments_item is not None
+                and self._v._tree.currentItem() is self._v._experiments_item)
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 

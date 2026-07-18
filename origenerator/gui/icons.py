@@ -91,6 +91,20 @@ def clock_icon() -> QIcon:
     return _two_mode(_draw_clock)
 
 
+def flask_icon() -> QIcon:
+    """An Erlenmeyer flask — the Experiments shelf's caret marker."""
+    return _two_mode(_draw_flask)
+
+
+@lru_cache(maxsize=None)
+def experiment_verdict_icon(verdict: str) -> QIcon:
+    """An experiment tile's review hover-buttons: a check ("up" — keep it, it
+    joins the gallery) or a cross ("down" — reject it and teach the experimenter
+    what to avoid). White line art on the buttons' own translucent chip, like the
+    per-seed re-roll controls."""
+    return QIcon(_render(lambda p, _c: _draw_verdict(p, verdict), _REROLL_GLYPH))
+
+
 @lru_cache(maxsize=None)
 def media_type_badge(media_type: str) -> QPixmap:
     """A small corner badge marking a Recents tile as an image or a video.
@@ -363,3 +377,33 @@ def _draw_clock(painter: QPainter, _color):
     painter.drawEllipse(QRectF(13, 13, 22, 22))
     painter.drawLine(QPointF(24, 24), QPointF(24, 15))   # hour hand, pointing up
     painter.drawLine(QPointF(24, 24), QPointF(31, 24))   # minute hand, to the right
+
+
+def _draw_flask(painter: QPainter, color):
+    """An Erlenmeyer flask with liquid — the "experiments" marker."""
+    # Neck and conical body, one outline.
+    painter.drawPolyline(
+        QPointF(20, 11), QPointF(20, 19), QPointF(13, 34),
+        QPointF(35, 34), QPointF(28, 19), QPointF(28, 11),
+    )
+    painter.drawLine(QPointF(18, 11), QPointF(30, 11))   # the lip
+    # The liquid: a filled band across the cone's lower half.
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawPolygon(QPointF(16.5, 27), QPointF(31.5, 27),
+                        QPointF(34, 32.5), QPointF(14, 32.5))
+
+
+def _draw_verdict(painter: QPainter, verdict: str):
+    """A check ("up") or a cross ("down"), matching the reroll glyphs' weight."""
+    pen = QPen(_REROLL_GLYPH)
+    pen.setWidthF(5.5)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    if verdict == "up":
+        painter.drawPolyline(QPointF(11, 25), QPointF(20, 34), QPointF(37, 14))
+    else:
+        painter.drawLine(QPointF(14, 14), QPointF(34, 34))
+        painter.drawLine(QPointF(34, 14), QPointF(14, 34))

@@ -234,6 +234,26 @@ def starred_generations(rows: list[dict]) -> list[dict]:
     return [row for row in rows if row.get("starred") and produced_output(row)]
 
 
+def is_unvetted_experiment(row: dict) -> bool:
+    """True for a background experiment the user hasn't approved: unreviewed or
+    rejected. Such a row stays out of the main gallery tree — the tree is the
+    user's curated space, and unvetted machine output waits on its shelf."""
+    return (row.get("source") == "experiment"
+            and row.get("experiment_verdict") != "up")
+
+
+def unreviewed_experiments(rows: list[dict]) -> list[dict]:
+    """The finished experiments awaiting the user's verdict, newest first — the
+    Experiments shelf's review queue. Only completed results qualify: a failed
+    experiment has nothing to judge, and an in-flight one shows as a live card."""
+    return [
+        row for row in rows
+        if row.get("source") == "experiment"
+        and row.get("experiment_verdict") is None
+        and produced_output(row)
+    ]
+
+
 def _build_settings_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[SettingsGroup]:
@@ -367,7 +387,11 @@ def build_gallery_tree(
     label and supplies the star state.
     """
     folder_meta = folder_meta or {}
-    rows = [row for row in rows if produced_output(row) or is_in_progress(row)]
+    rows = [
+        row for row in rows
+        if (produced_output(row) or is_in_progress(row))
+        and not is_unvetted_experiment(row)
+    ]
     # Only finished images have a file to condition an i2v's frame on, so the
     # index that keys image-conditioned folders is built from those alone.
     image_index = build_image_config_index(

@@ -75,6 +75,33 @@ def test_start_prepared_launches_and_tracks_the_job(qtbot, tmp_path):
     assert json.loads(rows[0]["params_json"])["seed"] == 3
 
 
+def test_finished_names_the_folder_and_the_generation(qtbot, tmp_path):
+    # The signal carries the prompt_id alongside the folder key so the view can
+    # tell whose completion this is — a user re-roll to load into the front tab,
+    # or a background experiment to leave the tabs alone for.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("k", _I2V, _params())
+    prompt_id = controller.job_for("k").prompt_id
+    finished = []
+    controller.finished.connect(lambda key, pid: finished.append((key, pid)))
+
+    controller.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 1.0)
+
+    assert finished == [("k", prompt_id)]
+
+
+def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+
+    controller.start_prepared("k", _I2V, _params(), source="experiment")
+
+    assert db.list_generations()[0]["source"] == "experiment"
+
+
 def test_start_prepared_is_a_noop_when_the_folder_is_already_running(qtbot, tmp_path):
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)

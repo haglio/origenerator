@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
@@ -17,6 +18,8 @@ from origenerator.config import (
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
+from origenerator.experiments.policy import ExperimentPolicy
+from origenerator.experiments.runner import ExperimentRunner
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
     ConfigSnapshot, filled_params, find_duplicate_generation, merge_denormalized,
@@ -40,6 +43,7 @@ from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
+    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
     GROUP_ROLE as _GROUP_ROLE,
     RECENTS_KEY as _RECENTS_KEY,
     STARRED_KEY as _STARRED_KEY,
@@ -139,6 +143,15 @@ class GalleryView(QWidget):
         self._last_reroll_frame: bytes | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
+        )
+        # The background experimenter: while enabled (the Experiments shelf's
+        # switch), it fills the GPU's idle time with policy-proposed variations
+        # of the user's own work, landing them on that shelf for review.
+        self._experiments = ExperimentRunner(
+            db,
+            ExperimentPolicy(registry=WORKFLOW_REGISTRY, rng=random.Random()),
+            self._launch_experiment,
+            parent=self,
         )
         self._image_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
@@ -356,6 +369,21 @@ class GalleryView(QWidget):
         filter_row.addStretch(1)
         self._recents_filter_bar.hide()  # shown only on the Recents shelf
         browser_box.addWidget(self._recents_filter_bar)
+        # The Experiments shelf's controls: the background experimenter's on/off
+        # switch and a one-line status. Rides under the header like the Recents
+        # filter, and appears only while that shelf is open.
+        self._experiments_cb = CheckBox("Run experiments while the GPU is idle")
+        self._experiments_cb.toggled.connect(self._on_experiments_toggled)
+        self._experiments_status = QLabel("")
+        self._experiments_status.setObjectName("estimateLabel")
+        self._experiments_bar = QWidget()
+        experiments_row = QHBoxLayout(self._experiments_bar)
+        experiments_row.setContentsMargins(0, 0, 0, 0)
+        experiments_row.addWidget(self._experiments_cb)
+        experiments_row.addWidget(self._experiments_status)
+        experiments_row.addStretch(1)
+        self._experiments_bar.hide()  # shown only on the Experiments shelf
+        browser_box.addWidget(self._experiments_bar)
         # Shown only while a Recents item is previewed: that item's generation lives
         # in a folder other than the shelf on screen, so this jumps the browser to
         # it. Left-aligned at its natural width, and it collapses away when hidden.
@@ -667,6 +695,57 @@ class GalleryView(QWidget):
         """Restore the global OSR2 toggle from a saved session."""
         self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
 
+    # --- background experiments: the runner's adapter and the shelf's controls
+
+    def experiments_enabled(self) -> bool:
+        """Whether the background experimenter is on (for session persistence)."""
+        return self._experiments.is_enabled()
+
+    def set_experiments_enabled(self, enabled):
+        """Restore the background experimenter's switch from a saved session."""
+        self._experiments.set_enabled(bool(enabled))
+        self._sync_experiments_bar()
+
+    def _on_experiments_toggled(self, checked: bool):
+        self._experiments.set_enabled(checked)
+        self._sync_experiments_bar()
+
+    def _sync_experiments_bar(self):
+        """Reflect the experimenter's real state in the shelf's switch + status."""
+        enabled = self._experiments.is_enabled()
+        self._experiments_cb.blockSignals(True)
+        self._experiments_cb.setChecked(enabled)
+        self._experiments_cb.blockSignals(False)
+        self._experiments_status.setText(
+            "On — new variations of your work land here for review"
+            if enabled else "Off — the GPU stays all yours"
+        )
+
+    def _launch_experiment(self, proposal):
+        """The runner's launch adapter: submit a proposal as a normal re-roll job
+        (tagged ``source="experiment"``), keyed to the settings folder its params
+        land in. Returns the launched row's prompt_id, or ``None`` when the
+        launch didn't take (no client, the folder is busy, or the submit failed)
+        so the runner can back off."""
+        key = self._folder_key_for(proposal.workflow.name, proposal.params)
+        if not self._reroll.start_prepared(key, proposal.workflow, proposal.params,
+                                           source="experiment"):
+            return None
+        return self._reroll.job_for(key).prompt_id
+
+    def _on_experiment_verdict(self, prompt_id: str, action_id: str):
+        """A review from the Experiments shelf: "keep" admits the result to the
+        gallery proper; "reject" records the down-verdict the policy learns from
+        and trashes the files (undoable). Either way the item leaves the shelf."""
+        if action_id == "keep":
+            self._db.set_experiment_verdict(prompt_id, "up")
+        else:
+            row = self._db.get_generation(prompt_id)
+            if row is not None:
+                self._actions.reject_experiment(row)
+            self._sync_undo_button()
+        self.refresh()
+
     def _folder_key_for(self, workflow_name: str, params: dict) -> str:
         """The settings-folder key a config lands in — the key the re-roll
         controller tracks its job under, and the tree leaf it groups into. Shared by
@@ -812,13 +891,16 @@ class GalleryView(QWidget):
             recipe_match.available_categories(self._rebuildable_videos(rows))
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
+        unreviewed = gallery.unreviewed_experiments(rows)
         self._browser.set_model(
             gallery.recent_generations(rows, _RECENTS_LIMIT, self._recents_media_types()),
             gallery.starred_folders(tree_model),
             gallery.starred_generations(rows),
+            unreviewed,
         )
         self._tree_view.populate(tree_model, expanded,
-                                 show_recents=bool(tree_model or self._browser._inflight_items()))
+                                 show_recents=bool(tree_model or self._browser._inflight_items()),
+                                 experiment_count=len(unreviewed))
         self._tree_view.reapply_filter()  # populate rebuilds un-filtered; re-narrow it
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
@@ -875,8 +957,10 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
-        # The image/video filter belongs to the Recents shelf alone.
+        # The image/video filter belongs to the Recents shelf alone; the
+        # experimenter's switch to the Experiments shelf alone.
         self._recents_filter_bar.setVisible(current is self._recents_item)
+        self._experiments_bar.setVisible(current is self._experiments_item)
         if current is None:
             self._title.set_display("")
             self._avg_label.setText("")
@@ -888,6 +972,10 @@ class GalleryView(QWidget):
             return
         if current is self._starred_item:
             self._browser.show_starred_overview()
+            return
+        if current is self._experiments_item:
+            self._sync_experiments_bar()
+            self._browser.show_experiments_overview()
             return
         group = current.data(0, _GROUP_ROLE)
         self._note_folder_visit(group.key if group is not None else None)
@@ -995,6 +1083,10 @@ class GalleryView(QWidget):
     @property
     def _starred_item(self):
         return self._tree_view.starred_item
+
+    @property
+    def _experiments_item(self):
+        return self._tree_view.experiments_item
 
     def _selected_folder_key(self) -> str | None:
         """The selected folder's key (or a shelf's), from the tree renderer."""
@@ -1518,10 +1610,17 @@ class GalleryView(QWidget):
             self._clear_reroll_selection()
             self._clear_metadata()
 
-    def _on_reroll_finished(self, key: str):
+    def _on_reroll_finished(self, key: str, prompt_id: str):
         """A re-roll saved its result (finalized by the controller): drop it as the
         info-pane source, rebuild so it shows as a normal thumbnail, and load it into
         the front tab so a Generate ends on its finished output, not the placeholder."""
+        finished_row = self._db.get_generation(prompt_id)
+        if finished_row is not None and finished_row.get("source") == "experiment":
+            # A background experiment landed: it waits on the Experiments shelf
+            # for review rather than moving the user's view — no front-tab load,
+            # no montage feed, no auto-loop or combine bookkeeping.
+            self.refresh()
+            return
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
@@ -1951,7 +2050,7 @@ class GalleryView(QWidget):
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""
         key = self._selected_folder_key()
-        return key if key in (_RECENTS_KEY, _STARRED_KEY) else None
+        return key if key in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY) else None
 
     def _current_location(self) -> str | None:
         """The history key for the view on screen — a shelf key on a shelf, else the
@@ -1986,7 +2085,7 @@ class GalleryView(QWidget):
     def _restore_location(self, location: str):
         """Re-show a history location without recording the move — a shelf overview
         (Recents/Starred) or a generation in its folder."""
-        if location in (_RECENTS_KEY, _STARRED_KEY):
+        if location in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY):
             self._return_to_shelf(location)
         else:
             self._show_generation(location)

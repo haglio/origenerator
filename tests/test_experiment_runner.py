@@ -137,6 +137,21 @@ def test_a_rejected_submit_backs_off_too(qtbot, tmp_path):
     assert len(launcher.launched) == 2
 
 
+def test_a_user_cancelled_experiment_earns_a_breather_not_a_failure(qtbot, tmp_path):
+    # Cancelling the in-flight experiment (its card's ✕) deletes its row. The
+    # next one shouldn't spawn 20 seconds later in the user's face — sit out a
+    # few ticks — but it's no failure either, so no exponential streak builds.
+    runner, db, _policy, launcher = make_runner(tmp_path)
+    runner.set_enabled(True)
+    db.delete_generation("exp-001")
+    runner.tick()
+    runner.tick()
+    runner.tick()
+    assert len(launcher.launched) == 1
+    runner.tick()
+    assert len(launcher.launched) == 2
+
+
 def test_the_timer_runs_only_while_enabled(qtbot, tmp_path):
     runner, _db, _policy, _launcher = make_runner(tmp_path)
     assert not runner._timer.isActive()

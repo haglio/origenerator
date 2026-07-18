@@ -19,6 +19,8 @@ RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated i
 RECENTS_LABEL = "Recents"     # its row label; a clock is drawn in the caret column
 STARRED_KEY = "__starred__"   # synthetic tree node collecting every starred folder
 STARRED_LABEL = "Starred"     # its row label; the star is drawn in the caret column
+EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
+EXPERIMENTS_LABEL = "Experiments"    # its row label; a flask is drawn in the caret column
 
 
 class GalleryTree:
@@ -32,27 +34,33 @@ class GalleryTree:
         self.leaf_by_id: dict[str, QTreeWidgetItem] = {}   # prompt_id -> its settings row
         self.recents_item: QTreeWidgetItem | None = None   # the "Recents" shelf row
         self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
+        self.experiments_item: QTreeWidgetItem | None = None  # the "Experiments" shelf row
         self._filter = ""                       # active filter query, lowercased
         self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
         self.seed_matches: dict[str, list[str]] = {}  # leaf key -> prompt_ids the query hit by seed
 
-    def populate(self, tree_model, expanded_keys, *, show_recents: bool):
+    def populate(self, tree_model, expanded_keys, *, show_recents: bool,
+                 experiment_count: int = 0):
         """Rebuild the tree from ``tree_model``, restoring the folders in
         ``expanded_keys``. ``show_recents`` keeps the Recents shelf up even with no
-        folders yet (in-flight work to show); Starred appears only once folders do."""
+        folders yet (in-flight work to show); Starred appears only once folders do.
+        ``experiment_count`` (unreviewed background experiments) shows in the
+        Experiments shelf's label so waiting work is visible from anywhere."""
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
         self.leaf_by_id = {}
         self.recents_item = None
         self.starred_item = None
+        self.experiments_item = None
         root = self._tree.invisibleRootItem()
         # Synthetic shelves lead the tree: Recents (in-flight work plus recently
         # finished items) whenever there is anything to show — so a first-ever
         # generation is visible while it runs, before any folder exists — then
-        # Starred (bookmarked folders) once folders do. Each is reachable in one
-        # click however the tree is scrolled, and draws its marker in the caret
-        # column so its label lines up with the media folders below.
+        # Starred (bookmarked folders) once folders do, then Experiments (always:
+        # it hosts the background experimenter's switch and review queue). Each is
+        # reachable in one click however the tree is scrolled, and draws its marker
+        # in the caret column so its label lines up with the media folders below.
         if show_recents:
             self.recents_item = self._add_shelf(
                 root, RECENTS_LABEL, RECENTS_KEY, icons.clock_icon(), "Recently generated"
@@ -62,6 +70,11 @@ class GalleryTree:
                 root, STARRED_LABEL, STARRED_KEY, icons.star_icon(filled=True),
                 "Your starred folders"
             )
+        label = EXPERIMENTS_LABEL + (f" ({experiment_count})" if experiment_count else "")
+        self.experiments_item = self._add_shelf(
+            root, label, EXPERIMENTS_KEY, icons.flask_icon(),
+            "Background experiments awaiting your review"
+        )
         for media in tree_model:
             self._add_node(media, root)
         # Folders default to collapsed; only restore folders the user had open.
@@ -111,9 +124,10 @@ class GalleryTree:
         failing that (only in-flight work so far, no finished folders), the Recents
         shelf, so a first generation stays visible while it runs."""
         root = self._tree.invisibleRootItem()
+        shelves = (self.recents_item, self.starred_item, self.experiments_item)
         for i in range(root.childCount()):
             item = root.child(i)
-            if item is not self.recents_item and item is not self.starred_item:
+            if item not in shelves:
                 return item
         return self.recents_item
 
@@ -207,6 +221,8 @@ class GalleryTree:
             return RECENTS_KEY  # so a rebuild keeps the shelf selected
         if item is self.starred_item:
             return STARRED_KEY  # so a rebuild keeps the shelf selected
+        if item is self.experiments_item:
+            return EXPERIMENTS_KEY  # so a rebuild keeps the shelf selected
         group = item.data(0, GROUP_ROLE)
         return group.key if group else None
 

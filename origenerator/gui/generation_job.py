@@ -22,11 +22,13 @@ from origenerator.progress import ProgressTracker
 logger = logging.getLogger(__name__)
 
 
-def insert_generation_row(db, job):
+def insert_generation_row(db, job, *, source="generated"):
     """Insert a :class:`GenerationJob`'s config as a new row (status ``pending``).
 
     A re-roll tracked from submit inserts its row up front so a restart mid-run can
     find it and reconnect; it's finished with :func:`mark_generation_completed`.
+    ``source`` tags who asked for it — ``"generated"`` for the user's own work,
+    ``"experiment"`` for the background experimenter's.
     """
     params = job.params
     db.insert_generation(
@@ -38,6 +40,7 @@ def insert_generation_row(db, job):
         seed=params.get("seed"),
         params_json=json.dumps(params),
         workflow_json=json.dumps(job.payload),
+        source=source,
     )
 
 

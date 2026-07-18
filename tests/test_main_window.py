@@ -88,6 +88,24 @@ def test_persists_the_global_osr2_toggle_on_close(qtbot, tmp_path):
     assert state.get("osr2_enabled") is True
 
 
+def test_restores_the_experiments_switch_from_app_state(qtbot, tmp_path):
+    # The background experimenter resumes across launches — "spend my idle GPU
+    # time" is a standing preference, not a per-session one.
+    state = AppState(tmp_path / "ui.json")
+    state.set("experiments_enabled", True)
+    win = _window(qtbot, tmp_path, state)
+    assert win._gallery_view.experiments_enabled() is True
+
+
+def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    win = _window(qtbot, tmp_path, state)
+    win._gallery_view.set_experiments_enabled(True)
+
+    win.close()  # closeEvent persists the session
+    assert state.get("experiments_enabled") is True
+
+
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
     # A re-roll left running by a prior session — owned by no restored tab — is
     # picked back up by the gallery once the window builds. The window's own DB is

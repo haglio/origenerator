@@ -177,3 +177,36 @@ def test_eviction_past_the_limit_purges_the_oldest_trash(tmp_path):
     assert db.get_generation("p2") is not None
     assert db.get_generation("p1") is None  # batch 1 was committed, not recoverable
     assert not actions.can_undo()
+
+
+def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "e1", "exp.png",
+                         thumb_dir=tmp_path / "thumbs")
+    file_path = output_dir / "exp.png"
+    thumb_path = tmp_path / "thumbs" / "e1.jpg"
+
+    actions.reject_experiment(row)
+
+    kept = db.get_generation("e1")
+    assert kept is not None                      # the row survives...
+    assert kept["experiment_verdict"] == "down"  # ...carrying the verdict to learn from
+    assert kept["output_files"] is None and kept["thumbnail_path"] is None
+    assert not file_path.exists() and not thumb_path.exists()  # the junk is gone
+    assert actions.can_undo() and actions.undo_label() == "Reject experiment"
+
+
+def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "e1", "exp.png",
+                         thumb_dir=tmp_path / "thumbs")
+    actions.reject_experiment(row)
+
+    actions.undo()
+
+    restored = db.get_generation("e1")
+    assert restored["experiment_verdict"] is None       # unreviewed again
+    assert restored["output_files"] == row["output_files"]
+    assert restored["thumbnail_path"] == row["thumbnail_path"]
+    assert (output_dir / "exp.png").exists()
+    assert (tmp_path / "thumbs" / "e1.jpg").exists()

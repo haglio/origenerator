@@ -41,17 +41,24 @@ class FakeWorkflow(WorkflowTemplate):
 
 
 class FakeI2vWorkflow(FakeWorkflow):
-    """An image-conditioned fake: adds the input_image its video starts from."""
+    """An image-conditioned fake: adds the input_image its video starts from,
+    and a LoRA slot (file + strength) like the real video workflows carry."""
 
     name = "fake_i2v"
     output_type = "video"
+    lora_keys = ("lora_name",)
 
     def default_params(self) -> dict:
-        return {**super().default_params(), "input_image": ""}
+        return {**super().default_params(), "input_image": "",
+                "lora_name": "style_a.safetensors", "lora_strength": 1.0}
 
     def param_definitions(self) -> list:
         return super().param_definitions() + [
             ParamDef("input_image", "Input Image", "image", ""),
+            ParamDef("lora_name", "LoRA", "combo", "style_a.safetensors",
+                     options=["None", "style_a.safetensors", "style_b.safetensors"]),
+            ParamDef("lora_strength", "LoRA Strength", "float", 1.0,
+                     min_val=0.0, max_val=2.0, step=0.05),
         ]
 
 
@@ -185,6 +192,33 @@ def test_unreviewed_experiments_do_not_compound():
     policy = make_policy(seed=6)
     for _ in range(100):
         assert policy.propose(rows).base_prompt_id == "vetted"
+
+
+def test_video_bases_dominate_even_an_image_heavy_gallery():
+    # Videos are the goal; a gallery that is overwhelmingly stills (the usual
+    # shape — many frames tried per video made) must not drown them out.
+    rows = [make_row(f"img-{i}") for i in range(40)]
+    rows += [make_row(f"vid-{i}", workflow_name="fake_i2v",
+                      params={"input_image": "frame.png [output]"}) for i in range(2)]
+    policy = make_policy(seed=9)
+    picked = [policy.propose(rows).workflow.name for _ in range(300)]
+    video_share = picked.count("fake_i2v") / len(picked)
+    assert video_share > 0.6
+
+
+def test_lora_dims_are_the_favorite_mutation():
+    # "Experimenting with LoRAs" — the LoRA file and its strength get picked to
+    # mutate well beyond an even split with the other dimensions.
+    rows = [make_row("vid-1", workflow_name="fake_i2v",
+                     params={"input_image": "frame.png [output]"})]
+    policy = make_policy(seed=10)
+    mutated = []
+    for _ in range(400):
+        mutated.extend(policy.propose(rows).mutated_keys)
+    lora = sum(1 for key in mutated if "lora" in key)
+    # Two LoRA dims among five mutable would get 40% of picks under an even
+    # split; favoring them has to show clearly above that.
+    assert lora > len(mutated) * 0.5
 
 
 def test_video_experiments_keep_their_start_frame():

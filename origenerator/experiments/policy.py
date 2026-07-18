@@ -26,6 +26,14 @@ _UP_BONUS = 1.0
 _RECENT_BONUS = 0.5
 _RECENT_WINDOW = 25  # rows arrive newest-first; this many count as "recent"
 
+# Videos are the goal. A gallery is usually stills-heavy (many frames tried per
+# video made), so video bases get a fixed share of proposals rather than a
+# multiplier the image count would swamp.
+_VIDEO_SHARE = 0.8
+# LoRA dims (the file slots and their strengths) are the dimensions the user
+# most wants explored, so they're drawn this much more often than the rest.
+_LORA_DIM_WEIGHT = 4.0
+
 # How often a proposal mutates two dimensions instead of one.
 _SECOND_DIM_CHANCE = 0.3
 # Exploration floor: this often, a mutated value is drawn uniformly instead of
@@ -64,7 +72,7 @@ class ExperimentPolicy:
     def propose(self, rows: list[dict]) -> Proposal | None:
         """The next experiment to run, derived from ``rows`` (newest first), or
         ``None`` when the gallery holds nothing to build on."""
-        bases = self._base_candidates(rows)
+        bases = self._prefer_videos(self._base_candidates(rows))
         if not bases:
             return None
         weights = [self._base_weight(row, i) for i, (row, _) in enumerate(bases)]
@@ -96,6 +104,17 @@ class ExperimentPolicy:
             out.append((row, workflow))
         return out
 
+    def _prefer_videos(self, bases):
+        """Narrow the base pool to videos ``_VIDEO_SHARE`` of the time.
+
+        Drawn per proposal, so images still get their minority share of
+        experiments; a gallery with only one kind keeps its whole pool."""
+        videos = [b for b in bases if b[1].output_type == "video"]
+        stills = [b for b in bases if b[1].output_type != "video"]
+        if not videos or not stills:
+            return bases
+        return videos if self._rng.random() < _VIDEO_SHARE else stills
+
     @staticmethod
     def _base_weight(row, index):
         weight = 1.0
@@ -116,17 +135,30 @@ class ExperimentPolicy:
         if not dims:
             return []
         count = 2 if len(dims) > 1 and self._rng.random() < _SECOND_DIM_CHANCE else 1
-        # Walk the dims in random order until enough mutations actually applied —
-        # a dim can be a no-op (a prompt with no donor to cross from, say), and a
-        # proposal that changes nothing but its seed teaches nothing.
-        self._rng.shuffle(dims)
+        # Walk the dims in weighted random order (LoRA dims first far more often)
+        # until enough mutations actually applied — a dim can be a no-op (a
+        # prompt with no donor to cross from, say), and a proposal that changes
+        # nothing but its seed teaches nothing.
         mutated = []
-        for dim in dims:
+        for dim in self._weighted_dim_order(dims):
             if len(mutated) == count:
                 break
             if self._apply_mutation(params, dim, workflow, rows):
                 mutated.append(dim.key)
         return mutated
+
+    def _weighted_dim_order(self, dims):
+        """The dims in draw order for this proposal: a weighted shuffle in which
+        a LoRA dim (the file slot or its strength) outdraws any other dimension
+        ``_LORA_DIM_WEIGHT``-fold — LoRAs are what the user wants explored."""
+        remaining = list(dims)
+        order = []
+        while remaining:
+            weights = [_LORA_DIM_WEIGHT if "lora" in d.key.lower() else 1.0
+                       for d in remaining]
+            index = self._rng.choices(range(len(remaining)), weights=weights, k=1)[0]
+            order.append(remaining.pop(index))
+        return order
 
     @staticmethod
     def _mutable_dims(workflow):

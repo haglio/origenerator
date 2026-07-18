@@ -106,6 +106,49 @@ def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
     assert state.get("experiments_enabled") is True
 
 
+def test_opening_with_unreviewed_experiments_presents_the_shelf(qtbot, tmp_path):
+    # "What did it come up with while I was away?" — a launch with experiments
+    # waiting opens on the review shelf instead of the last-visited folder.
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
+        workflow_json="{}", source="experiment",
+    )
+    db.update_generation(
+        "exp-1", status="completed",
+        output_files=json.dumps([{"filename": "exp.png", "subfolder": ""}]),
+    )
+    win = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+
+    view = win._gallery_view
+    view.refresh()
+    assert view._tree.currentItem() is view._experiments_item
+    assert view.visible_prompt_ids() == ["exp-1"]
+
+
+def test_opening_without_pending_experiments_keeps_the_saved_folder(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("gallery_folder", "__recents__")
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="g-1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        "g-1", status="completed",
+        output_files=json.dumps([{"filename": "g.png", "subfolder": ""}]),
+    )
+    win = OrigeneratorWindow(ComfyUIClient(), db, state)
+    qtbot.addWidget(win)
+
+    view = win._gallery_view
+    view.refresh()
+    assert view._tree.currentItem() is view._recents_item
+
+
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
     # A re-roll left running by a prior session — owned by no restored tab — is
     # picked back up by the gallery once the window builds. The window's own DB is

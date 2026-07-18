@@ -21,6 +21,7 @@ class FakeWorkflow(WorkflowTemplate):
             "negative_prompt": "",
             "seed": 0,
             "steps": 20,
+            "batch_size": 1,
             "sampler_name": "euler",
         }
 
@@ -30,6 +31,7 @@ class FakeWorkflow(WorkflowTemplate):
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
+            ParamDef("batch_size", "Batch Size", "int", 1, min_val=1, max_val=8),
             ParamDef("sampler_name", "Sampler", "combo", "euler",
                      options=["euler", "dpmpp_2m", "uni_pc"]),
         ]
@@ -147,6 +149,17 @@ def test_down_voted_values_are_sampled_less_than_up_voted_ones():
         if "sampler_name" in proposal.mutated_keys
     ]
     assert swapped.count("dpmpp_2m") > 2 * swapped.count("uni_pc")
+
+
+def test_batch_size_is_not_an_experiment_dimension():
+    # Varying batch size re-runs the same recipe in bulk — it explores nothing
+    # and multiplies the GPU bill, so it is never mutated.
+    base = make_row("base-1")
+    policy = make_policy(seed=8)
+    for _ in range(300):
+        proposal = policy.propose([base])
+        assert "batch_size" not in proposal.mutated_keys
+        assert proposal.params["batch_size"] == 1
 
 
 def test_a_clearly_damned_value_stops_being_proposed():

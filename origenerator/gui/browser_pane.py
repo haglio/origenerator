@@ -330,10 +330,6 @@ class BrowserPane:
                 "Results collect here; your keep/reject verdicts steer what gets "
                 "tried next.")
 
-    def showing_experiments(self) -> bool:
-        return (self._v._experiments_item is not None
-                and self._v._tree.currentItem() is self._v._experiments_item)
-
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
     def show_starred_overview(self):

@@ -58,6 +58,10 @@ class OrigeneratorWindow(QMainWindow):
         # Generate is itself a re-roll, so every in-flight row is the gallery's to
         # re-adopt — the tabs restore their configs only, owning no jobs.
         self._gallery_view.reconnect_running_rerolls()
+        # With experiments waiting for review, open on their shelf instead of the
+        # saved folder — presenting what came up while the user was away is the
+        # whole point of the background experimenter.
+        self._gallery_view.present_pending_experiments()
 
     def _restore_session(self):
         """Put the window back where it was — same monitor, size, and maximized

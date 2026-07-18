@@ -131,9 +131,13 @@ class ExperimentPolicy:
     @staticmethod
     def _mutable_dims(workflow):
         """The dimensions an experiment may vary: the prompt pair, any bounded
-        numeric, and any multi-option combo — per the workflow's own form."""
+        numeric, and any multi-option combo — per the workflow's own form.
+        Batch size is exempt: varying it re-runs the same recipe in bulk, which
+        explores nothing and multiplies the GPU bill."""
         dims = []
         for pd in workflow.param_definitions():
+            if pd.key == "batch_size":
+                continue
             if pd.key == "positive_prompt":
                 dims.append(pd)
             elif pd.type in ("int", "float") and pd.min_val is not None \

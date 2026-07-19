@@ -1,3 +1,14 @@
+"""Shared fixtures — and the overlay pin.
+
+The suite runs against the committed example overlay, never the developer's
+git-ignored content.local.json, so a run here matches a public checkout.
+pytest imports this before any test module, and the app loads its content at
+import, so the pin has to happen here.
+"""
+from origenerator import content as _content
+
+_content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT
+
 import gc
 import os
 

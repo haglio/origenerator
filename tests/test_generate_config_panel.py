@@ -128,7 +128,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     # follow the user into a workflow tuned for 20.
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
     panel._param_form.set_values({
-        "positive_prompt": "slow epsilon",
+        "positive_prompt": "slow beta",
         "input_image": "start.png",
         "audio_prompt": "wet stroking",
         "steps": 7,  # an edit — flf2v's default is 4
@@ -137,7 +137,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
 
     values = panel._param_form.get_values_static()
-    assert values["positive_prompt"] == "slow epsilon"
+    assert values["positive_prompt"] == "slow beta"
     assert values["input_image"] == "start.png"
     assert values["audio_prompt"] == "wet stroking"
     assert values["steps"] == 7

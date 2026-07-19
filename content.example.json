@@ -1,0 +1,45 @@
+{
+  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, shaft_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the sibling apps.",
+  "suite_root": "C:/path/to/suite-root",
+  "recipe_categories": {
+    "alpha": [
+      "alpha",
+      "alpha form"
+    ],
+    "beta": [
+      "beta",
+      "beta form"
+    ],
+    "gamma": [
+      "gamma",
+      "gamma form"
+    ],
+    "delta": [
+      "delta",
+      "delta form"
+    ],
+    "epsilon": [
+      "epsilon",
+      "epsilon form"
+    ],
+    "dancing": [
+      "dancing",
+      "dance",
+      "twerk",
+      "striptease",
+      "strip tease",
+      "stripping"
+    ]
+  },
+  "detector_labels": {
+    "model_labels": [
+      "label_a",
+      "anchor",
+      "label_c"
+    ],
+    "shaft_classes": [
+      "anchor",
+      "ANCHOR_EXPOSED"
+    ]
+  }
+}

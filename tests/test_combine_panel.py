@@ -70,13 +70,13 @@ def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("redacted")
+    panel.set_category("delta")
     opened = []
     panel.open_category_requested.connect(lambda i, c: opened.append((i, c)))
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "redacted")]
+    assert opened == [("img1", "delta")]
 
 
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
@@ -110,10 +110,10 @@ def _enabled(panel, text) -> bool:
 def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
     panel = _panel(qtbot)
 
-    panel.set_available_categories({"epsilon", "alpha"})
+    panel.set_available_categories({"beta", "epsilon"})
 
-    assert _enabled(panel, "epsilon") and _enabled(panel, "alpha")
-    assert not _enabled(panel, "zeta")  # nothing in the gallery to build a recipe from
+    assert _enabled(panel, "beta") and _enabled(panel, "epsilon")
+    assert not _enabled(panel, "gamma")  # nothing in the gallery to build a recipe from
     assert not _enabled(panel, "dancing")
     assert _enabled(panel, "-")            # the neutral option always stays pickable
 
@@ -130,10 +130,10 @@ def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
 
 def test_a_greyed_act_explains_itself(qtbot):
     panel = _panel(qtbot)
-    panel.set_available_categories({"epsilon"})
-    index = panel._category.findText("zeta")
+    panel.set_available_categories({"beta"})
+    index = panel._category.findText("gamma")
     assert "no past" in panel._category.itemData(index, TOOLTIP).lower()
-    assert not panel._category.itemData(panel._category.findText("epsilon"), TOOLTIP)
+    assert not panel._category.itemData(panel._category.findText("beta"), TOOLTIP)
 
 
 def test_dropdown_sits_beside_the_video_slot_in_one_part(qtbot):
@@ -150,7 +150,7 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel.image_slot.set_item("img1")
     assert not panel._generate_btn.isEnabled()  # image alone, no recipe chosen yet
 
-    panel.set_category("gamma")
+    panel.set_category("alpha")
     assert panel._generate_btn.isEnabled()      # a category is a recipe — no video needed
 
     panel.set_category("")                       # back to neutral
@@ -161,7 +161,7 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
 
-    panel.set_category("gamma")
+    panel.set_category("alpha")
 
     assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
     assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
@@ -169,7 +169,7 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     panel = _panel(qtbot)
-    panel.set_category("redacted")
+    panel.set_category("delta")
 
     panel.video_slot.set_item("vid1")
 
@@ -181,7 +181,7 @@ def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
     panel = _panel(qtbot)
     assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral prompt
 
-    panel.set_category("zeta")
+    panel.set_category("gamma")
     assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
 
     panel.set_category("")
@@ -191,13 +191,13 @@ def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
 def test_generate_emits_the_picked_act(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("redacted")
+    panel.set_category("delta")
     cats = []
     panel.category_requested.connect(lambda i, c: cats.append((i, c)))
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "redacted")]
+    assert cats == [("img1", "delta")]
 
 
 def test_clearing_a_slot_disables_generate_again(qtbot):

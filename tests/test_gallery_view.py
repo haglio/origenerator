@@ -3853,7 +3853,7 @@ def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_pa
 
 
 def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no alpha recipe exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon recipe exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -3863,7 +3863,7 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
 
-    view._open_category("img", "alpha")
+    view._open_category("img", "epsilon")
 
     assert view._info_tabs.count() == tabs_before  # no recipe to open: no tab forked
     assert shown                                   # but tell the user why
@@ -4144,9 +4144,9 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
 
     monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", fake_smart)
 
-    view._generate_category("img", "gamma")
+    view._generate_category("img", "alpha")
 
-    assert seen["category"] == "gamma"
+    assert seen["category"] == "alpha"
     assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
     assert seen["scened"]                    # candidates enriched with each recipe's start scene
     assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
@@ -4170,9 +4170,9 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
 
     monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
 
-    view._generate_category("img", "gamma")
+    view._generate_category("img", "alpha")
 
-    assert called["category"] == "gamma"   # model unavailable → the act's most-used recipe
+    assert called["category"] == "alpha"   # model unavailable → the act's most-used recipe
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
@@ -4207,7 +4207,7 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
 
 
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no alpha recipe exists
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip — no epsilon recipe exists
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -4216,7 +4216,7 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
 
-    view._generate_category("img", "alpha")
+    view._generate_category("img", "epsilon")
 
     assert view._reroll_jobs == {}            # nothing to reuse: launch nothing
     view._client.submit_job.assert_not_called()

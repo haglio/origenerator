@@ -1,12 +1,18 @@
 from pathlib import Path
 
+from origenerator.content import load_content
+
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_DIR / "state"
 DB_PATH = STATE_DIR / "origenerator.db"
 THUMB_DIR = STATE_DIR / "thumbnails"
 UI_STATE_PATH = STATE_DIR / "ui_state.json"
 
-COMFYUI_DIR = Path("C:/path/to/suite-root/projects/ComfyUIApp/ComfyUI")
+_SUITE_ROOT = Path(load_content()["suite_root"])
+
+# Sibling checkouts and the media library live outside this repo; their
+# location is private, so it comes from the content overlay.
+COMFYUI_DIR = _SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
@@ -20,7 +26,7 @@ COMFYUI_PORT = 8188
 # finalized video dropped under a per-source subfolder. Mirrors evolver's own
 # INBOX_DIR; we write under our own source name so Evolver can route
 # Origenerator's videos distinctly from other inbox sources.
-EVOLVER_INBOX_DIR = Path("C:/path/to/suite-root/videos/videos/2D/AI/0_inbox")
+EVOLVER_INBOX_DIR = _SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 
 THUMB_SIZE = (256, 256)
@@ -39,7 +45,7 @@ STROKE_DEFAULT_HZ = 1.2
 # no-ops when the broker isn't running.
 OSR2_BROKER_HOST = "127.0.0.1"
 OSR2_TCODE_UDP_PORT = 50557
-OSR2_STATE_DIR = Path("C:/path/to/suite-root/projects/fun_time/state")
+OSR2_STATE_DIR = _SUITE_ROOT / "projects" / "fun_time" / "state"
 OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / "genau_enabled.txt"
 
 # --- Voice command → prompt edit ------------------------------------------

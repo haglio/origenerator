@@ -8,7 +8,7 @@ on a dropped image via the gallery's combine launch.
 
 - :func:`smart_recipe` (primary) is situation-aware: the local LLM compares the
   dropped image's scene to the *starting scene* each recipe is used with — where
-  "is a anchor already in frame, whose hand is on it" actually lives, since that's a
+  "is the subject already in frame, and whose hand is on it" actually lives, since
   start-frame property — and picks the recipe that fits.
 - :func:`best_recipe` (fallback, when the model is unreachable or finds no fit) is
   the act's most-used recipe, image-independent.
@@ -24,24 +24,20 @@ import logging
 import urllib.request
 from collections import defaultdict
 
+from origenerator.content import load_content
+
 logger = logging.getLogger(__name__)
 
-CATEGORIES = ("gamma", "epsilon", "zeta", "redacted", "alpha", "dancing")
+_CONTENT = load_content()
 
-# Distinctive substrings that mark a video's prompt as depicting each act — the only
-# thing authored per act. Conservative (a loose match like a bare "bj" would fire on
-# unrelated words); a prompt that dodges all of them just won't count toward its act.
+# The acts a prompt can depict, and the distinctive substrings that mark each
+# one, are library vocabulary rather than logic: they come from the content
+# overlay (content.example.json documents the shape).  Conservative by design —
+# a loose match would fire on unrelated words, and a prompt that dodges every
+# substring simply does not count toward its act.
+CATEGORIES: tuple[str, ...] = tuple(_CONTENT["recipe_categories"])
 _CATEGORY_KEYWORDS = {
-    "gamma": ("gamma", "gamma", "oral", "alpha", "redacted", "alpha form",
-                "anchor in mouth", "anchor in her mouth", "anchor in mouth"),
-    "epsilon": ("epsilon", "epsilon", "stroking", "jerking", "jerk off", "stroke"),
-    "zeta": ("zeta", "redacted job", "zeta", "zeta", "zeta", "titty redacted",
-                "zeta", "between her redacteds", "between her zeta"),
-    "redacted": ("redacted", "redacted", "penetrat", "intercourse", "riding", "doggy",
-                "cowsubject", "delta"),
-    "alpha": ("alpha", "alpha", "redacted", "ejaculat", "redacted", "redacted on",
-                "epsilon form"),
-    "dancing": ("dancing", "dance", "twerk", "striptease", "strip tease", "stripping"),
+    name: tuple(words) for name, words in _CONTENT["recipe_categories"].items()
 }
 
 # Params that don't define a recipe: the free-text prompt, the start frame, the
@@ -150,7 +146,7 @@ def build_scene_messages(category: str, image_scene: str, representatives: list,
         f"The input image's scene:\n{image_scene}\n\n"
         f"Candidate {category} recipes, each shown by the starting scene it is made for:\n{listing}\n\n"
         "Pick the number whose starting scene best matches the input image's "
-        "situation — whether a anchor is already in frame, and if so whose hand(s) are "
+        "situation — whether the subject is already in frame, and if so whose hand(s) are "
         "on it (hers, his, or neither). "
         'Reply with only JSON: {"choice": <the number, or -1 if none fit>}'
     )

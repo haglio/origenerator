@@ -22,16 +22,20 @@ build.
 import logging
 from pathlib import Path
 
+from origenerator.content import load_content
+
 logger = logging.getLogger(__name__)
 
 _MODEL_REPO = "deepghs/anime_censor_detection"
 _MODEL_FILE = "censor_detect_v1.0_s/model.onnx"
-_MODEL_LABELS = ("label_a_f", "anchor", "region_a")
+# The aim model's class names are library vocabulary; they come from the
+# content overlay rather than from source.
+_MODEL_LABELS = tuple(load_content()["detector_labels"]["model_labels"])
 _INFER_SIZE = 640
 _IOU_LIMIT = 0.45
 
 # The label whose box the stroke aims at.
-_SHAFT_CLASSES = {"anchor", "ANCHOR_EXPOSED"}
+_SHAFT_CLASSES = set(load_content()["detector_labels"]["shaft_classes"])
 # The gallery's photoreal renders score low on the anime-trained detector even
 # when the box is spot-on (measured ~0.28 on a frame-filling redacted the box
 # nailed), so the bar sits low; a wrong aim is bounded by the manual override

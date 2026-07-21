@@ -304,7 +304,7 @@ def _draw_slideshow(painter: QPainter, color):
 def _draw_osr2(painter: QPainter, color):
     """A vertical double-headed arrow — the OSR2's up/down stroke axis."""
     cx, top, bot = 24, 12, 36
-    painter.drawLine(QPointF(cx, top + 7), QPointF(cx, bot - 7))  # redacted
+    painter.drawLine(QPointF(cx, top + 7), QPointF(cx, bot - 7))  # anchor
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(cx, top), QPointF(cx - 7, top + 9), QPointF(cx + 7, top + 9))

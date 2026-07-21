@@ -21,9 +21,9 @@ class FakeModel:
 
 
 def test_joins_segment_text_into_one_instruction():
-    model = FakeModel([_Segment(" no "), _Segment("redacted")])
+    model = FakeModel([_Segment(" no "), _Segment("hat")])
     transcriber = Transcriber(model=model)
-    assert transcriber.transcribe(np.array([0.2, -0.2], dtype=np.float32)) == "no redacted"
+    assert transcriber.transcribe(np.array([0.2, -0.2], dtype=np.float32)) == "no hat"
 
 
 def test_peak_normalizes_faint_audio_before_transcribing():

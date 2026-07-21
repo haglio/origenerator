@@ -2629,14 +2629,14 @@ def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
     assert view._voice.started
     (launch_key,) = view._reroll_jobs.keys()  # the folder the first generation lands in
 
-    view._voice.say({"positive": "a cat, no redacted", "negative": "ugly"})  # rewritten pair
+    view._voice.say({"positive": "a cat, no hat", "negative": "ugly"})  # rewritten pair
     client.job_completed.emit(view._reroll_jobs[launch_key].prompt_id, _REROLL_HISTORY)
 
     # the loop re-homed to the new-prompt folder, carrying both steered prompts
     assert launch_key not in view._reroll_jobs
     (new_key,) = view._reroll_jobs.keys()
     assert new_key != launch_key and view._auto.is_active(new_key)
-    assert view._reroll_jobs[new_key].params["positive_prompt"] == "a cat, no redacted"
+    assert view._reroll_jobs[new_key].params["positive_prompt"] == "a cat, no hat"
     assert view._reroll_jobs[new_key].params["negative_prompt"] == "ugly"
 
     # completing the re-homed generation makes its folder exist -> the view follows
@@ -2666,8 +2666,8 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     assert not view._voice_status.isHidden()
     assert "Listening" in view._voice_status.text()
 
-    view._voice.heard.emit("no redacted")
-    assert "no redacted" in view._voice_status.text()
+    view._voice.heard.emit("no hat")
+    assert "no hat" in view._voice_status.text()
 
     view._toggle_auto(False)
     assert view._voice_status.isHidden()

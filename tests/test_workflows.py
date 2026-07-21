@@ -546,7 +546,7 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     wf = Wan22I2vWorkflow()
     params = dict(
         wf.default_params(),
-        audio_prompt="skin slapping, redacted",
+        audio_prompt="rhythmic audio",
         audio_negative_prompt="music",
         audio_seed=7,
     )
@@ -558,7 +558,7 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     assert sampler["image"] == [decode_id, 0]
     assert sampler["frame_rate"] == params["frame_rate"]
     assert sampler["duration"] == pytest.approx(params["frame_count"] / params["frame_rate"])
-    assert sampler["prompt"] == "skin slapping, redacted"
+    assert sampler["prompt"] == "rhythmic audio"
     assert sampler["negative_prompt"] == "music"
     assert sampler["seed"] == 7
 
@@ -604,7 +604,7 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     # the track instead of the track guessing at pixels. The track is ATI's
     # fixed 121-point/24fps convention: a 3-point cluster riding the authored
     # sine between stroke_top and stroke_bottom, plus one static point holding
-    # the anchor (e.g. a redacted base) in place.
+    # the anchor (e.g. a anchor base) in place.
     from origenerator.workflows.wan21_ati_i2v import (
         REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
     )
@@ -917,7 +917,7 @@ def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():
 def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
     # Choosing where in the frame a thing is doesn't scale, so when the stroke
     # coordinates are all still at their defaults, payload build detects the
-    # redacted in the start frame and aims the track at it (converted into the
+    # anchor in the start frame and aims the track at it (converted into the
     # 480x864 reference frame, then scaled like any manual aim). Any edited
     # coordinate switches detection off entirely — the user's numbers win.
     # The funscript is unaffected either way: pos is normalized depth, so the

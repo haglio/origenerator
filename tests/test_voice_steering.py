@@ -28,7 +28,7 @@ class FakeListener(QObject):
 def _steering(transcribe=None, rewrite=None, listener=None):
     listener = listener if listener is not None else FakeListener()
     worker = VoiceWorker(
-        transcribe or (lambda audio: "no redacted"),
+        transcribe or (lambda audio: "no hat"),
         rewrite or (lambda pos, neg, instr: (f"{pos}, {instr}", neg)),
     )
     return VoiceSteering(listener=listener, worker=worker), listener
@@ -42,7 +42,7 @@ def test_an_utterance_rewrites_the_prompt_pair_in_place(qtbot):
     assert listener.started
     listener.utterance.emit(object())
 
-    assert prompts["positive"] == "a woman, no redacted"
+    assert prompts["positive"] == "a woman, no hat"
 
 
 def test_stop_ends_listening_and_ignores_later_utterances(qtbot):

@@ -137,7 +137,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     _AIM_KEYS = ("stroke_x", "stroke_top", "stroke_bottom", "anchor_x", "anchor_y")
 
     def _auto_aim_params(self, params: dict) -> dict:
-        """``params`` with the stroke aimed at the detected redacted, when the user
+        """``params`` with the stroke aimed at the detected anchor, when the user
         left every aim coordinate at its default and the start frame yields a
         detection — choosing where in the frame a thing is shouldn't be the
         user's job. Any edited coordinate, or no detection, leaves the given
@@ -300,7 +300,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         # integer size AND a track whose coordinates share that space), so both
         # are built here: the size is the input image's derived size (or the
         # unlocked override) and the authored stroke — auto-aimed at the
-        # detected redacted unless the user placed it — is rescaled into it.
+        # detected anchor unless the user placed it — is rescaled into it.
         params = self._auto_aim_params(params)
         width, height = self._output_size(params)
         stroke_params = self._scaled_stroke_params(params, width, height)

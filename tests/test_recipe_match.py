@@ -127,7 +127,7 @@ def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_
 
     monkeypatch.setattr(recipe_match, "_post_chat", fake_post)
     got = recipe_match.smart_recipe(
-        "alpha", "an redacted anchor in the frame", rows,
+        "alpha", "a prominent anchor in the frame", rows,
         base_url="x", model="m", system_prompt="S", timeout=1,
     )
     # recipe X is one option (its most-recent member x2 represents it), recipe Y another.

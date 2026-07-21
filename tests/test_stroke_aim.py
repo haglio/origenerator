@@ -6,7 +6,7 @@ from origenerator.workflows import stroke_aim
 
 
 def test_aim_fractions_map_the_box_to_column_span_and_base():
-    # A redacted box at (200, 300) sized 100x500 in a 1000x1000 image: the track
+    # A anchor box at (200, 300) sized 100x500 in a 1000x1000 image: the track
     # column runs through the box center; the stroke spans the gripped length
     # (18%..72% of the box); the anchor pins the base (93%).
     aim = stroke_aim.aim_fractions_from_box((200, 300, 100, 500), 1000, 1000)
@@ -17,7 +17,7 @@ def test_aim_fractions_map_the_box_to_column_span_and_base():
     assert aim["anchor_y"] == pytest.approx((300 + 0.93 * 500) / 1000)
 
 
-def test_detect_grip_aim_picks_the_most_confident_shaft(monkeypatch, tmp_path):
+def test_detect_grip_aim_picks_the_most_confident_anchor(monkeypatch, tmp_path):
     from PIL import Image
 
     frame = tmp_path / "frame.png"

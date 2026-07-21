@@ -1,9 +1,9 @@
 """Auto-aim the ATI stroke at the anatomy in a start frame.
 
-Manually telling the workflow where the redacted sits in every image doesn't
+Manually telling the workflow where the anchor sits in every image doesn't
 scale, so this module finds it: a detection pass over the start frame yields
-the redacted's bounding box, and the box maps to the stroke's aim — the track
-column through the box's center, a stroke span over the redacted's gripped
+the anchor's bounding box, and the box maps to the stroke's aim — the track
+column through the box's center, a stroke span over the anchor's gripped
 length, and the static anchor at its base. Results are FRACTIONS of the image
 (0..1), so the caller converts them into whatever coordinate frame it authors
 tracks in; this module knows nothing about reference frames or workflows.
@@ -35,9 +35,9 @@ _INFER_SIZE = 640
 _IOU_LIMIT = 0.45
 
 # The label whose box the stroke aims at.
-_SHAFT_CLASSES = set(load_content()["detector_labels"]["shaft_classes"])
+_SHAFT_CLASSES = set(load_content()["detector_labels"]["anchor_classes"])
 # The gallery's photoreal renders score low on the anime-trained detector even
-# when the box is spot-on (measured ~0.28 on a frame-filling redacted the box
+# when the box is spot-on (measured ~0.28 on a frame-filling anchor the box
 # nailed), so the bar sits low; a wrong aim is bounded by the manual override
 # and costs one re-roll, while a missed aim forfeits the feature.
 _MIN_SCORE = 0.22
@@ -54,7 +54,7 @@ _detector = None
 
 
 def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
-    """Map a detected redacted box ``(x, y, w, h)`` to the stroke's aim, each value
+    """Map a detected anchor box ``(x, y, w, h)`` to the stroke's aim, each value
     a fraction of the image: the track column through the box center, the
     stroke span over the gripped length, the anchor at the base."""
     x, y, w, h = box
@@ -69,7 +69,7 @@ def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
 
 
 def detect_grip_aim(image_path: Path | None) -> dict | None:
-    """The stroke aim for ``image_path``'s most confident detected redacted, as
+    """The stroke aim for ``image_path``'s most confident detected anchor, as
     image fractions (see :func:`aim_fractions_from_box`), or ``None`` when
     there's no file, no usable detector, or no confident detection."""
     if image_path is None:
@@ -77,9 +77,9 @@ def detect_grip_aim(image_path: Path | None) -> dict | None:
     try:
         from PIL import Image
 
-        best = _best_shaft(_detect(str(image_path)))
+        best = _best_anchor(_detect(str(image_path)))
         if best is None:
-            logger.info("Auto-aim: no redacted detected in %s", image_path)
+            logger.info("Auto-aim: no anchor detected in %s", image_path)
             return None
         with Image.open(image_path) as img:
             image_w, image_h = img.size
@@ -89,7 +89,7 @@ def detect_grip_aim(image_path: Path | None) -> dict | None:
         return None
 
 
-def _best_shaft(detections) -> dict | None:
+def _best_anchor(detections) -> dict | None:
     return max(
         (d for d in detections
          if d.get("class") in _SHAFT_CLASSES and d.get("score", 0) >= _MIN_SCORE),

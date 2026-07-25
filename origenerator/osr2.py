@@ -1,4 +1,4 @@
-"""Talk to the OSR2 device through the osr2_broker sibling.
+"""Talk to the OSR2 device through the broker sibling.
 
 The broker owns the device (real serial ``COM4``) and forwards raw T-code sent to
 its UDP listener straight to it, suppressing MultiFunPlayer for a moment so the two

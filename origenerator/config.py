@@ -37,7 +37,7 @@ THUMB_SIZE = (256, 256)
 # at this cadence (full strokes per second), phased to the clip's duration/loop.
 STROKE_DEFAULT_HZ = 1.2
 
-# The osr2_broker sibling bridges to the OSR2 device (COM4) and forwards raw
+# The broker sibling bridges to the OSR2 device (COM4) and forwards raw
 # T-code sent to this UDP port straight to the device (osr2_broker/session.py).
 # origenerator drives the device by streaming T-code here in sync with a playing
 # video. While it drives, it pauses genau auto-mode by writing "0" to the broker's

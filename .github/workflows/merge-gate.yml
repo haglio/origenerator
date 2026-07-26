@@ -1,0 +1,65 @@
+name: merge gate (full suite)
+
+# The merge queue's required check. The queue builds the candidate merge of a PR
+# onto current main, runs the whole suite on that candidate, and fast-forwards
+# main only when this is green -- so a red tree can never land. Also runs on PRs
+# for early feedback and on push to main as a visible post-merge backstop.
+#
+# Runs on windows-latest: origenerator is a PyQt6 desktop app whose tests wrap
+# Windows-only behaviour (subprocess CREATE_NO_WINDOW, taskbar AUMID, window
+# geometry), so an ubuntu runner would diverge. The editable install uses compat
+# mode -- the repo dir shares the package's name and would otherwise win as a
+# namespace shadow.
+#
+# shared_ui is a sibling package origenerator imports via sys.path (paths.py
+# walks up to the directory that contains it), NOT a pip dependency. So we check
+# it out ADJACENT to origenerator under the workspace root; that satisfies both
+# the runtime lookup and tests/test_paths.py, which asserts the sibling exists on
+# disk. Both repos are public, so the default GITHUB_TOKEN can clone shared_ui.
+#
+# The suite renders Qt offscreen (QT_QPA_PLATFORM) and mocks every outside
+# service -- ComfyUI over websockets, the onnx/hf stroke-aim model -- so no step
+# touches the network or a real model. The optional "voice" extra (faster-whisper,
+# sounddevice) is deliberately not installed; those imports are lazy and their
+# tests inject fakes, so the suite is green without them.
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: merge-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: origenerator
+
+jobs:
+  full-suite:
+    runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - name: Check out origenerator
+        uses: actions/checkout@v4
+        with:
+          path: origenerator
+      - name: Check out shared_ui adjacent (imported via sys.path, not installed)
+        uses: actions/checkout@v4
+        with:
+          repository: haglio/shared_ui
+          path: shared_ui
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (editable, compat mode)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" --config-settings editable_mode=compat
+      - name: Run the suite
+        run: python -m pytest -q

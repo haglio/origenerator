@@ -6,7 +6,6 @@ dist/
 build/
 .pytest_cache/
 state/
-.claude/
 
 # Private overlays — real values live here and never get published; each has
 # a committed *.example.* template documenting its shape.

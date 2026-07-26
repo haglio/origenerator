@@ -30,3 +30,7 @@ voice = ["faster-whisper", "sounddevice"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 qt_api = "pyqt6"
+
+[tool.setuptools.packages.find]
+include = ["origenerator*"]
+namespaces = false

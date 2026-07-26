@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from origenerator.content import load_content
 
@@ -8,11 +9,56 @@ DB_PATH = STATE_DIR / "origenerator.db"
 THUMB_DIR = STATE_DIR / "thumbnails"
 UI_STATE_PATH = STATE_DIR / "ui_state.json"
 
-_SUITE_ROOT = Path(load_content()["suite_root"])
+_CONTENT = load_content()
+# Public now: the tests assert which paths still hang off the media-library root
+# and which come from the project roots, and that split is the thing worth
+# pinning -- getting it backwards silently repoints a live app at nothing.
+SUITE_ROOT = Path(_CONTENT["suite_root"])
 
-# Sibling checkouts and the media library live outside this repo; their
-# location is private, so it comes from the content overlay.
-COMFYUI_DIR = _SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
+
+def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
+    """The folders that hold the suite's own app checkouts, in search order.
+
+    ``suite_root`` used to answer this as well as naming where the media library
+    and the third-party apps are, and one folder was the answer to all of it.
+    The suite's *own* repos then moved out of the file-synced tree the library
+    stays in, so they get their own key; everything that did not move --
+    the library, ComfyUI -- keeps reading ``suite_root``.
+
+    A *list*, because the move runs one repo at a time: with a single path there
+    is a window where a sibling that has not moved yet is unreachable. An
+    overlay that says nothing still means ``suite_root/projects``, as before.
+    """
+    content = _CONTENT if content is None else content
+    roots = content.get("project_roots")
+    if not roots:
+        return (Path(content["suite_root"]) / "projects",)
+    return tuple(Path(root) for root in roots)
+
+
+PROJECT_ROOTS = project_roots()
+
+
+def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
+    """The sibling checkout *name*, from the first root that actually holds it.
+
+    Falls back to a path under the first root when no root does: every consumer
+    here already guards on existence (the OSR2 handoff is a no-op when the
+    broker isn't running), so a missing sibling must not be an import-time crash.
+    """
+    roots = PROJECT_ROOTS if roots is None else roots
+    for root in roots:
+        candidate = root / name
+        if candidate.is_dir():
+            return candidate
+    return roots[0] / name
+
+
+# The media library and the third-party apps live outside this repo; their
+# location is private, so it comes from the content overlay. ComfyUI is not one
+# of the suite's own repos and did not move with them, so it stays on the suite
+# root rather than coming from the project roots.
+COMFYUI_DIR = SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
@@ -26,7 +72,7 @@ COMFYUI_PORT = 8188
 # finalized video dropped under a per-source subfolder. Mirrors evolver's own
 # INBOX_DIR; we write under our own source name so Evolver can route
 # Origenerator's videos distinctly from other inbox sources.
-EVOLVER_INBOX_DIR = _SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
+EVOLVER_INBOX_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 
 THUMB_SIZE = (256, 256)
@@ -45,7 +91,7 @@ STROKE_DEFAULT_HZ = 1.2
 # no-ops when the broker isn't running.
 OSR2_BROKER_HOST = "127.0.0.1"
 OSR2_TCODE_UDP_PORT = 50557
-OSR2_STATE_DIR = _SUITE_ROOT / "projects" / "fun_time" / "state"
+OSR2_STATE_DIR = project_dir("fun_time") / "state"
 OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / "genau_enabled.txt"
 
 # --- Voice command → prompt edit ------------------------------------------

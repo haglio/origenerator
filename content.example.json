@@ -1,5 +1,5 @@
 {
-  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the sibling apps.",
+  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the third-party apps such as ComfyUI. project_roots is optional: the folders holding the suite's own app checkouts, searched in order, for when they do not live under suite_root/projects; omit it and that is exactly where they are looked for.",
   "suite_root": "C:/path/to/suite-root",
   "recipe_categories": {
     "alpha": [

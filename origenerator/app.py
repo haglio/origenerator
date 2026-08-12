@@ -202,6 +202,20 @@ def main():
         status("Skipping library maintenance (branch session)...")
         logger.info("Branch session: library maintenance left to the live app")
     else:
+        status("Adopting branch-session results...")
+        # What a preview branch generated comes home as the rows that session
+        # recorded — generated, full params — before the import scan below can
+        # find the bare files and reconstruct lesser "imported" rows for them.
+        from origenerator.branch_session import adopt_branch_rows
+        from origenerator.config import PROJECT_DIR
+        try:
+            adopted = adopt_branch_rows(
+                db, PROJECT_DIR / ".claude" / "worktrees", COMFYUI_OUTPUT_DIR, THUMB_DIR)
+            if adopted:
+                logger.info("Adopted %d generations from branch sessions", adopted)
+        except Exception as e:
+            logger.warning("Branch-session adoption failed: %s", e)
+
         status("Reconnecting to running generations...")
         # Resolve any generation left mid-run by a previous session against ComfyUI
         # (finished-while-away, still-running, or gone). Runs before the import below

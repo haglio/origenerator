@@ -34,7 +34,23 @@ maintenance only the live app should do (see `origenerator/branch_session.py`).
 Two things to tell the user when handing one over: copy the primary's
 `content.local.json` into the worktree root first (else the session comes up on
 the example overlay and finds no library), and close the live app first (two
-instances contend for ComfyUI).
+instances contend for ComfyUI). Generations made in a branch session are not
+lost to it: the live app's next launch adopts them out of the worktree's
+database as first-class rows (`branch_session.adopt_branch_rows`).
+
+## Verify the physical end, not just the suite
+
+Device or UI work is not delivered because tests pass — three rounds of "it
+doesn't work" (2026-08-12) came from exactly that gap. Probes that settle it
+from a session, no hardware in view: send
+`origenerator.osr2.Osr2Broker.park()` and stat
+`../fun_time/state/osr2_serial_tx.txt` (its mtime moves iff UDP → broker →
+serial happened; `broker_heartbeat.txt` is broker liveness); grep each state
+dir's `origenerator.log` for "OSR2 stroke engaged" / "streaming" to see whether
+the app ever actually drove; render a widget offscreen and look at the PNG
+(`widget.grab().save(...)` — offscreen has no fonts, so text is tofu there but
+fine live); and check which instance the user is running from the launch lines
+at the top of each state dir's log — the "main app" can be on pre-merge code.
 
 ## Landing — GitHub merge queue, not local ff-merge
 

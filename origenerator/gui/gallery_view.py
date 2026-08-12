@@ -448,10 +448,11 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
-        # This window's own drive panel — genau's readout, copied — pinned to the
-        # bottom-right corner so the stroke is controllable without leaving the
-        # gallery ("always available", not only in the fullscreen views).
-        self._stroke_panel = StrokePanel(self._osr2_stroke, self)
+        # This window's own drive panel — genau's readout, copied — built into
+        # the bottom of the center (browser) pane, where it takes its own room
+        # rather than floating over anyone's buttons.
+        self._stroke_panel = StrokePanel(self._osr2_stroke)
+        browser_box.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignHCenter)
         # The live auto-generate slideshow (double-click the preview while a folder
         # loops), and the folder key it follows — None while none is open.
         self._auto_montage = None
@@ -629,12 +630,6 @@ class GalleryView(QWidget):
         self._reconcile_osr2()
         self._stroke_panel.refresh()
 
-    def _reposition_stroke_panel(self):
-        self._stroke_panel.move(
-            max(0, self.width() - self._stroke_panel.width() - 12),
-            max(0, self.height() - self._stroke_panel.height() - 12),
-        )
-        self._stroke_panel.raise_()
 
     # --- the live auto-generate montage (double-click the preview while looping) ---
 
@@ -1299,7 +1294,6 @@ class GalleryView(QWidget):
         super().resizeEvent(event)
         if self._voice_status.isVisible():
             self._reposition_voice_status()
-        self._reposition_stroke_panel()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,

@@ -162,6 +162,7 @@ class BrowserPane:
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
+            enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -383,9 +384,13 @@ class BrowserPane:
 
     def show_thumbnails(self, group):
         container, flow = self._new_tile_pane()
-        # An image-conditioned folder's items carry per-seed re-roll hover controls;
-        # its rows all share the one workflow, so the kind is decided once.
-        i2v = bool(group.rows) and gallery.is_image_conditioned(group.rows[0].get("workflow_name"))
+        # An i2v folder's items carry per-seed re-roll hover controls; its rows
+        # all share the one workflow, so the kind is decided once. Media-gated
+        # because the enhancer is image-conditioned too, but its items have no
+        # video seed to offer.
+        i2v = bool(group.rows) \
+            and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
+            and gallery.media_type_of_row(group.rows[0]) == "video"
         # The re-roll tile leads the flow so it sits beside the newest item
         # (thumbnails are sorted newest-first). A generation running in this folder —
         # a re-roll, which is also what a tab's Generate now is — is this tile: it
@@ -400,6 +405,7 @@ class BrowserPane:
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
+                enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
@@ -525,14 +531,29 @@ class BrowserPane:
         count = len(ids)
         suffix = f" {count} item{'s' if count != 1 else ''}"
         all_starred = all(self._is_starred(pid) for pid in ids)
+        # Enhance is offered when any picked item is a finished image — the
+        # handler skips the rest — and enhances deliberately, badge or not.
+        enhanceable = [pid for pid in ids if self._is_enhanceable(pid)]
         menu = QMenu(self._v)
         star_action = menu.addAction(("Unstar" if all_starred else "Star") + suffix)
+        enhance_action = None
+        if enhanceable:
+            n = len(enhanceable)
+            enhance_action = menu.addAction(
+                f"Enhance {n} image{'s' if n != 1 else ''}"
+            )
         delete_action = menu.addAction("Delete" + suffix)
         chosen = menu.exec(global_pos)
         if chosen is delete_action:
             self._v._delete_selection()
         elif chosen is star_action:
             self._v.set_items_starred(ids, not all_starred)
+        elif enhance_action is not None and chosen is enhance_action:
+            self._v.enhance_items(enhanceable)
+
+    def _is_enhanceable(self, prompt_id: str) -> bool:
+        row = self._v._db.get_generation(prompt_id)
+        return bool(row and gallery.is_enhanceable_row(row))
 
     def _is_starred(self, prompt_id: str) -> bool:
         row = self._v._db.get_generation(prompt_id)

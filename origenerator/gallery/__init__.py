@@ -43,6 +43,13 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
+from origenerator.gallery.enhance import (
+    ENHANCE_WORKFLOW,
+    enhance_params_for,
+    is_enhanceable_row,
+    is_enhanced_row,
+    rows_awaiting_enhancement,
+)
 from origenerator.gallery.signatures import (
     is_image_conditioned,
     lora_signature,

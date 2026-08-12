@@ -7,17 +7,19 @@ _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
 
 
 class SdxlT2iWorkflow(WorkflowTemplate):
-    """SDXL text-to-image, finished by an upscale/enhance pass.
+    """SDXL text-to-image, optionally finished by an upscale/enhance pass.
 
-    The base render is the plain SDXL recipe. Its decode then runs the shared
-    enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`): a model
-    upscale for sharpness, and a low-denoise second sampling pass in which the
-    checkpoint re-imagines the enlarged pixels — real generated texture rather
-    than interpolation, which is what keeps the result naturalistic.
+    The base render is the plain SDXL recipe. With the ``enhance`` toggle on
+    (its default here), its decode then runs the shared enhance tail
+    (:meth:`WorkflowTemplate.enhance_image_nodes`): a model upscale for
+    sharpness, and a low-denoise second sampling pass in which the checkpoint
+    re-imagines the enlarged pixels — real generated texture rather than
+    interpolation, which is what keeps the result naturalistic. Toggled off,
+    the graph ends at the plain decode, as it did before v003.
     """
 
     name = "sdxl_t2i"
-    version = "v003"
+    version = "v004"
     display_name = "SDXL Text-to-Image"
     output_type = "image"
     model_keys = ("checkpoint",)
@@ -38,6 +40,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
+            "enhance": True,
             "upscale_model": _DEFAULT_UPSCALE_MODEL,
             "enhance_scale": 2.0,
             "enhance_steps": 20,
@@ -67,6 +70,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("scheduler", "Scheduler", "combo", "normal",
                      options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", True),
             ParamDef("upscale_model", "Upscale Model", "combo", _DEFAULT_UPSCALE_MODEL,
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
@@ -78,12 +82,15 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        enhance_nodes, enhanced_ref = self.enhance_image_nodes(
-            "9", "10", "11", "12", "13", "14",
-            image_ref=["6", 0], model_ref=["1", 0],
-            positive_ref=["2", 0], negative_ref=["3", 0], vae_ref=["8", 0],
-            params=params,
-        )
+        enhance_nodes: dict = {}
+        enhanced_ref = ["6", 0]  # enhance off: save the plain decode
+        if params.get("enhance"):
+            enhance_nodes, enhanced_ref = self.enhance_image_nodes(
+                "9", "10", "11", "12", "13", "14",
+                image_ref=["6", 0], model_ref=["1", 0],
+                positive_ref=["2", 0], negative_ref=["3", 0], vae_ref=["8", 0],
+                params=params,
+            )
         return {
             "1": {
                 "class_type": "CheckpointLoaderSimple",

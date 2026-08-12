@@ -65,6 +65,25 @@ def test_browse_button_fits_its_caption(qtbot):
     assert btn.width() >= reference.sizeHint().width()
 
 
+def test_bool_param_renders_a_checkbox_and_round_trips(qtbot):
+    # The enhance toggle is a "bool" ParamDef: a CheckBox field that reads and
+    # writes True/False like any other value — so a stored recipe's flag comes
+    # back checked/unchecked, and the emitted params carry a real bool.
+    form = ParamForm([ParamDef("enhance", "Enhance", "bool", True)])
+    qtbot.addWidget(form)
+    assert isinstance(form._widgets["enhance"], CheckBox)
+    assert form.get_values()["enhance"] is True
+
+    changes = []
+    form.changed.connect(lambda: changes.append(1))
+    form.set_values({"enhance": False})
+    assert form.get_values_static()["enhance"] is False
+    assert changes  # unticking announced itself like any edit
+
+    form.set_values({"enhance": True})
+    assert form.get_values()["enhance"] is True
+
+
 def test_seed_random_control_is_the_ticked_checkbox(qtbot):
     # The Random control must be our CheckBox, not a plain QCheckBox whose
     # native dark-style tick renders as a bare down-caret.

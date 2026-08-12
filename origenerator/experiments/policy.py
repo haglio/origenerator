@@ -94,6 +94,10 @@ class ExperimentPolicy:
             workflow = self._registry.get(row.get("workflow_name") or "")
             if workflow is None:
                 continue
+            if workflow.name == "image_enhance":
+                # An enhance is a derivative of a generation, not a recipe worth
+                # exploring: mutating one just re-enhances an existing image.
+                continue
             if row.get("status") != "completed" or not produced_output(row):
                 continue
             if row.get("source") == "experiment" and row.get("experiment_verdict") != "up":

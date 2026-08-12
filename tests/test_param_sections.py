@@ -23,6 +23,7 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("steps") == "Sampling"
     assert ps.section_title("scheduler") == "Sampling"
     assert ps.section_title("upscale_model") == "Model & LoRA"  # a model file slot
+    assert ps.section_title("enhance") == "Enhance"             # the toggle leads
     assert ps.section_title("enhance_scale") == "Enhance"
     assert ps.section_title("enhance_denoise") == "Enhance"
     assert ps.section_title("stroke_hz") == "Stroke"

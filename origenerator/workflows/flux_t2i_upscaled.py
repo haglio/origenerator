@@ -18,10 +18,17 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     The saved graph also carried a stray ``VRGDG_LLM_Multi`` prompt-enhancer node
     hanging off the side, unconnected to the sampling path; it isn't part of the
     pipeline (and needs a custom node plus an API key), so it's left out here.
+
+    The ``enhance`` toggle (off by default — the plain 4x upscale is this
+    workflow's namesake behavior) swaps that bare upscale for the shared
+    enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`): the upscale is
+    rescaled to ``enhance_scale`` x the base render and re-sampled at low
+    denoise by the same Flux model on the same guided conditioning, generating
+    real fine texture instead of leaving interpolated pixels.
     """
 
     name = "flux_t2i_upscaled"
-    version = "v001"
+    version = "v002"
     display_name = "Flux Text-to-Image (Upscaled)"
     output_type = "image"
     model_keys = ("unet",)
@@ -46,6 +53,10 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "clip_name2": "t5xxl_fp16.safetensors",
             "vae": "ae.safetensors",
             "upscale_model": "RealESRGAN_x4.pth",
+            "enhance": False,
+            "enhance_scale": 2.0,
+            "enhance_steps": 20,
+            "enhance_denoise": 0.15,
             "filename_prefix": "image/flux_t2i_upscaled",
         }
 
@@ -61,10 +72,38 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("guidance", "Guidance (Flux)", "float", 4.5,
                      min_val=0.0, max_val=20.0, step=0.1),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
+            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+                     min_val=1.0, max_val=4.0, step=0.25),
+            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
+                     min_val=0.0, max_val=1.0, step=0.05),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/flux_t2i_upscaled"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:
+        if params.get("enhance"):
+            # The tail's loader/upscaler take over the legacy nodes' ids ("10"/
+            # "11", same content), then rescale, re-encode, and re-sample on the
+            # same Flux model, guided conditioning, and VAE as the base pass.
+            tail, saved_ref = self.enhance_image_nodes(
+                "10", "11", "13", "14", "15", "16",
+                image_ref=["9", 0], model_ref=["1", 0],
+                positive_ref=["5", 0], negative_ref=["6", 0], vae_ref=["3", 0],
+                params=params,
+            )
+        else:
+            tail = {
+                "10": {
+                    "class_type": "UpscaleModelLoader",
+                    "inputs": {"model_name": params["upscale_model"]},
+                },
+                "11": {
+                    "class_type": "ImageUpscaleWithModel",
+                    "inputs": {"upscale_model": ["10", 0], "image": ["9", 0]},
+                },
+            }
+            saved_ref = ["11", 0]
         return {
             "1": {
                 "class_type": "UnetLoaderGGUF",
@@ -122,18 +161,11 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                 "class_type": "VAEDecode",
                 "inputs": {"samples": ["8", 0], "vae": ["3", 0]},
             },
-            "10": {
-                "class_type": "UpscaleModelLoader",
-                "inputs": {"model_name": params["upscale_model"]},
-            },
-            "11": {
-                "class_type": "ImageUpscaleWithModel",
-                "inputs": {"upscale_model": ["10", 0], "image": ["9", 0]},
-            },
+            **tail,
             "12": {
                 "class_type": "SaveImage",
                 "inputs": {
-                    "images": ["11", 0],
+                    "images": saved_ref,
                     "filename_prefix": params["filename_prefix"],
                 },
             },

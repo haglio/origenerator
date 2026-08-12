@@ -243,6 +243,188 @@ def test_sdxl_t2i_extract_output_info():
     assert files[0]["filename"] == "sdxl_t2i_00001_.png"
 
 
+# ---- The upscale/enhance tail (a checkbox on every image workflow) ----
+
+# Every image-producing workflow carries the enhance toggle; these are they.
+_ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
+                             "flux_t2i_upscaled", "wan22_t2i")
+
+
+def test_image_workflows_expose_the_enhance_toggle():
+    # The tail is an option in the generation controls: a bool (checkbox) param
+    # on every image workflow. The SDXL pair keeps it on by default (their
+    # established behavior); flux and WAN t2i add it off, preserving theirs.
+    defaults = {"sdxl_t2i": True, "sdxl_pose_transfer": True,
+                "flux_t2i_upscaled": False, "wan22_t2i": False}
+    for name, default in defaults.items():
+        wf = WORKFLOW_REGISTRY[name]
+        toggle = {pd.key: pd for pd in wf.param_definitions()}["enhance"]
+        assert toggle.type == "bool", name
+        assert toggle.default is default, name
+        assert wf.default_params()["enhance"] is default, name
+
+
+def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
+    # With the checkbox on, every image workflow ends in the shared tail:
+    # model upscale -> rescale to enhance_scale x the base (the model is 4x) ->
+    # re-encode -> a low-denoise KSampler on the workflow's own model and
+    # conditioning -> decode -> save.
+    for name in _ENHANCE_TOGGLE_WORKFLOWS:
+        wf = WORKFLOW_REGISTRY[name]
+        params = dict(wf.default_params(), seed=11, enhance=True,
+                      enhance_scale=2.0, enhance_steps=17, enhance_denoise=0.35)
+        payload = wf.build_api_payload(params)
+
+        loader_id = _node_id(payload, "UpscaleModelLoader")
+        assert payload[loader_id]["inputs"]["model_name"] == params["upscale_model"], name
+        up_id = _node_id(payload, "ImageUpscaleWithModel")
+        assert payload[up_id]["inputs"]["upscale_model"] == [loader_id, 0]
+        scale_id = _node_id(payload, "ImageScaleBy")
+        scale = payload[scale_id]["inputs"]
+        assert scale["image"] == [up_id, 0]
+        assert scale["scale_by"] == pytest.approx(2.0 / 4.0)
+        encode_id = _node_id(payload, "VAEEncode")
+        assert payload[encode_id]["inputs"]["pixels"] == [scale_id, 0]
+
+        sampler = next(n for n in payload.values()
+                       if n["class_type"] == "KSampler"
+                       and n["inputs"]["latent_image"] == [encode_id, 0])
+        sampler_id = next(k for k, v in payload.items() if v is sampler)
+        assert sampler["inputs"]["steps"] == 17, name
+        assert sampler["inputs"]["denoise"] == 0.35
+        assert sampler["inputs"]["seed"] == 11
+        assert sampler["inputs"]["cfg"] == params["cfg"]
+
+        save = _find_node(payload, "SaveImage")
+        final = payload[save["inputs"]["images"][0]]
+        assert final["class_type"] == "VAEDecode", name
+        assert final["inputs"]["samples"] == [sampler_id, 0]
+        assert final["inputs"]["vae"] == payload[encode_id]["inputs"]["vae"]
+
+
+def test_enhance_toggle_off_ends_at_the_plain_output():
+    # Unchecked, no tail is built: no re-encode, no second low-denoise sampler.
+    # Flux keeps its namesake bare 4x upscale; the others save the base output
+    # exactly as they did before the toggle existed.
+    for name in _ENHANCE_TOGGLE_WORKFLOWS:
+        wf = WORKFLOW_REGISTRY[name]
+        payload = wf.build_api_payload(dict(wf.default_params(), enhance=False))
+        assert _find_node(payload, "VAEEncode") is None, name
+        assert _find_node(payload, "ImageScaleBy") is None, name
+        saved = _find_node(payload, "SaveImage")["inputs"]["images"]
+        if name == "flux_t2i_upscaled":
+            assert saved == [_node_id(payload, "ImageUpscaleWithModel"), 0]
+        else:
+            assert _find_node(payload, "ImageUpscaleWithModel") is None, name
+            assert payload[saved[0]]["class_type"] in ("VAEDecode", "ImageFromBatch"), name
+
+
+def test_wan22_t2i_enhances_on_its_low_noise_refinement_chain():
+    # The WAN tail re-samples on the LOW-noise model's shift chain — the stage
+    # WAN 2.2 itself refines with — using the same text conditioning and VAE as
+    # the base pass, over the single kept frame.
+    wf = WORKFLOW_REGISTRY["wan22_t2i"]
+    payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
+    encode_id = _node_id(payload, "VAEEncode")
+    sampler = next(n for n in payload.values()
+                   if n["class_type"] == "KSampler"
+                   and n["inputs"]["latent_image"] == [encode_id, 0])
+    low = next(n for n in payload.values()
+               if n["class_type"] == "KSamplerAdvanced"
+               and n["inputs"]["add_noise"] == "disable")
+    assert sampler["inputs"]["model"] == low["inputs"]["model"]
+    assert sampler["inputs"]["positive"] == low["inputs"]["positive"]
+    assert sampler["inputs"]["negative"] == low["inputs"]["negative"]
+    frame_id = _node_id(payload, "ImageFromBatch")
+    assert _find_node(payload, "ImageUpscaleWithModel")["inputs"]["image"] == [frame_id, 0]
+
+
+def test_flux_enhance_resamples_on_the_guided_conditioning():
+    # Flux's tail re-samples on the same GGUF model, FluxGuidance-wrapped
+    # positive, and its own VAE — cfg stays at Flux's 1.0.
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
+    encode_id = _node_id(payload, "VAEEncode")
+    sampler = next(n for n in payload.values()
+                   if n["class_type"] == "KSampler"
+                   and n["inputs"]["latent_image"] == [encode_id, 0])
+    base = next(n for n in payload.values()
+                if n["class_type"] == "KSampler" and n is not sampler)
+    assert sampler["inputs"]["model"] == base["inputs"]["model"]
+    assert sampler["inputs"]["positive"] == base["inputs"]["positive"]
+    assert sampler["inputs"]["cfg"] == 1.0
+    assert payload[encode_id]["inputs"]["vae"] == _find_node(payload, "VAEDecode")["inputs"]["vae"]
+
+
+# ---- Image Enhance (the standalone form of the tail) ----
+
+def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, monkeypatch):
+    from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
+
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    assert wf.__class__ is ImageEnhanceWorkflow
+    assert wf.output_type == "image"
+    assert wf.model_keys == ("checkpoint",)
+    assert wf.seed_keys() == ("seed",)
+    # It takes an input image, so — like every input-image workflow — its size
+    # derives from it: the source's own dimensions at enhance_scale, no budget.
+    assert wf.derives_size_from_input is True
+    import origenerator.workflows.derived_size as ds
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    _write_image(tmp_path / "src.png", (640, 360))
+    params = dict(wf.default_params(), input_image="src.png", enhance_scale=2.0)
+    assert wf.derived_display_size(params) == (1280, 720)
+    assert wf.derived_display_size(dict(params, enhance_scale=1.5)) == (960, 540)
+    assert wf.derived_display_size(dict(params, input_image="missing.png")) is None
+
+
+def test_image_enhance_build_api_payload_structure():
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    params = dict(wf.default_params(), input_image="pick.png", seed=5,
+                  positive_prompt="warm window light", enhance_scale=2.0,
+                  enhance_steps=12, enhance_denoise=0.2)
+    payload = wf.build_api_payload(params)
+
+    load_id = _node_id(payload, "LoadImage")
+    assert payload[load_id]["inputs"]["image"] == "pick.png"
+    up_id = _node_id(payload, "ImageUpscaleWithModel")
+    assert payload[up_id]["inputs"]["image"] == [load_id, 0]
+    assert _find_node(payload, "ImageScaleBy")["inputs"]["scale_by"] == pytest.approx(0.5)
+    encode_id = _node_id(payload, "VAEEncode")
+    sampler = _find_node(payload, "KSampler")
+    assert sampler["inputs"]["latent_image"] == [encode_id, 0]
+    assert sampler["inputs"]["steps"] == 12
+    assert sampler["inputs"]["denoise"] == 0.2
+    assert sampler["inputs"]["seed"] == 5
+    # The SDXL checkpoint does the refining, steered by the prompts.
+    ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
+    assert sampler["inputs"]["model"] == [ckpt_id, 0]
+    assert any(n["class_type"] == "CLIPTextEncode"
+               and n["inputs"]["text"] == "warm window light"
+               for n in payload.values())
+    save_id = _node_id(payload, "SaveImage")
+    assert wf.output_node_id == save_id
+    final = payload[payload[save_id]["inputs"]["images"][0]]
+    assert final["class_type"] == "VAEDecode"
+
+
+def test_image_enhance_honors_an_unlocked_size_override():
+    # Unlocking the derived Dimensions swaps the relative rescale for an exact
+    # one, so the override actually governs the saved size.
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    params = dict(wf.default_params(), input_image="pick.png", width=1536, height=864)
+    payload = wf.build_api_payload(params)
+    assert _find_node(payload, "ImageScaleBy") is None
+    scale = _find_node(payload, "ImageScale")
+    up_id = _node_id(payload, "ImageUpscaleWithModel")
+    assert scale["inputs"] == {
+        "image": [up_id, 0], "upscale_method": "lanczos",
+        "width": 1536, "height": 864, "crop": "disabled",
+    }
+    scale_id = _node_id(payload, "ImageScale")
+    assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
+
+
 # ---- The SDXL upscale/enhance tail (shared by both SDXL workflows) ----
 
 def test_sdxl_workflows_end_with_an_upscale_enhance_pass():

@@ -4229,6 +4229,97 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     assert shown                              # but tell the user why
 
 
+# --- standalone enhance: the folder button, the selection action, the queue ---
+
+_ENHANCE_HISTORY = {"outputs": {"12": {"images": [
+    {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]}}}
+
+
+def _enhanceable_db(tmp_path, count=2):
+    """A DB whose one SDXL folder holds ``count`` finished, un-enhanced images
+    (pre-enhance v002 rows: no enhance params, so nothing marks them)."""
+    db = Database(tmp_path / "test.db")
+    for i in range(count):
+        pid = f"g{i}"
+        db.insert_generation(
+            prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+            positive_prompt="a cat", seed=i,
+            params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": i}),
+            workflow_json="{}",
+        )
+        db.update_generation(pid, status="completed",
+                             output_files=json.dumps([{"filename": f"sdxl_t2i_g{i}.png",
+                                                       "subfolder": "image",
+                                                       "type": "output"}]))
+    return db
+
+
+def test_enhance_all_button_shows_only_on_a_folder_awaiting_enhancement(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._enhance_all_btn.isHidden()   # a plain image awaits
+
+    # Once a standalone enhance of that image exists, nothing awaits: the
+    # button retires from this folder.
+    db.insert_generation(
+        prompt_id="e0", workflow_name="image_enhance", workflow_version="v001",
+        params_json=json.dumps({"input_image": "image/sdxl_t2i_g0.png [output]"}),
+        workflow_json="{}",
+    )
+    db.update_generation("e0", status="completed",
+                         output_files=json.dumps([{"filename": "image_enhance_e0.png"}]))
+    view.refresh()
+    key = gallery.settings_folder_key(db.get_generation("g0"))
+    view._tree.setCurrentItem(view._item_by_key[key])
+    assert view._enhance_all_btn.isHidden()
+
+
+def test_enhance_all_queues_and_serializes_same_folder_enhances(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._enhance_all()
+
+    # Both images share one source config, so their enhances share one folder —
+    # the controller runs one job per folder, and the second waits in the queue.
+    assert len(view._reroll_jobs) == 1
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["input_image"].startswith("image/sdxl_t2i_g")
+    assert job.params["positive_prompt"] == "a cat"   # the source's own prompt
+    assert len(view._enhance_queue) == 1
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    # The completion pumped the queue: the second enhance is running, first done.
+    assert view._enhance_queue == []
+    (job2,) = view._reroll_jobs.values()
+    assert job2.workflow.name == "image_enhance"
+    assert job2.prompt_id != job.prompt_id
+    assert view._db.get_generation(job.prompt_id)["status"] == "completed"
+
+
+def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
+    # The thumbnail context menu's action: enhance exactly the picked images,
+    # through the same queue the folder button uses.
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.enhance_items(["g0", "g1"])
+
+    assert len(view._reroll_jobs) == 1
+    assert len(view._enhance_queue) == 1
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+
+
 def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     client = _reroll_client()

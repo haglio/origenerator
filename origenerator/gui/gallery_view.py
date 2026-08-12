@@ -176,6 +176,10 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
+        # Standalone enhances waiting to launch (image_enhance params, in order).
+        # Enhances of one source config share a folder, and the controller runs
+        # one job per folder — so the queue drains as completions pump it.
+        self._enhance_queue: list[dict] = []
         self._editing_key: str | None = None  # folder being renamed inline
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
@@ -356,6 +360,13 @@ class GalleryView(QWidget):
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
         self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
+        self._enhance_all_btn = self._tool_button(
+            icons.enhance_icon(),
+            "Enhance every not-yet-enhanced image in this folder "
+            "(upscale + low-denoise re-sample)",
+            self._enhance_all,
+        )
+        self._enhance_all_btn.hide()  # shown only on a folder with images awaiting it
         # A single global switch: while it's on, whatever scripted video is in the
         # front tab drives the OSR2. Always visible (it's app-wide), lit when on.
         self._osr2_btn = self._tool_button(
@@ -370,7 +381,8 @@ class GalleryView(QWidget):
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
-                       self._slideshow_btn, self._auto_btn, self._osr2_btn, self._delete_btn):
+                       self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
+                       self._osr2_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -1002,6 +1014,7 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
+        self._sync_enhance_all_button()  # enhance-all fits a folder with plain images
         # The image/video filter belongs to the Recents shelf alone; the
         # experimenter's switch to the Experiments shelf alone.
         self._recents_filter_bar.setVisible(current is self._recents_item)
@@ -1310,6 +1323,68 @@ class GalleryView(QWidget):
         """Offer the slideshow only on a folder that actually holds media."""
         group = self._current_group()
         self._slideshow_btn.setVisible(group is not None and bool(gallery.rows_under(group)))
+
+    # --- standalone enhance: the folder button, the selection action, the queue ---
+
+    def _sync_enhance_all_button(self):
+        """Offer Enhance All only on a settings folder holding finished images
+        that haven't been enhanced yet — neither inline (their workflow's
+        ``enhance`` toggle) nor by a standalone enhance of their output."""
+        group = self._current_group()
+        available = isinstance(group, gallery.SettingsGroup) and bool(
+            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
+        )
+        self._enhance_all_btn.setVisible(available)
+
+    def _enhance_all(self):
+        """The folder button's action: queue a standalone enhance for every
+        member image that isn't enhanced yet, then retire the button."""
+        group = self._current_group()
+        if not isinstance(group, gallery.SettingsGroup):
+            return
+        self._enqueue_enhancements(
+            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
+        )
+        self._sync_enhance_all_button()
+
+    def enhance_items(self, prompt_ids: list[str]):
+        """Queue a standalone enhance for each picked generation (the thumbnail
+        context menu's action) — a deliberate pick, so already-enhanced images
+        are re-enhanced rather than skipped."""
+        rows = [self._db.get_generation(pid) for pid in prompt_ids]
+        self._enqueue_enhancements([r for r in rows if r is not None])
+
+    def _enqueue_enhancements(self, rows: list[dict]):
+        for row in rows:
+            params = gallery.enhance_params_for(row)
+            if params is not None:
+                self._enhance_queue.append(params)
+        self._pump_enhance_queue()
+
+    def _pump_enhance_queue(self):
+        """Launch queued enhances through the re-roll controller.
+
+        Enhances of differently configured sources key to different folders and
+        submit at once (ComfyUI's own queue serializes the GPU); enhances of one
+        folder's images share a key, and the controller runs one job per folder
+        — so the head waits there, and every completion or failure pumps again.
+        """
+        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+        index = gallery.build_image_config_index(self._image_rows)
+        while self._enhance_queue:
+            params = self._enhance_queue[0]
+            key = gallery.settings_folder_key(
+                {"workflow_name": workflow.name, "workflow_version": workflow.version,
+                 "params_json": json.dumps(params)},
+                index,
+            )
+            prepared = randomize_seeds(params, workflow.seed_keys())
+            if self._reroll.start_prepared(key, workflow, prepared):
+                self._enhance_queue.pop(0)
+                continue
+            if self._reroll.has(key):
+                return  # that folder is busy; the next finished/failed pumps again
+            self._enhance_queue.pop(0)  # unlaunchable (no client / submit failed)
 
     def _start_slideshow(self):
         """Open the current folder's media in a fullscreen slideshow."""
@@ -1675,6 +1750,7 @@ class GalleryView(QWidget):
             # for review rather than moving the user's view — no front-tab load,
             # no montage feed, no auto-loop or combine bookkeeping.
             self.refresh()
+            self._pump_enhance_queue()  # the GPU freed up all the same
             return
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
@@ -1697,6 +1773,8 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(item)
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
+        self._pump_enhance_queue()     # a same-folder enhance can go now
+        self._sync_enhance_all_button()  # a landed enhance may retire the button
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None):
         """After a re-roll finishes, load its result into the front config tab.
@@ -1718,6 +1796,7 @@ class GalleryView(QWidget):
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
+        self._pump_enhance_queue()    # a failure must not strand the queued rest
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

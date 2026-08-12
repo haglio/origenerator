@@ -92,6 +92,21 @@ def override_size(params: dict) -> tuple[int, int] | None:
     return (width, height) if width > 0 and height > 0 else None
 
 
+def measure_image_size(input_image: str | None) -> tuple[int, int] | None:
+    """The raw pixel size of the file ``input_image`` names, or ``None`` when
+    it's missing or unreadable. For a workflow whose output tracks the input's
+    own dimensions (the enhance workflow: source x scale) rather than a pixel
+    budget."""
+    path = resolve_input_image_path(input_image)
+    if path is None:
+        return None
+    try:
+        with Image.open(path) as img:
+            return img.size
+    except (OSError, ValueError):
+        return None
+
+
 def measure_derived_size(
     input_image: str | None, megapixels: float = TARGET_MEGAPIXELS,
 ) -> tuple[int, int] | None:

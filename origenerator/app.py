@@ -126,6 +126,13 @@ def main():
 
     app = QApplication.instance() or QApplication(sys.argv)
 
+    # The one place the stylesheet is applied, and it must be the application:
+    # QToolTip popups are top-level widgets a window-level sheet never reaches,
+    # so styling per-window left every tooltip on the native Windows 11 dark
+    # palette — which renders them unreadable, i.e. effectively missing.
+    from origenerator.gui.stylesheet import build_stylesheet
+    app.setStyleSheet(build_stylesheet())
+
     # Show the splash before the slow imports/boot work below so the user gets
     # immediate feedback. Each phase updates its status line; app.processEvents
     # keeps the busy sweep animating while the main thread is blocked.
@@ -143,18 +150,37 @@ def main():
         on_status=status, pump_events=app.processEvents,
     )
 
+    # A branch session (a worktree run via launch_preview_branch.vbs) is here to
+    # show unlanded code, not to maintain the library — so it starts from the
+    # primary install's database rather than re-scanning ComfyUI's whole history
+    # into a fresh one, and skips the maintenance passes below (see
+    # origenerator.branch_session).
+    from origenerator.branch_session import is_branch_session, seed_branch_db
+    branch_session = is_branch_session()
+
     status("Opening the image library...")
+    if branch_session:
+        from origenerator.config import project_dir
+        try:
+            primary_db = project_dir("origenerator") / "state" / DB_PATH.name
+            if seed_branch_db(primary_db, DB_PATH):
+                logger.info("Branch session: database seeded from %s", primary_db)
+        except Exception as e:
+            logger.warning("Branch DB seed failed (starting empty): %s", e)
     from origenerator.db import Database
     db = Database(DB_PATH)
 
     # Reclaim any trash left by deletes from a previous session: the in-memory
     # undo stack is empty now, so those held files are unreachable and safe to
-    # clear (see GalleryActions / Trash).
-    from origenerator.trash import Trash
-    try:
-        Trash(STATE_DIR / "trash").sweep()
-    except Exception as e:
-        logger.warning("Trash sweep failed: %s", e)
+    # clear (see GalleryActions / Trash). Not in a branch session — what its
+    # deletes hold are real library files, and purging them is the one way a
+    # preview could destroy something for good.
+    if not branch_session:
+        from origenerator.trash import Trash
+        try:
+            Trash(STATE_DIR / "trash").sweep()
+        except Exception as e:
+            logger.warning("Trash sweep failed: %s", e)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -168,104 +194,112 @@ def main():
         client_id=resolve_comfyui_client_id(app_state),
     )
 
-    status("Reconnecting to running generations...")
-    # Resolve any generation left mid-run by a previous session against ComfyUI
-    # (finished-while-away, still-running, or gone). Runs before the import below
-    # so a finalized job's output is already recorded and isn't imported twice.
-    from origenerator.reconcile import reconcile_in_flight
-    try:
-        reconcile_in_flight(db, client, COMFYUI_OUTPUT_DIR, THUMB_DIR)
-    except Exception as e:
-        logger.warning("Reconcile of in-flight generations failed: %s", e)
+    if branch_session:
+        # The seeded database is already maintained — every pass below ran on it
+        # in the live app. Re-running them here would only slow the preview down
+        # (the import scan alone reads the whole output history) and write
+        # records the live install then imports as duplicates of its own.
+        status("Skipping library maintenance (branch session)...")
+        logger.info("Branch session: library maintenance left to the live app")
+    else:
+        status("Reconnecting to running generations...")
+        # Resolve any generation left mid-run by a previous session against ComfyUI
+        # (finished-while-away, still-running, or gone). Runs before the import below
+        # so a finalized job's output is already recorded and isn't imported twice.
+        from origenerator.reconcile import reconcile_in_flight
+        try:
+            reconcile_in_flight(db, client, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+        except Exception as e:
+            logger.warning("Reconcile of in-flight generations failed: %s", e)
 
-    status("Scanning for new images...")
-    from origenerator.importer import (
-        backfill_input_image,
-        backfill_model_and_lora_params,
-        backfill_shared_thumbnails,
-        backfill_unknown_workflows,
-        import_comfyui_output,
-        merge_video_sidecar_rows,
-    )
-    try:
-        count = import_comfyui_output(COMFYUI_OUTPUT_DIR, db, THUMB_DIR)
-        if count:
-            logger.info("Imported %d existing files from ComfyUI output", count)
-    except Exception as e:
-        logger.warning("Import failed: %s", e)
+        status("Scanning for new images...")
+        from origenerator.importer import (
+            backfill_input_image,
+            backfill_model_and_lora_params,
+            backfill_shared_thumbnails,
+            backfill_unknown_workflows,
+            import_comfyui_output,
+            merge_video_sidecar_rows,
+        )
+        try:
+            count = import_comfyui_output(COMFYUI_OUTPUT_DIR, db, THUMB_DIR)
+            if count:
+                logger.info("Imported %d existing files from ComfyUI output", count)
+        except Exception as e:
+            logger.warning("Import failed: %s", e)
 
-    status("Tidying up video previews...")
-    # Fold each video's metadata-PNG sidecar into one playable gallery entry.
-    try:
-        consolidated = merge_video_sidecar_rows(db)
-        if consolidated:
-            logger.info("Consolidated %d video sidecar previews", consolidated)
-    except Exception as e:
-        logger.warning("Sidecar consolidation failed: %s", e)
+        status("Tidying up video previews...")
+        # Fold each video's metadata-PNG sidecar into one playable gallery entry.
+        try:
+            consolidated = merge_video_sidecar_rows(db)
+            if consolidated:
+                logger.info("Consolidated %d video sidecar previews", consolidated)
+        except Exception as e:
+            logger.warning("Sidecar consolidation failed: %s", e)
 
-    status("Updating workflow labels...")
-    # Relabel any imports that predate filename-based workflow inference.
-    try:
-        relabeled = backfill_unknown_workflows(db)
-        if relabeled:
-            logger.info("Relabelled %d previously-unknown imports", relabeled)
-    except Exception as e:
-        logger.warning("Workflow backfill failed: %s", e)
+        status("Updating workflow labels...")
+        # Relabel any imports that predate filename-based workflow inference.
+        try:
+            relabeled = backfill_unknown_workflows(db)
+            if relabeled:
+                logger.info("Relabelled %d previously-unknown imports", relabeled)
+        except Exception as e:
+            logger.warning("Workflow backfill failed: %s", e)
 
-    status("Sorting by model and LoRA...")
-    # Fill the base model and LoRA onto imports that predate reading them from
-    # the embedded graph, so they nest into the gallery's model/LoRA folders.
-    try:
-        sorted_ = backfill_model_and_lora_params(db)
-        if sorted_:
-            logger.info("Backfilled model/LoRA for %d imports", sorted_)
-    except Exception as e:
-        logger.warning("Model/LoRA backfill failed: %s", e)
+        status("Sorting by model and LoRA...")
+        # Fill the base model and LoRA onto imports that predate reading them from
+        # the embedded graph, so they nest into the gallery's model/LoRA folders.
+        try:
+            sorted_ = backfill_model_and_lora_params(db)
+            if sorted_:
+                logger.info("Backfilled model/LoRA for %d imports", sorted_)
+        except Exception as e:
+            logger.warning("Model/LoRA backfill failed: %s", e)
 
-    status("Linking videos to their source images...")
-    # Fill input_image onto image-to-video imports that predate reading it from
-    # the embedded graph, so each video links back to the gallery image it was
-    # animated from (the same link a freshly generated i2v/flf2v already carries).
-    try:
-        linked = backfill_input_image(db)
-        if linked:
-            logger.info("Backfilled source image for %d video imports", linked)
-    except Exception as e:
-        logger.warning("Input-image backfill failed: %s", e)
+        status("Linking videos to their source images...")
+        # Fill input_image onto image-to-video imports that predate reading it from
+        # the embedded graph, so each video links back to the gallery image it was
+        # animated from (the same link a freshly generated i2v/flf2v already carries).
+        try:
+            linked = backfill_input_image(db)
+            if linked:
+                logger.info("Backfilled source image for %d video imports", linked)
+        except Exception as e:
+            logger.warning("Input-image backfill failed: %s", e)
 
-    status("Repairing thumbnails...")
-    # Re-render any thumbnail an old filename-stem collision left wrong or
-    # missing, so each generation's thumbnail matches its own preview again.
-    try:
-        fixed = backfill_shared_thumbnails(db, COMFYUI_OUTPUT_DIR, THUMB_DIR)
-        if fixed:
-            logger.info("Repaired %d colliding thumbnails", fixed)
-    except Exception as e:
-        logger.warning("Thumbnail repair failed: %s", e)
+        status("Repairing thumbnails...")
+        # Re-render any thumbnail an old filename-stem collision left wrong or
+        # missing, so each generation's thumbnail matches its own preview again.
+        try:
+            fixed = backfill_shared_thumbnails(db, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+            if fixed:
+                logger.info("Repaired %d colliding thumbnails", fixed)
+        except Exception as e:
+            logger.warning("Thumbnail repair failed: %s", e)
 
-    status("Recovering generation times...")
-    # Recover how long past generations took from ComfyUI's console logs, so
-    # estimates have history to draw on before any new run is timed live.
-    from origenerator.log_backfill import backfill_durations_from_logs
-    try:
-        log_paths = sorted(COMFYUI_LOG_DIR.glob("comfyui*.log"))
-        timed = backfill_durations_from_logs(db, log_paths)
-        if timed:
-            logger.info("Backfilled generation time for %d imports from logs", timed)
-    except Exception as e:
-        logger.warning("Duration backfill failed: %s", e)
+        status("Recovering generation times...")
+        # Recover how long past generations took from ComfyUI's console logs, so
+        # estimates have history to draw on before any new run is timed live.
+        from origenerator.log_backfill import backfill_durations_from_logs
+        try:
+            log_paths = sorted(COMFYUI_LOG_DIR.glob("comfyui*.log"))
+            timed = backfill_durations_from_logs(db, log_paths)
+            if timed:
+                logger.info("Backfilled generation time for %d imports from logs", timed)
+        except Exception as e:
+            logger.warning("Duration backfill failed: %s", e)
 
-    status("Restoring folder bookmarks...")
-    # Heal stars and custom names whose folder key drifted after a key formula
-    # change, and stamp identity onto live ones so the next change is handled
-    # automatically. Runs after the backfills above — they can move a generation's
-    # folder by filling in its workflow/model/LoRA — so the tree it reconciles
-    # against is final.
-    from origenerator.reconcile import reconcile_folder_meta
-    try:
-        reconcile_folder_meta(db)
-    except Exception as e:
-        logger.warning("Folder bookmark reconcile failed: %s", e)
+        status("Restoring folder bookmarks...")
+        # Heal stars and custom names whose folder key drifted after a key formula
+        # change, and stamp identity onto live ones so the next change is handled
+        # automatically. Runs after the backfills above — they can move a generation's
+        # folder by filling in its workflow/model/LoRA — so the tree it reconciles
+        # against is final.
+        from origenerator.reconcile import reconcile_folder_meta
+        try:
+            reconcile_folder_meta(db)
+        except Exception as e:
+            logger.warning("Folder bookmark reconcile failed: %s", e)
 
     status("Connecting to ComfyUI...")
     client.start()

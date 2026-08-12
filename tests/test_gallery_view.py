@@ -4497,6 +4497,22 @@ def _resolve_by_id(monkeypatch):
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
 
 
+class _StubStroke:
+    """Stands in for Osr2StrokeDriver so no device backend spins up."""
+
+    active = False
+
+    def toggle(self):
+        self.active = not self.active
+        return self.active
+
+    def stop(self):
+        self.active = False
+
+    def status_text(self):
+        return "OSR2 stub"
+
+
 def _auto_montage_view(qtbot, monkeypatch, rows):
     """A gallery on a settings leaf whose loop reports active, with the slideshow
     built on stubbed player and stroke so no media or device backend spins up."""
@@ -4504,7 +4520,7 @@ def _auto_montage_view(qtbot, monkeypatch, rows):
     qtbot.addWidget(view)
     monkeypatch.setattr(
         view, "_make_auto_montage",
-        lambda: AutoGenerateView(player=MagicMock(), stroke=MagicMock(active=False)),
+        lambda: AutoGenerateView(player=MagicMock(), stroke=_StubStroke()),
     )
     view.refresh()
     _open_leaf(view)

@@ -78,6 +78,9 @@ def test_the_knobs_shape_the_status_line(qtbot):
     assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
 
 
-def test_the_status_line_reads_off_while_stopped(qtbot):
+def test_the_status_line_reads_off_but_keeps_the_knobs_while_stopped(qtbot):
+    # The slideshow shows this line before the stroke ever starts, so the knobs
+    # must be readable (and tunable) while the device is still parked.
     driver, _broker, _clock = _driver(qtbot)
-    assert driver.status_text() == "OSR2 off"
+    driver.adjust_speed(50)
+    assert driver.status_text() == "OSR2 off · 200/min · sine · travel 100 around 50"

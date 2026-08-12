@@ -24,6 +24,18 @@ already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that clip, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
+## Judging a branch before it lands
+
+Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
+runs THAT worktree's code as its own app instance: the primary checkout's venv,
+the worktree's own `state/`, and `ORIGENERATOR_BRANCH_SESSION=1` — under which
+the app seeds its database from the primary install's and skips the library
+maintenance only the live app should do (see `origenerator/branch_session.py`).
+Two things to tell the user when handing one over: copy the primary's
+`content.local.json` into the worktree root first (else the session comes up on
+the example overlay and finds no library), and close the live app first (two
+instances contend for ComfyUI).
+
 ## Landing — GitHub merge queue, not local ff-merge
 
 This repo is public at `github.com/haglio/origenerator` with a merge-queue ruleset on

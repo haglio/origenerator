@@ -600,6 +600,34 @@ def test_set_generating_true_again_keeps_the_fill(panel):
     assert panel._generate_btn._fraction == 0.5    # still halfway, not reset to 0
 
 
+def test_generate_button_ignores_another_jobs_progress(panel):
+    # The client's progress is multiplexed across every job on the server; while a
+    # background experiment executes, its steps must not fill this tab's button —
+    # only the tracked run's own progress counts once the tab knows its prompt id.
+    panel.set_generating(True, prompt_id="mine")
+
+    panel._on_progress("experiment", 6, 12)        # someone else's run
+    assert panel._generate_btn._fraction == 0.0    # untouched (progress mode starts at 0)
+
+    panel._on_progress("mine", 3, 12)              # this tab's own run
+    assert panel._generate_btn._fraction == 0.25
+
+
+def test_reasserting_generating_retargets_the_tracked_prompt(panel):
+    # A chained i2v swaps to a new prompt mid-flight (image stage, then video
+    # stage) without leaving the generating state; the re-assert must adopt the
+    # new prompt id so the second stage's progress still drives the button.
+    panel.set_generating(True, prompt_id="image-stage")
+    panel._on_progress("image-stage", 6, 12)
+    assert panel._generate_btn._fraction == 0.5
+
+    panel.set_generating(True, prompt_id="video-stage")  # stage swap, still generating
+    panel._on_progress("image-stage", 9, 12)       # stale stage: ignored now
+    assert panel._generate_btn._fraction == 0.5
+    panel._on_progress("video-stage", 3, 12)
+    assert panel._generate_btn._fraction == 0.25
+
+
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")

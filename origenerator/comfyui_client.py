@@ -16,6 +16,14 @@ _PREVIEW_IMAGE_EVENT = 1
 # encoded image, so the displayable bytes start at offset 8.
 _PREVIEW_IMAGE_OFFSET = 8
 
+# Every HTTP call to ComfyUI carries this timeout. Without one, a wedged or
+# swap-thrashed server hangs the calling thread forever — the GUI thread for a
+# submit/cancel (the whole app freezes), or the websocket thread for a history
+# fetch (no job ever completes again). Generous, because a busy server that IS
+# answering can legitimately take a while; it's a socket-inactivity limit, not a
+# total-transfer one, so even a large /view download streams fine under it.
+_HTTP_TIMEOUT_S = 30.0
+
 
 def format_prompt_error(body: str) -> str:
     """Turn ComfyUI's 400 ``/prompt`` body into a one-line, human-readable reason.
@@ -234,7 +242,7 @@ class ComfyUIClient(QThread):
             data=b"",
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             resp.read()
 
     def cancel_prompt(self, prompt_id: str):
@@ -245,7 +253,7 @@ class ComfyUIClient(QThread):
             data=body,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             resp.read()
 
     def _post_prompt(self, workflow_payload: dict, prompt_id: str) -> dict:
@@ -260,7 +268,7 @@ class ComfyUIClient(QThread):
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
             # ComfyUI explains a rejected prompt in the response body (which node
@@ -271,7 +279,7 @@ class ComfyUIClient(QThread):
 
     def fetch_history(self, prompt_id: str) -> dict:
         url = f"{self.base_url}/history/{prompt_id}"
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             return data.get(prompt_id, {})
 
@@ -283,7 +291,7 @@ class ComfyUIClient(QThread):
         Used at startup to tell a job still in flight from one that has gone.
         """
         url = f"{self.base_url}/queue"
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
         ids: set[str] = set()
         for key in ("queue_running", "queue_pending"):
@@ -299,5 +307,5 @@ class ComfyUIClient(QThread):
             "type": folder_type,
         })
         url = f"{self.base_url}/view?{params}"
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
             return resp.read()

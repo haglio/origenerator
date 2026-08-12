@@ -241,6 +241,30 @@ def test_cancel_prompt_deletes_from_queue():
     assert json.loads(req.data) == {"delete": ["comfy-X"]}
 
 
+def test_every_http_call_carries_a_timeout():
+    # Without a timeout, a wedged or swap-thrashed ComfyUI hangs the calling
+    # thread forever: the GUI thread on a submit/cancel (the app freezes), or the
+    # websocket thread on a history fetch (no job ever completes again). Every
+    # HTTP helper must therefore pass one.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    client.client_id = "test-client"
+    body = json.dumps({"pid": {}, "queue_running": [], "queue_pending": []}).encode()
+    calls = [
+        lambda: client.submit_job({"1": {"class_type": "T", "inputs": {}}}, "pid"),
+        client.interrupt,
+        lambda: client.cancel_prompt("pid"),
+        lambda: client.fetch_history("pid"),
+        client.fetch_queue,
+        lambda: client.fetch_output_file("out.png"),
+    ]
+    for call in calls:
+        with patch("urllib.request.urlopen", return_value=_mock_response(200, body)) as m:
+            call()
+        assert m.call_args.kwargs.get("timeout"), f"{call} passed no timeout"
+
+
 def test_comfyui_responding_true_for_comfyui_system_stats():
     body = json.dumps({"system": {"os": "nt"}, "devices": []}).encode()
     with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):

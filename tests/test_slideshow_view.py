@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.stroke_engine import StrokeState
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -63,11 +64,12 @@ def test_down_toggles_pause_and_the_caption_reflects_it(qtbot):
 
 
 class _FakeStroke:
-    """Enough of the stroke driver for the shared keys and caption."""
+    """Enough of the stroke driver for the shared keys and the drive panel."""
 
     def __init__(self):
         self.active = False
         self.calls = []
+        self.state = StrokeState()
 
     def toggle(self):
         self.active = not self.active
@@ -88,7 +90,7 @@ def test_space_drives_the_shared_stroke_not_the_pause(qtbot):
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
                          stroke=stroke)
     qtbot.addWidget(view)
-    assert "Space" in view._stroke_caption.text()  # the key legend, while off
+    assert view._stroke_panel is not None  # the drive panel rides along
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in stroke.calls
     assert not view._playlist.paused

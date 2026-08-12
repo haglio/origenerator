@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.fullscreen_preview import FullscreenPreview
+from origenerator.stroke_engine import StrokeState
 
 
 def _make_png(path):
@@ -197,11 +198,12 @@ def test_paging_emits_media_changed_to_re_aim_the_osr2(qtbot, tmp_path):
 
 
 class _FakeStroke:
-    """Enough of the stroke driver for the shared keys and caption."""
+    """Enough of the stroke driver for the shared keys and the drive panel."""
 
     def __init__(self):
         self.active = False
         self.calls = []
+        self.state = StrokeState()
 
     def toggle(self):
         self.active = not self.active
@@ -223,7 +225,7 @@ def test_the_shared_stroke_keys_work_here_too(qtbot, tmp_path):
     _press(win, Qt.Key.Key_Space)  # not wired yet: inert, and must not crash
     stroke = _FakeStroke()
     win.set_stroke(stroke)
-    assert "Space" in win._stroke_caption.text()  # the key legend, while off
+    assert win._stroke_panel is not None  # the drive panel came with it
     _press(win, Qt.Key.Key_Space)
     _press(win, Qt.Key.Key_J)
     assert stroke.calls == [("toggle", True), ("speed", -5)]

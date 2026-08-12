@@ -20,7 +20,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.stroke_hud import StrokeCaption, apply_stroke_key
+from origenerator.gui.stroke_hud import apply_stroke_key
+from origenerator.gui.stroke_panel import StrokePanel
 
 
 class FullscreenPreview(QWidget):
@@ -37,7 +38,7 @@ class FullscreenPreview(QWidget):
         # The gallery hands its app-global stroke driver in via set_stroke once
         # this view announces itself; until then the stroke keys are inert.
         self._stroke = None
-        self._stroke_caption: StrokeCaption | None = None
+        self._stroke_panel: StrokePanel | None = None
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround behind the media
         palette = self.palette()
@@ -66,11 +67,13 @@ class FullscreenPreview(QWidget):
         self._index = index
 
     def set_stroke(self, stroke) -> None:
-        """Wire the shared OSR2 stroke keys and their standing caption in — so
-        the device can run over a fullscreen image, which has no script."""
+        """Wire the shared OSR2 stroke keys and genau's drive panel in — so the
+        device can run over a fullscreen image, which has no script."""
         self._stroke = stroke
-        if self._stroke_caption is None and stroke is not None:
-            self._stroke_caption = StrokeCaption(stroke, self)
+        if self._stroke_panel is None and stroke is not None:
+            self._stroke_panel = StrokePanel(stroke, self)
+            self._stroke_panel.reposition()
+            self._stroke_panel.show()
 
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
@@ -87,14 +90,14 @@ class FullscreenPreview(QWidget):
         elif key == Qt.Key.Key_Right:
             self._step(1)
         elif apply_stroke_key(self._stroke, key):
-            self._stroke_caption.refresh()
+            self._stroke_panel.refresh()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self._stroke_caption is not None:
-            self._stroke_caption.reposition()
+        if self._stroke_panel is not None:
+            self._stroke_panel.reposition()
 
     def _step(self, delta: int) -> None:
         """Page ``delta`` items through the folder, wrapping at either end."""

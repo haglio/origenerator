@@ -19,9 +19,9 @@ The arrow keys are laid out like a Fun Time satellite's controls:
 
 And since a still image gives the OSR2 nothing to follow, the view answers the
 shared stroke keys (see :mod:`origenerator.gui.stroke_hud`) against the
-gallery's app-global stroke driver, with the standing caption along its top —
-the same controls every other surface offers. The stroke outlives this view:
-closing it leaves the device running.
+gallery's app-global stroke driver, with genau's drive panel floated along its
+top — the same controls every other surface offers. The stroke outlives this
+view: closing it leaves the device running.
 
 Escape closes the view (the loop keeps running); :attr:`closed` fires so the
 gallery can forget it.
@@ -32,7 +32,8 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.stroke_hud import CAPTION_CSS, StrokeCaption, apply_stroke_key
+from origenerator.gui.stroke_hud import CAPTION_CSS, apply_stroke_key
+from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import LIVE, AutoGeneratePlaylist
 
 _GENERATING = "Generating…"
@@ -69,11 +70,11 @@ class AutoGenerateView(QWidget):
         layout.addWidget(self._preview, 1)
 
         # A translucent position caption floating over the bottom of the media,
-        # and the stroke's standing caption along the top (see stroke_hud).
+        # and the drive panel — genau's readout, copied — along the top.
         self._counter = QLabel(self)
         self._counter.setStyleSheet(CAPTION_CSS)
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_caption = StrokeCaption(stroke, self) if stroke is not None else None
+        self._stroke_panel = StrokePanel(stroke, self) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -228,15 +229,15 @@ class AutoGenerateView(QWidget):
         elif key == Qt.Key.Key_Down:
             self._toggle_lock()
         elif apply_stroke_key(self._stroke, key):
-            self._stroke_caption.refresh()
+            self._stroke_panel.refresh()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
-        if self._stroke_caption is not None:
-            self._stroke_caption.reposition()
+        if self._stroke_panel is not None:
+            self._stroke_panel.reposition()
 
     def closeEvent(self, event):
         # The stroke is the gallery's, app-global, and deliberately keeps

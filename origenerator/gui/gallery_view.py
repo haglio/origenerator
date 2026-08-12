@@ -40,7 +40,8 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
-from origenerator.gui.stroke_hud import apply_stroke_key, stroke_caption_text
+from origenerator.gui.stroke_hud import apply_stroke_key
+from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
@@ -220,7 +221,7 @@ class GalleryView(QWidget):
                 # keep them out of text fields and other windows.
                 if (not event.modifiers()
                         and apply_stroke_key(self._osr2_stroke, event.key())):
-                    self._show_stroke_status()
+                    self._stroke_panel.refresh()
                     return True
         return super().eventFilter(obj, event)
 
@@ -447,19 +448,10 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
-        # This window's own stroke feedback: a floating caption shown while the
-        # stroke runs (and flashed on a tuning key while it doesn't).
-        self._stroke_status = QLabel(self)
-        self._stroke_status.setObjectName("strokeStatus")
-        self._stroke_status.setStyleSheet(
-            "#strokeStatus { color: white; background: rgba(20, 20, 20, 225);"
-            " padding: 8px 16px; border-radius: 6px; }"
-        )
-        self._stroke_status.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_status.hide()
-        self._stroke_status_timer = QTimer(self)
-        self._stroke_status_timer.setSingleShot(True)
-        self._stroke_status_timer.timeout.connect(self._stroke_status.hide)
+        # This window's own drive panel — genau's readout, copied — pinned to the
+        # bottom-right corner so the stroke is controllable without leaving the
+        # gallery ("always available", not only in the fullscreen views).
+        self._stroke_panel = StrokePanel(self._osr2_stroke, self)
         # The live auto-generate slideshow (double-click the preview while a folder
         # loops), and the folder key it follows — None while none is open.
         self._auto_montage = None
@@ -633,28 +625,16 @@ class GalleryView(QWidget):
     def _on_stroke_active_changed(self, _active: bool):
         """The stroke took or released the device (from whichever surface): the
         funscript reconcile stands down while it holds it, and this window's
-        caption follows."""
+        drive panel repaints to say so."""
         self._reconcile_osr2()
-        self._show_stroke_status()
+        self._stroke_panel.refresh()
 
-    def _show_stroke_status(self):
-        """Float the stroke's state over this window: pinned while it drives,
-        flashed for a moment when a key tunes it while it's off."""
-        self._stroke_status.setText(stroke_caption_text(self._osr2_stroke))
-        self._stroke_status.adjustSize()
-        self._reposition_stroke_status()
-        self._stroke_status.show()
-        self._stroke_status.raise_()
-        if self._osr2_stroke.active:
-            self._stroke_status_timer.stop()
-        else:
-            self._stroke_status_timer.start(2500)
-
-    def _reposition_stroke_status(self):
-        self._stroke_status.move(
-            max(0, (self.width() - self._stroke_status.width()) // 2),
-            max(0, self.height() - self._stroke_status.height() - 12),
+    def _reposition_stroke_panel(self):
+        self._stroke_panel.move(
+            max(0, self.width() - self._stroke_panel.width() - 12),
+            max(0, self.height() - self._stroke_panel.height() - 12),
         )
+        self._stroke_panel.raise_()
 
     # --- the live auto-generate montage (double-click the preview while looping) ---
 
@@ -1319,8 +1299,7 @@ class GalleryView(QWidget):
         super().resizeEvent(event)
         if self._voice_status.isVisible():
             self._reposition_voice_status()
-        if self._stroke_status.isVisible():
-            self._reposition_stroke_status()
+        self._reposition_stroke_panel()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,

@@ -45,6 +45,7 @@ class Osr2StrokeDriver(QObject):
         )
         self._state = StrokeState()
         self._active = False
+        self._streaming = False  # a one-shot "first T-code sent" log per start
         self._interval_ms = interval_ms
         self._now = now_source
         self._last_tick = 0.0
@@ -69,6 +70,7 @@ class Osr2StrokeDriver(QObject):
         if self._active:
             return
         self._active = True
+        self._streaming = False
         self._last_tick = self._now()
         self._broker.pause_genau()
         self._timer.start()
@@ -91,11 +93,19 @@ class Osr2StrokeDriver(QObject):
         now = self._now()
         stroke_engine.advance(self._state, now - self._last_tick)
         self._last_tick = now
-        self._broker.send_position(
-            stroke_engine.position(self._state), self._interval_ms
-        )
+        pos = stroke_engine.position(self._state)
+        self._broker.send_position(pos, self._interval_ms)
+        if not self._streaming:
+            self._streaming = True
+            logger.info("OSR2 stroke streaming: first T-code pos=%.0f", pos)
 
-    # --- the knobs the slideshow's keys turn -------------------------------
+    # --- the knobs the keys and the drive panel turn -----------------------
+
+    @property
+    def state(self) -> StrokeState:
+        """The live stroke state, for the drive panel to draw. Read-only by
+        convention — the setters below are how it changes."""
+        return self._state
 
     def adjust_speed(self, delta: int) -> None:
         stroke_engine.adjust_speed(self._state, delta)
@@ -105,6 +115,15 @@ class Osr2StrokeDriver(QObject):
 
     def adjust_center(self, delta: int) -> None:
         stroke_engine.adjust_center(self._state, delta)
+
+    def set_speed(self, value: int) -> None:
+        stroke_engine.set_speed(self._state, value)
+
+    def set_amplitude(self, value: int) -> None:
+        stroke_engine.set_amplitude(self._state, value)
+
+    def set_center(self, value: int) -> None:
+        stroke_engine.set_center(self._state, value)
 
     def cycle_shape(self) -> None:
         stroke_engine.cycle_shape(self._state)

@@ -5,8 +5,8 @@ rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
 and pacing. Images advance on a dwell timer; videos play once and advance when
 they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down holds,
 and Escape closes. The shared OSR2 stroke keys ride along (Space and friends —
-see :mod:`origenerator.gui.stroke_hud`) with the standing caption up top, so the
-device can run over a slideshow of stills.
+see :mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated
+up top, so the device can run over a slideshow of stills.
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
@@ -14,7 +14,8 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer
 
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.stroke_hud import StrokeCaption, apply_stroke_key
+from origenerator.gui.stroke_hud import apply_stroke_key
+from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import SlideshowPlaylist
 
 
@@ -51,7 +52,7 @@ class SlideshowView(QWidget):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_caption = StrokeCaption(stroke, self) if stroke is not None else None
+        self._stroke_panel = StrokePanel(stroke, self) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -141,15 +142,15 @@ class SlideshowView(QWidget):
         elif apply_stroke_key(self._stroke, key):
             # Space belongs to the stroke cluster now, everywhere — holding the
             # slideshow is Down, matching the auto-generate view's lock.
-            self._stroke_caption.refresh()
+            self._stroke_panel.refresh()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
-        if self._stroke_caption is not None:
-            self._stroke_caption.reposition()
+        if self._stroke_panel is not None:
+            self._stroke_panel.reposition()
 
     def closeEvent(self, event):
         self._timer.stop()

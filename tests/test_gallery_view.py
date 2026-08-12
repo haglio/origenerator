@@ -23,6 +23,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.stroke_engine import StrokeState
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -4511,6 +4512,7 @@ class _SignalStroke(QObject):
         super().__init__()
         self.active = False
         self.calls = []
+        self.state = StrokeState()
 
     def toggle(self):
         self.active = not self.active
@@ -4652,7 +4654,6 @@ def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypat
     view._osr2_stroke.toggle()                   # the stroke takes the device
     assert stopped == [True]                     # the funscript drive stood down
     assert view._osr2_drive_source() is None     # and nothing may retake the device
-    assert not view._stroke_status.isHidden()    # the main window says who has it
 
 
 def test_closing_the_montage_leaves_the_stroke_running(qtbot, monkeypatch):

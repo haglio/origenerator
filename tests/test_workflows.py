@@ -1082,10 +1082,11 @@ def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
 
 def test_sdxl_pose_transfer_build_api_payload_structure():
     # The re-skin pipeline: the input image is scaled to the SDXL pixel budget
-    # (keeping its aspect ratio), DWPose extracts its skeleton, and an SDXL
-    # ControlNet applies that skeleton to both prompt conditionings — while the
-    # sampler still denoises a fresh latent, sized off the same derivation, so
-    # everything but the pose is up to the prompt and checkpoint.
+    # (keeping its aspect ratio), its structure is extracted — a DepthAnythingV2
+    # map by default — and an SDXL ControlNet applies that map to both prompt
+    # conditionings, while the sampler still denoises a fresh latent, sized off
+    # the same derivation, so everything but the structure is up to the prompt
+    # and checkpoint.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(),
@@ -1096,6 +1097,7 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
         controlnet_strength=0.65,
         controlnet_end=0.9,
     )
+    assert params["control_mode"] == "depth"  # the shipped default
     payload = wf.build_api_payload(params)
 
     # The size chain: LoadImage -> ImageScaleToTotalPixels (1 MP, /16 stride)
@@ -1112,19 +1114,25 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     assert latent["inputs"]["height"] == [getsize_id, 1]
     assert latent["inputs"]["batch_size"] == params["batch_size"]
 
-    # The pose chain: DWPose reads the scaled image (so the skeleton is drawn
-    # in the same aspect the latent uses), and the ControlNet applies it across
-    # both conditionings at the form's strength/end values.
-    pose = _find_node(payload, "DWPreprocessor")
-    assert pose["inputs"]["image"] == [scale_id, 0]
-    assert pose["inputs"]["bbox_detector"] == params["pose_bbox_detector"]
-    assert pose["inputs"]["pose_estimator"] == params["pose_estimator"]
-    pose_id = _node_id(payload, "DWPreprocessor")
+    # The structure chain: DepthAnythingV2 reads the scaled image (so the map
+    # is drawn in the same aspect the latent uses), the union ControlNet is
+    # switched to its depth head, and the map is applied across both
+    # conditionings at the form's strength/end values.
+    da_loader_id = _node_id(payload, "DownloadAndLoadDepthAnythingV2Model")
+    assert payload[da_loader_id]["inputs"]["model"] == params["depth_model"]
+    depth = _find_node(payload, "DepthAnything_V2")
+    assert depth["inputs"]["da_model"] == [da_loader_id, 0]
+    assert depth["inputs"]["images"] == [scale_id, 0]
+    depth_id = _node_id(payload, "DepthAnything_V2")
+    assert _find_node(payload, "DWPreprocessor") is None
     cn_loader_id = _node_id(payload, "ControlNetLoader")
     assert payload[cn_loader_id]["inputs"]["control_net_name"] == params["controlnet"]
+    union_id = _node_id(payload, "SetUnionControlNetType")
+    assert payload[union_id]["inputs"]["control_net"] == [cn_loader_id, 0]
+    assert payload[union_id]["inputs"]["type"] == "depth"
     apply = _find_node(payload, "ControlNetApplyAdvanced")
-    assert apply["inputs"]["control_net"] == [cn_loader_id, 0]
-    assert apply["inputs"]["image"] == [pose_id, 0]
+    assert apply["inputs"]["control_net"] == [union_id, 0]
+    assert apply["inputs"]["image"] == [depth_id, 0]
     assert apply["inputs"]["strength"] == 0.65
     assert apply["inputs"]["start_percent"] == 0.0
     assert apply["inputs"]["end_percent"] == 0.9
@@ -1181,7 +1189,7 @@ def test_sdxl_pose_transfer_size_override_replaces_the_in_graph_derivation():
     latent = _find_node(payload, "EmptyLatentImage")
     assert latent["inputs"]["width"] == 1152
     assert latent["inputs"]["height"] == 896
-    assert _find_node(payload, "DWPreprocessor")["inputs"]["image"] == [scale_id, 0]
+    assert _find_node(payload, "DepthAnything_V2")["inputs"]["images"] == [scale_id, 0]
 
 
 def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, monkeypatch):
@@ -1204,14 +1212,35 @@ def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, 
     assert 0.9 * 1024 * 1024 <= width * height <= 1.1 * 1024 * 1024
 
 
+def test_sdxl_pose_transfer_pose_mode_swaps_depth_for_a_dwpose_skeleton():
+    # "pose" mode is the single-standing-figure alternative: DWPose replaces
+    # the depth chain (skeleton from the same scaled image, so it shares the
+    # latent's aspect), and the union ControlNet switches to its openpose head.
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(wf.default_params(), input_image="x.png", control_mode="pose")
+    payload = wf.build_api_payload(params)
+
+    scale_id = _node_id(payload, "ImageScaleToTotalPixels")
+    pose = _find_node(payload, "DWPreprocessor")
+    assert pose["inputs"]["image"] == [scale_id, 0]
+    assert pose["inputs"]["bbox_detector"] == params["pose_bbox_detector"]
+    assert pose["inputs"]["pose_estimator"] == params["pose_estimator"]
+    assert _find_node(payload, "DepthAnything_V2") is None
+    assert _find_node(payload, "DownloadAndLoadDepthAnythingV2Model") is None
+    union = _find_node(payload, "SetUnionControlNetType")
+    assert union["inputs"]["type"] == "openpose"
+    pose_id = _node_id(payload, "DWPreprocessor")
+    assert _find_node(payload, "ControlNetApplyAdvanced")["inputs"]["image"] == [pose_id, 0]
+
+
 def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
     # xinsir's SDXL pose ControlNets were trained on thicker skeleton sticks
     # than the OpenPose standard, and comfyui_controlnet_aux ships a DWPose
     # toggle for exactly that. It follows the picked ControlNet by filename
-    # (the default is a xinsir model), so swapping in a non-xinsir ControlNet
-    # gets standard sticks without a second setting to keep in sync.
+    # (both shipped defaults are xinsir models), so swapping in a non-xinsir
+    # ControlNet gets standard sticks without a second setting to keep in sync.
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
-    params = dict(wf.default_params(), input_image="x.png")
+    params = dict(wf.default_params(), input_image="x.png", control_mode="pose")
     assert "xinsir" in params["controlnet"].lower()  # the shipped default
 
     pose = _find_node(wf.build_api_payload(params), "DWPreprocessor")
@@ -1220,6 +1249,23 @@ def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
     other = dict(params, controlnet="OpenPoseXL2.safetensors")
     pose = _find_node(wf.build_api_payload(other), "DWPreprocessor")
     assert pose["inputs"]["scale_stick_for_xinsr_cn"] == "disable"
+
+
+def test_sdxl_pose_transfer_union_type_node_only_wraps_union_controlnets():
+    # SetUnionControlNetType tells a union model which head to run, but a
+    # plain single-purpose ControlNet crashes on the extra argument — so the
+    # node is added only when the picked file says it's a union model, and a
+    # plain ControlNet is applied directly.
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(
+        wf.default_params(), input_image="x.png", control_mode="pose",
+        controlnet="xinsir_openpose_sdxl_1.0.safetensors",
+    )
+    payload = wf.build_api_payload(params)
+    assert _find_node(payload, "SetUnionControlNetType") is None
+    cn_loader_id = _node_id(payload, "ControlNetLoader")
+    apply = _find_node(payload, "ControlNetApplyAdvanced")
+    assert apply["inputs"]["control_net"] == [cn_loader_id, 0]
 
 
 def test_sdxl_pose_transfer_extract_output_info():

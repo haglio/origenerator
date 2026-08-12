@@ -603,7 +603,7 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
     assert shown == []                           # the user's tab is left alone
 
     view._on_reroll_finished("some-key", "i1")   # the user's own re-roll landing
-    assert shown == ["some-key"]
+    assert [r["prompt_id"] for r in shown] == ["i1"]  # handed the finished row itself
 
 
 def test_the_experiments_switch_drives_and_reports_the_runner(qtbot):
@@ -2331,12 +2331,15 @@ def _select_first_leaf(view):
 
 
 def _seeded_db(tmp_path, seed=7):
-    """A DB holding one completed SDXL image with full, re-rollable params."""
+    """A DB holding one completed SDXL image with full, re-rollable params —
+    stamped with the workflow's current version, as a run made by this app would
+    be (the settings key folds the version in, so a stale one would put re-rolls
+    of this row in a different folder)."""
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="orig",
         workflow_name="sdxl_t2i",
-        workflow_version="v002",
+        workflow_version=_SDXL.version,
         positive_prompt="a cat",
         negative_prompt="",
         seed=seed,
@@ -3781,11 +3784,13 @@ def _combine_db(tmp_path):
     """A DB with one SDXL image to drop in and one i2v video whose recipe to reuse.
 
     The video's own input image is left at the workflow default (empty), so the
-    combined result — keyed to the dropped image — lands in a fresh folder.
+    combined result — keyed to the dropped image — lands in a fresh folder. Rows
+    carry the workflows' current versions, as runs made by this app would (the
+    settings key folds the version in).
     """
     db = Database(tmp_path / "test.db")
     db.insert_generation(
-        prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v002",
+        prompt_id="img", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
         positive_prompt="a dog", seed=1,
         params_json=json.dumps(dict(_SDXL.default_params(), seed=1, positive_prompt="a dog")),
         workflow_json="{}",
@@ -3793,7 +3798,7 @@ def _combine_db(tmp_path):
     db.update_generation("img", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_pick.png", "subfolder": ""}]))
     db.insert_generation(
-        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version=_WAN_I2V.version,
         positive_prompt="dance", seed=42,
         params_json=json.dumps(dict(_WAN_I2V.default_params(),
                                     seed=42, noise_seed=99, positive_prompt="dance")),
@@ -3887,7 +3892,7 @@ def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
 
 def _insert_completed_video(db, prompt_id, params, filename):
     db.insert_generation(
-        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
+        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version=_WAN_I2V.version,
         positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
         seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
     )

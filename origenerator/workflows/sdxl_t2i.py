@@ -41,7 +41,10 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "upscale_model": _DEFAULT_UPSCALE_MODEL,
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.3,
+            # Kept low deliberately: at 0.3 the enhance pass re-imagined creases
+            # and skin folds into wounds/disfigurements (user-reported). 0.15
+            # refines texture without redrawing anatomy.
+            "enhance_denoise": 0.15,
             "filename_prefix": "image/sdxl_t2i",
         }
 
@@ -69,7 +72,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
                      min_val=1.0, max_val=4.0, step=0.25),
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.3,
+            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/sdxl_t2i"),
         ]

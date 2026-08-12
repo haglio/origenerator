@@ -212,6 +212,59 @@ def test_settings_signature_tolerates_missing_or_invalid_params():
     assert settings_signature(None, "not json") == settings_signature(None, "{}")
 
 
+def test_settings_signature_splits_workflow_generations():
+    # A workflow's version is part of a row's identity: different generations of
+    # a workflow render the same recipe differently (v002 SDXL had no enhance
+    # tail), so their rows must not share a folder. The regression this pins: an
+    # old row stores none of the newer params, so default-normalization alone
+    # hashes it exactly like a new run.
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    old = json.dumps({"positive_prompt": "a lighthouse", "steps": 50})  # pre-enhance row
+    new = json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                          positive_prompt="a lighthouse"))
+    assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
+        != settings_signature("sdxl_t2i", new, None, workflow_version="v003")
+    # The same generation still groups: the split is the version, not the
+    # old row's sparseness.
+    assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
+        == settings_signature("sdxl_t2i", new, None, workflow_version="v002")
+
+
+def test_settings_signature_gives_imports_and_live_forms_the_current_generation():
+    # "imported" names no recipe generation (best-effort metadata), and a live
+    # form's prospective settings pass no version at all; both take the current
+    # version, so a sparse import, its full re-roll (stamped with the real
+    # version), and the form that would re-run it all share one folder.
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    reroll = json.dumps(wf.default_params())
+    assert settings_signature("sdxl_t2i", "{}", None, workflow_version="imported") \
+        == settings_signature("sdxl_t2i", reroll, None, workflow_version=wf.version)
+    assert settings_signature("sdxl_t2i", "{}", None, workflow_version="imported") \
+        == settings_signature("sdxl_t2i", reroll)
+
+
+def test_gallery_tree_splits_different_workflow_generations_into_folders():
+    # The user-facing shape of the version fold: an old-generation SDXL render
+    # and a new one of the same recipe become sibling settings folders rather
+    # than one mixed folder of unlike outputs.
+    old = _row(prompt_id="old", workflow_version="v002",
+               params_json=json.dumps({"positive_prompt": "a lighthouse"}),
+               output_files=json.dumps([{"filename": "sdxl_t2i_old.png"}]))
+    new = _row(prompt_id="new", workflow_version="v003",
+               params_json=json.dumps({"positive_prompt": "a lighthouse"}),
+               output_files=json.dumps([{"filename": "sdxl_t2i_new.png"}]))
+    tree = build_gallery_tree([old, new])
+    (workflow,) = tree[0].workflow_groups
+    (model,) = workflow.model_groups
+    (lora,) = model.children
+    assert len(lora.children) == 2
+    assert [{r["prompt_id"] for r in leaf.rows} for leaf in lora.children] \
+        == [{"old"}, {"new"}]
+
+
 def test_reroll_regenerates_its_frame_and_stays_in_its_folder():
     # A re-roll regenerates the start frame (same image config, a fresh file) then
     # runs the video on it, building params via prepared_params (which fills every
@@ -652,14 +705,21 @@ def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
 def test_legacy_preframe_settings_folder_key_drops_the_frame():
     # The pre-frame-config key hashes the video's own settings with the input image
     # dropped — distinct from the current key, which folds the frame's config in.
-    from origenerator.gallery import legacy_preframe_settings_folder_key, settings_folder_key
+    from origenerator.gallery import (
+        legacy_preframe_settings_folder_key,
+        legacy_preversion_settings_folder_key,
+        settings_folder_key,
+    )
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     assert legacy_preframe_settings_folder_key(video) != settings_folder_key(video, index)
-    # A non-image-conditioned row never folded a frame, so its key is unchanged.
+    # A non-image-conditioned row never folded a frame, so its pre-version key is
+    # the preframe one; the current key differs from both by the version fold.
     image = _img("cat", "a cat", 20, 1)
-    assert legacy_preframe_settings_folder_key(image) == settings_folder_key(image)
+    assert legacy_preframe_settings_folder_key(image) \
+        == legacy_preversion_settings_folder_key(image)
+    assert legacy_preframe_settings_folder_key(image) != settings_folder_key(image)
 
 
 def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():

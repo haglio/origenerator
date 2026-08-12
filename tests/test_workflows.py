@@ -329,8 +329,11 @@ def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
         assert (scale.min_val, scale.max_val) == (1.0, 4.0)
         assert scale.default == 2.0
         assert by_key["enhance_steps"].type == "int"
-        assert by_key["enhance_denoise"].type == "float"
-        assert by_key["enhance_denoise"].max_val == 1.0
+        denoise = by_key["enhance_denoise"]
+        assert denoise.type == "float"
+        assert denoise.max_val == 1.0
+        # Low by design: 0.3 re-imagined creases into wounds/disfigurements.
+        assert denoise.default == 0.15
 
 
 # ---- WAN 2.2 FLF2V Loop ----

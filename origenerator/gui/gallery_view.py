@@ -1471,9 +1471,14 @@ class GalleryView(QWidget):
         workflow, params, video_row, image_row = built
         # The frame is re-buildable independently of the video seed, so the key —
         # which groups by the image's config, not its filename — is the same one
-        # whether we re-roll the seed, the frame, or both.
+        # whether we re-roll the seed, the frame, or both. The prospective row is
+        # stamped with the CURRENT workflow version (what the launched run will
+        # record), not the recipe video's stored one: the settings key folds the
+        # version in, and keying by an old recipe's version would park the reveal
+        # on a folder the finished row never joins.
         key = gallery.settings_folder_key(
-            {**dict(video_row), "params_json": json.dumps(params)},
+            {**dict(video_row), "params_json": json.dumps(params),
+             "workflow_version": workflow.version},
             gallery.build_image_config_index(self._image_rows),
         )
         if self._would_reproduce_a_completed_run(workflow, params):
@@ -1675,7 +1680,7 @@ class GalleryView(QWidget):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_montage_finished(key)  # a live montage gains this item's thumbnail
-        self._show_reroll_result_in_tab(key)
+        self._show_reroll_result_in_tab(finished_row)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
@@ -1693,17 +1698,18 @@ class GalleryView(QWidget):
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
 
-    def _show_reroll_result_in_tab(self, key: str):
+    def _show_reroll_result_in_tab(self, finished_row: dict | None):
         """After a re-roll finishes, load its result into the front config tab.
 
-        The just-finished generation is the folder's newest row (highest id); the
-        rebuild has already given the folder its node. Loading it leaves the tab
-        showing the finished image/video and its footer — the completed end-state of
-        a Generate — instead of the live-frame placeholder it held while running."""
-        item = self._item_by_key.get(key)
-        group = item.data(0, _GROUP_ROLE) if item is not None else None
-        if isinstance(group, gallery.SettingsGroup) and group.rows:
-            self._info_tabs.show_result_in_current_tab(group.rows[0], self._image_rows)
+        The finished row is handed over directly rather than resolved through the
+        folder the job was keyed under: a re-roll of an old-generation folder
+        lands its result in the current generation's folder (the settings key
+        folds the workflow version in), so the job's key can name a folder whose
+        newest row is not this result. Loading it leaves the tab showing the
+        finished image/video and its footer — the completed end-state of a
+        Generate — instead of the live-frame placeholder it held while running."""
+        if finished_row is not None and gallery.produced_output(finished_row):
+            self._info_tabs.show_result_in_current_tab(finished_row, self._image_rows)
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if

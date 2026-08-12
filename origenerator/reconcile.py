@@ -124,7 +124,7 @@ def reconcile_folder_meta(db) -> dict:
     image_index = gallery.build_image_config_index(
         [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == "image"]
     )
-    current, legacy_keys = _index_current_folders(rows_by_id.values())
+    current, legacy_keys = _index_current_folders(rows_by_id.values(), image_index)
     meta_by_key = {m["folder_key"]: dict(m) for m in meta}
 
     for row in meta:
@@ -150,7 +150,7 @@ def reconcile_folder_meta(db) -> dict:
     return summary
 
 
-def _index_current_folders(rows):
+def _index_current_folders(rows, image_index):
     """Map every current folder key → ``(level, a member prompt_id)``, plus each
     settings folder's legacy keys → its current key (for the historical formula
     changes, so bookmarks made before stored identity can still be recovered)."""
@@ -163,12 +163,13 @@ def _index_current_folders(rows):
             if members:
                 current[group.key] = (gallery.group_level(group), members[0]["prompt_id"])
                 if isinstance(group, gallery.SettingsGroup):
-                    legacy_keys.setdefault(
-                        gallery.legacy_settings_folder_key(members[0]), group.key
-                    )
-                    preframe = gallery.legacy_preframe_settings_folder_key(members[0])
-                    if preframe != group.key:  # differs only for image-conditioned folders
-                        legacy_keys.setdefault(preframe, group.key)
+                    for legacy in (
+                        gallery.legacy_settings_folder_key(members[0]),
+                        gallery.legacy_preframe_settings_folder_key(members[0]),
+                        gallery.legacy_preversion_settings_folder_key(members[0], image_index),
+                    ):
+                        if legacy != group.key:
+                            legacy_keys.setdefault(legacy, group.key)
             walk(gallery.child_groups(group))
 
     walk(gallery.build_gallery_tree(list(rows), {}))

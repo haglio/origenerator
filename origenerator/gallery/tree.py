@@ -96,7 +96,8 @@ def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     workflow_name = row.get("workflow_name") or "unknown"
     return _settings_key(
         media_type, workflow_name,
-        settings_signature(workflow_name, row.get("params_json"), image_index),
+        settings_signature(workflow_name, row.get("params_json"), image_index,
+                           workflow_version=row.get("workflow_version")),
     )
 
 
@@ -160,14 +161,36 @@ def legacy_preframe_settings_folder_key(row: dict) -> str:
     hashed with the input image dropped entirely (the pre-frame-config formula).
 
     The reconcile recomputes this to re-point a star or name made before that
-    change onto the row's current settings folder. Equal to the current key for
-    workflows that aren't image-conditioned, which never folded a frame in."""
+    change onto the row's current settings folder."""
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
     signature = json.dumps(
         canonical_settings(workflow_name, parse_params(row.get("params_json"))),
         sort_keys=True, default=str,
     )
+    return _settings_key(media_type, workflow_name, signature)
+
+
+def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = None) -> str:
+    """The settings-folder key ``row`` had before the workflow generation was
+    folded into the signature: canonical settings plus (for an image-conditioned
+    row) its start-frame configuration, but no ``workflow_version``.
+
+    The third historical formula shift. The reconcile recomputes this to
+    re-point a star or name made under it — one made since the last reconcile,
+    so its stored identity was never backfilled — onto the row's current
+    settings folder. Equal to :func:`legacy_preframe_settings_folder_key` for
+    workflows that aren't image-conditioned."""
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    params = parse_params(row.get("params_json"))
+    settings = canonical_settings(workflow_name, params)
+    if is_image_conditioned(workflow_name):
+        settings = {
+            **settings,
+            "input_image_config": _input_image_config(params.get("input_image"), image_index),
+        }
+    signature = json.dumps(settings, sort_keys=True, default=str)
     return _settings_key(media_type, workflow_name, signature)
 
 
@@ -266,7 +289,8 @@ def _build_settings_groups(
     constant here and never re-appears in a settings name.
     """
     grouped = _group_ordered(
-        rows, lambda r: settings_signature(wf_name, r.get("params_json"), image_index)
+        rows, lambda r: settings_signature(wf_name, r.get("params_json"), image_index,
+                                           workflow_version=r.get("workflow_version"))
     )
     settings_dicts = [
         canonical_settings(wf_name, parse_params(sig_rows[0].get("params_json")))

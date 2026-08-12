@@ -27,11 +27,14 @@ def _sdxl_full(**over):
 
 
 def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i"):
-    """Insert a generation whose params_json reflects its real settings."""
+    """Insert a generation whose params_json reflects its real settings — stamped
+    with the workflow's current version, as a run made by this app would be (the
+    settings signature folds the version in, so a stale one would split this row
+    from a live config tab's key)."""
     db.insert_generation(
         prompt_id=prompt_id,
         workflow_name=workflow_name,
-        workflow_version="v002",
+        workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
         positive_prompt=params.get("positive_prompt", ""),
         negative_prompt=params.get("negative_prompt", ""),
         seed=params.get("seed"),

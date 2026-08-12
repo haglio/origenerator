@@ -209,16 +209,20 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     # on show — so the button's generating state must be re-asserted then, not only at
     # reconnect time (when the image rows are still empty and the key can't match).
     db = Database(tmp_path / "t.db")
+    # Rows a live tab must match carry the workflows' current versions, as runs
+    # made by this app would — the settings key folds the version in.
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
-    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i", workflow_version="v",
+    db.insert_generation(prompt_id="img", workflow_name="sdxl_t2i",
+                         workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version,
                          positive_prompt="a face", seed=1,
                          params_json=json.dumps(img_params), workflow_json="{}")
     db.update_generation("img", status="completed",
                          output_files=json.dumps([{"filename": "sdxl_t2i_img.png"}]))
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
                       seed=7, positive_prompt="", input_image="sdxl_t2i_img.png [output]")
-    db.insert_generation(prompt_id="rr", workflow_name="wan22_i2v", workflow_version="v",
+    db.insert_generation(prompt_id="rr", workflow_name="wan22_i2v",
+                         workflow_version=WORKFLOW_REGISTRY["wan22_i2v"].version,
                          positive_prompt="", seed=7,
                          params_json=json.dumps(vid_params), workflow_json="{}")
     db.update_generation("rr", status="running")

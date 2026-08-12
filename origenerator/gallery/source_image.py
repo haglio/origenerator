@@ -71,7 +71,8 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
         workflow_name = image.get("workflow_name")
         params = parse_params(image.get("params_json"))
         config = _ImageConfig(
-            signature=settings_signature(workflow_name, image.get("params_json")),
+            signature=settings_signature(workflow_name, image.get("params_json"),
+                                         workflow_version=image.get("workflow_version")),
             label=settings_label(canonical_settings(workflow_name, params)),
         )
         for f in row_output_files(image):

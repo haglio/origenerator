@@ -154,7 +154,8 @@ class InfoPaneTabs(QTabWidget):
         index = build_image_config_index(
             [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
         )
-        return workflow_name, settings_signature(workflow_name, row.get("params_json"), index)
+        return workflow_name, settings_signature(workflow_name, row.get("params_json"), index,
+                                                 workflow_version=row.get("workflow_version"))
 
     def _on_strip_activated(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)

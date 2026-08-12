@@ -17,6 +17,7 @@ preview launcher sets it, and the primary's launcher never does.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from contextlib import closing
@@ -27,6 +28,104 @@ ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
 
 def is_branch_session(environ=os.environ) -> bool:
     return environ.get(ENV_FLAG) == "1"
+
+
+def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
+                      thumb_dir: Path) -> int:
+    """Adopt generations made in branch sessions into the live database.
+
+    A branch session generates into the shared ComfyUI output like any session,
+    but records the rows only in its own worktree database — so its results
+    used to reach the live app only through the import scan, which reconstructs
+    rows from the files and stamps them ``imported``: the exact params replaced
+    by what the embedded graph gives up, and the results left off the Recents
+    shelf (app-made results only). Adopting the branch's own rows keeps them
+    what they are: generated here, by the user.
+
+    Runs at live-app launch, before the import scan, so the scan finds the
+    files already recorded. A file the scan already imported in an earlier
+    launch is upgraded — the reconstructed row makes way for the original.
+    Thumbnails are regenerated into the live state (the worktree's are on
+    borrowed time), and the worktree databases are only ever read: a branch is
+    unfinished code, and this is the one-way door back out of it.
+    """
+    from origenerator.media import media_type_from_filename
+    from origenerator.thumbnail import generate_thumbnail
+
+    worktrees_root = Path(worktrees_root)
+    if not worktrees_root.is_dir():
+        return 0
+    primary_by_file = _rows_by_rel_path(db.list_generations())
+    adopted = 0
+    for branch_db in sorted(worktrees_root.glob("*/state/origenerator.db")):
+        for row in _completed_rows(branch_db):
+            if db.get_generation(row["prompt_id"]) is not None:
+                continue  # already adopted (or a row the branch merely seeded)
+            rel_paths = _rel_paths(row)
+            claimed = [primary_by_file[p] for p in rel_paths if p in primary_by_file]
+            if any((r.get("source") or "generated") != "imported" for r in claimed):
+                continue  # the live app has its own first-class record
+            first = rel_paths[0] if rel_paths else None
+            if first is None or not (output_dir / first).exists():
+                continue  # nothing on disk to adopt
+            for reconstruction in claimed:
+                db.delete_generation(reconstruction["prompt_id"])
+            row.pop("id", None)  # the live table assigns its own
+            row["thumbnail_path"] = None
+            try:
+                media = media_type_from_filename(first) or "image"
+                row["thumbnail_path"] = str(generate_thumbnail(
+                    output_dir / first, media, thumb_dir, name=row["prompt_id"]))
+            except Exception:
+                pass  # a tile can live without its thumbnail; the row cannot wait
+            db.restore_generation(row)
+            for path in rel_paths:
+                primary_by_file[path] = row
+            adopted += 1
+    return adopted
+
+
+def _completed_rows(branch_db: Path) -> list[dict]:
+    """Every completed generation the branch session itself made, oldest first
+    (so adoption preserves the order they were made in). Only ``generated``
+    rows: a worktree database also holds thousands of seeded and imported rows
+    describing the shared library, and "adopting" those would churn the live
+    table with copies of records it already keeps. Unreadable databases —
+    mid-write, corrupt, half-deleted worktrees — yield nothing rather than
+    failing the launch."""
+    try:
+        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
+        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
+            conn.row_factory = sqlite3.Row
+            return [dict(r) for r in conn.execute(
+                "SELECT * FROM generations WHERE status = 'completed'"
+                " AND (source IS NULL OR source = 'generated') ORDER BY id")]
+    except sqlite3.Error:
+        return []
+
+
+def _rel_paths(row: dict) -> list[str]:
+    """A row's output files as the output-dir-relative paths the import scan
+    keys by, bad JSON tolerated as none."""
+    try:
+        files = json.loads(row.get("output_files") or "[]")
+    except (TypeError, ValueError):
+        return []
+    paths = []
+    for entry in files if isinstance(files, list) else []:
+        name = entry.get("filename")
+        if name:
+            sub = entry.get("subfolder") or ""
+            paths.append(f"{sub}/{name}" if sub else name)
+    return paths
+
+
+def _rows_by_rel_path(rows: list[dict]) -> dict:
+    by_path = {}
+    for row in rows:
+        for path in _rel_paths(row):
+            by_path.setdefault(path, row)
+    return by_path
 
 
 def seed_branch_db(primary_db: Path, branch_db: Path) -> bool:

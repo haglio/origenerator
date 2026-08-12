@@ -326,7 +326,9 @@ class GalleryView(QWidget):
         )
         self._slideshow_btn.hide()  # shown only while a folder with media is open
         self._auto_btn = self._tool_button(
-            icons.autoloop_icon(), "Auto-generate variations of this folder",
+            icons.autoloop_icon(),
+            "Auto-generate: repeatedly generate variations of this folder until "
+            "toggled off (Esc stops it too)",
             self._toggle_auto, checkable=True,
         )
         self._auto_btn.setStyleSheet(  # a lit background while auto-generate is running
@@ -425,10 +427,12 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
-        # The live auto-generate montage (double-click the preview while a folder
-        # loops), and the folder key it follows — None while none is open.
+        # The live auto-generate slideshow (double-click the preview while a folder
+        # loops), and the folder key it follows — None while none is open. While its
+        # built-in stroke engine holds the OSR2, the funscript reconcile stands down.
         self._auto_montage = None
         self._auto_montage_key_open: str | None = None
+        self._montage_stroke_active = False
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -528,9 +532,13 @@ class GalleryView(QWidget):
             self._osr2_driving = driving
 
     def _osr2_drive_source(self):
-        """The drive target the device should follow, or ``None``. A fullscreen view
-        wins when it's showing a scripted video (it drives regardless of the toggle);
-        otherwise the front tab's video, but only while the toggle is on."""
+        """The drive target the device should follow, or ``None``. The auto-generate
+        slideshow's stroke engine owns the device outright while it runs; else a
+        fullscreen view wins when it's showing a scripted video (it drives regardless
+        of the toggle); otherwise the front tab's video, but only while the toggle is
+        on."""
+        if self._montage_stroke_active:
+            return None
         fullscreen = self._fullscreen_preview
         if fullscreen is not None:
             target = fullscreen.osr2_drive_target()
@@ -601,7 +609,8 @@ class GalleryView(QWidget):
         return key if key is not None and self._auto.is_active(key) else None
 
     def _make_auto_montage(self) -> AutoGenerateView:
-        """Build the montage window (a seam so tests can inject a stub player)."""
+        """Build the slideshow window (a seam so tests can stub the player and
+        the stroke driver)."""
         return AutoGenerateView()
 
     def _on_preview_double_clicked(self):
@@ -612,70 +621,67 @@ class GalleryView(QWidget):
             self._open_auto_montage(key)
 
     def _open_auto_montage(self, key: str):
-        """Open the fullscreen montage following folder ``key``'s loop: seed it with
-        the items generated so far (oldest first, so the newest lands nearest the
-        centre) and the current live frame, then wire its curation keys."""
+        """Open the fullscreen slideshow following folder ``key``'s loop: seed its
+        rotation with the items generated so far (oldest first, ending at the live
+        slot) and the current live frame, then wire its curation keys and its
+        stroke engine's hold on the OSR2."""
         montage = self._make_auto_montage()
         self._auto_montage = montage
         self._auto_montage_key_open = key
         montage.closed.connect(self._on_auto_montage_closed)
         montage.cancel_requested.connect(lambda: self._skip_auto_current(key))
-        montage.star_requested.connect(lambda: self._star_auto_current(key))
+        montage.weird_requested.connect(self._trash_generation)
+        montage.stroke_active_changed.connect(self._on_montage_stroke_changed)
         group = self._group_for_key(key)
         if isinstance(group, gallery.SettingsGroup):
             for row in reversed(group.rows):
-                if gallery.produced_output(row):
-                    montage.add_thumbnail(row.get("thumbnail_path"))
+                preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+                if preview is not None:
+                    montage.add_finished(preview[0], preview[1], row["prompt_id"])
         job = self._reroll.job_for(key)
         if job is not None and job.last_preview is not None:
             montage.show_live_frame(job.last_preview)
         montage.showFullScreen()
 
     def _on_auto_montage_closed(self):
-        """The montage was dismissed (Esc/close): forget it — the loop keeps running."""
+        """The slideshow was dismissed (Esc/close): forget it — the loop keeps
+        running. Its stroke engine stopped itself on close, so the funscript
+        reconcile may take the device back."""
         self._auto_montage = None
         self._auto_montage_key_open = None
+        self._montage_stroke_active = False
+        self._reconcile_osr2()
+
+    def _on_montage_stroke_changed(self, active: bool):
+        """The slideshow's stroke engine took or released the OSR2: while it holds
+        the device, nothing else may drive it."""
+        self._montage_stroke_active = active
+        self._reconcile_osr2()
 
     def _feed_montage_preview(self, key: str, data: bytes):
-        """Mirror a loop's live frame into the montage centre while it's open."""
+        """Mirror a loop's live frame into the slideshow's live slot while it's open."""
         if self._auto_montage is not None and key == self._auto_montage_key_open:
             self._auto_montage.show_live_frame(data)
 
     def _feed_montage_finished(self, key: str):
-        """A loop item finished: push its thumbnail out to the montage's sides and
-        show its result in the centre until the next one starts streaming."""
+        """A loop item finished: it joins the slideshow's rotation — taking over on
+        screen from its own live frames when the rotation is showing the live slot."""
         if self._auto_montage is None or key != self._auto_montage_key_open:
             return
         group = self._group_for_key(key)
         if not (isinstance(group, gallery.SettingsGroup) and group.rows):
             return
         row = group.rows[0]  # the just-finished item is the folder's newest
-        self._auto_montage.add_thumbnail(row.get("thumbnail_path"))
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
-            self._auto_montage.show_center_media(*preview)
+            self._auto_montage.note_finished(preview[0], preview[1], row["prompt_id"])
 
     def _skip_auto_current(self, key: str):
-        """Montage Up: abandon the generation on screen but keep looping — cancel the
-        in-flight job, then launch the next as if this one had finished."""
+        """Slideshow Up on the live slot: abandon the generation on screen but keep
+        looping — cancel the in-flight job, then launch the next as if this one had
+        finished."""
         self._drop_reroll(key)
         self._auto.note_finished(key)  # still looping → launch the next
-
-    def _star_auto_current(self, key: str):
-        """Montage Down: star the item on screen — the in-flight generation if one is
-        running, else the folder's newest finished item — and confirm it on screen."""
-        job = self._reroll.job_for(key)
-        pid = job.prompt_id if job is not None else self._newest_prompt_id(key)
-        if pid is not None:
-            self._db.set_generation_starred(pid, True)
-            if self._auto_montage is not None:
-                self._auto_montage.set_center_starred(True)
-
-    def _newest_prompt_id(self, key: str) -> str | None:
-        group = self._group_for_key(key)
-        if isinstance(group, gallery.SettingsGroup) and group.rows:
-            return group.rows[0].get("prompt_id")
-        return None
 
     def _group_for_key(self, key: str):
         item = self._item_by_key.get(key)
@@ -1209,7 +1215,10 @@ class GalleryView(QWidget):
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, cancelled, or failed): drop its
-        working params and, if it was the voice target, stop listening."""
+        working params and, if it was the voice target, stop listening. An open
+        slideshow of the loop loses its live slot but keeps rotating."""
+        if self._auto_montage is not None and key == self._auto_montage_key_open:
+            self._auto_montage.set_generating(False)
         self._auto_working.pop(key, None)
         if key == self._voice_target_key:
             self._voice.stop()
@@ -1280,7 +1289,7 @@ class GalleryView(QWidget):
         items = self._slideshow_items(group)
         if not items:
             return
-        self._slideshow = SlideshowView(items, on_delete=self._slideshow_delete)
+        self._slideshow = SlideshowView(items, on_delete=self._trash_generation)
         logger.info("Slideshow: %d items, shuffled order[:10]=%s",
                     len(items), self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
@@ -1295,8 +1304,9 @@ class GalleryView(QWidget):
                 items.append((resolved[0], resolved[1], row["prompt_id"]))
         return items
 
-    def _slideshow_delete(self, prompt_id: str):
-        """Trash a generation culled from the slideshow (its Up key)."""
+    def _trash_generation(self, prompt_id: str):
+        """Trash a generation condemned from a slideshow (its Up key) — the same
+        undoable delete as anywhere else."""
         row = self._db.get_generation(prompt_id)
         if row is not None:
             self._actions.delete_rows([row])

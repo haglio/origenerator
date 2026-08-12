@@ -4488,15 +4488,24 @@ def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
     assert driver.started[-1] == ("pB", "aB")
 
 
-# --- the live auto-generate montage -----------------------------------------
+# --- the live auto-generate slideshow ----------------------------------------
+
+def _resolve_by_id(monkeypatch):
+    """Resolve every row's preview to a per-row image path (the autouse default
+    stubs resolution to None, which would leave the slideshow nothing to seed)."""
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+
 
 def _auto_montage_view(qtbot, monkeypatch, rows):
-    """A gallery on a settings leaf whose loop reports active, with the montage
-    built on a stubbed player so no real media backend spins up."""
+    """A gallery on a settings leaf whose loop reports active, with the slideshow
+    built on stubbed player and stroke so no media or device backend spins up."""
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient())
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_make_auto_montage",
-                        lambda: AutoGenerateView(player=MagicMock()))
+    monkeypatch.setattr(
+        view, "_make_auto_montage",
+        lambda: AutoGenerateView(player=MagicMock(), stroke=MagicMock(active=False)),
+    )
     view.refresh()
     _open_leaf(view)
     key = view._selected_folder_key()
@@ -4532,12 +4541,14 @@ def test_double_clicking_the_preview_while_looping_opens_the_montage(qtbot, monk
     view._auto_montage.close()
 
 
-def test_the_montage_seeds_with_the_items_generated_so_far(qtbot, monkeypatch):
+def test_the_montage_seeds_the_rotation_and_opens_on_the_live_slot(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view, key = _auto_montage_view(qtbot, monkeypatch, rows)
+    _resolve_by_id(monkeypatch)
     view._open_auto_montage(key)
     montage = view._auto_montage
-    assert len(montage._left_thumbs) + len(montage._right_thumbs) == 2
+    assert montage._playlist.count == 3  # both finished items, plus the live slot
+    assert montage._playlist.on_live()
     montage.close()
 
 
@@ -4552,13 +4563,14 @@ def test_a_live_frame_feeds_the_open_montage(qtbot, monkeypatch):
     montage.close()
 
 
-def test_a_finished_item_adds_a_thumbnail_to_the_montage(qtbot, monkeypatch):
+def test_a_finished_item_joins_the_montage_rotation(qtbot, monkeypatch):
     view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._open_auto_montage(key)
     montage = view._auto_montage
-    before = len(montage._left_thumbs) + len(montage._right_thumbs)
+    before = montage._playlist.count
+    _resolve_by_id(monkeypatch)
     view._feed_montage_finished(key)
-    assert len(montage._left_thumbs) + len(montage._right_thumbs) == before + 1
+    assert montage._playlist.count == before + 1
     montage.close()
 
 
@@ -4579,24 +4591,42 @@ def test_up_in_the_montage_skips_the_current_and_keeps_looping(qtbot, monkeypatc
     assert relaunched == [key]  # ...but the loop launches the next
 
 
-def test_down_in_the_montage_stars_the_in_flight_item(qtbot, monkeypatch):
+def test_marking_weird_in_the_montage_trashes_the_item(qtbot, monkeypatch):
     view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._open_auto_montage(key)
-    job = MagicMock()
-    job.prompt_id = "i1"
-    monkeypatch.setattr(view._reroll, "job_for", lambda k: job)
-    view._star_auto_current(key)
-    assert view._db.get_generation("i1")["starred"]
-    assert not view._auto_montage._star.isHidden()  # confirmed on screen
+    view._auto_montage.weird_requested.emit("i1")
+    assert [r["prompt_id"] for r in view._actions.deleted[0]] == ["i1"]
     view._auto_montage.close()
 
 
-def test_down_stars_the_newest_finished_item_when_none_is_in_flight(qtbot, monkeypatch):
+def test_the_montage_stroke_takes_the_device_from_the_funscript_drive(qtbot, monkeypatch):
     view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._open_auto_montage(key)
-    monkeypatch.setattr(view._reroll, "job_for", lambda k: None)  # nothing generating
-    view._star_auto_current(key)
-    assert view._db.get_generation("i1")["starred"]  # the folder's newest item
+    stopped = []
+    monkeypatch.setattr(view._osr2_driver, "stop", lambda: stopped.append(True))
+    view._osr2_driving = ("clip.mp4", "player")  # as if a funscript drive were on
+    view._auto_montage.stroke_active_changed.emit(True)
+    assert view._montage_stroke_active
+    assert stopped == [True]                 # the funscript drive stood down
+    assert view._osr2_drive_source() is None  # and nothing may retake the device
+    view._auto_montage.stroke_active_changed.emit(False)
+    assert not view._montage_stroke_active
+    view._auto_montage.close()
+
+
+def test_closing_the_montage_releases_the_stroke_hold(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    view._auto_montage.stroke_active_changed.emit(True)
+    view._auto_montage.close()
+    assert not view._montage_stroke_active
+
+
+def test_the_loop_ending_drops_the_montage_live_slot(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._open_auto_montage(key)
+    view._on_auto_stopped(key)
+    assert view._auto_montage._playlist.live is False
     view._auto_montage.close()
 
 

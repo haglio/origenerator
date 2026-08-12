@@ -13,6 +13,7 @@ from PIL import Image
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
+    follow,
     graph_model_params,
     input_image_name,
 )
@@ -400,11 +401,26 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     if image_name is not None:
         result["params"]["input_image"] = image_name
 
+    # The SDXL workflows end in a second, low-denoise KSampler over a re-encoded
+    # image (the enhance pass). Its steps/denoise describe the refinement, not
+    # the recipe, so when a base sampler exists too, only the base one is read —
+    # a refinement pass is recognized by sampling a VAEEncode'd latent.
+    def _is_refine_pass(node: dict) -> bool:
+        src = follow(prompt_data, node.get("inputs", {}).get("latent_image"))
+        return bool(src) and src.get("class_type") == "VAEEncode"
+
+    has_base_ksampler = any(
+        n.get("class_type") == "KSampler" and not _is_refine_pass(n)
+        for n in prompt_data.values()
+    )
+
     for node in prompt_data.values():
         class_type = node.get("class_type", "")
         inputs = node.get("inputs", {})
 
         if class_type == "KSampler":
+            if has_base_ksampler and _is_refine_pass(node):
+                continue
             seed = inputs.get("seed")
             if isinstance(seed, int):
                 result["seed"] = seed

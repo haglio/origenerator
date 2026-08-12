@@ -584,3 +584,26 @@ def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
     assert meta["positive_prompt"] == "a kitten"
     assert meta["negative_prompt"] == "blurry"
     assert meta["seed"] == 746703007625838   # stage-1 (add_noise enable) seed
+
+
+def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
+    import origenerator.importer as imp
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    # An enhanced SDXL graph carries two KSamplers. A re-imported output must
+    # record the recipe's base pass, not the low-denoise refinement the enhance
+    # tail runs over its VAEEncode'd latent — otherwise the import would claim
+    # the run took 20 steps at denoise 0.3.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    graph = wf.build_api_payload(dict(
+        wf.default_params(), positive_prompt="a harbor at dawn", seed=4242,
+        steps=50, enhance_steps=20, enhance_denoise=0.3,
+    ))
+    _make_png_with_metadata(tmp_path / "sdxl_t2i_00001_.png", graph)
+    meta = imp._extract_metadata(tmp_path / "sdxl_t2i_00001_.png", ".png")
+
+    assert meta["workflow_name"] == "sdxl_t2i"
+    assert meta["positive_prompt"] == "a harbor at dawn"
+    assert meta["seed"] == 4242
+    assert meta["params"]["steps"] == 50
+    assert meta["params"]["denoise"] == 1.0

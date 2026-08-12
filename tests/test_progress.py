@@ -3,10 +3,19 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def test_expected_steps_single_ksampler_is_its_step_count():
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    payload = wf.build_api_payload({**wf.default_params(), "steps": 30})
+    assert expected_progress_steps(payload) == 30
+
+
+def test_expected_steps_sums_the_base_and_enhance_passes():
+    # sdxl_t2i's enhance tail runs a second KSampler after the base one; the
+    # bar's total covers both, so it ramps once across the whole job.
     payload = WORKFLOW_REGISTRY["sdxl_t2i"].build_api_payload(
-        {**WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), "steps": 50}
+        {**WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+         "steps": 50, "enhance_steps": 20}
     )
-    assert expected_progress_steps(payload) == 50
+    assert expected_progress_steps(payload) == 70
 
 
 def test_expected_steps_dual_sampler_sums_the_two_passes():

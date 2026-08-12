@@ -20,6 +20,11 @@ SCHEDULER_OPTIONS = [
     "ddim_uniform", "beta",
 ]
 
+# The native factor of the installed ESRGAN-family upscale models (both are 4x).
+# The enhance tail rescales the model's output DOWN from this to the requested
+# ``enhance_scale``, so the saved image lands at enhance_scale x the base render.
+_UPSCALE_MODEL_FACTOR = 4.0
+
 
 @dataclass
 class ParamDef:
@@ -183,6 +188,73 @@ class WorkflowTemplate(ABC):
             },
         }
         return nodes, [scale_id, 0], [size_id, 0], [size_id, 1]
+
+    @staticmethod
+    def enhance_image_nodes(loader_id: str, upscale_id: str, scale_id: str,
+                            encode_id: str, sampler_id: str, decode_id: str, *,
+                            image_ref, model_ref, positive_ref, negative_ref,
+                            vae_ref, params: dict):
+        """The upscale/enhance tail appended after a workflow's decode, and the
+        IMAGE ref its save node should store.
+
+        Two stages, matching the two things wrong with a raw SDXL render. The
+        decoded image first runs through an ESRGAN-family upscale model — real
+        edge reconstruction, so the enlargement is sharp rather than resampled —
+        and is rescaled to ``enhance_scale`` x the base render (relative to the
+        model's own 4x output; see :data:`_UPSCALE_MODEL_FACTOR`). ``VAEEncode``
+        then hands it to a second ``KSampler`` at ``enhance_denoise``: low
+        enough to keep the composition, high enough that the checkpoint
+        re-imagines fine texture — skin, hair, fabric — that no upscaler can
+        invent, which is what reads as naturalistic. The pass reuses the base
+        sampler's model, conditioning, cfg and seed, so an enhanced render is
+        still exactly the recipe its params record; at ``enhance_denoise`` 0 it
+        degrades to a plain sharpening upscale.
+
+        Returns ``(nodes, [decode_id, 0])`` — the dict to merge into the
+        payload, and the enhanced-image ref to feed the save node.
+        """
+        nodes = {
+            loader_id: {
+                "class_type": "UpscaleModelLoader",
+                "inputs": {"model_name": params["upscale_model"]},
+            },
+            upscale_id: {
+                "class_type": "ImageUpscaleWithModel",
+                "inputs": {"upscale_model": [loader_id, 0], "image": image_ref},
+            },
+            scale_id: {
+                "class_type": "ImageScaleBy",
+                "inputs": {
+                    "image": [upscale_id, 0],
+                    "upscale_method": "lanczos",
+                    "scale_by": params["enhance_scale"] / _UPSCALE_MODEL_FACTOR,
+                },
+            },
+            encode_id: {
+                "class_type": "VAEEncode",
+                "inputs": {"pixels": [scale_id, 0], "vae": vae_ref},
+            },
+            sampler_id: {
+                "class_type": "KSampler",
+                "inputs": {
+                    "model": model_ref,
+                    "positive": positive_ref,
+                    "negative": negative_ref,
+                    "latent_image": [encode_id, 0],
+                    "seed": params["seed"],
+                    "steps": params["enhance_steps"],
+                    "cfg": params["cfg"],
+                    "sampler_name": params["sampler_name"],
+                    "scheduler": params["scheduler"],
+                    "denoise": params["enhance_denoise"],
+                },
+            },
+            decode_id: {
+                "class_type": "VAEDecode",
+                "inputs": {"samples": [sampler_id, 0], "vae": vae_ref},
+            },
+        }
+        return nodes, [decode_id, 0]
 
     @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):

@@ -3,10 +3,21 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.model_files import list_model_files
 
+_DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
+
 
 class SdxlT2iWorkflow(WorkflowTemplate):
+    """SDXL text-to-image, finished by an upscale/enhance pass.
+
+    The base render is the plain SDXL recipe. Its decode then runs the shared
+    enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`): a model
+    upscale for sharpness, and a low-denoise second sampling pass in which the
+    checkpoint re-imagines the enlarged pixels — real generated texture rather
+    than interpolation, which is what keeps the result naturalistic.
+    """
+
     name = "sdxl_t2i"
-    version = "v002"
+    version = "v003"
     display_name = "SDXL Text-to-Image"
     output_type = "image"
     model_keys = ("checkpoint",)
@@ -27,11 +38,16 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
+            "upscale_model": _DEFAULT_UPSCALE_MODEL,
+            "enhance_scale": 2.0,
+            "enhance_steps": 20,
+            "enhance_denoise": 0.3,
             "filename_prefix": "image/sdxl_t2i",
         }
 
     def param_definitions(self) -> list[ParamDef]:
         checkpoints = list_model_files("checkpoints", ["reapony_v80.safetensors"])
+        upscalers = list_model_files("upscale_models", [_DEFAULT_UPSCALE_MODEL])
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
@@ -48,10 +64,23 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("scheduler", "Scheduler", "combo", "normal",
                      options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
+            ParamDef("upscale_model", "Upscale Model", "combo", _DEFAULT_UPSCALE_MODEL,
+                     options=upscalers),
+            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+                     min_val=1.0, max_val=4.0, step=0.25),
+            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.3,
+                     min_val=0.0, max_val=1.0, step=0.05),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/sdxl_t2i"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:
+        enhance_nodes, enhanced_ref = self.enhance_image_nodes(
+            "9", "10", "11", "12", "13", "14",
+            image_ref=["6", 0], model_ref=["1", 0],
+            positive_ref=["2", 0], negative_ref=["3", 0], vae_ref=["8", 0],
+            params=params,
+        )
         return {
             "1": {
                 "class_type": "CheckpointLoaderSimple",
@@ -95,7 +124,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "7": {
                 "class_type": "SaveImage",
                 "inputs": {
-                    "images": ["6", 0],
+                    "images": enhanced_ref,
                     "filename_prefix": params["filename_prefix"],
                 },
             },
@@ -103,4 +132,5 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
+            **enhance_nodes,
         }

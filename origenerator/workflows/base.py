@@ -30,7 +30,7 @@ _UPSCALE_MODEL_FACTOR = 4.0
 class ParamDef:
     key: str
     label: str
-    type: str  # "str", "int", "float", "seed", "combo", "image"
+    type: str  # "str", "int", "float", "seed", "combo", "image", "bool"
     default: Any
     options: list | None = None
     min_val: float | None = None

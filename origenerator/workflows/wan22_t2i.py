@@ -10,10 +10,17 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     second), and ``ImageFromBatch`` keeps the first frame, which ``SaveImage``
     writes as a PNG. No input image and no CLIP-Vision — conditioning is text
     only, which is what separates it from :class:`Wan22I2vWorkflow`.
+
+    The ``enhance`` toggle (off by default) appends the shared enhance tail
+    (:meth:`WorkflowTemplate.enhance_image_nodes`) to the kept frame: a model
+    upscale, then a low-denoise re-sample on the LOW-noise model's chain — the
+    stage WAN 2.2 itself uses for late-step refinement — with the same text
+    conditioning and VAE, so the enlargement carries generated texture rather
+    than interpolated pixels.
     """
 
     name = "wan22_t2i"
-    version = "v001"
+    version = "v002"
     display_name = "WAN 2.2 Text-to-Image"
     output_type = "image"
     model_keys = ("unet_high", "unet_low")
@@ -35,6 +42,11 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "shift_high": 8.0,
             "shift_low": 8.0,
+            "enhance": False,
+            "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
+            "enhance_scale": 2.0,
+            "enhance_steps": 20,
+            "enhance_denoise": 0.15,
             "filename_prefix": "image/wan22_t2i",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -54,11 +66,30 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
+            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+                     min_val=1.0, max_val=4.0, step=0.25),
+            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
+                     min_val=0.0, max_val=1.0, step=0.05),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/wan22_t2i"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:
         half_steps = params["steps"] // 2
+        enhance_nodes: dict = {}
+        enhanced_ref = ["13", 0]  # enhance off: save the kept frame as-is
+        if params.get("enhance"):
+            # Re-sample on the low-noise chain ("6") — WAN 2.2's own refinement
+            # stage — with the same conditioning and VAE as the base pass. The
+            # WAN VAE encodes the kept frame as a one-frame video latent, which
+            # is exactly the shape the t2i pass itself denoises.
+            enhance_nodes, enhanced_ref = self.enhance_image_nodes(
+                "15", "16", "17", "18", "19", "20",
+                image_ref=["13", 0], model_ref=["6", 0],
+                positive_ref=["7", 0], negative_ref=["8", 0], vae_ref=["2", 0],
+                params=params,
+            )
         return {
             "1": {
                 "class_type": "CLIPLoader",
@@ -152,8 +183,9 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             "14": {
                 "class_type": "SaveImage",
                 "inputs": {
-                    "images": ["13", 0],
+                    "images": enhanced_ref,
                     "filename_prefix": params["filename_prefix"],
                 },
             },
+            **enhance_nodes,
         }

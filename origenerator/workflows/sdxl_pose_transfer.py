@@ -38,14 +38,15 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     hand-set size with a different aspect would distort the very structure it
     exists to preserve.
 
-    Like sdxl_t2i, the render is finished by the shared upscale/enhance tail
-    (:meth:`WorkflowTemplate.enhance_image_nodes`). Its second sampling pass
-    reuses the ControlNet-applied conditioning, so the structure stays pinned
-    while the checkpoint sharpens and re-textures the enlarged image.
+    Like sdxl_t2i, the render is optionally finished by the shared
+    upscale/enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`),
+    on by default via the ``enhance`` toggle. Its second sampling pass reuses
+    the ControlNet-applied conditioning, so the structure stays pinned while
+    the checkpoint sharpens and re-textures the enlarged image.
     """
 
     name = "sdxl_pose_transfer"
-    version = "v003"
+    version = "v004"
     display_name = "SDXL Pose Transfer"
     output_type = "image"
     derives_size_from_input = True
@@ -73,6 +74,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "pose_bbox_detector": "yolox_l.onnx",
             "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+            "enhance": True,
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
@@ -111,6 +113,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("scheduler", "Scheduler", "combo", "normal",
                      options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", True),
             ParamDef("upscale_model", "Upscale Model", "combo", defaults["upscale_model"],
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
@@ -206,14 +209,17 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         )
         structure, hint_ref = self._structure_nodes(params, scaled_ref)
         controlnet, controlnet_ref = self._controlnet_nodes(params)
-        # The enhance pass re-samples on the ControlNet-applied conditioning
-        # (node 9), so the upscale can't drift off the structure map.
-        enhance_nodes, enhanced_ref = self.enhance_image_nodes(
-            "15", "16", "17", "18", "19", "20",
-            image_ref=["13", 0], model_ref=["4", 0],
-            positive_ref=["9", 0], negative_ref=["9", 1], vae_ref=["12", 0],
-            params=params,
-        )
+        enhance_nodes: dict = {}
+        enhanced_ref = ["13", 0]  # enhance off: save the plain decode
+        if params.get("enhance"):
+            # The enhance pass re-samples on the ControlNet-applied conditioning
+            # (node 9), so the upscale can't drift off the structure map.
+            enhance_nodes, enhanced_ref = self.enhance_image_nodes(
+                "15", "16", "17", "18", "19", "20",
+                image_ref=["13", 0], model_ref=["4", 0],
+                positive_ref=["9", 0], negative_ref=["9", 1], vae_ref=["12", 0],
+                params=params,
+            )
         return {
             **size_nodes,
             **structure,

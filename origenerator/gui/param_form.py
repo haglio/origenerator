@@ -510,8 +510,16 @@ class ParamForm(QWidget):
             widget.valueChanged.connect(self.changed)
         elif isinstance(widget, QComboBox):
             widget.currentIndexChanged.connect(self.changed)
+        elif isinstance(widget, CheckBox):
+            widget.toggled.connect(self.changed)
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
+        if pd.type == "bool":
+            # An on/off setting (the enhance toggle): a bare checkbox, its label
+            # provided by the form row like every other field's.
+            w = CheckBox("")
+            w.setChecked(bool(pd.default))
+            return w
         if pd.type == "str" and pd.multiline:
             w = QPlainTextEdit()
             w.setPlainText(str(pd.default))
@@ -584,6 +592,8 @@ class ParamForm(QWidget):
         """One field's current value. A seed with its Random box checked is
         re-rolled when ``randomize_seed``; otherwise it's read from the field."""
         w = self._widgets[pd.key]
+        if pd.type == "bool":
+            return w.isChecked()
         if pd.type == "seed":
             cb = self._randomize_checks.get(pd.key)
             if randomize_seed and cb and cb.isChecked():
@@ -608,7 +618,9 @@ class ParamForm(QWidget):
         """Apply one value to its widget. A seed is pinned (its Random box cleared),
         matching how reusing a generation reproduces an exact seed."""
         w = self._widgets[pd.key]
-        if pd.type == "seed":
+        if pd.type == "bool":
+            w.setChecked(bool(value))
+        elif pd.type == "seed":
             w.setText(str(int(value)))
             cb = self._randomize_checks.get(pd.key)
             if cb:

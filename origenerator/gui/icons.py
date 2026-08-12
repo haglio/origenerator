@@ -66,6 +66,11 @@ def slideshow_icon() -> QIcon:
     return _two_mode(_draw_slideshow)
 
 
+def enhance_icon() -> QIcon:
+    """A picture frame with a plus — enhance (upscale + re-sample) images."""
+    return _two_mode(_draw_enhance)
+
+
 def mic_icon() -> QIcon:
     """A microphone — hold to speak a prompt edit (push-to-talk)."""
     return _two_mode(_draw_mic)
@@ -147,6 +152,32 @@ def star_badge() -> QPixmap:
     painter.setBrush(_BADGE_CHIP)
     painter.drawRoundedRect(QRectF(4, 4, _SIZE - 8, _SIZE - 8), 11, 11)
     _draw_star(painter, _STAR_GLYPH, filled=True)
+    painter.end()
+    return pixmap.scaled(
+        _BADGE_DISPLAY, _BADGE_DISPLAY,
+        Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+    )
+
+
+@lru_cache(maxsize=None)
+def enhance_badge() -> QPixmap:
+    """A corner badge marking an enhanced image: a green plus on the translucent
+    chip the other badges use, so an upscaled/re-sampled result reads at a
+    glance over a thumbnail of any color. Cached and pre-scaled — the one badge
+    decorates every enhanced tile."""
+    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_BADGE_CHIP)
+    painter.drawRoundedRect(QRectF(4, 4, _SIZE - 8, _SIZE - 8), 11, 11)
+    pen = QPen(QColor(GREEN))
+    pen.setWidthF(6.5)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.drawLine(QPointF(24, 13), QPointF(24, 35))
+    painter.drawLine(QPointF(13, 24), QPointF(35, 24))
     painter.end()
     return pixmap.scaled(
         _BADGE_DISPLAY, _BADGE_DISPLAY,
@@ -299,6 +330,13 @@ def _draw_slideshow(painter: QPainter, color):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawPolygon(QPointF(21, 19), QPointF(21, 29), QPointF(30, 24))  # play triangle
+
+
+def _draw_enhance(painter: QPainter, _color):
+    """A picture frame with a bold plus in its lower-right — 'enhance images'."""
+    painter.drawRoundedRect(QRectF(9, 11, 23, 19), 3, 3)   # the picture frame
+    painter.drawLine(QPointF(35, 26), QPointF(35, 38))     # the plus, offset low-right
+    painter.drawLine(QPointF(29, 32), QPointF(41, 32))
 
 
 def _draw_osr2(painter: QPainter, color):

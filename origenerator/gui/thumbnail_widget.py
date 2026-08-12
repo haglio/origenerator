@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplicat
 from PyQt6.QtGui import QPixmap, QDrag, QCursor
 from PyQt6.QtCore import Qt, QPoint, QSize, QEvent, pyqtSignal
 
+from origenerator.gui.enhanced_badge import EnhancedBadge
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
@@ -54,7 +55,7 @@ class ThumbnailWidget(QWidget):
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, starred: bool = False,
-                 corner_actions: list | None = None):
+                 enhanced: bool = False, corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
@@ -120,6 +121,13 @@ class ThumbnailWidget(QWidget):
         # shown only while starred so an unstarred tile stays clean.
         self._star_badge = StarBadge(self)
         self._star_badge.setVisible(self._starred)
+
+        # A green plus in the bottom-right of the image area marks an enhanced
+        # image (upscaled + re-sampled), clear of the other corners' badges.
+        self._enhanced_badge = None
+        if enhanced:
+            image_bottom = layout.contentsMargins().top() + _IMAGE_SIZE.height()
+            self._enhanced_badge = EnhancedBadge(self, image_bottom)
 
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.

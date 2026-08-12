@@ -48,7 +48,7 @@ SECTIONS: tuple[Section, ...] = (
         "shift", "shift_high", "shift_low", "denoise",
     ), collapsed=True),
     Section("Enhance", (
-        "enhance_scale", "enhance_steps", "enhance_denoise",
+        "enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
     ), collapsed=True),
     Section("Stroke", (
         "stroke_hz", "stroke_x", "stroke_top", "stroke_bottom",

@@ -246,6 +246,72 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
         == settings_signature("sdxl_t2i", reroll)
 
 
+def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
+    from origenerator.gallery import is_enhanced_row
+
+    # An explicit flag is authoritative, whichever way it points.
+    assert is_enhanced_row(_row(params_json=json.dumps({"enhance": True}))) is True
+    assert is_enhanced_row(_row(params_json=json.dumps(
+        {"enhance": False, "enhance_denoise": 0.15}))) is False
+    # A standalone enhancer run is enhanced by definition.
+    assert is_enhanced_row(_row(workflow_name="image_enhance", params_json="{}")) is True
+    # SDXL rows from the era the tail ran unconditionally carry its params but
+    # no flag; they count. Pre-enhance rows and other workflows' rows don't.
+    assert is_enhanced_row(_row(params_json=json.dumps({"enhance_denoise": 0.3}))) is True
+    assert is_enhanced_row(_row(params_json=json.dumps({"steps": 50}))) is False
+    assert is_enhanced_row(_row(workflow_name="wan22_t2i",
+                                params_json=json.dumps({"enhance_denoise": 0.15}))) is False
+
+
+def test_rows_awaiting_enhancement_targets_only_plain_uncovered_images():
+    from origenerator.gallery import rows_awaiting_enhancement
+
+    plain = _img("plain", "a cat", 30, 1)          # nothing enhanced about it
+    inline = _row(prompt_id="inline",               # ran the tail itself
+                  params_json=json.dumps({"positive_prompt": "a cat", "enhance": True}),
+                  output_files=json.dumps([{"filename": "sdxl_t2i_inline.png"}]))
+    covered = _img("covered", "a cat", 30, 2)       # already has a standalone enhance
+    enhance_of_covered = _row(
+        prompt_id="e1", workflow_name="image_enhance",
+        params_json=json.dumps({"input_image": "image/sdxl_t2i_covered.png [output]"}),
+        output_files=json.dumps([{"filename": "image_enhance_00001_.png"}]),
+    )
+    video = _row(prompt_id="vid", workflow_name="wan22_i2v",
+                 output_files=json.dumps([{"filename": "wan22_i2v_v.mp4"}]))
+
+    folder = [plain, inline, covered, video]
+    awaiting = rows_awaiting_enhancement(folder, folder + [enhance_of_covered])
+    assert [r["prompt_id"] for r in awaiting] == ["plain"]
+
+
+def test_enhance_params_for_builds_an_image_enhance_config():
+    from origenerator.gallery import enhance_params_for
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    src = _row(
+        prompt_id="s",
+        params_json=json.dumps({
+            "positive_prompt": "a lakeside cabin", "negative_prompt": "blurry",
+            "checkpoint": "dreamscape_v3.safetensors",
+        }),
+        output_files=json.dumps([{"filename": "sdxl_t2i_s.png", "subfolder": "image",
+                                  "type": "output"}]),
+    )
+    params = enhance_params_for(src)
+    assert params["input_image"] == "image/sdxl_t2i_s.png [output]"
+    assert params["positive_prompt"] == "a lakeside cabin"   # steers the texture
+    assert params["negative_prompt"] == "blurry"
+    assert params["checkpoint"] == "dreamscape_v3.safetensors"  # source's own style
+
+    # A row with no output file has nothing to enhance.
+    assert enhance_params_for(_row(output_files=None)) is None
+    # A source with no checkpoint (WAN/flux) keeps the enhancer's SDXL default.
+    bare = _row(params_json="{}",
+                output_files=json.dumps([{"filename": "wan22_t2i_b.png"}]))
+    assert enhance_params_for(bare)["checkpoint"] == \
+        WORKFLOW_REGISTRY["image_enhance"].default_params()["checkpoint"]
+
+
 def test_gallery_tree_splits_different_workflow_generations_into_folders():
     # The user-facing shape of the version fold: an old-generation SDXL render
     # and a new one of the same recipe become sibling settings folders rather

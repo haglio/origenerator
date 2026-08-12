@@ -3,7 +3,6 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout
 
 from origenerator.config import PROJECT_DIR
-from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -28,7 +27,6 @@ class LoadingScreen(QDialog):
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
-        self.setStyleSheet(build_stylesheet())
 
         icon_path = PROJECT_DIR / "icon.ico"
         if icon_path.exists():

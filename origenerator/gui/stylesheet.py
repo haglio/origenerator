@@ -29,13 +29,15 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_MUTED)};
     }}
     QToolTip {{
-        /* QToolTip is a QWidget, so the global QWidget rule above paints it but
-           leaves it borderless and hard to read; style it explicitly so the
-           toolbar buttons' tooltips actually show, legibly, on hover. */
+        /* Tooltips are top-level popups, so this rule only reaches them because
+           the sheet is set on the QApplication (see app.main) — on a window it
+           is inert, and the tooltips fall back to the native palette, which
+           Windows 11's dark mode renders unreadably (light-on-light; the
+           "missing" tooltips). Styled explicitly, and with square corners: a
+           rounded stylesheet tooltip on Windows paints artifact boxes. */
         background-color: {_h(BG_TERTIARY)};
         color: {_h(TEXT_PRIMARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
         padding: 4px 6px;
     }}
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox {{

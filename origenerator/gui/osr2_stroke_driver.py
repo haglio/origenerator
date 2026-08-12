@@ -101,9 +101,10 @@ class Osr2StrokeDriver(QObject):
         stroke_engine.cycle_shape(self._state)
 
     def status_text(self) -> str:
-        """One line of what the device is doing, for the slideshow's caption."""
+        """One line of what the device is (or would be) doing, for the
+        slideshow's standing caption — the knobs read the same either way, so
+        the stroke can be tuned before it's started."""
         state = self._state
-        if not self._active:
-            return "OSR2 off"
-        return (f"OSR2 · {state.bpm:.0f}/min · {state.shape.value}"
-                f" · travel {state.amplitude} around {state.center}")
+        knobs = (f"{state.bpm:.0f}/min · {state.shape.value}"
+                 f" · travel {state.amplitude} around {state.center}")
+        return f"OSR2 · {knobs}" if self._active else f"OSR2 off · {knobs}"

@@ -27,9 +27,24 @@ def test_stylesheet_greys_disabled_dropdown_items():
 
 
 def test_stylesheet_styles_tooltips():
-    # A global QWidget background rule leaves QToolTip unreadable/blank unless it's
-    # styled explicitly, so the toolbar buttons' tooltips never appear on hover.
-    assert "QToolTip" in build_stylesheet()
+    # Native tooltips render unreadably on Windows 11 dark mode, so the sheet
+    # must style QToolTip explicitly — with square corners, since a rounded
+    # stylesheet tooltip paints artifact boxes on Windows.
+    qss = build_stylesheet()
+    tooltip_rule = qss.split("QToolTip", 1)[1].split("}", 1)[0]
+    assert "background-color" in tooltip_rule
+    assert "border-radius" not in tooltip_rule
+
+
+def test_the_launch_applies_the_stylesheet_to_the_application():
+    # QToolTip popups are top-level widgets: a window-level stylesheet never
+    # reaches them, which is exactly how every tooltip in the app went missing
+    # once — the QToolTip rule sat inert on the main window. The sheet must be
+    # set on the QApplication, in main().
+    from pathlib import Path
+    app_source = (Path(__file__).resolve().parents[1]
+                  / "origenerator" / "app.py").read_text(encoding="utf-8")
+    assert "app.setStyleSheet(build_stylesheet())" in app_source
 
 
 def test_stylesheet_styles_collapsible_section_headers():

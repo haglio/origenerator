@@ -179,18 +179,26 @@ def test_the_loop_ending_drops_the_live_slot_but_keeps_rotating(qtbot, tmp_path)
     assert "generating" not in view._counter.text()
 
 
+def test_the_stroke_caption_stands_ready_and_names_its_keys(qtbot):
+    # The caption is the only trace the OSR2 controls exist, so it's up from the
+    # start — status plus the key legend while the stroke is off.
+    view = _view(qtbot)
+    assert not view._stroke_caption.isHidden()
+    assert view._stroke_caption.text().startswith("OSR2 stub")
+    assert "Space" in view._stroke_caption.text()
+
+
 def test_space_toggles_the_stroke_and_reports_the_takeover(qtbot):
     view = _view(qtbot)
-    view.show()
-    qtbot.waitExposed(view)
     active = []
     view.stroke_active_changed.connect(active.append)
     _press(view, Qt.Key.Key_Space)
     assert active == [True]
-    assert not view._stroke_caption.isHidden()
+    # Driving now: the caption drops the key legend and shows the bare status.
     assert view._stroke_caption.text() == "OSR2 stub"
     _press(view, Qt.Key.Key_Space)
     assert active == [True, False]
+    assert "Space" in view._stroke_caption.text()  # legend returns when off
 
 
 def test_the_stroke_keys_map_like_genau(qtbot):

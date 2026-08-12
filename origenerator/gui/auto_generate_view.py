@@ -20,9 +20,10 @@ The arrow keys are laid out like a Fun Time satellite's controls:
 And since a still image gives the OSR2 nothing to follow, the view carries the
 OSR2 side of genau — the direct stroke engine, none of the visuals — on genau's
 own keys: Space starts/stops the device, J/L speed, 7/9 amplitude, U/O center,
-I shape. Each press flashes the stroke's state in a caption. The gallery listens
-to :attr:`stroke_active_changed` to keep the funscript driver off the device
-while the stroke runs.
+I shape. A standing caption along the top shows the stroke's state, naming
+those keys while it's off so they can be found at all. The gallery listens to
+:attr:`stroke_active_changed` to keep the funscript driver off the device while
+the stroke runs.
 
 Escape closes the view (the loop keeps running); :attr:`closed` fires so the
 gallery can forget it.
@@ -36,7 +37,6 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.slideshow import LIVE, AutoGeneratePlaylist
 
 _GENERATING = "Generating…"
-_STROKE_CAPTION_MS = 2500  # how long a stroke key's state flash lingers
 _CAPTION_CSS = (
     "color: white; background: rgba(0, 0, 0, 140);"
     " padding: 4px 10px; border-radius: 4px;"
@@ -86,22 +86,21 @@ class AutoGenerateView(QWidget):
         layout.addWidget(self._preview, 1)
 
         # A translucent position caption floating over the bottom of the media,
-        # and the stroke engine's state flashed along the top on its keys.
+        # and the stroke engine's state standing along the top — always shown,
+        # since an idle line naming its keys is the only way the OSR2 controls
+        # are discoverable at all (nothing else on screen hints they exist).
         self._counter = QLabel(self)
         self._counter.setStyleSheet(_CAPTION_CSS)
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._stroke_caption = QLabel(self)
         self._stroke_caption.setStyleSheet(_CAPTION_CSS)
         self._stroke_caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_caption.hide()
-        self._stroke_caption_timer = QTimer(self)
-        self._stroke_caption_timer.setSingleShot(True)
-        self._stroke_caption_timer.timeout.connect(self._stroke_caption.hide)
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._advance)
 
+        self._update_stroke_caption()
         self._show_current()
 
     # --- the gallery feeds these as the loop runs --------------------------
@@ -215,18 +214,21 @@ class AutoGenerateView(QWidget):
     def _toggle_stroke(self):
         active = self._stroke.toggle()
         self.stroke_active_changed.emit(active)
-        self._flash_stroke_caption()
+        self._update_stroke_caption()
 
     def _stroke_adjust(self, action):
         action()
-        self._flash_stroke_caption()
+        self._update_stroke_caption()
 
-    def _flash_stroke_caption(self):
-        self._stroke_caption.setText(self._stroke.status_text())
+    def _update_stroke_caption(self):
+        """The standing OSR2 line along the top: the stroke's state, plus its
+        keys while it's off — the invitation to press Space."""
+        text = self._stroke.status_text()
+        if not self._stroke.active:
+            text += "   ·   Space drives · J/L speed · 7/9 travel · U/O center · I shape"
+        self._stroke_caption.setText(text)
         self._reposition_stroke_caption()
-        self._stroke_caption.show()
         self._stroke_caption.raise_()
-        self._stroke_caption_timer.start(_STROKE_CAPTION_MS)
 
     # --- captions ----------------------------------------------------------
 

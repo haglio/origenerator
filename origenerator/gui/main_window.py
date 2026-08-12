@@ -9,7 +9,6 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.stylesheet import build_stylesheet
 
 # The open editable config tabs (in the gallery's info pane). Kept under its
 # historical key so sessions saved before the Generate/Gallery merge still restore.
@@ -34,7 +33,6 @@ class OrigeneratorWindow(QMainWindow):
         # gallery's own pane floors keep content readable at those slot sizes; only
         # a manual drag below that compresses it.
         self.setMinimumSize(600, 400)
-        self.setStyleSheet(build_stylesheet())
         icon_path = PROJECT_DIR / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))

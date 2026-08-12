@@ -5,8 +5,11 @@ where that one follows a playing video's script, this one *is* the motion
 source, advancing a :class:`~origenerator.stroke_engine.StrokeState` on a timer
 and streaming each sampled position as T-code. Same broker etiquette, too: it
 pauses genau while it drives, and parks the device + restores genau when it
-stops. The auto-generate slideshow owns one and lays genau's own keys over it,
-so the device can run while images with no script roll by.
+stops. The gallery owns the one instance, app-global — every surface (the main
+window, the fullscreen viewer, both slideshows) drives it through the shared
+key cluster in :mod:`origenerator.gui.stroke_hud`, and the stroke outlives any
+of them: closing a view leaves the device running until Space (or Esc in the
+gallery) stops it.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 
-from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator import stroke_engine
 from origenerator.config import (
@@ -29,6 +32,10 @@ _TICK_MS = 33  # ~30 Hz — the cadence genau streams at
 
 
 class Osr2StrokeDriver(QObject):
+    # The device changed hands: the funscript reconcile stands down while the
+    # stroke holds it, and every surface's caption follows along.
+    active_changed = pyqtSignal(bool)
+
     def __init__(self, broker=None, *, interval_ms: int = _TICK_MS,
                  now_source=time.monotonic, parent=None):
         super().__init__(parent)
@@ -66,6 +73,7 @@ class Osr2StrokeDriver(QObject):
         self._broker.pause_genau()
         self._timer.start()
         logger.info("OSR2 stroke engaged: %s", self.status_text())
+        self.active_changed.emit(True)
 
     def stop(self) -> None:
         """Release the device: stop streaming, park it, and restore genau."""
@@ -76,6 +84,7 @@ class Osr2StrokeDriver(QObject):
         self._broker.park()
         self._broker.restore_genau()
         logger.info("OSR2 stroke released: parked, genau restored")
+        self.active_changed.emit(False)
 
     def poll(self) -> None:
         """One tick: advance the phase by real elapsed time and send the position."""

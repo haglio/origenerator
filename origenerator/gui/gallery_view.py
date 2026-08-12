@@ -39,6 +39,8 @@ from origenerator.gui.reroll_prompt import (
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
+from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
+from origenerator.gui.stroke_hud import apply_stroke_key, stroke_caption_text
 from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
@@ -91,10 +93,18 @@ class GalleryView(QWidget):
 
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
-                 actions: GalleryActions | None = None):
+                 actions: GalleryActions | None = None,
+                 osr2_stroke: Osr2StrokeDriver | None = None):
         super().__init__(parent)
         self._db = db
         self._client = client
+        # The one app-global stroke driver (genau's engine, no funscript needed):
+        # every surface — this window, the fullscreen viewer, both slideshows —
+        # drives it through the shared stroke keys, and while it holds the device
+        # the funscript reconcile stands down. Injectable so tests never touch
+        # the broker. Built before _build_ui, which wires its window feedback.
+        self._osr2_stroke = osr2_stroke if osr2_stroke is not None else Osr2StrokeDriver(parent=self)
+        self._osr2_stroke.active_changed.connect(self._on_stroke_active_changed)
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
@@ -205,6 +215,13 @@ class GalleryView(QWidget):
                         and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
                     self._undo()
                     return True
+                # The OSR2 stroke keys work right here in the main window too —
+                # not only in the fullscreen views — under the same guards that
+                # keep them out of text fields and other windows.
+                if (not event.modifiers()
+                        and apply_stroke_key(self._osr2_stroke, event.key())):
+                    self._show_stroke_status()
+                    return True
         return super().eventFilter(obj, event)
 
     def _handle_escape(self) -> bool:
@@ -218,6 +235,9 @@ class GalleryView(QWidget):
         handled = False
         if self._osr2_enabled:
             self._osr2_btn.setChecked(False)  # untoggling stops the driver
+            handled = True
+        if self._osr2_stroke.active:
+            self._osr2_stroke.stop()  # the stroke is part of the same panic-stop
             handled = True
         if self._auto.any_active():
             self._auto.stop_all()
@@ -427,12 +447,23 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
+        # This window's own stroke feedback: a floating caption shown while the
+        # stroke runs (and flashed on a tuning key while it doesn't).
+        self._stroke_status = QLabel(self)
+        self._stroke_status.setObjectName("strokeStatus")
+        self._stroke_status.setStyleSheet(
+            "#strokeStatus { color: white; background: rgba(20, 20, 20, 225);"
+            " padding: 8px 16px; border-radius: 6px; }"
+        )
+        self._stroke_status.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._stroke_status.hide()
+        self._stroke_status_timer = QTimer(self)
+        self._stroke_status_timer.setSingleShot(True)
+        self._stroke_status_timer.timeout.connect(self._stroke_status.hide)
         # The live auto-generate slideshow (double-click the preview while a folder
-        # loops), and the folder key it follows — None while none is open. While its
-        # built-in stroke engine holds the OSR2, the funscript reconcile stands down.
+        # loops), and the folder key it follows — None while none is open.
         self._auto_montage = None
         self._auto_montage_key_open: str | None = None
-        self._montage_stroke_active = False
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -442,6 +473,7 @@ class GalleryView(QWidget):
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self._osr2_driver.stop)
+            app.aboutToQuit.connect(self._osr2_stroke.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
@@ -537,7 +569,7 @@ class GalleryView(QWidget):
         fullscreen view wins when it's showing a scripted video (it drives regardless
         of the toggle); otherwise the front tab's video, but only while the toggle is
         on."""
-        if self._montage_stroke_active:
+        if self._osr2_stroke.active:
             return None
         fullscreen = self._fullscreen_preview
         if fullscreen is not None:
@@ -560,6 +592,7 @@ class GalleryView(QWidget):
         self._fullscreen_preview = fullscreen
         fullscreen.closed.connect(lambda: self._on_fullscreen_closed(fullscreen))
         fullscreen.media_changed.connect(self._reconcile_osr2)
+        fullscreen.set_stroke(self._osr2_stroke)  # the shared stroke keys work here too
         self._arm_fullscreen_navigation(fullscreen)
         self._reconcile_osr2()
 
@@ -595,6 +628,34 @@ class GalleryView(QWidget):
             self._fullscreen_preview = None
             self._reconcile_osr2()
 
+    # --- the app-global OSR2 stroke: reconcile hold and main-window feedback --
+
+    def _on_stroke_active_changed(self, _active: bool):
+        """The stroke took or released the device (from whichever surface): the
+        funscript reconcile stands down while it holds it, and this window's
+        caption follows."""
+        self._reconcile_osr2()
+        self._show_stroke_status()
+
+    def _show_stroke_status(self):
+        """Float the stroke's state over this window: pinned while it drives,
+        flashed for a moment when a key tunes it while it's off."""
+        self._stroke_status.setText(stroke_caption_text(self._osr2_stroke))
+        self._stroke_status.adjustSize()
+        self._reposition_stroke_status()
+        self._stroke_status.show()
+        self._stroke_status.raise_()
+        if self._osr2_stroke.active:
+            self._stroke_status_timer.stop()
+        else:
+            self._stroke_status_timer.start(2500)
+
+    def _reposition_stroke_status(self):
+        self._stroke_status.move(
+            max(0, (self.width() - self._stroke_status.width()) // 2),
+            max(0, self.height() - self._stroke_status.height() - 12),
+        )
+
     # --- the live auto-generate montage (double-click the preview while looping) ---
 
     def _plain_fullscreen_allowed(self) -> bool:
@@ -609,9 +670,9 @@ class GalleryView(QWidget):
         return key if key is not None and self._auto.is_active(key) else None
 
     def _make_auto_montage(self) -> AutoGenerateView:
-        """Build the slideshow window (a seam so tests can stub the player and
-        the stroke driver)."""
-        return AutoGenerateView()
+        """Build the slideshow window on the shared stroke driver (a seam so
+        tests can stub the player and the stroke)."""
+        return AutoGenerateView(stroke=self._osr2_stroke)
 
     def _on_preview_double_clicked(self):
         """A preview double-click that opened no plain fullscreen: open the live
@@ -631,7 +692,6 @@ class GalleryView(QWidget):
         montage.closed.connect(self._on_auto_montage_closed)
         montage.cancel_requested.connect(lambda: self._skip_auto_current(key))
         montage.weird_requested.connect(self._trash_generation)
-        montage.stroke_active_changed.connect(self._on_montage_stroke_changed)
         group = self._group_for_key(key)
         if isinstance(group, gallery.SettingsGroup):
             for row in reversed(group.rows):
@@ -645,18 +705,9 @@ class GalleryView(QWidget):
 
     def _on_auto_montage_closed(self):
         """The slideshow was dismissed (Esc/close): forget it — the loop keeps
-        running. Its stroke engine stopped itself on close, so the funscript
-        reconcile may take the device back."""
+        running, and so does a running stroke (it's app-global, not the view's)."""
         self._auto_montage = None
         self._auto_montage_key_open = None
-        self._montage_stroke_active = False
-        self._reconcile_osr2()
-
-    def _on_montage_stroke_changed(self, active: bool):
-        """The slideshow's stroke engine took or released the OSR2: while it holds
-        the device, nothing else may drive it."""
-        self._montage_stroke_active = active
-        self._reconcile_osr2()
 
     def _feed_montage_preview(self, key: str, data: bytes):
         """Mirror a loop's live frame into the slideshow's live slot while it's open."""
@@ -1264,6 +1315,8 @@ class GalleryView(QWidget):
         super().resizeEvent(event)
         if self._voice_status.isVisible():
             self._reposition_voice_status()
+        if self._stroke_status.isVisible():
+            self._reposition_stroke_status()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,
@@ -1289,7 +1342,8 @@ class GalleryView(QWidget):
         items = self._slideshow_items(group)
         if not items:
             return
-        self._slideshow = SlideshowView(items, on_delete=self._trash_generation)
+        self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
+                                        stroke=self._osr2_stroke)
         logger.info("Slideshow: %d items, shuffled order[:10]=%s",
                     len(items), self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()

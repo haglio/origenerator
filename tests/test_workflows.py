@@ -972,6 +972,182 @@ def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
     assert fc.step == 4
 
 
+# ---- SDXL Pose Transfer (re-skin an image, keeping its pose) ----
+
+def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
+    from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
+
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    assert wf.__class__ is SdxlPoseTransferWorkflow
+    assert wf.name == "sdxl_pose_transfer"
+    assert wf.output_type == "image"
+    # The checkpoint identifies the output, exactly as in sdxl_t2i — the
+    # controlnet is a conditioning aid, not what the gallery groups by.
+    assert wf.model_keys == ("checkpoint",)
+    assert wf.seed_keys() == ("seed",)
+    # The output size follows the pose image's aspect ratio, so the workflow
+    # derives it from the input rather than exposing manual width/height.
+    assert wf.derives_size_from_input is True
+
+
+def test_sdxl_pose_transfer_build_api_payload_structure():
+    # The re-skin pipeline: the input image is scaled to the SDXL pixel budget
+    # (keeping its aspect ratio), DWPose extracts its skeleton, and an SDXL
+    # ControlNet applies that skeleton to both prompt conditionings — while the
+    # sampler still denoises a fresh latent, sized off the same derivation, so
+    # everything but the pose is up to the prompt and checkpoint.
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(
+        wf.default_params(),
+        positive_prompt="a figure in a sunlit atrium",
+        negative_prompt="grainy",
+        input_image="pose_source.png",
+        seed=77,
+        controlnet_strength=0.65,
+        controlnet_end=0.9,
+    )
+    payload = wf.build_api_payload(params)
+
+    # The size chain: LoadImage -> ImageScaleToTotalPixels (1 MP, /16 stride)
+    # -> GetImageSize -> the latent's width/height. No hardcoded dimensions.
+    load_id = _node_id(payload, "LoadImage")
+    scale_id = _node_id(payload, "ImageScaleToTotalPixels")
+    getsize_id = _node_id(payload, "GetImageSize")
+    assert payload[load_id]["inputs"]["image"] == "pose_source.png"
+    assert payload[scale_id]["inputs"]["image"] == [load_id, 0]
+    assert payload[scale_id]["inputs"]["megapixels"] == 1.0
+    assert payload[scale_id]["inputs"]["resolution_steps"] == 16
+    latent = _find_node(payload, "EmptyLatentImage")
+    assert latent["inputs"]["width"] == [getsize_id, 0]
+    assert latent["inputs"]["height"] == [getsize_id, 1]
+    assert latent["inputs"]["batch_size"] == params["batch_size"]
+
+    # The pose chain: DWPose reads the scaled image (so the skeleton is drawn
+    # in the same aspect the latent uses), and the ControlNet applies it across
+    # both conditionings at the form's strength/end values.
+    pose = _find_node(payload, "DWPreprocessor")
+    assert pose["inputs"]["image"] == [scale_id, 0]
+    assert pose["inputs"]["bbox_detector"] == params["pose_bbox_detector"]
+    assert pose["inputs"]["pose_estimator"] == params["pose_estimator"]
+    pose_id = _node_id(payload, "DWPreprocessor")
+    cn_loader_id = _node_id(payload, "ControlNetLoader")
+    assert payload[cn_loader_id]["inputs"]["control_net_name"] == params["controlnet"]
+    apply = _find_node(payload, "ControlNetApplyAdvanced")
+    assert apply["inputs"]["control_net"] == [cn_loader_id, 0]
+    assert apply["inputs"]["image"] == [pose_id, 0]
+    assert apply["inputs"]["strength"] == 0.65
+    assert apply["inputs"]["start_percent"] == 0.0
+    assert apply["inputs"]["end_percent"] == 0.9
+
+    # Both prompts route through the ControlNet apply into the sampler, which
+    # otherwise runs the plain sdxl_t2i recipe on the checkpoint's model.
+    encodes = {
+        n["inputs"]["text"]: nid for nid, n in payload.items()
+        if n["class_type"] == "CLIPTextEncode"
+    }
+    apply_id = _node_id(payload, "ControlNetApplyAdvanced")
+    assert apply["inputs"]["positive"] == [encodes["a figure in a sunlit atrium"], 0]
+    assert apply["inputs"]["negative"] == [encodes["grainy"], 0]
+    sampler = _find_node(payload, "KSampler")
+    assert sampler["inputs"]["positive"] == [apply_id, 0]
+    assert sampler["inputs"]["negative"] == [apply_id, 1]
+    assert sampler["inputs"]["seed"] == 77
+    assert sampler["inputs"]["denoise"] == params["denoise"]
+    ckpt = _find_node(payload, "CheckpointLoaderSimple")
+    assert ckpt["inputs"]["ckpt_name"] == params["checkpoint"]
+
+    # Decoded through the standalone VAE and saved, like sdxl_t2i.
+    decode_id = _node_id(payload, "VAEDecode")
+    vae_id = _node_id(payload, "VAELoader")
+    assert payload[decode_id]["inputs"]["vae"] == [vae_id, 0]
+    save = _find_node(payload, "SaveImage")
+    assert save["inputs"]["images"] == [decode_id, 0]
+    assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
+
+
+def test_sdxl_pose_transfer_size_override_replaces_the_in_graph_derivation():
+    # Unlocking the derived size swaps the budget-scaling for a plain ImageScale
+    # to the explicit WxH, whose literal size drives the latent — and the pose
+    # skeleton is still drawn from that same scaled image, so it keeps matching
+    # the canvas it will be applied to.
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(wf.default_params(), input_image="x.png", width=1152, height=896)
+    payload = wf.build_api_payload(params)
+
+    assert _find_node(payload, "ImageScaleToTotalPixels") is None
+    assert _find_node(payload, "GetImageSize") is None
+    scale_id = _node_id(payload, "ImageScale")
+    load_id = _node_id(payload, "LoadImage")
+    assert payload[scale_id]["inputs"] == {
+        "image": [load_id, 0], "upscale_method": "lanczos",
+        "width": 1152, "height": 896, "crop": "disabled",
+    }
+    latent = _find_node(payload, "EmptyLatentImage")
+    assert latent["inputs"]["width"] == 1152
+    assert latent["inputs"]["height"] == 896
+    assert _find_node(payload, "DWPreprocessor")["inputs"]["image"] == [scale_id, 0]
+
+
+def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, monkeypatch):
+    # The form's locked Dimensions field must show the size this workflow will
+    # actually render — the pose image's aspect at the 1 MP SDXL budget, not the
+    # video workflows' 0.4 MP.
+    import origenerator.workflows.derived_size as ds
+    from origenerator.workflows.derived_size import scale_to_total_pixels
+
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    _write_image(tmp_path / "tall.png", (1080, 1920))
+
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(wf.default_params(), input_image="tall.png")
+    derived = wf.derived_display_size(params)
+    assert derived == scale_to_total_pixels(1080, 1920, megapixels=1.0)
+    width, height = derived
+    # Sanity-pin the budget itself: the derived area sits at ~1 MP, far above
+    # what the 0.4 MP video budget would produce for the same image.
+    assert 0.9 * 1024 * 1024 <= width * height <= 1.1 * 1024 * 1024
+
+
+def test_sdxl_pose_transfer_scales_pose_sticks_for_xinsir_controlnets():
+    # xinsir's SDXL pose ControlNets were trained on thicker skeleton sticks
+    # than the OpenPose standard, and comfyui_controlnet_aux ships a DWPose
+    # toggle for exactly that. It follows the picked ControlNet by filename
+    # (the default is a xinsir model), so swapping in a non-xinsir ControlNet
+    # gets standard sticks without a second setting to keep in sync.
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    params = dict(wf.default_params(), input_image="x.png")
+    assert "xinsir" in params["controlnet"].lower()  # the shipped default
+
+    pose = _find_node(wf.build_api_payload(params), "DWPreprocessor")
+    assert pose["inputs"]["scale_stick_for_xinsr_cn"] == "enable"
+
+    other = dict(params, controlnet="OpenPoseXL2.safetensors")
+    pose = _find_node(wf.build_api_payload(other), "DWPreprocessor")
+    assert pose["inputs"]["scale_stick_for_xinsr_cn"] == "disable"
+
+
+def test_sdxl_pose_transfer_extract_output_info():
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    save_id = next(
+        nid for nid, node in wf.build_api_payload(wf.default_params()).items()
+        if node["class_type"] == "SaveImage"
+    )
+    assert wf.output_node_id == save_id  # /history is read off the save node
+    history = {
+        "outputs": {
+            save_id: {
+                "images": [
+                    {"filename": "sdxl_pose_transfer_00001_.png",
+                     "subfolder": "image", "type": "output"}
+                ]
+            }
+        }
+    }
+    files = wf.extract_output_info(history)
+    assert len(files) == 1
+    assert files[0]["filename"] == "sdxl_pose_transfer_00001_.png"
+
+
 # ---- WAN 2.2 T2I (dual-noise text-to-image) ----
 
 def test_wan22_t2i_is_registered_as_an_image_workflow():

@@ -5,6 +5,21 @@ from typing import Any
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.model_files import is_no_lora
 
+# ComfyUI's KSampler vocabulary, for workflows that expose sampler/scheduler
+# pickers (the SDXL pair) — one copy, so the option lists can't drift apart.
+SAMPLER_OPTIONS = [
+    "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
+    "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
+    "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu",
+    "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
+    "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm", "ddim",
+    "uni_pc", "uni_pc_bh2",
+]
+SCHEDULER_OPTIONS = [
+    "normal", "karras", "exponential", "sgm_uniform", "simple",
+    "ddim_uniform", "beta",
+]
+
 
 @dataclass
 class ParamDef:
@@ -120,19 +135,21 @@ class WorkflowTemplate(ABC):
         return node, [node_id, 0]
 
     @staticmethod
-    def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict):
-        """The subgraph that sizes an i2v run off its input image, and the refs a
-        video node reads for its scaled start image and its width/height.
+    def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict,
+                         megapixels: float = 0.4):
+        """The subgraph that sizes a run off its input image, and the refs the
+        downstream nodes read for the scaled image and its width/height.
 
         Returns ``(nodes, scaled_image_ref, width_ref, height_ref)`` to merge into
-        the payload. By default the image is scaled to the shared pixel budget
-        in-graph (``ImageScaleToTotalPixels`` on a /16 stride) and the size read
-        back off it (``GetImageSize``), so a portrait or widescreen yields a
-        proportional video without a hardcoded WxH. When the user has unlocked the
-        derived size and set an explicit ``width``/``height`` (see
+        the payload. By default the image is scaled to ``megapixels`` in-graph
+        (``ImageScaleToTotalPixels`` on a /16 stride — 0.4 MP is the video
+        budget; the SDXL still workflow passes its own) and the size read back
+        off it (``GetImageSize``), so a portrait or widescreen yields a
+        proportional output without a hardcoded WxH. When the user has unlocked
+        the derived size and set an explicit ``width``/``height`` (see
         :func:`~origenerator.workflows.derived_size.override_size`), the image is
         instead scaled to that exact size (``ImageScale``) and the literal
-        width/height drive the video node — ``size_id`` is then unused.
+        width/height drive the consumer — ``size_id`` is then unused.
         """
         override = override_size(params)
         if override is not None:
@@ -156,7 +173,7 @@ class WorkflowTemplate(ABC):
                 "inputs": {
                     "image": image_ref,
                     "upscale_method": "lanczos",
-                    "megapixels": 0.4,
+                    "megapixels": megapixels,
                     "resolution_steps": 16,
                 },
             },

@@ -36,10 +36,12 @@ SECTIONS: tuple[Section, ...] = (
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section("Model & LoRA", (
         "checkpoint", "unet", "unet_high", "unet_low",
+        "controlnet", "controlnet_strength", "controlnet_end",
         "lora", "lora_strength",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
         "clip_name", "clip_name1", "clip_name2", "clip_vision_name",
         "vae", "vae_name", "upscale_model",
+        "pose_bbox_detector", "pose_estimator",
     ), collapsed=True),
     Section("Sampling", (
         "steps", "cfg", "guidance", "sampler_name", "scheduler",

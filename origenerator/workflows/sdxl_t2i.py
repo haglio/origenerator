@@ -1,4 +1,6 @@
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import (
+    SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
+)
 from origenerator.workflows.model_files import list_model_files
 
 
@@ -41,18 +43,10 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("batch_size", "Batch Size", "int", 1, min_val=1, max_val=16),
             ParamDef("steps", "Steps", "int", 50, min_val=1, max_val=200),
             ParamDef("cfg", "CFG Scale", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5),
-            ParamDef("sampler_name", "Sampler", "combo", "euler", options=[
-                "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
-                "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
-                "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu",
-                "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
-                "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm", "ddim",
-                "uni_pc", "uni_pc_bh2",
-            ]),
-            ParamDef("scheduler", "Scheduler", "combo", "normal", options=[
-                "normal", "karras", "exponential", "sgm_uniform", "simple",
-                "ddim_uniform", "beta",
-            ]),
+            ParamDef("sampler_name", "Sampler", "combo", "euler",
+                     options=SAMPLER_OPTIONS),
+            ParamDef("scheduler", "Scheduler", "combo", "normal",
+                     options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/sdxl_t2i"),
         ]

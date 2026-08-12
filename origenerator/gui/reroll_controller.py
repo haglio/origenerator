@@ -48,7 +48,11 @@ def _parse_progress_state(raw):
 class RerollController(QObject):
     """Tracks one in-flight job (re-roll or combine) per settings-folder key and
     drives each to completion, emitting the redraws the view should make along
-    the way."""
+    the way.
+
+    User work owns the GPU: launching any user job first cancels every in-flight
+    background experiment (the one generator of jobs the user didn't ask for), so
+    a Generate starts at once instead of queuing behind a long ambient run."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
@@ -77,6 +81,16 @@ class RerollController(QObject):
     def has(self, key: str) -> bool:
         return key in self._jobs
 
+    def _launchable(self, key: str, source: str = "generated") -> bool:
+        """Whether a launch may claim ``key``. An idle folder always may. A
+        folder whose live job is a background experiment may be claimed by user
+        work — :meth:`_launch` preempts the experiment — but never by another
+        experiment, and a folder running user work is claimed by no one."""
+        job = self._jobs.get(key)
+        if job is None:
+            return True
+        return source != "experiment" and job.source == "experiment"
+
     def start_prepared(self, key: str, workflow, params: dict, *,
                        source: str = "generated") -> bool:
         """Launch a job with already-built ``params`` under folder ``key``.
@@ -88,7 +102,7 @@ class RerollController(QObject):
         the job is tracked; ``False`` when there's no client, a job for ``key`` is
         already running, or the submit failed (``_launch`` drops the job then).
         """
-        if self._client is None or key in self._jobs:
+        if self._client is None or not self._launchable(key, source):
             return False
         self._launch(key, workflow, params, self._on_finished, source=source)
         return key in self._jobs
@@ -105,7 +119,7 @@ class RerollController(QObject):
         Returns ``True`` once the chained job is tracked; ``False`` with no client
         or a job for ``key`` already running.
         """
-        if self._client is None or key in self._jobs:
+        if self._client is None or not self._launchable(key):
             return False
         self._launch(
             key, image_workflow, prepared_params(image_row, image_workflow),
@@ -157,7 +171,7 @@ class RerollController(QObject):
         image-seed re-roll of a hand-picked (un-rebuildable) frame from duplicating
         the item. Also a no-op with no client or a folder already re-rolling.
         """
-        if self._client is None or key in self._jobs:
+        if self._client is None or not self._launchable(key):
             return  # no client, or this folder already has one running
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
@@ -192,16 +206,21 @@ class RerollController(QObject):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
 
-        A running row is recorded before the job is submitted so an app restart
-        mid-generation can find it and reconnect, exactly as the Generate tab does.
+        User work preempts the ambient experimenter here, at the one choke point
+        every user path funnels through — so a Generate never sits behind an
+        experiment's run (see :meth:`_preempt_experiments`). A running row is
+        recorded before the job is submitted so an app restart mid-generation can
+        find it and reconnect, exactly as the Generate tab does.
         """
+        if source != "experiment":
+            self._preempt_experiments()
         try:
-            job = GenerationJob(self._client, workflow, params)
+            job = GenerationJob(self._client, workflow, params, source=source)
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             return
         self._register(key, job, on_finished)
-        insert_generation_row(self._db, job, source=source)
+        insert_generation_row(self._db, job)
         try:
             job.start()
             self._db.update_generation(job.prompt_id, status="running")
@@ -210,6 +229,24 @@ class RerollController(QObject):
             self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
             self._jobs.pop(key, None)
         self.changed.emit()
+
+    def _preempt_experiments(self):
+        """Clear the GPU for user work: cancel every in-flight background
+        experiment before a user launch is submitted.
+
+        A video experiment can hold the GPU for many minutes; without this, the
+        user's job silently queues behind it in ComfyUI and their progress bar
+        never moves — indistinguishable from a hang. Each preempted experiment is
+        dropped exactly as a hand-cancel would drop it (interrupted or dequeued,
+        its abandoned row deleted), which the runner reads as "not now" — a short
+        breather, not a failure backoff (see ExperimentRunner._resolve_last_outcome).
+        """
+        for key, job in list(self._jobs.items()):
+            if job.source == "experiment":
+                logger.info(
+                    "Preempting background experiment %s for user work", job.prompt_id
+                )
+                self.cancel(key)
 
     def _register(self, key, job, on_finished):
         """Track a re-roll job for a folder and wire its completion and failure."""
@@ -272,9 +309,12 @@ class RerollController(QObject):
             return
         params = gallery.parse_params(row.get("params_json"))
         try:
+            # Carry the row's source onto the rebound job, so an experiment left
+            # running by a previous session is still preemptible by user work.
             job = GenerationJob.reconnect(
                 self._client, workflow, params, row["prompt_id"],
                 progress_state=_parse_progress_state(row.get("progress_json")),
+                source=row.get("source") or "generated",
             )
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
@@ -284,8 +324,9 @@ class RerollController(QObject):
     def cancel(self, key: str):
         """Stop and forget a folder's running re-roll, dropping its abandoned row.
 
-        Silent: the tile's cancel button is the only caller, so the view drives the
-        follow-up redraw itself rather than through :attr:`changed`.
+        Silent — no :attr:`changed` emit: the tile's cancel button drives its own
+        follow-up redraw, and the other caller (:meth:`_preempt_experiments`) is
+        immediately followed by a launch that emits it anyway.
         """
         job = self._jobs.pop(key, None)
         if job is not None:

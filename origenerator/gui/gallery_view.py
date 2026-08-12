@@ -830,11 +830,15 @@ class GalleryView(QWidget):
     def _reconcile_generating(self):
         """Show the front config tab's Cancel button while a re-roll of its settings
         folder is in flight, so the run it launched (or any re-roll of that folder)
-        can be stopped from the tab, not only the folder's tile. Idempotent — driven
-        by every re-roll lifecycle change and by switching the front tab."""
+        can be stopped from the tab, not only the folder's tile. Passes the job's
+        prompt id along so the tab's progress fill tracks that run alone, not
+        whatever else the GPU is doing (a background experiment, another folder).
+        Idempotent — driven by every re-roll lifecycle change (including a chained
+        i2v swapping to its video-stage prompt) and by switching the front tab."""
         panel = self._info_tabs.current_config_panel()
         if panel is not None:
-            panel.set_generating(self._panel_reroll_key(panel) in self._reroll_jobs)
+            job = self._reroll.job_for(self._panel_reroll_key(panel))
+            panel.set_generating(job is not None, job.prompt_id if job is not None else None)
 
     def _cancel_panel_reroll(self, panel):
         """Cancel the re-roll running in ``panel``'s settings folder — the tab's

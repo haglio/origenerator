@@ -22,13 +22,13 @@ from origenerator.progress import ProgressTracker
 logger = logging.getLogger(__name__)
 
 
-def insert_generation_row(db, job, *, source="generated"):
+def insert_generation_row(db, job):
     """Insert a :class:`GenerationJob`'s config as a new row (status ``pending``).
 
     A re-roll tracked from submit inserts its row up front so a restart mid-run can
     find it and reconnect; it's finished with :func:`mark_generation_completed`.
-    ``source`` tags who asked for it — ``"generated"`` for the user's own work,
-    ``"experiment"`` for the background experimenter's.
+    The row's ``source`` comes from the job itself, so the row and the live job
+    can never disagree about who asked for the run.
     """
     params = job.params
     db.insert_generation(
@@ -40,7 +40,7 @@ def insert_generation_row(db, job, *, source="generated"):
         seed=params.get("seed"),
         params_json=json.dumps(params),
         workflow_json=json.dumps(job.payload),
-        source=source,
+        source=job.source,
     )
 
 
@@ -64,12 +64,17 @@ class GenerationJob(QObject):
     finished = pyqtSignal(list, object, object)  # output_files, thumb_path|None, duration|None
     failed = pyqtSignal(str)                     # error message
 
-    def __init__(self, client, workflow, params, *,
+    def __init__(self, client, workflow, params, *, source="generated",
                  output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR, parent=None):
         super().__init__(parent)
         self._client = client
         self.workflow = workflow
         self.params = dict(params)
+        # Who asked for this run: "generated" for the user's own work,
+        # "experiment" for the background experimenter's. Kept on the job (not
+        # just the DB row) so the controller can tell a preemptible ambient run
+        # from user work it must never cancel.
+        self.source = source
         self.payload = workflow.build_api_payload(self.params)
         self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key
         self._output_dir = output_dir

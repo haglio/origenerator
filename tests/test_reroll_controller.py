@@ -233,6 +233,105 @@ def test_start_reroll_from_image_is_a_noop_when_the_folder_is_already_running(qt
     client.submit_job.assert_called_once()
 
 
+# --- user work preempts background experiments --------------------------------
+
+def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
+    # A video experiment can hold the GPU for many minutes; a user's Generate must
+    # kick it off rather than silently queue behind it with a dead progress bar.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("exp-key", _I2V, _params(), source="experiment")
+    experiment = controller.job_for("exp-key")
+    client.progress.emit(experiment.prompt_id, 1, 10)  # ComfyUI began executing it
+
+    started = controller.start_prepared("user-key", _I2V, _params(seed=7))
+
+    assert started is True
+    client.interrupt.assert_called_once()              # the running experiment was stopped
+    assert not controller.has("exp-key")
+    assert db.get_generation(experiment.prompt_id) is None  # its abandoned row is dropped
+    assert controller.has("user-key")
+
+
+def test_user_launch_dequeues_a_still_queued_experiment(qtbot, tmp_path):
+    # An experiment ComfyUI hasn't started yet is removed from the queue (not
+    # interrupted — that would kill whatever IS executing).
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("exp-key", _I2V, _params(), source="experiment")
+    experiment = controller.job_for("exp-key")
+
+    controller.start_prepared("user-key", _I2V, _params(seed=7))
+
+    client.cancel_prompt.assert_called_once_with(experiment.prompt_id)
+    client.interrupt.assert_not_called()
+
+
+def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
+    # Every user path funnels through the same launch choke point, so a per-item
+    # seed re-roll clears the experimenter exactly as the Generate button does.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("exp-key", _I2V, _params(), source="experiment")
+
+    controller.reroll_video_seed("k", _video_row())
+
+    assert not controller.has("exp-key")
+    assert controller.has("k")
+
+
+def test_an_experiment_launch_never_preempts(qtbot, tmp_path):
+    # Only user work owns the GPU; the ambient experimenter never bumps anything.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("exp-1", _I2V, _params(), source="experiment")
+
+    controller.start_prepared("exp-2", _I2V, _params(seed=5), source="experiment")
+
+    client.interrupt.assert_not_called()
+    client.cancel_prompt.assert_not_called()
+    assert controller.has("exp-1")
+
+
+def test_user_launch_claims_the_experiments_own_folder(qtbot, tmp_path):
+    # Even when the user's settings land in the very folder the experiment runs
+    # in, their Generate preempts it and takes the slot — not a silent no-op.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("k", _I2V, _params(), source="experiment")
+
+    started = controller.start_prepared("k", _I2V, _params(seed=7))
+
+    assert started is True
+    assert controller.job_for("k").source == "generated"
+    assert client.submit_job.call_count == 2
+
+
+def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
+    # An experiment left running by a previous session reconnects with its row's
+    # source, so the first user launch after a restart still clears it off the GPU.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    db.insert_generation(prompt_id="exp-rr", workflow_name="sdxl_t2i", workflow_version="v",
+                         positive_prompt="x", seed=1,
+                         params_json=json.dumps({**wf.default_params(), "seed": 1}),
+                         workflow_json="{}", source="experiment")
+    db.update_generation("exp-rr", status="running")
+    controller.reconnect_running()
+
+    controller.start_prepared("user-key", _I2V, _params(seed=7))
+
+    client.interrupt.assert_called_once()  # reconnected jobs report as running
+    assert db.get_generation("exp-rr") is None
+
+
 def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
     # A running job's live progress is written to its row, so a restart can resume
     # the bar where it was instead of spinning until ComfyUI's next per-step push.

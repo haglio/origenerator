@@ -82,6 +82,7 @@ class GenerateConfigPanel(QWidget):
         self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
+        self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         self._build_ui()
         self._connect_signals()
@@ -240,11 +241,20 @@ class GenerateConfigPanel(QWidget):
             pass
 
     def _on_progress(self, prompt_id: str, value: int, max_val: int):
-        """Fill the Generate button with the run's progress while this tab's re-roll
-        is in flight. Generation is serial (one GPU), so the running job is this
-        tab's whenever it's the one marked generating."""
-        if self._generating:
-            self._generate_btn.set_progress(value, max_val)
+        """Fill the Generate button with this tab's own run's progress.
+
+        The client's progress is multiplexed across every job on the server, and
+        generation is no longer serial from this tab's point of view — a background
+        experiment can be executing while this tab's job still waits — so the event
+        must match the tracked prompt, not just arrive while generating. Without
+        the check, an experiment's steps filled the user's button, then their real
+        run reset it to zero: "progress" that lies. A caller that never learned the
+        prompt id (``set_generating(True)`` bare) keeps the old any-run behavior."""
+        if not self._generating:
+            return
+        if self._generating_prompt_id is not None and prompt_id != self._generating_prompt_id:
+            return  # someone else's run (e.g. a background experiment)
+        self._generate_btn.set_progress(value, max_val)
 
     def _on_go_to_folder(self):
         """Ask the gallery to open the displayed generation's own folder."""
@@ -343,18 +353,24 @@ class GenerateConfigPanel(QWidget):
             return
         self.generate_requested.emit(key, params)
 
-    def set_generating(self, generating: bool):
+    def set_generating(self, generating: bool, prompt_id: str | None = None):
         """Reflect whether a run of this config's folder is in flight.
 
         While it is, Cancel shows and the Generate button switches to progress mode
         (filling as the run advances) so it can't be relaunched over; when it ends,
         Generate returns — still disabled in a read-only gallery with no client.
 
+        ``prompt_id`` names the run, so the button fills only with that job's
+        progress (see :meth:`_on_progress`). It's tracked even on a redundant
+        re-assert, because a chained i2v swaps to a new prompt mid-flight (image
+        stage, then video stage) without ever leaving the generating state.
+
         Idempotent: only an actual change flips the button, because ``start`` resets
         the fill to zero. The gallery re-asserts this state on every rebuild (so a
         reconnected run lights the right tab's button), and re-entering progress mode
         on each of those would keep snapping a filling bar back to empty.
         """
+        self._generating_prompt_id = prompt_id if generating else None
         if generating == self._generating:
             return
         self._generating = generating

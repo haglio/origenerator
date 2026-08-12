@@ -38,6 +38,26 @@ instances contend for ComfyUI). Generations made in a branch session are not
 lost to it: the live app's next launch adopts them out of the worktree's
 database as first-class rows (`branch_session.adopt_branch_rows`).
 
+The preview is part of delivering any user-facing change, not an extra: the
+user judges mergability by clicking through the real app, and skipping the
+handoff leaves him "just guessing at whether it's mergable" (his words, from
+the session that forced this flow into existence). Three delivery lessons from
+that session (2026-08-12):
+
+- Launch the preview once yourself and confirm it comes up clean (the launcher
+  logs to `state\origenerator_launcher.log`) before handing it over.
+- Hand a `file:///` markdown link to the vbs FILE itself — never its folder,
+  never a shell command, and never any launcher sharing a filename with the
+  live app's. The user was once handed the worktree's `launch_origenerator.vbs`
+  by that name; he clicked the identically named launcher he runs daily, and a
+  whole "still doesn't work" review cycle ran against the OLD app while the fix
+  sat unlaunched. `launch_preview_branch.vbs` is named distinctly exactly so
+  that cannot recur.
+- When "still doesn't work" survives a fix, check WHICH app his runs actually
+  hit before debugging further: generation rows land in the `state/` database
+  of whichever checkout served them, and their `workflow_version` names the
+  code that ran.
+
 ## Verify the physical end, not just the suite
 
 Device or UI work is not delivered because tests pass — three rounds of "it

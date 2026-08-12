@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 
 from origenerator import stroke_engine
 from origenerator.config import (
@@ -29,6 +29,10 @@ from origenerator.stroke_engine import StrokeState
 logger = logging.getLogger(__name__)
 
 _TICK_MS = 33  # ~30 Hz — the cadence genau streams at
+# The first command after a takeover eases the device from wherever it was
+# parked to the stroke's current position, instead of slamming there in one
+# tick (genau's HandoffGlide, distilled). Streaming holds until the glide ends.
+_TAKEOVER_GLIDE_MS = 400
 
 
 class Osr2StrokeDriver(QObject):
@@ -46,11 +50,14 @@ class Osr2StrokeDriver(QObject):
         self._state = StrokeState()
         self._active = False
         self._streaming = False  # a one-shot "first T-code sent" log per start
-        self._interval_ms = interval_ms
         self._now = now_source
         self._last_tick = 0.0
+        self._glide_until = 0.0  # takeover ease-in: no streaming before this
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
+        # Precise, not Qt's default coarse type: a coarse 33ms timer on Windows
+        # fires in clumps, and clumped sends read on the device as stutter.
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._timer.timeout.connect(self.poll)
 
     @property
@@ -71,8 +78,15 @@ class Osr2StrokeDriver(QObject):
             return
         self._active = True
         self._streaming = False
-        self._last_tick = self._now()
+        now = self._now()
+        self._last_tick = now
         self._broker.pause_genau()
+        # Ease the device from wherever it was parked onto the stroke, then
+        # hold the stream until that glide lands — the alternative is one
+        # 33ms command across most of the axis, which arrives as a slam.
+        self._broker.send_position(
+            stroke_engine.position(self._state), _TAKEOVER_GLIDE_MS)
+        self._glide_until = now + _TAKEOVER_GLIDE_MS / 1000.0
         self._timer.start()
         logger.info("OSR2 stroke engaged: %s", self.status_text())
         self.active_changed.emit(True)
@@ -89,12 +103,22 @@ class Osr2StrokeDriver(QObject):
         self.active_changed.emit(False)
 
     def poll(self) -> None:
-        """One tick: advance the phase by real elapsed time and send the position."""
+        """One tick: advance the phase by real elapsed time and send the position.
+
+        The interval sent with each command is that same real elapsed time, not
+        the timer's nominal 33ms: when the GUI thread stalls and ticks arrive
+        late or bunched, a fixed interval turns each late tick into a violent
+        catch-up move — the jitter that read as two senders fighting. With the
+        true gap, a late tick just asks for a proportionally longer glide.
+        """
         now = self._now()
-        stroke_engine.advance(self._state, now - self._last_tick)
+        dt = now - self._last_tick
+        stroke_engine.advance(self._state, dt)
         self._last_tick = now
+        if now < self._glide_until:
+            return  # still easing onto the stroke; streaming would cut it short
         pos = stroke_engine.position(self._state)
-        self._broker.send_position(pos, self._interval_ms)
+        self._broker.send_position(pos, max(1, round(dt * 1000)))
         if not self._streaming:
             self._streaming = True
             logger.info("OSR2 stroke streaming: first T-code pos=%.0f", pos)

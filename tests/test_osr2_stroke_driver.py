@@ -47,18 +47,40 @@ def test_starting_takes_the_device_and_pauses_genau(qtbot):
     assert handovers == [True]  # announced, so the funscript drive stands down
 
 
-def test_polls_stream_positions_advancing_with_the_clock(qtbot):
+def test_taking_over_glides_in_and_streaming_waits_for_the_glide(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
+    assert broker.positions == [(0.0, 400)]  # ease onto the stroke, don't slam
     clock.t += 0.033
     driver.poll()
-    clock.t += 0.033
+    assert len(broker.positions) == 1        # still gliding: no stream yet
+    clock.t += 0.4
     driver.poll()
-    assert len(broker.positions) == 2
-    (p1, i1), (p2, i2) = broker.positions
-    assert 0.0 <= p1 <= 100.0 and 0.0 <= p2 <= 100.0
-    assert p2 > p1  # a fresh sine stroke is rising off the bottom
-    assert i1 == i2 == 33
+    assert len(broker.positions) == 2        # the glide landed; streaming begins
+
+
+def test_streamed_intervals_are_the_real_gaps_between_ticks(qtbot):
+    # A fixed interval turns every late tick into a violent catch-up move (the
+    # jitter that read as two senders fighting); the true gap glides instead.
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    clock.t += 0.5  # past the takeover glide
+    driver.poll()
+    for late_by in (0.033, 0.1, 0.047):
+        clock.t += late_by
+        driver.poll()
+    intervals = [i for _pos, i in broker.positions[-3:]]
+    assert intervals == [33, 100, 47]
+    positions = [pos for pos, _i in broker.positions]
+    assert all(0.0 <= pos <= 100.0 for pos in positions)
+
+
+def test_the_tick_timer_is_precise_not_coarse(qtbot):
+    # Qt's default coarse timer clumps 33ms ticks on Windows, and clumped sends
+    # read on the device as stutter.
+    from PyQt6.QtCore import Qt
+    driver, _broker, _clock = _driver(qtbot)
+    assert driver._timer.timerType() == Qt.TimerType.PreciseTimer
 
 
 def test_stopping_parks_the_device_and_restores_genau(qtbot):

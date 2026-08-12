@@ -54,6 +54,26 @@ def _registered(workflow_name: str | None):
     return WORKFLOW_REGISTRY.get(workflow_name or "")
 
 
+def _grouping_version(workflow_name: str | None, workflow_version: str | None) -> str:
+    """The workflow generation a row groups under: its stored version when that
+    names a concrete one, else the workflow's current registered version.
+
+    Folding this into the settings key is what puts different generations of a
+    workflow in different folders. When a workflow's recipe changes (a v002 SDXL
+    render vs a v003 one with the enhance tail), its outputs look different, but
+    default-normalization would merge them: an old row lacking the new params is
+    filled with their defaults (:func:`canonical_settings`) and so hashes like a
+    new run. A row with no concrete version — a live form's prospective settings
+    (``None``), or an import's best-effort metadata (``"imported"``/
+    ``"unknown"``) — takes the current version, preserving the property that a
+    sparse import and a full re-roll of it group together.
+    """
+    if workflow_version and workflow_version not in ("imported", "unknown"):
+        return workflow_version
+    wf = _registered(workflow_name)
+    return wf.version if wf else ""
+
+
 @lru_cache(maxsize=None)
 def _workflow_instance_keys(workflow_name: str) -> frozenset:
     """A registered workflow's per-instance keys: every seed param it declares
@@ -217,7 +237,8 @@ def rows_in_settings(rows, key, image_index=None):
     return [
         row for row in rows
         if (row.get("workflow_name") or "") == workflow_name
-        and settings_signature(workflow_name, row.get("params_json"), image_index) == signature
+        and settings_signature(workflow_name, row.get("params_json"), image_index,
+                               workflow_version=row.get("workflow_version")) == signature
     ]
 
 
@@ -225,6 +246,7 @@ def settings_signature(
     workflow_name: str | None,
     params_json: str | None,
     image_index: dict | None = None,
+    workflow_version: str | None = None,
 ) -> str:
     """Canonical grouping key: a row's normalized settings (see
     :func:`canonical_settings`), order-independent.
@@ -235,9 +257,17 @@ def settings_signature(
     configured frames get distinct keys while a video and its re-rolls (same
     frame config, a freshly regenerated file) share one. ``image_index`` may be
     omitted for rows that aren't image-conditioned.
+
+    The workflow generation is folded in too (see :func:`_grouping_version`), so
+    rows made before and after a workflow's recipe changed never share a key. A
+    stored row passes its ``workflow_version`` column; ``None`` (a live form's
+    prospective settings) means the current version.
     """
     params = parse_params(params_json)
-    settings = canonical_settings(workflow_name, params)
+    settings = {
+        **canonical_settings(workflow_name, params),
+        "workflow_version": _grouping_version(workflow_name, workflow_version),
+    }
     if is_image_conditioned(workflow_name):
         settings = {
             **settings,

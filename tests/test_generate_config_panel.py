@@ -303,14 +303,20 @@ def _wiz_params():
     return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
 
 
+# Rows a live config tab should match carry the workflow's current version, as a
+# run made by this app would — the settings signature folds the version in, so a
+# stale one would split the row from the tab's folder.
+_SDXL_VERSION = WORKFLOW_REGISTRY["sdxl_t2i"].version
+
+
 def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     db.insert_generation(
-        prompt_id="wiz", workflow_name="sdxl_t2i", workflow_version="v",
+        prompt_id="wiz", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     db.insert_generation(  # a different prompt → a different settings folder
-        prompt_id="drg", workflow_name="sdxl_t2i", workflow_version="v",
+        prompt_id="drg", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a dragon",
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                                     positive_prompt="a dragon")),
@@ -325,7 +331,7 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
 def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     db.insert_generation(
-        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v",
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
@@ -351,7 +357,7 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
 def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     db.insert_generation(
-        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version="v",
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     )
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))

@@ -169,7 +169,7 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     # build_gallery_tree both resolve it in gallery.tree), not the facade re-export.
     original = gallery.settings_signature
     monkeypatch.setattr(gallery.tree, "settings_signature",
-                        lambda wf, pj, image_index=None: original(wf, pj, image_index) + "X")
+                        lambda *a, **kw: original(*a, **kw) + "X")
     new_key = gallery.settings_folder_key(row)
     assert new_key != key
 
@@ -197,6 +197,27 @@ def test_reconcile_repoints_an_i2v_star_across_the_frame_config_change(tmp_path)
     index = gallery.build_image_config_index([db.get_generation("img")])
     legacy_key = gallery.legacy_preframe_settings_folder_key(video)
     current_key = gallery.settings_folder_key(video, index)
+    assert legacy_key != current_key                 # the fold moved the folder's key
+    db.set_folder_starred(legacy_key, True)          # a star from before the fold
+
+    summary = reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()
+    assert meta.get(current_key, {}).get("starred") is True  # moved onto the live folder
+    assert legacy_key not in meta                             # old key cleared
+    assert summary["repointed"] == 1
+
+
+def test_reconcile_repoints_a_star_across_the_version_fold(tmp_path):
+    # A star made before the workflow generation was folded into the settings
+    # key dangles once the formula changes. With no stored identity it is
+    # recovered through the pre-version legacy formula and moved onto the live
+    # folder — so a bookmark made just before this fix survives it.
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    legacy_key = gallery.legacy_preversion_settings_folder_key(row)
+    current_key = gallery.settings_folder_key(row)
     assert legacy_key != current_key                 # the fold moved the folder's key
     db.set_folder_starred(legacy_key, True)          # a star from before the fold
 

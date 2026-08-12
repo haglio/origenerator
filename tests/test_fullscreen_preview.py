@@ -194,3 +194,36 @@ def test_paging_emits_media_changed_to_re_aim_the_osr2(qtbot, tmp_path):
 
     _press(win, Qt.Key.Key_Right)
     assert changed == [True]
+
+
+class _FakeStroke:
+    """Enough of the stroke driver for the shared keys and caption."""
+
+    def __init__(self):
+        self.active = False
+        self.calls = []
+
+    def toggle(self):
+        self.active = not self.active
+        self.calls.append(("toggle", self.active))
+        return self.active
+
+    def adjust_speed(self, delta):
+        self.calls.append(("speed", delta))
+
+    def status_text(self):
+        return "OSR2 stub"
+
+
+def test_the_shared_stroke_keys_work_here_too(qtbot, tmp_path):
+    # An image has no funscript, so the app-global stroke is how the device runs
+    # over a fullscreen still — wired in by the gallery, standing caption and all.
+    win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    _press(win, Qt.Key.Key_Space)  # not wired yet: inert, and must not crash
+    stroke = _FakeStroke()
+    win.set_stroke(stroke)
+    assert "Space" in win._stroke_caption.text()  # the key legend, while off
+    _press(win, Qt.Key.Key_Space)
+    _press(win, Qt.Key.Key_J)
+    assert stroke.calls == [("toggle", True), ("speed", -5)]

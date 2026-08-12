@@ -38,10 +38,13 @@ def _driver(qtbot):
 
 def test_starting_takes_the_device_and_pauses_genau(qtbot):
     driver, broker, _clock = _driver(qtbot)
+    handovers = []
+    driver.active_changed.connect(handovers.append)
     assert driver.toggle() is True
     assert driver.active
     assert broker.paused == 1
     assert broker.parked == 0  # taking the device isn't parking it
+    assert handovers == [True]  # announced, so the funscript drive stands down
 
 
 def test_polls_stream_positions_advancing_with_the_clock(qtbot):
@@ -61,11 +64,15 @@ def test_polls_stream_positions_advancing_with_the_clock(qtbot):
 def test_stopping_parks_the_device_and_restores_genau(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
+    handovers = []
+    driver.active_changed.connect(handovers.append)
     assert driver.toggle() is False
     assert broker.parked == 1
     assert broker.restored == 1
+    assert handovers == [False]  # announced, so the funscript drive may re-aim
     driver.stop()  # already stopped: releasing again must not park twice
     assert broker.parked == 1
+    assert handovers == [False]  # and a redundant stop announces nothing
 
 
 def test_the_knobs_shape_the_status_line(qtbot):

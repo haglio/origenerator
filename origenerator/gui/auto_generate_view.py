@@ -17,37 +17,31 @@ The arrow keys are laid out like a Fun Time satellite's controls:
 * Down       — lock: hold the current item against the auto-advance (a locked
                video replays); press again to release.
 
-And since a still image gives the OSR2 nothing to follow, the view carries the
-OSR2 side of genau — the direct stroke engine, none of the visuals — on genau's
-own keys: Space starts/stops the device, J/L speed, 7/9 amplitude, U/O center,
-I shape. A standing caption along the top shows the stroke's state, naming
-those keys while it's off so they can be found at all. The gallery listens to
-:attr:`stroke_active_changed` to keep the funscript driver off the device while
-the stroke runs.
+And since a still image gives the OSR2 nothing to follow, the view answers the
+shared stroke keys (see :mod:`origenerator.gui.stroke_hud`) against the
+gallery's app-global stroke driver, with the standing caption along its top —
+the same controls every other surface offers. The stroke outlives this view:
+closing it leaves the device running.
 
 Escape closes the view (the loop keeps running); :attr:`closed` fires so the
 gallery can forget it.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.stroke_hud import CAPTION_CSS, StrokeCaption, apply_stroke_key
 from origenerator.slideshow import LIVE, AutoGeneratePlaylist
 
 _GENERATING = "Generating…"
-_CAPTION_CSS = (
-    "color: white; background: rgba(0, 0, 0, 140);"
-    " padding: 4px 10px; border-radius: 4px;"
-)
 
 
 class AutoGenerateView(QWidget):
     closed = pyqtSignal()            # dismissed (Esc / close) — loop keeps running
     cancel_requested = pyqtSignal()  # Up on the live slot: cancel the generation
     weird_requested = pyqtSignal(str)  # Up on a finished item: mark it weird (prompt_id)
-    stroke_active_changed = pyqtSignal(bool)  # the stroke engine took/released the device
 
     def __init__(self, *, player=None, stroke=None, image_dwell_ms=4000, parent=None):
         super().__init__(parent)
@@ -60,19 +54,8 @@ class AutoGenerateView(QWidget):
 
         self._playlist = AutoGeneratePlaylist(image_dwell_ms=image_dwell_ms)
         self._live_frame: bytes | None = None  # the in-flight generation's latest frame
-
-        # The stroke driver is injectable so unit tests can watch the calls
-        # without touching the broker; built here by default so the gallery's
-        # montage seam stays a bare constructor call.
-        if stroke is None:
-            # Imported here, not at module scope, so tests injecting a stub
-            # never pull the device stack in at all.
-            from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
-            stroke = Osr2StrokeDriver(parent=self)
-            # Quitting mid-stroke still parks the device and restores genau.
-            app = QApplication.instance()
-            if app is not None:
-                app.aboutToQuit.connect(stroke.stop)
+        # The gallery hands in its one app-global stroke driver; without one
+        # (a bare test construction) the stroke keys are inert.
         self._stroke = stroke
 
         layout = QVBoxLayout(self)
@@ -86,21 +69,16 @@ class AutoGenerateView(QWidget):
         layout.addWidget(self._preview, 1)
 
         # A translucent position caption floating over the bottom of the media,
-        # and the stroke engine's state standing along the top — always shown,
-        # since an idle line naming its keys is the only way the OSR2 controls
-        # are discoverable at all (nothing else on screen hints they exist).
+        # and the stroke's standing caption along the top (see stroke_hud).
         self._counter = QLabel(self)
-        self._counter.setStyleSheet(_CAPTION_CSS)
+        self._counter.setStyleSheet(CAPTION_CSS)
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_caption = QLabel(self)
-        self._stroke_caption.setStyleSheet(_CAPTION_CSS)
-        self._stroke_caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._stroke_caption = StrokeCaption(stroke, self) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._advance)
 
-        self._update_stroke_caption()
         self._show_current()
 
     # --- the gallery feeds these as the loop runs --------------------------
@@ -209,27 +187,6 @@ class AutoGenerateView(QWidget):
         else:
             self._advance()
 
-    # --- the OSR2 stroke (genau's keys, none of its visuals) ---------------
-
-    def _toggle_stroke(self):
-        active = self._stroke.toggle()
-        self.stroke_active_changed.emit(active)
-        self._update_stroke_caption()
-
-    def _stroke_adjust(self, action):
-        action()
-        self._update_stroke_caption()
-
-    def _update_stroke_caption(self):
-        """The standing OSR2 line along the top: the stroke's state, plus its
-        keys while it's off — the invitation to press Space."""
-        text = self._stroke.status_text()
-        if not self._stroke.active:
-            text += "   ·   Space drives · J/L speed · 7/9 travel · U/O center · I shape"
-        self._stroke_caption.setText(text)
-        self._reposition_stroke_caption()
-        self._stroke_caption.raise_()
-
     # --- captions ----------------------------------------------------------
 
     def _update_counter(self):
@@ -270,36 +227,21 @@ class AutoGenerateView(QWidget):
             self._condemn()
         elif key == Qt.Key.Key_Down:
             self._toggle_lock()
-        elif key == Qt.Key.Key_Space:
-            self._toggle_stroke()
-        elif key == Qt.Key.Key_J:
-            self._stroke_adjust(lambda: self._stroke.adjust_speed(-5))
-        elif key == Qt.Key.Key_L:
-            self._stroke_adjust(lambda: self._stroke.adjust_speed(5))
-        elif key == Qt.Key.Key_7:
-            self._stroke_adjust(lambda: self._stroke.adjust_amplitude(-10))
-        elif key == Qt.Key.Key_9:
-            self._stroke_adjust(lambda: self._stroke.adjust_amplitude(10))
-        elif key == Qt.Key.Key_U:
-            self._stroke_adjust(lambda: self._stroke.adjust_center(-5))
-        elif key == Qt.Key.Key_O:
-            self._stroke_adjust(lambda: self._stroke.adjust_center(5))
-        elif key == Qt.Key.Key_I:
-            self._stroke_adjust(self._stroke.cycle_shape)
+        elif apply_stroke_key(self._stroke, key):
+            self._stroke_caption.refresh()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
-        if self._stroke_caption.isVisible():
-            self._reposition_stroke_caption()
+        if self._stroke_caption is not None:
+            self._stroke_caption.reposition()
 
     def closeEvent(self, event):
+        # The stroke is the gallery's, app-global, and deliberately keeps
+        # running: dismissing the view shouldn't park the device mid-use.
         self._timer.stop()
-        if self._stroke.active:
-            self._stroke.stop()  # never leave the device running unattended
-            self.stroke_active_changed.emit(False)
         self._preview.clear()  # release any held video file so it can be deleted
         self.closed.emit()
         super().closeEvent(event)

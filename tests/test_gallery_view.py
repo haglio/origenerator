@@ -4389,9 +4389,13 @@ class _FakeFullscreen(QObject):
         self._target = target
         self.playlist = None       # the items set_playlist was armed with, if any
         self.playlist_index = None
+        self.stroke = None         # the shared stroke driver the gallery wires in
 
     def osr2_drive_target(self):
         return self._target
+
+    def set_stroke(self, stroke):
+        self.stroke = stroke
 
     def set_playlist(self, items, index):
         self.playlist = list(items)
@@ -4497,17 +4501,41 @@ def _resolve_by_id(monkeypatch):
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
 
 
-class _StubStroke:
-    """Stands in for Osr2StrokeDriver so no device backend spins up."""
+class _SignalStroke(QObject):
+    """Stands in for the app-global Osr2StrokeDriver: records the calls, flips
+    on toggle, and reports the handovers — no device backend spins up."""
 
-    active = False
+    active_changed = pyqtSignal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self.active = False
+        self.calls = []
 
     def toggle(self):
         self.active = not self.active
+        self.calls.append(("toggle", self.active))
+        self.active_changed.emit(self.active)
         return self.active
 
     def stop(self):
+        was_active = self.active
         self.active = False
+        self.calls.append(("stop",))
+        if was_active:
+            self.active_changed.emit(False)
+
+    def adjust_speed(self, delta):
+        self.calls.append(("speed", delta))
+
+    def adjust_amplitude(self, delta):
+        self.calls.append(("amplitude", delta))
+
+    def adjust_center(self, delta):
+        self.calls.append(("center", delta))
+
+    def cycle_shape(self):
+        self.calls.append(("shape",))
 
     def status_text(self):
         return "OSR2 stub"
@@ -4516,11 +4544,12 @@ class _StubStroke:
 def _auto_montage_view(qtbot, monkeypatch, rows):
     """A gallery on a settings leaf whose loop reports active, with the slideshow
     built on stubbed player and stroke so no media or device backend spins up."""
-    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient())
+    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
+                       osr2_stroke=_SignalStroke())
     qtbot.addWidget(view)
     monkeypatch.setattr(
         view, "_make_auto_montage",
-        lambda: AutoGenerateView(player=MagicMock(), stroke=_StubStroke()),
+        lambda: AutoGenerateView(player=MagicMock(), stroke=view._osr2_stroke),
     )
     view.refresh()
     _open_leaf(view)
@@ -4615,27 +4644,41 @@ def test_marking_weird_in_the_montage_trashes_the_item(qtbot, monkeypatch):
     view._auto_montage.close()
 
 
-def test_the_montage_stroke_takes_the_device_from_the_funscript_drive(qtbot, monkeypatch):
+def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypatch):
     view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
     stopped = []
     monkeypatch.setattr(view._osr2_driver, "stop", lambda: stopped.append(True))
     view._osr2_driving = ("clip.mp4", "player")  # as if a funscript drive were on
-    view._auto_montage.stroke_active_changed.emit(True)
-    assert view._montage_stroke_active
-    assert stopped == [True]                 # the funscript drive stood down
-    assert view._osr2_drive_source() is None  # and nothing may retake the device
-    view._auto_montage.stroke_active_changed.emit(False)
-    assert not view._montage_stroke_active
-    view._auto_montage.close()
+    view._osr2_stroke.toggle()                   # the stroke takes the device
+    assert stopped == [True]                     # the funscript drive stood down
+    assert view._osr2_drive_source() is None     # and nothing may retake the device
+    assert not view._stroke_status.isHidden()    # the main window says who has it
 
 
-def test_closing_the_montage_releases_the_stroke_hold(qtbot, monkeypatch):
+def test_closing_the_montage_leaves_the_stroke_running(qtbot, monkeypatch):
+    # The stroke is app-global: dismissing a view must not park the device.
     view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._open_auto_montage(key)
-    view._auto_montage.stroke_active_changed.emit(True)
+    view._osr2_stroke.toggle()
     view._auto_montage.close()
-    assert not view._montage_stroke_active
+    assert view._osr2_stroke.active
+
+
+def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._osr2_stroke.toggle()
+    assert view._handle_escape() is True
+    assert not view._osr2_stroke.active
+
+
+def test_the_stroke_keys_work_in_the_main_window_too(qtbot, monkeypatch):
+    # "Always available": the same keys the fullscreen views answer are routed
+    # app-wide by the gallery's event filter, under its own-keys guards.
+    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
+    event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_L, _NO_MOD)
+    assert view.eventFilter(view, event) is True
+    assert ("speed", 5) in view._osr2_stroke.calls
 
 
 def test_the_loop_ending_drops_the_montage_live_slot(qtbot, monkeypatch):

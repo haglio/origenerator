@@ -3,8 +3,10 @@
 Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
 rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
 and pacing. Images advance on a dwell timer; videos play once and advance when
-they end (``PreviewWidget.video_ended``). Space pauses, the arrows step and tune
-the dwell, and Escape closes.
+they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down holds,
+and Escape closes. The shared OSR2 stroke keys ride along (Space and friends —
+see :mod:`origenerator.gui.stroke_hud`) with the standing caption up top, so the
+device can run over a slideshow of stills.
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
@@ -12,14 +14,16 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer
 
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.stroke_hud import StrokeCaption, apply_stroke_key
 from origenerator.slideshow import SlideshowPlaylist
 
 
 class SlideshowView(QWidget):
     def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, on_delete=None,
-                 player=None, parent=None):
+                 player=None, stroke=None, parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
+        self._stroke = stroke  # the gallery's app-global stroke driver, or None
         playlist_kwargs = {"image_dwell_ms": image_dwell_ms}
         if shuffle is not None:  # else the playlist uses its own random shuffle
             playlist_kwargs["shuffle"] = shuffle
@@ -47,6 +51,7 @@ class SlideshowView(QWidget):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._stroke_caption = StrokeCaption(stroke, self) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -125,8 +130,6 @@ class SlideshowView(QWidget):
         key = event.key()
         if key == Qt.Key.Key_Escape:
             self.close()
-        elif key == Qt.Key.Key_Space:
-            self._toggle_pause()
         elif key == Qt.Key.Key_Left:
             self._back()
         elif key == Qt.Key.Key_Right:
@@ -135,12 +138,18 @@ class SlideshowView(QWidget):
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
             self._toggle_pause()    # hold on the current item
+        elif apply_stroke_key(self._stroke, key):
+            # Space belongs to the stroke cluster now, everywhere — holding the
+            # slideshow is Down, matching the auto-generate view's lock.
+            self._stroke_caption.refresh()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
+        if self._stroke_caption is not None:
+            self._stroke_caption.reposition()
 
     def closeEvent(self, event):
         self._timer.stop()

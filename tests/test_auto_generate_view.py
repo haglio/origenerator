@@ -188,16 +188,14 @@ def test_the_stroke_caption_stands_ready_and_names_its_keys(qtbot):
     assert "Space" in view._stroke_caption.text()
 
 
-def test_space_toggles_the_stroke_and_reports_the_takeover(qtbot):
+def test_space_toggles_the_stroke_and_the_caption_follows(qtbot):
     view = _view(qtbot)
-    active = []
-    view.stroke_active_changed.connect(active.append)
     _press(view, Qt.Key.Key_Space)
-    assert active == [True]
+    assert ("toggle", True) in view._stroke.calls
     # Driving now: the caption drops the key legend and shows the bare status.
     assert view._stroke_caption.text() == "OSR2 stub"
     _press(view, Qt.Key.Key_Space)
-    assert active == [True, False]
+    assert ("toggle", False) in view._stroke.calls
     assert "Space" in view._stroke_caption.text()  # legend returns when off
 
 
@@ -224,12 +222,12 @@ def test_escape_closes_and_emits_closed(qtbot):
     assert closed == [True]
 
 
-def test_closing_stops_a_running_stroke_and_releases_the_media(qtbot):
+def test_closing_leaves_the_stroke_running_and_releases_the_media(qtbot):
+    # The stroke is the gallery's, app-global: dismissing the slideshow must not
+    # park the device mid-use. (Esc in the gallery is the panic-stop.)
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Space)   # the stroke is driving
-    active = []
-    view.stroke_active_changed.connect(active.append)
     view.close()
-    assert ("stop",) in view._stroke.calls   # never left running unattended
-    assert active == [False]
+    assert ("stop",) not in view._stroke.calls
+    assert view._stroke.active
     view._preview._player.setSource.assert_called_with(QUrl())

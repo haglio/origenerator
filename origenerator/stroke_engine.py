@@ -60,12 +60,26 @@ class StrokeState:
         return max(half, min(100 - half, self.intended_center))
 
 
+def set_speed(state: StrokeState, value: int) -> None:
+    state.speed = max(MIN_SPEED, min(MAX_SPEED, value))
+
+
 def adjust_speed(state: StrokeState, delta: int) -> None:
-    state.speed = max(MIN_SPEED, min(MAX_SPEED, state.speed + delta))
+    set_speed(state, state.speed + delta)
+
+
+def set_amplitude(state: StrokeState, value: int) -> None:
+    state.amplitude = max(0, min(100, value))
 
 
 def adjust_amplitude(state: StrokeState, delta: int) -> None:
-    state.amplitude = max(0, min(100, state.amplitude + delta))
+    set_amplitude(state, state.amplitude + delta)
+
+
+def set_center(state: StrokeState, value: int) -> None:
+    """Aim the center at ``value``; the effective center still clamps so the
+    amplitude fits (see :attr:`StrokeState.center`)."""
+    state.intended_center = max(0, min(100, value))
 
 
 def adjust_center(state: StrokeState, delta: int) -> None:
@@ -117,8 +131,22 @@ def _waveform_raw(phase: float, shape: StrokeShape) -> float:
 def position(state: StrokeState) -> float:
     """The stroke position for the current phase, 0-100 (bottom-top) — the same
     scale :func:`origenerator.osr2.format_position` takes."""
-    raw = _waveform_raw(state.phase, state.shape)
+    return _position_at(state, state.phase)
+
+
+def _position_at(state: StrokeState, phase: float) -> float:
+    raw = _waveform_raw(phase, state.shape)
     half = state.amplitude / 2
     low = max(0.0, state.center - half)
     high = min(100.0, state.center + half)
     return low + raw * (high - low)
+
+
+def trace(state: StrokeState, samples: int, span_s: float) -> list[float]:
+    """The stroke sampled forward from now, as 0-1 heights — the drive HUD's
+    picture of the motion the device is being sent, ``span_s`` seconds of it."""
+    span_cycles = span_s * state.bpm / 60.0
+    return [
+        _position_at(state, state.phase + (i / max(1, samples - 1)) * span_cycles) / 100.0
+        for i in range(samples)
+    ]

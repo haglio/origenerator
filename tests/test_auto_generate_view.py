@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QEvent, QUrl
 from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.auto_generate_view import AutoGenerateView
+from origenerator.stroke_engine import StrokeState
 
 
 def _png(path):
@@ -26,11 +27,13 @@ def _press(view, key):
 
 
 class FakeStroke:
-    """Stands in for Osr2StrokeDriver: records the calls, flips on toggle."""
+    """Stands in for Osr2StrokeDriver: records the calls, flips on toggle. A
+    real StrokeState rides along so the drive panel can draw from it."""
 
     def __init__(self):
         self.active = False
         self.calls = []
+        self.state = StrokeState()
 
     def toggle(self):
         self.active = not self.active
@@ -179,24 +182,21 @@ def test_the_loop_ending_drops_the_live_slot_but_keeps_rotating(qtbot, tmp_path)
     assert "generating" not in view._counter.text()
 
 
-def test_the_stroke_caption_stands_ready_and_names_its_keys(qtbot):
-    # The caption is the only trace the OSR2 controls exist, so it's up from the
-    # start — status plus the key legend while the stroke is off.
+def test_the_drive_panel_stands_ready_from_the_start(qtbot):
+    # The panel is the visible form of the OSR2 controls, so it's up from the
+    # start, with the key legend as its tooltip.
     view = _view(qtbot)
-    assert not view._stroke_caption.isHidden()
-    assert view._stroke_caption.text().startswith("OSR2 stub")
-    assert "Space" in view._stroke_caption.text()
+    assert view._stroke_panel is not None
+    assert not view._stroke_panel.isHidden()
+    assert "Space" in view._stroke_panel.toolTip()
 
 
-def test_space_toggles_the_stroke_and_the_caption_follows(qtbot):
+def test_space_toggles_the_stroke(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in view._stroke.calls
-    # Driving now: the caption drops the key legend and shows the bare status.
-    assert view._stroke_caption.text() == "OSR2 stub"
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", False) in view._stroke.calls
-    assert "Space" in view._stroke_caption.text()  # legend returns when off
 
 
 def test_the_stroke_keys_map_like_genau(qtbot):

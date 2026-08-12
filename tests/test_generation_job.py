@@ -50,12 +50,13 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     client.progress.emit("comfy-OTHER", 5, 50)
     assert started == [] and progress == []
 
-    # SDXL is a single 50-step pass, so progress forwards as value-over-total.
+    # SDXL runs a 50-step base pass then a 20-step enhance pass, so progress
+    # forwards as value over the 70-step whole-run total.
     client.progress.emit("comfy-A", 5, 50)
     assert started == [True]
-    assert progress == [(5, 50)]
+    assert progress == [(5, 70)]
     assert job.state == "running"
-    assert job.last_progress == (5, 50)
+    assert job.last_progress == (5, 70)
 
     client.progress.emit("comfy-A", 7, 50)
     assert started == [True]  # started fires only once

@@ -243,6 +243,96 @@ def test_sdxl_t2i_extract_output_info():
     assert files[0]["filename"] == "sdxl_t2i_00001_.png"
 
 
+# ---- The SDXL upscale/enhance tail (shared by both SDXL workflows) ----
+
+def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
+    # Both SDXL stills workflows finish with a hires-fix tail: the decoded
+    # render is model-upscaled (sharpness), rescaled to enhance_scale x the
+    # base size (the model itself is 4x, so the rescale is relative to its
+    # output), re-encoded, and re-sampled at low denoise — the checkpoint
+    # generating real fine texture rather than interpolating pixels, which is
+    # what keeps the enlargement naturalistic. SaveImage stores that result.
+    for name in ("sdxl_t2i", "sdxl_pose_transfer"):
+        wf = WORKFLOW_REGISTRY[name]
+        params = dict(wf.default_params(), seed=11, enhance_scale=2.0,
+                      enhance_steps=17, enhance_denoise=0.35)
+        payload = wf.build_api_payload(params)
+
+        loader_id = _node_id(payload, "UpscaleModelLoader")
+        assert payload[loader_id]["inputs"]["model_name"] == params["upscale_model"], name
+        up_id = _node_id(payload, "ImageUpscaleWithModel")
+        assert payload[up_id]["inputs"]["upscale_model"] == [loader_id, 0]
+        scale_id = _node_id(payload, "ImageScaleBy")
+        scale = payload[scale_id]["inputs"]
+        assert scale["image"] == [up_id, 0]
+        assert scale["scale_by"] == pytest.approx(2.0 / 4.0)
+        encode_id = _node_id(payload, "VAEEncode")
+        assert payload[encode_id]["inputs"]["pixels"] == [scale_id, 0]
+
+        # Two samplers: the base pass and the enhance pass over the re-encoded
+        # image. The enhance pass runs its own steps/denoise but reuses the
+        # base pass's model, conditioning, cfg and seed — same recipe, refined.
+        samplers = {nid: n["inputs"] for nid, n in payload.items()
+                    if n["class_type"] == "KSampler"}
+        assert len(samplers) == 2, name
+        enhance_id = next(nid for nid, s in samplers.items()
+                          if s["latent_image"] == [encode_id, 0])
+        base_id = next(nid for nid in samplers if nid != enhance_id)
+        base, enhance = samplers[base_id], samplers[enhance_id]
+        assert enhance["steps"] == 17
+        assert enhance["denoise"] == 0.35
+        assert enhance["seed"] == 11
+        assert enhance["model"] == base["model"]
+        assert enhance["positive"] == base["positive"]
+        assert enhance["negative"] == base["negative"]
+        assert enhance["cfg"] == base["cfg"]
+        assert enhance["sampler_name"] == base["sampler_name"]
+        assert enhance["scheduler"] == base["scheduler"]
+
+        # The tail hangs off the BASE pass's decode, and SaveImage stores the
+        # enhance pass's decode, both through the workflow's one VAE.
+        base_decode_id = payload[up_id]["inputs"]["image"][0]
+        assert payload[base_decode_id]["class_type"] == "VAEDecode"
+        assert payload[base_decode_id]["inputs"]["samples"] == [base_id, 0]
+        save = _find_node(payload, "SaveImage")
+        final_decode_id = save["inputs"]["images"][0]
+        assert payload[final_decode_id]["class_type"] == "VAEDecode"
+        assert payload[final_decode_id]["inputs"]["samples"] == [enhance_id, 0]
+        assert payload[final_decode_id]["inputs"]["vae"] == payload[encode_id]["inputs"]["vae"]
+        assert wf.extract_output_info(
+            {"outputs": {_node_id(payload, "SaveImage"): {"images": [{"filename": "x.png"}]}}}
+        ) == [{"filename": "x.png"}]
+
+
+def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
+    # The enhance tail's look-affecting knobs are ordinary form fields: the
+    # upscale model picked from the installed upscale_models files like every
+    # other model picker, and the scale/steps/denoise numerics — not hidden
+    # defaults the form would silently reset.
+    import origenerator.workflows.sdxl_pose_transfer as pose
+    import origenerator.workflows.sdxl_t2i as t2i
+
+    installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
+    picker = lambda category, fallback: installed.get(category, list(fallback))
+    monkeypatch.setattr(t2i, "list_model_files", picker)
+    monkeypatch.setattr(pose, "list_model_files", picker)
+
+    for name in ("sdxl_t2i", "sdxl_pose_transfer"):
+        wf = WORKFLOW_REGISTRY[name]
+        by_key = {pd.key: pd for pd in wf.param_definitions()}
+        model = by_key["upscale_model"]
+        assert model.type == "combo"
+        assert model.options == ["4x_crisp.pt", "4x_soft.pth"]
+        assert model.default == wf.default_params()["upscale_model"]
+        scale = by_key["enhance_scale"]
+        assert scale.type == "float"
+        assert (scale.min_val, scale.max_val) == (1.0, 4.0)
+        assert scale.default == 2.0
+        assert by_key["enhance_steps"].type == "int"
+        assert by_key["enhance_denoise"].type == "float"
+        assert by_key["enhance_denoise"].max_val == 1.0
+
+
 # ---- WAN 2.2 FLF2V Loop ----
 
 def test_wan22_default_params_has_required_keys():
@@ -1056,12 +1146,18 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
     ckpt = _find_node(payload, "CheckpointLoaderSimple")
     assert ckpt["inputs"]["ckpt_name"] == params["checkpoint"]
 
-    # Decoded through the standalone VAE and saved, like sdxl_t2i.
+    # Decoded through the standalone VAE like sdxl_t2i, then finished by the
+    # enhance tail: the upscaler reads this decode, and SaveImage stores the
+    # tail's own re-sampled decode (the chain itself is pinned by
+    # test_sdxl_workflows_end_with_an_upscale_enhance_pass).
     decode_id = _node_id(payload, "VAEDecode")
     vae_id = _node_id(payload, "VAELoader")
     assert payload[decode_id]["inputs"]["vae"] == [vae_id, 0]
+    assert _find_node(payload, "ImageUpscaleWithModel")["inputs"]["image"] == [decode_id, 0]
     save = _find_node(payload, "SaveImage")
-    assert save["inputs"]["images"] == [decode_id, 0]
+    final_decode = payload[save["inputs"]["images"][0]]
+    assert final_decode["class_type"] == "VAEDecode"
+    assert final_decode["inputs"]["vae"] == [vae_id, 0]
     assert save["inputs"]["filename_prefix"] == params["filename_prefix"]
 
 

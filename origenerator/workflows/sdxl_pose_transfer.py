@@ -11,30 +11,41 @@ _TARGET_MEGAPIXELS = 1.0
 
 
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
-    """SDXL text-to-image steered by the pose of an input image.
+    """SDXL text-to-image steered by the structure of an input image.
 
     A variation of :class:`~origenerator.workflows.sdxl_t2i.SdxlT2iWorkflow`
-    that re-skins an image: a DWPose skeleton is extracted from the input and
-    applied through an SDXL ControlNet, so the render keeps the input's pose,
-    angle and proportions while the prompt and checkpoint replace everything
-    else about how it looks. Only the skeleton crosses over — the sampler still
-    denoises from scratch (denoise 1.0), which is what lets the presentation
-    change completely while the structure holds.
+    that re-skins an image: a structure map extracted from the input is applied
+    through an SDXL ControlNet, so the render keeps the input's pose, angle and
+    proportions while the prompt and checkpoint replace everything else about
+    how it looks. Only the map crosses over — the sampler still denoises from
+    scratch (denoise 1.0), which is what lets the presentation change
+    completely while the structure holds.
+
+    Two structure modes. "depth" (the default) conditions on a DepthAnythingV2
+    map: it captures every body, their contact and the camera angle no matter
+    how entangled or tightly framed the scene, and carries no color or texture
+    to leak through. "pose" conditions on a DWPose skeleton instead — a looser
+    rein that only pins the figure, but DWPose's person detector collapses on
+    close-ups and horizontal, overlapping bodies (observed fusing two people
+    into one figure), so it fits single mostly-upright subjects only. The union
+    ControlNet serves both modes through one file; SetUnionControlNetType picks
+    the head, and is added only for union files because a plain single-purpose
+    ControlNet crashes on the extra argument.
 
     The output size is derived from the input image (its aspect ratio at the
     SDXL pixel budget), the same locked-Dimensions treatment the i2v workflows
-    get, because the pose skeleton is stretched to the output canvas — a
-    hand-set size with a different aspect would distort the pose it exists to
-    preserve.
+    get, because the structure map is stretched to the output canvas — a
+    hand-set size with a different aspect would distort the very structure it
+    exists to preserve.
 
     Like sdxl_t2i, the render is finished by the shared upscale/enhance tail
     (:meth:`WorkflowTemplate.enhance_image_nodes`). Its second sampling pass
-    reuses the ControlNet-applied conditioning, so the pose stays pinned while
-    the checkpoint sharpens and re-textures the enlarged image.
+    reuses the ControlNet-applied conditioning, so the structure stays pinned
+    while the checkpoint sharpens and re-textures the enlarged image.
     """
 
     name = "sdxl_pose_transfer"
-    version = "v002"
+    version = "v003"
     display_name = "SDXL Pose Transfer"
     output_type = "image"
     derives_size_from_input = True
@@ -55,9 +66,11 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
-            "controlnet": "xinsir_openpose_sdxl_1.0.safetensors",
+            "control_mode": "depth",
+            "controlnet": "xinsir_controlnet_union_sdxl_promax.safetensors",
             "controlnet_strength": 0.8,
             "controlnet_end": 1.0,
+            "depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "pose_bbox_detector": "yolox_l.onnx",
             "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
@@ -75,14 +88,16 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("input_image", "Pose Image", "image", ""),
+            ParamDef("input_image", "Structure Image", "image", ""),
             ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
                      options=checkpoints),
-            ParamDef("controlnet", "ControlNet (Pose)", "combo", defaults["controlnet"],
+            ParamDef("control_mode", "Structure From", "combo", "depth",
+                     options=["depth", "pose"]),
+            ParamDef("controlnet", "ControlNet", "combo", defaults["controlnet"],
                      options=controlnets),
-            ParamDef("controlnet_strength", "Pose Strength", "float", 0.8,
+            ParamDef("controlnet_strength", "Structure Strength", "float", 0.8,
                      min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("controlnet_end", "Pose Hold (End %)", "float", 1.0,
+            ParamDef("controlnet_end", "Structure Hold (End %)", "float", 1.0,
                      min_val=0.0, max_val=1.0, step=0.05),
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("batch_size", "Batch Size", "int", 1, min_val=1, max_val=16),
@@ -111,14 +126,85 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             params.get("input_image", ""), megapixels=_TARGET_MEGAPIXELS
         )
 
+    @staticmethod
+    def _structure_nodes(params: dict, scaled_ref) -> tuple[dict, list]:
+        """The mode's extractor subgraph and the hint-image ref it produces.
+
+        Both modes read the already-scaled image, so the map they draw shares
+        the latent's aspect exactly.
+        """
+        if params["control_mode"] == "pose":
+            nodes = {
+                "8": {
+                    "class_type": "DWPreprocessor",
+                    "inputs": {
+                        "image": scaled_ref,
+                        "detect_hand": "enable",
+                        "detect_body": "enable",
+                        "detect_face": "enable",
+                        "resolution": 1024,
+                        "bbox_detector": params["pose_bbox_detector"],
+                        "pose_estimator": params["pose_estimator"],
+                        # xinsir's SDXL ControlNets are trained on thicker
+                        # skeleton sticks; the toggle follows the picked file so
+                        # a swapped-in non-xinsir ControlNet gets standard
+                        # sticks automatically.
+                        "scale_stick_for_xinsr_cn": (
+                            "enable" if "xinsir" in params["controlnet"].lower()
+                            else "disable"
+                        ),
+                    },
+                },
+            }
+            return nodes, ["8", 0]
+        nodes = {
+            "22": {
+                "class_type": "DownloadAndLoadDepthAnythingV2Model",
+                "inputs": {"model": params["depth_model"]},
+            },
+            "23": {
+                "class_type": "DepthAnything_V2",
+                "inputs": {"da_model": ["22", 0], "images": scaled_ref},
+            },
+        }
+        return nodes, ["23", 0]
+
+    @staticmethod
+    def _controlnet_nodes(params: dict) -> tuple[dict, list]:
+        """The ControlNet loading subgraph and the CONTROL_NET ref to apply.
+
+        A union file gets a SetUnionControlNetType picking the mode's head; a
+        plain single-purpose ControlNet is passed straight through, because it
+        crashes on the union node's extra argument.
+        """
+        nodes = {
+            "7": {
+                "class_type": "ControlNetLoader",
+                "inputs": {"control_net_name": params["controlnet"]},
+            },
+        }
+        if "union" not in params["controlnet"].lower():
+            return nodes, ["7", 0]
+        nodes["21"] = {
+            "class_type": "SetUnionControlNetType",
+            "inputs": {
+                "control_net": ["7", 0],
+                "type": "openpose" if params["control_mode"] == "pose" else "depth",
+            },
+        }
+        return nodes, ["21", 0]
+
     def build_api_payload(self, params: dict) -> dict:
-        # Size the still off the pose image: derived in-graph at the SDXL budget
-        # by default, or scaled to the user's explicit WxH when the derived size
-        # was unlocked. The DWPose skeleton is drawn from the scaled image, so
-        # the pose map shares the latent's aspect exactly.
+        # Size the still off the input image: derived in-graph at the SDXL
+        # budget by default, or scaled to the user's explicit WxH when the
+        # derived size was unlocked.
         size_nodes, scaled_ref, width_ref, height_ref = self.image_size_nodes(
             "2", "3", ["1", 0], params, megapixels=_TARGET_MEGAPIXELS
         )
+        structure, hint_ref = self._structure_nodes(params, scaled_ref)
+        controlnet, controlnet_ref = self._controlnet_nodes(params)
+        # The enhance pass re-samples on the ControlNet-applied conditioning
+        # (node 9), so the upscale can't drift off the structure map.
         enhance_nodes, enhanced_ref = self.enhance_image_nodes(
             "15", "16", "17", "18", "19", "20",
             image_ref=["13", 0], model_ref=["4", 0],
@@ -127,6 +213,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         )
         return {
             **size_nodes,
+            **structure,
+            **controlnet,
             "1": {
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
@@ -143,36 +231,13 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["4", 1], "text": params["negative_prompt"]},
             },
-            "7": {
-                "class_type": "ControlNetLoader",
-                "inputs": {"control_net_name": params["controlnet"]},
-            },
-            "8": {
-                "class_type": "DWPreprocessor",
-                "inputs": {
-                    "image": scaled_ref,
-                    "detect_hand": "enable",
-                    "detect_body": "enable",
-                    "detect_face": "enable",
-                    "resolution": 1024,
-                    "bbox_detector": params["pose_bbox_detector"],
-                    "pose_estimator": params["pose_estimator"],
-                    # xinsir's SDXL ControlNets are trained on thicker skeleton
-                    # sticks; the toggle follows the picked file so a swapped-in
-                    # non-xinsir ControlNet gets standard sticks automatically.
-                    "scale_stick_for_xinsr_cn": (
-                        "enable" if "xinsir" in params["controlnet"].lower()
-                        else "disable"
-                    ),
-                },
-            },
             "9": {
                 "class_type": "ControlNetApplyAdvanced",
                 "inputs": {
                     "positive": ["5", 0],
                     "negative": ["6", 0],
-                    "control_net": ["7", 0],
-                    "image": ["8", 0],
+                    "control_net": controlnet_ref,
+                    "image": hint_ref,
                     "strength": params["controlnet_strength"],
                     "start_percent": 0.0,
                     "end_percent": params["controlnet_end"],

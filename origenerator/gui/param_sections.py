@@ -44,7 +44,8 @@ SECTIONS: tuple[Section, ...] = (
         "depth_model", "pose_bbox_detector", "pose_estimator",
     ), collapsed=True),
     Section("Sampling", (
-        "steps", "cfg", "guidance", "sampler_name", "scheduler",
+        "steps", "split_step", "cfg", "cfg_high", "cfg_low",
+        "guidance", "sampler_name", "scheduler",
         "shift", "shift_high", "shift_low", "denoise",
     ), collapsed=True),
     Section("Enhance", (

@@ -109,3 +109,40 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
     params = gallery.combined_params(video, image, _ManualSize())
 
     assert (params["width"], params["height"]) == (720, 928)
+
+# --- curated_params: the overlay's hand-tuned act recipe on a dropped image ---
+
+
+_SPEC = {
+    "workflow": "wan22_i2v",
+    "params": {"positive_prompt": "gamma form scene", "steps": 24,
+               "lora_high": "example-act-high.safetensors"},
+}
+
+
+def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+
+    params = gallery.curated_params(_SPEC, image, _I2V)
+
+    assert params["input_image"] == "sdxl_new.png [output]"
+    assert params["positive_prompt"] == "gamma form scene"          # from the spec
+    assert params["steps"] == 24                                    # from the spec
+    assert params["lora_high"] == "example-act-high.safetensors"    # from the spec
+    assert params["cfg"] == _I2V.default_params()["cfg"]            # unnamed → default
+
+
+def test_curated_params_rerolls_every_seed():
+    # A curated recipe has no exemplar run to reproduce; a pinned seed would
+    # render the identical video for the same image every time.
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+
+    params = gallery.curated_params(_SPEC, image, _I2V)
+
+    for key in _I2V.seed_keys():
+        assert params[key] != _I2V.default_params()[key]
+
+
+def test_curated_params_returns_none_when_image_has_no_output_file():
+    assert gallery.curated_params(_SPEC, _image_row([]), _I2V) is None
+    assert gallery.curated_params(_SPEC, _image_row(None), _I2V) is None

@@ -16,7 +16,7 @@ This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
 """
 
-from origenerator.gallery.combine import combined_params
+from origenerator.gallery.combine import combined_params, curated_params
 from origenerator.gallery.groups import (
     LoraGroup,
     MediaGroup,

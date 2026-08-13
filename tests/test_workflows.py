@@ -836,6 +836,41 @@ def test_wan22_i2v_build_api_payload_structure():
     assert _find_node(payload, "VHS_VideoCombine") is None
 
 
+def test_wan22_i2v_split_step_and_per_stage_cfg_override_the_shared_values():
+    # A LoRA author's recommended settings can be per-stage (e.g. 24 steps split
+    # at 3, cfg 3.5 high / 6.0 low). split_step moves the handoff; cfg_high/
+    # cfg_low replace the shared cfg for their sampler only.
+    wf = Wan22I2vWorkflow()
+    params = dict(wf.default_params(), steps=24, split_step=3,
+                  cfg=3.5, cfg_high=2.0, cfg_low=6.0)
+    payload = wf.build_api_payload(params)
+
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+    low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+    assert high["inputs"]["end_at_step"] == 3
+    assert low["inputs"]["start_at_step"] == 3
+    assert high["inputs"]["cfg"] == 2.0
+    assert low["inputs"]["cfg"] == 6.0
+
+
+def test_wan22_i2v_zero_split_and_cfg_overrides_keep_the_shared_behavior():
+    # The 0 sentinels — the defaults — reproduce the classic graph: a steps//2
+    # handoff and one cfg for both stages, so every stored recipe re-runs as it
+    # originally ran.
+    wf = Wan22I2vWorkflow()
+    params = dict(wf.default_params(), steps=20, cfg=1.0)
+    payload = wf.build_api_payload(params)
+
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+    low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+    assert high["inputs"]["end_at_step"] == 10
+    assert low["inputs"]["start_at_step"] == 10
+    assert high["inputs"]["cfg"] == 1.0
+    assert low["inputs"]["cfg"] == 1.0
+
+
 def test_wan22_i2v_payload_generates_synced_foley_audio():
     # Every i2v render carries a HunyuanVideo-Foley pass: the decoded frames
     # drive the foley sampler (so the audio follows the on-screen motion), and

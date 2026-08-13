@@ -1745,16 +1745,68 @@ class GalleryView(QWidget):
             )
         return video_id
 
+    def _curated_combination(self, image_id: str, category: str):
+        """The ``(workflow, params)`` for ``category``'s overlay-curated recipe on
+        the dropped image — the pinned setup that outranks mining (see
+        :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
+
+        ``None`` sends the caller on to mining: the act has no curated entry, the
+        entry names an unknown or non-image-conditioned workflow, or the image
+        row is gone or has no output file to seed from.
+        """
+        spec = recipe_match.curated_recipe(category)
+        if spec is None:
+            return None
+        workflow = WORKFLOW_REGISTRY.get(spec.get("workflow") or "")
+        if workflow is None or not gallery.is_image_conditioned(workflow.name):
+            logger.warning("combine: category=%s curated workflow %r not usable",
+                           category, spec.get("workflow"))
+            return None
+        image_row = self._db.get_generation(image_id)
+        if image_row is None:
+            return None
+        params = gallery.curated_params(spec, image_row, workflow)
+        if params is None:
+            return None
+        return workflow, params
+
+    def _generate_curated(self, image_id: str, category: str) -> bool:
+        """Launch ``category``'s curated recipe on the dropped image; ``False``
+        when the act has no usable curated entry, so the caller falls back to
+        mining. No reproduce warning: the seeds are fresh every launch."""
+        built = self._curated_combination(image_id, category)
+        if built is None:
+            return False
+        workflow, params = built
+        logger.info("combine: category=%s image=%s -> curated recipe", category, image_id)
+        key = gallery.settings_folder_key(
+            {"workflow_name": workflow.name, "workflow_version": workflow.version,
+             "params_json": json.dumps(params)},
+            gallery.build_image_config_index(self._image_rows),
+        )
+        if self._reroll.start_prepared(key, workflow, params):
+            self._reveal_combination(key)
+        return True
+
     def _generate_category(self, image_id: str, category: str):
-        """Run the recipe that fits ``category`` on the dropped image, handing the
-        chosen exemplar off to the shared combine launch."""
+        """Run the recipe that fits ``category`` on the dropped image: the
+        overlay's curated recipe when one is pinned for the act, else the mined
+        exemplar handed off to the shared combine launch."""
+        if self._generate_curated(image_id, category):
+            return
         video_id = self._resolve_category(image_id, category)
         if video_id is not None:
             self._generate_combination(image_id, video_id)
 
     def _open_category(self, image_id: str, category: str):
         """Open the recipe that fits ``category`` as an editable generate tab — the
-        Open-in-generator counterpart to :meth:`_generate_category`."""
+        Open-in-generator counterpart to :meth:`_generate_category`, honoring the
+        same curated-over-mined order."""
+        built = self._curated_combination(image_id, category)
+        if built is not None:
+            workflow, params = built
+            self._info_tabs.open_config(workflow.name, params)
+            return
         video_id = self._resolve_category(image_id, category)
         if video_id is not None:
             self._open_combination(image_id, video_id)

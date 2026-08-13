@@ -7,9 +7,12 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
-    denoised by two ``KSamplerAdvanced`` passes (high-noise model for the first
-    half of the steps, low-noise model for the second) and written with the
-    native ``CreateVideo`` + ``SaveVideo`` nodes. The output resolution is
+    denoised by two ``KSamplerAdvanced`` passes (high-noise model first, low-noise
+    model after) and written with the native ``CreateVideo`` + ``SaveVideo``
+    nodes. The stages hand off at ``split_step`` (0 = half the steps), and each
+    can run its own guidance via ``cfg_high``/``cfg_low`` (0 = the shared
+    ``cfg``) — LoRA authors tune these per stage (motion lives in the high pass,
+    texture in the low), so a recipe can follow their numbers exactly. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
@@ -18,7 +21,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_i2v"
-    version = "v003"
+    version = "v004"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     derives_size_from_input = True
@@ -36,7 +39,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "frame_count": 121,
             "batch_size": 1,
             "steps": 20,
+            "split_step": 0,
             "cfg": 3.5,
+            "cfg_high": 0.0,
+            "cfg_low": 0.0,
             "sampler_name": "euler",
             "scheduler": "simple",
             "shift_high": 8.0,
@@ -75,7 +81,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("frame_count", "Frames", "int", 121, min_val=5, max_val=161, step=4),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
+            ParamDef("split_step", "Split Step (0 = half)", "int", 0, min_val=0, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg_high", "CFG (High) (0 = CFG Scale)", "float", 0.0, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg_low", "CFG (Low) (0 = CFG Scale)", "float", 0.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=models),
@@ -89,7 +98,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         ]
 
     def build_api_payload(self, params: dict) -> dict:
-        half_steps = params["steps"] // 2
+        split_step = params["split_step"] or params["steps"] // 2
+        cfg_high = params["cfg_high"] or params["cfg"]
+        cfg_low = params["cfg_low"] or params["cfg"]
         # Each LoRA is optional: "None" adds no LoraLoader for that stage, so its
         # sampler runs the base UNET unmodified (WorkflowTemplate.lora_model_input).
         lora_high, model_high = self.lora_model_input(
@@ -185,11 +196,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                     "add_noise": "enable",
                     "noise_seed": params["noise_seed"],
                     "steps": params["steps"],
-                    "cfg": params["cfg"],
+                    "cfg": cfg_high,
                     "sampler_name": params["sampler_name"],
                     "scheduler": params["scheduler"],
                     "start_at_step": 0,
-                    "end_at_step": half_steps,
+                    "end_at_step": split_step,
                     "return_with_leftover_noise": "enable",
                 },
             },
@@ -203,10 +214,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                     "add_noise": "disable",
                     "noise_seed": params["seed"],
                     "steps": params["steps"],
-                    "cfg": params["cfg"],
+                    "cfg": cfg_low,
                     "sampler_name": params["sampler_name"],
                     "scheduler": params["scheduler"],
-                    "start_at_step": half_steps,
+                    "start_at_step": split_step,
                     "end_at_step": 10000,
                     "return_with_leftover_noise": "disable",
                 },

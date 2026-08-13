@@ -41,8 +41,13 @@ database as first-class rows (`branch_session.adopt_branch_rows`).
 The preview is part of delivering any user-facing change, not an extra: the
 user judges mergability by clicking through the real app, and skipping the
 handoff leaves him "just guessing at whether it's mergable" (his words, from
-the session that forced this flow into existence). Three delivery lessons from
-that session (2026-08-12):
+the session that forced this flow into existence). **It comes BEFORE the pull
+request, and his verdict is what opens one** — see Landing below, where opening
+a non-draft PR here merges the work hands-off within about twenty minutes.
+A preview handed over alongside an already-open PR is not a review, it is a
+courtesy notice: the queue lands the change while he is still clicking (that is
+what happened on #33, 2026-08-13). Three delivery lessons from the session that
+forced this flow into existence (2026-08-12):
 
 - Launch the preview once yourself and confirm it comes up clean (the launcher
   logs to `state\origenerator_launcher.log`) before handing it over.
@@ -78,11 +83,22 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
 `main`, so the global "ff-merge into the primary checkout under
 `.git/agent-merge.lock`" flow does NOT apply here:
 
+- **His verdict on the preview opens the PR — nothing else does.** Opening a
+  non-draft PR here is not "proposing" the change, it is landing it:
+  `.github/workflows/auto-merge.yml` arms auto-merge the moment one opens, and
+  the queue merges it hands-off once the gate is green, about twenty minutes
+  later. So the order is preview → his word → PR, never PR-and-preview together.
+  If you want the branch pushed and visible before he has looked, open it
+  `gh pr create --fill --draft` (that workflow exempts drafts on purpose) and
+  `gh pr ready` once he says it's good.
 - **Land through a pull request.** From your worktree: commit, `git fetch origin
   && git rebase origin/main`, `git push -u origin <branch>`, then
   `gh pr create --fill`. Auto-merge arms itself; the queue rebases your PR onto
   `main`, runs the required check, and merges it when green. Don't ff-merge into
   the primary checkout, don't push `main` directly, and never force-push `main`.
+- **The branch is pruned for you when it merges** — this repo has GitHub's
+  "automatically delete head branches" on. A branch you abandon without merging
+  is still yours to remove: `git push origin --delete <branch>`.
 - **The `.git/agent-merge.lock` is retired here** — the GitHub queue serializes.
 - **Sync local checkouts by pulling.** `main` advances only on origin (via the
   queue), so the primary checkout and worktrees update with

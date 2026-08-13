@@ -68,6 +68,13 @@ class WorkflowTemplate(ABC):
     # in LoRA (same base model) split there. Empty for workflows with no LoRA; the
     # gallery then collapses that level to a single "(no LoRA)" folder.
     lora_keys: tuple[str, ...] = ()
+    # Param keys the enhance tail reads that the ``enhance``/``enhance_*`` naming
+    # doesn't already cover, so they join :meth:`enhance_keys` and stay out of the
+    # gallery's grouping. The SDXL and WAN t2i workflows list ``upscale_model``
+    # here: it loads the tail's upscaler and does nothing with the toggle off.
+    # Flux does not — there the same param also drives the plain 4x upscale that
+    # is that workflow's namesake output, so it stays part of the recipe.
+    extra_enhance_keys: tuple[str, ...] = ()
     # The output node whose /history entry lists the saved files, and the key it
     # lists them under: "images" for SaveImage / native SaveVideo, "gifs" for
     # VHS_VideoCombine.
@@ -103,6 +110,23 @@ class WorkflowTemplate(ABC):
         order. Derived from ``param_definitions`` so it stays in sync with the UI.
         """
         return tuple(pd.key for pd in self.param_definitions() if pd.type == "seed")
+
+    def enhance_keys(self) -> tuple[str, ...]:
+        """Param keys that configure the enhancement rather than the recipe.
+
+        An enhancement is a finish applied to an image, not a different image:
+        the gallery deliberately doesn't group by these, so an enhanced render
+        shares a folder with its unenhanced twin — the same way a standalone
+        enhance folds into the row it upgrades without moving it.
+
+        Derived from the ``enhance``/``enhance_*`` naming (plus
+        :attr:`extra_enhance_keys` for the tail params that convention misses),
+        so a workflow growing another enhance knob can't silently start
+        splitting folders by it.
+        """
+        named = tuple(pd.key for pd in self.param_definitions()
+                      if pd.key == "enhance" or pd.key.startswith("enhance_"))
+        return named + self.extra_enhance_keys
 
     @abstractmethod
     def build_api_payload(self, params: dict) -> dict:

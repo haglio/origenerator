@@ -523,6 +523,25 @@ def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
         assert denoise.default == 0.15
 
 
+def test_enhance_keys_cover_every_param_only_the_tail_reads():
+    # The gallery drops these from a row's identity, so an enhanced render shares
+    # its unenhanced twin's folder. A tail param left off the list would silently
+    # split that folder again, so every workflow's list must cover its whole tail.
+    for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i"):
+        wf = WORKFLOW_REGISTRY[name]
+        assert set(wf.enhance_keys()) == {
+            "enhance", "upscale_model", "enhance_scale", "enhance_steps", "enhance_denoise",
+        }, name
+    # Flux keeps upscale_model in its recipe: with the toggle OFF that same
+    # param drives the plain 4x upscale this workflow is named for, so it is a
+    # real difference between two of its renders.
+    assert set(WORKFLOW_REGISTRY["flux_t2i_upscaled"].enhance_keys()) == {
+        "enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
+    }
+    # A workflow with no tail at all declares nothing.
+    assert WORKFLOW_REGISTRY["wan22_i2v"].enhance_keys() == ()
+
+
 # ---- WAN 2.2 FLF2V Loop ----
 
 def test_wan22_default_params_has_required_keys():

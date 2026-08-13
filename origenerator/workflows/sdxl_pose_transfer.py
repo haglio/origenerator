@@ -51,6 +51,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     output_type = "image"
     derives_size_from_input = True
     model_keys = ("checkpoint",)
+    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
 
     def default_params(self) -> dict:

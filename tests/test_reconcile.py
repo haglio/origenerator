@@ -229,6 +229,38 @@ def test_reconcile_repoints_a_star_across_the_version_fold(tmp_path):
     assert summary["repointed"] == 1
 
 
+def test_reconcile_repoints_both_stars_across_the_enhancement_merge(tmp_path):
+    # The enhancement split is the one formula change that MERGED folders: an
+    # enhanced render and its unenhanced twin used to be two, and are now one. A
+    # star on either of the old folders has to land on the merged one — including
+    # the enhanced side, whose row may not be the member the legacy key is
+    # recomputed from.
+    db = Database(tmp_path / "t.db")
+    plain = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30,
+                                             "seed": 1, "enhance": False},
+                           filename="sdxl_t2i_p1.png")
+    enhanced = _add_completed(db, "p2", params={"positive_prompt": "a cat", "steps": 30,
+                                                "seed": 2, "enhance": True},
+                              filename="sdxl_t2i_p2.png")
+    current_key = gallery.settings_folder_key(plain)
+    assert gallery.settings_folder_key(enhanced) == current_key  # one folder now
+    plain_key, enhanced_key = (
+        gallery.legacy_preenhance_settings_folder_keys([row]).pop()
+        for row in (plain, enhanced)
+    )
+    assert plain_key != enhanced_key != current_key  # two folders before
+    db.set_folder_starred(plain_key, True)
+    db.rename_folder(enhanced_key, "Cats")
+
+    summary = reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()
+    assert meta.get(current_key, {}).get("starred") is True    # the star came along
+    assert meta[current_key]["custom_name"] == "Cats"          # so did the name
+    assert plain_key not in meta and enhanced_key not in meta  # both old keys cleared
+    assert summary["repointed"] == 2
+
+
 def test_reconcile_leaves_a_truly_orphaned_bookmark_untouched(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},

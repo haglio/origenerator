@@ -28,6 +28,17 @@ from origenerator.workflows.model_files import is_no_lora
 # workflow growing a seed can't silently start splitting folders by it.
 INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 
+# Params that configure a row's *enhancement* rather than its recipe — also
+# dropped from its settings, so an enhanced image and its unenhanced twin share
+# one folder. An enhancement is a finish applied to an image, not a different
+# image: the standalone enhancer already folds its result onto the row it
+# upgrades without moving it, and the workflows' inline ``enhance`` toggle means
+# the same thing. This static set serves rows with no registered workflow
+# (imports); a registered row's keys come from its template instead
+# (:meth:`WorkflowTemplate.enhance_keys`), so a workflow growing another enhance
+# knob can't silently start splitting folders by it.
+ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})
+
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
 _TYPE_ANNOTATION = frozenset({"[output]", "[input]", "[temp]"})
 
@@ -83,6 +94,22 @@ def _workflow_instance_keys(workflow_name: str) -> frozenset:
     return frozenset(_registered(workflow_name).seed_keys()) | {"input_image"}
 
 
+@lru_cache(maxsize=None)
+def _workflow_enhance_keys(workflow_name: str) -> frozenset:
+    """A registered workflow's enhancement-layer keys (see :data:`ENHANCE_KEYS`).
+    Cached for the same reason as :func:`_workflow_instance_keys` — it too walks
+    ``param_definitions()``."""
+    return frozenset(_registered(workflow_name).enhance_keys())
+
+
+def workflow_enhance_keys(workflow_name: str | None) -> frozenset:
+    """The param keys that configure ``workflow_name``'s enhancement rather than
+    its recipe, falling back to the static :data:`ENHANCE_KEYS` for a workflow
+    with no registered template."""
+    wf = _registered(workflow_name)
+    return _workflow_enhance_keys(workflow_name) if wf is not None else ENHANCE_KEYS
+
+
 def is_image_conditioned(workflow_name: str | None) -> bool:
     """True when a workflow drives its output from an ``input_image`` — an i2v
     whose start frame is itself (usually) a generation with its own settings."""
@@ -100,17 +127,41 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
     (``prepared_params`` fills every default) hash the same, and stored keys the
     workflow doesn't define (an i2v import's in-graph-derived ``width``/``height``,
     raw sampler-node fields) never split a folder. Falls back to dropping only the
-    per-instance keys when the workflow is unknown — there are then no defaults to
-    normalize against.
+    per-instance and enhancement keys when the workflow is unknown — there are then
+    no defaults to normalize against.
+
+    The enhancement layer (:data:`ENHANCE_KEYS`) is dropped alongside the
+    per-instance keys: whether a render ran the enhance tail, and how, doesn't
+    make it a different image.
     """
     wf = _registered(workflow_name)
     if wf is None:
-        return settings_only(params)
-    instance_keys = _workflow_instance_keys(workflow_name)
+        return {k: v for k, v in settings_only(params).items() if k not in ENHANCE_KEYS}
+    ungrouped = _workflow_instance_keys(workflow_name) | _workflow_enhance_keys(workflow_name)
     return {
         key: params.get(key, default)
         for key, default in wf.default_params().items()
-        if key not in instance_keys
+        if key not in ungrouped
+    }
+
+
+def enhance_settings(workflow_name: str | None, params: dict) -> dict:
+    """A row's enhancement-layer params, normalized against the workflow's
+    defaults exactly as :func:`canonical_settings` normalizes its recipe.
+
+    Deliberately absent from every current key. The one caller is the reconcile's
+    pre-layer legacy formula
+    (:func:`~origenerator.gallery.tree.legacy_preenhance_settings_folder_keys`),
+    which must reproduce the signature these params used to be part of.
+    """
+    keys = workflow_enhance_keys(workflow_name)
+    wf = _registered(workflow_name)
+    if wf is None:
+        return {k: v for k, v in params.items() if k in keys}
+    return {
+        key: params.get(key, default)
+        for key, default in wf.default_params().items()
+        if key in keys
     }
 
 
@@ -249,7 +300,8 @@ def settings_signature(
     workflow_version: str | None = None,
 ) -> str:
     """Canonical grouping key: a row's normalized settings (see
-    :func:`canonical_settings`), order-independent.
+    :func:`canonical_settings`), order-independent — the enhancement layer
+    excluded, so an enhanced render keys the same as its unenhanced twin.
 
     For an image-conditioned workflow the start frame's own configuration is
     folded in — resolved through ``image_index`` (see

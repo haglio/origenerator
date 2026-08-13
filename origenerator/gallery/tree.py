@@ -7,7 +7,9 @@ and — for an image-to-video workflow — the specific start-frame *file*. A re
 regenerates that frame, so the raw filename is per-instance; but the
 *configuration* that produced the frame is not, so it is folded back into the
 settings key. Two i2v videos built from re-rolls of one image stay together,
-while two built from differently configured images split apart).
+while two built from differently configured images split apart. The enhance
+tail's params are excluded too, so an enhanced render and its unenhanced twin
+land in one folder — enhancement is a finish on an image, not another image).
 
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
@@ -45,9 +47,11 @@ from origenerator.gallery.labels import (
 )
 from origenerator.gallery.output import is_in_progress, media_type_of_row, produced_output
 from origenerator.gallery.signatures import (
+    _grouping_version,
     _input_image_config,
     is_image_conditioned,
     canonical_settings,
+    enhance_settings,
     lora_signature,
     model_signature,
     parse_params,
@@ -156,6 +160,19 @@ def legacy_settings_folder_key(row: dict) -> str:
     return _settings_key(media_type, workflow_name, signature)
 
 
+def _preenhance_settings(workflow_name: str, params: dict) -> dict:
+    """A row's settings the way every formula predating the enhancement split
+    computed them: the recipe with the enhance tail's params still folded in.
+
+    Each legacy key below is a snapshot of a formula that ran while enhancement
+    was part of a row's identity, so all three rebuild from this rather than from
+    :func:`canonical_settings`, which no longer carries those params."""
+    return {
+        **canonical_settings(workflow_name, params),
+        **enhance_settings(workflow_name, params),
+    }
+
+
 def legacy_preframe_settings_folder_key(row: dict) -> str:
     """The settings-folder key an image-conditioned row had before its start
     frame's configuration was folded into the key — :func:`canonical_settings`
@@ -166,7 +183,7 @@ def legacy_preframe_settings_folder_key(row: dict) -> str:
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
     signature = json.dumps(
-        canonical_settings(workflow_name, parse_params(row.get("params_json"))),
+        _preenhance_settings(workflow_name, parse_params(row.get("params_json"))),
         sort_keys=True, default=str,
     )
     return _settings_key(media_type, workflow_name, signature)
@@ -185,7 +202,7 @@ def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = 
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
     params = parse_params(row.get("params_json"))
-    settings = canonical_settings(workflow_name, params)
+    settings = _preenhance_settings(workflow_name, params)
     if is_image_conditioned(workflow_name):
         settings = {
             **settings,
@@ -193,6 +210,37 @@ def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = 
         }
     signature = json.dumps(settings, sort_keys=True, default=str)
     return _settings_key(media_type, workflow_name, signature)
+
+
+def legacy_preenhance_settings_folder_keys(members, image_index: dict | None = None) -> set[str]:
+    """The settings-folder keys a folder's ``members`` were split across before
+    the enhancement layer left the signature: today's key with the enhance tail's
+    params folded back in.
+
+    The fourth historical formula shift, and the only one that *merged* folders —
+    an enhanced render and its unenhanced twin used to be two. So this takes the
+    whole member list and returns a key per distinct enhance setting found among
+    them, rather than one key from a single member: a star sitting on either old
+    folder must find its way to the merged one. The reconcile recomputes these to
+    re-point a star or name made under that formula — one made since the last
+    reconcile, so its stored identity was never backfilled."""
+    keys = set()
+    for row in members:
+        media_type = media_type_of_row(row)
+        workflow_name = row.get("workflow_name") or "unknown"
+        params = parse_params(row.get("params_json"))
+        settings = {
+            **_preenhance_settings(workflow_name, params),
+            "workflow_version": _grouping_version(workflow_name, row.get("workflow_version")),
+        }
+        if is_image_conditioned(workflow_name):
+            settings = {
+                **settings,
+                "input_image_config": _input_image_config(params.get("input_image"), image_index),
+            }
+        keys.add(_settings_key(media_type, workflow_name,
+                               json.dumps(settings, sort_keys=True, default=str)))
+    return keys
 
 
 def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:

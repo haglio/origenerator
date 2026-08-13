@@ -24,6 +24,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     display_name = "WAN 2.2 Text-to-Image"
     output_type = "image"
     model_keys = ("unet_high", "unet_low")
+    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
 
     def default_params(self) -> dict:

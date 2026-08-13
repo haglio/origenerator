@@ -246,6 +246,66 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
         == settings_signature("sdxl_t2i", reroll)
 
 
+def test_settings_signature_ignores_the_enhancement():
+    # An enhancement is a finish applied to an image, not a different image: the
+    # same recipe with the enhance tail on and off is ONE folder. (The standalone
+    # enhancer already worked this way — it folds onto the row it upgrades without
+    # moving it — and the workflows' inline toggle now agrees.)
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    def sdxl(**overrides):
+        return json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                               positive_prompt="a lighthouse", **overrides))
+
+    plain = settings_signature("sdxl_t2i", sdxl(enhance=False), None, workflow_version="v004")
+    assert settings_signature("sdxl_t2i", sdxl(enhance=True), None,
+                              workflow_version="v004") == plain
+    # Nor does HOW it was enhanced: the tail's own knobs are part of the finish,
+    # so a harder upscale or a second pass at another denoise stays put too.
+    assert settings_signature("sdxl_t2i", sdxl(enhance=True, enhance_scale=4.0,
+                                               enhance_steps=40, enhance_denoise=0.3,
+                                               upscale_model="4x_other.pth"),
+                              None, workflow_version="v004") == plain
+    # A real recipe difference still splits — the drop is the tail, not the row.
+    assert settings_signature("sdxl_t2i", sdxl(enhance=True, steps=12), None,
+                              workflow_version="v004") != plain
+
+
+def test_flux_still_groups_by_its_namesake_upscale_model():
+    # Flux reads upscale_model on BOTH paths: with the toggle off it drives the
+    # plain 4x upscale the workflow is named for, so there it is a genuine
+    # difference between two renders and keeps splitting folders.
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    def flux(**overrides):
+        return json.dumps(dict(WORKFLOW_REGISTRY["flux_t2i_upscaled"].default_params(),
+                               positive_prompt="a lighthouse", **overrides))
+
+    assert settings_signature("flux_t2i_upscaled", flux(upscale_model="RealESRGAN_x4.pth")) \
+        != settings_signature("flux_t2i_upscaled", flux(upscale_model="4x_crisp.pt"))
+    # Its enhance toggle is still just a finish, though.
+    assert settings_signature("flux_t2i_upscaled", flux(enhance=True)) \
+        == settings_signature("flux_t2i_upscaled", flux(enhance=False))
+
+
+def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin():
+    # The tree-level shape of the same rule: one settings leaf, both rows in it,
+    # and a name that doesn't try to tell them apart by the enhancement.
+    def render(prompt_id, seed, enhance):
+        return _row(
+            prompt_id=prompt_id,
+            params_json=json.dumps({"positive_prompt": "a cat", "steps": 30,
+                                    "seed": seed, "enhance": enhance}),
+            output_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png"}]),
+        )
+
+    enhanced, plain = render("e1", 1, True), render("p1", 2, False)
+    (lora,) = build_gallery_tree([enhanced, plain])[0].workflow_groups[0].model_groups[0].children
+    (leaf,) = lora.children
+    assert {r["prompt_id"] for r in leaf.rows} == {"e1", "p1"}
+    assert leaf.label == "a cat"
+
+
 def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
     from origenerator.gallery import is_enhanced_row
 

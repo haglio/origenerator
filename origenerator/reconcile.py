@@ -167,6 +167,10 @@ def _index_current_folders(rows, image_index):
                         gallery.legacy_settings_folder_key(members[0]),
                         gallery.legacy_preframe_settings_folder_key(members[0]),
                         gallery.legacy_preversion_settings_folder_key(members[0], image_index),
+                        # Per member, not just the first: the enhancement split
+                        # merged two folders into this one, and a star on either
+                        # of them has to find its way here.
+                        *gallery.legacy_preenhance_settings_folder_keys(members, image_index),
                     ):
                         if legacy != group.key:
                             legacy_keys.setdefault(legacy, group.key)

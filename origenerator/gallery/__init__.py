@@ -73,6 +73,7 @@ from origenerator.gallery.tree import (
     build_gallery_tree,
     folder_key_at_level,
     is_unvetted_experiment,
+    legacy_preenhance_settings_folder_keys,
     legacy_preframe_settings_folder_key,
     legacy_preversion_settings_folder_key,
     legacy_settings_folder_key,

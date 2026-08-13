@@ -23,6 +23,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     display_name = "SDXL Text-to-Image"
     output_type = "image"
     model_keys = ("checkpoint",)
+    extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"
 
     def default_params(self) -> dict:

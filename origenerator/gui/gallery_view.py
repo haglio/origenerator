@@ -50,7 +50,9 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
     GROUP_ROLE as _GROUP_ROLE,
     RECENTS_KEY as _RECENTS_KEY,
+    RECENTS_LABEL as _RECENTS_LABEL,
     STARRED_KEY as _STARRED_KEY,
+    STARRED_LABEL as _STARRED_LABEL,
 )
 from origenerator.navigation import NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
@@ -350,7 +352,9 @@ class GalleryView(QWidget):
         self._slideshow_btn = self._tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow", self._start_slideshow
         )
-        self._slideshow_btn.hide()  # shown only while a folder with media is open
+        # Shown wherever there's a collection of media to play — a folder, or the
+        # Recents/Starred shelf — with its tooltip naming that subject.
+        self._slideshow_btn.hide()
         self._auto_btn = self._tool_button(
             icons.autoloop_icon(),
             "Auto-generate: repeatedly generate variations of this folder until "
@@ -1337,9 +1341,26 @@ class GalleryView(QWidget):
         self._auto_btn.blockSignals(False)
 
     def _sync_slideshow_button(self):
-        """Offer the slideshow only on a folder that actually holds media."""
+        """Offer the slideshow on anything that holds media: a folder, or the
+        Recents/Starred shelf — each a collection of generations like a folder,
+        just gathered rather than nested. The tooltip names what it would play."""
+        self._slideshow_btn.setVisible(bool(self._slideshow_rows()))
+        self._slideshow_btn.setToolTip(f"Play {self._slideshow_subject()} as a slideshow")
+
+    def _slideshow_rows(self) -> list[dict]:
+        """The generations the slideshow would play from the view on screen: the
+        shelf's collection on a shelf, else everything under the selected folder."""
+        rows = self._browser.shelf_rows()
+        if rows is not None:
+            return rows
         group = self._current_group()
-        self._slideshow_btn.setVisible(group is not None and bool(gallery.rows_under(group)))
+        return gallery.rows_under(group) if group is not None else []
+
+    def _slideshow_subject(self) -> str:
+        """What the slideshow button would play, named for its tooltip."""
+        return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL}.get(
+            self._current_shelf_key(), "this folder"
+        )
 
     # --- standalone enhance: the folder button, the selection action, the queue ---
 
@@ -1404,24 +1425,23 @@ class GalleryView(QWidget):
             self._enhance_queue.pop(0)  # unlaunchable (no client / submit failed)
 
     def _start_slideshow(self):
-        """Open the current folder's media in a fullscreen slideshow."""
-        group = self._current_group()
-        if group is None:
-            return
-        items = self._slideshow_items(group)
+        """Open what's on screen — a folder, or the Recents/Starred shelf — as a
+        fullscreen slideshow."""
+        items = self._slideshow_items(self._slideshow_rows())
         if not items:
             return
         self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
                                         stroke=self._osr2_stroke)
-        logger.info("Slideshow: %d items, shuffled order[:10]=%s",
-                    len(items), self._slideshow._playlist.order[:10])
+        logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
+                    self._slideshow_subject(), len(items),
+                    self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
 
-    def _slideshow_items(self, group) -> list:
-        """(path, media_type, prompt_id) for each generation under ``group`` with a
-        resolvable preview, in gallery order — the slideshow's playlist."""
+    def _slideshow_items(self, rows) -> list:
+        """(path, media_type, prompt_id) for each of ``rows`` with a resolvable
+        preview, in the order given — the slideshow's playlist."""
         items = []
-        for row in gallery.rows_under(group):
+        for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
             if resolved is not None:
                 items.append((resolved[0], resolved[1], row["prompt_id"]))
@@ -1891,6 +1911,7 @@ class GalleryView(QWidget):
         self._browser.set_recent_rows(gallery.recent_generations(
             self._db.list_generations(), _RECENTS_LIMIT, self._recents_media_types()
         ))
+        self._sync_slideshow_button()  # a filter that empties the shelf retires it
 
     def _drill_into(self, key: str):
         self._browser._drill_into(key)

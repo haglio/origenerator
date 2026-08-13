@@ -1,4 +1,5 @@
-"""A fullscreen slideshow of a folder's generations.
+"""A fullscreen slideshow of a set of generations — a folder's, or a shelf's
+(Recents, Starred).
 
 Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
 rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
@@ -111,7 +112,7 @@ class SlideshowView(QWidget):
     # --- caption -----------------------------------------------------------
 
     def _update_counter(self):
-        # Show the item's number within the folder (its shuffled position), not the
+        # Show the item's number within the set (its shuffled position), not the
         # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
         text = f"{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
         if self._playlist.paused:

@@ -52,7 +52,7 @@ class RerollController(QObject):
 
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment (the one generator of jobs the user didn't ask for), so
-    a Generate starts at once instead of queuing behind a long ambient run."""
+    a Generate starts at once instead of queuing behind a long experiment run."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
@@ -206,7 +206,7 @@ class RerollController(QObject):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
 
-        User work preempts the ambient experimenter here, at the one choke point
+        User work preempts a background experiment here, at the one choke point
         every user path funnels through — so a Generate never sits behind an
         experiment's run (see :meth:`_preempt_experiments`). A running row is
         recorded before the job is submitted so an app restart mid-generation can
@@ -234,12 +234,14 @@ class RerollController(QObject):
         """Clear the GPU for user work: cancel every in-flight background
         experiment before a user launch is submitted.
 
-        A video experiment can hold the GPU for many minutes; without this, the
-        user's job silently queues behind it in ComfyUI and their progress bar
-        never moves — indistinguishable from a hang. Each preempted experiment is
-        dropped exactly as a hand-cancel would drop it (interrupted or dequeued,
-        its abandoned row deleted), which the runner reads as "not now" — a short
-        breather, not a failure backoff (see ExperimentRunner._resolve_last_outcome).
+        Experiments belong to the closed app, and opening it drops the batch the
+        last absence left (see :func:`origenerator.experiments.background
+        .cancel_experiments`) — but one whose dequeue ComfyUI refused survives
+        that sweep and is adopted as a live job. A video experiment can hold the
+        GPU for many minutes; without this the user's job silently queues behind
+        it and their progress bar never moves, indistinguishable from a hang.
+        Each preempted experiment is dropped exactly as a hand-cancel would drop
+        it: interrupted or dequeued, its abandoned row deleted.
         """
         for key, job in list(self._jobs.items()):
             if job.source == "experiment":

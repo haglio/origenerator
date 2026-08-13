@@ -286,15 +286,29 @@ class ComfyUIClient(QThread):
     def fetch_queue(self) -> set[str]:
         """The prompt ids ComfyUI is currently running or has pending.
 
+        Used at startup to tell a job still in flight from one that has gone.
+        """
+        return self._queue_ids("queue_running", "queue_pending")
+
+    def fetch_running(self) -> set[str]:
+        """Just the prompt ids ComfyUI is executing right now.
+
+        :meth:`interrupt` stops whatever is executing, whoever submitted it — so
+        a caller that wants to stop its own job checks this first.
+        """
+        return self._queue_ids("queue_running")
+
+    def _queue_ids(self, *sections: str) -> set[str]:
+        """The prompt ids in the named ``/queue`` sections.
+
         ``/queue`` returns ``{queue_running: [...], queue_pending: [...]}`` where
         each entry is a tuple whose second element (index 1) is the prompt_id.
-        Used at startup to tell a job still in flight from one that has gone.
         """
         url = f"{self.base_url}/queue"
         with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
         ids: set[str] = set()
-        for key in ("queue_running", "queue_pending"):
+        for key in sections:
             for item in data.get(key, []):
                 if isinstance(item, (list, tuple)) and len(item) > 1:
                     ids.add(item[1])

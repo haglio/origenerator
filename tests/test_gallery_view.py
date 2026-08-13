@@ -606,18 +606,35 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
     assert [r["prompt_id"] for r in shown] == ["i1"]  # handed the finished row itself
 
 
-def test_the_experiments_switch_drives_and_reports_the_runner(qtbot):
+def test_the_experiments_switch_reports_what_each_position_means(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
     assert view.experiments_enabled() is False
+    assert "Off" in view._experiments_status.text()
 
     view.set_experiments_enabled(True)           # a restored session turns it on
     assert view.experiments_enabled() is True
     assert view._experiments_cb.isChecked()      # the shelf's switch reflects it
+    # The switch is a promise about the closed app, and says so.
+    assert "close the app" in view._experiments_status.text()
 
-    view._on_experiments_toggled(False)          # the user clicks it off
+    view._experiments_cb.setChecked(False)       # the user clicks it off
     assert view.experiments_enabled() is False
+    assert "Off" in view._experiments_status.text()
+
+
+def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
+    # The whole point of the switch's new meaning: turning it on mid-session
+    # must not put anything on the GPU while the user is sitting right there.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db, client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.set_experiments_enabled(True)
+
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):

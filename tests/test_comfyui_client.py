@@ -125,6 +125,23 @@ def test_fetch_queue_returns_running_and_pending_ids():
     assert ids == {"run-1", "pend-1", "pend-2"}
 
 
+def test_fetch_running_returns_only_what_is_executing():
+    # Telling the executing prompt from a merely queued one is what lets a
+    # caller interrupt its own job without stopping someone else's.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    body = json.dumps({
+        "queue_running": [[0, "run-1", {}, {}, []]],
+        "queue_pending": [[1, "pend-1", {}, {}, []]],
+    }).encode()
+
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
+        ids = client.fetch_running()
+
+    assert ids == {"run-1"}
+
+
 def test_parse_ws_executing_none_signals_completion():
     client = ComfyUIClient.__new__(ComfyUIClient)
     messages = []

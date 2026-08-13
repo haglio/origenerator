@@ -89,8 +89,8 @@ def test_persists_the_global_osr2_toggle_on_close(qtbot, tmp_path):
 
 
 def test_restores_the_experiments_switch_from_app_state(qtbot, tmp_path):
-    # The background experimenter resumes across launches — "spend my idle GPU
-    # time" is a standing preference, not a per-session one.
+    # The background experimenter resumes across launches — "spend the time I'm
+    # not here" is a standing preference, not a per-session one.
     state = AppState(tmp_path / "ui.json")
     state.set("experiments_enabled", True)
     win = _window(qtbot, tmp_path, state)
@@ -104,6 +104,97 @@ def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
 
     win.close()  # closeEvent persists the session
     assert state.get("experiments_enabled") is True
+
+
+class _QueueSpyClient(ComfyUIClient):
+    """A real client whose queue operations are recorded instead of sent."""
+
+    def __init__(self, running=()):
+        super().__init__()
+        self.running = set(running)
+        self.canceled = []
+        self.submitted = []
+        self.interrupts = 0
+
+    def fetch_running(self):
+        return set(self.running)
+
+    def cancel_prompt(self, prompt_id):
+        self.canceled.append(prompt_id)
+
+    def interrupt(self):
+        self.interrupts += 1
+
+    def submit_job(self, payload, prompt_id):
+        self.submitted.append(prompt_id)
+        return prompt_id
+
+
+def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1):
+    """One finished generation for the policy to build experiments on."""
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt=prompt, seed=seed,
+        params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                                    positive_prompt=prompt, seed=seed)),
+        workflow_json="{}",
+    )
+    db.update_generation(
+        prompt_id, status="completed",
+        output_files=json.dumps([{"filename": f"{prompt_id}.png", "subfolder": ""}]),
+    )
+
+
+def test_closing_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
+    # The switch is a standing "spend the time I'm not here": closing is what
+    # queues the batch, because ComfyUI outlives the app and works through it.
+    db = Database(tmp_path / "t.db")
+    _completed_image(db)
+    client = _QueueSpyClient()
+    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+    win._gallery_view.set_experiments_enabled(True)
+    assert client.submitted == []  # nothing while the app is open
+
+    win.close()
+
+    queued = [r for r in db.list_generations() if r.get("source") == "experiment"]
+    assert client.submitted
+    assert {r["prompt_id"] for r in queued} == set(client.submitted)
+    assert all(r.get("status") == "running" for r in queued)
+
+
+def test_closing_with_the_switch_off_queues_nothing(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    _completed_image(db)
+    client = _QueueSpyClient()
+    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+
+    win.close()
+
+    assert client.submitted == []
+
+
+def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_path):
+    # Experiments belong to the closed app: whatever ComfyUI hadn't got through
+    # is dropped as the window opens, so the GPU is the user's from the start.
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
+        workflow_json="{}", source="experiment",
+    )
+    db.update_generation("exp-1", status="running")
+    client = _QueueSpyClient(running=["exp-1"])
+
+    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+
+    assert client.canceled == ["exp-1"]
+    assert client.interrupts == 1  # it was mid-render — dequeuing alone wouldn't stop it
+    assert db.get_generation("exp-1") is None
+    assert win._gallery_view._reroll_jobs == {}  # and it is not adopted as a live job
 
 
 def test_opening_with_unreviewed_experiments_presents_the_shelf(qtbot, tmp_path):

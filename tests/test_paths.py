@@ -43,3 +43,18 @@ def test_gui_module_imports_in_fresh_interpreter():
     )
     assert result.returncode == 0, result.stderr
     assert "OrigeneratorWindow" in result.stdout
+
+
+def test_player_core_is_found_the_same_way_and_is_importable():
+    # The family's stroke lives there — the waveform and its dials, cruise
+    # control, and where the drive readout's parts sit — so this app drives the
+    # OSR2 from genau's own model rather than a second copy of it.
+    from origenerator.paths import ensure_player_core_on_path, sibling_checkout
+
+    checkout = sibling_checkout("player_core")
+    assert (checkout / "player_core" / "__init__.py").exists()
+    ensure_player_core_on_path()
+    ensure_player_core_on_path()  # idempotent
+    import player_core.cruise_control  # noqa: F401
+    import player_core.direct_control  # noqa: F401
+    import player_core.drive_layout  # noqa: F401

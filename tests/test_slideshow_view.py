@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.stroke_engine import StrokeState
+from origenerator.stroke_engine import Stroke
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -75,7 +75,7 @@ class _FakeStroke:
     def __init__(self):
         self.active = False
         self.calls = []
-        self.state = StrokeState()
+        self.state = Stroke()
 
     def toggle(self):
         self.active = not self.active

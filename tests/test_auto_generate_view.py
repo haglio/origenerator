@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QEvent, QUrl
 from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.auto_generate_view import AutoGenerateView
-from origenerator.stroke_engine import StrokeState
+from origenerator.stroke_engine import Stroke
 
 
 def _png(path):
@@ -28,12 +28,12 @@ def _press(view, key):
 
 class FakeStroke:
     """Stands in for Osr2StrokeDriver: records the calls, flips on toggle. A
-    real StrokeState rides along so the drive panel can draw from it."""
+    real Stroke rides along so the drive panel can draw from it."""
 
     def __init__(self):
         self.active = False
         self.calls = []
-        self.state = StrokeState()
+        self.state = Stroke()
 
     def toggle(self):
         self.active = not self.active
@@ -52,6 +52,12 @@ class FakeStroke:
 
     def adjust_center(self, delta):
         self.calls.append(("center", delta))
+
+    def toggle_cruise(self):
+        self.calls.append("cruise")
+
+    def quarter_offset(self):
+        self.calls.append("nudge")
 
     def cycle_shape(self):
         self.calls.append(("shape",))

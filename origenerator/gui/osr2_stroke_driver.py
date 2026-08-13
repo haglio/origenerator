@@ -2,7 +2,7 @@
 
 The counterpart to :class:`~origenerator.gui.osr2_driver.Osr2Driver` for stills:
 where that one follows a playing video's script, this one *is* the motion
-source, advancing a :class:`~origenerator.stroke_engine.StrokeState` on a clock
+source, advancing a :class:`~origenerator.stroke_engine.Stroke` on a clock
 of its own and streaming each sampled position as T-code. Same broker etiquette,
 too: it pauses genau while it drives, and parks the device + restores genau when
 it stops. The gallery owns the one instance, app-global — every surface (the main
@@ -37,7 +37,7 @@ from origenerator.config import (
     OSR2_BROKER_HOST, OSR2_GENAU_ENABLED_FILE, OSR2_TCODE_UDP_PORT,
 )
 from origenerator.osr2 import Osr2Broker
-from origenerator.stroke_engine import StrokeState
+from origenerator.stroke_engine import Stroke
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class Osr2StrokeDriver(QObject):
             OSR2_BROKER_HOST, OSR2_TCODE_UDP_PORT,
             genau_enabled_file=OSR2_GENAU_ENABLED_FILE,
         )
-        self._state = StrokeState()
+        self._state = Stroke()
         self._active = False
         self._streaming = False  # a one-shot "first T-code sent" log per start
         self._now = now_source
@@ -143,6 +143,7 @@ class Osr2StrokeDriver(QObject):
         if self._active:
             return
         self._active = True
+        self._state.state.playing = True
         self._streaming = False
         now = self._now()
         self._last_tick = now
@@ -159,6 +160,7 @@ class Osr2StrokeDriver(QObject):
         if not self._active:
             return
         self._active = False
+        self._state.state.playing = False
         ticker, self._ticker = self._ticker, None
         if ticker is not None:
             ticker.stop()  # waits, so no tick can land after the park below
@@ -180,6 +182,10 @@ class Osr2StrokeDriver(QObject):
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:
+            # Cruise control moves the dials before the phase is sampled, so a
+            # tick sends the stroke it just asked for rather than the one before.
+            stroke_engine.tick_cruise_control(
+                self._state.state, self._state.cruise, now)
             stroke_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
             pos = stroke_engine.position_ahead(self._state, lead_ms / 1000.0)
@@ -202,44 +208,63 @@ class Osr2StrokeDriver(QObject):
     # --- the knobs the keys and the drive panel turn -----------------------
 
     @property
-    def state(self) -> StrokeState:
-        """The live stroke state, for the drive panel to draw. Read-only by
+    def state(self) -> Stroke:
+        """The live stroke, for the drive panel to draw. Read-only by
         convention — the setters below are how it changes."""
         return self._state
 
     def adjust_speed(self, delta: int) -> None:
         with self._lock:
-            stroke_engine.adjust_speed(self._state, delta)
+            stroke_engine.adjust_speed(self._state.state, delta)
 
     def adjust_amplitude(self, delta: int) -> None:
         with self._lock:
-            stroke_engine.adjust_amplitude(self._state, delta)
+            stroke_engine.adjust_amplitude(self._state.state, delta)
 
     def adjust_center(self, delta: int) -> None:
         with self._lock:
-            stroke_engine.adjust_center(self._state, delta)
+            stroke_engine.adjust_center(self._state.state, delta)
 
     def set_speed(self, value: int) -> None:
         with self._lock:
-            stroke_engine.set_speed(self._state, value)
+            stroke_engine.set_speed(self._state.state, value)
 
     def set_amplitude(self, value: int) -> None:
         with self._lock:
-            stroke_engine.set_amplitude(self._state, value)
+            stroke_engine.set_amplitude(self._state.state, value)
 
     def set_center(self, value: int) -> None:
         with self._lock:
-            stroke_engine.set_center(self._state, value)
+            stroke_engine.set_center(self._state.state, value)
 
-    def cycle_shape(self) -> None:
+    def cycle_shape(self, step: int = 1) -> None:
         with self._lock:
-            stroke_engine.cycle_shape(self._state)
+            stroke_engine.cycle_shape(self._state.state, step)
+
+    def toggle_cruise(self) -> None:
+        """Hands off: cruise control varies amplitude, centre, speed and shape
+        for you (genau's ``/``). It only moves the dials while the stroke is
+        actually running, so arming it against a parked device changes nothing
+        until the device is taken."""
+        with self._lock:
+            stroke_engine.toggle_cruise_control(self._state.cruise)
+
+    @property
+    def cruising(self) -> bool:
+        return self._state.cruise.active
+
+    def quarter_offset(self) -> None:
+        r"""Shift the stroke a quarter cycle (genau's ``\``)."""
+        with self._lock:
+            stroke_engine.quarter_offset(self._state)
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the
         slideshow's standing caption — the knobs read the same either way, so
         the stroke can be tuned before it's started."""
-        state = self._state
-        knobs = (f"{state.bpm:.0f}/min · {state.shape.value}"
+        state = self._state.state
+        knobs = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")
+        if self._state.cruise.active:
+            knobs += " · cruise"
         return f"OSR2 · {knobs}" if self._active else f"OSR2 off · {knobs}"

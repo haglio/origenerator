@@ -8,6 +8,7 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
+from origenerator.experiments.background import cancel_experiments
 from origenerator.gui.gallery_view import GalleryView
 
 # The open editable config tabs (in the gallery's info pane). Kept under its
@@ -52,6 +53,10 @@ class OrigeneratorWindow(QMainWindow):
         quit_shortcut.activated.connect(self.close)
 
         self._restore_session()
+        # Background experiments belong to the closed app, so the ones the last
+        # absence left in ComfyUI's queue are dropped before anything is adopted:
+        # an open app never has one competing for the GPU.
+        cancel_experiments(db, client)
         # Reconnect to any generation left running by the previous session. A tab's
         # Generate is itself a re-roll, so every in-flight row is the gallery's to
         # re-adopt — the tabs restore their configs only, owning no jobs.
@@ -89,8 +94,10 @@ class OrigeneratorWindow(QMainWindow):
             pass  # corrupt/hand-edited state — fall back to the default size
 
     def closeEvent(self, event):
-        """Persist the session (open config tabs, gallery folder/selection) and the
+        """Hand ComfyUI the background experiments for the coming absence, then
+        persist the session (open config tabs, gallery folder/selection) and the
         window geometry so the next launch reopens as it was."""
+        self._gallery_view.queue_experiments_for_absence()
         self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())

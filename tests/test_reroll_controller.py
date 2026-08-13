@@ -284,7 +284,7 @@ def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
 
 
 def test_an_experiment_launch_never_preempts(qtbot, tmp_path):
-    # Only user work owns the GPU; the ambient experimenter never bumps anything.
+    # Only user work owns the GPU; a background experiment never bumps anything.
     client = _client()
     db = Database(tmp_path / "test.db")
     controller = RerollController(db, client)
@@ -313,8 +313,9 @@ def test_user_launch_claims_the_experiments_own_folder(qtbot, tmp_path):
 
 
 def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
-    # An experiment left running by a previous session reconnects with its row's
-    # source, so the first user launch after a restart still clears it off the GPU.
+    # Opening the app drops the batch the last absence queued, but one ComfyUI
+    # refused to dequeue survives that sweep and is adopted as a live job. It
+    # reconnects with its row's source, so the first user launch still clears it.
     client = _client()
     db = Database(tmp_path / "test.db")
     controller = RerollController(db, client)

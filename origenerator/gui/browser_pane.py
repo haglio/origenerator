@@ -322,14 +322,14 @@ class BrowserPane:
 
     def _experiments_empty_hint(self) -> str:
         if self._v.experiments_enabled():
-            return ("Nothing to review yet.\n\nWhile the GPU is idle, variations "
-                    "of your own generations are tried in the background and "
-                    "collect here for your verdict.")
-        return ("Background experiments are off.\n\nTurn them on above and idle "
-                "GPU time will be spent trying variations of your work — new "
-                "prompts on proven settings, nudged parameters, other models. "
-                "Results collect here; your keep/reject verdicts steer what gets "
-                "tried next.")
+            return ("Nothing to review yet.\n\nEach time you close the app, "
+                    "variations of your own generations are queued up and run "
+                    "while you're away; they collect here for your verdict.")
+        return ("Background experiments are off.\n\nTurn them on above and the "
+                "time the app is closed will be spent trying variations of your "
+                "work — new prompts on proven settings, nudged parameters, other "
+                "models. Results collect here; your keep/reject verdicts steer "
+                "what gets tried next.")
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 

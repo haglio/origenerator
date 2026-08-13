@@ -18,8 +18,8 @@ from origenerator.config import (
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
+from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
-from origenerator.experiments.runner import ExperimentRunner
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
     ConfigSnapshot, filled_params, find_duplicate_generation, merge_denormalized,
@@ -155,14 +155,11 @@ class GalleryView(QWidget):
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
-        # The background experimenter: while enabled (the Experiments shelf's
-        # switch), it fills the GPU's idle time with policy-proposed variations
-        # of the user's own work, landing them on that shelf for review.
-        self._experiments = ExperimentRunner(
-            db,
-            ExperimentPolicy(registry=WORKFLOW_REGISTRY, rng=random.Random()),
-            self._launch_experiment,
-            parent=self,
+        # Derives the background experiments this gallery hands ComfyUI as the
+        # app closes (the Experiments shelf's switch): variations of the user's
+        # own work, landing on that shelf for review at the next launch.
+        self._experiment_policy = ExperimentPolicy(
+            registry=WORKFLOW_REGISTRY, rng=random.Random()
         )
         self._image_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
@@ -407,7 +404,7 @@ class GalleryView(QWidget):
         # The Experiments shelf's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header like the Recents
         # filter, and appears only while that shelf is open.
-        self._experiments_cb = CheckBox("Run experiments while the GPU is idle")
+        self._experiments_cb = CheckBox("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         self._experiments_status = QLabel("")
         self._experiments_status.setObjectName("estimateLabel")
@@ -418,6 +415,7 @@ class GalleryView(QWidget):
         experiments_row.addWidget(self._experiments_status)
         experiments_row.addStretch(1)
         self._experiments_bar.hide()  # shown only on the Experiments shelf
+        self._sync_experiments_bar()
         browser_box.addWidget(self._experiments_bar)
         # Shown only while a Recents item is previewed: that item's generation lives
         # in a folder other than the shelf on screen, so this jumps the browser to
@@ -739,19 +737,32 @@ class GalleryView(QWidget):
         """Restore the global OSR2 toggle from a saved session."""
         self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
 
-    # --- background experiments: the runner's adapter and the shelf's controls
+    # --- background experiments: the closing batch and the shelf's controls ---
 
     def experiments_enabled(self) -> bool:
         """Whether the background experimenter is on (for session persistence)."""
-        return self._experiments.is_enabled()
+        return self._experiments_cb.isChecked()
 
     def set_experiments_enabled(self, enabled):
         """Restore the background experimenter's switch from a saved session."""
-        self._experiments.set_enabled(bool(enabled))
-        self._sync_experiments_bar()
+        self._experiments_cb.setChecked(bool(enabled))
 
-    def _on_experiments_toggled(self, checked: bool):
-        self._experiments.set_enabled(checked)
+    def queue_experiments_for_absence(self) -> int:
+        """Hand ComfyUI a batch of experiments to run while the app is closed.
+
+        Called from the window's close, the one moment the GPU becomes nobody's:
+        ComfyUI outlives the app and works through the batch alone, and the next
+        launch finalizes what finished onto the Experiments shelf. A no-op with
+        the switch off. Returns how many were queued.
+        """
+        if not self.experiments_enabled():
+            return 0
+        return queue_experiments(
+            self._db.list_generations(), self._experiment_policy,
+            self._launch_experiment,
+        )
+
+    def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()
 
     def present_pending_experiments(self):
@@ -764,22 +775,19 @@ class GalleryView(QWidget):
             self.select_folder(_EXPERIMENTS_KEY)
 
     def _sync_experiments_bar(self):
-        """Reflect the experimenter's real state in the shelf's switch + status."""
-        enabled = self._experiments.is_enabled()
-        self._experiments_cb.blockSignals(True)
-        self._experiments_cb.setChecked(enabled)
-        self._experiments_cb.blockSignals(False)
+        """Say what the switch's current position means, under the switch."""
         self._experiments_status.setText(
-            "On — new variations of your work land here for review"
-            if enabled else "Off — the GPU stays all yours"
+            "On — variations run after you close the app and land here for review"
+            if self.experiments_enabled() else "Off — the GPU stays all yours"
         )
 
     def _launch_experiment(self, proposal):
-        """The runner's launch adapter: submit a proposal as a normal re-roll job
+        """The batch's launch adapter: submit a proposal as a normal re-roll job
         (tagged ``source="experiment"``), keyed to the settings folder its params
         land in. Returns the launched row's prompt_id, or ``None`` when the
-        launch didn't take (no client, the folder is busy, or the submit failed)
-        so the runner can back off."""
+        launch didn't take — no client, the submit failed, or an earlier
+        proposal in this batch already claimed the folder (the same recipe
+        twice explores nothing)."""
         key = self._folder_key_for(proposal.workflow.name, proposal.params)
         if not self._reroll.start_prepared(key, proposal.workflow, proposal.params,
                                            source="experiment"):

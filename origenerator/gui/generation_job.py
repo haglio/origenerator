@@ -71,9 +71,9 @@ class GenerationJob(QObject):
         self.workflow = workflow
         self.params = dict(params)
         # Who asked for this run: "generated" for the user's own work,
-        # "experiment" for the background experimenter's. Kept on the job (not
-        # just the DB row) so the controller can tell a preemptible ambient run
-        # from user work it must never cancel.
+        # "experiment" for a background experiment's. Kept on the job (not just
+        # the DB row) so the controller can tell a preemptible experiment from
+        # user work it must never cancel.
         self.source = source
         self.payload = workflow.build_api_payload(self.params)
         self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key

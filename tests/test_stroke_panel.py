@@ -6,7 +6,8 @@ wiring from a press to the driver.
 """
 
 from origenerator.gui.stroke_panel import (
-    CRUISE, PANEL_H, PANEL_W, SHAPE, StrokePanel, controls, tracks,
+    CRUISE, PANEL_H, PANEL_W, SHAPE, StrokePanel, controls, drive_hud,
+    extra_controls, tracks,
 )
 from origenerator.stroke_engine import Stroke
 from player_core import drive_layout
@@ -105,7 +106,7 @@ def test_pressing_a_band_sets_the_level_drawn_under_the_pointer(qtbot):
 
 def test_the_panel_actually_paints(qtbot):
     # Nothing else here paints, and a NameError in paintEvent takes the whole app
-    # down the first time the panel is shown — which is what shipped.
+    # down the first time the panel is shown — which is what shipped once.
     stroke = FakeStroke()
     panel = StrokePanel(stroke)
     qtbot.addWidget(panel)
@@ -113,3 +114,35 @@ def test_the_panel_actually_paints(qtbot):
     stroke.active = True
     stroke.state.cruise.active = True
     panel.grab()  # and again in every state the marks are drawn differently in
+
+
+def test_the_picture_is_the_readout_player_core_draws(qtbot):
+    # Not a repaint of the design: the same painter, onto the same slab. A
+    # QPainter lookalike is what read as this app's idea of genau's readout.
+    from player_core.drive_readout import DriveSection
+    from player_core.hud_panel import HudPanel
+
+    stroke = FakeStroke()
+    panel = StrokePanel(stroke)
+    qtbot.addWidget(panel)
+    drawn = panel.render_panel()
+    assert isinstance(drawn, HudPanel)
+    assert drawn.image.size == (PANEL_W, PANEL_H)
+
+    expected = HudPanel(PANEL_W, PANEL_H)
+    section = DriveSection()
+    section.draw(expected.draw, 10, 10, drive_hud(stroke.state, stroke.active))
+    for control in extra_controls(10, 10, stroke.state):
+        section.draw_control(expected.draw, control)
+    assert drawn.image.tobytes() == expected.image.tobytes()
+
+
+def test_the_readout_goes_grey_while_nothing_reaches_the_device(qtbot):
+    # A live blue trace over a parked device is a picture of a stroke nobody is
+    # making — Fun Time greys the whole block, so this does.
+    from player_core.drive_readout import DRIVEN_BY_GENAU, DRIVEN_BY_NOTHING
+
+    stroke = FakeStroke()
+    assert drive_hud(stroke.state, False).driven == DRIVEN_BY_NOTHING
+    assert not drive_hud(stroke.state, False).live
+    assert drive_hud(stroke.state, True).driven == DRIVEN_BY_GENAU

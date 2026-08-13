@@ -47,6 +47,7 @@ _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
 
 # The row under the block: cruise control and the waveform.
 CRUISE, SHAPE = "cruise", "shape"
+_LABEL_H = drive_layout.LABEL_H   # a "key value" line
 _ROW_H = drive_layout.GAP + drive_layout.CONTROL_SIZE
 _WAVE_GLYPH = "∿"
 # Fun Time's console names the shape beside its mark; so does this.

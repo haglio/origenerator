@@ -101,3 +101,15 @@ def test_pressing_a_band_sets_the_level_drawn_under_the_pointer(qtbot):
     x, y, w, _h = speed.rect
     panel._press_at(x + w - 1, y)
     assert stroke.calls == [("set_speed", 100)]
+
+
+def test_the_panel_actually_paints(qtbot):
+    # Nothing else here paints, and a NameError in paintEvent takes the whole app
+    # down the first time the panel is shown — which is what shipped.
+    stroke = FakeStroke()
+    panel = StrokePanel(stroke)
+    qtbot.addWidget(panel)
+    panel.grab()
+    stroke.active = True
+    stroke.state.cruise.active = True
+    panel.grab()  # and again in every state the marks are drawn differently in

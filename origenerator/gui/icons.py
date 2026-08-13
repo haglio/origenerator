@@ -366,8 +366,8 @@ def _draw_stroke(painter: QPainter, color):
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     painter.setPen(pen)
     painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawArc(QRectF(9, 14, 15, 20), 180 * 16, -180 * 16)
-    painter.drawArc(QRectF(24, 14, 15, 20), 0, 180 * 16)
+    painter.drawArc(QRectF(9, 14, 15, 20), 0, 180 * 16)          # the crest
+    painter.drawArc(QRectF(24, 14, 15, 20), 180 * 16, 180 * 16)  # the trough
 
 
 def _draw_audio(painter: QPainter, color):

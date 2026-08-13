@@ -21,6 +21,16 @@ from origenerator.progress import ProgressTracker
 
 logger = logging.getLogger(__name__)
 
+# What a run that ended without writing a file records as its failure. ComfyUI
+# ends an interrupted prompt exactly as it ends a successful one — an "executing"
+# frame with no node — and its history then carries no outputs, so a cancel that
+# didn't come from this job's own cancel() (ComfyUI's own UI, a second app
+# instance, an experiment sweep's /interrupt) arrives here looking like a
+# completion. Recording it as one would leave a generation the app believes
+# exists with nothing on disk: invisible in the gallery, yet enough to make a
+# re-run of those settings look like a duplicate and be refused.
+_NO_OUTPUT_MESSAGE = "The run ended without producing an output file (interrupted)"
+
 
 def insert_generation_row(db, job):
     """Insert a :class:`GenerationJob`'s config as a new row (status ``pending``).
@@ -284,6 +294,9 @@ class GenerationJob(QObject):
         Thumbnailing and duration parsing are best-effort — a failure there must
         never strand a real completion, so the job still finishes with no thumbnail
         rather than hanging and losing its output.
+
+        A run that produced no file didn't finish, so it fails instead — see
+        :data:`_NO_OUTPUT_MESSAGE`.
         """
         if self._state not in ("queued", "running"):
             return
@@ -294,6 +307,10 @@ class GenerationJob(QObject):
             self.workflow, history_data, self._output_dir, self._thumb_dir,
             self.prompt_id, params=self.params,
         )
+        if not files:
+            self._state = "failed"
+            self.failed.emit(_NO_OUTPUT_MESSAGE)
+            return
         self._state = "finished"
         self.finished.emit(files, thumb, duration)
 

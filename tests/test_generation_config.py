@@ -49,6 +49,9 @@ def _row(workflow="sdxl_t2i", params=None, status="completed", **extra):
         "workflow_name": workflow,
         "status": status,
         "params_json": json.dumps(params or {}),
+        # A real completed generation recorded what it produced; only a row that
+        # did counts as one already made (see the no-output test below).
+        "output_files": json.dumps([{"filename": "out.png", "subfolder": ""}]),
     }
     row.update(extra)
     return row
@@ -152,6 +155,21 @@ def test_find_duplicate_ignores_non_completed_rows():
     rows = [
         _row(params=params, status="error"),
         _row(params=params, status="running"),
+    ]
+    snap = _snapshot(params=params)
+    assert find_duplicate_generation(rows, snap) is None
+
+
+def test_find_duplicate_ignores_a_completed_row_that_produced_nothing():
+    # A run canceled mid-flight can land as 'completed' with no output recorded
+    # (ComfyUI ends an interrupted prompt the same way it ends a finished one).
+    # The video it would have made doesn't exist, so re-running it is a retry —
+    # never a duplicate, whatever the row's status says.
+    params = {"steps": 20, "seed": 7}
+    rows = [
+        _row(params=params, output_files=None),
+        _row(params=params, output_files="[]"),
+        _row(params=params, output_files="not json"),
     ]
     snap = _snapshot(params=params)
     assert find_duplicate_generation(rows, snap) is None

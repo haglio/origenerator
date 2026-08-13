@@ -66,7 +66,7 @@ class SlideshowView(QWidget):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._stroke_panel = StrokePanel(stroke, self) if stroke is not None else None
+        self._stroke_panel = StrokePanel(stroke, self, host=self) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -110,6 +110,33 @@ class SlideshowView(QWidget):
     def _back(self):
         self._playlist.back()
         self._show_current()
+
+    # --- what Genau's console acts on here ---------------------------------
+    # Its transport steps Genau's clips and its clip-seconds pace how long an
+    # unheld one stays up. Here the clips are the slides, so the same four
+    # buttons step, hold and cull them, and the same pair sets the dwell.
+
+    @property
+    def dwell_s(self) -> int:
+        return round(self._playlist.image_dwell_ms / 1000)
+
+    @property
+    def locked(self) -> bool:
+        """Whether what is on screen is being held — the console's padlock."""
+        return self._playlist.paused
+
+    def stroke_step(self, delta: int) -> None:
+        self._advance() if delta > 0 else self._back()
+
+    def stroke_toggle_hold(self) -> None:
+        self._toggle_pause()
+
+    def stroke_cull(self) -> None:
+        self._delete_current()
+
+    def set_dwell_s(self, seconds: int) -> None:
+        self._playlist.image_dwell_ms = seconds * 1000
+        self._show_current()  # re-arm the dwell timer on the new pace
 
     def _on_video_ended(self):
         """A clip finished: move on, unless the user paused while it played."""

@@ -79,6 +79,17 @@ class SlideshowPlaylist:
             self._pos = 0
 
     @property
+    def image_dwell_ms(self) -> int:
+        """How long an image holds the screen. Settable, because Genau's console
+        carries the pair that sets it — the same clip-seconds pace Genau leaves
+        its own clips up for."""
+        return self._image_dwell_ms
+
+    @image_dwell_ms.setter
+    def image_dwell_ms(self, value: int) -> None:
+        self._image_dwell_ms = max(0, int(value))
+
+    @property
     def paused(self) -> bool:
         return self._paused
 

@@ -37,20 +37,23 @@ class InFlightItem:
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for the bottom bar
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
-    queued_behind: int | None = None  # ComfyUI prompts ahead of it, when it's waiting on some
+    foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
 
 
-def queue_wait_text(queued_behind: int | None) -> str | None:
-    """How a job's wait reads while ComfyUI has other work in front of it.
+def queue_wait_text(foreign_ahead: int | None) -> str | None:
+    """How a job's wait reads while another app is holding ComfyUI in front of it.
 
-    ``None`` when nothing is — which is every surface's cue to say what it always
-    said. Shared so the bar, the card and the preview all name the same number the
-    same way; the count includes other clients' prompts, which is the whole reason
-    a wait ever looked like a hang.
+    Only another app's work earns this line. A wait behind the user's own jobs is
+    no mystery — ComfyUI is working through exactly what they asked for, and the
+    first of those is the one on screen being generated — so saying "waiting in
+    ComfyUI" there sends them hunting for phantom jobs that are their own.
+
+    ``None`` when nothing foreign is ahead: every surface's cue to say what it
+    always said.
     """
-    if not queued_behind:
+    if not foreign_ahead:
         return None
-    return f"Waiting behind {queued_behind} job{'' if queued_behind == 1 else 's'} in ComfyUI"
+    return f"Waiting behind {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
 
 
 class InFlightCard(QWidget):
@@ -114,7 +117,7 @@ class InFlightCard(QWidget):
             # No frame yet: name the stage instead of showing a blank square —
             # and when ComfyUI is what's holding it up, say how much is in front.
             self._image.setText(
-                queue_wait_text(item.queued_behind)
+                queue_wait_text(item.foreign_ahead)
                 or ("Generating…" if item.status == "running" else "Queued…")
             )
 

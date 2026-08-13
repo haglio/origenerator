@@ -112,11 +112,11 @@ class RunningJobBar(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def _waiting_text(self, item, queued: int) -> str:
-        """What else is in the way. ComfyUI's backlog in front of this job wins when
-        there is one: it counts other clients' prompts too, so it's the real wait —
-        and it's what turns an unmoving bar from a mystery into a queue. Otherwise
-        this app's own count of what it has waiting behind the shown job."""
-        return queue_wait_text(item.queued_behind) or (
+        """What else is in the way. Another app's hold on ComfyUI wins when there is
+        one — that's the wait nothing else here can explain. Otherwise this app's own
+        count of what it has queued behind the shown job, which needs no explaining:
+        the user asked for those, and the first of them is the one on screen."""
+        return queue_wait_text(item.foreign_ahead) or (
             f"+{queued} queued" if queued > 0 else ""
         )
 

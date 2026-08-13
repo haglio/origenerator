@@ -68,6 +68,12 @@ def _queue_number(item):
     return None
 
 
+def _queue_client_id(item):
+    """Which websocket client submitted a ``/queue`` entry, from its extra_data."""
+    extra = item[3] if isinstance(item, (list, tuple)) and len(item) > 3 else None
+    return extra.get("client_id") if isinstance(extra, dict) else None
+
+
 def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
     """True only if the server at host:port is actually ComfyUI.
 
@@ -312,30 +318,34 @@ class ComfyUIClient(QThread):
         """
         return self._queue_ids("queue_running")
 
-    def queue_backlog(self, prompt_id: str) -> int | None:
-        """How many prompts ComfyUI will execute before ``prompt_id``.
+    def foreign_backlog(self, prompt_id: str) -> int | None:
+        """How many prompts from *other* clients ComfyUI will run before ``prompt_id``.
 
-        Counts everything ahead of it whoever submitted it — another Origenerator
-        session, another app pointed at the same server — because that is the part
-        this app can't otherwise see: a job parked behind work it never launched
-        looks exactly like a hang. ``None`` means it isn't waiting on anything:
-        ComfyUI is executing it already, or it has left the queue.
+        The user's own jobs ahead of it deliberately don't count: those are things
+        they asked for, the first of them is on screen being generated, and calling
+        that a wait "in ComfyUI" turns their own queue into a phantom they go
+        hunting for. What's worth reporting is work this app didn't launch —
+        another Origenerator instance, another app on the same server — which they
+        can neither see here nor cancel. ``None`` when the prompt isn't queued at
+        all: ComfyUI is executing it already, or it has left the queue.
         """
         data = self._fetch_queue_data()
         pending = data.get("queue_pending", [])
         mine = next((it for it in pending if _queue_prompt_id(it) == prompt_id), None)
         if mine is None:
             return None
-        running = len(data.get("queue_running", []))
+        running = data.get("queue_running", [])
         number = _queue_number(mine)
         if number is None:
-            return running  # unnumbered: all that's certain is what's executing
-        # Pending entries come back heap-ordered rather than run-ordered, so a
-        # position in the list means nothing — the queue number says who goes first.
-        return running + sum(
-            1 for it in pending
-            if (n := _queue_number(it)) is not None and n < number
-        )
+            ahead = list(running)  # unnumbered: all that's certain is what's executing
+        else:
+            # Pending entries come back heap-ordered rather than run-ordered, so a
+            # position in the list says nothing — the queue number is what orders them.
+            ahead = list(running) + [
+                it for it in pending
+                if (n := _queue_number(it)) is not None and n < number
+            ]
+        return sum(1 for it in ahead if _queue_client_id(it) != self.client_id)
 
     def _queue_ids(self, *sections: str) -> set[str]:
         """The prompt ids in the named ``/queue`` sections."""

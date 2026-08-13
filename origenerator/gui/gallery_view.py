@@ -931,9 +931,9 @@ class GalleryView(QWidget):
         # each job's own finished/failed handler, which persists and refreshes.
         for job in list(self._reroll_jobs.values()):
             job.reconcile()
-            # And re-read what ComfyUI has in front of a job it hasn't started, so
-            # a wait behind another client's work shows a number instead of an
-            # unmoving bar (see GenerationJob.refresh_backlog).
+            # And re-read what another app has in front of a job ComfyUI hasn't
+            # started, so that wait shows a number instead of an unmoving bar
+            # (see GenerationJob.refresh_backlog).
             job.refresh_backlog()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
@@ -1735,10 +1735,11 @@ class GalleryView(QWidget):
         self._info_tabs.show_reroll_frame(self._last_reroll_frame, self._shown_wait_note)
 
     def _wait_note(self, key: str) -> str | None:
-        """What re-roll ``key`` is waiting on, when ComfyUI has work in front of
-        it — the pane's wait text, in place of a bare 'waiting for preview'."""
+        """What re-roll ``key`` is waiting on, when another app is holding ComfyUI
+        in front of it — the pane's wait text, in place of a bare 'waiting for
+        preview'. Its own folder's queue isn't a wait worth naming."""
         job = self._reroll_jobs.get(key)
-        return queue_wait_text(job.queued_behind) if job is not None else None
+        return queue_wait_text(job.foreign_ahead) if job is not None else None
 
     def _refresh_wait_note(self):
         """Keep that wait text current between rebuilds. The count falls as the

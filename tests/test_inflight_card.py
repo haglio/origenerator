@@ -68,16 +68,24 @@ def test_update_item_refreshes_caption_and_frame_in_place(qtbot):
     assert not card._image.pixmap().isNull()
 
 
-def test_card_names_the_comfyui_backlog_instead_of_a_bare_queued(qtbot):
-    # "Queued…" alone is the mystery: queued behind what? The count says behind
-    # what, including work this app never launched.
-    card = InFlightCard(_item(status="queued", queued_behind=2))
+def test_card_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
+    # "Queued…" alone is the mystery: queued behind what? Another app's jobs are
+    # the part nothing else in this app can explain.
+    card = InFlightCard(_item(status="queued", foreign_ahead=2))
     qtbot.addWidget(card)
-    assert card._image.text() == "Waiting behind 2 jobs in ComfyUI"
+    assert card._image.text() == "Waiting behind 2 jobs from another app"
 
 
-def test_a_frame_still_wins_over_the_backlog_text(qtbot):
+def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
+    # Waiting on his own queue is no mystery — ComfyUI is working through what he
+    # asked for — so the card says what it always said.
+    card = InFlightCard(_item(status="queued", foreign_ahead=0))
+    qtbot.addWidget(card)
+    assert card._image.text() == "Queued…"
+
+
+def test_a_frame_still_wins_over_the_wait_text(qtbot):
     # Once ComfyUI is actually rendering it, the picture is the better answer.
-    card = InFlightCard(_item(status="running", frame=_png_bytes(), queued_behind=2))
+    card = InFlightCard(_item(status="running", frame=_png_bytes(), foreign_ahead=2))
     qtbot.addWidget(card)
     assert not card._image.pixmap().isNull()

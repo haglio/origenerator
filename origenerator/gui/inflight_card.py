@@ -37,6 +37,20 @@ class InFlightItem:
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for the bottom bar
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
+    queued_behind: int | None = None  # ComfyUI prompts ahead of it, when it's waiting on some
+
+
+def queue_wait_text(queued_behind: int | None) -> str | None:
+    """How a job's wait reads while ComfyUI has other work in front of it.
+
+    ``None`` when nothing is — which is every surface's cue to say what it always
+    said. Shared so the bar, the card and the preview all name the same number the
+    same way; the count includes other clients' prompts, which is the whole reason
+    a wait ever looked like a hang.
+    """
+    if not queued_behind:
+        return None
+    return f"Waiting behind {queued_behind} job{'' if queued_behind == 1 else 's'} in ComfyUI"
 
 
 class InFlightCard(QWidget):
@@ -59,6 +73,7 @@ class InFlightCard(QWidget):
         self._image = QLabel()
         self._image.setFixedSize(*_IMAGE_SIZE)
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image.setWordWrap(True)  # the queue-wait line is a sentence, not a word
         self._image.setStyleSheet(
             f"background-color: transparent; border: {_BORDER}; border-radius: 3px;"
         )
@@ -96,8 +111,12 @@ class InFlightCard(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             ))
         else:
-            # No frame yet: name the stage instead of showing a blank square.
-            self._image.setText("Generating…" if item.status == "running" else "Queued…")
+            # No frame yet: name the stage instead of showing a blank square —
+            # and when ComfyUI is what's holding it up, say how much is in front.
+            self._image.setText(
+                queue_wait_text(item.queued_behind)
+                or ("Generating…" if item.status == "running" else "Queued…")
+            )
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

@@ -296,3 +296,42 @@ def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
     assert finished == []
     client.interrupt.assert_not_called()
     client.cancel_prompt.assert_not_called()
+
+
+# --- how much of ComfyUI's queue is in front of a job it hasn't started ------
+
+def test_refresh_backlog_reads_the_queue_while_the_job_waits(qtbot, tmp_path):
+    job, client = _started_job(tmp_path)
+    client.queue_backlog = MagicMock(return_value=3)
+
+    job.refresh_backlog()
+
+    client.queue_backlog.assert_called_once_with("comfy-A")
+    assert job.queued_behind == 3
+
+
+def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
+    job, client = _started_job(tmp_path)
+    client.queue_backlog = MagicMock(return_value=3)
+    job.refresh_backlog()
+
+    client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
+
+    assert job.state == "running"
+    assert job.queued_behind is None  # the count clears the moment it's ours
+    job.refresh_backlog()
+    assert job.queued_behind is None
+    client.queue_backlog.assert_called_once()  # and isn't asked for again
+
+
+def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
+    # A count that outlived the read behind it would be a worse lie than none.
+    job, client = _started_job(tmp_path)
+    client.queue_backlog = MagicMock(return_value=2)
+    job.refresh_backlog()
+    assert job.queued_behind == 2
+
+    client.queue_backlog = MagicMock(side_effect=OSError("connection refused"))
+    job.refresh_backlog()
+
+    assert job.queued_behind is None

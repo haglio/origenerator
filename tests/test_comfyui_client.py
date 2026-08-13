@@ -142,6 +142,64 @@ def test_fetch_running_returns_only_what_is_executing():
     assert ids == {"run-1"}
 
 
+def _queue_client(body: dict):
+    """A bare client whose one /queue call answers with ``body``."""
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host = "127.0.0.1"
+    client.port = 8188
+    return client, patch("urllib.request.urlopen",
+                         return_value=_mock_response(200, json.dumps(body).encode()))
+
+
+def test_queue_backlog_counts_everything_ahead_whoever_queued_it():
+    # The point of the number: ComfyUI is shared, so what's holding a submit up is
+    # often another client's work this app can't otherwise see.
+    client, urlopen = _queue_client({
+        "queue_running": [[0, "someone-elses", {}, {}, []]],
+        "queue_pending": [[1, "also-theirs", {}, {}, []], [2, "ours", {}, {}, []]],
+    })
+    with urlopen:
+        assert client.queue_backlog("ours") == 2
+
+
+def test_queue_backlog_orders_by_queue_number_not_list_position():
+    # /queue returns pending items heap-ordered, so position in the list says
+    # nothing about who runs first — only the queue number does.
+    client, urlopen = _queue_client({
+        "queue_running": [],
+        "queue_pending": [[9, "later", {}, {}, []], [3, "ours", {}, {}, []],
+                          [1, "sooner", {}, {}, []]],
+    })
+    with urlopen:
+        assert client.queue_backlog("ours") == 1  # only "sooner" is really ahead
+
+
+def test_queue_backlog_is_none_once_comfyui_starts_it():
+    client, urlopen = _queue_client({
+        "queue_running": [[0, "ours", {}, {}, []]],
+        "queue_pending": [],
+    })
+    with urlopen:
+        assert client.queue_backlog("ours") is None  # not waiting: it's executing
+
+
+def test_queue_backlog_is_none_for_a_prompt_that_has_left_the_queue():
+    client, urlopen = _queue_client({"queue_running": [], "queue_pending": []})
+    with urlopen:
+        assert client.queue_backlog("finished-or-never-there") is None
+
+
+def test_queue_backlog_falls_back_to_what_is_executing_when_unnumbered():
+    # A malformed entry with no queue number still yields the one thing that's
+    # certainly ahead of it, rather than claiming nothing is.
+    client, urlopen = _queue_client({
+        "queue_running": [[0, "theirs", {}, {}, []]],
+        "queue_pending": [["?", "ours", {}, {}, []]],
+    })
+    with urlopen:
+        assert client.queue_backlog("ours") == 1
+
+
 def test_parse_ws_executing_none_signals_completion():
     client = ComfyUIClient.__new__(ComfyUIClient)
     messages = []

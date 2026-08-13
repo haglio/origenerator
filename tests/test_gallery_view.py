@@ -3164,6 +3164,63 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     view._preview.show_message.assert_called_once()
 
 
+def _waiting_view(qtbot, tmp_path, backlog):
+    """A gallery with a selected re-roll ComfyUI hasn't started, ``backlog`` prompts
+    ahead of it and no frame yet — the state that used to read as a hang."""
+    client = _reroll_client()
+    client.fetch_history = MagicMock(return_value={})  # reconcile finds nothing done
+    client.queue_backlog = MagicMock(return_value=backlog)
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    view._preview.show_message = MagicMock()
+    return view, client
+
+
+def test_a_run_stuck_behind_comfyui_says_how_much_is_ahead(qtbot, tmp_path):
+    # The reported mystery: a Generate parked behind another client's work looked
+    # exactly like a hang. The pane now names the queue it's waiting on.
+    view, _client = _waiting_view(qtbot, tmp_path, backlog=3)
+
+    view._poll()
+
+    assert view._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs in ComfyUI"
+
+
+def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
+    view, client = _waiting_view(qtbot, tmp_path, backlog=3)
+    view._poll()
+
+    client.queue_backlog = MagicMock(return_value=1)  # one finished ahead of us
+    view._poll()
+
+    assert view._preview.show_message.call_args.args[0] == "Waiting behind 1 job in ComfyUI"
+
+
+def test_nothing_ahead_leaves_the_plain_waiting_note(qtbot, tmp_path):
+    # ComfyUI took it straight away: there's no queue to report, just no frame yet.
+    view, _client = _waiting_view(qtbot, tmp_path, backlog=None)
+
+    view._poll()
+
+    assert view._preview.show_message.call_args.args[0] == "Waiting for preview…"
+
+
+def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
+    # Once ComfyUI is rendering it, the frame is the answer — don't paint over it.
+    view, client = _waiting_view(qtbot, tmp_path, backlog=3)
+    view._poll()
+    job = list(view._reroll_jobs.values())[0]
+    client.preview_image.emit(job.prompt_id, _png_bytes())
+    view._preview.show_message = MagicMock()
+
+    view._poll()
+
+    view._preview.show_message.assert_not_called()
+
+
 def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tmp_path):
     # Submitting a re-roll inserts a running row, so the next poll rebuilds the
     # tree — the selected re-roll must keep driving the info pane across it.
@@ -3587,16 +3644,20 @@ class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
-                 progress=(0, 0)):
+                 progress=(0, 0), queued_behind=None):
         self.prompt_id = prompt_id
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
+        self.queued_behind = queued_behind  # ComfyUI prompts ahead of it, if any
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
 
     def reconcile(self):
         pass  # the poll pings this on every tracked re-roll; nothing to do here
+
+    def refresh_backlog(self):
+        pass  # the poll re-reads the queue position here; the fake's is fixed
 
 
 def _open_recents(view):

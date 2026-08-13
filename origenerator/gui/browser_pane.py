@@ -34,6 +34,17 @@ _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
 _STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shelf
 
 
+def _unique_rows(rows) -> list[dict]:
+    """``rows`` in order with later repeats of a generation dropped."""
+    seen = set()
+    unique = []
+    for row in rows:
+        if row["prompt_id"] not in seen:
+            seen.add(row["prompt_id"])
+            unique.append(row)
+    return unique
+
+
 def _inflight_signature(items) -> tuple:
     """The identity of the in-flight set — its job keys — so a frame-only change
     refreshes cards in place while an added or removed job forces a re-render."""
@@ -364,6 +375,10 @@ class BrowserPane:
             "or star a folder from the list, to collect them here."
         ))
 
+    def showing_starred(self) -> bool:
+        return (self._v._starred_item is not None
+                and self._v._tree.currentItem() is self._v._starred_item)
+
     @staticmethod
     def _empty_state(text: str) -> QWidget:
         """A centered hint filling an otherwise-blank shelf pane (Recents/Starred)."""
@@ -381,6 +396,26 @@ class BrowserPane:
         if seed is not None:
             return f"seed {seed}"
         return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
+
+    # --- what the open shelf collects (the slideshow plays it) --------------
+
+    def shelf_rows(self) -> list[dict] | None:
+        """Every generation the open shelf collects, in shelf order — or ``None``
+        off the shelves, where a folder is what's on screen instead.
+
+        The slideshow plays these, so they have to match the tiles: Recents is its
+        listed items (the media-type filter already applied), and Starred is its
+        starred items plus everything under each bookmarked folder, since a folder
+        tile there stands for its whole folder. A starred item inside a starred
+        folder is one item, so repeats drop out.
+        """
+        if self.showing_recents():
+            return list(self._recent_rows)
+        if self.showing_starred():
+            return _unique_rows(self._starred_rows + [
+                row for group in self._starred_groups for row in gallery.rows_under(group)
+            ])
+        return None
 
     # --- the thumbnail grid: a settings leaf's generations ------------------
 

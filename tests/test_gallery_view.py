@@ -2710,13 +2710,17 @@ def test_esc_stops_auto_generate(qtbot, tmp_path):
     assert not view._auto.is_active(key)
 
 
-# --- slideshow: play a folder's media fullscreen ----------------------------
+# --- slideshow: play a folder's or a shelf's media fullscreen ---------------
+
+def _resolve_by_id(monkeypatch):
+    """Resolve every row's preview to a per-row image path (the autouse default
+    stubs resolution to None, which would leave the slideshow nothing to seed)."""
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+
 
 def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
-    monkeypatch.setattr(
-        gallery, "resolve_preview",
-        lambda row, output_dir: (row["prompt_id"] + ".png", "image"),
-    )
+    _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2729,15 +2733,96 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view._slideshow.close()
 
 
-def test_slideshow_button_hidden_off_a_folder(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+def test_slideshow_button_follows_what_is_on_screen(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._slideshow_btn.isHidden()      # a folder with media offers it
+    assert not view._slideshow_btn.isHidden()          # a folder with media offers it
+    assert "this folder" in view._slideshow_btn.toolTip()
 
-    view._tree.setCurrentItem(view._recents_item)  # a shelf holds no folder group
+    # The shelves are collections of media too, so each plays as a folder does...
+    view._tree.setCurrentItem(view._recents_item)
+    assert not view._slideshow_btn.isHidden()
+    assert "Recents" in view._slideshow_btn.toolTip()
+    view._tree.setCurrentItem(view._starred_item)
+    assert not view._slideshow_btn.isHidden()
+    assert "Starred" in view._slideshow_btn.toolTip()
+
+    # ...while a shelf holding no media of its own doesn't offer one.
+    view._tree.setCurrentItem(view._experiments_item)
     assert view._slideshow_btn.isHidden()
+
+
+def test_slideshow_plays_the_recents_shelf(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert len(view._slideshow._playlist) == 2  # both recent generations queued
+    view._slideshow.close()
+
+
+def test_recents_slideshow_honors_the_media_type_filter(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._recents_video_cb.setChecked(False)  # the shelf now lists images only
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    # It plays what the shelf shows, not everything recent.
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i1"]
+    view._slideshow.close()
+
+    view._recents_image_cb.setChecked(False)  # nothing left on the shelf to play
+    assert view._slideshow_btn.isHidden()
+
+
+def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db.set_generation_starred("i2", True)  # a starred item...
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    view._toggle_star(_key(lora.child(0)))   # ...and a starred folder (the cat one)
+    view._tree.setCurrentItem(view._starred_item)
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    # The item, plus what the bookmarked folder's tile stands for.
+    assert {item[2] for item in view._slideshow._playlist._items} == {"i1", "i2"}
+    view._slideshow.close()
+
+
+def test_starred_slideshow_plays_a_starred_item_in_a_starred_folder_once(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._toggle_star(_select_first_leaf(view))  # star the folder holding it too
+    view._tree.setCurrentItem(view._starred_item)
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i1"]  # not twice
+    view._slideshow.close()
 
 
 def _insert_running_reroll(db, prompt_id="rr", seed=99):
@@ -4789,13 +4874,6 @@ def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
 
 
 # --- the live auto-generate slideshow ----------------------------------------
-
-def _resolve_by_id(monkeypatch):
-    """Resolve every row's preview to a per-row image path (the autouse default
-    stubs resolution to None, which would leave the slideshow nothing to seed)."""
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
-
 
 class _SignalStroke(QObject):
     """Stands in for the app-global Osr2StrokeDriver: records the calls, flips

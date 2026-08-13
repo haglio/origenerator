@@ -4583,7 +4583,48 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
     combo = view._combine._category
     enabled = {combo.itemText(i) for i in range(1, combo.count())
                if combo.model().item(i).isEnabled()}
-    assert enabled == {"dancing"}  # the only act the gallery can build a recipe for
+    # "dancing" has a video to mine; "gamma" needs none — the example overlay
+    # curates a recipe for it.
+    assert enabled == {"dancing", "gamma"}
+
+
+def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_path, monkeypatch):
+    # "gamma" is curated in the example overlay, so the launch takes its pinned
+    # workflow+params — mining is never consulted, and the gallery needs no past
+    # gamma video at all.
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
+
+    view._generate_category("img", "gamma")
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "wan22_i2v"
+    assert job.params["input_image"] == "sdxl_pick.png [output]"     # run on the dropped image
+    assert job.params["lora_high"] == "example-act-high.safetensors"  # the curated spec's pin
+    assert job.params["steps"] == 24
+
+
+def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
+    opened = []
+    monkeypatch.setattr(view._info_tabs, "open_config",
+                        lambda name, params: opened.append((name, params)))
+
+    view._open_category("img", "gamma")
+
+    (name, params), = opened
+    assert name == "wan22_i2v"
+    assert params["input_image"] == "sdxl_pick.png [output]"
+    assert params["lora_high"] == "example-act-high.safetensors"
 
 
 def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monkeypatch):

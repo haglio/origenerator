@@ -12,8 +12,11 @@ on a dropped image via the gallery's combine launch.
   start-frame property — and picks the recipe that fits.
 - :func:`best_recipe` (fallback, when the model is unreachable or finds no fit) is
   the act's most-used recipe, image-independent.
-- :func:`available_categories` reports which acts have any video at all, so the
-  dropdown can grey out the ones neither tier could answer.
+- :func:`curated_recipe` sits above both tiers: an act the content overlay pins a
+  hand-tuned workflow+params for skips mining entirely — its videos may all share
+  a weakness (mining can only reproduce the past), and the pin is the way out.
+- :func:`available_categories` reports which acts have any video at all (or a
+  curated recipe), so the dropdown can grey out the ones no tier could answer.
 
 The LLM boundary is one function, so the grouping and act-membership logic stays
 unit-testable without a live model, a database, or a widget.
@@ -39,6 +42,28 @@ CATEGORIES: tuple[str, ...] = tuple(_CONTENT["recipe_categories"])
 _CATEGORY_KEYWORDS = {
     name: tuple(words) for name, words in _CONTENT["recipe_categories"].items()
 }
+
+# Optional hand-tuned recipes, also overlay vocabulary: an act named here runs
+# its pinned workflow+params instead of whatever the gallery mining would pick.
+# Mining can only ever reproduce past videos, so an act whose past videos all
+# share a weakness (the wrong LoRA, a speed-over-quality setup) is stuck with
+# it; a curated entry is how the overlay breaks that loop with a known-good
+# setup (a purpose-trained LoRA pair at its author's recommended settings).
+_CURATED_RECIPES: dict = _CONTENT.get("combine_recipes") or {}
+
+
+def curated_recipe(category: str) -> dict | None:
+    """The overlay's hand-tuned recipe for ``category``, or ``None`` for mining.
+
+    A usable entry is a dict naming a ``workflow`` (its ``params`` dict holds
+    the pinned settings; anything unnamed falls to the workflow's defaults).
+    Anything else — no entry, or a malformed one — returns ``None`` so the
+    caller falls back to mining the gallery rather than failing the act.
+    """
+    spec = _CURATED_RECIPES.get(category)
+    if not isinstance(spec, dict) or not spec.get("workflow"):
+        return None
+    return spec
 
 # Params that don't define a recipe: the free-text prompt, the start frame, the
 # seeds and bookkeeping — plus values that are incidental or derived, not deliberate
@@ -102,11 +127,14 @@ def _act_recipe_groups(category: str, video_rows, *, require_scene: bool = False
 
 
 def available_categories(video_rows) -> set[str]:
-    """The acts ``video_rows`` holds at least one video of — the ones a recipe can be
-    mined for. The panel greys out the rest, so an act that could only ever answer
-    "no recipe yet" is never offered."""
+    """The acts a picked dropdown entry can actually answer: those ``video_rows``
+    holds at least one video of (a recipe can be mined), plus those the overlay
+    curates a recipe for (nothing to mine — the recipe is pinned). The panel greys
+    out the rest, so an act that could only ever answer "no recipe yet" is never
+    offered."""
     return {c for c in CATEGORIES
-            if any(_matches_category(c, row.get("positive_prompt")) for row in video_rows)}
+            if curated_recipe(c) is not None
+            or any(_matches_category(c, row.get("positive_prompt")) for row in video_rows)}
 
 
 def best_recipe(category: str, video_rows) -> str | None:

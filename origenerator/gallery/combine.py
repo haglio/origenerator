@@ -1,13 +1,15 @@
-"""Combine a gallery image with another video's recipe into new i2v params.
+"""Combine a gallery image with a video recipe into new i2v params.
 
 The gallery already holds both halves of an image-to-video: a video row carries a
 full recipe (workflow + settings + seed), and any image row's output file can seed
-an i2v. This readies that video's recipe to re-run on a *different* image — the one
-input a user picks — without touching a Generate tab. Qt-free so it stays
-unit-testable; the seed is deliberately kept (reused), not re-rolled.
+an i2v. This readies a recipe to re-run on a *different* image — the one input a
+user picks — without touching a Generate tab. The recipe is either a past video's
+(:func:`combined_params`, seed deliberately kept so the motion reproduces) or the
+overlay's hand-tuned spec for an act (:func:`curated_params`, seeds re-rolled —
+there is no past run to reproduce). Qt-free so it stays unit-testable.
 """
 
-from origenerator.generation_config import filled_params
+from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.gallery.output import output_file_reference, row_output_files
 
 # What a size-deriving workflow's stored size is recorded under. Not a recipe
@@ -44,3 +46,20 @@ def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
         for key in _SIZE_KEYS:
             params.pop(key, None)
     return params
+
+
+def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
+    """The overlay's hand-tuned act recipe readied to run on ``image_row``'s frame.
+
+    ``spec["params"]`` over ``workflow``'s defaults, every seed re-rolled (a
+    curated recipe has no exemplar run whose motion a kept seed would reproduce,
+    and a pinned one would render the identical video for the same image every
+    time), with ``input_image`` pointed at ``image_row``'s output file. ``None``
+    when the image produced no file to reference.
+    """
+    ref = output_file_reference(row_output_files(image_row))
+    if ref is None:
+        return None
+    params = dict(workflow.default_params())
+    params.update(spec.get("params") or {})
+    return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}

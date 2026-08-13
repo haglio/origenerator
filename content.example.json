@@ -1,5 +1,5 @@
 {
-  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the third-party apps such as ComfyUI. project_roots is optional: the folders holding the suite's own app checkouts, searched in order, for when they do not live under suite_root/projects; omit it and that is exactly where they are looked for. ambient_audio_dir is optional too: the library folder the toolbar's audio switch shuffles clips out of, sound only, relative to suite_root unless it is absolute; omit it and that switch simply stays silent.",
+  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the third-party apps such as ComfyUI. project_roots is optional: the folders holding the suite's own app checkouts, searched in order, for when they do not live under suite_root/projects; omit it and that is exactly where they are looked for. ambient_audio_dir is optional too: the library folder the toolbar's audio switch shuffles clips out of, sound only, relative to suite_root unless it is absolute; omit it and that switch simply stays silent. combine_recipes is optional as well: an act named here pins the gallery's Combine to this hand-tuned workflow+params (any param unnamed falls to the workflow's defaults, seeds are re-rolled per launch) instead of mining a recipe from past videos — the way out when an act's past videos all share a weakness.",
   "suite_root": "C:/path/to/suite-root",
   "ambient_audio_dir": "videos/example-folder/ambient-clips",
   "recipe_categories": {
@@ -31,6 +31,23 @@
       "strip tease",
       "stripping"
     ]
+  },
+  "combine_recipes": {
+    "gamma": {
+      "workflow": "wan22_i2v",
+      "params": {
+        "positive_prompt": "gamma form, an example scene unfolds",
+        "negative_prompt": "example flaws to avoid",
+        "steps": 24,
+        "split_step": 3,
+        "cfg_high": 3.5,
+        "cfg_low": 6.0,
+        "shift_high": 5.0,
+        "shift_low": 5.0,
+        "lora_high": "example-act-high.safetensors",
+        "lora_low": "example-act-low.safetensors"
+      }
+    }
   },
   "detector_labels": {
     "model_labels": [

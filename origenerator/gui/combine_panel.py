@@ -8,8 +8,9 @@ slot as the override path), and dropping a video wipes the dropdown back to "-".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while Open in generator hands it to a generate tab to edit before running.
 
-Acts the gallery holds no video of are greyed out (:meth:`CombinePanel.set_available_categories`),
-so the dropdown only ever offers what a recipe can actually be mined for.
+Acts with nothing to answer a pick — no video to mine a recipe from and no curated
+recipe in the content overlay — are greyed out
+(:meth:`CombinePanel.set_available_categories`).
 
 The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown and
 the two buttons, and reports the request through one of four signals — a dropped

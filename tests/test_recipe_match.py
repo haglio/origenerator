@@ -38,18 +38,41 @@ def test_best_recipe_returns_none_without_a_video_of_that_act():
     assert recipe_match.best_recipe("alpha", rows) is None
 
 
-def test_available_categories_are_those_with_a_video_to_mine():
+def test_available_categories_are_those_with_a_video_to_mine_or_a_curated_recipe():
     rows = [
         _video("h1", "a beta", "2026-01-01", lora_high="Z"),
         _video("c1", "an epsilon form moment", "2026-01-02", lora_high="Z"),
     ]
-    # Only the acts the gallery can actually build a recipe for; the rest have nothing
-    # to mine, so the panel greys them out.
-    assert recipe_match.available_categories(rows) == {"beta", "epsilon"}
+    # The acts the gallery can mine a recipe for, plus "gamma" — the example
+    # overlay curates a recipe for it, so it needs no past video. The rest have
+    # nothing to answer with, so the panel greys them out.
+    assert recipe_match.available_categories(rows) == {"beta", "epsilon", "gamma"}
 
 
-def test_available_categories_is_empty_without_any_video():
-    assert recipe_match.available_categories([]) == set()
+def test_available_categories_offers_only_curated_acts_without_any_video():
+    # An empty gallery leaves nothing to mine — only the overlay-curated act stands.
+    assert recipe_match.available_categories([]) == {"gamma"}
+
+
+# --- curated_recipe: the overlay's hand-tuned act recipes ---------------------
+
+
+def test_curated_recipe_returns_the_overlays_entry():
+    spec = recipe_match.curated_recipe("gamma")  # curated in the example overlay
+    assert spec["workflow"] == "wan22_i2v"
+    assert spec["params"]["lora_high"] == "example-act-high.safetensors"
+
+
+def test_curated_recipe_is_none_for_an_uncurated_act():
+    assert recipe_match.curated_recipe("beta") is None
+
+
+def test_curated_recipe_is_none_for_a_malformed_entry(monkeypatch):
+    # A junk entry must send the caller to mining, never fail the act outright.
+    monkeypatch.setattr(recipe_match, "_CURATED_RECIPES",
+                        {"beta": "not a dict", "epsilon": {"params": {}}})
+    assert recipe_match.curated_recipe("beta") is None      # not a dict
+    assert recipe_match.curated_recipe("epsilon") is None   # names no workflow
 
 
 def test_best_recipe_groups_ignoring_prompt_seed_and_input_image():

@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS generations (
     params_json     TEXT    NOT NULL,
     workflow_json   TEXT    NOT NULL,
     output_files    TEXT,
+    -- Set when a standalone enhance was folded into this row: the output_files
+    -- it had before (the pre-enhance file, still on disk and listed among the
+    -- current output_files). Presence marks the row enhanced-in-place.
+    original_files  TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
     -- The user's per-item bookmark: a starred image or video, independent of the
@@ -53,9 +57,9 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
-    "output_files", "thumbnail_path", "error_message", "starred", "progress_json",
-    "experiment_verdict", "duration_seconds", "created_at", "completed_at",
-    "evolver_exported_at",
+    "output_files", "original_files", "thumbnail_path", "error_message", "starred",
+    "progress_json", "experiment_verdict", "duration_seconds", "created_at",
+    "completed_at", "evolver_exported_at",
 )
 
 
@@ -90,6 +94,8 @@ class Database:
             )
         if "experiment_verdict" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN experiment_verdict TEXT")
+        if "original_files" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN original_files TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -128,7 +134,7 @@ class Database:
 
     def update_generation(self, prompt_id: str, **fields):
         allowed = {
-            "status", "output_files", "thumbnail_path",
+            "status", "output_files", "original_files", "thumbnail_path",
             "error_message", "completed_at", "duration_seconds", "progress_json",
         }
         to_set = {k: v for k, v in fields.items() if k in allowed}

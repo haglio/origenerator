@@ -48,14 +48,23 @@ def _output_path(file: dict) -> str:
 def _output_items(row: dict) -> list[MetaItem]:
     """One labeled item per output file. Each copies just its filename (dropping
     the image/ or video/ subfolder the displayed path carries) and reveals its
-    absolute location under ComfyUI's output folder in the OS file manager."""
+    absolute location under ComfyUI's output folder in the OS file manager.
+
+    An enhanced-in-place row lists its pre-enhance file(s) too — they stay in
+    ``output_files`` — labeled ``Original`` so the un-enhanced version is always
+    reachable from the image it upgraded into."""
+    originals = {
+        f.get("filename")
+        for f in gallery.parse_file_list(row.get("original_files"))
+    }
     items = []
     for f in gallery.row_output_files(row):
         filename = f.get("filename")
         if not filename:
             continue
         full = COMFYUI_OUTPUT_DIR / (f.get("subfolder") or "") / filename
-        items.append(MetaItem("File", _output_path(f), copy=filename, reveal=str(full)))
+        label = "Original" if filename in originals else "File"
+        items.append(MetaItem(label, _output_path(f), copy=filename, reveal=str(full)))
     return items
 
 

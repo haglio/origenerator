@@ -20,9 +20,9 @@ from origenerator.thumbnail import generate_animated_thumbnail
 logger = logging.getLogger(__name__)
 
 
-def row_output_files(row: dict) -> list[dict]:
-    """Parse a row's ``output_files`` JSON into a list, tolerating bad data."""
-    raw = row.get("output_files")
+def parse_file_list(raw) -> list[dict]:
+    """Parse a stored file-list JSON (``output_files``/``original_files``) into
+    a list, tolerating bad data."""
     if not raw:
         return []
     try:
@@ -30,6 +30,11 @@ def row_output_files(row: dict) -> list[dict]:
     except (json.JSONDecodeError, TypeError):
         return []
     return files if isinstance(files, list) else []
+
+
+def row_output_files(row: dict) -> list[dict]:
+    """Parse a row's ``output_files`` JSON into a list, tolerating bad data."""
+    return parse_file_list(row.get("output_files"))
 
 
 def produced_output(row: dict) -> bool:

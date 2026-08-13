@@ -20,10 +20,13 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     whose maker is unknown). The prompts steer that texture; a batch enhance
     seeds them from the source generation's own prompts.
 
-    The gallery treats the result as image-conditioned: its folder is keyed by
-    the source image's configuration (like an i2v's start frame), so a
-    folder's enhanced copies cluster together, and the output size is the
-    source's own dimensions at ``enhance_scale`` — no pixel budget.
+    Machinery, not a peer workflow (``selectable`` False): its results are
+    upgrades of existing images, not generations with a shared nature, so it
+    never appears in the Generate dropdown and its finished rows never live in
+    the gallery — each is folded into the image it enhanced
+    (:func:`origenerator.gallery.enhance.fold_enhancement`), which keeps its
+    folder and star and simply becomes the enhanced version. The output size
+    is the source's own dimensions at ``enhance_scale`` — no pixel budget.
     """
 
     name = "image_enhance"
@@ -31,6 +34,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     display_name = "Image Enhance"
     output_type = "image"
     derives_size_from_input = True
+    selectable = False
     model_keys = ("checkpoint",)
     output_node_id = "12"
 

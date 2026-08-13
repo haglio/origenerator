@@ -25,6 +25,7 @@ Qt dependency so it can be unit-tested directly.
 import hashlib
 import json
 
+from origenerator.gallery.enhance import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     LoraGroup,
     MediaGroup,
@@ -411,10 +412,17 @@ def build_gallery_tree(
     label and supplies the star state.
     """
     folder_meta = folder_meta or {}
+    # A running standalone enhance is machinery, not a generation: its result
+    # folds into the image it upgrades, so its transient row must not grow an
+    # "Image Enhance" folder while it cooks (its progress shows as an in-flight
+    # card on Recents). A completed one still in the DB — its source image
+    # deleted before it could fold — stays visible, so it can be found and
+    # deleted rather than haunting the disk invisibly.
     rows = [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
         and not is_unvetted_experiment(row)
+        and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
     ]
     # Only finished images have a file to condition an i2v's frame on, so the
     # index that keys image-conditioned folders is built from those alone.

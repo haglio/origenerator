@@ -140,8 +140,12 @@ class GenerateConfigPanel(QWidget):
         header = QHBoxLayout()
         header.addWidget(QLabel("Workflow:"))
         self._workflow_combo = NoWheelComboBox()
+        # Machinery workflows (the standalone image enhancer) stay out of the
+        # picker: they're launched by gallery buttons, and their results fold
+        # into existing images rather than forming generations of their own.
         for key, wf in WORKFLOW_REGISTRY.items():
-            self._workflow_combo.addItem(wf.display_name, key)
+            if wf.selectable:
+                self._workflow_combo.addItem(wf.display_name, key)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
         # Elide to a short floor when the window is narrow instead of holding the
         # width of the longest workflow name, which would set the tab's whole
@@ -480,11 +484,18 @@ class GenerateConfigPanel(QWidget):
         return self._custom_title
 
     def prefill(self, workflow_name: str, params: dict):
-        # Switch to the matching workflow if found
-        for i in range(self._workflow_combo.count()):
-            if self._workflow_combo.itemData(i) == workflow_name:
-                self._workflow_combo.setCurrentIndex(i)
-                break
+        # Switch to the matching workflow. A registered workflow the picker
+        # normally hides (machinery, selectable False) is added on demand, so
+        # reusing such a row still lands on the right form instead of silently
+        # applying its params to whatever workflow was already selected.
+        index = self._workflow_combo.findData(workflow_name)
+        if index < 0 and workflow_name in WORKFLOW_REGISTRY:
+            self._workflow_combo.addItem(
+                WORKFLOW_REGISTRY[workflow_name].display_name, workflow_name
+            )
+            index = self._workflow_combo.findData(workflow_name)
+        if index >= 0:
+            self._workflow_combo.setCurrentIndex(index)
         if self._param_form:
             self._param_form.set_values(params)
         # Now that the settings match a real folder, show its newest result (the

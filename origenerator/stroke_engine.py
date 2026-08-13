@@ -134,6 +134,17 @@ def position(state: StrokeState) -> float:
     return _position_at(state, state.phase)
 
 
+def position_ahead(state: StrokeState, lead_s: float) -> float:
+    """Where the stroke will be ``lead_s`` seconds from now, 0-100.
+
+    This, not :func:`position`, is what a device command should aim at: the
+    OSR2 is told a place and how long to take getting there, so the place has
+    to be one it is actually due to be at when the time is up. Aimed at the
+    present it can only ever chase.
+    """
+    return _position_at(state, state.phase + lead_s * state.bpm / 60.0)
+
+
 def _position_at(state: StrokeState, phase: float) -> float:
     raw = _waveform_raw(phase, state.shape)
     half = state.amplitude / 2

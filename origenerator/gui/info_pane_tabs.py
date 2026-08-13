@@ -3,6 +3,8 @@
 Every tab is the same plain, editable :class:`GenerateConfigPanel` — pick a
 workflow and set params — with no special or permanent tab. New tabs fork via the
 "+" button or a thumbnail double-click; the first one is created on construction.
+The corner's "✕ All" empties the pane in one click, since a session that has
+spread across a dozen tabs otherwise costs a dozen clicks to clear.
 This owns every tab's lifecycle — add, close, rename, and session capture/restore
 of each tab's configuration.
 
@@ -19,14 +21,14 @@ Clicking a config tab's history-strip thumbnail opens (or reuses) a tab for that
 generation.
 
 Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
-test) the "+" is hidden and :meth:`open_config` is a no-op — but a tab still shows,
-its form up for inspection with Generate disabled.
+test) the corner buttons are hidden and :meth:`open_config` is a no-op — but a tab
+still shows, its form up for inspection with Generate disabled.
 """
 
 import time
 
 from PyQt6.QtWidgets import (
-    QTabWidget, QToolButton, QInputDialog, QApplication,
+    QTabWidget, QToolButton, QInputDialog, QApplication, QWidget, QHBoxLayout,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -61,8 +63,22 @@ class InfoPaneTabs(QTabWidget):
         self._add_btn.setText("+")
         self._add_btn.setToolTip("New configuration")
         self._add_btn.clicked.connect(lambda: self._add_subtab())
-        self._add_btn.setVisible(client is not None)  # nothing to run without a client
-        self.setCornerWidget(self._add_btn, Qt.Corner.TopRightCorner)
+        self._close_all_btn = QToolButton()
+        self._close_all_btn.setText("✕ All")
+        self._close_all_btn.setToolTip("Close all configurations")
+        self._close_all_btn.clicked.connect(self.close_all_subtabs)
+        # A corner holds one widget, so both buttons share a row there. Close-all
+        # goes to the LEFT of "+", which keeps "+" on the exact far-right pixel it
+        # has always occupied, and the gap between them means a miss on the "+" a
+        # user clicks constantly doesn't empty the pane instead.
+        self._corner = QWidget()
+        corner_row = QHBoxLayout(self._corner)
+        corner_row.setContentsMargins(0, 0, 0, 0)
+        corner_row.setSpacing(8)
+        corner_row.addWidget(self._close_all_btn)
+        corner_row.addWidget(self._add_btn)
+        self._corner.setVisible(client is not None)  # nothing to run without a client
+        self.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
@@ -139,6 +155,29 @@ class InfoPaneTabs(QTabWidget):
     def _close_subtab(self, index: int):
         self._last_close_at = time.monotonic()  # arm the stray-double-click guard
         self._discard_subtab(index)
+
+    def close_all_subtabs(self):
+        """Close every open config tab at once, leaving the pane empty.
+
+        The same end state as clicking each tab's ✕ in turn — an empty pane has
+        always been reachable that way, and every caller here already copes with
+        no tab in front — but at one click rather than one per tab. Walking from
+        the last index down keeps each index valid as the tabs below it shift.
+        """
+        for index in range(self.count() - 1, -1, -1):
+            self._discard_subtab(index)
+
+    def _sync_close_all(self):
+        """Grey out close-all when the pane is already empty."""
+        self._close_all_btn.setEnabled(self.count() > 0)
+
+    def tabInserted(self, index: int):  # Qt hook: every add path lands here
+        super().tabInserted(index)
+        self._sync_close_all()
+
+    def tabRemoved(self, index: int):  # Qt hook: every close path lands here
+        super().tabRemoved(index)
+        self._sync_close_all()
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""
@@ -296,8 +335,7 @@ class InfoPaneTabs(QTabWidget):
             ))
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
-        while self.count() > 0:  # clear every tab before rebuilding from the snapshot
-            self._discard_subtab(self.count() - 1)
+        self.close_all_subtabs()  # clear every tab before rebuilding from the snapshot
         for snapshot, title in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)

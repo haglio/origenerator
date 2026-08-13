@@ -1,7 +1,9 @@
 import json
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PyQt6.QtCore import Qt
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -138,6 +140,64 @@ def test_close_subtab_removes_and_tears_down(tabs):
     assert tabs._config_panels() == [tabs.widget(0)]
 
 
+# --- close all --------------------------------------------------------------
+
+def test_close_all_button_empties_the_pane_in_one_click(tabs):
+    tabs._add_subtab()
+    tabs._add_subtab()  # three open tabs
+
+    tabs._close_all_btn.click()
+
+    assert tabs.count() == 0
+    assert tabs._config_panels() == []
+
+
+def test_close_all_tears_down_every_panel(tabs):
+    # Each closed tab must release what it holds, exactly as its own ✕ does —
+    # closing in bulk is no excuse to leak a panel's timers/handles.
+    panels = [tabs.widget(0), tabs._add_subtab(), tabs._add_subtab()]
+    with ExitStack() as stack:
+        spies = [
+            stack.enter_context(patch.object(p, "teardown", wraps=p.teardown))
+            for p in panels
+        ]
+        tabs.close_all_subtabs()
+        for spy in spies:
+            spy.assert_called_once()
+
+
+def test_close_all_on_an_already_empty_pane_is_harmless(tabs):
+    tabs.close_all_subtabs()
+    tabs.close_all_subtabs()  # nothing left to walk
+    assert tabs.count() == 0
+
+
+def test_close_all_is_disabled_only_while_the_pane_is_empty(tabs):
+    assert tabs._close_all_btn.isEnabled()  # one tab open
+    tabs.close_all_subtabs()
+    assert not tabs._close_all_btn.isEnabled()  # nothing left to close
+    tabs._add_btn.click()
+    assert tabs._close_all_btn.isEnabled()  # a fresh tab re-arms it
+
+
+def test_close_all_leaves_the_add_button_usable(tabs):
+    # An emptied pane is not a dead end: "+" still opens a fresh tab.
+    tabs.close_all_subtabs()
+    tabs._add_btn.click()
+    assert tabs.count() == 1
+    assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
+
+
+def test_the_add_button_keeps_the_far_right_corner(tabs):
+    # Close-all sits to the LEFT of "+", so the button the user clicks constantly
+    # stays where it has always been and a miss doesn't empty the pane.
+    assert tabs.cornerWidget(Qt.Corner.TopRightCorner) is tabs._corner
+    row = tabs._corner.layout()
+    assert [row.itemAt(i).widget() for i in range(row.count())] == [
+        tabs._close_all_btn, tabs._add_btn,
+    ]
+
+
 # --- a read-only gallery (no client) ---------------------------------------
 
 def test_a_tab_still_shows_without_a_client(qtbot, tmp_path):
@@ -147,6 +207,9 @@ def test_a_tab_still_shows_without_a_client(qtbot, tmp_path):
     assert tabs.count() == 1  # a tab still shows, Generate disabled
     assert tabs.widget(0)._generate_btn.isEnabled() is False
     assert not tabs._add_btn.isVisible()
+    # Neither corner button shows: with no "+" to reopen one, a close-all would
+    # strand the pane empty for the rest of the session.
+    assert tabs._corner.isHidden()
 
 
 def test_open_config_is_a_no_op_without_a_client(qtbot, tmp_path):

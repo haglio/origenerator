@@ -299,6 +299,21 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
 
 # --- show the newest matching generation instead of the blank placeholder -----
 
+def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
+    # The standalone image enhancer is launched by the gallery's enhance
+    # buttons, not picked by hand: it stays out of the dropdown. Reusing one of
+    # its rows still lands on its form — the entry is added on demand.
+    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+    combo = panel._workflow_combo
+    keys = {combo.itemData(i) for i in range(combo.count())}
+    assert "image_enhance" not in keys
+    assert "sdxl_t2i" in keys
+
+    panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
+    assert combo.currentData() == "image_enhance"
+
+
 def _wiz_params():
     return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a wizard")
 

@@ -253,7 +253,12 @@ def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
     assert is_enhanced_row(_row(params_json=json.dumps({"enhance": True}))) is True
     assert is_enhanced_row(_row(params_json=json.dumps(
         {"enhance": False, "enhance_denoise": 0.15}))) is False
-    # A standalone enhancer run is enhanced by definition.
+    # A folded-in standalone enhance marks the row via original_files.
+    assert is_enhanced_row(_row(
+        params_json=json.dumps({"steps": 50}),
+        original_files=json.dumps([{"filename": "sdxl_t2i_old.png"}]),
+    )) is True
+    # A still-transient (unfolded) enhancer row is an enhanced image too.
     assert is_enhanced_row(_row(workflow_name="image_enhance", params_json="{}")) is True
     # SDXL rows from the era the tail ran unconditionally carry its params but
     # no flag; they count. Pre-enhance rows and other workflows' rows don't.
@@ -310,6 +315,18 @@ def test_enhance_params_for_builds_an_image_enhance_config():
                 output_files=json.dumps([{"filename": "wan22_t2i_b.png"}]))
     assert enhance_params_for(bare)["checkpoint"] == \
         WORKFLOW_REGISTRY["image_enhance"].default_params()["checkpoint"]
+    # An already-enhanced row re-enhances from its ORIGINAL file, so a
+    # deliberate re-enhance re-derives rather than compounding upscales.
+    folded = _row(
+        params_json="{}",
+        output_files=json.dumps([{"filename": "image_enhance_1_.png", "subfolder": "image",
+                                  "type": "output"},
+                                 {"filename": "sdxl_t2i_s.png", "subfolder": "image",
+                                  "type": "output"}]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_s.png", "subfolder": "image",
+                                    "type": "output"}]),
+    )
+    assert enhance_params_for(folded)["input_image"] == "image/sdxl_t2i_s.png [output]"
 
 
 def test_gallery_tree_splits_different_workflow_generations_into_folders():

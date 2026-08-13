@@ -4297,12 +4297,19 @@ def test_enhance_all_queues_and_serializes_same_folder_enhances(qtbot, tmp_path)
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    # The completion pumped the queue: the second enhance is running, first done.
+    # The completion pumped the queue: the second enhance is running, and the
+    # first FOLDED into its source — the transient job row is gone, and the
+    # source image itself now wears the enhanced file (its identity untouched).
     assert view._enhance_queue == []
     (job2,) = view._reroll_jobs.values()
     assert job2.workflow.name == "image_enhance"
     assert job2.prompt_id != job.prompt_id
-    assert view._db.get_generation(job.prompt_id)["status"] == "completed"
+    assert view._db.get_generation(job.prompt_id) is None
+    (upgraded,) = [r for r in view._db.list_generations() if r.get("original_files")]
+    files = gallery.row_output_files(upgraded)
+    assert files[0]["filename"] == "image_enhance_00001_.png"   # the new face
+    assert files[1]["filename"] == f"sdxl_t2i_{upgraded['prompt_id']}.png"  # still listed
+    assert gallery.is_enhanced_row(upgraded)
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):

@@ -55,6 +55,11 @@ class WorkflowTemplate(ABC):
     # out of ``default_params`` (the size isn't a stored recipe setting), so an
     # override never splits a gallery folder from an otherwise identical run.
     derives_size_from_input: bool = False
+    # False for machinery workflows the user never picks by hand (the standalone
+    # image enhancer, launched by the gallery's enhance buttons): they stay out
+    # of the Generate tab's workflow dropdown but remain registered — payloads
+    # still build, in-flight rows still reconnect and caption themselves.
+    selectable: bool = True
     # The param key(s) whose values identify which model produced an output.
     # The gallery groups a workflow's generations into model folders by these.
     model_keys: tuple[str, ...] = ()

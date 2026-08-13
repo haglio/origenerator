@@ -1752,6 +1752,15 @@ class GalleryView(QWidget):
             self.refresh()
             self._pump_enhance_queue()  # the GPU freed up all the same
             return
+        if finished_row is not None \
+                and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+            # A standalone enhance is an upgrade, not a generation: fold its
+            # output onto the image it enhanced — same row, same folder, same
+            # star, now wearing the enhanced pixels and badge — and let the
+            # upgraded image be what the front tab shows.
+            source_id = gallery.fold_enhancement(self._db, finished_row)
+            if source_id is not None:
+                finished_row = self._db.get_generation(source_id)
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()

@@ -281,6 +281,17 @@ def main():
         except Exception as e:
             logger.warning("Input-image backfill failed: %s", e)
 
+        status("Folding enhancements into their images...")
+        # A standalone enhance is an upgrade of an existing image, not its own
+        # generation: fold any completed image_enhance row onto its source —
+        # completions that landed while the app was closed, and the rows from
+        # before enhancement folded at all.
+        from origenerator.gallery import fold_completed_enhancements
+        try:
+            fold_completed_enhancements(db)
+        except Exception as e:
+            logger.warning("Enhancement fold failed: %s", e)
+
         status("Repairing thumbnails...")
         # Re-render any thumbnail an old filename-stem collision left wrong or
         # missing, so each generation's thumbnail matches its own preview again.

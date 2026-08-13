@@ -39,6 +39,7 @@ from origenerator.gallery.output import (
     media_type_of_row,
     output_disk_files,
     output_file_reference,
+    parse_file_list,
     produced_output,
     resolve_preview,
     row_output_files,
@@ -46,6 +47,8 @@ from origenerator.gallery.output import (
 from origenerator.gallery.enhance import (
     ENHANCE_WORKFLOW,
     enhance_params_for,
+    fold_completed_enhancements,
+    fold_enhancement,
     is_enhanceable_row,
     is_enhanced_row,
     rows_awaiting_enhancement,

@@ -366,6 +366,11 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     assert wf.output_type == "image"
     assert wf.model_keys == ("checkpoint",)
     assert wf.seed_keys() == ("seed",)
+    # Machinery, not a peer workflow: launched by the gallery's enhance
+    # buttons, never offered in the Generate dropdown. Every real workflow is.
+    assert wf.selectable is False
+    assert all(WORKFLOW_REGISTRY[n].selectable for n in WORKFLOW_REGISTRY
+               if n != "image_enhance")
     # It takes an input image, so — like every input-image workflow — its size
     # derives from it: the source's own dimensions at enhance_scale, no budget.
     assert wf.derives_size_from_input is True

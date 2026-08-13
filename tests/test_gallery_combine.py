@@ -65,3 +65,47 @@ def test_combined_params_references_the_images_subfolder_output():
     params = gallery.combined_params(video, image, _I2V)
 
     assert params["input_image"] == "images/sdxl_new.png [output]"
+
+
+def test_combined_params_drops_the_recipes_stored_size():
+    # A recipe video carrying a size — an import's scraped one, or an unlocked
+    # override — sized the frame IT ran on. Carried onto a differently shaped
+    # image it would stretch it, so the swap drops it.
+    video = _video_row(seed=3, noise_seed=9, width=720, height=928)
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+
+    params = gallery.combined_params(video, image, _I2V)
+
+    assert "width" not in params and "height" not in params
+
+
+def test_combined_params_payload_derives_the_size_from_the_dropped_image():
+    # The end of the same story: with no size carried over, the built graph
+    # scales to the pixel budget and reads the size back off the result, rather
+    # than forcing the recipe's WxH onto an image of another shape.
+    video = _video_row(seed=3, noise_seed=9, width=720, height=928)
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+
+    payload = _I2V.build_api_payload(gallery.combined_params(video, image, _I2V))
+
+    assert payload["20"]["class_type"] == "ImageScaleToTotalPixels"
+    assert payload["21"]["class_type"] == "GetImageSize"
+    assert payload["14"]["inputs"]["width"] == ["21", 0]
+    assert payload["14"]["inputs"]["height"] == ["21", 1]
+
+
+def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
+    # The drop is gated on the workflow deriving its size, not on the key names:
+    # a workflow that sizes by hand has width/height as real recipe settings.
+    class _ManualSize:
+        derives_size_from_input = False
+
+        def default_params(self):
+            return {"input_image": "", "width": 512, "height": 512}
+
+    video = _video_row(width=720, height=928)
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+
+    params = gallery.combined_params(video, image, _ManualSize())
+
+    assert (params["width"], params["height"]) == (720, 928)

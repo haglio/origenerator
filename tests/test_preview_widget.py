@@ -309,10 +309,9 @@ def test_open_fullscreen_is_a_no_op_without_media(make_preview):
     assert w.open_fullscreen() is None
 
 
-def test_open_fullscreen_ignores_a_live_frame(make_preview):
-    # A generating preview shows streamed frames with no file behind them yet.
+def test_a_plain_message_opens_nothing(make_preview):
     w = make_preview()
-    w.show_frame(_png_bytes())
+    w.show_message("Nothing to show")  # not a running generation: nothing to watch
     assert w.open_fullscreen() is None
 
 
@@ -333,6 +332,127 @@ def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
     qtbot.addWidget(w)
     w.mouseDoubleClickEvent(None)
     assert called == [True]
+
+
+# --- watching a generation fullscreen while it's still being made -----------
+
+class _FakeFullscreen(QWidget):
+    """Stands in for FullscreenPreview so a test can see what the pane feeds a
+    view opened over a running generation, without a real media backend."""
+
+    def __init__(self, media, *, frame=None, **kwargs):
+        super().__init__()
+        self.media = media
+        self.frames = [frame] if frame is not None else []
+        self.landed = None
+        self._live = media is None
+
+    def is_live(self):
+        return self._live
+
+    def show_frame(self, data):
+        self.frames.append(data)
+
+    def show_landed(self, media):
+        self.landed = media
+        self._live = False
+
+    def showFullScreen(self):
+        self.show()
+
+
+@pytest.fixture
+def live_preview(make_preview, monkeypatch):
+    """A preview mirroring a running generation, with the fullscreen view it opens
+    faked out."""
+    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", _FakeFullscreen)
+    return make_preview()
+
+
+def test_a_live_frame_opens_fullscreen_over_the_generation(live_preview):
+    # The reported gap: double-clicking a generating preview did nothing, so a run
+    # could only be watched full-screen once it had finished.
+    live_preview.show_frame(_png_bytes())
+
+    win = live_preview.open_fullscreen()
+
+    assert win is not None
+    assert win.media is None          # no file behind it yet — it follows the run
+    assert win.frames == [_png_bytes()]  # seeded with the frame that was on screen
+
+
+def test_fullscreen_opens_over_the_wait_before_the_first_frame(live_preview):
+    live_preview.show_message("Waiting for preview…", live=True)
+    win = live_preview.open_fullscreen()
+    assert win is not None and win.frames == []  # nothing to seed it with yet
+
+
+def test_the_generation_streams_on_into_the_open_view(live_preview):
+    # Opened over the wait, it fills in as the run's frames arrive.
+    live_preview.show_message("Waiting for preview…", live=True)
+    win = live_preview.open_fullscreen()
+
+    live_preview.show_frame(_png_bytes())
+
+    assert win.frames == [_png_bytes()]
+
+
+def test_blanking_between_rebuilds_keeps_the_view_on_the_generation(live_preview):
+    # Every gallery rebuild clears the pane to its placeholder while a run streams;
+    # that must not take the fullscreen view off the generation it's watching.
+    live_preview.show_frame(_png_bytes())
+    win = live_preview.open_fullscreen()
+
+    live_preview.clear()             # the rebuild's blank
+    live_preview.show_frame(_png_bytes())  # the frames resume
+
+    assert win.frames == [_png_bytes(), _png_bytes()]
+    assert win.landed is None        # and it was never told the run had landed
+
+
+def test_a_blank_before_the_result_still_lands_the_view(live_preview, tmp_path):
+    # The finish path blanks the pane (that same rebuild) a beat before the saved
+    # file reaches it, so the hand-off can't key off the pane still looking live.
+    live_preview.show_frame(_png_bytes())
+    win = live_preview.open_fullscreen()
+
+    live_preview.clear()
+    png = _make_png(tmp_path / "done.png")
+    live_preview.show_image(png)
+
+    assert win.landed == (png, "image")
+
+
+def test_the_finished_file_takes_over_from_the_frames(live_preview, tmp_path):
+    live_preview.show_frame(_png_bytes())
+    win = live_preview.open_fullscreen()
+
+    png = _make_png(tmp_path / "done.png")
+    live_preview.show_image(png)  # the run landed: the pane swaps to the saved file
+
+    assert win.landed == (png, "image")
+
+
+def test_a_dismissed_view_stops_being_fed(live_preview, tmp_path):
+    live_preview.show_frame(_png_bytes())
+    win = live_preview.open_fullscreen()
+    win.close()
+
+    live_preview.show_frame(_png_bytes())
+    live_preview.show_image(_make_png(tmp_path / "done.png"))
+
+    assert win.frames == [_png_bytes()]  # only the frame it was opened with
+    assert win.landed is None
+
+
+def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
+    live_preview.show_frame(_png_bytes())
+    win = live_preview.open_fullscreen()
+    live_preview.show_image(_make_png(tmp_path / "done.png"))  # this run landed
+
+    live_preview.show_frame(_png_bytes())  # a later run starts streaming
+
+    assert win.frames == [_png_bytes()]  # the view still shows what it landed on
 
 
 # --- funscript strip: proof a shown video carries a stroke script -----------

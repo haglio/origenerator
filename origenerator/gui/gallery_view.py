@@ -1745,8 +1745,16 @@ class GalleryView(QWidget):
         """Empty the info pane if it was mirroring a re-roll that has ended with no
         result to show (cancelled or failed)."""
         if key == self._selected_reroll_key:
+            self._close_live_fullscreen()
             self._clear_reroll_selection()
             self._clear_metadata()
+
+    def _close_live_fullscreen(self):
+        """Dismiss a fullscreen view that was watching a generation which ended with
+        nothing to show — left up, it would sit on a stale partial frame forever."""
+        fullscreen = self._fullscreen_preview
+        if fullscreen is not None and fullscreen.is_live():
+            fullscreen.close()
 
     def _on_reroll_finished(self, key: str, prompt_id: str):
         """A re-roll saved its result (finalized by the controller): drop it as the

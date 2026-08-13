@@ -1,3 +1,4 @@
+from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
@@ -13,6 +14,13 @@ from origenerator.stroke_engine import StrokeState
 def _make_png(path):
     Image.new("RGB", (32, 24), (10, 120, 200)).save(path, "PNG")
     return path
+
+
+def _png_bytes():
+    """A streamed in-progress frame: encoded image bytes, no file on disk."""
+    buf = BytesIO()
+    Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
+    return buf.getvalue()
 
 
 def _make_tall_png(path):
@@ -176,6 +184,21 @@ def test_paging_wraps_around_the_ends(qtbot, tmp_path):
     assert win._preview._media == (a, "image")
 
 
+def test_paging_leaves_the_live_generation_behind(qtbot, tmp_path):
+    # Paged onto a saved item, the view is no longer the run's — later frames of it
+    # must not paint over what the user paged to.
+    a = _make_png(tmp_path / "a.png")
+    b = _make_png(tmp_path / "b.png")
+    win = FullscreenPreview(None, frame=_png_bytes(), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_playlist([(a, "image"), (b, "image")], 0)
+
+    _press(win, Qt.Key.Key_Right)
+
+    assert win.is_live() is False
+    assert win._preview._media == (b, "image")
+
+
 def test_paging_is_inert_without_a_playlist(qtbot, tmp_path):
     a = _make_png(tmp_path / "a.png")
     win = FullscreenPreview((a, "image"), player=MagicMock())  # a lone item, never armed
@@ -195,6 +218,77 @@ def test_paging_emits_media_changed_to_re_aim_the_osr2(qtbot, tmp_path):
 
     _press(win, Qt.Key.Key_Right)
     assert changed == [True]
+
+
+# --- opened over a generation still being made ------------------------------
+
+def test_opens_over_a_running_generation_showing_its_frame(qtbot):
+    win = FullscreenPreview(None, frame=_png_bytes(), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win.is_live() is True
+    assert win._preview._media is None                    # no file behind it yet
+    assert not win._preview._image_label.pixmap().isNull()  # the streamed frame shows
+
+
+def test_opened_before_the_first_frame_it_says_it_is_generating(qtbot):
+    win = FullscreenPreview(None, player=MagicMock())
+    qtbot.addWidget(win)
+    assert win.is_live() is True
+    assert win._preview._image_label.text() == "Generating…"
+
+
+def test_a_later_frame_replaces_the_one_it_opened_over(qtbot):
+    win = FullscreenPreview(None, player=MagicMock())
+    qtbot.addWidget(win)
+    win.show_frame(_png_bytes())
+    assert not win._preview._image_label.pixmap().isNull()
+
+
+def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
+    # Watching a generation full-screen ends on the finished image, not the last
+    # low-res frame it streamed.
+    png = _make_png(tmp_path / "done.png")
+    win = FullscreenPreview(None, frame=_png_bytes(), player=MagicMock())
+    qtbot.addWidget(win)
+    changed = []
+    win.media_changed.connect(lambda: changed.append(True))
+
+    win.show_landed((png, "image"))
+
+    assert win._preview._media == (png, "image")
+    assert win.is_live() is False
+    assert changed == [True]  # a landed video is a fresh OSR2 target
+
+
+def test_frames_are_ignored_once_it_has_landed(qtbot, tmp_path):
+    png = _make_png(tmp_path / "done.png")
+    win = FullscreenPreview(None, player=MagicMock())
+    qtbot.addWidget(win)
+    win.show_landed((png, "image"))
+
+    win.show_frame(_png_bytes())  # a later run's frames must not paint over it
+
+    assert win._preview._media == (png, "image")
+
+
+def test_a_landed_view_pages_the_folder_like_any_other(qtbot, tmp_path):
+    a = _make_png(tmp_path / "a.png")
+    b = _make_png(tmp_path / "b.png")
+    win = FullscreenPreview(None, frame=_png_bytes(), player=MagicMock())
+    qtbot.addWidget(win)
+    win.show_landed((a, "image"))
+    win.set_playlist([(a, "image"), (b, "image")], 0)
+
+    _press(win, Qt.Key.Key_Right)
+
+    assert win._preview._media == (b, "image")
+
+
+def test_a_live_view_drives_no_device(qtbot):
+    # Streamed frames are no video: nothing for the OSR2 to follow.
+    win = FullscreenPreview(None, frame=_png_bytes(), player=MagicMock())
+    qtbot.addWidget(win)
+    assert win.osr2_drive_target() is None
 
 
 class _FakeStroke:

@@ -296,6 +296,8 @@ def test_show_reroll_frame_shows_a_waiting_note_without_a_frame(tabs):
     panel._preview.show_message = MagicMock()
     tabs.show_reroll_frame(None)
     panel._preview.show_message.assert_called_once()
+    # Marked live, so the pane can be double-clicked open before the first frame.
+    assert panel._preview.show_message.call_args.kwargs == {"live": True}
 
 
 def test_show_reroll_frame_mirrors_a_frame(tabs):

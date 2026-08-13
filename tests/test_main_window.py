@@ -88,6 +88,24 @@ def test_persists_the_global_osr2_toggle_on_close(qtbot, tmp_path):
     assert state.get("osr2_enabled") is True
 
 
+def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):
+    # Left on, the audio bed comes back on at the next launch — the same standing
+    # preference the OSR2 and experiments switches are.
+    state = AppState(tmp_path / "ui.json")
+    state.set("audio_enabled", True)
+    win = _window(qtbot, tmp_path, state)
+    assert win._gallery_view.audio_enabled() is True
+
+
+def test_persists_the_audio_switch_on_close(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    win = _window(qtbot, tmp_path, state)
+    win._gallery_view.set_audio_enabled(True)
+
+    win.close()  # closeEvent persists the session
+    assert state.get("audio_enabled") is True
+
+
 def test_restores_the_experiments_switch_from_app_state(qtbot, tmp_path):
     # The background experimenter resumes across launches — "spend the time I'm
     # not here" is a standing preference, not a per-session one.

@@ -14,7 +14,7 @@ from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
+    AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
@@ -25,6 +25,7 @@ from origenerator.generation_config import (
     ConfigSnapshot, filled_params, find_duplicate_generation, merge_denormalized,
     randomize_seeds,
 )
+from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.combine_panel import CombinePanel
@@ -98,10 +99,17 @@ class GalleryView(QWidget):
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
                  actions: GalleryActions | None = None,
-                 osr2_stroke: Osr2StrokeDriver | None = None):
+                 osr2_stroke: Osr2StrokeDriver | None = None,
+                 ambient_audio: AmbientAudio | None = None):
         super().__init__(parent)
         self._db = db
         self._client = client
+        # The app-global audio bed behind the toolbar's audio switch: several
+        # library clips at once, sound only. Injectable so tests never open a
+        # real media backend. Built before _build_ui, whose switch drives it.
+        self._ambient_audio = (
+            ambient_audio if ambient_audio is not None else AmbientAudio(parent=self)
+        )
         # The one app-global stroke driver (genau's engine, no funscript needed):
         # every surface — this window, the fullscreen viewer, both slideshows —
         # drives it through the shared stroke keys, and while it holds the device
@@ -382,12 +390,24 @@ class GalleryView(QWidget):
         self._osr2_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
+        # The other app-global switch, beside the OSR2's: while it's on, a few
+        # library clips play at once with only their sound — something to work
+        # over, tied to nothing on screen.
+        self._audio_btn = self._tool_button(
+            icons.audio_icon(),
+            f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
+            "shuffling endlessly",
+            self._on_audio_toggle, checkable=True,
+        )
+        self._audio_btn.setStyleSheet(
+            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+        )
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
                        self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
-                       self._osr2_btn, self._delete_btn):
+                       self._audio_btn, self._osr2_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -485,6 +505,9 @@ class GalleryView(QWidget):
         if app is not None:
             app.aboutToQuit.connect(self._osr2_driver.stop)
             app.aboutToQuit.connect(self._osr2_stroke.stop)
+            # Same reason the preview releases its player: a live media player at
+            # Qt/Python shutdown can deadlock the real (WMF) backend.
+            app.aboutToQuit.connect(self._ambient_audio.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
@@ -746,6 +769,25 @@ class GalleryView(QWidget):
     def set_osr2_enabled(self, enabled):
         """Restore the global OSR2 toggle from a saved session."""
         self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
+
+    # --- the audio bed: one app-global switch, following nothing on screen ----
+
+    def _on_audio_toggle(self, on: bool):
+        """Start or silence the audio bed. Unlike the OSR2's switch it has nothing
+        to re-aim: it plays under whatever the user is doing, so the toggle is the
+        whole of it."""
+        if on:
+            self._ambient_audio.start()
+        else:
+            self._ambient_audio.stop()
+
+    def audio_enabled(self) -> bool:
+        """Whether the audio bed's switch is on (for session persistence)."""
+        return self._audio_btn.isChecked()
+
+    def set_audio_enabled(self, enabled):
+        """Restore the audio bed's switch from a saved session."""
+        self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
 
     # --- background experiments: the closing batch and the shelf's controls ---
 

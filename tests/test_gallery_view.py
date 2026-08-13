@@ -4869,6 +4869,48 @@ def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
     assert view.osr2_enabled() is True and view._osr2_btn.isChecked()
 
 
+class _FakeAmbientAudio:
+    """Stands in for the audio bed so a gallery test never opens a media backend."""
+
+    def __init__(self):
+        self.starts = 0
+        self.stops = 0
+
+    def start(self):
+        self.starts += 1
+
+    def stop(self):
+        self.stops += 1
+
+
+def _audio_view(qtbot):
+    bed = _FakeAmbientAudio()
+    view = GalleryView(FakeDB([]), actions=FakeActions(), ambient_audio=bed)
+    qtbot.addWidget(view)
+    return view, bed
+
+
+def test_the_audio_switch_starts_and_silences_the_bed(qtbot):
+    view, bed = _audio_view(qtbot)
+    assert (bed.starts, bed.stops) == (0, 0)  # off until asked
+
+    view._audio_btn.setChecked(True)
+    assert bed.starts == 1
+
+    view._audio_btn.setChecked(False)
+    assert bed.stops == 1
+
+
+def test_audio_enabled_state_round_trips_for_persistence(qtbot):
+    view, bed = _audio_view(qtbot)
+    assert view.audio_enabled() is False
+
+    view.set_audio_enabled(True)
+
+    assert view.audio_enabled() is True and view._audio_btn.isChecked()
+    assert bed.starts == 1  # restoring the switch actually starts it playing
+
+
 def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeypatch):
     # Left/Right in fullscreen page through the folder: the view is armed with the
     # visible items' media, starting on the one already shown.

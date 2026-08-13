@@ -81,6 +81,11 @@ def osr2_icon() -> QIcon:
     return _two_mode(_draw_osr2)
 
 
+def audio_icon() -> QIcon:
+    """A speaker sounding off — the audio bed's on/off switch."""
+    return _two_mode(_draw_audio)
+
+
 def delete_icon() -> QIcon:
     return _two_mode(lambda p, _color: _draw_trash(p))
 
@@ -347,6 +352,21 @@ def _draw_osr2(painter: QPainter, color):
     painter.setBrush(color)
     painter.drawPolygon(QPointF(cx, top), QPointF(cx - 7, top + 9), QPointF(cx + 7, top + 9))
     painter.drawPolygon(QPointF(cx, bot), QPointF(cx - 7, bot - 9), QPointF(cx + 7, bot - 9))
+
+
+def _draw_audio(painter: QPainter, color):
+    """A speaker cone with two waves coming off it — sound is playing."""
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    painter.drawPolygon(QPointF(10, 19), QPointF(16, 19), QPointF(23, 12),
+                        QPointF(23, 36), QPointF(16, 29), QPointF(10, 29))
+    pen = QPen(color)
+    pen.setWidthF(4)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawArc(QRectF(23, 17, 10, 14), -70 * 16, 140 * 16)   # the near wave
+    painter.drawArc(QRectF(25, 11, 16, 26), -70 * 16, 140 * 16)   # the far wave
 
 
 def _draw_mic(painter: QPainter, color):

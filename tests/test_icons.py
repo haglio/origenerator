@@ -44,7 +44,7 @@ def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
     from PyQt6.QtGui import QIcon
 
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.delete_icon,
-              icons.clock_icon,
+              icons.clock_icon, icons.audio_icon, icons.osr2_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
     for make in makers:
         icon = make()

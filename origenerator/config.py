@@ -39,6 +39,28 @@ def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
 PROJECT_ROOTS = project_roots()
 
 
+def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
+    """The folder the audio switch shuffles clips out of, or ``None`` for none.
+
+    *Which* folder of the library it is describes the library, so it comes from
+    the overlay rather than from source. A relative value hangs off
+    ``suite_root`` -- where it in fact sits -- and an absolute one is taken as
+    given, so a folder outside the library tree works too.
+    """
+    content = _CONTENT if content is None else content
+    raw = content.get("ambient_audio_dir")
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else Path(content["suite_root"]) / path
+
+
+AMBIENT_AUDIO_DIR = ambient_audio_dir()
+# How many clips the audio bed plays at once. Each voice walks its own shuffled
+# pass of the folder, so they drift apart the moment two clip lengths differ.
+AMBIENT_AUDIO_VOICES = 3
+
+
 def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     """The sibling checkout *name*, from the first root that actually holds it.
 

@@ -1,5 +1,8 @@
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+
+from origenerator.db_salvage import salvage_if_malformed
 
 _SCHEMA = """\
 CREATE TABLE IF NOT EXISTS generations (
@@ -67,10 +70,11 @@ class Database:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        salvage_if_malformed(self.path, _SCHEMA)
         self._init_schema()
 
     def _init_schema(self):
-        with sqlite3.connect(self.path) as conn:
+        with self._connect() as conn:
             conn.executescript(_SCHEMA)
             self._migrate(conn)
 
@@ -102,10 +106,23 @@ class Database:
         if "ref_prompt_id" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN ref_prompt_id TEXT")
 
+    @contextmanager
     def _connect(self):
+        """A connection that commits on the way out, and always closes.
+
+        Closing is what the plain ``with sqlite3.connect(...)`` this replaced
+        never did -- that one commits and then leaves the connection to the
+        garbage collector, which on Windows keeps the file open long enough for
+        the next rename or replace of it to be refused (see
+        :mod:`origenerator.db_salvage`).
+        """
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def insert_generation(
         self,

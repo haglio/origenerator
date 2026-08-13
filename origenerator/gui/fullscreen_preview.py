@@ -1,6 +1,12 @@
 """A fullscreen view of a single image or video, opened by double-clicking a
 preview. Escape or another double-click closes it.
 
+It also opens over a generation that's still running: built with no media, it
+shows that generation's streamed low-res frames (:meth:`show_frame`) until the
+pane that opened it hands over the finished file (:meth:`show_landed`), at which
+point it's an ordinary fullscreen view of that file. So a generation can be
+watched full-screen while it's made, not only once it lands.
+
 Reuses :class:`PreviewWidget` (looping, like the inline preview) for the actual
 rendering, over a solid black surround. The media is scaled as large as it fits
 the screen without cropping, so a shape that doesn't match the screen letterboxes
@@ -23,18 +29,25 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 
+_GENERATING = "Generating…"
+
 
 class FullscreenPreview(QWidget):
     closed = pyqtSignal()  # the view was dismissed (Esc, a double-click, or close)
     media_changed = pyqtSignal()  # paged to a different item (re-aim the OSR2 drive)
 
-    def __init__(self, media: tuple, *, player=None, parent=None):
+    def __init__(self, media: tuple | None, *, frame: bytes | None = None,
+                 player=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Preview")
         # The navigable folder: a lone item until set_playlist arms Left/Right to
-        # page across the folder the view was opened from.
-        self._items: list[tuple] = [media]
+        # page across the folder the view was opened from. Empty while following a
+        # running generation — it has no file to page from yet.
+        self._items: list[tuple] = [media] if media is not None else []
         self._index = 0
+        # Following a generation still in flight: no media of its own, so the pane
+        # that opened it feeds the frames and hands over the file that lands.
+        self._live = media is None
         # The gallery hands its app-global stroke driver in via set_stroke once
         # this view announces itself; until then the stroke keys are inert.
         self._stroke = None
@@ -54,7 +67,35 @@ class FullscreenPreview(QWidget):
                                       show_funscript_strip=True, mute_audio=False,
                                       on_double_click=self.close)
         layout.addWidget(self._preview, 1)
+        if media is not None:
+            self._preview.show_media(media[0], media[1])
+        elif frame is not None:
+            self._preview.show_frame(frame)  # the frame the double-click landed on
+        else:
+            self._preview.show_message(_GENERATING)  # opened before the first one
+
+    def is_live(self) -> bool:
+        """Whether this view is still following a generation in flight — the pane
+        that opened it checks before feeding it another frame or its result."""
+        return self._live
+
+    def show_frame(self, data: bytes) -> None:
+        """One more streamed frame of the generation being followed. Ignored once
+        it has landed (or the view has paged away), which is no longer this run."""
+        if self._live:
+            self._preview.show_frame(data)
+
+    def show_landed(self, media: tuple) -> None:
+        """The followed generation finished: show the saved file in place of its
+        frames, and become an ordinary fullscreen view of it — a finished video is
+        a fresh OSR2 target, hence ``media_changed``."""
+        if not self._live:
+            return
+        self._live = False
+        self._items = [media]
+        self._index = 0
         self._preview.show_media(media[0], media[1])
+        self.media_changed.emit()
 
     def set_playlist(self, items: list[tuple], index: int) -> None:
         """Arm Left/Right to page across the folder the view was opened from.
@@ -103,6 +144,7 @@ class FullscreenPreview(QWidget):
         """Page ``delta`` items through the folder, wrapping at either end."""
         if len(self._items) <= 1:
             return
+        self._live = False  # paged off a live generation: its frames stop landing here
         self._index = (self._index + delta) % len(self._items)
         self._preview.show_media(*self._items[self._index])
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed

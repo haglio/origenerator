@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLineEdit
+from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -3030,6 +3030,110 @@ def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
     assert view._selected_reroll_key is None
 
 
+class _FakeLiveFullscreen(QWidget):
+    """Stands in for the FullscreenPreview a double-click pops open, recording what
+    the running generation feeds it — without a real media backend."""
+
+    closed = pyqtSignal()
+    media_changed = pyqtSignal()
+
+    def __init__(self, media, *, frame=None, **kwargs):
+        super().__init__()
+        self.media = media
+        self.frames = [frame] if frame is not None else []
+        self.landed = None
+        self._live = media is None
+
+    def is_live(self):
+        return self._live
+
+    def show_frame(self, data):
+        self.frames.append(data)
+
+    def show_landed(self, media):
+        self.landed = media
+        self._live = False
+
+    def showFullScreen(self):
+        self.show()
+
+    def set_stroke(self, stroke):
+        pass
+
+    def osr2_drive_target(self):
+        return None
+
+
+def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
+        qtbot, tmp_path, monkeypatch):
+    # The reported gap, end to end: double-clicking the preview mid-generation did
+    # nothing. Now it opens over the live frames, keeps streaming them, and lands on
+    # the finished image when the run completes.
+    from origenerator.gui import fullscreen_preview as fs_module
+    from origenerator.gui import generate_config_panel as gcp_module
+    monkeypatch.setattr(fs_module, "FullscreenPreview", _FakeLiveFullscreen)
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    frame = _png_bytes()
+    client.preview_image.emit(job.prompt_id, frame)
+
+    win = view._preview.open_fullscreen()  # the double-click, mid-generation
+    qtbot.addWidget(win)
+    assert win is not None and win.is_live()
+    assert win.frames == [frame]  # seeded with what was on screen
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), (200, 30, 30)).save(buf, format="PNG")  # a later, redder frame
+    later = buf.getvalue()
+    client.preview_image.emit(job.prompt_id, later)
+    assert win.frames == [frame, later]  # the run goes on streaming into it
+
+    done = tmp_path / "done.png"
+    Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, output_dir: (done, "image"))
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert win.landed == (done, "image")  # ends on the result, not the last frame
+
+
+def test_a_cancelled_generation_closes_the_view_watching_it(qtbot, tmp_path):
+    # Nothing will ever land, so the view would sit on a stale partial frame.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    fs = _FakeFullscreen(None, live=True)
+    view._on_fullscreen_opened(fs)
+
+    view._cancel_reroll(key)
+
+    assert fs.closes == 1
+
+
+def test_a_cancelled_generation_leaves_a_plain_fullscreen_alone(qtbot, tmp_path):
+    # One opened over a saved file has its own thing on screen: it stays up.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    fs = _FakeFullscreen(None)
+    view._on_fullscreen_opened(fs)
+
+    view._cancel_reroll(key)
+
+    assert fs.closes == 0
+
+
 def test_clicking_add_selects_the_reroll_so_its_preview_shows_at_once(qtbot, tmp_path):
     # One click on "+" both starts the re-roll and selects it, so the info pane
     # shows its live preview without a second click on the now-running tile.
@@ -4501,19 +4605,29 @@ class _FakeDriver:
 
 class _FakeFullscreen(QObject):
     """Stand-in for a FullscreenPreview: a settable drive target, a closed signal,
-    a media_changed signal (paging), and a recorded playlist arming."""
+    a media_changed signal (paging), and a recorded playlist arming. ``live`` makes
+    it one opened over a generation still in flight."""
     closed = pyqtSignal()
     media_changed = pyqtSignal()
 
-    def __init__(self, target):
+    def __init__(self, target, *, live=False):
         super().__init__()
         self._target = target
+        self._live = live
         self.playlist = None       # the items set_playlist was armed with, if any
         self.playlist_index = None
         self.stroke = None         # the shared stroke driver the gallery wires in
+        self.closes = 0
 
     def osr2_drive_target(self):
         return self._target
+
+    def is_live(self):
+        return self._live
+
+    def close(self):
+        self.closes += 1
+        self.closed.emit()
 
     def set_stroke(self, stroke):
         self.stroke = stroke

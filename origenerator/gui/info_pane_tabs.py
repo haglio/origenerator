@@ -234,14 +234,15 @@ class InfoPaneTabs(QTabWidget):
     def show_reroll_frame(self, frame: bytes | None):
         """Mirror a running re-roll's live frame into the current tab's preview —
         or a 'waiting' note when no frame has arrived yet, never the idle
-        placeholder."""
+        placeholder. The note is marked live, so double-clicking the pane opens
+        the run fullscreen even before its first frame streams."""
         panel = self.current_config_panel()
         if panel is None:
             return
         if frame:
             panel._preview.show_frame(frame)
         else:
-            panel._preview.show_message("Waiting for preview…")
+            panel._preview.show_message("Waiting for preview…", live=True)
 
     def clear_current_preview(self):
         """Empty the current tab's preview (a re-roll ended with nothing to show,

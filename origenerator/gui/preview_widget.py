@@ -43,6 +43,13 @@ class PreviewWidget(QWidget):
         # The current on-disk media as (path, media_type), or None while showing a
         # placeholder or a live frame — what a double-click pops open fullscreen.
         self._media: tuple | None = None
+        # Whether a generation is running behind this pane — its streamed frames, or
+        # the wait before the first one arrives — and that latest frame. A double-click
+        # opens fullscreen over these too, and the view opened that way keeps following
+        # from here: later frames, then the finished file. Without it, watching a
+        # generation had to wait for it to land.
+        self._live = False
+        self._live_frame: bytes | None = None
         self._allow_fullscreen = allow_fullscreen  # a slideshow / the fullscreen view opts out
         self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
         # A double-click that doesn't open fullscreen (this preview opted out, was
@@ -131,6 +138,7 @@ class PreviewWidget(QWidget):
     def show_image(self, path) -> None:
         self._player.stop()
         self._media = (path, "image")
+        self._end_live(self._media)
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._pixmap = None
@@ -145,6 +153,7 @@ class PreviewWidget(QWidget):
     def show_video(self, path) -> None:
         self._set_movie(None)
         self._media = (path, "video")
+        self._end_live(self._media)
         self._pixmap = None
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
@@ -165,27 +174,64 @@ class PreviewWidget(QWidget):
             return
         self._player.stop()
         self._media = None  # a transient live frame, not a file to open fullscreen
+        self._live, self._live_frame = True, data  # …but a running generation to watch
         self._draggable_id = None  # nor a saved generation to drag out
         self._set_movie(None)
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
         self._hide_strip()  # a live in-progress frame has no script yet
+        win = self._following_fullscreen()
+        if win is not None:
+            win.show_frame(data)  # keep a view watching this generation up to date
 
-    def show_message(self, text: str) -> None:
+    def show_message(self, text: str, *, live: bool = False) -> None:
         """Show a plain text message in place of any media.
 
         For a transient state the idle placeholder would misdescribe — a re-roll
         that's generating but hasn't streamed a preview frame yet.
+
+        ``live`` marks the message as a running generation's, so a double-click
+        opens fullscreen over it all the same — the view comes up saying it's
+        generating and fills in as the frames arrive.
         """
         self._player.stop()
         self._media = None  # a message, not a file to open fullscreen
+        self._end_live(None)  # a message is no result to hand a following view
+        self._live = live
         self._draggable_id = None  # nor a saved generation to drag out
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
         self._hide_strip()
+
+    def _end_live(self, media: tuple | None) -> None:
+        """Stop mirroring a running generation, handing ``media`` — the file it
+        landed as, if any — to a fullscreen view opened over its live frames, so
+        watching a generation fullscreen ends on the finished image rather than the
+        last low-res frame.
+
+        What decides the hand-off is the *view's* own liveness, never this pane's:
+        the pane blanks to its placeholder on every gallery rebuild while a run
+        streams — including the one that lands it, moments before the saved file
+        arrives here — so its own flag is already off by then."""
+        self._live, self._live_frame = False, None
+        if media is None:
+            return
+        win = self._following_fullscreen()
+        if win is not None:
+            win.show_landed(media)
+
+    def _following_fullscreen(self):
+        """The fullscreen view this pane opened over a running generation and is
+        still feeding, or ``None``. One that's been dismissed — or that already
+        landed on a file, and so is an ordinary fullscreen view now — follows
+        nothing."""
+        win = self._fullscreen
+        if win is None or not win.isVisible() or not win.is_live():
+            return None
+        return win
 
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
@@ -282,19 +328,21 @@ class PreviewWidget(QWidget):
         self._fullscreen_gate = gate
 
     def open_fullscreen(self):
-        """Pop the current media open fullscreen (Escape or a double-click closes
-        it). A no-op when this preview opted out (a slideshow, or the fullscreen
-        view itself), a gate vetoes it, or nothing displayable is on screen — a
-        placeholder, a message, or a live in-progress frame with no file behind it
-        yet."""
-        if not self._allow_fullscreen or self._media is None:
+        """Pop what's on screen open fullscreen (Escape or a double-click closes it).
+
+        That's the current file, or — while a generation is running behind this pane —
+        its live frames, in a view that goes on following the run from here and swaps
+        to the finished file when it lands. A no-op when this preview opted out (a
+        slideshow, or the fullscreen view itself), a gate vetoes it, or there's
+        nothing to watch at all: the idle placeholder or a plain message."""
+        if not self._allow_fullscreen or (self._media is None and not self._live):
             return None
         if self._fullscreen_gate is not None and not self._fullscreen_gate():
             return None  # gated off — the caller's double-click callback takes over
         # Imported here, not at module scope: fullscreen_preview builds a
         # PreviewWidget, so a top-level import would be circular.
         from origenerator.gui.fullscreen_preview import FullscreenPreview
-        self._fullscreen = FullscreenPreview(self._media)
+        self._fullscreen = FullscreenPreview(self._media, frame=self._live_frame)
         self._fullscreen.showFullScreen()
         # The view listens for this to drive the OSR2 off the fullscreen video for as
         # long as it's up — independently of the global Drive-OSR2 toggle.

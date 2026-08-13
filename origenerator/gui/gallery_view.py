@@ -42,7 +42,7 @@ from origenerator.gui.inflight_card import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
-from origenerator.gui.stroke_hud import apply_stroke_key
+from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.running_job_bar import RunningJobBar
 from origenerator.gui.browser_pane import BrowserPane
@@ -402,12 +402,26 @@ class GalleryView(QWidget):
         self._audio_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
+        # The stroke's own switch, beside the OSR2's. Genau toggles its engine
+        # from Fun Time's console; there is no console here, so the toolbar
+        # carries it — and the drive readout appears with it rather than sitting
+        # there dark while nothing is being sent.
+        self._stroke_btn = self._tool_button(
+            icons.stroke_icon(),
+            "Drive the OSR2 from a self-generated stroke — no video needed "
+            f"({STROKE_KEY_LEGEND})",
+            self._on_stroke_toggle, checkable=True,
+        )
+        self._stroke_btn.setStyleSheet(
+            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+        )
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
                        self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
-                       self._audio_btn, self._osr2_btn, self._delete_btn):
+                       self._audio_btn, self._osr2_btn, self._stroke_btn,
+                       self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -490,6 +504,7 @@ class GalleryView(QWidget):
         # the bottom of the center (browser) pane, where it takes its own room
         # rather than floating over anyone's buttons.
         self._stroke_panel = StrokePanel(self._osr2_stroke)
+        self._stroke_panel.setVisible(self._osr2_stroke.active)
         browser_box.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignHCenter)
         # The live auto-generate slideshow (double-click the preview while a folder
         # loops), and the folder key it follows — None while none is open.
@@ -664,11 +679,22 @@ class GalleryView(QWidget):
 
     # --- the app-global OSR2 stroke: reconcile hold and main-window feedback --
 
-    def _on_stroke_active_changed(self, _active: bool):
-        """The stroke took or released the device (from whichever surface): the
-        funscript reconcile stands down while it holds it, and this window's
-        drive panel repaints to say so."""
+    def _on_stroke_toggle(self, checked: bool):
+        """The toolbar switch: take the device, or park it. The stroke is
+        app-global, so this only asks — every surface hears back through
+        ``active_changed``, including this window's own button."""
+        if checked != self._osr2_stroke.active:
+            self._osr2_stroke.toggle()
+
+    def _on_stroke_active_changed(self, active: bool):
+        """The stroke took or released the device (from whichever surface — a
+        key in a slideshow, or the toolbar switch here): the funscript reconcile
+        stands down while it holds it, the switch follows, and the drive readout
+        appears with it."""
         self._reconcile_osr2()
+        if self._stroke_btn.isChecked() != active:
+            self._stroke_btn.setChecked(active)
+        self._stroke_panel.setVisible(active)
         self._stroke_panel.refresh()
 
 

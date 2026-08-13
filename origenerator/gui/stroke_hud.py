@@ -6,13 +6,14 @@ fullscreen viewer, the folder slideshow, the auto-generate slideshow) answers
 the same keys through this helper, and floats the same drive panel
 (:mod:`origenerator.gui.stroke_panel`). The keys are genau's own, so the muscle
 memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
-I shape.
+I shape, / cruise control, backslash nudges a quarter cycle.
 """
 
 from PyQt6.QtCore import Qt
 
 # The key legend, shown as the drive panel's tooltip.
-STROKE_KEY_LEGEND = "Space drives · J/L speed · 7/9 travel · U/O center · I shape"
+STROKE_KEY_LEGEND = ("Space drives · J/L speed · 7/9 travel · U/O center"
+                     r" · I shape · / cruise · \ nudge")
 
 # The translucent overlay style the fullscreen counters share.
 CAPTION_CSS = (
@@ -43,6 +44,10 @@ def apply_stroke_key(stroke, key) -> bool:
         stroke.adjust_center(5)
     elif key == Qt.Key.Key_I:
         stroke.cycle_shape()
+    elif key == Qt.Key.Key_Slash:
+        stroke.toggle_cruise()
+    elif key == Qt.Key.Key_Backslash:
+        stroke.quarter_offset()
     else:
         return False
     return True

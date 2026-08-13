@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.fullscreen_preview import FullscreenPreview
-from origenerator.stroke_engine import StrokeState
+from origenerator.stroke_engine import Stroke
 
 
 def _make_png(path):
@@ -297,7 +297,7 @@ class _FakeStroke:
     def __init__(self):
         self.active = False
         self.calls = []
-        self.state = StrokeState()
+        self.state = Stroke()
 
     def toggle(self):
         self.active = not self.active

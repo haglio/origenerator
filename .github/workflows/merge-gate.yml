@@ -11,11 +11,15 @@ name: merge gate (full suite)
 # mode -- the repo dir shares the package's name and would otherwise win as a
 # namespace shadow.
 #
-# shared_ui is a sibling package origenerator imports via sys.path (paths.py
-# walks up to the directory that contains it), NOT a pip dependency. So we check
-# it out ADJACENT to origenerator under the workspace root; that satisfies both
-# the runtime lookup and tests/test_paths.py, which asserts the sibling exists on
-# disk. Both repos are public, so the default GITHUB_TOKEN can clone shared_ui.
+# shared_ui and player_core are sibling packages origenerator imports via
+# sys.path (paths.py walks up to the directory that contains each), NOT pip
+# dependencies. So we check them out ADJACENT to origenerator under the
+# workspace root; that satisfies both the runtime lookup and tests/test_paths.py,
+# which asserts the siblings exist on disk. player_core carries the family's
+# stroke -- the waveform and its dials, cruise control, and where the drive
+# readout's parts sit -- which this app drives the OSR2 from rather than keeping
+# a second copy of. All three repos are public, so the default GITHUB_TOKEN can
+# clone them.
 #
 # The suite renders Qt offscreen (QT_QPA_PLATFORM) and mocks every outside
 # service -- ComfyUI over websockets, the onnx/hf stroke-aim model -- so no step
@@ -54,6 +58,11 @@ jobs:
         with:
           repository: haglio/shared_ui
           path: shared_ui
+      - name: Check out player_core adjacent (imported via sys.path, not installed)
+        uses: actions/checkout@v4
+        with:
+          repository: haglio/player_core
+          path: player_core
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -81,6 +81,11 @@ def osr2_icon() -> QIcon:
     return _two_mode(_draw_osr2)
 
 
+def stroke_icon() -> QIcon:
+    """A sine wave — the self-generated stroke's on/off switch."""
+    return _two_mode(_draw_stroke)
+
+
 def audio_icon() -> QIcon:
     """A speaker sounding off — the audio bed's on/off switch."""
     return _two_mode(_draw_audio)
@@ -352,6 +357,17 @@ def _draw_osr2(painter: QPainter, color):
     painter.setBrush(color)
     painter.drawPolygon(QPointF(cx, top), QPointF(cx - 7, top + 9), QPointF(cx + 7, top + 9))
     painter.drawPolygon(QPointF(cx, bot), QPointF(cx - 7, bot - 9), QPointF(cx + 7, bot - 9))
+
+
+def _draw_stroke(painter: QPainter, color):
+    """One cycle of a sine — the stroke this drives the device with."""
+    pen = QPen(color)
+    pen.setWidthF(4)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawArc(QRectF(9, 14, 15, 20), 180 * 16, -180 * 16)
+    painter.drawArc(QRectF(24, 14, 15, 20), 0, 180 * 16)
 
 
 def _draw_audio(painter: QPainter, color):

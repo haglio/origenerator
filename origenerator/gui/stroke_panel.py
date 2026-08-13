@@ -1,26 +1,24 @@
-"""Genau's drive readout, copied — the stroke being sent, drawn and pressable.
+"""Genau's drive readout, drawn in Qt — the stroke being sent, and pressable.
 
-This is genau's ``drive_hud`` block, reproduced control for control so the two
-apps read as one device surface: the trace of the stroke in the middle (blue
-while live, grey while not), Center down the left — its number, then a −/+ pair
-riding the dotted line it moves — Amplitude down the right — a −/+ pair at the
-ends of its bar, then its number — and Speed under the trace with its own −/+
-and number. The marks step an axis; each band is the picture of its own value,
-so a press in one asks for the value drawn under the pointer and a held button
-keeps asking as it moves (genau's ``tracks`` behavior, same math).
+Where the parts sit and what a press on one asks for is
+:mod:`player_core.drive_layout`, which genau's own readout is drawn from too:
+the trace of the stroke in the middle (blue while live, grey while not), Center
+down the left — its number, then a −/+ pair riding the dotted line it moves —
+Amplitude down the right, and Speed under the trace. This module is the painter
+over that layout, and nothing else. Genau paints the same rects with Pillow into
+an mpv overlay; this paints them with QPainter into a widget floated over a
+slideshow.
 
-One mark genau doesn't have: the power square at the top-left corner. Genau's
-engine is toggled from its own console; origenerator's has no console, so the
-panel itself carries the on/off — the same square the other marks are drawn as,
-▶ to take the device and ■ to park it (Space still does the same).
+Under the block sits the row genau keeps in Fun Time's console rather than in
+the readout: cruise control, which varies the stroke hands-free, and the
+waveform, which cycles through the shapes. There is no console here to put them
+in, and a readout missing them is a readout of half the stroke.
 
-The geometry and hit-testing live in pure functions mirroring genau's, so the
-widget is a thin painter over testable layout.
+The on/off switch is not here. It is a button in the window's own toolbar, and
+this panel is what appears once it is pressed.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass
 
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QColor, QPainter, QPen
@@ -28,164 +26,69 @@ from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer
 
 from origenerator import stroke_engine
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND
-from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.paths import ensure_player_core_on_path, ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
+ensure_player_core_on_path()
 
-from shared_ui.colors import BLUE, TEXT_MUTED, TEXT_PRIMARY
+from player_core import drive_layout  # noqa: E402
+from player_core.drive_layout import (  # noqa: E402
+    AMPLITUDE, CENTER, SECTION_H, SECTION_W, SPEED, DriveControl, DriveTrack,
+    Rect, clamp01, geometry, hit, track_value,
+)
+from shared_ui.colors import BLUE, TEXT_MUTED, TEXT_PRIMARY  # noqa: E402
 
-Rect = tuple[int, int, int, int]  # (x, y, w, h)
-
-# Genau's drive_hud dimensions, kept verbatim so the copy is the original.
-_LABEL_H = 14
-_BAR_H = 12
-_CTRL = 14
-_GAP = 6
-_AMP_W = 18
-_WAVE_H = 96
-_CTR_LABEL_W = 34
-_AMP_LABEL_W = 24
-_WAVE_W = 120
 _TRACK = QColor(56, 56, 62)  # the unfilled part of a bar
 
-SECTION_W = _CTR_LABEL_W + _GAP + _CTRL + _GAP + _WAVE_W + _GAP + _AMP_W + _GAP + _AMP_LABEL_W
-SECTION_H = _WAVE_H + _GAP + _CTRL + 2 + _LABEL_H
-
 _PAD = 10          # the slab's breathing room around the block
-_TRACE_SAMPLES = 80
+_TRACE_SAMPLES = drive_layout.TRACE_SAMPLES
 _TRACE_SECONDS = 12.0
-_LESS, _MORE = "−", "+"
 _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
 
-AMPLITUDE, CENTER, SPEED, POWER = "amp", "center", "speed", "power"
+# The row under the block: cruise control and the waveform.
+CRUISE, SHAPE = "cruise", "shape"
+_ROW_H = drive_layout.GAP + drive_layout.CONTROL_SIZE
+_WAVE_GLYPH = "∿"
+# Fun Time's console names the shape beside its mark; so does this.
+_SHAPE_NAMES = {"rounded_square": "Square", "sine": "Sine",
+                "triangle": "Triangle", "sawtooth": "Sawtooth"}
+
+PANEL_W = SECTION_W + 2 * _PAD
+PANEL_H = SECTION_H + _ROW_H + 2 * _PAD
 
 
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
-
-
-def _percent(fraction: float) -> int:
-    return round(_clamp01(fraction) * 100)
-
-
-@dataclass(frozen=True)
-class PanelControl:
-    rect: Rect
-    action: str
-    glyph: str
-    dim: bool
-
-
-@dataclass(frozen=True)
-class PanelTrack:
-    """A band that takes its value from where you press in it (genau's
-    ``DriveTrack``): along the speed bar for the rate, up the amplitude bar for
-    the reach, anywhere in the trace for the height the stroke swings about."""
-
-    rect: Rect
-    axis: str
-    center: float
-
-
-@dataclass(frozen=True)
-class _Geometry:
-    wave: Rect
-    speed_bar: Rect
-    speed_down: Rect
-    speed_up: Rect
-    amp_bar: Rect
-    amp_up: Rect
-    amp_down: Rect
-    center_up: Rect
-    center_down: Rect
-    power: Rect
-    center_label_right: int
-    amp_label_left: int
-    axis_label_y: int
-    speed_label_y: int
-    speed_label_x: int
-
-
-def geometry(x: int, y: int, center_frac: float) -> _Geometry:
-    """Every rect the panel draws or hit-tests — genau's ``_geometry``, plus the
-    power square in the top-left corner."""
-    ctr_ctrl_x = x + _CTR_LABEL_W + _GAP
-    wave_x = ctr_ctrl_x + _CTRL + _GAP
-    amp_x = wave_x + _WAVE_W + _GAP
-    wave = (wave_x, y, _WAVE_W, _WAVE_H)
-    wave_bottom = y + _WAVE_H
-
-    amp_up = (amp_x, y, _AMP_W, _CTRL)
-    amp_down = (amp_x, wave_bottom - _CTRL, _AMP_W, _CTRL)
-    amp_bar = (amp_x, y + _CTRL + 2, _AMP_W, _WAVE_H - 2 * (_CTRL + 2))
-
-    center_y = y + round((1 - center_frac) * (_WAVE_H - 1))
-    up_y = min(max(y, center_y - _CTRL - 1), wave_bottom - 2 * _CTRL - 2)
-    center_up = (ctr_ctrl_x, up_y, _CTRL, _CTRL)
-    center_down = (ctr_ctrl_x, up_y + _CTRL + 2, _CTRL, _CTRL)
-
-    speed_y = wave_bottom + _GAP
-    speed_down = (wave_x, speed_y, _CTRL, _CTRL)
-    speed_up = (amp_x + _AMP_W - _CTRL, speed_y, _CTRL, _CTRL)
-    bar_x = wave_x + _CTRL + 4
-    speed_bar = (bar_x, speed_y + (_CTRL - _BAR_H) // 2,
-                 (amp_x + _AMP_W - _CTRL - 4) - bar_x, _BAR_H)
-
-    return _Geometry(
-        wave=wave, speed_bar=speed_bar, speed_down=speed_down, speed_up=speed_up,
-        amp_bar=amp_bar, amp_up=amp_up, amp_down=amp_down,
-        center_up=center_up, center_down=center_down,
-        power=(x, y, _CTRL, _CTRL),
-        center_label_right=x + _CTR_LABEL_W,
-        amp_label_left=amp_x + _AMP_W + _GAP,
-        axis_label_y=y + (_WAVE_H - 2 * _LABEL_H) // 2,
-        speed_label_y=speed_y + _CTRL + 2,
-        speed_label_x=(wave_x + amp_x + _AMP_W) // 2,
+def _limits(state) -> drive_layout.Limits:
+    """Which dials have run out of road — what dims the mark that would now do
+    nothing."""
+    dials = state.state
+    half = dials.amplitude // 2
+    return drive_layout.Limits(
+        spd_at_min=dials.speed <= stroke_engine.MIN_SPEED,
+        spd_at_max=dials.speed >= stroke_engine.MAX_SPEED,
+        amp_at_min=dials.amplitude <= 0,
+        amp_at_max=dials.amplitude >= 100,
+        ctr_at_min=dials.intended_center <= half,
+        ctr_at_max=dials.intended_center >= 100 - half,
     )
 
 
-def controls(x: int, y: int, state: stroke_engine.StrokeState,
-             active: bool) -> list[PanelControl]:
-    """The panel's marks: genau's −/+ pair per axis (dimmed at the end of its
-    range), plus the power square (▶ off, ■ driving)."""
-    g = geometry(x, y, state.center / 100)
+def controls(x: int, y: int, state, active: bool) -> list[DriveControl]:
+    """Every mark on the panel: the shared −/+ pair per axis, plus this app's
+    own row — cruise control (lit while it has the dials) and the waveform."""
+    row_y = y + SECTION_H + drive_layout.GAP
+    size = drive_layout.CONTROL_SIZE
+    g = geometry(x, y, drive_layout.fraction(state.state.center))
     return [
-        PanelControl(g.power, POWER, "■" if active else "▶", False),
-        PanelControl(g.speed_down, "speed_down", _LESS, state.speed <= stroke_engine.MIN_SPEED),
-        PanelControl(g.speed_up, "speed_up", _MORE, state.speed >= stroke_engine.MAX_SPEED),
-        PanelControl(g.amp_up, "amp_up", _MORE, state.amplitude >= 100),
-        PanelControl(g.amp_down, "amp_down", _LESS, state.amplitude <= 0),
-        PanelControl(g.center_up, "center_up", _MORE, state.center >= 100 - state.amplitude // 2),
-        PanelControl(g.center_down, "center_down", _LESS, state.center <= state.amplitude // 2),
+        *drive_layout.controls(x, y, state.state.center, _limits(state)),
+        DriveControl((g.wave[0], row_y, size, size), CRUISE, "cc",
+                     not state.cruise.active),
+        DriveControl((g.wave[0] + size + drive_layout.GAP, row_y, size, size),
+                     SHAPE, _WAVE_GLYPH, False),
     ]
 
 
-def tracks(x: int, y: int, state: stroke_engine.StrokeState) -> list[PanelTrack]:
-    center = state.center / 100
-    g = geometry(x, y, center)
-    return [
-        PanelTrack(g.amp_bar, AMPLITUDE, center),
-        PanelTrack(g.wave, CENTER, center),
-        PanelTrack(g.speed_bar, SPEED, center),
-    ]
-
-
-def track_value(track: PanelTrack, px: int, py: int) -> int:
-    """The 0-100 level a press at ``(px, py)`` asks for — genau's math: along
-    the speed bar, the height of the trace for center, and the reach out from
-    the center for amplitude."""
-    x, y, w, h = track.rect
-    if track.axis == SPEED:
-        return _percent((px - x) / max(1, w - 1))
-    height = _clamp01(1 - (py - y) / max(1, h - 1))
-    if track.axis == CENTER:
-        return _percent(height)
-    return _percent(2 * abs(height - track.center))
-
-
-def _hit(rect: Rect, px: int, py: int) -> bool:
-    x, y, w, h = rect
-    return x <= px < x + w and y <= py < y + h
+def tracks(x: int, y: int, state) -> list[DriveTrack]:
+    return drive_layout.tracks(x, y, state.state.center)
 
 
 class StrokePanel(QWidget):
@@ -194,8 +97,8 @@ class StrokePanel(QWidget):
     def __init__(self, stroke, parent=None):
         super().__init__(parent)
         self._stroke = stroke
-        self._drag_track: PanelTrack | None = None
-        self.setFixedSize(SECTION_W + 2 * _PAD, SECTION_H + 2 * _PAD)
+        self._drag_track: DriveTrack | None = None
+        self.setFixedSize(PANEL_W, PANEL_H)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
         # The trace scrolls with the phase, so repaint on a beat while shown.
         self._repaint = QTimer(self)
@@ -205,11 +108,16 @@ class StrokePanel(QWidget):
     def refresh(self) -> None:
         self.update()
 
+    # Fun Time insets its HUD from the window's top-left corner by this much,
+    # and a reader glancing between the two apps is looking for one panel in one
+    # place.
+    MARGIN = 8
+
     def reposition(self) -> None:
-        """Top-center of the parent — where the fullscreen views float it."""
+        """The parent's top-left corner, where Fun Time puts the same readout."""
         parent = self.parentWidget()
         if parent is not None:
-            self.move(max(0, (parent.width() - self.width()) // 2), 16)
+            self.move(self.MARGIN, self.MARGIN)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -222,15 +130,20 @@ class StrokePanel(QWidget):
     # --- presses: marks step, bands set, power toggles ---------------------
 
     def mousePressEvent(self, event):
-        px, py = int(event.position().x()), int(event.position().y())
+        self._press_at(int(event.position().x()), int(event.position().y()))
+
+    def _press_at(self, px: int, py: int) -> None:
+        """A press at ``(px, py)`` in the panel: a mark steps its axis, a band
+        sets it outright. Split out from the event so the mapping can be tested
+        without synthesizing mouse events."""
         state = self._stroke.state
         for control in controls(_PAD, _PAD, state, self._stroke.active):
-            if _hit(control.rect, px, py):
+            if hit(control.rect, px, py):
                 self._act(control.action)
                 self.update()
                 return
         for track in tracks(_PAD, _PAD, state):
-            if _hit(track.rect, px, py):
+            if hit(track.rect, px, py):
                 self._drag_track = track
                 self._set_from_track(track, px, py)
                 return
@@ -245,22 +158,24 @@ class StrokePanel(QWidget):
 
     def _act(self, action: str) -> None:
         stroke = self._stroke
-        if action == POWER:
-            stroke.toggle()
+        if action == CRUISE:
+            stroke.toggle_cruise()
+        elif action == SHAPE:
+            stroke.cycle_shape()
         elif action == "speed_down":
             stroke.adjust_speed(-5)
         elif action == "speed_up":
             stroke.adjust_speed(5)
-        elif action == "amp_up":
+        elif action == "amplitude_up":
             stroke.adjust_amplitude(10)
-        elif action == "amp_down":
+        elif action == "amplitude_down":
             stroke.adjust_amplitude(-10)
         elif action == "center_up":
             stroke.adjust_center(5)
         elif action == "center_down":
             stroke.adjust_center(-5)
 
-    def _set_from_track(self, track: PanelTrack, px: int, py: int) -> None:
+    def _set_from_track(self, track: DriveTrack, px: int, py: int) -> None:
         value = track_value(track, px, py)
         if track.axis == SPEED:
             self._stroke.set_speed(value)
@@ -285,25 +200,33 @@ class StrokePanel(QWidget):
         # goes the muted grey of a dead control while nothing is being sent.
         level_ink = QColor(BLUE) if live else QColor(TEXT_MUTED)
         value_ink = QColor(TEXT_PRIMARY) if live else QColor(TEXT_MUTED)
-        g = geometry(_PAD, _PAD, state.center / 100)
+        dials = state.state
+        g = geometry(_PAD, _PAD, drive_layout.fraction(dials.center))
 
         self._wave(painter, g.wave, state, level_ink)
         self._amp_bar(painter, g.amp_bar, state, level_ink)
         self._bar(painter, g.speed_bar,
-                  (state.speed - stroke_engine.MIN_SPEED)
+                  (dials.speed - stroke_engine.MIN_SPEED)
                   / (stroke_engine.MAX_SPEED - stroke_engine.MIN_SPEED), level_ink)
-        for control in controls(_PAD, _PAD, state, live):
+        marks = controls(_PAD, _PAD, state, live)
+        for control in marks:
             self._control(painter, control)
 
         tiny = painter.font()
         tiny.setPointSize(7)
         painter.setFont(tiny)
-        self._stacked(painter, g.axis_label_y, "Center", str(state.center),
+        self._stacked(painter, g.axis_label_y, "Center", str(dials.center),
                       right=g.center_label_right, ink=value_ink)
-        self._stacked(painter, g.axis_label_y, "Amp", str(state.amplitude),
+        self._stacked(painter, g.axis_label_y, "Amp", str(dials.amplitude),
                       left=g.amp_label_left, ink=value_ink)
         self._speed_label(painter, g.speed_label_y, g.speed_label_x,
-                          str(state.speed), ink=value_ink)
+                          str(dials.speed), ink=value_ink)
+        row = [c for c in marks if c.action == SHAPE][0].rect
+        painter.setPen(QPen(value_ink, 1))
+        painter.drawText(QRectF(row[0] + row[2] + drive_layout.GAP, row[1],
+                                SECTION_W, row[3]),
+                         int(Qt.AlignmentFlag.AlignVCenter),
+                         _SHAPE_NAMES.get(dials.shape.value, dials.shape.value))
         painter.end()
 
     def _wave(self, painter: QPainter, rect: Rect, state, ink: QColor) -> None:
@@ -314,7 +237,7 @@ class StrokePanel(QWidget):
         # The center's dotted ruler — the height the stroke swings about.
         dotted = QPen(QColor(TEXT_MUTED), 1, Qt.PenStyle.DotLine)
         painter.setPen(dotted)
-        center_y = y + round((1 - state.center / 100) * (h - 1))
+        center_y = y + round((1 - state.state.center / 100) * (h - 1))
         painter.drawLine(x + 2, center_y, x + w - 3, center_y)
         # The stroke itself, sampled forward from now.
         samples = stroke_engine.trace(state, _TRACE_SAMPLES, _TRACE_SECONDS)
@@ -337,8 +260,8 @@ class StrokePanel(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(_TRACK)
         painter.drawRect(x, y, w, h)
-        half = state.amplitude / 200  # amplitude% of the axis, as a 0-1 half-span
-        center = state.center / 100
+        half = state.state.amplitude / 200  # amplitude% of the axis, as a 0-1 half-span
+        center = state.state.center / 100
         top = y + round((1 - min(1.0, center + half)) * (h - 1))
         bottom = y + round((1 - max(0.0, center - half)) * (h - 1))
         painter.setBrush(ink)
@@ -350,9 +273,9 @@ class StrokePanel(QWidget):
         painter.setBrush(_TRACK)
         painter.drawRect(x, y, w, h)
         painter.setBrush(ink)
-        painter.drawRect(x, y, max(1, round(_clamp01(fill) * w)), h)
+        painter.drawRect(x, y, max(1, round(clamp01(fill) * w)), h)
 
-    def _control(self, painter: QPainter, control: PanelControl) -> None:
+    def _control(self, painter: QPainter, control: DriveControl) -> None:
         x, y, w, h = control.rect
         ink = QColor(TEXT_MUTED) if control.dim else QColor(TEXT_PRIMARY)
         painter.setPen(QPen(ink, 1))

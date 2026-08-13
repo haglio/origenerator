@@ -23,7 +23,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.stroke_engine import StrokeState
+from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -4958,7 +4958,7 @@ class _SignalStroke(QObject):
         super().__init__()
         self.active = False
         self.calls = []
-        self.state = StrokeState()
+        self.state = Stroke()
 
     def toggle(self):
         self.active = not self.active
@@ -4981,6 +4981,12 @@ class _SignalStroke(QObject):
 
     def adjust_center(self, delta):
         self.calls.append(("center", delta))
+
+    def toggle_cruise(self):
+        self.calls.append("cruise")
+
+    def quarter_offset(self):
+        self.calls.append("nudge")
 
     def cycle_shape(self):
         self.calls.append(("shape",))

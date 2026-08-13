@@ -231,18 +231,22 @@ class InfoPaneTabs(QTabWidget):
             panel._preview.show_media(*preview)
             panel._preview.set_draggable_id(prompt_id)
 
-    def show_reroll_frame(self, frame: bytes | None):
+    def show_reroll_frame(self, frame: bytes | None, note: str | None = None):
         """Mirror a running re-roll's live frame into the current tab's preview —
         or a 'waiting' note when no frame has arrived yet, never the idle
         placeholder. The note is marked live, so double-clicking the pane opens
-        the run fullscreen even before its first frame streams."""
+        the run fullscreen even before its first frame streams.
+
+        ``note`` replaces the generic wait when something more useful can be said —
+        how much of ComfyUI's queue is in front of this run — so a pane that sits
+        unchanged for minutes reads as a queue rather than a hang."""
         panel = self.current_config_panel()
         if panel is None:
             return
         if frame:
             panel._preview.show_frame(frame)
         else:
-            panel._preview.show_message("Waiting for preview…", live=True)
+            panel._preview.show_message(note or "Waiting for preview…", live=True)
 
     def clear_current_preview(self):
         """Empty the current tab's preview (a re-roll ended with nothing to show,

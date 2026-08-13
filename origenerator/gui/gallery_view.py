@@ -37,6 +37,7 @@ from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.inflight_card import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
@@ -152,6 +153,9 @@ class GalleryView(QWidget):
         self._selected_reroll_key: str | None = None
         self._reroll_tile: RerollTile | None = None
         self._last_reroll_frame: bytes | None = None
+        # The queue-wait text currently painted in the pane, so a poll repaints it
+        # only when the number actually moves.
+        self._shown_wait_note: str | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
         )
@@ -923,6 +927,10 @@ class GalleryView(QWidget):
         # each job's own finished/failed handler, which persists and refreshes.
         for job in list(self._reroll_jobs.values()):
             job.reconcile()
+            # And re-read what ComfyUI has in front of a job it hasn't started, so
+            # a wait behind another client's work shows a number instead of an
+            # unmoving bar (see GenerationJob.refresh_backlog).
+            job.refresh_backlog()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)
@@ -936,6 +944,7 @@ class GalleryView(QWidget):
         # The bottom bar is always on screen, so refresh the active job every tick —
         # its live frame and progress advance between rebuilds.
         self._update_running_bar()
+        self._refresh_wait_note()
 
     def _rebuild(self, rows, meta):
         expanded = self._tree_view.persisted_expanded_keys()
@@ -1702,7 +1711,27 @@ class GalleryView(QWidget):
         self._browser.clear_thumbnail_selection()
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(True)
-        self._info_tabs.show_reroll_frame(self._last_reroll_frame)
+        self._shown_wait_note = self._wait_note(key)
+        self._info_tabs.show_reroll_frame(self._last_reroll_frame, self._shown_wait_note)
+
+    def _wait_note(self, key: str) -> str | None:
+        """What re-roll ``key`` is waiting on, when ComfyUI has work in front of
+        it — the pane's wait text, in place of a bare 'waiting for preview'."""
+        job = self._reroll_jobs.get(key)
+        return queue_wait_text(job.queued_behind) if job is not None else None
+
+    def _refresh_wait_note(self):
+        """Keep that wait text current between rebuilds. The count falls as the
+        queue drains, and a pane frozen on a stale number is the mystery this is
+        here to end. Only while the selected run has streamed no frame — once it
+        has, the frame itself is the answer."""
+        key = self._selected_reroll_key
+        if key is None or self._last_reroll_frame is not None:
+            return
+        note = self._wait_note(key)
+        if note != self._shown_wait_note:
+            self._shown_wait_note = note
+            self._info_tabs.show_reroll_frame(None, note)
 
     def _on_reroll_preview(self, key: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
@@ -1718,6 +1747,7 @@ class GalleryView(QWidget):
         generation is taking over the pane, or the re-roll has ended."""
         self._selected_reroll_key = None
         self._last_reroll_frame = None
+        self._shown_wait_note = None
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(False)
 

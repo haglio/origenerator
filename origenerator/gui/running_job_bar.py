@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 
+from origenerator.gui.inflight_card import queue_wait_text
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -106,9 +107,18 @@ class RunningJobBar(QWidget):
         self._render_preview(item.frame)
         self._progress.show()
         self._render_progress(item)
-        self._queued.setText(f"+{queued} queued" if queued > 0 else "")
+        self._queued.setText(self._waiting_text(item, queued))
         self._cancel.setVisible(item.cancel is not None)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def _waiting_text(self, item, queued: int) -> str:
+        """What else is in the way. ComfyUI's backlog in front of this job wins when
+        there is one: it counts other clients' prompts too, so it's the real wait —
+        and it's what turns an unmoving bar from a mystery into a queue. Otherwise
+        this app's own count of what it has waiting behind the shown job."""
+        return queue_wait_text(item.queued_behind) or (
+            f"+{queued} queued" if queued > 0 else ""
+        )
 
     def _render_preview(self, frame):
         pixmap = QPixmap()

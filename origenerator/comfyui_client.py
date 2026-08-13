@@ -54,6 +54,20 @@ def format_prompt_error(body: str) -> str:
     return reason or body.strip() or "Bad Request"
 
 
+def _queue_prompt_id(item):
+    """The prompt id of a ``/queue`` entry — element 1 of its tuple — or ``None``."""
+    if isinstance(item, (list, tuple)) and len(item) > 1:
+        return item[1]
+    return None
+
+
+def _queue_number(item):
+    """A ``/queue`` entry's queue number (element 0), which orders execution."""
+    if isinstance(item, (list, tuple)) and item and isinstance(item[0], (int, float)):
+        return item[0]
+    return None
+
+
 def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
     """True only if the server at host:port is actually ComfyUI.
 
@@ -298,21 +312,45 @@ class ComfyUIClient(QThread):
         """
         return self._queue_ids("queue_running")
 
-    def _queue_ids(self, *sections: str) -> set[str]:
-        """The prompt ids in the named ``/queue`` sections.
+    def queue_backlog(self, prompt_id: str) -> int | None:
+        """How many prompts ComfyUI will execute before ``prompt_id``.
 
-        ``/queue`` returns ``{queue_running: [...], queue_pending: [...]}`` where
-        each entry is a tuple whose second element (index 1) is the prompt_id.
+        Counts everything ahead of it whoever submitted it — another Origenerator
+        session, another app pointed at the same server — because that is the part
+        this app can't otherwise see: a job parked behind work it never launched
+        looks exactly like a hang. ``None`` means it isn't waiting on anything:
+        ComfyUI is executing it already, or it has left the queue.
         """
+        data = self._fetch_queue_data()
+        pending = data.get("queue_pending", [])
+        mine = next((it for it in pending if _queue_prompt_id(it) == prompt_id), None)
+        if mine is None:
+            return None
+        running = len(data.get("queue_running", []))
+        number = _queue_number(mine)
+        if number is None:
+            return running  # unnumbered: all that's certain is what's executing
+        # Pending entries come back heap-ordered rather than run-ordered, so a
+        # position in the list means nothing — the queue number says who goes first.
+        return running + sum(
+            1 for it in pending
+            if (n := _queue_number(it)) is not None and n < number
+        )
+
+    def _queue_ids(self, *sections: str) -> set[str]:
+        """The prompt ids in the named ``/queue`` sections."""
+        data = self._fetch_queue_data()
+        return {
+            pid for key in sections for item in data.get(key, [])
+            if (pid := _queue_prompt_id(item)) is not None
+        }
+
+    def _fetch_queue_data(self) -> dict:
+        """``/queue`` as ``{queue_running: [...], queue_pending: [...]}``, each
+        entry a tuple of ``(number, prompt_id, prompt, ...)``."""
         url = f"{self.base_url}/queue"
         with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-        ids: set[str] = set()
-        for key in sections:
-            for item in data.get(key, []):
-                if isinstance(item, (list, tuple)) and len(item) > 1:
-                    ids.add(item[1])
-        return ids
+            return json.loads(resp.read())
 
     def fetch_output_file(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
         params = urllib.parse.urlencode({

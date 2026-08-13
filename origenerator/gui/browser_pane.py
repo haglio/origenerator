@@ -233,12 +233,13 @@ class BrowserPane:
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
+                behind = job.queued_behind  # ComfyUI's backlog in front of it, if any
                 cancel = lambda k=folder_key: self._v._cancel_reroll(k)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
                 folder_key = gallery.settings_folder_key(row, image_index)
-                frame, progress, cancel = None, None, None
+                frame, progress, cancel, behind = None, None, None, None
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(
@@ -250,6 +251,7 @@ class BrowserPane:
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 progress=progress,
                 cancel=cancel,
+                queued_behind=behind,
             ))
         items.sort(key=lambda it: it.status != "running")  # stable: running first
         return items

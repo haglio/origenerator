@@ -66,3 +66,18 @@ def test_update_item_refreshes_caption_and_frame_in_place(qtbot):
     card.update_item(_item(caption="new caption", status="running", frame=_png_bytes()))
     assert card._caption.text() == "new caption"
     assert not card._image.pixmap().isNull()
+
+
+def test_card_names_the_comfyui_backlog_instead_of_a_bare_queued(qtbot):
+    # "Queued…" alone is the mystery: queued behind what? The count says behind
+    # what, including work this app never launched.
+    card = InFlightCard(_item(status="queued", queued_behind=2))
+    qtbot.addWidget(card)
+    assert card._image.text() == "Waiting behind 2 jobs in ComfyUI"
+
+
+def test_a_frame_still_wins_over_the_backlog_text(qtbot):
+    # Once ComfyUI is actually rendering it, the picture is the better answer.
+    card = InFlightCard(_item(status="running", frame=_png_bytes(), queued_behind=2))
+    qtbot.addWidget(card)
+    assert not card._image.pixmap().isNull()

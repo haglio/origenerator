@@ -5,15 +5,19 @@ Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
 rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
 and pacing. Images advance on a dwell timer; videos play once and advance when
 they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down holds,
-and Escape closes. The shared OSR2 stroke keys ride along (Space and friends —
-see :mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated
-up top, so the device can run over a slideshow of stills.
+Enter leaves for the shown item's own folder (``open_requested``), and Escape
+closes. The items either side of the one on screen ride along as small stills
+(see :mod:`origenerator.gui.neighbor_previews`). The shared OSR2 stroke keys ride
+along too (Space and friends — see :mod:`origenerator.gui.stroke_hud`) with
+genau's drive panel floated up top, so the device can run over a slideshow of
+stills.
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
+from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
@@ -21,6 +25,9 @@ from origenerator.slideshow import SlideshowPlaylist
 
 
 class SlideshowView(QWidget):
+    # Enter on an item: leave the slideshow for that generation's own folder.
+    open_requested = pyqtSignal(str)
+
     def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, on_delete=None,
                  player=None, stroke=None, parent=None):
         super().__init__(parent)
@@ -44,7 +51,13 @@ class SlideshowView(QWidget):
         self._preview = PreviewWidget(player=player, loop_videos=False,
                                       allow_fullscreen=False)
         self._preview.video_ended.connect(self._on_video_ended)
+        # The media is refitted a beat after the window resizes (and again when a
+        # video's resolution arrives), so re-place the neighbors when it lands.
+        self._preview.media_resized.connect(self._reposition_neighbors)
         layout.addWidget(self._preview, 1)
+
+        # The items either side of this one, floated over the black surround.
+        self._neighbors = NeighborPreviews(self)
 
         # A translucent position/pause caption floating over the bottom of the media.
         self._counter = QLabel(self)
@@ -72,6 +85,7 @@ class SlideshowView(QWidget):
         path, media_type = item[0], item[1]
         self._preview.show_media(path, media_type)
         self._update_counter()
+        self._update_neighbors()
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
@@ -109,6 +123,38 @@ class SlideshowView(QWidget):
         else:
             self._show_current()  # resume, re-arming the dwell timer
 
+    def _open_current(self):
+        """Enter: leave the slideshow and hand its item to the gallery, which
+        opens the folder it lives in — the way out of a shelf's slideshow, where
+        what you're watching came from folders all over the tree."""
+        item = self._playlist.current()
+        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        self.close()
+        if prompt_id is not None:
+            self.open_requested.emit(prompt_id)
+
+    # --- the neighboring items ---------------------------------------------
+
+    def _update_neighbors(self):
+        """Draw the items either side of this one — nothing on a playlist too
+        short for a neighbor to be anything but the item already on screen."""
+        if len(self._playlist) < 2:
+            self._neighbors.set_neighbors(None, None)
+            return
+        self._neighbors.set_neighbors(
+            still_for(self._playlist.peek(-1)), still_for(self._playlist.peek(1)),
+            media_rect=self._media_rect(),
+        )
+
+    def _reposition_neighbors(self):
+        self._neighbors.reposition(self._media_rect())
+
+    def _media_rect(self):
+        """Where the media is drawn, in this view's coordinates."""
+        rect = self._preview.media_rect()
+        rect.moveTopLeft(self._preview.mapTo(self, rect.topLeft()))
+        return rect
+
     # --- caption -----------------------------------------------------------
 
     def _update_counter(self):
@@ -140,6 +186,8 @@ class SlideshowView(QWidget):
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
             self._toggle_pause()    # hold on the current item
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._open_current()    # out of the slideshow, into its folder
         elif apply_stroke_key(self._stroke, key):
             # Space belongs to the stroke cluster now, everywhere — holding the
             # slideshow is Down, matching the auto-generate view's lock.
@@ -150,6 +198,7 @@ class SlideshowView(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
+        self._reposition_neighbors()
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
 

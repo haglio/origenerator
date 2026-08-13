@@ -690,7 +690,8 @@ class GalleryView(QWidget):
             for row in reversed(group.rows):
                 preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
                 if preview is not None:
-                    montage.add_finished(preview[0], preview[1], row["prompt_id"])
+                    montage.add_finished(preview[0], preview[1], row["prompt_id"],
+                                         row.get("thumbnail_path"))
         job = self._reroll.job_for(key)
         if job is not None and job.last_preview is not None:
             montage.show_live_frame(job.last_preview)
@@ -718,7 +719,8 @@ class GalleryView(QWidget):
         row = group.rows[0]  # the just-finished item is the folder's newest
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
-            self._auto_montage.note_finished(preview[0], preview[1], row["prompt_id"])
+            self._auto_montage.note_finished(preview[0], preview[1], row["prompt_id"],
+                                             row.get("thumbnail_path"))
 
     def _skip_auto_current(self, key: str):
         """Slideshow Up on the live slot: abandon the generation on screen but keep
@@ -1432,20 +1434,31 @@ class GalleryView(QWidget):
             return
         self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
                                         stroke=self._osr2_stroke)
+        self._slideshow.open_requested.connect(self._open_from_slideshow)
         logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
                     self._slideshow_subject(), len(items),
                     self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
 
     def _slideshow_items(self, rows) -> list:
-        """(path, media_type, prompt_id) for each of ``rows`` with a resolvable
-        preview, in the order given — the slideshow's playlist."""
+        """(path, media_type, prompt_id, thumbnail) for each of ``rows`` with a
+        resolvable preview, in the order given — the slideshow's playlist. The
+        thumbnail is what the view draws for the item while it's a neighbor
+        rather than the one on screen (a video has no other still)."""
         items = []
         for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
             if resolved is not None:
-                items.append((resolved[0], resolved[1], row["prompt_id"]))
+                items.append((resolved[0], resolved[1], row["prompt_id"],
+                              row.get("thumbnail_path")))
         return items
+
+    def _open_from_slideshow(self, prompt_id: str):
+        """Enter in a slideshow: land in the item's own folder with it selected —
+        the same jump a shelf tile's double-click makes. The slideshow has already
+        closed itself, so this arrives on the gallery."""
+        self._slideshow = None
+        self._browser.open_in_containing_folder(prompt_id)
 
     def _trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same

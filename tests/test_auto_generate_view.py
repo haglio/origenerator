@@ -68,6 +68,20 @@ def _view(qtbot, seeded=0, tmp_path=None):
     return view
 
 
+def test_the_slots_either_side_ride_along_as_stills(qtbot, tmp_path):
+    view = _view(qtbot, seeded=2, tmp_path=tmp_path)  # sitting on the live slot
+    frame = _png_bytes()
+    view.show_live_frame(frame)
+
+    # Behind the live slot is the newest finished item; ahead, wrapping, the oldest.
+    assert view._neighbors._sources == (str(tmp_path / "seed1.png"),
+                                        str(tmp_path / "seed0.png"))
+
+    _press(view, Qt.Key.Key_Left)  # step back onto the newest finished item
+    # The live slot is next door now, and shows the generation's latest frame.
+    assert view._neighbors._sources == (str(tmp_path / "seed0.png"), frame)
+
+
 def test_opens_on_the_live_slot_awaiting_frames(qtbot):
     view = _view(qtbot)
     assert view._playlist.on_live()

@@ -45,6 +45,14 @@ class SlideshowPlaylist:
         """The shuffled play order (item indices) — exposed for diagnostics."""
         return list(self._order)
 
+    def peek(self, offset: int):
+        """The item ``offset`` steps away in the running pass, wrapping — what the
+        view draws either side of the one on screen. ``None`` when empty."""
+        if not self._items:
+            return None
+        pos = (self._pos + offset) % len(self._items)
+        return self._items[self._order[pos]]
+
     def advance(self):
         """Step to the next item; at the end, reshuffle and start a fresh pass."""
         if self._items:
@@ -118,7 +126,8 @@ class AutoGeneratePlaylist:
     """
 
     def __init__(self, *, image_dwell_ms=4000):
-        self._items: list[tuple] = []  # (path, media_type, prompt_id), oldest first
+        # (path, media_type, prompt_id, still), oldest first
+        self._items: list[tuple] = []
         self._live = True  # the view opens on a running loop, so a slot exists
         self._pos = 0
         self._locked = False
@@ -152,8 +161,12 @@ class AutoGeneratePlaylist:
     # --- how the rotation grows and shrinks --------------------------------
 
     def add_finished(self, path, media_type: str, prompt_id: str, *,
-                     stay_live: bool = False) -> None:
+                     still=None, stay_live: bool = False) -> None:
         """Append a finished item just before the live slot.
+
+        ``still`` is the item's stored thumbnail, carried so the view can draw it
+        small as a neighbor without opening the file itself (a video has no other
+        still to show).
 
         With ``stay_live`` (seeding an opening view), a rotation sitting on the
         live slot follows it — the view keeps showing the in-flight generation.
@@ -162,7 +175,7 @@ class AutoGeneratePlaylist:
         hands over to the finished file.
         """
         was_on_live = self.on_live()
-        self._items.append((path, media_type, prompt_id))
+        self._items.append((path, media_type, prompt_id, still))
         if was_on_live and stay_live:
             self._pos = len(self._items)
 
@@ -186,6 +199,15 @@ class AutoGeneratePlaylist:
             self._pos = 0
 
     # --- stepping ----------------------------------------------------------
+
+    def peek(self, offset: int):
+        """The slot ``offset`` steps away, wrapping — what the view draws either
+        side of the one on screen. ``LIVE`` for the live slot, ``None`` when the
+        rotation is empty."""
+        if self.count == 0:
+            return None
+        pos = (self._pos + offset) % self.count
+        return LIVE if (self._live and pos == len(self._items)) else self._items[pos]
 
     def advance(self):
         if self.count:

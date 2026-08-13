@@ -305,8 +305,8 @@ def test_show_reroll_frame_prefers_a_given_wait_note(tabs):
     # run is stuck behind, that replaces it.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
-    tabs.show_reroll_frame(None, "Waiting behind 3 jobs in ComfyUI")
-    assert panel._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs in ComfyUI"
+    tabs.show_reroll_frame(None, "Waiting behind 3 jobs from another app")
+    assert panel._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs from another app"
 
 
 def test_show_reroll_frame_mirrors_a_frame(tabs):

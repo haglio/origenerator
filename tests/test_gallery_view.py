@@ -3254,7 +3254,7 @@ def _waiting_view(qtbot, tmp_path, backlog):
     ahead of it and no frame yet — the state that used to read as a hang."""
     client = _reroll_client()
     client.fetch_history = MagicMock(return_value={})  # reconcile finds nothing done
-    client.queue_backlog = MagicMock(return_value=backlog)
+    client.foreign_backlog = MagicMock(return_value=backlog)
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
@@ -3264,29 +3264,30 @@ def _waiting_view(qtbot, tmp_path, backlog):
     return view, client
 
 
-def test_a_run_stuck_behind_comfyui_says_how_much_is_ahead(qtbot, tmp_path):
+def test_a_run_stuck_behind_another_app_says_how_much_is_ahead(qtbot, tmp_path):
     # The reported mystery: a Generate parked behind another client's work looked
-    # exactly like a hang. The pane now names the queue it's waiting on.
+    # exactly like a hang. The pane now names what's holding it.
     view, _client = _waiting_view(qtbot, tmp_path, backlog=3)
 
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs in ComfyUI"
+    assert view._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs from another app"
 
 
 def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
     view, client = _waiting_view(qtbot, tmp_path, backlog=3)
     view._poll()
 
-    client.queue_backlog = MagicMock(return_value=1)  # one finished ahead of us
+    client.foreign_backlog = MagicMock(return_value=1)  # one finished ahead of us
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting behind 1 job in ComfyUI"
+    assert view._preview.show_message.call_args.args[0] == "Waiting behind 1 job from another app"
 
 
-def test_nothing_ahead_leaves_the_plain_waiting_note(qtbot, tmp_path):
-    # ComfyUI took it straight away: there's no queue to report, just no frame yet.
-    view, _client = _waiting_view(qtbot, tmp_path, backlog=None)
+def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
+    # Only another app's work earns the extra line: waiting on his own queue means
+    # ComfyUI is generating something he asked for, which is no mystery at all.
+    view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
 
     view._poll()
 
@@ -3729,12 +3730,12 @@ class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
-                 progress=(0, 0), queued_behind=None):
+                 progress=(0, 0), foreign_ahead=None):
         self.prompt_id = prompt_id
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
-        self.queued_behind = queued_behind  # ComfyUI prompts ahead of it, if any
+        self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
 

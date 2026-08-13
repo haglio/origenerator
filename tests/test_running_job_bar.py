@@ -15,10 +15,10 @@ def bar(qtbot):
 
 
 def _item(key="j1", caption="SDXL › x", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, queued_behind=None):
+          progress=None, reveal=None, cancel=None, foreign_ahead=None):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
-                        queued_behind=queued_behind)
+                        foreign_ahead=foreign_ahead)
 
 
 def test_keeps_its_slot_when_idle(bar):
@@ -100,33 +100,34 @@ def test_idle_and_active_have_the_same_footprint(bar):
     assert bar.sizeHint().height() == idle
 
 
-# --- waiting on ComfyUI: name the backlog instead of spinning silently -------
+# --- waiting on another app: name it, and never mislabel the user's own queue
 
-def test_says_how_much_of_comfyui_is_ahead_of_the_job(bar):
-    # The reported mystery: the bar spun with no clue that another client's work
-    # was in front. Now it says so, in the slot that answers "what's in the way".
-    bar.set_items([_item(status="queued", queued_behind=3)])
-    assert bar._queued.text() == "Waiting behind 3 jobs in ComfyUI"
+def test_says_how_many_jobs_another_app_has_ahead(bar):
+    # The reported mystery: the bar spun with no clue another app's work was in
+    # front. Now it says so, in the slot that answers "what's in the way".
+    bar.set_items([_item(status="queued", foreign_ahead=3)])
+    assert bar._queued.text() == "Waiting behind 3 jobs from another app"
 
 
 def test_one_job_ahead_reads_in_the_singular(bar):
-    bar.set_items([_item(status="queued", queued_behind=1)])
-    assert bar._queued.text() == "Waiting behind 1 job in ComfyUI"
+    bar.set_items([_item(status="queued", foreign_ahead=1)])
+    assert bar._queued.text() == "Waiting behind 1 job from another app"
 
 
-def test_the_comfyui_wait_wins_over_this_apps_own_count(bar):
-    # Our own queued jobs are in ComfyUI's queue too, so the backlog already
-    # counts them — and it counts what this app never launched, which "+N" can't.
+def test_the_users_own_queue_is_still_just_a_queued_count(bar):
+    # His own three jobs read as a ComfyUI wait and sent him hunting for phantom
+    # jobs. ComfyUI is generating what he asked for; the count says so plainly.
     bar.set_items([
-        _item(key="a", status="queued", queued_behind=4),
+        _item(key="a", foreign_ahead=0),
+        _item(key="b", status="queued", foreign_ahead=0),
+        _item(key="c", status="queued", foreign_ahead=0),
+    ])
+    assert bar._queued.text() == "+2 queued"
+
+
+def test_another_apps_hold_wins_over_this_apps_own_count(bar):
+    bar.set_items([
+        _item(key="a", status="queued", foreign_ahead=4),
         _item(key="b", status="queued"),
     ])
-    assert bar._queued.text() == "Waiting behind 4 jobs in ComfyUI"
-
-
-def test_nothing_ahead_leaves_the_queued_count_as_it_was(bar):
-    bar.set_items([
-        _item(key="a", queued_behind=0),
-        _item(key="b", status="queued"),
-    ])
-    assert bar._queued.text() == "+1 queued"
+    assert bar._queued.text() == "Waiting behind 4 jobs from another app"

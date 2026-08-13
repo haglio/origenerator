@@ -95,9 +95,9 @@ class GenerationJob(QObject):
         self._progress_tracker = ProgressTracker.for_payload(self.payload)
         self._last_progress = (0, 0)
         self._last_preview: bytes | None = None
-        # How many ComfyUI prompts are ahead of this one, as of the last
-        # refresh_backlog; None while it isn't waiting on any.
-        self._queued_behind: int | None = None
+        # Jobs another app has in front of this one in ComfyUI, as of the last
+        # refresh_backlog; None while nothing foreign is ahead.
+        self._foreign_ahead: int | None = None
 
     # --- state, exposed so a freshly-built tile can rebind to a running job --
 
@@ -114,28 +114,28 @@ class GenerationJob(QObject):
         return self._last_preview
 
     @property
-    def queued_behind(self) -> int | None:
-        """How many ComfyUI prompts sit in front of this job, or ``None`` when it
-        isn't waiting on any — read by whatever displays the job."""
-        return self._queued_behind
+    def foreign_ahead(self) -> int | None:
+        """Jobs another app has in front of this one in ComfyUI, or ``None`` when
+        none are — read by whatever displays the job."""
+        return self._foreign_ahead
 
     def refresh_backlog(self) -> None:
-        """Re-read how much of ComfyUI's queue is ahead of this job.
+        """Re-read what another app is holding ComfyUI with, ahead of this job.
 
         A caller that polls invokes this while the job waits. ComfyUI is a shared
-        server that outlives the app, so what's holding a submit up is often work
-        this session never launched — another Origenerator instance, another app —
-        and with no number for it the wait can't be told apart from a hang. A job
-        ComfyUI has already started reports nothing to wait on.
+        server that outlives the app, so a submit can sit behind work this session
+        never launched, and with no word of it that wait is indistinguishable from
+        a hang. The user's own jobs ahead aren't counted — those are what they
+        asked for — and a job ComfyUI has already started waits on nothing.
         """
         if self._state != "queued":
-            self._queued_behind = None
+            self._foreign_ahead = None
             return
         try:
-            self._queued_behind = self._client.queue_backlog(self.prompt_id)
+            self._foreign_ahead = self._client.foreign_backlog(self.prompt_id)
         except Exception as e:
             logger.debug("Could not read the queue position of %s: %s", self.prompt_id, e)
-            self._queued_behind = None
+            self._foreign_ahead = None
 
     def progress_state(self) -> dict:
         """A JSON-able snapshot of this job's live progress, to persist on its row.
@@ -259,7 +259,7 @@ class GenerationJob(QObject):
     def _mark_running(self):
         if self._state == "queued":
             self._state = "running"
-            self._queued_behind = None  # it's ours now: nothing left in front of it
+            self._foreign_ahead = None  # it's ours now: nothing left in front of it
             self.started.emit()
 
     def _on_progress(self, prompt_id: str, value: int, max_val: int):

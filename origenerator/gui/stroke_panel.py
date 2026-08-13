@@ -1,18 +1,19 @@
-"""The drive readout, floated over whichever surface hosts it — and pressable.
+"""Genau's console, shown here — the same one Fun Time draws, minus its mode row.
 
-Nothing here draws the readout. :class:`player_core.drive_readout.DriveSection`
-does, the same painter Fun Time's console shows, onto the same
-:class:`player_core.hud_panel.HudPanel` slab; this renders that into a Pillow
-image and blits it. Sharing the *layout* and repainting the design in QPainter
-was not enough — it had its own font, its own slab and its own trace, and read
-as this app's idea of Genau's readout rather than Genau's readout.
+Nothing on it is drawn here. :class:`player_core.console_hud.ConsolePainter`
+paints it, and this widget renders that into a bitmap and blits it: the status
+line, the transport, the clip-seconds pace, the hands-free row, the OSR2 line
+and the drive readout under them, all the code Fun Time runs. What a press posts
+is that console's own answer too — the same command strings Fun Time routes —
+and this only routes them to what this app has: the slideshow for the transport
+and the pace, the stroke driver for everything about the stroke.
 
-What this adds is the row Fun Time keeps in its console, because there is no
-console here: cruise control, which varies the stroke hands-free, and the
-waveform. Both are drawn through the readout's own ``draw_control``, so they are
-the same mark as the six above them rather than a lookalike.
+The one row left off is the one naming the three players, and the minimize
+button riding it (``modes_row=False``). This console is inside another app's
+window, so it is not one of those three and has no borderless window of its own
+to park.
 
-The on/off switch is not here. It is a button in the window's toolbar, and this
+The on/off switch is not on it either. That is a button in the toolbar, and this
 panel is what appears once it is pressed.
 """
 
@@ -29,27 +30,42 @@ from origenerator.paths import ensure_player_core_on_path
 ensure_player_core_on_path()
 
 from player_core import drive_layout  # noqa: E402
+from player_core.console import ConsoleModel, console_rows, row_width  # noqa: E402
+from player_core.console_hud import (  # noqa: E402
+    ConsoleHud, ConsolePainter, ModeHud, hud_xy,
+)
 from player_core.direct_control import POSITION_MAX  # noqa: E402
-from player_core.drive_layout import (  # noqa: E402
-    CENTER, SECTION_H, SECTION_W, SPEED, DriveControl, DriveTrack, geometry,
-    hit, track_value,
-)
 from player_core.drive_readout import (  # noqa: E402
-    DRIVEN_BY_GENAU, DRIVEN_BY_NOTHING, DriveHud, DriveSection,
+    DRIVEN_BY_GENAU, DRIVEN_BY_NOTHING, DriveHud,
 )
-from player_core.hud_panel import HudPanel  # noqa: E402
 
-_PAD = 10          # the slab's breathing room around the block
 _TRACE_SECONDS = 12.0
 _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
 
-# The row under the block: cruise control and the waveform.
-CRUISE, SHAPE = "cruise", "shape"
-_ROW_H = drive_layout.GAP + drive_layout.CONTROL_SIZE
-_WAVE_GLYPH = "∿"
+# How far the clip-seconds pair steps the slideshow's dwell, and the range it
+# may reach — the same shape Genau's own advance interval has.
+DWELL_STEP_S = 1
+MIN_DWELL_S, MAX_DWELL_S = 1, 60
 
-PANEL_W = SECTION_W + 2 * _PAD
-PANEL_H = SECTION_H + _ROW_H + 2 * _PAD
+
+class _NoHost:
+    """What the console acts on where there is nothing to act on.
+
+    The gallery window shows this console with no slideshow behind it, so its
+    transport and its pace have nothing to step. They are drawn all the same —
+    the console is the console — and simply do nothing here.
+    """
+
+    dwell_s = 0
+    locked = True
+
+    def stroke_step(self, delta: int) -> None: ...
+
+    def stroke_toggle_hold(self) -> None: ...
+
+    def stroke_cull(self) -> None: ...
+
+    def set_dwell_s(self, seconds: int) -> None: ...
 
 
 def _limits(state) -> drive_layout.Limits:
@@ -67,14 +83,14 @@ def _limits(state) -> drive_layout.Limits:
     )
 
 
-def drive_hud(state, active: bool) -> DriveHud:
+def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     """The live stroke as the readout's own view of it.
 
-    Everything the picture is made of: the dials, where the device is, and the
-    stroke sampled forward — the same samples it is being sent, so the trace is
-    the motion rather than a drawing of it. ``driven`` is what dims the whole
-    readout: nothing reaching the device is a picture of a stroke nobody is
-    making, and it goes grey exactly as Fun Time's does.
+    The dials, where the device is, and the stroke sampled forward — the same
+    samples it is being sent, so the trace is the motion rather than a drawing
+    of it. ``driven`` is what dims the whole readout: nothing reaching the
+    device is a picture of a stroke nobody is making, and it goes grey exactly
+    as Fun Time's does.
     """
     dials = state.state
     limits = _limits(state)
@@ -83,6 +99,7 @@ def drive_hud(state, active: bool) -> DriveHud:
         shape=dials.shape.value,
         position=round(POSITION_MAX * stroke_engine.position(state) / 100),
         driven=DRIVEN_BY_GENAU if active else DRIVEN_BY_NOTHING,
+        advance_interval=dwell_s,
         trace_seconds=_TRACE_SECONDS,
         spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
         amp_at_min=limits.amp_at_min, amp_at_max=limits.amp_at_max,
@@ -92,49 +109,49 @@ def drive_hud(state, active: bool) -> DriveHud:
     )
 
 
-def extra_controls(x: int, y: int, state) -> list[DriveControl]:
-    """This app's own row under the block — cruise control (lit while it has the
-    dials) and the waveform. Fun Time's console carries these two; there is no
-    console here."""
-    row_y = y + SECTION_H + drive_layout.GAP
-    size = drive_layout.CONTROL_SIZE
-    g = geometry(x, y, drive_layout.fraction(state.state.center))
-    return [
-        DriveControl((g.wave[0], row_y, size, size), CRUISE, "cc",
-                     not state.cruise.active),
-        DriveControl((g.wave[0] + size + drive_layout.GAP, row_y, size, size),
-                     SHAPE, _WAVE_GLYPH, False),
-    ]
+def console_hud(stroke, host) -> ConsoleHud:
+    """The whole console as Fun Time's painter takes it.
+
+    ``mode`` is genau because that is what this is: a self-generated stroke over
+    what is on screen, with no Nau playlist behind it. The empty
+    :class:`ModeHud` is what leaves the status line saying only whether the
+    slide is held — there is no compilation, no browse order and no length
+    filter here to report.
+    """
+    return ConsoleHud(
+        modes=ModeHud(),
+        console=ConsoleModel(
+            mode="genau", active=True, locked=host.locked,
+            osr2="genau" if stroke.active else "off",
+            cruise=stroke.state.cruise.active,
+            shape=stroke.state.state.shape.value,
+            advance_interval=host.dwell_s,
+        ),
+        drive=drive_hud(stroke.state, stroke.active, host.dwell_s),
+        modes_row=False,
+    )
 
 
-def controls(x: int, y: int, state, active: bool) -> list[DriveControl]:
-    """Every mark on the panel: the readout's own six, and this app's two."""
-    return [
-        *drive_layout.controls(x, y, state.state.center, _limits(state),
-                               dim=not active),
-        *extra_controls(x, y, state),
-    ]
-
-
-def tracks(x: int, y: int, state) -> list[DriveTrack]:
-    return drive_layout.tracks(x, y, state.state.center)
+def panel_size(stroke, host) -> tuple[int, int]:
+    """How big the console draws, which is what the widget has to be."""
+    return ConsolePainter().rgba(console_hud(stroke, host))[1]
 
 
 class StrokePanel(QWidget):
-    """The pressable drive readout, floated over whichever surface hosts it."""
+    """The console, floated over whichever surface hosts it."""
 
     # Fun Time insets its HUD from the window's top-left corner by this much, and
     # a reader glancing between the two apps looks for one panel in one place.
-    MARGIN = 8
+    MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None):
+    def __init__(self, stroke, parent=None, host=None):
         super().__init__(parent)
         self._stroke = stroke
-        self._drag_track: DriveTrack | None = None
-        self._section = DriveSection()
-        self.setFixedSize(PANEL_W, PANEL_H)
+        self._host = host if host is not None else _NoHost()
+        self._painter = ConsolePainter()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
+        self.setFixedSize(*panel_size(stroke, self._host))
         # The trace scrolls with the phase, so repaint on a beat while shown.
         self._repaint = QTimer(self)
         self._repaint.setInterval(_REPAINT_MS)
@@ -144,7 +161,7 @@ class StrokePanel(QWidget):
         self.update()
 
     def reposition(self) -> None:
-        """The parent's top-left corner, where Fun Time puts the same readout."""
+        """The parent's top-left corner, where Fun Time puts the same console."""
         parent = self.parentWidget()
         if parent is not None:
             self.move(self.MARGIN, self.MARGIN)
@@ -157,84 +174,83 @@ class StrokePanel(QWidget):
         super().hideEvent(event)
         self._repaint.stop()
 
-    # --- presses: marks step, bands set ------------------------------------
+    # --- presses: the console says what they post, this routes them ---------
 
     def mousePressEvent(self, event):
-        self._press_at(int(event.position().x()), int(event.position().y()))
-
-    def _press_at(self, px: int, py: int) -> None:
-        """A press at ``(px, py)``: a mark steps its axis, a band sets it
-        outright. Split out from the event so the mapping can be tested without
-        synthesizing mouse events."""
-        state = self._stroke.state
-        for control in controls(_PAD, _PAD, state, self._stroke.active):
-            if hit(control.rect, px, py):
-                self._act(control.action)
-                self.update()
-                return
-        for track in tracks(_PAD, _PAD, state):
-            if hit(track.rect, px, py):
-                self._drag_track = track
-                self._set_from_track(track, px, py)
-                return
+        self._post(self._painter.press_at(*self._window(event)))
 
     def mouseMoveEvent(self, event):
-        if self._drag_track is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            self._set_from_track(self._drag_track, int(event.position().x()),
-                                 int(event.position().y()))
+        if self._painter.holding:
+            self._post(self._painter.drag_to(*self._window(event)))
 
     def mouseReleaseEvent(self, event):
-        self._drag_track = None
+        self._painter.release()
 
-    def _act(self, action: str) -> None:
-        stroke = self._stroke
-        if action == CRUISE:
+    def _window(self, event) -> tuple[int, int]:
+        """This widget's coordinates as the window ones the painter expects.
+
+        It sits at the same inset from its parent that Fun Time's does from its
+        window, so putting the margin back is the whole conversion.
+        """
+        return (int(event.position().x()) + self.MARGIN,
+                int(event.position().y()) + self.MARGIN)
+
+    def _post(self, action: str) -> None:
+        """Do here what Fun Time would route to whichever player owns it."""
+        if not action:
+            return
+        stroke, host = self._stroke, self._host
+        if action.startswith("genau_") and "_" in action[6:]:
+            axis, _, value = action[6:].rpartition("_")
+            if value.isdigit() and axis in ("amp", "center", "speed"):
+                {"amp": stroke.set_amplitude, "center": stroke.set_center,
+                 "speed": stroke.set_speed}[axis](int(value))
+                self.update()
+                return
+        step = {
+            "genau_speed_up": (stroke.adjust_speed, 5),
+            "genau_speed_down": (stroke.adjust_speed, -5),
+            "genau_amplitude_up": (stroke.adjust_amplitude, 10),
+            "genau_amplitude_down": (stroke.adjust_amplitude, -10),
+            "genau_center_up": (stroke.adjust_center, 5),
+            "genau_center_down": (stroke.adjust_center, -5),
+            "genau_prev_clip": (host.stroke_step, -1),
+            "genau_next_clip": (host.stroke_step, 1),
+        }.get(action)
+        if step is not None:
+            step[0](step[1])
+        elif action == "genau_toggle_cruise":
             stroke.toggle_cruise()
-        elif action == SHAPE:
+        elif action == "genau_cycle_shape":
             stroke.cycle_shape()
-        elif action == "speed_down":
-            stroke.adjust_speed(-5)
-        elif action == "speed_up":
-            stroke.adjust_speed(5)
-        elif action == "amplitude_up":
-            stroke.adjust_amplitude(10)
-        elif action == "amplitude_down":
-            stroke.adjust_amplitude(-10)
-        elif action == "center_up":
-            stroke.adjust_center(5)
-        elif action == "center_down":
-            stroke.adjust_center(-5)
-
-    def _set_from_track(self, track: DriveTrack, px: int, py: int) -> None:
-        value = track_value(track, px, py)
-        if track.axis == SPEED:
-            self._stroke.set_speed(value)
-        elif track.axis == CENTER:
-            self._stroke.set_center(value)
-        else:
-            self._stroke.set_amplitude(value)
+        elif action == "quarter_button":
+            stroke.quarter_offset()
+        elif action == "main_lock":
+            host.stroke_toggle_hold()
+        elif action == "genau_weird_clip":
+            host.stroke_cull()
+        elif action in ("genau_advance_up", "genau_advance_down"):
+            delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
+            host.set_dwell_s(max(MIN_DWELL_S,
+                                 min(MAX_DWELL_S, host.dwell_s + delta)))
         self.update()
 
-    # --- painting: the readout's own painter, blitted ----------------------
+    # --- painting: the console's own painter, blitted ----------------------
 
-    def render_panel(self) -> HudPanel:
-        """The readout drawn onto its slab — the picture, before it is a widget.
-
-        Returned rather than blitted straight, so a test can look at what was
-        actually drawn without a screen in front of it.
-        """
-        state = self._stroke.state
-        panel = HudPanel(PANEL_W, PANEL_H)
-        hud = drive_hud(state, self._stroke.active)
-        self._section.draw(panel.draw, _PAD, _PAD, hud)
-        for control in extra_controls(_PAD, _PAD, state):
-            self._section.draw_control(panel.draw, control)
-        return panel
+    def render_console(self) -> tuple[bytes, tuple[int, int]]:
+        """The console drawn — the picture, before it is a widget. Returned
+        rather than blitted straight so a test can look at what was actually
+        drawn without a screen in front of it."""
+        return self._painter.rgba(console_hud(self._stroke, self._host))
 
     def paintEvent(self, event):
-        image = self.render_panel().image
+        raw, (width, height) = self.render_console()
+        if (width, height) != (self.width(), self.height()):
+            # The rows change width with what they say — a two-digit dwell, a
+            # longer waveform name — so the widget follows the picture rather
+            # than cropping it.
+            self.setFixedSize(width, height)
         painter = QPainter(self)
-        painter.drawImage(0, 0, QImage(
-            image.tobytes("raw", "RGBA"), image.width, image.height,
-            QImage.Format.Format_RGBA8888))
+        painter.drawImage(0, 0, QImage(raw, width, height,
+                                       QImage.Format.Format_RGBA8888))
         painter.end()

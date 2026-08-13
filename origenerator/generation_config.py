@@ -86,6 +86,20 @@ def _params_identical(a: dict, b: dict) -> bool:
     return a.keys() == b.keys() and all(_values_equal(a[k], b[k]) for k in a)
 
 
+def _recorded_an_output(row: dict) -> bool:
+    """True when a row has at least one output file recorded against it.
+
+    The gallery's :func:`origenerator.gallery.output.produced_output` in miniature,
+    re-derived here rather than imported because ``origenerator.gallery`` imports
+    this module (see :mod:`origenerator.gallery.combine`).
+    """
+    try:
+        files = json.loads(row.get("output_files") or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(files, list) and bool(files)
+
+
 def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     """Return the first already-completed generation ``snapshot`` would reproduce.
 
@@ -94,6 +108,13 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     when it is a reproducible generation of ours whose full parameters match:
 
     * ``completed`` -- a failed or canceled attempt is a legitimate retry.
+    * it recorded an output file -- a run that started but never finished can
+      still be sitting there marked ``completed`` with nothing to show for it
+      (ComfyUI ends an interrupted prompt exactly as it ends a finished one, so a
+      cancel that didn't come from the job's own Cancel is reported as a
+      completion with no outputs). The gallery already shows only rows that
+      produced a file, so counting one that didn't refuses to make something the
+      user cannot see anywhere.
     * ``source == "generated"`` -- imports lack our full graph/params and aren't
       reproducible, so re-running never re-creates one.
     * every parameter equal -- matching only the keys a stored row happens to
@@ -106,6 +127,8 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
         return None
     for row in rows:
         if row.get("status") != "completed":
+            continue
+        if not _recorded_an_output(row):
             continue
         if row.get("source", "generated") != "generated":
             continue

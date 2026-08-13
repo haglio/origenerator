@@ -75,6 +75,26 @@ def test_start_prepared_launches_and_tracks_the_job(qtbot, tmp_path):
     assert json.loads(rows[0]["params_json"])["seed"] == 3
 
 
+def test_an_interrupted_job_lands_as_an_error_not_a_completion(qtbot, tmp_path):
+    # A cancel from outside this job (ComfyUI's own UI, a second app instance)
+    # ends the prompt the way a success ends it, with a history carrying no
+    # outputs. The row must record the failure: a 'completed' row with no file is
+    # invisible in the gallery yet still refuses a re-run of those settings as a
+    # duplicate — the state the user hits as "it says it exists already".
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("video/wf/deadbeef", _I2V, _params(seed=3, noise_seed=9))
+    prompt_id = controller.jobs["video/wf/deadbeef"].prompt_id
+
+    client.job_completed.emit(prompt_id, {"outputs": {}})
+
+    row = db.get_generation(prompt_id)
+    assert row["status"] == "error"
+    assert not json.loads(row["output_files"] or "[]")
+    assert "video/wf/deadbeef" not in controller.jobs
+
+
 def test_finished_names_the_folder_and_the_generation(qtbot, tmp_path):
     # The signal carries the prompt_id alongside the folder key so the view can
     # tell whose completion this is — a user re-roll to load into the front tab,

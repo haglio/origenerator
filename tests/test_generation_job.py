@@ -140,6 +140,23 @@ def test_completion_generates_thumbnail_when_output_exists(qtbot, tmp_path):
     assert thumb is not None and Path(thumb).exists()
 
 
+def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
+    # ComfyUI ends an interrupted prompt exactly as it ends a finished one, and
+    # its history then carries no outputs. Such a run made no file, so it must not
+    # be recorded as a completed generation — one that is blocks a re-run of the
+    # same settings as a duplicate of something that doesn't exist.
+    job, client = _started_job(tmp_path)
+    finished, failed = [], []
+    job.finished.connect(lambda *a: finished.append(a))
+    job.failed.connect(failed.append)
+
+    client.job_completed.emit("comfy-A", {"outputs": {}})
+
+    assert finished == []
+    assert len(failed) == 1 and "without producing an output file" in failed[0]
+    assert job.state == "failed"
+
+
 def test_completion_detaches_so_later_signals_are_ignored(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     finished = []

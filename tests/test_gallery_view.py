@@ -2808,6 +2808,36 @@ def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypat
     view._slideshow.close()
 
 
+def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    slideshow = view._slideshow
+    qtbot.addWidget(slideshow)
+    shown = slideshow._playlist.current()[2]
+
+    slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
+
+    assert view._slideshow is None                  # out of the slideshow...
+    assert shown in view.visible_prompt_ids()       # ...into the folder holding it
+    assert view._browser.selected_ids == {shown}    # with that item picked
+
+
+def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
+    # The neighbor stills either side of the shown item are drawn from these —
+    # a video has no other still to show small.
+    _resolve_by_id(monkeypatch)
+    row = dict(_image("i1", "a cat", 50, 1), thumbnail_path="thumb.png")
+    view = GalleryView(FakeDB([row]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._slideshow_items([row])[0] == ("i1.png", "image", "i1", "thumb.png")
+
+
 def test_starred_slideshow_plays_a_starred_item_in_a_starred_folder_once(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])

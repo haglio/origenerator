@@ -1,7 +1,8 @@
-"""SlideshowView — the fullscreen player: show, advance, pause, and keys."""
+"""SlideshowView — the fullscreen player: show, advance, pause, neighbors, keys."""
 
 from unittest.mock import MagicMock
 
+from PIL import Image
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QKeyEvent
 
@@ -9,6 +10,11 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.stroke_engine import StrokeState
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
+
+
+def _png(path):
+    Image.new("RGB", (16, 16), (20, 80, 160)).save(path, "PNG")
+    return str(path)
 
 
 def _view(qtbot, items=_ITEMS, **kw):
@@ -130,3 +136,52 @@ def test_the_caption_shows_the_item_number(qtbot):
     assert view._counter.text().startswith("1 / 3")
     _press(view, Qt.Key.Key_Right)
     assert view._counter.text().startswith("2 / 3")
+
+
+def test_enter_leaves_for_the_shown_items_folder(qtbot):
+    items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None)
+    qtbot.addWidget(view)
+    view.show()
+    opened = []
+    view.open_requested.connect(opened.append)
+
+    _press(view, Qt.Key.Key_Return)
+
+    assert opened == ["id-a"]     # the gallery is handed the item on screen
+    assert not view.isVisible()   # and the slideshow is out of the way
+
+
+def test_the_items_either_side_ride_along_as_stills(qtbot, tmp_path):
+    items = [(_png(tmp_path / f"{name}.png"), "image", f"id-{name}")
+             for name in ("a", "b", "c")]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None)
+    qtbot.addWidget(view)
+    view.resize(800, 600)
+
+    left, right = view._neighbors._labels
+    assert view._neighbors._sources == (items[2][0], items[1][0])  # c behind, b ahead
+    assert not left.pixmap().isNull() and not right.pixmap().isNull()
+
+    _press(view, Qt.Key.Key_Right)  # onto b: a behind it now, c ahead
+    assert view._neighbors._sources == (items[0][0], items[2][0])
+
+
+def test_a_video_neighbor_falls_back_to_its_thumbnail(qtbot, tmp_path):
+    thumb = _png(tmp_path / "thumb.png")
+    items = [("a.png", "image", "id-a"), ("b.mp4", "video", "id-b", thumb)]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None)
+    qtbot.addWidget(view)
+
+    # Two items, so the clip is both what's behind and what's ahead — and it's
+    # drawn as its stored still, the only thing a video can show small.
+    assert view._neighbors._sources == (thumb, thumb)
+
+
+def test_a_single_item_slideshow_shows_no_neighbors(qtbot, tmp_path):
+    view = SlideshowView([(_png(tmp_path / "only.png"), "image", "id")],
+                         player=MagicMock(), shuffle=lambda order: None)
+    qtbot.addWidget(view)
+
+    assert view._neighbors._sources == (None, None)  # itself is no neighbor
+    assert all(label.isHidden() for label in view._neighbors._labels)

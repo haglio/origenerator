@@ -17,6 +17,10 @@ The arrow keys are laid out like a Fun Time satellite's controls:
 * Down       — lock: hold the current item against the auto-advance (a locked
                video replays); press again to release.
 
+The slots either side of the one on screen ride along as small stills (see
+:mod:`origenerator.gui.neighbor_previews`) — including the live slot, which shows
+the generation's latest streamed frame.
+
 And since a still image gives the OSR2 nothing to follow, the view answers the
 shared stroke keys (see :mod:`origenerator.gui.stroke_hud`) against the
 gallery's app-global stroke driver, with genau's drive panel floated along its
@@ -31,6 +35,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
+from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import CAPTION_CSS, apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
@@ -67,7 +72,13 @@ class AutoGenerateView(QWidget):
         self._preview = PreviewWidget(player=player, allow_fullscreen=False,
                                       mute_audio=True, loop_videos=False)
         self._preview.video_ended.connect(self._on_video_ended)
+        # The media is refitted a beat after the window resizes (and again when a
+        # video's resolution arrives), so re-place the neighbors when it lands.
+        self._preview.media_resized.connect(self._reposition_neighbors)
         layout.addWidget(self._preview, 1)
+
+        # The slots either side of this one, floated over the black surround.
+        self._neighbors = NeighborPreviews(self)
 
         # A translucent position caption floating over the bottom of the media,
         # and the drive panel — genau's readout, copied — along the top.
@@ -86,28 +97,35 @@ class AutoGenerateView(QWidget):
 
     def show_live_frame(self, data: bytes) -> None:
         """Remember the current generation's streamed frame, mirroring it into
-        the view while the rotation is showing the live slot."""
+        the view while the rotation is showing the live slot — and into the
+        neighbor still when the live slot is what sits next door."""
         self._live_frame = data
         if self._playlist.on_live():
             self._preview.show_frame(data)
+        else:
+            self._update_neighbors()
 
-    def add_finished(self, path, media_type: str, prompt_id: str) -> None:
+    def add_finished(self, path, media_type: str, prompt_id: str, still=None) -> None:
         """Seed one already-finished item into the rotation (oldest first); an
-        opening view stays on the live slot while these pour in."""
-        self._playlist.add_finished(path, media_type, prompt_id, stay_live=True)
+        opening view stays on the live slot while these pour in. ``still`` is the
+        item's thumbnail, drawn when it's a neighbor rather than the main event."""
+        self._playlist.add_finished(path, media_type, prompt_id, still=still,
+                                    stay_live=True)
         self._update_counter()
+        self._update_neighbors()
 
-    def note_finished(self, path, media_type: str, prompt_id: str) -> None:
+    def note_finished(self, path, media_type: str, prompt_id: str, still=None) -> None:
         """The in-flight generation completed: join the rotation as its newest
         finished item. If the live slot was on screen, its low-res frame hands
         over to the finished file right there."""
         was_on_live = self._playlist.on_live()
         self._live_frame = None  # the next launch streams its own frames
-        self._playlist.add_finished(path, media_type, prompt_id)
+        self._playlist.add_finished(path, media_type, prompt_id, still=still)
         if was_on_live:
             self._show_current()
         else:
             self._update_counter()
+            self._update_neighbors()
 
     def set_generating(self, generating: bool) -> None:
         """Add or drop the rotation's live slot as the loop starts or ends."""
@@ -134,6 +152,7 @@ class AutoGenerateView(QWidget):
         else:
             self._preview.show_media(current[0], current[1])
         self._update_counter()
+        self._update_neighbors()
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
@@ -209,6 +228,36 @@ class AutoGenerateView(QWidget):
         y = self.height() - self._counter.height() - 24
         self._counter.move(max(0, x), max(0, y))
 
+    # --- the neighboring slots ---------------------------------------------
+
+    def _update_neighbors(self):
+        """Draw the slots either side of this one — nothing while the rotation is
+        too short for a neighbor to be anything but what's already on screen."""
+        if self._playlist.count < 2:
+            self._neighbors.set_neighbors(None, None)
+            return
+        self._neighbors.set_neighbors(
+            self._neighbor_still(self._playlist.peek(-1)),
+            self._neighbor_still(self._playlist.peek(1)),
+            media_rect=self._media_rect(),
+        )
+
+    def _neighbor_still(self, slot):
+        """A neighboring slot's still: the in-flight generation's latest frame for
+        the live slot, else the finished item's thumbnail."""
+        if slot is LIVE:
+            return self._live_frame
+        return still_for(slot)
+
+    def _reposition_neighbors(self):
+        self._neighbors.reposition(self._media_rect())
+
+    def _media_rect(self):
+        """Where the media is drawn, in this view's coordinates."""
+        rect = self._preview.media_rect()
+        rect.moveTopLeft(self._preview.mapTo(self, rect.topLeft()))
+        return rect
+
     def _reposition_stroke_caption(self):
         self._stroke_caption.adjustSize()
         x = (self.width() - self._stroke_caption.width()) // 2
@@ -236,6 +285,7 @@ class AutoGenerateView(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._reposition_counter()
+        self._reposition_neighbors()
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
 

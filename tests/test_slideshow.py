@@ -111,6 +111,15 @@ def test_remove_current_drops_the_item_and_advances():
     assert playlist.current() == ("b", "image")  # the next item becomes current
 
 
+def test_peek_names_the_items_either_side_wrapping():
+    playlist = SlideshowPlaylist(
+        [("a", "image"), ("b", "image"), ("c", "image")], shuffle=lambda order: None,
+    )  # order == [0, 1, 2], current == a
+    assert playlist.peek(1) == ("b", "image")
+    assert playlist.peek(-1) == ("c", "image")  # wraps to the end of the pass
+    assert SlideshowPlaylist([]).peek(1) is None
+
+
 # --- AutoGeneratePlaylist: the growing rotation behind the auto-generate view
 
 
@@ -136,10 +145,18 @@ def test_seeding_grows_the_rotation_but_stays_on_the_live_slot():
     assert playlist.index == 3  # the live slot trails the finished items
 
 
+def test_peek_names_the_slots_either_side_wrapping_across_the_live_one():
+    playlist = _grown(2)          # two finished items, then the live slot (current)
+    assert playlist.peek(-1)[2] == "id-1"  # the newest finished item, behind it
+    assert playlist.peek(1)[2] == "id-0"   # and wrapping round to the oldest
+    playlist.back()                        # onto the newest finished item
+    assert playlist.peek(1) is LIVE        # the live slot is what's next
+
+
 def test_a_completion_hands_the_live_slot_over_to_the_finished_item():
     playlist = _grown(1)
     playlist.add_finished("done.png", "image", "id-done")  # no stay_live: it landed
-    assert playlist.current() == ("done.png", "image", "id-done")
+    assert playlist.current() == ("done.png", "image", "id-done", None)
     assert playlist.on_live() is False
     assert playlist.count == 3  # both finished items, plus the next one's live slot
 

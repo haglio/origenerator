@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
 from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
-from PyQt6.QtCore import Qt, QUrl, QPoint, QEvent, pyqtSignal
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtCore import Qt, QUrl, QPoint, QRect, QSize, QEvent, pyqtSignal
+from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
@@ -28,6 +28,7 @@ _PLACEHOLDER = "Select a generation to preview"
 
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
+    media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
     fullscreen_opened = pyqtSignal(object)  # popped a FullscreenPreview open (drive cue)
     drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
@@ -240,6 +241,37 @@ class PreviewWidget(QWidget):
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video
 
+    def media_rect(self) -> QRect:
+        """Where the media is actually drawn inside this pane, in its coordinates.
+
+        Media is fitted keeping its aspect ratio, so a portrait image on a wide
+        screen leaves surround either side of it — which is what an overlay (the
+        slideshows' neighbor stills) needs to know to keep clear of the picture.
+        Falls back to the whole pane whenever the drawn size isn't knowable yet:
+        a video whose resolution hasn't arrived, or nothing on screen at all.
+        """
+        drawn = self._drawn_size()
+        if drawn is None or drawn.isEmpty():
+            return self.rect()
+        rect = QRect(QPoint(0, 0), drawn)
+        rect.moveCenter(self._image_label.mapTo(self, self._image_label.rect().center()))
+        return rect
+
+    def _drawn_size(self):
+        """The media's rendered size — the scaled pixmap or movie frame, or a
+        video's resolution fitted to its surface — or ``None`` when unknown."""
+        if self.is_showing_video():
+            resolution = self._player.metaData().value(QMediaMetaData.Key.Resolution)
+            if isinstance(resolution, QSize) and resolution.isValid():
+                return resolution.scaled(self._video.size(),
+                                         Qt.AspectRatioMode.KeepAspectRatio)
+            return None
+        if self._movie is not None:
+            scaled = self._movie.scaledSize()
+            return scaled if scaled.isValid() else None
+        pixmap = self._image_label.pixmap()
+        return None if pixmap is None or pixmap.isNull() else pixmap.size()
+
     def player(self) -> QMediaPlayer:
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
@@ -411,4 +443,7 @@ class PreviewWidget(QWidget):
                 self._scale_movie()
             elif self._pixmap is not None:
                 self._rescale()
+            # The label lags this widget going fullscreen, so anything placed
+            # against the media's rect has to re-place when the refit lands.
+            self.media_resized.emit()
         return super().eventFilter(obj, event)

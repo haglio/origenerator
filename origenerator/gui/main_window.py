@@ -20,6 +20,7 @@ _GALLERY_COMBINE_KEY = "gallery_combine"
 _GEOMETRY_KEY = "window_geometry"
 _OSR2_ENABLED_KEY = "osr2_enabled"
 _EXPERIMENTS_ENABLED_KEY = "experiments_enabled"
+_AUDIO_ENABLED_KEY = "audio_enabled"
 
 
 class OrigeneratorWindow(QMainWindow):
@@ -78,6 +79,7 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.set_osr2_enabled(self._app_state.get(_OSR2_ENABLED_KEY))
         self._gallery_view.set_experiments_enabled(
             self._app_state.get(_EXPERIMENTS_ENABLED_KEY))
+        self._gallery_view.set_audio_enabled(self._app_state.get(_AUDIO_ENABLED_KEY))
 
     def _restore_geometry(self):
         """Reapply the saved window geometry: screen, size, and maximized state.
@@ -105,6 +107,7 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_OSR2_ENABLED_KEY, self._gallery_view.osr2_enabled())
         self._app_state.set(
             _EXPERIMENTS_ENABLED_KEY, self._gallery_view.experiments_enabled())
+        self._app_state.set(_AUDIO_ENABLED_KEY, self._gallery_view.audio_enabled())
         self._app_state.set(
             _GEOMETRY_KEY,
             base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),

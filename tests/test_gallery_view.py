@@ -125,6 +125,8 @@ class FakeDB:
         self._rows = list(rows)
         self._by_id = {r["prompt_id"]: r for r in rows}
         self._meta = {}
+        self._custom = {}       # folder id -> {"name", "members": {key: (level, ref)}}
+        self._next_custom = 1
 
     def list_generations(self):
         return list(self._rows)
@@ -168,6 +170,37 @@ class FakeDB:
     def restore_generation(self, row):
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
+
+    # --- custom folders (the groupings the user composes) ------------------
+
+    def create_custom_folder(self, name, folder_id=None):
+        if folder_id is None:
+            folder_id = self._next_custom
+        self._next_custom = max(self._next_custom, folder_id) + 1
+        self._custom[folder_id] = {"name": name, "members": {}}
+        return folder_id
+
+    def rename_custom_folder(self, folder_id, name):
+        self._custom[folder_id]["name"] = name
+
+    def delete_custom_folder(self, folder_id):
+        self._custom.pop(folder_id, None)
+
+    def add_custom_folder_members(self, folder_id, members):
+        for folder_key, level, ref in members:
+            self._custom[folder_id]["members"][folder_key] = (level, ref)
+
+    def remove_custom_folder_member(self, folder_id, folder_key):
+        self._custom[folder_id]["members"].pop(folder_key, None)
+
+    def list_custom_folders(self):
+        return [{"id": fid, "name": f["name"], "members": list(f["members"])}
+                for fid, f in sorted(self._custom.items())]
+
+    def custom_folder_members_full(self):
+        return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
+                for fid, f in self._custom.items()
+                for key, (level, ref) in f["members"].items()]
 
     def add(self, row):  # test helper: simulate a new generation landing
         self._rows.insert(0, row)
@@ -5465,3 +5498,225 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     qtbot.addWidget(other)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
+
+
+# --- folders the user composes: multi-select, group, drop, rename, remove -----
+
+def _two_leaf_view(qtbot, extra=()):
+    """A view whose Images tree holds two settings folders ("a cat", "a dog")
+    under one "(no LoRA)" parent, plus whatever ``extra`` rows are handed in.
+
+    Returns the two folders by *key*: every rebuild throws its tree items away,
+    and these tests all rebuild."""
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1), *extra]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    return view, _key(lora.child(0)), _key(lora.child(1))
+
+
+def _pick(view, *keys):
+    """Pick several folder rows the way a click then Ctrl-clicks does."""
+    items = [view._item_by_key[key] for key in keys]
+    view._tree.setCurrentItem(items[0])
+    for item in items[1:]:
+        item.setSelected(True)
+
+
+def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+
+    _pick(view, cat, dog)
+
+    assert view.visible_folder_keys() == [cat, dog]  # both, as tiles
+    assert "2 folders" in view._title.display_text()
+    assert not view._group_btn.isHidden()  # offering to save the grouping
+
+
+def test_the_slideshow_of_a_multi_selection_plays_every_picked_folder(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+
+    _pick(view, cat, dog)
+
+    assert {r["prompt_id"] for r in view._slideshow_rows()} == {"i1", "i2"}
+
+
+def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+
+    view._tree.setCurrentItem(view._item_by_key[cat])  # a plain click on one row
+
+    assert view._selection_group is None
+    assert view.visible_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
+    assert view._group_btn.isHidden()
+
+
+def test_delete_is_dark_while_several_folders_are_picked(qtbot):
+    # Otherwise Delete would wipe whichever single row happened to be current.
+    view, cat, dog = _two_leaf_view(qtbot)
+
+    _pick(view, cat, dog)
+
+    assert view._current_deletable_folder() is None
+    assert not view._delete_btn.isEnabled()
+
+
+def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Favorites", True)))
+
+    view._group_selection()
+
+    (record,) = view._db.list_custom_folders()
+    assert record["name"] == "Favorites"
+    assert record["members"] == [cat, dog]
+    # ...and the view has landed on it, showing what it gathered.
+    assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
+    assert view.visible_folder_keys() == [cat, dog]
+
+
+def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("", False)))
+
+    view._group_selection()
+
+    assert view._db.list_custom_folders() == []
+
+
+def _make_folder(view, name, keys):
+    folder_id = view._db.create_custom_folder(name)
+    view._db.add_custom_folder_members(
+        folder_id, [(key, "settings", None) for key in keys]
+    )
+    view.refresh()
+    return folder_id
+
+
+def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Favorites", [cat])
+
+    row = _top_level(view._tree)["Favorites"]
+    view._tree.setCurrentItem(row)
+
+    assert row.childCount() == 0  # flat like a shelf: its members live elsewhere
+    assert view.visible_folder_keys() == [cat]
+    assert {r["prompt_id"] for r in view._slideshow_rows()} == {"i1"}
+
+
+def test_a_custom_folder_is_not_where_the_gallery_lands_by_default(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Favorites", [cat])
+
+    assert view._tree_view.default_item() is _top_level(view._tree)["Images"]
+
+
+def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [cat])
+
+    view._on_folders_dropped(gallery.custom_folder_key(folder_id), [dog])
+
+    (record,) = view._db.list_custom_folders()
+    assert record["members"] == [cat, dog]
+    assert view.visible_folder_keys() == [cat, dog]  # landed on it
+
+
+def test_dropping_a_folder_onto_starred_stars_it(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+
+    view._on_folders_dropped(gallery_view_module._STARRED_KEY, [cat])
+
+    assert view._db.folder_meta_map()[cat]["starred"] is True
+
+
+def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
+    # Without (level, ref) a membership cannot be re-derived when a key formula
+    # moves, and the grouping silently loses the folder.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [])
+
+    view._on_folders_dropped(gallery.custom_folder_key(folder_id), [cat])
+
+    (member,) = view._db.custom_folder_members_full()
+    assert (member["level"], member["ref_prompt_id"]) == ("settings", "i1")
+
+
+def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [cat, dog])
+    group = view._group_for_key(gallery.custom_folder_key(folder_id))
+
+    view._remove_from_custom_folder(group, dog)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["members"] == [cat]
+    assert view._db.get_generation("i2") is not None  # the folder itself survives
+
+
+def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [cat, dog])
+    view._confirm = lambda text: True
+
+    view._remove_custom_folder(view._group_for_key(gallery.custom_folder_key(folder_id)))
+
+    assert view._db.list_custom_folders() == []
+    assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
+    assert "Favorites" not in _top_level(view._tree)
+
+
+def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
+    # Delete trashes a folder's generations; a custom folder holds none of its own,
+    # so that path must never accept one.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [cat])
+    view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert view._db.get_generation("i1") is not None
+    assert view._db.list_custom_folders()[0]["id"] == folder_id
+
+
+def test_renaming_a_custom_folder_renames_the_folder_itself(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Favorites", [cat])
+
+    view._apply_rename(gallery.custom_folder_key(folder_id), "Best of")
+
+    assert view._db.list_custom_folders()[0]["name"] == "Best of"
+    assert "Best of" in _top_level(view._tree)
+
+
+def test_a_custom_folder_survives_a_rebuild_and_follows_its_members(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Favorites", [cat])
+    view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
+
+    view._db.add(_image("i3", "a cat", 50, 9))  # a new seed joins the gathered folder
+    view.refresh()
+
+    assert view._tree.currentItem() is _top_level(view._tree)["Favorites"]
+    assert {r["prompt_id"] for r in view._slideshow_rows()} == {"i1", "i3"}
+
+
+def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
+    # A poll or a finished generation rebuilds the tree; collapsing the selection
+    # would throw away the folder the user is in the middle of composing.
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+
+    view._db.add(_image("i3", "a fish", 50, 3))
+    view.refresh()
+
+    assert view._selection_group is not None
+    assert len(view.visible_folder_keys()) == 2

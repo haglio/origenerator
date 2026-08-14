@@ -4,7 +4,9 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.reconcile import reconcile_in_flight, reconcile_folder_meta
+from origenerator.reconcile import (
+    reconcile_custom_folders, reconcile_in_flight, reconcile_folder_meta,
+)
 
 # sdxl_t2i saves under output node "7".
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -296,3 +298,83 @@ def test_reconcile_with_no_bookmarks_is_a_noop(tmp_path):
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
     assert reconcile_folder_meta(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
+
+
+# --- custom-folder membership reconciliation ---------------------------------
+
+def _folder_holding(db, *members):
+    folder_id = db.create_custom_folder("Favorites")
+    db.add_custom_folder_members(folder_id, list(members))
+    return folder_id
+
+
+def test_reconcile_repoints_a_membership_orphaned_by_a_formula_change(tmp_path):
+    # A folder the user gathered by hand drifts exactly the way a star does.
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    legacy_key = gallery.legacy_settings_folder_key(row)
+    current_key = gallery.settings_folder_key(row)
+    folder_id = _folder_holding(db, (legacy_key, None, None))
+
+    summary = reconcile_custom_folders(db)
+
+    (record,) = db.list_custom_folders()
+    assert record["members"] == [current_key]  # the grouping followed the folder
+    assert record["id"] == folder_id
+    assert summary["repointed"] == 1
+
+
+def test_reconcile_backfills_identity_onto_a_live_membership(tmp_path):
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    _folder_holding(db, (gallery.settings_folder_key(row), None, None))
+
+    summary = reconcile_custom_folders(db)
+
+    (member,) = db.custom_folder_members_full()
+    assert (member["level"], member["ref_prompt_id"]) == ("settings", "p1")
+    assert summary["refreshed"] == 1
+
+
+def test_reconcile_remaps_a_membership_through_its_stored_identity(tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    key = gallery.settings_folder_key(row)
+    _folder_holding(db, (key, "settings", "p1"))  # as a prior reconcile left it
+
+    # Simulate a *future* settings-key formula change (see the star test above).
+    original = gallery.settings_signature
+    monkeypatch.setattr(gallery.tree, "settings_signature",
+                        lambda *a, **kw: original(*a, **kw) + "X")
+    new_key = gallery.settings_folder_key(row)
+    assert new_key != key
+
+    summary = reconcile_custom_folders(db)
+
+    assert db.list_custom_folders()[0]["members"] == [new_key]
+    assert summary["repointed"] == 1
+
+
+def test_reconcile_keeps_a_membership_whose_folder_is_simply_gone(tmp_path):
+    # Its generations may come back (an undone delete), and a grouping the user
+    # built by hand is never silently thinned.
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_p1.png")
+    dead = "image/sdxl_t2i/000000000000"
+    _folder_holding(db, (dead, None, None))
+
+    summary = reconcile_custom_folders(db)
+
+    assert db.list_custom_folders()[0]["members"] == [dead]
+    assert summary["orphaned"] == 1
+
+
+def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_p1.png")
+    assert reconcile_custom_folders(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}

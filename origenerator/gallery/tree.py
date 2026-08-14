@@ -306,14 +306,6 @@ def starred_generations(rows: list[dict]) -> list[dict]:
     return [row for row in rows if row.get("starred") and produced_output(row)]
 
 
-def is_unvetted_experiment(row: dict) -> bool:
-    """True for a background experiment the user hasn't approved: unreviewed or
-    rejected. Such a row stays out of the main gallery tree — the tree is the
-    user's curated space, and unvetted machine output waits on its shelf."""
-    return (row.get("source") == "experiment"
-            and row.get("experiment_verdict") != "up")
-
-
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     """The finished experiments awaiting the user's verdict, newest first — the
     Experiments shelf's review queue. Only completed results qualify: a failed
@@ -453,11 +445,17 @@ def build_gallery_tree(
     :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
     running/pending generation whose folder must appear at once, its live tile
     standing in until its output lands). A terminal file-less row — a failed
-    generation — is dropped. Folders appear in the order their first member
-    appears in ``rows`` (the caller orders rows newest-first); a star never moves
-    a folder — bookmarks are gathered by :func:`starred_folders` instead.
-    ``folder_meta`` (keyed by each folder's stable ``key``) overrides the default
-    label and supplies the star state.
+    generation, or a rejected experiment whose files went to the trash — is
+    dropped. Folders appear in the order their first member appears in ``rows``
+    (the caller orders rows newest-first); a star never moves a folder —
+    bookmarks are gathered by :func:`starred_folders` instead. ``folder_meta``
+    (keyed by each folder's stable ``key``) overrides the default label and
+    supplies the star state.
+
+    A background experiment is nested like anything else, from the moment it
+    starts running: it is a generation, so it gets the folder its settings put it
+    in, and the Experiments shelf is a review queue over those rows rather than a
+    holding pen outside the tree.
     """
     folder_meta = folder_meta or {}
     # A running standalone enhance is machinery, not a generation: its result
@@ -469,7 +467,6 @@ def build_gallery_tree(
     rows = [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
-        and not is_unvetted_experiment(row)
         and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
     ]
     # Only finished images have a file to condition an i2v's frame on, so the

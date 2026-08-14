@@ -15,9 +15,15 @@ window or a clock.
 
 import random
 
+# How long an image holds the screen unless something says otherwise.
+# Genau's console shows this as its clip-seconds pace and sets it from
+# there, so the number it opens at has to be the one the slideshow uses.
+DEFAULT_IMAGE_DWELL_MS = 4000
+
 
 class SlideshowPlaylist:
-    def __init__(self, items, *, image_dwell_ms=4000, shuffle=random.shuffle):
+    def __init__(self, items, *, image_dwell_ms=DEFAULT_IMAGE_DWELL_MS,
+                 shuffle=random.shuffle):
         self._items = list(items)  # each an (path, media_type) pair
         self._shuffle = shuffle
         self._order = list(range(len(self._items)))
@@ -113,10 +119,6 @@ class SlideshowPlaylist:
         video — which advances when it ends, not on a clock."""
         if self._paused or self.current() is None or self.current_is_video():
             return None
-        return self._image_dwell_ms
-
-    @property
-    def image_dwell_ms(self) -> int:
         return self._image_dwell_ms
 
 

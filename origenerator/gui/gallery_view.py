@@ -42,6 +42,7 @@ from origenerator.gui.inflight_card import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.running_job_bar import RunningJobBar
@@ -116,6 +117,11 @@ class GalleryView(QWidget):
         # the funscript reconcile stands down. Injectable so tests never touch
         # the broker. Built before _build_ui, which wires its window feedback.
         self._osr2_stroke = osr2_stroke if osr2_stroke is not None else Osr2StrokeDriver(parent=self)
+        # How long a slide holds the screen, app-wide: Genau's console shows
+        # it as clip seconds and sets it, from whichever window the console
+        # is on — including this one, with nothing playing, where it is what
+        # the next slideshow opens at.
+        self._pace = SlideshowPace(parent=self)
         self._osr2_stroke.active_changed.connect(self._on_stroke_active_changed)
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
@@ -503,7 +509,7 @@ class GalleryView(QWidget):
         # This window's own drive panel — genau's readout, copied — built into
         # the bottom of the center (browser) pane, where it takes its own room
         # rather than floating over anyone's buttons.
-        self._stroke_panel = StrokePanel(self._osr2_stroke)
+        self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
         self._stroke_panel.setVisible(self._osr2_stroke.active)
         browser_box.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignHCenter)
         # The live auto-generate slideshow (double-click the preview while a folder
@@ -1501,6 +1507,7 @@ class GalleryView(QWidget):
         if not items:
             return
         self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
+                                        pace=self._pace,
                                         stroke=self._osr2_stroke)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
         logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",

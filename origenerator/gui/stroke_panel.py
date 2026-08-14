@@ -24,6 +24,8 @@ from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtCore import Qt, QTimer
 
 from origenerator import stroke_engine
+from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
+from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND
 from origenerator.paths import ensure_player_core_on_path
 
@@ -41,31 +43,6 @@ from player_core.drive_readout import (  # noqa: E402
 
 _TRACE_SECONDS = 12.0
 _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
-
-# How far the clip-seconds pair steps the slideshow's dwell, and the range it
-# may reach — the same shape Genau's own advance interval has.
-DWELL_STEP_S = 1
-MIN_DWELL_S, MAX_DWELL_S = 1, 60
-
-
-class _NoHost:
-    """What the console acts on where there is nothing to act on.
-
-    The gallery window shows this console with no slideshow behind it, so its
-    transport and its pace have nothing to step. They are drawn all the same —
-    the console is the console — and simply do nothing here.
-    """
-
-    dwell_s = 0
-    locked = True
-
-    def stroke_step(self, delta: int) -> None: ...
-
-    def stroke_toggle_hold(self) -> None: ...
-
-    def stroke_cull(self) -> None: ...
-
-    def set_dwell_s(self, seconds: int) -> None: ...
 
 
 def _limits(state) -> drive_layout.Limits:
@@ -144,10 +121,13 @@ class StrokePanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None, host=None):
+    def __init__(self, stroke, parent=None, host=None, pace=None):
         super().__init__(parent)
         self._stroke = stroke
-        self._host = host if host is not None else _NoHost()
+        # Without a slideshow behind it the console still has a pace to set: the
+        # one the next slideshow will open at.
+        self._host = host if host is not None else PaceOnlyHost(
+            pace if pace is not None else SlideshowPace(parent=self))
         self._painter = ConsolePainter()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
@@ -231,8 +211,7 @@ class StrokePanel(QWidget):
             host.stroke_cull()
         elif action in ("genau_advance_up", "genau_advance_down"):
             delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
-            host.set_dwell_s(max(MIN_DWELL_S,
-                                 min(MAX_DWELL_S, host.dwell_s + delta)))
+            host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
         self.update()
 
     # --- painting: the console's own painter, blitted ----------------------

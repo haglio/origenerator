@@ -129,14 +129,6 @@ class GenerateConfigPanel(QWidget):
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(8)
 
-        # Every version an enhanced image holds, at the very top of the scroll:
-        # the preview opens on the most-enhanced one, and this is where the
-        # earlier levels (and the original) are, each naming what made it. Hides
-        # itself for an image with only its original, which is most of them.
-        self._versions = EnhanceVersions()
-        self._versions.level_selected.connect(self._show_level)
-        body.addWidget(self._versions)
-
         # The output file + when it was made, at the top of the scroll (shown only
         # while displaying a saved generation). Params — editable or read-only — all
         # live in the form below now, so this block carries only those two facts.
@@ -185,6 +177,14 @@ class GenerateConfigPanel(QWidget):
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.animated_activated)
         body.addWidget(self._animated_strip)
+        # Every version an enhanced image holds, alongside the other cross-links:
+        # the preview opens on the most-enhanced one, and this is where the
+        # earlier levels (and the original) are, each captioned with what made
+        # it and draggable onto the Enhance subpanel to reuse those settings.
+        # Hides itself for an image with only its original, which is most of them.
+        self._versions = EnhanceVersions()
+        self._versions.level_selected.connect(self._show_level)
+        body.addWidget(self._versions)
 
         self._scroll.setWidget(body_host)
         main_box.addWidget(self._scroll, 4)
@@ -593,12 +593,24 @@ class GenerateConfigPanel(QWidget):
         self._metadata_block.show_row(row)
         self._metadata_block.show()
         # The preview is already on output_files[0] — the most-enhanced version —
-        # so the list opens with that level selected and offers the rest.
-        self._versions.show_levels(enhance_levels(row))
+        # so the strip leads with that level and offers the rest beside it.
+        self._versions.show_levels(self._version_items(row))
         self._folder_btn.show()  # any saved generation has a containing folder to open
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)
+
+    @staticmethod
+    def _level_path(level) -> Path:
+        """Where one version's file lives under ComfyUI's output folder."""
+        return (COMFYUI_OUTPUT_DIR / (level.file.get("subfolder") or "")
+                / (level.file.get("filename") or ""))
+
+    def _version_items(self, row: dict) -> list[tuple]:
+        """``(level, image path)`` for each version this image holds — the strip
+        draws each tile from the file itself, so a level shows what it actually
+        looks like rather than the row's one shared thumbnail."""
+        return [(level, self._level_path(level)) for level in enhance_levels(row)]
 
     def _show_level(self, position: int):
         """Put one of the displayed image's enhancement levels in the preview.
@@ -613,8 +625,7 @@ class GenerateConfigPanel(QWidget):
         levels = enhance_levels(self._displayed_row)
         if not 0 <= position < len(levels):
             return
-        file = levels[position].file
-        path = COMFYUI_OUTPUT_DIR / (file.get("subfolder") or "") / (file.get("filename") or "")
+        path = self._level_path(levels[position])
         if path.exists():
             self._preview.show_media(path, "image")
 

@@ -1,16 +1,20 @@
-"""The open folder's enhancement settings, at the bottom of the browser pane.
+"""The app's enhancement settings, at the bottom of the browser pane.
 
 Enhancement is not one of the settings that decide which folder a generation
 lands in — it is a finish applied to an image afterward — so it is deliberately
 not on the Generate form beside Seed, Dimensions and Output. It lives here
-instead, beside Genau's console, and belongs to the FOLDER on screen: whatever
-is set here is what Enhance All runs with, what a single image's Enhance action
-runs with, and — with the box ticked — what every image the folder newly
-generates receives as it lands.
+instead, beside Genau's console, and it is app-wide: whatever is set here is
+what Enhance All runs with, what a single image's Enhance action runs with, and
+— with the box ticked — what every image the app newly generates receives as it
+lands. It follows you rather than the folder, so it shows on the shelves
+(Recents, Starred, Experiments) exactly as it does on a settings folder.
 
-Editing writes straight back through ``on_change``, the way the gallery's other
-per-folder state persists: there is no Apply button, and the settings are read
-again from the database each time the folder is opened.
+Editing writes straight back through ``on_change`` — there is no Apply button —
+and the settings persist with the rest of the session state.
+
+An enhancement level dragged in from the info pane's version strip is absorbed:
+the settings that made that version become the ones on the panel, so "do that
+again" doesn't mean reading its numbers off and typing them back in.
 """
 
 from PyQt6.QtWidgets import (
@@ -20,6 +24,7 @@ from PyQt6.QtWidgets import (
 from origenerator.gallery import (
     ENHANCE_SETTING_KEYS, ENHANCE_WORKFLOW, MATCH_SOURCE_MODEL, EnhanceSettings,
 )
+from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.no_wheel import (
     NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
 )
@@ -30,9 +35,9 @@ ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox  # noqa: E402
 
 _AUTO_TOOLTIP = (
-    "Enhance every image this folder generates from now on, as it lands — with "
-    "the settings below. The original is kept, so an enhancement can always be "
-    "compared against it or redone."
+    "Enhance every image generated from now on, as it lands — with the settings "
+    "below. The original is kept, so an enhancement can always be compared "
+    "against it or redone."
 )
 
 
@@ -52,11 +57,11 @@ def _enhancer_param_defs() -> dict:
 class EnhancePanel(QWidget):
     """The Enhance subpanel: an auto box over the knobs an enhancement runs at.
 
-    ``show_settings`` loads a folder's stored configuration (or the defaults for
-    one never configured); every edit calls back with the new
-    :class:`~origenerator.gallery.enhance.EnhanceSettings`. The panel carries no
-    folder key of its own — the gallery knows which folder is open and routes the
-    write — so it stays a plain editor of one value.
+    ``show_settings`` loads a stored configuration (or the defaults, before
+    anything has been set); every edit calls back with the new
+    :class:`~origenerator.gallery.enhance.EnhanceSettings`. The panel holds no
+    state of its own beyond its fields — the gallery keeps the value and routes
+    it where it's needed — so it stays a plain editor.
     """
 
     def __init__(self, on_change, parent=None):
@@ -65,6 +70,7 @@ class EnhancePanel(QWidget):
         self._loading = False  # suppress the write-back while filling the fields
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
+        self.setAcceptDrops(True)  # a version tile dropped here hands its settings over
 
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
@@ -174,3 +180,30 @@ class EnhancePanel(QWidget):
     def _emit(self, *_args):
         if not self._loading:
             self._on_change(self.settings())
+
+    # --- absorbing a dragged enhancement level -----------------------------
+
+    def dragEnterEvent(self, event):
+        if params_from_mime(event.mimeData()) is not None:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        """Take the settings of the version dropped on us.
+
+        The auto box is left as it is: the drop says what to enhance *at*, not
+        whether to keep enhancing.
+        """
+        params = params_from_mime(event.mimeData())
+        if params is None:
+            event.ignore()
+            return
+        merged = dict(self.settings().params)
+        merged.update({k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS})
+        self.show_settings(EnhanceSettings(auto=self._auto.isChecked(), params=merged))
+        self._emit()
+        event.acceptProposedAction()

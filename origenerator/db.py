@@ -55,11 +55,7 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     -- A bookmark's identity: the tree tier it sits at and a member generation, so
     -- its key can be recomputed under any future key formula (see reconcile).
     level         TEXT,
-    ref_prompt_id TEXT,
-    -- This folder's enhancement settings, as the Enhance subpanel left them:
-    -- ``{"auto": bool, "params": {...}}``. What Enhance All, a single enhance,
-    -- and the auto-enhance of newly generated members all run with.
-    enhance_json  TEXT
+    ref_prompt_id TEXT
 );
 
 -- A folder the user composed by hand out of other folders (see
@@ -136,8 +132,6 @@ class Database:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
         if "ref_prompt_id" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN ref_prompt_id TEXT")
-        if "enhance_json" not in folder_cols:
-            conn.execute("ALTER TABLE folder_meta ADD COLUMN enhance_json TEXT")
 
     @contextmanager
     def _connect(self):
@@ -368,48 +362,16 @@ class Database:
                 (folder_key, 1 if starred else 0),
             )
 
-    def folder_enhance_map(self) -> dict[str, str]:
-        """``{folder_key: enhance_json}`` for every folder that has settings.
-
-        Read whole rather than per folder because the gallery consults it on each
-        rebuild — once per open folder, and once per row an auto-enhance might
-        claim — and the table is small.
-        """
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT folder_key, enhance_json FROM folder_meta"
-                " WHERE enhance_json IS NOT NULL"
-            ).fetchall()
-        return {r["folder_key"]: r["enhance_json"] for r in rows}
-
-    def set_folder_enhance(self, folder_key: str, enhance_json: str | None):
-        """Store (or clear, when ``None``) a folder's enhancement settings.
-
-        Deliberately its own column and its own writer: :meth:`upsert_folder_meta`
-        names only the bookmark columns, so the reconcile re-stamping a folder's
-        identity leaves these settings untouched.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO folder_meta (folder_key, enhance_json)
-                   VALUES (?, ?)
-                   ON CONFLICT(folder_key)
-                   DO UPDATE SET enhance_json = excluded.enhance_json""",
-                (folder_key, enhance_json),
-            )
-
     def folder_meta_full(self) -> list[dict]:
         """Every folder_meta row with its bookmark identity, for the reconcile.
 
         Unlike :meth:`folder_meta_map` (which the view uses for labels/stars), this
-        also carries ``level``, ``ref_prompt_id`` and the folder's enhancement
-        settings, so a stale key can be re-derived and everything hanging off it
-        moved across.
+        also carries ``level`` and ``ref_prompt_id`` so a stale key can be re-derived.
         """
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT folder_key, custom_name, starred, level, ref_prompt_id, "
-                "enhance_json FROM folder_meta"
+                "SELECT folder_key, custom_name, starred, level, ref_prompt_id "
+                "FROM folder_meta"
             ).fetchall()
         return [
             {
@@ -418,7 +380,6 @@ class Database:
                 "starred": bool(r["starred"]),
                 "level": r["level"],
                 "ref_prompt_id": r["ref_prompt_id"],
-                "enhance_json": r["enhance_json"],
             }
             for r in rows
         ]

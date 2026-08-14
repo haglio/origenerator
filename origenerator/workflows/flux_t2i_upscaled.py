@@ -33,6 +33,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     output_type = "image"
     model_keys = ("unet",)
     output_node_id = "12"
+    base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs
 
     def default_params(self) -> dict:
         return {
@@ -169,4 +170,8 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                     "filename_prefix": params["filename_prefix"],
                 },
             },
+            # With the tail on, keep the plain upscale too — this workflow's own
+            # namesake output, made on the way and otherwise discarded. Last, so
+            # the primary save is still the first SaveImage in the payload.
+            **self.base_save_node(self.base_output_node_id, ["11", 0], params),
         }

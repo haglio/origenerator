@@ -59,10 +59,7 @@ def _output_items(row: dict) -> list[MetaItem]:
         level.file.get("filename"): level
         for level in gallery.enhance_levels(row) if level.index > 0
     }
-    originals = {
-        f.get("filename")
-        for f in gallery.parse_file_list(row.get("original_files"))
-    }
+    originals = {f.get("filename") for f in gallery.original_files_of(row)}
     items = []
     for f in gallery.row_output_files(row):
         filename = f.get("filename")

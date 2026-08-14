@@ -55,6 +55,9 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     model_keys = ("checkpoint",)
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
+    # The pre-enhance render, saved when the tail runs. 21 is the union
+    # ControlNet and 22/23 the depth pair, so this sits clear of both.
+    base_output_node_id = "24"
 
     def default_params(self) -> dict:
         return {
@@ -294,4 +297,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
                 },
             },
             **enhance_nodes,
+            # With the tail on, keep the base render too — it is made on the way
+            # and would otherwise be discarded, leaving no original.
+            **self.base_save_node(self.base_output_node_id, ["13", 0], params),
         }

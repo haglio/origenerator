@@ -202,13 +202,20 @@ def test_the_loop_ending_drops_the_live_slot_but_keeps_rotating(qtbot, tmp_path)
     assert "generating" not in view._counter.text()
 
 
-def test_the_drive_panel_stands_ready_from_the_start(qtbot):
-    # The panel is the visible form of the OSR2 controls, so it's up from the
-    # start, with the key legend as its tooltip.
+def test_the_drive_panel_shows_only_while_the_stroke_runs(qtbot):
+    # A readout of a stroke nobody is making is not information: the panel is
+    # built with the view but stays down until the stroke is actually driving,
+    # and goes back down when it stops.
     view = _view(qtbot)
     assert view._stroke_panel is not None
-    assert not view._stroke_panel.isHidden()
+    assert view._stroke_panel.isHidden()
     assert "Space" in view._stroke_panel.toolTip()
+
+    _press(view, Qt.Key.Key_Space)
+    assert not view._stroke_panel.isHidden()
+
+    _press(view, Qt.Key.Key_Space)
+    assert view._stroke_panel.isHidden()
 
 
 def test_space_toggles_the_stroke(qtbot):

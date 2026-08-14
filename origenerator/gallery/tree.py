@@ -269,30 +269,30 @@ def starred_folders(tree: list[MediaGroup]) -> list:
 
 
 def recent_generations(
-    rows: list[dict], limit: int, media_types: set[str] | None = None
+    rows: list[dict], media_types: set[str] | None = None
 ) -> list[dict]:
-    """The most recently generated rows, newest first — the Recents shelf's list.
+    """Every generated row, newest first — the whole of the Recents shelf's list.
 
     "Generated" means this app produced the row, from a Generate tab or a gallery
     re-roll; an imported file discovered on disk (``source`` ``"imported"``) is not
     a recent *generation* and is left out. As in the tree, only rows that produced
     an output file appear — the shelf is a gallery of results, so a failed or
     in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
-    (the caller lists them by descending id), so the first ``limit`` survivors are
-    the most recent.
+    (the caller lists them by descending id), so the result is too.
+
+    Nothing is capped here: the shelf keeps going as far back as the user has ever
+    generated, and the pane draws a page of tiles at a time as it's scrolled into
+    (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow_recents`).
 
     ``media_types`` is the shelf's image/video filter (its checkboxes): a set of
-    the ``media_type_of_row`` values to keep, applied *before* the limit so
-    selecting one type yields up to ``limit`` of it rather than that type among the
-    newest ``limit`` rows of every type. ``None`` (the default) keeps every type;
-    an empty set keeps none.
+    the ``media_type_of_row`` values to keep. ``None`` (the default) keeps every
+    type; an empty set keeps none.
     """
-    generated = [
+    return [
         row for row in rows
         if (row.get("source") or "generated") == "generated" and produced_output(row)
         and (media_types is None or media_type_of_row(row) in media_types)
     ]
-    return generated[:limit]
 
 
 def starred_generations(rows: list[dict]) -> list[dict]:

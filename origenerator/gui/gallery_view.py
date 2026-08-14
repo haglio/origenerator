@@ -67,7 +67,6 @@ from shared_ui.check_box import CheckBox
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
-_RECENTS_LIMIT = 50  # most recent generations the shelf lists at once
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 
 
@@ -471,6 +470,10 @@ class GalleryView(QWidget):
         browser_box.addWidget(self._avg_label)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
+        # The Recents shelf has no end: reaching the bottom of what it has drawn
+        # draws the next page. Range as well as value — see BrowserPane.grow_recents.
+        self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
+        self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
         browser_box.addWidget(self._scroll, 1)
         self._panes.addWidget(browser)
 
@@ -1036,7 +1039,7 @@ class GalleryView(QWidget):
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = gallery.unreviewed_experiments(rows)
         self._browser.set_model(
-            gallery.recent_generations(rows, _RECENTS_LIMIT, self._recents_media_types()),
+            gallery.recent_generations(rows, self._recents_media_types()),
             gallery.starred_folders(tree_model),
             gallery.starred_generations(rows),
             unreviewed,
@@ -1057,7 +1060,7 @@ class GalleryView(QWidget):
             else:
                 self._title.set_display("")
                 self._avg_label.setText("")
-                self._browser.show_widget(QWidget())
+                self._browser.show_empty()
                 self._selected_row = None  # nothing selected
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
@@ -2039,7 +2042,7 @@ class GalleryView(QWidget):
         """A media-type checkbox toggled: re-list the shelf under the new filter.
         Lightweight — re-derives the recent rows and redraws, with no tree rebuild."""
         self._browser.set_recent_rows(gallery.recent_generations(
-            self._db.list_generations(), _RECENTS_LIMIT, self._recents_media_types()
+            self._db.list_generations(), self._recents_media_types()
         ))
         self._sync_slideshow_button()  # a filter that empties the shelf retires it
 

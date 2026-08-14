@@ -914,6 +914,69 @@ def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
     assert view._tree.currentItem().text(0) == "Recents"
 
 
+def _many_recents(count):
+    """``count`` generated images, newest first, so the shelf runs past one page."""
+    return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
+
+
+def _scroll_bar(view):
+    return view._scroll.verticalScrollBar()
+
+
+def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
+    # The shelf lists every generation ever made, so it draws a page of tiles at a
+    # time rather than all 120 at once.
+    view = GalleryView(FakeDB(_many_recents(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    assert len(view.visible_prompt_ids()) == 50
+    # And it's the newest page — the shelf still reads newest-first.
+    assert view.visible_prompt_ids()[0] == "i119"
+
+
+def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
+    view = GalleryView(FakeDB(_many_recents(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+
+    bar = _scroll_bar(view)
+    bar.setRange(0, 5000)          # a laid-out shelf with room to scroll
+    assert len(view.visible_prompt_ids()) == 50   # ...and no growth up at the top
+
+    bar.setValue(bar.maximum())    # scroll to the end: the next page follows
+    assert len(view.visible_prompt_ids()) == 100
+    bar.setRange(0, 9000)
+    bar.setValue(bar.maximum())
+    assert view.visible_prompt_ids() == [f"i{n}" for n in reversed(range(120))]
+
+    bar.setValue(bar.maximum())    # the true end of the shelf: nothing more to draw
+    assert len(view.visible_prompt_ids()) == 120
+
+
+def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
+    # A generation landing rebuilds the gallery under the open shelf. That must not
+    # collapse it back to one page and throw away everything the user scrolled
+    # down through — the new item just joins the top of what's already drawn.
+    db = FakeDB(_many_recents(120))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    bar = _scroll_bar(view)
+    bar.setRange(0, 5000)
+    bar.setValue(bar.maximum())
+    assert len(view.visible_prompt_ids()) == 100
+
+    db._rows.insert(0, _image("fresh", "a dog", 50, 999))  # a generation lands
+    view.refresh()
+
+    assert len(view.visible_prompt_ids()) == 100      # the two pages stay open...
+    assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
+
+
 def test_recents_media_filter_checkboxes_default_on_and_only_show_on_the_shelf(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
@@ -949,6 +1012,24 @@ def test_recents_media_filter_hides_the_unchecked_media_type(qtbot):
 
     view._recents_video_cb.setChecked(False)          # both off: nothing to show
     assert view.visible_prompt_ids() == []
+
+
+def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
+    # A filter change is a new listing, not a redraw of the old one, so the shelf
+    # starts over at its newest item instead of holding the pages already scrolled.
+    view = GalleryView(FakeDB(_many_recents(120)))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    bar = _scroll_bar(view)
+    bar.setRange(0, 5000)
+    bar.setValue(bar.maximum())
+    assert len(view.visible_prompt_ids()) == 100
+
+    view._recents_video_cb.setChecked(False)  # images only — still all 120 of them
+
+    assert len(view.visible_prompt_ids()) == 50
+    assert view.visible_prompt_ids()[0] == "i119"
 
 
 def test_recents_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):

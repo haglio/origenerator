@@ -1,6 +1,13 @@
 """A fullscreen view of a single image or video, opened by double-clicking a
 preview. Escape or another double-click closes it.
 
+Armed with the folder it was opened from (:meth:`set_playlist`) it is the
+slideshow without the shuffling and the clock: Left/Right page through that
+folder, Up culls the item on screen and Down keeps it — bookmarking it and asking
+for it to be enhanced, exactly as the slideshow's Down does — so the two
+fullscreen views are one thing to learn. Shift+Left/Right is the axis this one
+adds: the enhancement levels of the image on screen.
+
 It also opens over a generation that's still running: built with no media, it
 shows that generation's streamed low-res frames (:meth:`show_frame`) until the
 pane that opened it hands over the finished file (:meth:`show_landed`), at which
@@ -36,6 +43,8 @@ _GENERATING = "Generating…"
 class FullscreenPreview(QWidget):
     closed = pyqtSignal()  # the view was dismissed (Esc, a double-click, or close)
     media_changed = pyqtSignal()  # paged to a different item (re-aim the OSR2 drive)
+    delete_requested = pyqtSignal(str)  # Up on an item (prompt_id): trash it
+    star_requested = pyqtSignal(str)    # Down on an item (prompt_id): bookmark it
 
     def __init__(self, media: tuple | None, *, frame: bytes | None = None,
                  player=None, parent=None):
@@ -132,7 +141,9 @@ class FullscreenPreview(QWidget):
     def set_playlist(self, items: list[tuple], index: int) -> None:
         """Arm Left/Right to page across the folder the view was opened from.
 
-        ``items`` is the folder's media in shown order as ``(path, media_type)``;
+        ``items`` is the folder's media in shown order as ``(path, media_type)``
+        or ``(path, media_type, prompt_id)`` — the id is what Up and Down act on,
+        so a curated folder can be culled and bookmarked without leaving the view.
         ``index`` is the one already on screen. Until this is called the view holds
         a lone item and paging is inert.
         """
@@ -233,6 +244,50 @@ class FullscreenPreview(QWidget):
         self._show_note(text)
         self._note_timer.start(ms)
 
+    # --- culling and keeping, the slideshow's two verticals ------------------
+
+    def _current_id(self) -> str | None:
+        """The prompt id of the item on screen, when the playlist carries one."""
+        if not self._items or self._index >= len(self._items):
+            return None
+        item = self._items[self._index]
+        return item[2] if len(item) > 2 else None
+
+    def _delete_current(self) -> None:
+        """Up: hand the item on screen to the gallery to trash, then page off it.
+
+        The view holds no database, so the deletion is asked for; what it does own
+        is what is on screen, and a culled item must not stay there.
+        """
+        prompt_id = self._current_id()
+        if prompt_id is None:
+            return
+        del self._items[self._index]
+        self.delete_requested.emit(prompt_id)
+        if not self._items:
+            self.close()
+            return
+        self._index %= len(self._items)
+        self._preview.show_media(*self._items[self._index][:2])
+        self.media_changed.emit()
+
+    def _star_current(self) -> None:
+        """Bookmark the item on screen. It stays up — starring is not a move."""
+        prompt_id = self._current_id()
+        if prompt_id is not None:
+            self.star_requested.emit(prompt_id)
+
+    def _hold_current(self) -> None:
+        """Down: bookmark the image on screen, and ask for it to be enhanced.
+
+        The slideshow's Down does both off one press (there it locks the slide
+        too, which is the only thing this view has no clock to hold against), and
+        the two fullscreen views are meant to be one thing to learn — so stopping
+        on a picture says you want it in exactly the same two ways here.
+        """
+        self._star_current()
+        self._enhance_current()
+
     def set_stroke(self, stroke) -> None:
         """Wire the shared OSR2 stroke keys and genau's drive panel in — so the
         device can run over a fullscreen image, which has no script."""
@@ -264,8 +319,10 @@ class FullscreenPreview(QWidget):
             self._step_level(-1) if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
             self._step_level(1) if shifted else self._step(1)
+        elif key == Qt.Key.Key_Up:
+            self._delete_current()   # cull this one, as the slideshow's Up does
         elif key == Qt.Key.Key_Down:
-            self._enhance_current()
+            self._hold_current()     # keep it, as the slideshow's Down does
         elif key == Qt.Key.Key_E:
             self._toggle_enhance()
         elif apply_stroke_key(self._stroke, key):

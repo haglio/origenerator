@@ -4,7 +4,7 @@ Pure, Qt-free playlist state: what's on screen, how to step through it, and how
 long to dwell on an image before advancing. Two policies live here.
 :class:`SlideshowPlaylist` backs the gallery slideshow: a fixed set played in a
 random order, reshuffled each pass, with the shuffle injectable so the order is
-deterministic under test. :class:`AutoGeneratePlaylist` backs the auto-generate
+deterministic under test, and a lock that holds one item against the advance. :class:`AutoGeneratePlaylist` backs the auto-generate
 slideshow: a chronological rotation that grows as the loop lands each item, with
 a trailing "live" slot for the generation in flight. Both carry the same lock —
 a hold on the item on screen that stops the advance — so the two slideshows
@@ -137,6 +137,11 @@ class SlideshowPlaylist:
 
     @property
     def locked(self) -> bool:
+        """Whether the item on screen is being held against the advance.
+
+        "Lock" is what this hold is called everywhere else — the auto-generate
+        rotation, Fun Time's console — so it is what it is called here.
+        """
         return self._locked
 
     def toggle_lock(self) -> bool:

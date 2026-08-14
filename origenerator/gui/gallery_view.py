@@ -719,6 +719,9 @@ class GalleryView(QWidget):
         fullscreen.closed.connect(lambda: self._on_fullscreen_closed(fullscreen))
         fullscreen.media_changed.connect(self._reconcile_osr2)
         fullscreen.set_stroke(self._osr2_stroke)  # the shared stroke keys work here too
+        # Up and Down curate from up there, exactly as they do in the slideshow.
+        fullscreen.delete_requested.connect(self._trash_generation)
+        fullscreen.star_requested.connect(self._star_generation)
         self._arm_fullscreen_navigation(fullscreen)
         self._reconcile_osr2()
 
@@ -727,8 +730,16 @@ class GalleryView(QWidget):
         through it, starting on the item already on screen. Skipped for a lone
         item. Shift+Left/Right gets its own axis: the versions of whichever
         image is on screen, so a level can be compared against the one below it
-        at full size rather than in a thumbnail."""
+        at full size rather than in a thumbnail.
+
+        A view opened over a generation still being made has no place among that
+        media — it has no file yet — so it is armed with the folder anyway, from
+        the top: watching something render is no reason to lose the folder it is
+        being made in, and the first arrow leaves the live frames for it.
+        """
         items, index = self._folder_media_playlist()
+        if not items and fullscreen.is_live():
+            items, index = self._folder_media(), 0
         if len(items) > 1:
             fullscreen.set_playlist(items, index)
         fullscreen.set_levels(self._folder_level_playlists())
@@ -778,19 +789,30 @@ class GalleryView(QWidget):
         """The visible folder's resolvable media in shown order, and the index of
         the currently-shown item — the playlist a fullscreen view pages through.
 
+        Each entry carries its generation's id alongside the media, so the view's
+        Up and Down can name what to trash and what to bookmark.
+
         Returns an empty list when the shown item isn't among them, so an armed
         playlist's starting item always matches what's already on screen."""
         selected_pid = self._selected["prompt_id"] if self._selected else None
         items, index, found = [], 0, False
+        for path, media_type, pid in self._folder_media():
+            if pid == selected_pid:
+                index, found = len(items), True
+            items.append((path, media_type, pid))
+        return (items, index) if found else ([], 0)
+
+    def _folder_media(self) -> list[tuple]:
+        """The visible folder's resolvable media in shown order, each with its own
+        generation id. In-flight and output-less rows have nothing to show
+        fullscreen, so they are left out."""
+        media = []
         for pid in self._browser.visible_prompt_ids():
             row = self._db.get_generation(pid)
             preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
-            if preview is None:
-                continue  # in-flight or output-less: nothing to show fullscreen
-            if pid == selected_pid:
-                index, found = len(items), True
-            items.append(preview)
-        return (items, index) if found else ([], 0)
+            if preview is not None:
+                media.append((preview[0], preview[1], pid))
+        return media
 
     def _on_fullscreen_closed(self, fullscreen):
         """The fullscreen view closed: drop it and re-aim at the toggle's video, or
@@ -2044,6 +2066,7 @@ class GalleryView(QWidget):
             return
         self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
                                         on_enhance=self._enhance_from_slideshow,
+                                        on_star=self._star_generation,
                                         pace=self._pace,
                                         stroke=self._osr2_stroke)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
@@ -2053,16 +2076,21 @@ class GalleryView(QWidget):
         self._slideshow.showFullScreen()
 
     def _slideshow_items(self, rows) -> list:
-        """(path, media_type, prompt_id, thumbnail) for each of ``rows`` with a
-        resolvable preview, in the order given — the slideshow's playlist. The
-        thumbnail is what the view draws for the item while it's a neighbor
-        rather than the one on screen (a video has no other still)."""
+        """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
+        order given — the slideshow's playlist. The thumbnail is what the view
+        draws for the item while it's a neighbor rather than the one on screen (a
+        video has no other still).
+
+        A row still being made has no file, and takes a ``None`` path: the view
+        shows its streamed frames instead. A folder whose only item is cooking is
+        still a folder worth watching, which is why it isn't simply skipped."""
         items = []
         for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-            if resolved is not None:
-                items.append((resolved[0], resolved[1], row["prompt_id"],
-                              row.get("thumbnail_path")))
+            if resolved is None and row.get("status") not in ("running", "pending"):
+                continue  # finished with no file: nothing to show, ever
+            path, media_type = resolved if resolved else (None, gallery.media_type_of_row(row))
+            items.append((path, media_type, row["prompt_id"], row.get("thumbnail_path")))
         return items
 
     def _open_from_slideshow(self, prompt_id: str):
@@ -2071,6 +2099,11 @@ class GalleryView(QWidget):
         closed itself, so this arrives on the gallery."""
         self._slideshow = None
         self._browser.open_in_containing_folder(prompt_id)
+
+    def _star_generation(self, prompt_id: str):
+        """Bookmark a generation from a fullscreen view (its Down key) — the same
+        star the gallery's own control sets."""
+        self.set_items_starred([prompt_id], True)
 
     def _trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same
@@ -2449,11 +2482,19 @@ class GalleryView(QWidget):
             self._last_reroll_frame = data
             self._info_tabs.show_reroll_frame(data)
         self._feed_montage_preview(key, data)
+        self._feed_slideshow_preview(key, data)
         # An enhance's frames go to the version strip of whichever tab shows the
         # image being enhanced, not to the pane — an enhancement isn't a
         # generation taking the preview over.
         self._enhance_frames[key] = data
         self._reconcile_pending_enhancements()
+
+    def _feed_slideshow_preview(self, key: str, data: bytes):
+        """Mirror a re-roll's live frame into an open slideshow, if that run is one
+        of the items it is playing."""
+        job = self._reroll.job_for(key)
+        if self._slideshow is not None and job is not None:
+            self._slideshow.show_live_frame(job.prompt_id, data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real

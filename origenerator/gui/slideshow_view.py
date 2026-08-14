@@ -5,9 +5,10 @@ Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
 rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
 and pacing. Images advance on a dwell timer; videos play once and advance when
 they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down locks
-the slide on screen against the advance (a locked clip replays, and the hold asks
-for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves for
-the shown item's own folder (``open_requested``), and Escape closes.
+the slide on screen against the advance (a locked clip replays, and the hold both
+stars the slide and asks for an enhancement — see
+:meth:`SlideshowView._hold_current`), Enter leaves for the shown item's own folder
+(``open_requested``), and Escape closes.
 
 Anything that moves off a locked slide — a step either way, a cull — releases the
 lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
@@ -31,13 +32,16 @@ from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import SlideshowPlaylist
 
+_BEING_MADE = "Generating…"  # an item with no file yet, before its first frame
+
 
 class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
 
     def __init__(self, items, *, image_dwell_ms=None, shuffle=None, on_delete=None,
-                 on_enhance=None, player=None, stroke=None, pace=None, parent=None):
+                 on_enhance=None, on_star=None, player=None, stroke=None, pace=None,
+                 parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
         # Holding a slide is also how you ask for it: Down enhances what is on
@@ -47,6 +51,8 @@ class SlideshowView(QWidget):
         self._on_enhance = on_enhance
         self._enhance_on_hold = on_enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
+        self._on_star = on_star
+        self._frames: dict[str, bytes] = {}  # latest streamed frame, by generation
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
@@ -68,10 +74,11 @@ class SlideshowView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # Already a fullscreen view with its own keys, so a double-click here must
-        # not spawn a nested fullscreen preview.
+        # Already a fullscreen view, so a double-click leaves it rather than
+        # spawning a nested one — the way out of every other fullscreen view here.
         self._preview = PreviewWidget(player=player, loop_videos=False,
-                                      allow_fullscreen=False)
+                                      allow_fullscreen=False,
+                                      on_double_click=self.close)
         self._preview.video_ended.connect(self._on_video_ended)
         # The media is refitted a beat after the window resizes (and again when a
         # video's resolution arrives), so re-place the neighbors when it lands.
@@ -115,19 +122,40 @@ class SlideshowView(QWidget):
     # --- playback ----------------------------------------------------------
 
     def _show_current(self):
-        """Render the current item and arm the dwell timer if it's an image."""
+        """Render the current item and arm the dwell timer if it's an image.
+
+        An item with no file yet is one still being made: it shows the frames its
+        generation has streamed so far, or says so until the first arrives, and
+        dwells like an image. A folder whose only item is cooking is still a
+        folder worth watching.
+        """
         self._timer.stop()
         item = self._playlist.current()
         if item is None:
             return
         path, media_type = item[0], item[1]
-        self._preview.show_media(path, media_type)
+        if path is None:
+            frame = self._frames.get(item[2] if len(item) > 2 else None)
+            if frame is not None:
+                self._preview.show_frame(frame)
+            else:
+                self._preview.show_message(_BEING_MADE)
+        else:
+            self._preview.show_media(path, media_type)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the corner belongs to whatever is on screen now
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
+
+    def show_live_frame(self, prompt_id: str, frame: bytes) -> None:
+        """One more streamed frame of a generation in the playlist. Redraws only
+        when that generation is the one on screen."""
+        self._frames[prompt_id] = frame
+        item = self._playlist.current()
+        if item is not None and item[0] is None and len(item) > 2 and item[2] == prompt_id:
+            self._preview.show_frame(frame)
 
     def _advance(self):
         self._playlist.advance()
@@ -205,12 +233,12 @@ class SlideshowView(QWidget):
             self._advance()
 
     def _hold_current(self):
-        """Down: hold the slide, and ask for it to be enhanced.
+        """Down: hold the slide, star it, and ask for it to be enhanced.
 
         Stopping on a picture is the gesture that says you want it, so it is
-        also the one that asks for the better version — nothing extra to press,
-        and the run happens while you keep looking at it. Releasing the hold
-        asks for nothing; only stopping does.
+        also the one that stars it and the one that asks for the better version
+        — nothing extra to press, and the run happens while you keep looking at
+        it. Releasing the hold asks for nothing; only stopping does.
         """
         held = self._toggle_lock()
         if held:
@@ -296,13 +324,25 @@ class SlideshowView(QWidget):
         self._note.raise_()
 
     def _toggle_lock(self) -> bool:
-        """Flip the lock; returns whether the slide is now held."""
+        """Flip the lock; returns whether the slide is now held.
+
+        Locking also stars what is on screen: holding a slide is how the user says
+        this one is worth keeping, and having said it they should not have to say
+        it twice in two ways.
+        """
         if self._playlist.toggle_lock():
             self._timer.stop()  # hold on the current item
+            self._star_current()
             self._update_counter()
             return True
         self._show_current()  # released, re-arming the dwell timer
         return False
+
+    def _star_current(self):
+        """Bookmark the item on screen, if a starrer is wired and it has an id."""
+        item = self._playlist.current()
+        if self._on_star is not None and item is not None and len(item) > 2:
+            self._on_star(item[2])
 
     def _open_current(self):
         """Enter: leave the slideshow and hand its item to the gallery, which
@@ -365,7 +405,7 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
-            self._hold_current()    # hold on the current item, and enhance it
+            self._hold_current()    # hold it, star it, and enhance it
         elif key == Qt.Key.Key_E:
             self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):

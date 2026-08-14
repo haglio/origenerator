@@ -340,3 +340,76 @@ def test_the_enhancing_note_sits_above_the_counter_not_over_the_console(qtbot):
     assert note.top() > view.height() // 2      # bottom half, clear of the console
     assert note.bottom() <= counter.top()       # stacked with it, not over it
     assert abs(note.center().x() - view.width() // 2) <= 1
+# --- locking also stars, and a double-click leaves ---------------------------
+
+def test_locking_stars_the_item_on_screen(qtbot):
+    # Holding a slide is how the user says this one is worth keeping; having said
+    # it once they should not have to say it again in a second way.
+    starred = []
+    items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
+    view = _view(qtbot, items=items, on_star=starred.append)
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert view._playlist.locked
+    assert starred == ["gen-a"]
+
+
+def test_letting_go_of_the_lock_does_not_unstar(qtbot):
+    starred = []
+    items = [("a.png", "image", "gen-a", None)]
+    view = _view(qtbot, items=items, on_star=starred.append)
+
+    _press(view, Qt.Key.Key_Down)
+    _press(view, Qt.Key.Key_Down)
+
+    assert not view._playlist.locked
+    assert starred == ["gen-a"]  # starred once, on the way in
+
+
+def test_a_slideshow_without_a_starrer_still_locks(qtbot):
+    view = _view(qtbot)
+    _press(view, Qt.Key.Key_Down)
+    assert view._playlist.locked
+
+
+def test_double_clicking_leaves_the_slideshow(qtbot):
+    # The way out of every other fullscreen view here, and the way it used to work.
+    view = _view(qtbot)
+    view.show()
+    closed = []
+    view.closed = closed  # a marker; the real signal is the window closing
+    view._preview._on_double_click()
+    assert not view.isVisible()
+
+
+# --- an item still being made ------------------------------------------------
+
+def test_an_item_with_no_file_yet_says_it_is_being_made(qtbot):
+    view = _view(qtbot, items=[(None, "image", "gen-live", None)])
+    assert view._playlist.current()[2] == "gen-live"
+    assert view._preview.is_showing_video() is False
+
+
+def test_a_streamed_frame_lands_on_the_item_being_made(qtbot, tmp_path):
+    from PIL import Image
+    from io import BytesIO
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buffer, "PNG")
+    view = _view(qtbot, items=[(None, "image", "gen-live", None)])
+
+    view.show_live_frame("gen-live", buffer.getvalue())
+
+    assert view._preview._live_frame == buffer.getvalue()
+
+
+def test_a_frame_for_something_else_is_kept_but_not_shown(qtbot):
+    # It rides along for when the rotation reaches that item, without disturbing
+    # the one on screen.
+    view = _view(qtbot, items=[("a.png", "image", "gen-a", None),
+                               (None, "image", "gen-live", None)])
+
+    view.show_live_frame("gen-live", b"not-a-real-png")
+
+    assert view._frames["gen-live"] == b"not-a-real-png"

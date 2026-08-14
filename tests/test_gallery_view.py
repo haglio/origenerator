@@ -3664,6 +3664,8 @@ class _FakeLiveFullscreen(QWidget):
 
     closed = pyqtSignal()
     media_changed = pyqtSignal()
+    delete_requested = pyqtSignal(str)
+    star_requested = pyqtSignal(str)
 
     def __init__(self, media, *, frame=None, **kwargs):
         super().__init__()
@@ -5858,10 +5860,13 @@ class _FakeDriver:
 
 class _FakeFullscreen(QObject):
     """Stand-in for a FullscreenPreview: a settable drive target, a closed signal,
-    a media_changed signal (paging), and a recorded playlist arming. ``live`` makes
-    it one opened over a generation still in flight."""
+    a media_changed signal (paging), the curation signals its Up/Down keys emit,
+    and a recorded playlist arming. ``live`` makes it one opened over a generation
+    still in flight."""
     closed = pyqtSignal()
     media_changed = pyqtSignal()
+    delete_requested = pyqtSignal(str)
+    star_requested = pyqtSignal(str)
 
     def __init__(self, target, *, live=False):
         super().__init__()
@@ -6018,7 +6023,9 @@ def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeyp
     view._on_fullscreen_opened(fs)
 
     order = view._browser.visible_prompt_ids()
-    assert fs.playlist == [(f"{pid}.png", "image") for pid in order]
+    # Each entry carries its generation's id, so the view's Up and Down can name
+    # what to trash and what to bookmark.
+    assert fs.playlist == [(f"{pid}.png", "image", pid) for pid in order]
     assert fs.playlist_index == order.index("i2")  # opened on the shown item
 
 
@@ -6630,27 +6637,27 @@ def _queue_view(qtbot, client):
     return view
 
 
-def test_the_bar_names_another_apps_queue_before_generate_is_pressed(qtbot):
+def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
     # The reported bug: the queue read as free, then Generate reported six jobs
     # ahead of it out of nowhere. Polling the server's own queue is what lets the
-    # bar say so while nothing of ours is in flight at all.
+    # strip say so while nothing of ours is in flight at all.
     client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
     view = _queue_view(qtbot, client)
 
     view._poll()
 
-    assert view._running_bar._caption.text() == (
+    assert view._queue.running_preview()._caption.text() == (
         "3 jobs from another app are queued on ComfyUI")
-    assert not view._running_bar._clear.isHidden()
+    assert not view._queue._clear.isHidden()
 
 
-def test_a_queue_of_our_own_leaves_the_bar_as_it_was(qtbot):
+def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
     view = _queue_view(qtbot, _QueueClient())
 
     view._poll()
 
-    assert view._running_bar._caption.text() == ""
-    assert view._running_bar._clear.isHidden()
+    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue._clear.isHidden()
 
 
 def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
@@ -6662,13 +6669,13 @@ def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
 
     view = _queue_view(qtbot, _QueueClient(ForeignQueue(running=[], pending=["a"])))
     view._poll()
-    assert not view._running_bar._clear.isHidden()
+    assert not view._queue._clear.isHidden()
 
     view._client = Wedged()
     view._poll()
 
     assert view._foreign_queue.total == 0
-    assert view._running_bar._clear.isHidden()
+    assert view._queue._clear.isHidden()
 
 
 def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot):
@@ -6679,7 +6686,7 @@ def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot):
     view._poll()
     view._confirm_clear_queue = lambda total: True
 
-    view._running_bar._clear.click()
+    view._queue._clear.click()
 
     assert client.cleared == 1
 
@@ -6690,7 +6697,7 @@ def test_clearing_can_be_declined_at_the_prompt(qtbot):
     view._poll()
     view._confirm_clear_queue = lambda total: False  # user says no
 
-    view._running_bar._clear.click()
+    view._queue._clear.click()
 
     assert client.cleared == 0
 
@@ -6702,7 +6709,7 @@ def test_the_prompt_says_how_many_jobs_go(qtbot):
     asked = []
     view._confirm_clear_queue = lambda total: asked.append(total) or False
 
-    view._running_bar._clear.click()
+    view._queue._clear.click()
 
     assert asked == [3]
 
@@ -6719,7 +6726,7 @@ def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, monkeypatch):
         lambda *a, **k: warned.append(a),
     )
 
-    view._running_bar._clear.click()  # must not raise
+    view._queue._clear.click()  # must not raise
 
     assert warned
 
@@ -6731,10 +6738,11 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     view._confirm_clear_queue = lambda total: True
 
     client._foreign = ForeignQueue(running=[], pending=[])  # the clear empties it
-    view._running_bar._clear.click()
+    view._queue._clear.click()
 
-    assert view._running_bar._caption.text() == ""
-    assert view._running_bar._clear.isHidden()
+    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue._clear.isHidden()
+
 
 def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_path):
     # A folder generating with the Auto switch on has to read honestly: the base
@@ -6851,3 +6859,49 @@ def test_the_fullscreen_view_is_armed_with_each_images_versions(qtbot, tmp_path)
     hook, ids = fs.enhance_hook
     assert hook == view._enhance_from_slideshow
     assert set(ids.values()) == {"g0"}
+
+
+def test_watching_a_generation_fullscreen_still_pages_its_folder(qtbot, monkeypatch):
+    # A view opened over something still being made has no place among the
+    # folder's files — but the folder is still what it was opened from, so its
+    # arrows page it rather than doing nothing at all.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(
+        gallery, "resolve_preview",
+        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"),
+    )
+    view.refresh()
+    _open_leaf(view)
+    fs = _FakeFullscreen(None, live=True)
+
+    view._on_fullscreen_opened(fs)
+
+    assert [entry[2] for entry in fs.playlist] == view._browser.visible_prompt_ids()
+    assert fs.playlist_index == 0
+
+
+def test_a_slideshow_opens_on_a_folder_whose_only_item_is_still_cooking(qtbot):
+    # It used to refuse: the one row had no file, so the playlist came back empty
+    # and the button did nothing. A folder being filled is still worth watching.
+    db = FakeDB([_running_row("cooking", prompt="a cat")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    rows = view._db.list_generations()
+
+    items = view._slideshow_items(rows)
+
+    assert [item[2] for item in items] == ["cooking"]
+    assert items[0][0] is None  # no file behind it yet
+
+
+def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
+    db = FakeDB([_row("gone", "sdxl_t2i", {"positive_prompt": "a cat"}, "gone.png",
+                      output_files="[]")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._slideshow_items(view._db.list_generations()) == []

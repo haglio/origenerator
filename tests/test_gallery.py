@@ -1196,7 +1196,7 @@ def test_recent_generations_keeps_the_callers_newest_first_order():
     # Rows arrive newest-first (the DB lists by descending id); the shelf keeps
     # that order and doesn't re-sort.
     rows = [_img("i3", "c", 50, 3), _img("i2", "b", 50, 2), _img("i1", "a", 50, 1)]
-    assert [r["prompt_id"] for r in recent_generations(rows, 10)] == ["i3", "i2", "i1"]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
 
 
 def test_recent_generations_excludes_imported_files():
@@ -1205,7 +1205,7 @@ def test_recent_generations_excludes_imported_files():
     generated = _img("gen", "a cat", 50, 1)
     imported = _row(prompt_id="imp", source="imported",
                     output_files=json.dumps([{"filename": "imp.png"}]))
-    assert [r["prompt_id"] for r in recent_generations([imported, generated], 10)] == ["gen"]
+    assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["gen"]
 
 
 def test_recent_generations_excludes_rows_that_produced_no_output():
@@ -1213,26 +1213,28 @@ def test_recent_generations_excludes_rows_that_produced_no_output():
     # to show and stays off the shelf.
     done = _img("done", "a cat", 50, 1)
     pending = _row(prompt_id="wip", output_files=None)
-    assert [r["prompt_id"] for r in recent_generations([done, pending], 10)] == ["done"]
+    assert [r["prompt_id"] for r in recent_generations([done, pending])] == ["done"]
 
 
-def test_recent_generations_caps_at_the_limit():
-    rows = [_img(f"i{n}", "a cat", 50, n) for n in range(5)]
-    assert [r["prompt_id"] for r in recent_generations(rows, 3)] == ["i0", "i1", "i2"]
+def test_recent_generations_is_uncapped():
+    # The shelf keeps going as far back as the user has generated — nothing is
+    # trimmed off the end here; the pane draws it a page at a time as it scrolls.
+    rows = [_img(f"i{n}", "a cat", 50, n) for n in range(200)]
+    assert len(recent_generations(rows)) == 200
 
 
 def test_recent_generations_filters_to_the_selected_media_types():
     # The shelf's media-type checkboxes narrow it: with only "video" selected the
     # images drop out, and with only "image" the videos do.
     rows = [_i2v("v2", "styleA", seed=2), _img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
-    assert [r["prompt_id"] for r in recent_generations(rows, 10, {"video"})] == ["v2", "v1"]
-    assert [r["prompt_id"] for r in recent_generations(rows, 10, {"image"})] == ["i1"]
+    assert [r["prompt_id"] for r in recent_generations(rows, {"video"})] == ["v2", "v1"]
+    assert [r["prompt_id"] for r in recent_generations(rows, {"image"})] == ["i1"]
 
 
 def test_recent_generations_defaults_to_every_media_type():
     # No filter argument keeps both, unchanged from the pre-filter behavior.
     rows = [_i2v("v1", "styleA", seed=1), _img("i1", "a cat", 50, 1)]
-    assert [r["prompt_id"] for r in recent_generations(rows, 10)] == ["v1", "i1"]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["v1", "i1"]
 
 
 def test_starred_generations_collects_starred_items_newest_first():
@@ -1255,18 +1257,17 @@ def test_starred_generations_excludes_rows_with_no_output():
     assert starred_generations([starred_wip]) == []
 
 
-def test_recent_generations_filters_before_applying_the_limit():
-    # The limit counts survivors of the filter, so selecting one type yields up to
-    # `limit` of it — not "that type among the newest `limit` rows". Here the only
-    # video is the last row; a limit-then-filter order would drop it, keeping none.
+def test_recent_generations_reaches_a_lone_old_match_of_the_selected_type():
+    # A type the user has barely made is still listed however far back it sits:
+    # nothing trims the list, so the one video under five images still surfaces.
     rows = [_img(f"i{n}", "a cat", 50, n) for n in range(5)] + [_i2v("v1", "styleA", seed=9)]
-    assert [r["prompt_id"] for r in recent_generations(rows, 3, {"video"})] == ["v1"]
+    assert [r["prompt_id"] for r in recent_generations(rows, {"video"})] == ["v1"]
 
 
 def test_recent_generations_with_no_media_types_selected_is_empty():
     # Unchecking both boxes selects nothing, so the shelf clears.
     rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
-    assert recent_generations(rows, 10, set()) == []
+    assert recent_generations(rows, set()) == []
 
 
 def test_child_groups_and_rows_under_walk_the_tree():

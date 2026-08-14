@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
 from origenerator import gallery
 from origenerator.gui import icons
@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
 _STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shelf
+# The Recents shelf lists every generation ever made, so it draws a page of tiles
+# at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
+# end — far enough ahead (three tile rows) that the next page is there before the
+# user arrives at it, rather than after a visible stop.
+_RECENTS_PAGE = 50
+_RECENTS_REACH = 600
 
 
 def _unique_rows(rows) -> list[dict]:
@@ -66,7 +72,9 @@ class BrowserPane:
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
-        self._recent_rows: list[dict] = []  # recently generated rows, newest first
+        self._recent_rows: list[dict] = []  # every generated row, newest first
+        self._recents_flow = None           # the open shelf's layout, to grow into
+        self._recents_drawn = 0             # finished items it has drawn so far
         self._starred_groups: list = []     # folders the Starred shelf collects
         self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
@@ -80,9 +88,14 @@ class BrowserPane:
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
-        shelf is open, redraw it — the media-type filter changing between rebuilds."""
+        shelf is open, redraw it — the media-type filter changing between rebuilds.
+
+        A new filter is a new listing, so the shelf reopens on its first page at the
+        top rather than holding the pages and offset the old listing was read at."""
         self._recent_rows = recent_rows
         if self.showing_recents():
+            self._recents_flow = None  # a fresh listing, not a redraw to be preserved
+            self._recents_drawn = 0
             self._render_recents()
 
     # --- folder-tile overview ----------------------------------------------
@@ -94,6 +107,7 @@ class BrowserPane:
         """Clear the pane to nothing on screen — no folder selected."""
         self._visible_ids = []
         self._visible_keys = []
+        self._forget_recents_paging()
         self.show_widget(QWidget())
 
     def _new_tile_pane(self):
@@ -104,7 +118,16 @@ class BrowserPane:
         self._v._reroll_tile = None  # re-created below only when this folder re-rolls
         self._visible_ids = []
         self._visible_keys = []
+        self._forget_recents_paging()
         return container, flow
+
+    def _forget_recents_paging(self):
+        """Drop the Recents shelf's paging state, because the pane it was drawn in
+        is being replaced. :meth:`_render_recents` re-establishes it for the new
+        one; anything else leaves it cleared, so a scroll of some *other* pane
+        can't grow tiles into a layout that is no longer on screen."""
+        self._recents_flow = None
+        self._recents_drawn = 0
 
     def _add_folder_tile(self, flow, group, *, starred, context=""):
         """Build one folder tile, wire its click/context signals, and track it."""
@@ -143,9 +166,18 @@ class BrowserPane:
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails; a hint when the media-type filter leaves
-        neither. Both the cards and the thumbnails obey that filter."""
-        container, flow = self._new_tile_pane()
+        then the finished thumbnails a page at a time; a hint when the media-type
+        filter leaves neither. Both the cards and the thumbnails obey that filter.
+
+        The shelf has no end — it lists every generation ever made — so it opens on
+        one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
+        a shelf already on screen (a landing generation rebuilds the gallery under
+        it) keeps the pages that were open, at the offset they were being read at,
+        rather than snapping the user back up to the newest item.
+        """
+        drawn = self._recents_drawn
+        offset = self._scroll_bar().value() if self._recents_flow is not None else 0
+        container, flow = self._new_tile_pane()  # which clears both of those
         items = self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
@@ -156,11 +188,58 @@ class BrowserPane:
             flow.addWidget(card)
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item
-        for row in self._recent_rows:
-            self._add_shelf_thumbnail(flow, row)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        self.show_widget(container if (items or self._recent_rows)
-                         else self._empty_state(self._recents_empty_hint()))
+        if not (items or self._recent_rows):
+            self.show_widget(self._empty_state(self._recents_empty_hint()))
+            return
+        self._recents_flow = flow
+        self._draw_recents_page(max(_RECENTS_PAGE, drawn))
+        self.show_widget(container)
+        self._restore_scroll(offset)  # a no-op at 0: a shelf opened fresh starts on top
+
+    def _draw_recents_page(self, count: int):
+        """Add up to ``count`` more finished items to the open shelf, picking up
+        where the last page left off. Short (or empty) at the end of the list."""
+        page = self._recent_rows[self._recents_drawn:self._recents_drawn + count]
+        for row in page:
+            self._add_shelf_thumbnail(self._recents_flow, row)
+        self._recents_drawn += len(page)
+
+    def grow_recents(self, *_):
+        """Draw the next page once the shelf is scrolled near its end — what makes
+        Recents keep going instead of stopping at a fixed count.
+
+        Wired to the browser scroll bar's value *and* its range: the value for the
+        scrolling itself, the range because a pane only gets its real one once the
+        page just drawn has been laid out, which is when a shelf redrawn back at
+        the offset it was being read at finds itself already near the end. A range
+        of zero is that not-yet-laid-out pane rather than a shelf scrolled to its
+        bottom, so it waits rather than drawing pages nobody has scrolled to.
+        """
+        if self._recents_flow is None or self._recents_drawn >= len(self._recent_rows):
+            return
+        bar = self._scroll_bar()
+        if bar.maximum() and bar.value() >= bar.maximum() - _RECENTS_REACH:
+            self._draw_recents_page(_RECENTS_PAGE)
+
+    def _scroll_bar(self):
+        """The browser pane's vertical scroll bar: what the shelf grows off, and
+        what a redraw puts back where the user was reading."""
+        return self._v._scroll.verticalScrollBar()
+
+    def _restore_scroll(self, offset: int):
+        """Scroll the freshly drawn shelf back to ``offset``. The new pane hasn't
+        been laid out yet, so the bar may have no range to move within — hence the
+        second attempt once this turn's layout has run."""
+        if not offset:
+            return
+        self._scroll_bar().setValue(offset)
+        if self._scroll_bar().value() != offset:
+            QTimer.singleShot(0, lambda: self._reapply_scroll(offset))
+
+    def _reapply_scroll(self, offset: int):
+        if self.showing_recents():  # unless the user has since navigated off it
+            self._scroll_bar().setValue(offset)
 
     def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
         """Build one finished-item tile for a shelf (Recents/Starred/Experiments):

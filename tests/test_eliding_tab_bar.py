@@ -62,3 +62,23 @@ def test_tabs_collapse_further_as_more_open(qtbot):
     roomy = _tabs_with(qtbot, n=8, width=600)
     crowded = _tabs_with(qtbot, n=20, width=600)
     assert crowded.tabBar().tabRect(0).width() < roomy.tabBar().tabRect(0).width()
+
+
+def test_the_row_keeps_its_height_when_the_last_tab_closes(qtbot):
+    # Qt sizes a tab widget's corner buttons to the bar, and a stock empty bar is
+    # zero pixels tall — which took the "+" off screen with the last tab and made
+    # an emptied pane a dead end. The row holds the height it had.
+    tabs = _tabs_with(qtbot, n=2)
+    full = tabs.tabBar().sizeHint().height()
+    assert full > 0
+    tabs.removeTab(0)
+    tabs.removeTab(0)
+    assert tabs.tabBar().count() == 0
+    assert tabs.tabBar().sizeHint().height() == full
+
+
+def test_a_bar_that_never_held_a_tab_asks_for_no_row(qtbot):
+    # Nothing to reserve a row for until a tab has shown what one measures.
+    bar = ElidingTabBar()
+    qtbot.addWidget(bar)
+    assert bar.sizeHint().height() == 0

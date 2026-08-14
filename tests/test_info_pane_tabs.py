@@ -219,6 +219,24 @@ def test_close_all_leaves_the_add_button_usable(tabs):
     assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
 
 
+def test_the_add_button_is_still_on_screen_with_no_tabs_left(tabs):
+    # It isn't enough that "+" still works when clicked in a test: Qt sizes the
+    # corner to the tab bar, so an emptied pane used to flatten both buttons to
+    # zero pixels and leave nothing to click at all.
+    from PyQt6.QtWidgets import QApplication
+
+    tabs.resize(900, 300)
+    tabs.show()
+    QApplication.processEvents()
+    standing = tabs._add_btn.height()
+
+    tabs.close_all_subtabs()
+    QApplication.processEvents()
+
+    assert tabs._add_btn.height() == standing
+    assert tabs._close_all_btn.height() == standing
+
+
 def test_the_add_button_keeps_the_far_right_corner(tabs):
     # Close-all sits to the LEFT of "+", so the button the user clicks constantly
     # stays where it has always been and a miss doesn't empty the pane.

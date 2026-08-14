@@ -30,7 +30,7 @@ import time
 
 from PyQt6.QtWidgets import (
     QTabWidget, QToolButton, QInputDialog, QApplication, QWidget, QHBoxLayout,
-    QStyle,
+    QStyle, QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
@@ -62,11 +62,9 @@ class InfoPaneTabs(QTabWidget):
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self._close_subtab)
         self.tabBarDoubleClicked.connect(self._rename_subtab)
-        self._add_btn = QToolButton()
-        self._add_btn.setText("+")
-        self._add_btn.setToolTip("New configuration")
+        self._add_btn = self._tab_row_button("+", "New configuration")
         self._add_btn.clicked.connect(lambda: self._add_subtab())
-        self._close_all_btn = QToolButton()
+        self._close_all_btn = self._tab_row_button("All", "Close all configurations")
         # The tabs' own close mark, at the tabs' own size, rather than a ✕ typed
         # into the label: one control that closes tabs, spelled one way.
         indicator = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
@@ -75,29 +73,74 @@ class InfoPaneTabs(QTabWidget):
         self._close_all_btn.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
-        self._close_all_btn.setText("All")
-        self._close_all_btn.setToolTip("Close all configurations")
         self._close_all_btn.clicked.connect(self.close_all_subtabs)
-        # A corner holds one widget, so both buttons share a row there. Close-all
-        # goes to the LEFT of "+", which keeps "+" on the exact far-right pixel it
-        # has always occupied, and the gap between them means a miss on the "+" a
-        # user clicks constantly doesn't empty the pane instead.
-        # The icon makes close-all the taller button, so "+" is matched to it —
-        # two heights in a two-button row is the mismatch this pairing ends.
-        self._add_btn.setFixedHeight(self._close_all_btn.sizeHint().height())
-        self._corner = QWidget()
+        # Both buttons share a row that stands in the tab strip, immediately after
+        # the last tab — where a browser's new-tab button stands — rather than
+        # marooned at the far right with a gap of nothing between (see
+        # :meth:`_place_tab_row_buttons`). Close-all goes to the LEFT of "+", so
+        # the gap between them means a miss on the "+" a user clicks constantly
+        # doesn't empty the pane instead.
+        self._corner = QWidget(self)
         corner_row = QHBoxLayout(self._corner)
         corner_row.setContentsMargins(0, 0, 0, 0)
+        # A gap of bare strip between them: both are flat and share the row's
+        # background, so the seam is invisible but unclickable — a miss on the "+"
+        # a user hits constantly lands on nothing rather than emptying the pane.
         corner_row.setSpacing(8)
         corner_row.addWidget(self._close_all_btn)
         corner_row.addWidget(self._add_btn)
         self._corner.setVisible(client is not None)  # nothing to run without a client
-        self.setCornerWidget(self._corner, Qt.Corner.TopRightCorner)
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
         self._add_subtab()  # start with one editable tab
+
+    # --- the two buttons standing in the tab row ----------------------------
+
+    def _tab_row_button(self, text: str, tooltip: str) -> QToolButton:
+        """A button that belongs to the tab strip: flat, tab-coloured, tab-tall.
+
+        Styled as ``#tabBarButton`` (see :func:`build_stylesheet`) so it reads as
+        part of the row rather than a little toolbar bolted onto it.
+        """
+        button = QToolButton()
+        button.setObjectName("tabBarButton")
+        button.setText(text)
+        button.setToolTip(tooltip)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Fill the row's height rather than sit centred in it: a tab runs the full
+        # height of the strip, and these stand alongside tabs.
+        button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        return button
+
+    def _place_tab_row_buttons(self):
+        """Stand the buttons in the tab row, immediately right of the last tab.
+
+        A QTabWidget corner widget is pinned to an edge, so the buttons would sit
+        at the far right with a gap of nothing between them and the tabs — and Qt
+        centres it in a row it may be taller than, which left them hanging below
+        the strip into the pane underneath. Placed by hand instead: exactly the
+        row's height, right where the tabs end. The bar is capped so a crowded row
+        can never slide its tabs beneath them.
+        """
+        bar = self.tabBar()
+        # A read-only gallery hides them, and reserving a strip of row for buttons
+        # that aren't there would just narrow the tabs for nothing.
+        width = self._corner.sizeHint().width() if not self._corner.isHidden() else 0
+        room = max(0, self.width() - width)
+        bar.setMaximumWidth(room)
+        self._corner.setGeometry(min(bar.sizeHint().width(), room), 0,
+                                 width, bar.sizeHint().height())
+        self._corner.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._place_tab_row_buttons()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._place_tab_row_buttons()
 
     # --- config tabs -------------------------------------------------------
 
@@ -133,6 +176,7 @@ class InfoPaneTabs(QTabWidget):
         index = self.indexOf(panel)
         if index >= 0:
             self.setTabText(index, text)
+            self._place_tab_row_buttons()  # a retitled tab is a differently wide one
 
     def _closed_within_double_click(self) -> bool:
         """Was a config tab closed within one double-click of now?
@@ -188,10 +232,12 @@ class InfoPaneTabs(QTabWidget):
     def tabInserted(self, index: int):  # Qt hook: every add path lands here
         super().tabInserted(index)
         self._sync_close_all()
+        self._place_tab_row_buttons()  # the row just got wider
 
     def tabRemoved(self, index: int):  # Qt hook: every close path lands here
         super().tabRemoved(index)
         self._sync_close_all()
+        self._place_tab_row_buttons()  # ...and narrower
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""

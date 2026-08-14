@@ -14,6 +14,17 @@ def test_stylesheet_styles_the_subtab_add_button():
     assert "QToolButton" in build_stylesheet()
 
 
+def test_the_tab_row_buttons_are_styled_as_tabs_not_as_buttons():
+    # "✕ All" and "+" stand in the tab row beside the tabs, so they take the tabs'
+    # own flat look — the raised, rounded, bordered QToolButton default read as a
+    # separate little toolbar bolted onto the strip.
+    qss = build_stylesheet()
+    rule = qss.split("QToolButton#tabBarButton {", 1)[1].split("}", 1)[0]
+    assert "border: none" in rule
+    assert "border-radius: 0" in rule
+    assert "QToolButton#tabBarButton:hover" in qss
+
+
 def test_stylesheet_greys_disabled_buttons():
     # Without an explicit :disabled rule a styled QPushButton ignores Qt's
     # disabled palette and never looks greyed out.

@@ -17,8 +17,10 @@ streamed frames the way the in-flight cards do everywhere else — so the level
 being made appears where the levels are, rather than the strip sitting unchanged
 until the fold lands.
 
-Hidden entirely for an image with nothing but its original and nothing running —
-the strip appears when there is actually something to look at.
+Every image the green badge marks shows this strip, down to one that kept no
+original and so lists a single enhancement: the badge says an enhancement
+happened, and this is where you find out which. Hidden only for an image that
+has received none, with none running.
 """
 
 import json
@@ -205,8 +207,10 @@ class EnhanceVersions(QWidget):
         """Rebuild the strip from ``(level, image_path)`` pairs, leading with the
         enhancement in flight when ``pending`` is a ``(status, frame)`` pair.
 
-        Hidden when there is neither: an image with only its original, and
-        nothing being made for it, has nothing to show here.
+        Hidden when there is neither — an image that has received no enhancement
+        and has none being made for it has nothing to show here. A single level
+        is enough to show: an image enhanced without an original kept still has
+        one enhancement worth naming and reusing.
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
         # related-media strips use, so no tile outlives the row it described.
@@ -226,7 +230,7 @@ class EnhanceVersions(QWidget):
             tile.clicked.connect(self.level_selected)
             flow.addWidget(tile)
         self._box.addWidget(self._host)
-        self.setVisible(len(items) > 1 or pending is not None)
+        self.setVisible(bool(items) or pending is not None)
 
     def update_pending(self, pending: tuple | None) -> bool:
         """Feed a new frame to the tile already standing, without rebuilding.

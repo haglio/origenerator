@@ -28,7 +28,11 @@ def _panel(qtbot):
 
 def _levels(count, params=None):
     """``count`` enhancements over an original, newest first — the shape
-    :func:`~origenerator.gallery.enhance.enhance_levels` produces."""
+    :func:`~origenerator.gallery.enhance.enhance_levels` produces. ``0`` is an
+    image that has received none, which lists nothing at all (not even its own
+    file: with no enhancement there is no version to compare)."""
+    if not count:
+        return []
     return [
         EnhanceLevel(i, f"Enhance {i}", {"filename": f"e{i}.png", "subfolder": "image"},
                      dict(params or {}))
@@ -157,7 +161,20 @@ def test_an_unenhanced_image_shows_no_version_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(0)))
-    assert versions.isHidden()      # nothing to choose between
+    assert versions.isHidden()      # no enhancement, nothing to say
+
+
+def test_a_lone_enhancement_is_still_worth_showing(qtbot):
+    # An image the inline tail finished kept no original, so it has exactly one
+    # level. The badge says it was enhanced; this is where you see how.
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items([
+        EnhanceLevel(1, "Enhance 1", {"filename": "img.png"},
+                     {"enhance_scale": 2.0, "enhance_steps": 20}),
+    ]))
+    assert not versions.isHidden()
+    assert len(_tiles(versions)) == 1
 
 
 def test_levels_are_shown_newest_first(qtbot):

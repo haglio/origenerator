@@ -182,40 +182,62 @@ def original_files_of(row: dict) -> list[dict]:
 
 
 def enhance_levels(row: dict) -> list[EnhanceLevel]:
-    """Every version this image holds, most-enhanced first, or ``[]`` when it
-    has received no enhancement at all.
+    """The enhancement(s) this image has received, newest first, with its
+    pre-enhance original last when it kept one. ``[]`` for an unenhanced image.
 
-    Whatever sits ahead of the originals (:func:`original_files_of`) is exactly
-    the enhancements, newest first — each fold prepends the file it produced.
-    Pairing them with the settings that made them and numbering them is what the
-    info pane's version list shows. A folded enhance recorded its own settings
-    (``enhance_history``); an inline one is described by the row's own params,
-    which are the very knobs its tail ran at.
+    Every image the green badge marks lists here, because the badge and this
+    answer the same question — what enhancement did this receive? Two shapes:
+
+    * it kept an original (:func:`original_files_of`), so whatever sits ahead of
+      that is the enhancements, newest first — each fold prepends the file it
+      produced — and the original closes the list as level 0;
+    * it kept none, which is every image the inline tail finished before the
+      enhancement became a layer. There is one file and no "before" to compare
+      it against, so the list is that single enhancement.
+
+    Each level names the settings that made it: a folded enhance recorded its
+    own (``enhance_history``), an inline one is described by the row's params,
+    which are the very knobs its tail ran at. That is what makes a level worth
+    dragging onto the Enhance panel even when it stands alone.
     """
-    originals = original_files_of(row)
     files = row_output_files(row)
-    if not originals or len(files) <= len(originals):
+    if not files:
         return []
     history = {
         entry.get("filename"): entry
         for entry in parse_file_list(row.get("enhance_history"))
         if isinstance(entry, dict)
     }
-    inline = parse_params(row.get("params_json")) if row.get("original_files") is None else {}
-    enhanced = files[:len(files) - len(originals)]
-    levels = []
-    for position, f in enumerate(enhanced):
-        index = len(enhanced) - position  # the newest enhancement is the highest
+    # A row's own params describe its enhancement only when the tail ran inline;
+    # a folded standalone enhance ran at its own settings, which live in the
+    # history, and the source row's knobs would be a plausible-looking lie.
+    inline = {} if row.get("original_files") else {
+        k: v for k, v in parse_params(row.get("params_json")).items()
+        if k in ENHANCE_SETTING_KEYS
+    }
+
+    def level(index: int, f: dict) -> EnhanceLevel:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        levels.append(EnhanceLevel(
+        return EnhanceLevel(
             index, f"Enhance {index}", f,
             {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS},
-        ))
-    # The pre-enhance file, level 0 — the one a re-enhance runs from, and the
-    # one the list offers as "what this looked like before".
-    levels.append(EnhanceLevel(0, "Original", originals[0]))
-    return levels
+        )
+
+    originals = original_files_of(row)
+    if originals and len(files) > len(originals):
+        enhanced = files[:len(files) - len(originals)]
+        levels = [level(len(enhanced) - i, f) for i, f in enumerate(enhanced)]
+        # The pre-enhance file, level 0 — the one a re-enhance runs from, and
+        # the one the list offers as "what this looked like before".
+        levels.append(EnhanceLevel(0, "Original", originals[0]))
+        return levels
+    if is_enhanced_row(row):
+        # Enhanced with nothing kept behind it: the row's leading file IS the
+        # enhancement. Only that one — a batch's other files are its siblings,
+        # not versions of it.
+        return [level(1, files[0])]
+    return []
 
 
 def is_enhanced_row(row: dict) -> bool:

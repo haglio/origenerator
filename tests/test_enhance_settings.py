@@ -162,6 +162,36 @@ def test_an_unenhanced_image_has_no_levels():
     assert enhance_levels(_source_row()) == []
 
 
+def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
+    # Every image the green badge marks lists here — including the ones the
+    # inline tail finished, which kept no original. There is one file and no
+    # "before", so the list is that single enhancement, named by the knobs the
+    # tail ran at so it can still be dragged onto the panel and reused.
+    row = dict(_source_row(), params_json=json.dumps({
+        "positive_prompt": "a lantern on a jetty",
+        "enhance": True, "enhance_scale": 2.0, "enhance_steps": 20,
+        "enhance_denoise": 0.15,
+    }))
+    (level,) = enhance_levels(row)
+    assert level.label == "Enhance 1"
+    assert level.settings == "2x · 20 steps · 0.15 denoise"
+    assert level.file["filename"] == "sdxl_t2i_src.png"
+
+
+def test_a_batch_the_tail_finished_lists_one_level_not_one_per_file():
+    # A batch's files are siblings of each other, not versions of each other,
+    # however many the run saved.
+    row = dict(
+        _source_row(),
+        params_json=json.dumps({"enhance": True, "enhance_scale": 2.0}),
+        output_files=json.dumps([
+            {"filename": "sdxl_t2i_a.png", "subfolder": "image", "type": "output"},
+            {"filename": "sdxl_t2i_b.png", "subfolder": "image", "type": "output"},
+        ]),
+    )
+    assert [lvl.label for lvl in enhance_levels(row)] == ["Enhance 1"]
+
+
 def test_a_batch_of_several_files_is_not_mistaken_for_levels():
     # A batch generation saves several files from one run, and none of them is a
     # level of any other — only original_files says a row has been enhanced.

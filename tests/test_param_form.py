@@ -669,15 +669,15 @@ def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
     # Requirement: the form presents params in one fixed order regardless of the
     # order the workflow happens to declare them, so switching workflows never
     # reshuffles where a kind of setting sits.
-    defs = WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()
-    form = ParamForm(defs)
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    defs = wf.param_definitions()
+    form = ParamForm(defs, hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
-    assert _display_order(form) == sorted(
-        (d.key for d in defs), key=param_sections.key_rank
-    )
+    shown = [d.key for d in defs if d.key not in wf.enhance_keys()]
+    assert _display_order(form) == sorted(shown, key=param_sections.key_rank)
     # Not vacuous: sdxl declares model-before-seed and dims-before-sampling, which
     # the canonical order reshuffles — so the two orders genuinely differ.
-    assert _display_order(form) != [d.key for d in defs]
+    assert _display_order(form) != shown
 
 
 def test_shared_sections_appear_in_the_same_order_across_workflows(qtbot):
@@ -707,6 +707,33 @@ def test_passthrough_row_lands_in_its_section_at_the_canonical_position(qtbot):
     )
     assert form._present_keys["Sampling"] == ["steps", "cfg", "guidance"]
     assert form._present_keys["Model & LoRA"] == ["vae"]
+
+
+def test_hidden_params_get_no_field_and_no_read_only_row(qtbot):
+    # The enhance params are off this form on purpose — everything laid out here
+    # decides which gallery folder a run lands in, and an enhancement doesn't.
+    # "Hidden" therefore means gone, not demoted to a read-only row.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    qtbot.addWidget(form)
+    shown = set(_display_order(form))
+    assert shown.isdisjoint(set(wf.enhance_keys()))
+    assert "enhance" not in form._widgets
+
+
+def test_hidden_params_still_round_trip_so_an_old_run_reproduces(qtbot):
+    # A row recorded with the tail baked in must rebuild exactly that graph when
+    # it is reused, even though nothing on screen offers the toggle any more.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    qtbot.addWidget(form)
+    # A fresh form emits the workflow's own defaults for them.
+    assert form.get_values_static()["enhance"] is False
+
+    form.set_values(dict(wf.default_params(), enhance=True, enhance_steps=44))
+    values = form.get_values_static()
+    assert values["enhance"] is True
+    assert values["enhance_steps"] == 44
 
 
 def test_clearing_passthrough_restores_the_editable_only_order(qtbot):

@@ -39,10 +39,12 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     exists to preserve.
 
     Like sdxl_t2i, the render is optionally finished by the shared
-    upscale/enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`),
-    on by default via the ``enhance`` toggle. Its second sampling pass reuses
-    the ControlNet-applied conditioning, so the structure stays pinned while
-    the checkpoint sharpens and re-textures the enlarged image.
+    upscale/enhance tail (:meth:`WorkflowTemplate.enhance_image_nodes`) via the
+    ``enhance`` toggle — off by default, since enhancement is a layer the
+    gallery's Enhance subpanel applies per folder afterward. Its second
+    sampling pass reuses the ControlNet-applied conditioning, so the structure
+    stays pinned while the checkpoint sharpens and re-textures the enlarged
+    image.
     """
 
     name = "sdxl_pose_transfer"
@@ -75,7 +77,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "depth_model": "depth_anything_v2_vitl_fp32.safetensors",
             "pose_bbox_detector": "yolox_l.onnx",
             "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
-            "enhance": True,
+            "enhance": False,
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
@@ -114,7 +116,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             ParamDef("scheduler", "Scheduler", "combo", "normal",
                      options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", True),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
             ParamDef("upscale_model", "Upscale Model", "combo", defaults["upscale_model"],
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,

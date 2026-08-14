@@ -250,18 +250,18 @@ _ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
                              "flux_t2i_upscaled", "wan22_t2i")
 
 
-def test_image_workflows_expose_the_enhance_toggle():
-    # The tail is an option in the generation controls: a bool (checkbox) param
-    # on every image workflow. The SDXL pair keeps it on by default (their
-    # established behavior); flux and WAN t2i add it off, preserving theirs.
-    defaults = {"sdxl_t2i": True, "sdxl_pose_transfer": True,
-                "flux_t2i_upscaled": False, "wan22_t2i": False}
-    for name, default in defaults.items():
+def test_image_workflows_carry_the_enhance_toggle_off_by_default():
+    # The tail is still a bool param on every image workflow — an old run
+    # reproduces exactly what it recorded — but nothing turns it on by hand any
+    # more, and no form offers it. Enhancement is a layer the gallery applies
+    # afterward (its Enhance subpanel, per folder), which keeps the original and
+    # names every level; baking the tail in here would leave neither.
+    for name in _ENHANCE_TOGGLE_WORKFLOWS:
         wf = WORKFLOW_REGISTRY[name]
         toggle = {pd.key: pd for pd in wf.param_definitions()}["enhance"]
         assert toggle.type == "bool", name
-        assert toggle.default is default, name
-        assert wf.default_params()["enhance"] is default, name
+        assert toggle.default is False, name
+        assert wf.default_params()["enhance"] is False, name
 
 
 def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
@@ -441,7 +441,7 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
     # what keeps the enlargement naturalistic. SaveImage stores that result.
     for name in ("sdxl_t2i", "sdxl_pose_transfer"):
         wf = WORKFLOW_REGISTRY[name]
-        params = dict(wf.default_params(), seed=11, enhance_scale=2.0,
+        params = dict(wf.default_params(), seed=11, enhance=True, enhance_scale=2.0,
                       enhance_steps=17, enhance_denoise=0.35)
         payload = wf.build_api_payload(params)
 
@@ -1340,6 +1340,7 @@ def test_sdxl_pose_transfer_build_api_payload_structure():
         seed=77,
         controlnet_strength=0.65,
         controlnet_end=0.9,
+        enhance=True,  # this test also pins where the tail hangs off the decode
     )
     assert params["control_mode"] == "depth"  # the shipped default
     payload = wf.build_api_payload(params)

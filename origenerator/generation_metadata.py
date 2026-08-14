@@ -50,9 +50,15 @@ def _output_items(row: dict) -> list[MetaItem]:
     the image/ or video/ subfolder the displayed path carries) and reveals its
     absolute location under ComfyUI's output folder in the OS file manager.
 
-    An enhanced-in-place row lists its pre-enhance file(s) too — they stay in
-    ``output_files`` — labeled ``Original`` so the un-enhanced version is always
-    reachable from the image it upgraded into."""
+    An enhanced-in-place row lists every version it holds — they all stay in
+    ``output_files`` — labeled by level (``Enhance 2``, ``Enhance 1``,
+    ``Original``) and named with the settings that made each, so the un-enhanced
+    version is always reachable and one experiment can be told from another. A
+    row with no enhancement labels its file(s) plainly ``File``."""
+    enhanced = {
+        level.file.get("filename"): level
+        for level in gallery.enhance_levels(row) if level.index > 0
+    }
     originals = {
         f.get("filename")
         for f in gallery.parse_file_list(row.get("original_files"))
@@ -63,7 +69,11 @@ def _output_items(row: dict) -> list[MetaItem]:
         if not filename:
             continue
         full = COMFYUI_OUTPUT_DIR / (f.get("subfolder") or "") / filename
-        label = "Original" if filename in originals else "File"
+        level = enhanced.get(filename)
+        if level is not None:
+            label = f"{level.label} ({level.settings})" if level.settings else level.label
+        else:
+            label = "Original" if filename in originals else "File"
         items.append(MetaItem(label, _output_path(f), copy=filename, reveal=str(full)))
     return items
 

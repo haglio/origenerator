@@ -20,7 +20,11 @@ def _client():
 
 
 def _params():
-    return dict(SDXL.default_params())
+    # enhance on, so the payload carries the two-sampler shape these tests pin
+    # the whole-run step total against. Nothing turns it on by hand in the app
+    # any more (the gallery's Enhance subpanel applies enhancement as a layer),
+    # but a reused old run still rebuilds exactly this graph.
+    return dict(SDXL.default_params(), enhance=True)
 
 
 def _started_job(tmp_path):

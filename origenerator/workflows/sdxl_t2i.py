@@ -9,13 +9,20 @@ _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
 class SdxlT2iWorkflow(WorkflowTemplate):
     """SDXL text-to-image, optionally finished by an upscale/enhance pass.
 
-    The base render is the plain SDXL recipe. With the ``enhance`` toggle on
-    (its default here), its decode then runs the shared enhance tail
+    The base render is the plain SDXL recipe. With the ``enhance`` toggle on,
+    its decode then runs the shared enhance tail
     (:meth:`WorkflowTemplate.enhance_image_nodes`): a model upscale for
     sharpness, and a low-denoise second sampling pass in which the checkpoint
     re-imagines the enlarged pixels — real generated texture rather than
-    interpolation, which is what keeps the result naturalistic. Toggled off,
-    the graph ends at the plain decode, as it did before v003.
+    interpolation, which is what keeps the result naturalistic. Toggled off
+    (its default), the graph ends at the plain decode.
+
+    The toggle defaults off because enhancement is now a *layer* the gallery
+    applies afterward — its Enhance subpanel, per folder, with the original
+    kept and every level listed. Baking the tail in here would produce an
+    enhanced image with no original to compare against and no level to name.
+    The param stays (an old run reproduces exactly what it recorded), but
+    nothing sets it by hand any more.
     """
 
     name = "sdxl_t2i"
@@ -41,7 +48,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "denoise": 1.0,
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
-            "enhance": True,
+            "enhance": False,
             "upscale_model": _DEFAULT_UPSCALE_MODEL,
             "enhance_scale": 2.0,
             "enhance_steps": 20,
@@ -71,7 +78,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             ParamDef("scheduler", "Scheduler", "combo", "normal",
                      options=SCHEDULER_OPTIONS),
             ParamDef("denoise", "Denoise", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", True),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
             ParamDef("upscale_model", "Upscale Model", "combo", _DEFAULT_UPSCALE_MODEL,
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,

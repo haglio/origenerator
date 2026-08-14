@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS generations (
     -- it had before (the pre-enhance file, still on disk and listed among the
     -- current output_files). Presence marks the row enhanced-in-place.
     original_files  TEXT,
+    -- One entry per enhancement folded into this row, newest first: the file it
+    -- produced and the settings that produced it. What lets the info pane list
+    -- every level an image has received rather than just "enhanced".
+    enhance_history TEXT,
     thumbnail_path  TEXT,
     error_message   TEXT,
     -- The user's per-item bookmark: a starred image or video, independent of the
@@ -51,7 +55,11 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     -- A bookmark's identity: the tree tier it sits at and a member generation, so
     -- its key can be recomputed under any future key formula (see reconcile).
     level         TEXT,
-    ref_prompt_id TEXT
+    ref_prompt_id TEXT,
+    -- This folder's enhancement settings, as the Enhance subpanel left them:
+    -- ``{"auto": bool, "params": {...}}``. What Enhance All, a single enhance,
+    -- and the auto-enhance of newly generated members all run with.
+    enhance_json  TEXT
 );
 
 -- A folder the user composed by hand out of other folders (see
@@ -81,9 +89,9 @@ CREATE TABLE IF NOT EXISTS custom_folder_members (
 _GENERATION_COLUMNS = (
     "id", "prompt_id", "source", "workflow_name", "workflow_version", "status",
     "positive_prompt", "negative_prompt", "seed", "params_json", "workflow_json",
-    "output_files", "original_files", "thumbnail_path", "error_message", "starred",
-    "progress_json", "experiment_verdict", "duration_seconds", "created_at",
-    "completed_at", "evolver_exported_at",
+    "output_files", "original_files", "enhance_history", "thumbnail_path",
+    "error_message", "starred", "progress_json", "experiment_verdict",
+    "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
 )
 
 
@@ -121,11 +129,15 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN experiment_verdict TEXT")
         if "original_files" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN original_files TEXT")
+        if "enhance_history" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN enhance_history TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
         if "ref_prompt_id" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN ref_prompt_id TEXT")
+        if "enhance_json" not in folder_cols:
+            conn.execute("ALTER TABLE folder_meta ADD COLUMN enhance_json TEXT")
 
     @contextmanager
     def _connect(self):
@@ -172,8 +184,9 @@ class Database:
 
     def update_generation(self, prompt_id: str, **fields):
         allowed = {
-            "status", "output_files", "original_files", "thumbnail_path",
-            "error_message", "completed_at", "duration_seconds", "progress_json",
+            "status", "output_files", "original_files", "enhance_history",
+            "thumbnail_path", "error_message", "completed_at", "duration_seconds",
+            "progress_json",
         }
         to_set = {k: v for k, v in fields.items() if k in allowed}
         if not to_set:
@@ -355,16 +368,48 @@ class Database:
                 (folder_key, 1 if starred else 0),
             )
 
+    def folder_enhance_map(self) -> dict[str, str]:
+        """``{folder_key: enhance_json}`` for every folder that has settings.
+
+        Read whole rather than per folder because the gallery consults it on each
+        rebuild — once per open folder, and once per row an auto-enhance might
+        claim — and the table is small.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT folder_key, enhance_json FROM folder_meta"
+                " WHERE enhance_json IS NOT NULL"
+            ).fetchall()
+        return {r["folder_key"]: r["enhance_json"] for r in rows}
+
+    def set_folder_enhance(self, folder_key: str, enhance_json: str | None):
+        """Store (or clear, when ``None``) a folder's enhancement settings.
+
+        Deliberately its own column and its own writer: :meth:`upsert_folder_meta`
+        names only the bookmark columns, so the reconcile re-stamping a folder's
+        identity leaves these settings untouched.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO folder_meta (folder_key, enhance_json)
+                   VALUES (?, ?)
+                   ON CONFLICT(folder_key)
+                   DO UPDATE SET enhance_json = excluded.enhance_json""",
+                (folder_key, enhance_json),
+            )
+
     def folder_meta_full(self) -> list[dict]:
         """Every folder_meta row with its bookmark identity, for the reconcile.
 
         Unlike :meth:`folder_meta_map` (which the view uses for labels/stars), this
-        also carries ``level`` and ``ref_prompt_id`` so a stale key can be re-derived.
+        also carries ``level``, ``ref_prompt_id`` and the folder's enhancement
+        settings, so a stale key can be re-derived and everything hanging off it
+        moved across.
         """
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT folder_key, custom_name, starred, level, ref_prompt_id "
-                "FROM folder_meta"
+                "SELECT folder_key, custom_name, starred, level, ref_prompt_id, "
+                "enhance_json FROM folder_meta"
             ).fetchall()
         return [
             {
@@ -373,6 +418,7 @@ class Database:
                 "starred": bool(r["starred"]),
                 "level": r["level"],
                 "ref_prompt_id": r["ref_prompt_id"],
+                "enhance_json": r["enhance_json"],
             }
             for r in rows
         ]

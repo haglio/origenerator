@@ -30,6 +30,12 @@ class Section:
 # start open — the fields touched every run; the rest start collapsed so a fresh
 # form is compact, one click from any group. A param's section is fixed here, so
 # switching workflows never reshuffles where a given kind of setting appears.
+#
+# There is deliberately no Enhance section: everything in this form defines the
+# settings folder a run lands in, and an enhancement does not — it is a finish
+# applied to an image afterward, which the gallery's Enhance subpanel owns per
+# folder. The enhance params stay on their workflows (the tail still builds from
+# them) but the form hides them; see ParamForm's ``hidden_keys``.
 SECTIONS: tuple[Section, ...] = (
     Section("Prompts", ("positive_prompt", "negative_prompt", "input_image"),
             collapsed=False),
@@ -47,9 +53,6 @@ SECTIONS: tuple[Section, ...] = (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
         "shift", "shift_high", "shift_low", "denoise",
-    ), collapsed=True),
-    Section("Enhance", (
-        "enhance", "enhance_scale", "enhance_steps", "enhance_denoise",
     ), collapsed=True),
     Section("Stroke", (
         "stroke_hz", "stroke_x", "stroke_top", "stroke_bottom",

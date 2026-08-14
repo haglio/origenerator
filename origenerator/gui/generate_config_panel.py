@@ -13,11 +13,13 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
     animated_preview_path, build_image_config_index, config_tab_title,
-    find_source_image_id, media_type_of_row, resolve_preview, row_output_files,
-    rows_in_settings, settings_signature, videos_from_source_image,
+    enhance_levels, find_source_image_id, media_type_of_row, resolve_preview,
+    row_output_files, rows_in_settings, settings_signature,
+    videos_from_source_image,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.animated_strip import AnimatedVideoStrip
+from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
@@ -126,6 +128,14 @@ class GenerateConfigPanel(QWidget):
         body = QVBoxLayout(body_host)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(8)
+
+        # Every version an enhanced image holds, at the very top of the scroll:
+        # the preview opens on the most-enhanced one, and this is where the
+        # earlier levels (and the original) are, each naming what made it. Hides
+        # itself for an image with only its original, which is most of them.
+        self._versions = EnhanceVersions()
+        self._versions.level_selected.connect(self._show_level)
+        body.addWidget(self._versions)
 
         # The output file + when it was made, at the top of the scroll (shown only
         # while displaying a saved generation). Params — editable or read-only — all
@@ -275,7 +285,12 @@ class GenerateConfigPanel(QWidget):
             # Dimensions field. A manual-size workflow passes None and lays out its
             # own width/height as usual.
             deriver = wf.derived_display_size if wf.derives_size_from_input else None
-            self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver))
+            # The enhance params stay off the form: everything laid out here
+            # decides which gallery folder a run lands in, and an enhancement
+            # doesn't — the browser pane's Enhance subpanel owns it per folder.
+            # They still round-trip, so reusing an old run reproduces it exactly.
+            self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
+                                         hidden_keys=wf.enhance_keys()))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {
@@ -563,6 +578,7 @@ class GenerateConfigPanel(QWidget):
         the state of a blank tab, or one whose preview is a bare autoshow rather than
         an explicit selection."""
         self._metadata_block.hide()
+        self._versions.hide()
         self._source_tile.clear()
         self._animated_strip.hide()
         self._folder_btn.hide()
@@ -576,10 +592,31 @@ class GenerateConfigPanel(QWidget):
         on-disk lookup."""
         self._metadata_block.show_row(row)
         self._metadata_block.show()
+        # The preview is already on output_files[0] — the most-enhanced version —
+        # so the list opens with that level selected and offers the rest.
+        self._versions.show_levels(enhance_levels(row))
         self._folder_btn.show()  # any saved generation has a containing folder to open
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)
+
+    def _show_level(self, position: int):
+        """Put one of the displayed image's enhancement levels in the preview.
+
+        Only the picture changes: the row on display, its form, its metadata and
+        the OSR2 drive all still belong to the generation — the levels are
+        versions of one image, not separate generations, so switching between
+        them is a look rather than a navigation.
+        """
+        if self._displayed_row is None:
+            return
+        levels = enhance_levels(self._displayed_row)
+        if not 0 <= position < len(levels):
+            return
+        file = levels[position].file
+        path = COMFYUI_OUTPUT_DIR / (file.get("subfolder") or "") / (file.get("filename") or "")
+        if path.exists():
+            self._preview.show_media(path, "image")
 
     def _show_source_tile(self, row: dict, image_rows: list[dict]):
         """Reveal the source-image tile when this row is a video built on a known

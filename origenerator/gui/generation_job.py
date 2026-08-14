@@ -89,6 +89,10 @@ class GenerationJob(QObject):
         self.source = source
         self.payload = workflow.build_api_payload(self.params)
         self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key
+        # Which run this job belongs to. Its own prompt normally — but a chained
+        # i2v is two prompts that are one run to whoever asked for it, so the
+        # second stage is given the first's id (see RerollController._launch).
+        self.origin = self.prompt_id
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir
         self._state = "idle"  # idle -> queued -> running -> finished/failed/canceled

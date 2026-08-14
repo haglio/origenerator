@@ -81,31 +81,74 @@ class RerollController(QObject):
         super().__init__(parent)
         self._db = db
         self._client = client
-        self._jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
+        self._jobs: dict[str, list[GenerationJob]] = {}  # folder key -> its live jobs
         self._progress_persist_at: dict[str, float] = {}  # prompt_id -> last-write time
         self._queue_order: list[str] = []  # prompt ids as ComfyUI last listed them
 
     @property
     def jobs(self) -> dict:
-        """The live re-roll jobs, keyed by settings-folder key (read-only view)."""
-        return self._jobs
+        """The folder-facing view: each folder's *leading* live job, by folder key.
+
+        A folder can have several queued at once, but the things keyed by folder —
+        its one live re-roll tile, the selection that follows it — show the one in
+        front. Use :attr:`all_jobs` for everything actually in flight.
+        """
+        return {key: jobs[0] for key, jobs in self._jobs.items() if jobs}
+
+    @property
+    def all_jobs(self) -> list:
+        """Every live job, across every folder."""
+        return [job for jobs in self._jobs.values() for job in jobs]
+
+    @property
+    def jobs_by_folder(self) -> dict:
+        """Every live job, grouped by the folder it will land in (read-only view)."""
+        return {key: list(jobs) for key, jobs in self._jobs.items()}
 
     def job_for(self, key: str):
-        """The live re-roll job for a folder, or ``None``."""
-        return self._jobs.get(key)
+        """The live job leading a folder's queue, or ``None``."""
+        jobs = self._jobs.get(key)
+        return jobs[0] if jobs else None
+
+    def newest_job_for(self, key: str):
+        """The job most recently launched into a folder, or ``None``.
+
+        What a caller that has just launched asks for: :meth:`job_for` would hand
+        back whatever was already queued in front of it.
+        """
+        jobs = self._jobs.get(key)
+        return jobs[-1] if jobs else None
+
+    def job_for_prompt(self, prompt_id: str | None):
+        """The live job with this prompt id, or ``None`` — it may have finished."""
+        return next((j for j in self.all_jobs if j.prompt_id == prompt_id), None)
+
+    def job_for_origin(self, origin: str | None):
+        """The live job of the run that began at ``origin``, or ``None``.
+
+        A chained i2v re-roll is two prompts — the frame, then the video on it —
+        but one run as far as whoever launched it is concerned, so both carry the
+        id of the first. That is what lets a config tab keep showing progress for
+        its own Generate across the hand-off (see :meth:`_on_image_finished`).
+        """
+        if origin is None:
+            return None
+        return next((j for j in self.all_jobs if j.origin == origin), None)
 
     def has(self, key: str) -> bool:
-        return key in self._jobs
+        return bool(self._jobs.get(key))
 
     def _launchable(self, key: str, source: str = "generated") -> bool:
-        """Whether a launch may claim ``key``. An idle folder always may. A
-        folder whose live job is a background experiment may be claimed by user
-        work — :meth:`_launch` preempts the experiment — but never by another
-        experiment, and a folder running user work is claimed by no one."""
-        job = self._jobs.get(key)
-        if job is None:
-            return True
-        return source != "experiment" and job.source == "experiment"
+        """Whether a launch may join ``key``.
+
+        User work always may, even into a folder already generating: ComfyUI runs
+        one prompt at a time and the bottom strip shows the line, so a second
+        Generate of the same settings queues behind the first instead of being
+        silently refused — which is what blocked two pictures of one recipe from
+        being re-rolled together. A background experiment still takes only an idle
+        folder, and never stacks; user work preempts one in :meth:`_launch`.
+        """
+        return source != "experiment" or not self._jobs.get(key)
 
     def start_prepared(self, key: str, workflow, params: dict, *,
                        source: str = "generated") -> bool:
@@ -115,13 +158,13 @@ class RerollController(QObject):
         and no seed is re-rolled. This is the gallery's image+video combine (which
         reuses the recipe video's exact seed) and the background experimenter,
         which tags its rows with ``source="experiment"``. Returns ``True`` once
-        the job is tracked; ``False`` when there's no client, a job for ``key`` is
-        already running, or the submit failed (``_launch`` drops the job then).
+        the job is tracked; ``False`` when there's no client, an experiment already
+        holds ``key``, or the submit failed (``_launch`` drops the job then).
         """
         if self._client is None or not self._launchable(key, source):
             return False
         self._launch(key, workflow, params, self._on_finished, source=source)
-        return key in self._jobs
+        return self.has(key)
 
     def start_reroll_from_image(self, key: str, image_row: dict, image_workflow,
                                 video_workflow, video_params: dict) -> bool:
@@ -132,8 +175,7 @@ class RerollController(QObject):
         is the dropped image itself, so — unlike :meth:`reroll_image_seed` — the
         image row is handed in directly rather than looked up from a video's input.
         The caller owns ``video_params`` (already seed-kept or re-rolled to taste).
-        Returns ``True`` once the chained job is tracked; ``False`` with no client
-        or a job for ``key`` already running.
+        Returns ``True`` once the chained job is tracked; ``False`` with no client.
         """
         if self._client is None or not self._launchable(key):
             return False
@@ -143,7 +185,7 @@ class RerollController(QObject):
                 k, job, files, thumb, dur, video_workflow, video_params
             ),
         )
-        return key in self._jobs
+        return self.has(key)
 
     def start(self, key: str, group, image_rows: list[dict]):
         """Launch a fresh variation of the settings folder ``key`` names — both
@@ -218,9 +260,14 @@ class RerollController(QObject):
         workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
         return (source, workflow) if workflow is not None else None
 
-    def _launch(self, key, workflow, params, on_finished, *, source="generated"):
+    def _launch(self, key, workflow, params, on_finished, *, source="generated",
+                origin=None):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
+
+        ``origin`` is the prompt id the run began under, carried across a chained
+        i2v's image→video hand-off so both stages read as one run; a fresh launch
+        is its own origin.
 
         User work preempts a background experiment here, at the one choke point
         every user path funnels through — so a Generate never sits behind an
@@ -235,6 +282,7 @@ class RerollController(QObject):
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             return
+        job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
         try:
@@ -243,8 +291,17 @@ class RerollController(QObject):
         except Exception as e:
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
-            self._jobs.pop(key, None)
+            self._drop(key, job)
         self.changed.emit()
+
+    def _drop(self, key: str, job: GenerationJob):
+        """Forget one job, and the folder's entry once its last one is gone."""
+        jobs = self._jobs.get(key)
+        if not jobs or job not in jobs:
+            return
+        jobs.remove(job)
+        if not jobs:
+            del self._jobs[key]
 
     def _preempt_experiments(self):
         """Clear the GPU for user work: cancel every in-flight background
@@ -259,20 +316,21 @@ class RerollController(QObject):
         Each preempted experiment is dropped exactly as a hand-cancel would drop
         it: interrupted or dequeued, its abandoned row deleted.
         """
-        for key, job in list(self._jobs.items()):
-            if job.source == "experiment":
-                logger.info(
-                    "Preempting background experiment %s for user work", job.prompt_id
-                )
-                self.cancel(key)
+        for key, jobs in list(self._jobs.items()):
+            for job in list(jobs):
+                if job.source == "experiment":
+                    logger.info(
+                        "Preempting background experiment %s for user work", job.prompt_id
+                    )
+                    self.cancel_job(job.prompt_id)
 
     def _register(self, key, job, on_finished):
         """Track a re-roll job for a folder and wire its completion and failure."""
-        self._jobs[key] = job
+        self._jobs.setdefault(key, []).append(job)
         job.finished.connect(
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
-        job.failed.connect(lambda msg, k=key: self._on_failed(k, msg))
+        job.failed.connect(lambda msg, k=key, j=job: self._on_failed(k, j, msg))
         job.preview.connect(lambda data, k=key: self.preview.emit(k, data))
         # Persist the job's live progress onto its row so a restart mid-run can resume
         # the bar at its last position (see GenerationJob.reconnect(progress_state=…)).
@@ -320,8 +378,8 @@ class RerollController(QObject):
 
     def _reconnect(self, row: dict, image_index: dict):
         key = gallery.settings_folder_key(row, image_index)
-        if key in self._jobs:
-            return  # a job for this folder is already tracked
+        if self.job_for_prompt(row["prompt_id"]) is not None:
+            return  # already tracked
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
             return
@@ -337,6 +395,7 @@ class RerollController(QObject):
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
             return
+        job.origin = job.prompt_id  # a resumed run's chain, if any, is behind it
         self._register(key, job, self._on_finished)
 
     @property
@@ -379,7 +438,7 @@ class RerollController(QObject):
         """
         if self._client is None:
             return
-        jobs = {job.prompt_id: job for job in self._jobs.values()}
+        jobs = {job.prompt_id: job for job in self.all_jobs}
         movable = {pid for pid, job in jobs.items() if job.state == "queued"}
         wanted = [pid for pid in prompt_ids if pid in movable]
         try:
@@ -391,36 +450,54 @@ class RerollController(QObject):
             jobs[pid].requeue()
 
     def cancel(self, key: str):
-        """Stop and forget a folder's running re-roll, dropping its abandoned row.
+        """Stop and forget the job leading a folder's queue, dropping its row.
+
+        The folder-level stop — the live tile's Cancel. A folder with more than one
+        job queued gives up the one in front; the rest are stopped from the queue
+        strip, a row at a time (:meth:`cancel_job`).
 
         Silent — no :attr:`changed` emit: the tile's cancel button drives its own
-        follow-up redraw, and the other caller (:meth:`_preempt_experiments`) is
-        immediately followed by a launch that emits it anyway.
+        follow-up redraw.
         """
-        job = self._jobs.pop(key, None)
+        job = self.job_for(key)
         if job is not None:
-            job.cancel()
-            self._db.delete_generation(job.prompt_id)  # drop the abandoned running row
+            self.cancel_job(job.prompt_id)
+
+    def cancel_job(self, prompt_id: str):
+        """Stop and forget one named job, dropping its abandoned running row.
+
+        What a queue row's Cancel calls, and how an experiment is preempted: a
+        folder may hold several jobs, so the one to stop has to be named rather
+        than inferred from its folder.
+        """
+        for key, jobs in list(self._jobs.items()):
+            for job in list(jobs):
+                if job.prompt_id == prompt_id:
+                    self._drop(key, job)
+                    job.cancel()
+                    self._db.delete_generation(prompt_id)  # drop the abandoned row
+                    return
 
     def _on_image_finished(self, key, image_job, files, thumb_path, duration,
                            video_workflow, video_params):
         """First stage of a chained i2v re-roll: finalize the fresh image, then run
-        the video on it, pointing its input at the just-saved output."""
-        self._jobs.pop(key, None)
+        the video on it, pointing its input at the just-saved output. The video
+        stage inherits the run's origin, so whoever launched it still sees one run."""
+        self._drop(key, image_job)
         mark_generation_completed(self._db, image_job.prompt_id, files, thumb_path, duration)
         input_ref = gallery.output_file_reference(files)
         if input_ref is not None:
             video_params = {**video_params, "input_image": input_ref}
-        self._launch(key, video_workflow, video_params, self._on_finished)
+        self._launch(key, video_workflow, video_params, self._on_finished,
+                     origin=image_job.origin)
 
     def _on_finished(self, key, job, files, thumb_path, duration):
-        self._jobs.pop(key, None)
+        self._drop(key, job)
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.finished.emit(key, job.prompt_id)
 
-    def _on_failed(self, key, message):
-        job = self._jobs.pop(key, None)
-        if job is not None:
-            self._db.update_generation(job.prompt_id, status="error", error_message=message)
+    def _on_failed(self, key, job, message):
+        self._drop(key, job)
+        self._db.update_generation(job.prompt_id, status="error", error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self.failed.emit(key)

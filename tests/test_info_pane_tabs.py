@@ -531,6 +531,27 @@ def _config_tab(workflow_name, params=None, seed_is_random=True, title=None):
     }
 
 
+def test_the_run_a_tab_launched_survives_a_restart(tabs, qtbot):
+    # A tab's Cancel and progress fill follow the run it started, so which run that
+    # was has to come back with the tab — otherwise a restart mid-generation
+    # reopens the tab with an idle button over a job still cooking.
+    tabs.currentWidget().note_launched("run-77")
+
+    fresh = InfoPaneTabs(tabs._client, tabs._db)
+    qtbot.addWidget(fresh)
+    fresh.restore_state(tabs.capture_state())
+
+    assert fresh._config_panels()[0].launched_run() == "run-77"
+
+
+def test_a_tab_that_never_generated_claims_no_run(tabs, qtbot):
+    fresh = InfoPaneTabs(tabs._client, tabs._db)
+    qtbot.addWidget(fresh)
+    fresh.restore_state(tabs.capture_state())
+
+    assert fresh._config_panels()[0].launched_run() is None
+
+
 def test_capture_state_lists_every_tab_and_current(tabs):
     tabs.currentWidget().prefill("sdxl_t2i", {})                  # the initial tab
     tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})   # index 1, current

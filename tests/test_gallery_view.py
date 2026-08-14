@@ -4274,9 +4274,9 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
-    view._reroll_jobs[folder_key] = _FakeRerollJob(
+    view._reroll._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
-    )
+    )]
     _open_recents(view)
 
     assert "rr1" in view._inflight_cards
@@ -4349,7 +4349,8 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
-    view._reroll_jobs[folder_key] = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})
+    view._reroll._jobs[folder_key] = [
+        _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
     _open_recents(view)
     assert "rr1" in view._inflight_cards
 
@@ -4371,7 +4372,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     view.refresh()
     folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
-    view._reroll_jobs[folder_key] = job
+    view._reroll._jobs[folder_key] = [job]
     _open_recents(view)
     card = view._inflight_cards["rr1"]
 
@@ -4916,6 +4917,79 @@ def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
     assert panel._generate_btn.isEnabled() is False
 
 
+def _two_image_db(tmp_path, prompts=("the first one", "a completely different one")):
+    """Two completed images. Same prompt for both puts them in one settings folder;
+    different prompts put them in two."""
+    db = Database(tmp_path / "t.db")
+    for (pid, prompt), seed in zip(zip(("a", "b"), prompts), (7, 8)):
+        params = dict(_SDXL.default_params(), seed=seed, positive_prompt=prompt)
+        db.insert_generation(prompt_id=pid, workflow_name="sdxl_t2i",
+                             workflow_version=_SDXL.version, positive_prompt=prompt,
+                             seed=seed, params_json=json.dumps(params), workflow_json="{}")
+        db.update_generation(pid, status="completed",
+                             output_files=json.dumps([{"filename": f"sdxl_{pid}.png",
+                                                       "subfolder": ""}]))
+    return db
+
+
+def _click_thumbnail(view, row, image_rows):
+    """Load a browsed generation into the info pane, as clicking its tile does."""
+    view._info_tabs.load_selection(row, image_rows)
+    return _front_panel(view)
+
+
+def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_path):
+    # The reported block: two pictures of one recipe. Generate the first, click the
+    # second, and its Generate button was still mid-run — so a second could not be
+    # started at all, and the button claimed the shown image was the one cooking.
+    db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    rows = {r["prompt_id"]: r for r in db.list_generations()}
+    image_rows = list(rows.values())
+    first = _click_thumbnail(view, rows["a"], image_rows)
+    first.use_random_seed()  # a fresh sample, not a duplicate of what's on screen
+    first._on_generate()
+    assert len(view._reroll.all_jobs) == 1
+
+    panel = _click_thumbnail(view, rows["b"], image_rows)
+
+    assert panel._generating is False
+    assert panel._generate_btn.text() == "Generate"
+    assert panel._generate_btn.isEnabled() is True
+
+    panel.use_random_seed()
+    panel._on_generate()
+
+    assert len(view._reroll.all_jobs) == 2  # both queued, as ComfyUI will run them
+
+
+def test_another_images_tab_can_still_generate_while_the_first_runs(qtbot, tmp_path):
+    # The reported block: Generate one image, click a completely different one, and
+    # its tab came up already in progress mode — so the second one could not be
+    # launched at all, and the button claimed a run that was not its own.
+    db = _two_image_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    rows = {r["prompt_id"]: r for r in db.list_generations()}
+    image_rows = list(rows.values())
+    view._info_tabs.load_selection(rows["a"], image_rows)
+    first = _front_panel(view)
+    first._param_form.set_values({"positive_prompt": "a re-roll of the first one"})
+    first._on_generate()
+
+    view._info_tabs.load_selection(rows["b"], image_rows)
+
+    second = _front_panel(view)
+    assert second is not first
+    assert second._generating is False
+    assert second._generate_btn.text() == "Generate"
+    assert second._generate_btn.isEnabled() is True
+    assert second._cancel_btn.isHidden() is True
+
+
 def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     # When the run ends the tab drops Cancel and Generate returns.
     client = _reroll_client()
@@ -5210,7 +5284,7 @@ def test_enhance_all_button_shows_only_on_a_folder_awaiting_enhancement(qtbot, t
     assert view._enhance_all_btn.isHidden()
 
 
-def test_enhance_all_queues_and_serializes_same_folder_enhances(qtbot, tmp_path):
+def test_enhance_all_queues_every_member_image(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -5220,24 +5294,21 @@ def test_enhance_all_queues_and_serializes_same_folder_enhances(qtbot, tmp_path)
     view._enhance_all()
 
     # Both images share one source config, so their enhances share one folder —
-    # the controller runs one job per folder, and the second waits in the queue.
-    assert len(view._reroll_jobs) == 1
-    (job,) = view._reroll_jobs.values()
-    assert job.workflow.name == "image_enhance"
-    assert job.params["input_image"].startswith("image/sdxl_t2i_g")
-    assert job.params["positive_prompt"] == "a cat"   # the source's own prompt
-    assert len(view._enhance_queue) == 1
+    # and both go to ComfyUI, which works through them one at a time with the
+    # bottom strip showing the line.
+    jobs = view._reroll.all_jobs
+    assert len(jobs) == 2
+    assert {j.workflow.name for j in jobs} == {"image_enhance"}
+    assert all(j.params["input_image"].startswith("image/sdxl_t2i_g") for j in jobs)
+    assert {j.params["positive_prompt"] for j in jobs} == {"a cat"}  # the sources' own
 
-    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    client.job_completed.emit(jobs[0].prompt_id, _ENHANCE_HISTORY)
 
-    # The completion pumped the queue: the second enhance is running, and the
-    # first FOLDED into its source — the transient job row is gone, and the
-    # source image itself now wears the enhanced file (its identity untouched).
-    assert view._enhance_queue == []
-    (job2,) = view._reroll_jobs.values()
-    assert job2.workflow.name == "image_enhance"
-    assert job2.prompt_id != job.prompt_id
-    assert view._db.get_generation(job.prompt_id) is None
+    # The finished one FOLDED into its source — the transient job row is gone, and
+    # the source image itself now wears the enhanced file (identity untouched) —
+    # while the other keeps running.
+    assert [j.prompt_id for j in view._reroll.all_jobs] == [jobs[1].prompt_id]
+    assert view._db.get_generation(jobs[0].prompt_id) is None
     (upgraded,) = [r for r in view._db.list_generations() if r.get("original_files")]
     files = gallery.row_output_files(upgraded)
     assert files[0]["filename"] == "image_enhance_00001_.png"   # the new face
@@ -5254,10 +5325,9 @@ def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
 
     view.enhance_items(["g0", "g1"])
 
-    assert len(view._reroll_jobs) == 1
-    assert len(view._enhance_queue) == 1
-    (job,) = view._reroll_jobs.values()
-    assert job.workflow.name == "image_enhance"
+    jobs = view._reroll.all_jobs
+    assert len(jobs) == 2
+    assert {j.workflow.name for j in jobs} == {"image_enhance"}
 
 
 # --- the Enhance subpanel: the app's enhancement settings -------------------
@@ -5394,7 +5464,6 @@ def test_auto_enhance_leaves_a_new_image_alone_with_the_box_off(qtbot, tmp_path)
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
 
     assert view._reroll_jobs == {}
-    assert view._enhance_queue == []
 
 
 def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_path):
@@ -5432,18 +5501,50 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     view.enhance_items(["g0"])
 
     assert panel._versions._host.findChildren(_PendingTile)
-    (key,) = view._reroll_jobs
-    view._reroll.preview.emit(key, b"a frame")
+    (job,) = view._reroll_jobs.values()
+    view._client.preview_image.emit(job.prompt_id, b"a frame")
     status, frame, settings = panel._pending_enhancement
-    assert (status, frame) == ("queued", b"a frame")
+    assert (status, frame) == ("running", b"a frame")
     # The tile names what is being made, the way a finished level names what
     # made it — read off the job, not the panel, which may have moved on since.
     assert settings.startswith("2x · 20 steps · 0.15 denoise")
 
-    # An enhance of a DIFFERENT image leaves this tab's strip alone.
-    panel.set_pending_enhancement(None)
+    # An enhance of a DIFFERENT image lands in the same settings folder (both
+    # images share a recipe), so it is this tab's own run it must keep showing.
     view.enhance_items(["g1"])
-    assert panel._pending_enhancement is None
+    assert panel._pending_enhancement == ("running", b"a frame", settings)
+
+
+def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
+    # A batch of enhances goes to the controller whole, and its members share one
+    # settings key, so the ones behind the leader must still be findable: a tab
+    # showing an image waiting its turn says so, rather than borrowing the frame
+    # of the one ComfyUI is actually rendering.
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    first = view._info_tabs.current_config_panel()
+    first.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    second = view._info_tabs._add_subtab()
+    second.show_saved_generation(db.get_generation("g1"), view._image_rows)
+
+    view.enhance_items(["g0", "g1"])
+
+    # Both went out — no backlog in here held the second one out of sight — and
+    # they landed in the one folder, which is why a tab must not read it by key.
+    leader, follower = view._reroll.all_jobs
+    assert [j.workflow.name for j in (leader, follower)] == \
+        ["image_enhance", "image_enhance"]
+    assert len(view._reroll.jobs) == 1
+    assert view.is_enhancing(db.get_generation("g1"))  # the one behind counts too
+
+    view._client.preview_image.emit(leader.prompt_id, b"a frame")
+    assert first._pending_enhancement == (
+        "running", b"a frame", gallery.describe_enhance_params(leader.params))
+    # The tab whose image is still waiting shows a queued tile, not that frame.
+    assert second._pending_enhancement == (
+        "queued", None, gallery.describe_enhance_params(follower.params))
 
 
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
@@ -5462,7 +5563,6 @@ def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
     assert view._reroll_jobs == {}
-    assert view._enhance_queue == []
     upgraded = db.get_generation("g0")
     assert gallery.is_enhanced_row(upgraded)
     # One enhancement, one level above the original.

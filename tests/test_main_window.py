@@ -356,11 +356,9 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
 
 
 def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
-    # The reported gap: after a restart the bottom bar resumed but the Generate
-    # button on the matching tab stayed idle. An i2v folder key depends on its start
-    # frame's config, which the view can only resolve once its image rows are rebuilt
-    # on show — so the button's generating state must be re-asserted then, not only at
-    # reconnect time (when the image rows are still empty and the key can't match).
+    # The reported gap: after a restart the bottom strip resumed but the Generate
+    # button on the tab that started the run stayed idle. The session records which
+    # run each tab launched, and the state is re-asserted once the view is up.
     db = Database(tmp_path / "t.db")
     # Rows a live tab must match carry the workflows' current versions, as runs
     # made by this app would — the settings key folds the version in.
@@ -382,10 +380,10 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
         {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
-         "title": None},
+         "title": None, "launched_run": "rr"},
     ], "current": 0})
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.refresh()  # rebuilds the image rows, then re-asserts the button
+    win._gallery_view.refresh()  # reconnects the run, then re-asserts the button
 
     panel = win._gallery_view._info_tabs.current_config_panel()
     assert panel._generating is True

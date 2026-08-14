@@ -88,6 +88,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
+        self._launched_run: str | None = None          # the run this tab's Generate started (see launched_run)
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
@@ -391,6 +392,19 @@ class GenerateConfigPanel(QWidget):
             return
         self.generate_requested.emit(key, params)
 
+    def launched_run(self) -> str | None:
+        """The run this tab's Generate started, if one is still its own.
+
+        Named by the prompt id the run *began* under, so a chained i2v (a frame,
+        then the video on it) stays one run to this tab. ``None`` once the tab has
+        been pointed at someone else's generation, or before it has generated.
+        """
+        return self._launched_run
+
+    def note_launched(self, origin: str | None):
+        """Claim (or, with ``None``, let go of) the run this tab's Generate started."""
+        self._launched_run = origin
+
     def set_generating(self, generating: bool, prompt_id: str | None = None):
         """Reflect whether a run of this config's folder is in flight.
 
@@ -557,7 +571,12 @@ class GenerateConfigPanel(QWidget):
         The form is seeded first so its recent-preview autoshow doesn't override
         the selection's own output. A workflow the app can't rebuild leaves the
         form as it was but still shows the preview and info.
+
+        Pointing the tab at someone else's generation ends its claim on a run it
+        launched: the button would otherwise sit mid-run over a picture that has
+        nothing to do with it, refusing a Generate of what is now on screen.
         """
+        self.note_launched(None)
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))

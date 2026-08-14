@@ -5,13 +5,16 @@ edits what a folder enhances at, and the version list shows what an image has
 already received.
 """
 
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QDropEvent
 
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL, EnhanceLevel, EnhanceSettings, default_enhance_params,
 )
 from origenerator.gui.enhance_panel import EnhancePanel
-from origenerator.gui.enhance_versions import EnhanceVersions
+from origenerator.gui.enhance_versions import (
+    EnhanceVersions, _LevelTile, enhance_level_mime, params_from_mime,
+)
 
 
 def _panel(qtbot):
@@ -21,13 +24,20 @@ def _panel(qtbot):
     return panel, edits
 
 
-def _levels(count):
+def _levels(count, params=None):
     """``count`` enhancements over an original, newest first — the shape
     :func:`~origenerator.gallery.enhance.enhance_levels` produces."""
     return [
-        EnhanceLevel(i, f"Enhance {i}", {"filename": f"e{i}.png", "subfolder": "image"})
+        EnhanceLevel(i, f"Enhance {i}", {"filename": f"e{i}.png", "subfolder": "image"},
+                     dict(params or {}))
         for i in range(count, 0, -1)
     ] + [EnhanceLevel(0, "Original", {"filename": "src.png", "subfolder": "image"})]
+
+
+def _items(levels):
+    """Pair each level with the file the strip would draw it from — nothing on
+    disk here, so the tiles fall back to their labels."""
+    return [(level, None) for level in levels]
 
 
 # --- the subpanel ----------------------------------------------------------
@@ -84,57 +94,100 @@ def test_settings_survive_a_load_and_read_back(qtbot):
     assert panel.settings() == original
 
 
-# --- the version list ------------------------------------------------------
+# --- the version strip -----------------------------------------------------
 
 
-def _buttons(widget):
-    return widget._host.findChildren(QPushButton)
+def _tiles(widget):
+    return widget._host.findChildren(_LevelTile)
 
 
-def test_an_unenhanced_image_shows_no_version_list(qtbot):
+def _labels(widget):
+    """Each tile's text, its em-dash "file is gone" placeholder dropped."""
+    from PyQt6.QtWidgets import QLabel
+    return [
+        " / ".join(lbl.text() for lbl in tile.findChildren(QLabel)
+                   if lbl.text() and lbl.text() != "—")
+        for tile in _tiles(widget)
+    ]
+
+
+def test_an_unenhanced_image_shows_no_version_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_levels(0))
+    versions.show_levels(_items(_levels(0)))
     assert versions.isHidden()      # nothing to choose between
 
 
-def test_levels_list_newest_first_with_the_newest_selected(qtbot):
+def test_levels_are_shown_newest_first(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_levels(2))
-    buttons = _buttons(versions)
-    assert [b.text() for b in buttons] == ["Enhance 2", "Enhance 1", "Original"]
-    # The preview opens on the most-enhanced version, so that button starts lit.
-    assert buttons[0].isChecked()
-    assert not buttons[1].isChecked()
+    versions.show_levels(_items(_levels(2)))
+    assert not versions.isHidden()
+    assert _labels(versions) == ["Enhance 2", "Enhance 1", "Original"]
 
 
 def test_clicking_a_level_reports_its_position(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_levels(2))
+    versions.show_levels(_items(_levels(2)))
     picked = []
     versions.level_selected.connect(picked.append)
 
-    _buttons(versions)[2].click()   # the original
+    tile = _tiles(versions)[2]      # the original
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton)
+    qtbot.mouseRelease(tile, Qt.MouseButton.LeftButton)
 
     assert picked == [2]
 
 
-def test_a_levels_settings_ride_on_its_button(qtbot):
+def test_a_levels_settings_caption_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels([
-        EnhanceLevel(1, "Enhance 1", {"filename": "e1.png"}, "2x · 20 steps"),
-        EnhanceLevel(0, "Original", {"filename": "src.png"}),
-    ])
-    assert "2x · 20 steps" in _buttons(versions)[0].text()
+    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0, "enhance_steps": 20})))
+    assert "2x" in _labels(versions)[0]
+    assert "20 steps" in _labels(versions)[0]
 
 
-def test_rebuilding_for_another_image_drops_the_old_buttons(qtbot):
+def test_rebuilding_for_another_image_drops_the_old_tiles(qtbot):
     # Switching selection must not stack one image's levels under another's.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_levels(2))
-    versions.show_levels(_levels(1))
-    assert [b.text() for b in _buttons(versions)] == ["Enhance 1", "Original"]
+    versions.show_levels(_items(_levels(2)))
+    versions.show_levels(_items(_levels(1)))
+    assert _labels(versions) == ["Enhance 1", "Original"]
+
+
+# --- dragging a level onto the panel to reuse its settings -----------------
+
+
+def test_a_level_carries_its_settings_as_a_drag_payload():
+    params = {"enhance_scale": 3.0, "enhance_steps": 40, "enhance_denoise": 0.35}
+    assert params_from_mime(enhance_level_mime(params)) == params
+
+
+def test_a_foreign_drag_carries_nothing_this_panel_wants():
+    from PyQt6.QtCore import QMimeData
+    mime = QMimeData()
+    mime.setText("just some text")
+    assert params_from_mime(mime) is None
+
+
+def test_dropping_a_level_absorbs_its_settings(qtbot):
+    panel, edits = _panel(qtbot)
+    panel._auto.setChecked(True)
+    edits.clear()
+    # Held in a local: a QMimeData freed mid-event takes the handler with it.
+    mime = enhance_level_mime({"enhance_scale": 3.0, "enhance_steps": 40,
+                               "enhance_denoise": 0.35})
+    event = QDropEvent(QPoint(5, 5).toPointF(), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    panel.dropEvent(event)
+
+    settings = panel.settings()
+    assert settings.params["enhance_scale"] == 3.0
+    assert settings.params["enhance_steps"] == 40
+    assert settings.params["enhance_denoise"] == 0.35
+    # The drop says what to enhance at, not whether to keep enhancing.
+    assert settings.auto is True
+    assert edits and edits[-1] == settings

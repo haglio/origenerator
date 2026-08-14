@@ -83,11 +83,13 @@ class ParamForm(QWidget):
     show as read-only rows dropped into the matching section.
 
     ``hidden_keys`` are params this form deliberately doesn't present at all —
-    no field, and no read-only row either. They round-trip at whatever value the
-    config carried (or the workflow's default), so a reused generation still
-    reproduces exactly. This is how the enhance params stay off a form whose
-    every other setting decides which gallery folder a run lands in: they belong
-    to the Enhance subpanel, which owns them per folder.
+    no field, no read-only row, and no value absorbed from a loaded config: they
+    are pinned at the workflow's own defaults, so what the form emits for them
+    is always the same. This is how the enhance params stay off a form whose
+    every other setting decides which gallery folder a run lands in. They belong
+    to the Enhance subpanel, which applies enhancement as a separate layer — and
+    pinning them is what stops a Generate seeded from an old enhanced run coming
+    out enhanced again with the subpanel's box unticked.
     """
 
     changed = pyqtSignal()          # any field's value changed
@@ -101,8 +103,8 @@ class ParamForm(QWidget):
         hidden_keys: tuple[str, ...] = (),
     ):
         super().__init__(parent)
-        # Params carried but never shown, and the values they currently carry —
-        # seeded from the definitions' own defaults so a fresh form emits them.
+        # Params carried but never shown, pinned at the definitions' own defaults
+        # — a loaded config never moves them (see the class docstring).
         self._hidden_keys = frozenset(hidden_keys)
         self._hidden = {
             pd.key: pd.default for pd in param_defs if pd.key in self._hidden_keys
@@ -666,11 +668,8 @@ class ParamForm(QWidget):
     def set_values(self, params: dict):
         # Retain any params without a field so they survive the read-back, and show
         # them as read-only rows in the matching section; the rest are applied to
-        # their widgets. A hidden key is retained the same way but shown nowhere —
-        # it is off this form on purpose, not merely unrecognized.
-        for key in self._hidden_keys:
-            if key in params:
-                self._hidden[key] = params[key]
+        # their widgets. A hidden key is dropped entirely — neither shown nor
+        # absorbed — so the form keeps emitting the workflow's default for it.
         self._passthrough = {
             k: v for k, v in params.items()
             if k not in self._widgets and k not in self._hidden_keys

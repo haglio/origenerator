@@ -583,17 +583,24 @@ def test_an_unenhanced_image_shows_no_version_list(saved_panel):
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
-    from PyQt6.QtWidgets import QPushButton
+    from PyQt6.QtWidgets import QLabel
+
+    from origenerator.gui.enhance_versions import _LevelTile
 
     panel, db = saved_panel
     image = _enhanced_image_row(db)
     panel.show_saved_generation(image, [image])
 
     assert not panel._versions.isHidden()
-    buttons = panel._versions._host.findChildren(QPushButton)
-    assert buttons[0].text().startswith("Enhance 1")
-    assert "2x · 20 steps · 0.15 denoise" in buttons[0].text()
-    assert buttons[1].text() == "Original"
+    tiles = panel._versions._host.findChildren(_LevelTile)
+    captions = [
+        " / ".join(lbl.text() for lbl in tile.findChildren(QLabel)
+                   if lbl.text() and lbl.text() != "—")
+        for tile in tiles
+    ]
+    assert captions[0].startswith("Enhance 1")
+    assert "2x" in captions[0] and "20 steps" in captions[0] and "0.15 denoise" in captions[0]
+    assert captions[1] == "Original"
 
 
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,

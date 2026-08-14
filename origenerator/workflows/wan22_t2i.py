@@ -26,6 +26,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     model_keys = ("unet_high", "unet_low")
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "14"
+    base_output_node_id = "21"  # the pre-enhance frame, saved when the tail runs
 
     def default_params(self) -> dict:
         return {
@@ -189,4 +190,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
                 },
             },
             **enhance_nodes,
+            # With the tail on, keep the base frame too — it is made on the way
+            # and would otherwise be discarded, leaving no original.
+            **self.base_save_node(self.base_output_node_id, ["13", 0], params),
         }

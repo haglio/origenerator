@@ -103,6 +103,9 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
         def default_params(self):
             return {"input_image": "", "width": 512, "height": 512}
 
+        def enhance_keys(self):
+            return ()
+
     video = _video_row(width=720, height=928)
     image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
 

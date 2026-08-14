@@ -32,6 +32,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     model_keys = ("checkpoint",)
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"
+    base_output_node_id = "15"  # the pre-enhance render, saved when the tail runs
 
     def default_params(self) -> dict:
         return {
@@ -151,4 +152,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
                 "inputs": {"vae_name": params["vae"]},
             },
             **enhance_nodes,
+            # With the tail on, keep the base render too — it is made on the way
+            # and would otherwise be discarded, leaving no original.
+            **self.base_save_node(self.base_output_node_id, ["6", 0], params),
         }

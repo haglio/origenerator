@@ -721,19 +721,22 @@ def test_hidden_params_get_no_field_and_no_read_only_row(qtbot):
     assert "enhance" not in form._widgets
 
 
-def test_hidden_params_still_round_trip_so_an_old_run_reproduces(qtbot):
-    # A row recorded with the tail baked in must rebuild exactly that graph when
-    # it is reused, even though nothing on screen offers the toggle any more.
+def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
+    # Loading an old enhanced run into a tab must not arm its enhancement for
+    # the next Generate: enhancement is the Enhance subpanel's, applied
+    # deliberately, so the form pins these at the workflow's own defaults.
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
-    # A fresh form emits the workflow's own defaults for them.
     assert form.get_values_static()["enhance"] is False
 
     form.set_values(dict(wf.default_params(), enhance=True, enhance_steps=44))
+
     values = form.get_values_static()
-    assert values["enhance"] is True
-    assert values["enhance_steps"] == 44
+    assert values["enhance"] is False
+    assert values["enhance_steps"] == wf.default_params()["enhance_steps"]
+    # And it is still emitted, so the payload always has a value to build from.
+    assert "enhance" in values
 
 
 def test_clearing_passthrough_restores_the_editable_only_order(qtbot):

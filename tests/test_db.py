@@ -320,7 +320,6 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
     assert db.folder_meta_full() == [{
         "folder_key": "image/sdxl_t2i/abc123", "custom_name": "Cats",
         "starred": True, "level": "settings", "ref_prompt_id": "p1",
-        "enhance_json": None,
     }]
 
 
@@ -349,29 +348,6 @@ def test_delete_folder_meta_removes_the_row(tmp_path):
     db.set_folder_starred("k", True)
     db.delete_folder_meta("k")
     assert db.folder_meta_full() == []
-
-
-def test_folder_enhance_settings_round_trip(tmp_path):
-    db = Database(tmp_path / "test.db")
-    assert db.folder_enhance_map() == {}
-    db.set_folder_enhance("image/sdxl_t2i/abc123", '{"auto": true}')
-    assert db.folder_enhance_map() == {"image/sdxl_t2i/abc123": '{"auto": true}'}
-    db.set_folder_enhance("image/sdxl_t2i/abc123", None)
-    assert db.folder_enhance_map() == {}   # cleared, not left reading as stale
-
-
-def test_enhance_settings_and_bookmarks_do_not_clobber_each_other(tmp_path):
-    # They share a row but not a writer: the reconcile re-stamping a folder's
-    # identity must leave its enhancement settings alone, and vice versa.
-    db = Database(tmp_path / "test.db")
-    db.set_folder_enhance("k", '{"auto": true}')
-    db.upsert_folder_meta("k", custom_name="Portraits", starred=True,
-                          level="settings", ref_prompt_id="p1")
-    assert db.folder_enhance_map()["k"] == '{"auto": true}'
-
-    db.set_folder_enhance("k", '{"auto": false}')
-    (row,) = db.folder_meta_full()
-    assert row["custom_name"] == "Portraits" and row["starred"] is True
 
 
 def test_list_generations_ordered_newest_first(tmp_path):

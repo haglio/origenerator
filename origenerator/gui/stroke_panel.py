@@ -115,7 +115,14 @@ def panel_size(stroke, host) -> tuple[int, int]:
 
 
 class StrokePanel(QWidget):
-    """The console, floated over whichever surface hosts it."""
+    """The console, floated over whichever surface hosts it.
+
+    It shows exactly while the stroke is running. A readout of a stroke nobody
+    is making is not information, and every surface that floats one — the main
+    window, a slideshow, the auto-generate montage, the fullscreen viewer — was
+    hosting it on the assumption that some other code would hide it. So the rule
+    lives here, where the driver is: the panel follows its own subject.
+    """
 
     # Fun Time insets its HUD from the window's top-left corner by this much, and
     # a reader glancing between the two apps looks for one panel in one place.
@@ -136,8 +143,28 @@ class StrokePanel(QWidget):
         self._repaint = QTimer(self)
         self._repaint.setInterval(_REPAINT_MS)
         self._repaint.timeout.connect(self.update)
+        # Present only while the stroke is running, and following it from
+        # wherever it was toggled — the signal for a driver that has one, and
+        # :meth:`refresh` (which the hosts call on every stroke key) for one that
+        # doesn't.
+        self.setVisible(bool(getattr(stroke, "active", False)))
+        signal = getattr(stroke, "active_changed", None)
+        if signal is not None:
+            signal.connect(self._on_active_changed)
+
+    def _on_active_changed(self, active: bool) -> None:
+        self.setVisible(active)
+        self.update()
 
     def refresh(self) -> None:
+        """Redraw, and re-check whether the stroke is running.
+
+        The hosts call this after every stroke key, which is the one moment the
+        answer can have changed under a driver that reports no signal — so the
+        panel appears and disappears on the key that did it, not only on the
+        signal a full driver happens to emit.
+        """
+        self.setVisible(bool(getattr(self._stroke, "active", False)))
         self.update()
 
     def reposition(self) -> None:

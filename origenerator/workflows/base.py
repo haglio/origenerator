@@ -80,6 +80,12 @@ class WorkflowTemplate(ABC):
     # VHS_VideoCombine.
     output_node_id: str
     output_key: str = "images"
+    # The node that saves the pre-enhance render, present in the payload only
+    # when the inline enhance tail ran (see :meth:`base_save_node`). Its files
+    # are appended after the primary ones and tagged as the original, so a row
+    # made with the tail on carries both versions — the enhanced one leading,
+    # the base one reachable — exactly like a standalone enhance folded in.
+    base_output_node_id: str | None = None
 
     @abstractmethod
     def default_params(self) -> dict:
@@ -341,6 +347,38 @@ class WorkflowTemplate(ABC):
 
         The output node lists them under ``output_key`` — ``images`` for
         SaveImage and native SaveVideo, ``gifs`` for VHS_VideoCombine.
+
+        When the run also saved its pre-enhance render (:meth:`base_save_node`),
+        those files follow, each tagged ``role: "original"``. The order is the
+        one the gallery reads as versions of one image — most enhanced first,
+        the original last — so an inline-enhanced run lists its levels the same
+        way a standalone enhance folded into a row does.
         """
-        node = history_data.get("outputs", {}).get(self.output_node_id, {})
-        return node.get(self.output_key, [])
+        outputs = history_data.get("outputs", {})
+        files = list(outputs.get(self.output_node_id, {}).get(self.output_key, []))
+        if self.base_output_node_id is None:
+            return files
+        base = outputs.get(self.base_output_node_id, {}).get(self.output_key, [])
+        return files + [{**f, "role": "original"} for f in base]
+
+    def base_save_node(self, node_id: str, image_ref, params: dict) -> dict:
+        """The extra SaveImage that keeps the pre-enhance render, or ``{}``.
+
+        The enhance tail re-samples an image the graph already made; without
+        this that base render is computed and thrown away, leaving an enhanced
+        result with nothing to compare it against. Saved under its own prefix,
+        it becomes the row's original — the version a re-enhance runs from and
+        the one the info pane offers beside the enhanced one. Empty when the
+        tail isn't running, since then the primary save IS the base render.
+        """
+        if not params.get("enhance"):
+            return {}
+        return {
+            node_id: {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "images": image_ref,
+                    "filename_prefix": f"{params['filename_prefix']}_base",
+                },
+            },
+        }

@@ -139,36 +139,60 @@ class EnhanceLevel:
     """One version of an image: its file, and how it came to be.
 
     ``index`` counts enhancements from the original (0), so the labels read
-    "Original", "Enhance 1", "Enhance 2"… ``settings`` is empty for the original
-    and for any level folded in before the settings were recorded.
+    "Original", "Enhance 1", "Enhance 2"… ``params`` are the knobs that produced
+    it — empty for the original, and for any level folded in before the settings
+    were recorded — and ``settings`` is those knobs as a line of text. Both:
+    the string captions the tile, the dict is what a tile dragged onto the
+    Enhance subpanel hands over.
     """
 
     index: int
     label: str
     file: dict
-    settings: str = ""
+    params: dict = field(default_factory=dict)
+
+    @property
+    def settings(self) -> str:
+        return describe_enhance_params(self.params)
 
     @property
     def is_original(self) -> bool:
         return self.index == 0
 
 
+def original_files_of(row: dict) -> list[dict]:
+    """The pre-enhance version(s) this row holds, or ``[]`` for an unenhanced one.
+
+    Two routes get here and both leave the same shape — the enhanced file(s)
+    leading ``output_files``, the original(s) behind them:
+
+    * a standalone enhance folded in, which records what the row held before its
+      first enhance in ``original_files``;
+    * an inline run of the enhance tail, which saves the base render alongside
+      the enhanced one and tags it ``role: "original"`` (see
+      :meth:`~origenerator.workflows.base.WorkflowTemplate.base_save_node`).
+
+    Deliberately not "every file after the first": a batch generation saves
+    several files from one run, and none of them is a version of any other.
+    """
+    stored = parse_file_list(row.get("original_files"))
+    if stored:
+        return stored
+    return [f for f in row_output_files(row) if f.get("role") == "original"]
+
+
 def enhance_levels(row: dict) -> list[EnhanceLevel]:
     """Every version this image holds, most-enhanced first, or ``[]`` when it
     has received no enhancement at all.
 
-    ``original_files`` is what says a row has been enhanced in place, and it
-    names the files the row held before its first enhance. Each fold prepends
-    the file it produced, so what sits ahead of those originals is exactly the
-    enhancements, newest first. Pairing them with the recorded settings
-    (:func:`fold_enhancement` writes ``enhance_history``) and numbering them is
-    what the info pane's version list shows.
-
-    Deliberately keyed off ``original_files`` rather than "more than one output
-    file": a batch generation saves several files from one run, and none of them
-    is a level of any other.
+    Whatever sits ahead of the originals (:func:`original_files_of`) is exactly
+    the enhancements, newest first — each fold prepends the file it produced.
+    Pairing them with the settings that made them and numbering them is what the
+    info pane's version list shows. A folded enhance recorded its own settings
+    (``enhance_history``); an inline one is described by the row's own params,
+    which are the very knobs its tail ran at.
     """
-    originals = parse_file_list(row.get("original_files"))
+    originals = original_files_of(row)
     files = row_output_files(row)
     if not originals or len(files) <= len(originals):
         return []
@@ -177,14 +201,16 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
         for entry in parse_file_list(row.get("enhance_history"))
         if isinstance(entry, dict)
     }
+    inline = parse_params(row.get("params_json")) if row.get("original_files") is None else {}
     enhanced = files[:len(files) - len(originals)]
     levels = []
     for position, f in enumerate(enhanced):
         index = len(enhanced) - position  # the newest enhancement is the highest
         entry = history.get(f.get("filename")) or {}
-        params = entry.get("params") if isinstance(entry.get("params"), dict) else {}
+        params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
         levels.append(EnhanceLevel(
-            index, f"Enhance {index}", f, describe_enhance_params(params)
+            index, f"Enhance {index}", f,
+            {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS},
         ))
     # The pre-enhance file, level 0 — the one a re-enhance runs from, and the
     # one the list offers as "what this looked like before".
@@ -195,10 +221,11 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
 def is_enhanced_row(row: dict) -> bool:
     """Whether this generation carries enhanced pixels — what the green
     thumbnail badge marks. A folded-in standalone enhance (``original_files``
-    set) counts; an explicit ``enhance`` param is authoritative for inline
-    runs; an SDXL row from the era the tail ran unconditionally (tail params
-    stored, no flag yet) counts too."""
-    if row.get("original_files"):
+    set) counts, as does an inline run that kept its base render beside the
+    enhanced one; an explicit ``enhance`` param is authoritative for the rest of
+    the inline runs; an SDXL row from the era the tail ran unconditionally (tail
+    params stored, no flag yet) counts too."""
+    if original_files_of(row):
         return True
     workflow = row.get("workflow_name") or ""
     if workflow == ENHANCE_WORKFLOW:
@@ -254,11 +281,11 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     folder pins a model — the checkpoint that made the source (the SDXL
     workflows record one), so an enhanced image stays in its own style.
 
-    ``settings`` is the folder's own configuration, as its Enhance subpanel left
-    it: the knobs it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the
-    workflow defaults, so Enhance All, a single enhance, and an auto-enhance of
-    a newly generated image all run at whatever that folder is set to. Omitted,
-    the workflow's own defaults apply.
+    ``settings`` is the Enhance subpanel's current, app-wide configuration: the
+    knobs it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the workflow
+    defaults, so Enhance All, a single enhance, and an auto-enhance of a newly
+    generated image all run at whatever the panel says. Omitted, the workflow's
+    own defaults apply.
 
     An already-enhanced row re-enhances from its ORIGINAL file, not the
     enhanced one, so a deliberate re-enhance re-derives at a fresh seed rather
@@ -266,7 +293,7 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     the ones already there. ``None`` when the row has no output file to
     enhance. The seed is left at the default; the launcher re-rolls it like any
     variation."""
-    files = parse_file_list(row.get("original_files")) or row_output_files(row)
+    files = original_files_of(row) or row_output_files(row)
     input_ref = output_file_reference(files)
     if input_ref is None:
         return None

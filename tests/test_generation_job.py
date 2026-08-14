@@ -396,6 +396,60 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     client.foreign_backlog.assert_called_once()  # and isn't asked for again
 
 
+# --- taking a later place in the queue (how a reorder is carried out) --------
+
+def test_requeue_leaves_the_queue_and_rejoins_the_back_of_it(qtbot, tmp_path):
+    # ComfyUI has no reorder endpoint, so a job moves down the queue by being
+    # dropped from it and submitted again — under the same prompt id, so its row,
+    # its live job and its history all stay the one thing they were.
+    job, client = _started_job(tmp_path)
+    client.submit_job.reset_mock()
+
+    assert job.requeue() is True
+
+    client.cancel_prompt.assert_called_once_with("comfy-A")
+    client.submit_job.assert_called_once_with(job.payload, "comfy-A")
+    assert job.state == "queued"
+
+
+def test_requeue_refuses_a_job_comfyui_has_already_started(qtbot, tmp_path):
+    # Nothing can be moved in front of what is executing, and dropping a running
+    # prompt would throw away work rather than reorder it.
+    job, client = _started_job(tmp_path)
+    client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
+    client.submit_job.reset_mock()
+
+    assert job.requeue() is False
+
+    client.cancel_prompt.assert_not_called()
+    client.submit_job.assert_not_called()
+    assert job.state == "running"
+
+
+def test_a_requeue_whose_resubmit_fails_leaves_the_job_off_the_queue(qtbot, tmp_path):
+    # The drop already happened, so a failed re-submit means the job is gone from
+    # ComfyUI: it must say so rather than report a queued job that isn't there.
+    job, client = _started_job(tmp_path)
+    client.submit_job = MagicMock(side_effect=RuntimeError("server said no"))
+
+    assert job.requeue() is False
+
+    assert job.state == "failed"
+
+
+def test_requeue_keeps_listening_for_the_job_it_resubmitted(qtbot, tmp_path):
+    # A requeued job is the same job: its progress, preview and completion must
+    # still land, or a reordered run would finish invisibly.
+    job, client = _started_job(tmp_path)
+    job.requeue()
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+
+    client.job_completed.emit("comfy-A", SDXL_HISTORY)
+
+    assert len(finished) == 1
+
+
 def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
     # A count that outlived the read behind it would be a worse lie than none.
     job, client = _started_job(tmp_path)

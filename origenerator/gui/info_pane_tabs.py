@@ -211,13 +211,30 @@ class InfoPaneTabs(QTabWidget):
                                                  workflow_version=row.get("workflow_version"))
 
     def _on_strip_activated(self, prompt_id: str):
+        self.reveal_config(prompt_id)
+
+    def reveal_config(self, prompt_id: str):
+        """Bring a generation's settings forward as an editable tab.
+
+        A tab already on that settings folder is selected rather than duplicated —
+        the pane spreads across tabs by folder, so a second one for the same
+        settings would be the same tab twice. Otherwise a fresh tab is opened,
+        prefilled from the generation.
+
+        This is where a click lands on a config tab's history strip and on a row
+        of the generation queue: both name a generation and mean "show me its
+        settings". A no-op for a generation the database no longer has.
+        """
         row = self._db.get_generation(prompt_id)
         if not row:
             return
         row_key = self._row_settings_key(row)
-        active = self.current_config_panel()
-        if active is not None and active.settings_key() == row_key:
-            return  # same settings folder as the active tab — don't spawn a duplicate
+        existing = next(
+            (p for p in self._config_panels() if p.settings_key() == row_key), None
+        )
+        if existing is not None:
+            self.setCurrentWidget(existing)
+            return
         params = merge_denormalized(row)
         if params:
             self.open_config(row.get("workflow_name", ""), params)

@@ -334,7 +334,8 @@ class BrowserPane:
                 card.update_item(item)
 
     def _inflight_items(self) -> list:
-        """Every queued/running generation as a card model, running ones first.
+        """Every queued/running generation as a card model, in the order ComfyUI
+        will work through them.
 
         The database's running/pending rows are the source of truth for what's in
         flight — every generation is a gallery re-roll (a tab's Generate launches
@@ -342,6 +343,12 @@ class BrowserPane:
         (after a restart that hasn't re-adopted it, say). A re-roll tracked this
         session grafts on its live frame, progress, cancel and start time from its
         :class:`GenerationJob`; an untracked running row shows a plain card.
+
+        ComfyUI's own queue orders them, since a drag in the bottom strip moves
+        jobs there without touching anything the rows record. A job it hasn't
+        listed yet — submitted between polls — waits at the back rather than
+        jumping the queue on screen; with no order known at all (no client, or a
+        first poll still to come) they fall back to running-first, as they were.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, job in self._v._reroll.jobs.items()}
@@ -379,8 +386,11 @@ class BrowserPane:
                 foreign_ahead=foreign,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),
+                open_config=lambda p=pid: self._v.open_config_tab(p),
             ))
-        items.sort(key=lambda it: it.status != "running")  # stable: running first
+        place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
+        items.sort(key=lambda it: (place.get(it.key, len(place)),
+                                   it.status != "running"))
         return items
 
     def _typical_seconds(self, workflow_name: str, cache: dict):

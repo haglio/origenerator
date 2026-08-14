@@ -49,7 +49,7 @@ from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
-from origenerator.gui.running_job_bar import RunningJobBar
+from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -606,12 +606,14 @@ class GalleryView(QWidget):
         self._panes.setSizes([220, 560, 440])
 
         layout.addWidget(self._panes, 1)
-        # A slim bar under the panes shows the one job currently in flight (ComfyUI
-        # runs them one at a time), reachable from any folder or config tab. Hidden
-        # until something runs; fed on every rebuild and poll.
-        self._running_bar = RunningJobBar()
-        self._running_bar.clear_queue_requested.connect(self._clear_foreign_queue)
-        layout.addWidget(self._running_bar)
+        # A strip under the panes lists every generation in flight — ComfyUI runs
+        # them one at a time, so a batch of Generates is a queue — reachable from
+        # any folder or config tab. Fed on every rebuild and poll; a row dragged to
+        # a new place asks the controller to make ComfyUI run them in that order.
+        self._queue = GenerationQueue()
+        self._queue.reorder_requested.connect(self._reroll.reorder)
+        self._queue.clear_queue_requested.connect(self._clear_foreign_queue)
+        layout.addWidget(self._queue)
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
         """A compact, icon-only toolbar button for the browser-pane header. A
@@ -1179,6 +1181,9 @@ class GalleryView(QWidget):
             # (see GenerationJob.refresh_backlog).
             job.refresh_backlog()
         self._refresh_foreign_queue()
+        # And re-read the order ComfyUI will work through its queue in, which a
+        # drag in the bottom strip changes (see RerollController.reorder).
+        self._reroll.refresh_queue_order()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)
@@ -1189,9 +1194,9 @@ class GalleryView(QWidget):
             # No DB change, but the in-flight cards still need each running re-roll's
             # live frame pushed in — it advances between rebuilds.
             self._browser.refresh_inflight()
-        # The bottom bar is always on screen, so refresh the active job every tick —
-        # its live frame and progress advance between rebuilds.
-        self._update_running_bar()
+        # The bottom strip is always on screen, so refresh it every tick — its
+        # rows' live frames and progress advance between rebuilds.
+        self._update_queue()
         self._refresh_wait_note()
 
     def _rebuild(self, rows, meta):
@@ -1261,7 +1266,7 @@ class GalleryView(QWidget):
             location = self._current_location()
             if location is not None:
                 self._record_visit(location)
-        self._update_running_bar()
+        self._update_queue()
         # Re-assert the front tab's Generate-as-progress state against the live jobs.
         # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
         # light its tab's button after a restart: at reconnect time the view's image
@@ -2583,11 +2588,10 @@ class GalleryView(QWidget):
     def _inflight_items(self) -> list:
         return self._browser._inflight_items()
 
-    def _update_running_bar(self):
-        """Feed the bottom bar the in-flight jobs (running first) plus whatever
-        another app has on ComfyUI, so the active generation shows from anywhere
-        and a queue that isn't ours is visible before Generate, not after."""
-        self._running_bar.set_items(self._inflight_items(), self._foreign_queue.total)
+    def _update_queue(self):
+        """Feed the bottom strip every in-flight job, in the order ComfyUI will
+        work through them, so the whole queue shows from anywhere in the view."""
+        self._queue.set_items(self._inflight_items())
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.
@@ -2634,7 +2638,7 @@ class GalleryView(QWidget):
             return
         logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)
         self._refresh_foreign_queue()
-        self._update_running_bar()  # the bar goes blank now rather than a poll later
+        self._update_queue()  # the strip goes blank now rather than a poll later
 
     def _confirm_clear_queue(self, total: int) -> bool:
         """Ask before dropping it: the jobs are somebody's work, and one of them

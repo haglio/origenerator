@@ -1,7 +1,7 @@
 import pytest
 
 from origenerator.gui.generation_queue import GenerationQueue
-from origenerator.gui.inflight_card import InFlightItem
+from origenerator.gui.inflight import InFlightItem
 
 
 @pytest.fixture

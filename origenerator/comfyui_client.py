@@ -93,7 +93,7 @@ def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
-    progress = pyqtSignal(str, int, int)  # prompt_id, value, max
+    progress = pyqtSignal(str, str, int, int)  # prompt_id, node_id, value, max
     node_executing = pyqtSignal(str, str)  # prompt_id, node_id
     job_completed = pyqtSignal(str, dict)  # prompt_id, history_data
     job_error = pyqtSignal(str, str)  # prompt_id, error_message
@@ -209,7 +209,10 @@ class ComfyUIClient(QThread):
             # can't set this itself.
             if prompt_id:
                 self._executing_prompt_id = prompt_id
-            self.progress.emit(prompt_id, data.get("value", 0), data.get("max", 0))
+            self.progress.emit(
+                prompt_id, str(data.get("node") or ""),
+                data.get("value", 0), data.get("max", 0),
+            )
 
         elif msg_type == "execution_error":
             self.job_error.emit(

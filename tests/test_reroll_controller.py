@@ -263,7 +263,7 @@ def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
     controller = RerollController(db, client)
     controller.start_prepared("exp-key", _I2V, _params(), source="experiment")
     experiment = controller.job_for("exp-key")
-    client.progress.emit(experiment.prompt_id, 1, 10)  # ComfyUI began executing it
+    client.progress.emit(experiment.prompt_id, "15", 1, 10)  # ComfyUI began executing it
 
     started = controller.start_prepared("user-key", _I2V, _params(seed=7))
 
@@ -363,7 +363,7 @@ def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
     controller.start_prepared(key, _I2V, _params(steps=20, seed=3, noise_seed=9))
     job = controller.jobs[key]
 
-    client.progress.emit(job.prompt_id, 5, 10)  # a live sampler step
+    client.progress.emit(job.prompt_id, "15", 5, 10)  # a live sampler step
 
     state = json.loads(db.get_generation(job.prompt_id)["progress_json"])
     assert state["last_progress"] == list(job.last_progress)
@@ -379,9 +379,9 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path):
     controller.start_prepared(key, _I2V, _params(steps=20))
     pid = controller.jobs[key].prompt_id
 
-    client.progress.emit(pid, 5, 10)                       # first tick -> written
+    client.progress.emit(pid, "15", 5, 10)                       # first tick -> written
     first = db.get_generation(pid)["progress_json"]
-    client.progress.emit(pid, 6, 10)                       # same second -> throttled
+    client.progress.emit(pid, "15", 6, 10)                       # same second -> throttled
     assert db.get_generation(pid)["progress_json"] == first
 
 

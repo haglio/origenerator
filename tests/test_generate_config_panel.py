@@ -601,11 +601,11 @@ def test_panel_forwards_the_preview_drag_signals(panel):
 
 def test_generate_button_fills_with_run_progress_only_while_generating(panel):
     panel.set_generating(True)
-    panel._on_progress("pid", 3, 12)
+    panel._on_progress("pid", "9", 3, 12)
     assert panel._generate_btn._fraction == 0.25   # the run's step progress
 
     panel.set_generating(False)                    # run ended: back to the idle button
-    panel._on_progress("pid", 9, 12)               # a stray later event is ignored
+    panel._on_progress("pid", "9", 9, 12)               # a stray later event is ignored
     assert panel._generate_btn._fraction is None
 
 
@@ -614,7 +614,7 @@ def test_set_generating_true_again_keeps_the_fill(panel):
     # already-running tab must NOT snap its filling button back to empty — otherwise
     # a reconnected run's bar would reset to 0 on each poll instead of advancing.
     panel.set_generating(True)
-    panel._on_progress("pid", 6, 12)               # filled to halfway
+    panel._on_progress("pid", "9", 6, 12)               # filled to halfway
     assert panel._generate_btn._fraction == 0.5
 
     panel.set_generating(True)                     # redundant re-assert on a rebuild
@@ -627,10 +627,10 @@ def test_generate_button_ignores_another_jobs_progress(panel):
     # only the tracked run's own progress counts once the tab knows its prompt id.
     panel.set_generating(True, prompt_id="mine")
 
-    panel._on_progress("experiment", 6, 12)        # someone else's run
+    panel._on_progress("experiment", "9", 6, 12)        # someone else's run
     assert panel._generate_btn._fraction == 0.0    # untouched (progress mode starts at 0)
 
-    panel._on_progress("mine", 3, 12)              # this tab's own run
+    panel._on_progress("mine", "9", 3, 12)              # this tab's own run
     assert panel._generate_btn._fraction == 0.25
 
 
@@ -639,13 +639,13 @@ def test_reasserting_generating_retargets_the_tracked_prompt(panel):
     # stage) without leaving the generating state; the re-assert must adopt the
     # new prompt id so the second stage's progress still drives the button.
     panel.set_generating(True, prompt_id="image-stage")
-    panel._on_progress("image-stage", 6, 12)
+    panel._on_progress("image-stage", "9", 6, 12)
     assert panel._generate_btn._fraction == 0.5
 
     panel.set_generating(True, prompt_id="video-stage")  # stage swap, still generating
-    panel._on_progress("image-stage", 9, 12)       # stale stage: ignored now
+    panel._on_progress("image-stage", "9", 9, 12)       # stale stage: ignored now
     assert panel._generate_btn._fraction == 0.5
-    panel._on_progress("video-stage", 3, 12)
+    panel._on_progress("video-stage", "9", 3, 12)
     assert panel._generate_btn._fraction == 0.25
 
 

@@ -282,7 +282,22 @@ def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
     assert client._executing_prompt_id == "job1"
 
 
-def test_reuses_a_supplied_client_id(qtbot):
+def test_progress_event_forwards_its_node_id(qtbot):
+    # The node id says whose numbers these are — the job side needs it to tell
+    # sampler steps from another node's units (a video loader's frame count).
+    client = ComfyUIClient()
+    seen = []
+    client.progress.connect(lambda pid, node, v, m: seen.append((pid, node, v, m)))
+
+    client._handle_ws_message(json.dumps({
+        "type": "progress",
+        "data": {"prompt_id": "job1", "node": "15", "value": 3, "max": 10},
+    }))
+    client._handle_ws_message(json.dumps({
+        "type": "progress", "data": {"prompt_id": "job1", "value": 4, "max": 10},
+    }))
+
+    assert seen == [("job1", "15", 3, 10), ("job1", "", 4, 10)]
     # Persisting and reusing this id across launches is how a restart reconnects to a
     # job still running in ComfyUI, which targets that job's live websocket messages
     # at the id that submitted it. The id also rides the /ws query so ComfyUI routes

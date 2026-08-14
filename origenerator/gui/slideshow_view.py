@@ -18,6 +18,7 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
+from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
@@ -28,11 +29,18 @@ class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
 
-    def __init__(self, items, *, image_dwell_ms=4000, shuffle=None, on_delete=None,
-                 player=None, stroke=None, parent=None):
+    def __init__(self, items, *, image_dwell_ms=None, shuffle=None, on_delete=None,
+                 player=None, stroke=None, pace=None, parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
+        # How long a slide holds the screen is app-wide, because the console
+        # that sets it is: turned up here or in the main window, it is the
+        # same number. An explicit dwell (a test's) still wins.
+        self._pace = pace if pace is not None else SlideshowPace(parent=self)
+        if image_dwell_ms is None:
+            image_dwell_ms = self._pace.dwell_ms
+        self._pace.changed.connect(self._on_pace_changed)
         playlist_kwargs = {"image_dwell_ms": image_dwell_ms}
         if shuffle is not None:  # else the playlist uses its own random shuffle
             playlist_kwargs["shuffle"] = shuffle
@@ -118,7 +126,7 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        return round(self._playlist.image_dwell_ms / 1000)
+        return self._pace.seconds
 
     @property
     def locked(self) -> bool:
@@ -135,8 +143,14 @@ class SlideshowView(QWidget):
         self._delete_current()
 
     def set_dwell_s(self, seconds: int) -> None:
+        self._pace.set_seconds(seconds)
+
+    def _on_pace_changed(self, seconds: int) -> None:
+        """The pace moved — here or in another window — so the slide on screen
+        takes the new one rather than waiting out the old."""
         self._playlist.image_dwell_ms = seconds * 1000
-        self._show_current()  # re-arm the dwell timer on the new pace
+        if not self._playlist.paused:
+            self._show_current()
 
     def _on_video_ended(self):
         """A clip finished: move on, unless the user paused while it played."""

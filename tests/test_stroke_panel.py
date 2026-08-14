@@ -66,8 +66,9 @@ class FakeHost:
         self.calls.append("cull")
 
     def set_dwell_s(self, seconds):
-        self.dwell_s = seconds
-        self.calls.append(("dwell", seconds))
+        from origenerator.gui.slideshow_pace import MAX_S, MIN_S
+        self.dwell_s = max(MIN_S, min(MAX_S, seconds))
+        self.calls.append(("dwell", self.dwell_s))
 
 
 def _panel(qtbot, stroke=None, host=None):
@@ -151,17 +152,17 @@ def test_a_parked_device_offers_none_of_the_strokes_marks(qtbot):
 
 
 def test_the_pace_stops_at_its_ends(qtbot):
-    from origenerator.gui.stroke_panel import MAX_DWELL_S, MIN_DWELL_S
+    from origenerator.gui.slideshow_pace import MAX_S, MIN_S
 
     panel, _stroke, host = _panel(qtbot)
-    host.dwell_s = MIN_DWELL_S
+    host.dwell_s = MIN_S
     panel.render_console()
     _press(panel, "genau_advance_down")
-    assert host.dwell_s == MIN_DWELL_S
-    host.dwell_s = MAX_DWELL_S
+    assert host.dwell_s == MIN_S
+    host.dwell_s = MAX_S
     panel.render_console()
     _press(panel, "genau_advance_up")
-    assert host.dwell_s == MAX_DWELL_S
+    assert host.dwell_s == MAX_S
 
 
 def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
@@ -204,3 +205,44 @@ def test_the_panel_actually_paints(qtbot):
     stroke.active = True
     stroke.state.cruise.active = True
     panel.grab()
+
+
+def test_the_pace_starts_at_the_slideshows_own_default(qtbot):
+    # It read 0s, which is not a pace at all — the console has to open on the
+    # number the slideshow actually uses, whether or not one is running.
+    from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
+    from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
+
+    pace = SlideshowPace()
+    assert pace.seconds == DEFAULT_IMAGE_DWELL_MS // 1000
+    panel = StrokePanel(FakeStroke(), host=PaceOnlyHost(pace))
+    qtbot.addWidget(panel)
+    assert console_hud(panel._stroke, panel._host).console.advance_interval == pace.seconds
+
+
+def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtbot):
+    from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
+    from origenerator.gui.slideshow_view import SlideshowView
+
+    pace = SlideshowPace()
+    panel = StrokePanel(FakeStroke(), host=PaceOnlyHost(pace))
+    qtbot.addWidget(panel)
+    panel.render_console()
+    _press(panel, "genau_advance_up")
+    view = SlideshowView([("a.png", "image", 1)], shuffle=lambda items: None,
+                         pace=pace)
+    qtbot.addWidget(view)
+    assert view._playlist.image_dwell_ms == pace.seconds * 1000
+
+
+def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
+    from origenerator.gui.slideshow_pace import SlideshowPace
+    from origenerator.gui.slideshow_view import SlideshowView
+
+    pace = SlideshowPace()
+    view = SlideshowView([("a.png", "image", 1), ("b.png", "image", 2)],
+                         shuffle=lambda items: None, pace=pace)
+    qtbot.addWidget(view)
+    pace.set_seconds(9)
+    assert view._playlist.image_dwell_ms == 9000
+    assert view.dwell_s == 9

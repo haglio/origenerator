@@ -1352,6 +1352,10 @@ class GalleryView(QWidget):
             return
         group = current.data(0, _GROUP_ROLE)
         self._note_folder_visit(group.key if group is not None else None)
+        if group is not None:
+            # A folder is somewhere the user went, so Back can return to it — and
+            # so leaving a shelf for one is a step Back can undo at all.
+            self._record_location(group.key)
         self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         self._show_group_contents(group)
@@ -3128,10 +3132,11 @@ class GalleryView(QWidget):
         return key if key in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY) else None
 
     def _current_location(self) -> str | None:
-        """The history key for the view on screen — a shelf key on a shelf, else the
-        selected generation's id (``None`` when nothing is selected)."""
+        """The history key for the view on screen — a shelf key on a shelf, the
+        selected generation's id in a folder, else the open folder's own key
+        (``None`` with nothing open at all)."""
         return self._current_shelf_key() or (
-            self._selected["prompt_id"] if self._selected else None
+            self._selected["prompt_id"] if self._selected else self._selected_folder_key()
         )
 
     def _record_location(self, location: str):
@@ -3159,11 +3164,22 @@ class GalleryView(QWidget):
 
     def _restore_location(self, location: str):
         """Re-show a history location without recording the move — a shelf overview
-        (Recents/Starred) or a generation in its folder."""
+        (Recents/Starred), a folder, or a generation in its folder."""
         if location in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY):
             self._return_to_shelf(location)
+        elif location in self._item_by_key:
+            self._return_to_folder(location)
         else:
             self._show_generation(location)
+
+    def _return_to_folder(self, key: str):
+        """Back/Forward onto a folder: open it without recording the move (so it
+        doesn't pile back onto history)."""
+        self._suppress_history = True
+        try:
+            self._tree.setCurrentItem(self._item_by_key[key])
+        finally:
+            self._suppress_history = False
 
     def _return_to_shelf(self, key: str):
         """Back/Forward onto a shelf: show it and restore the item that was selected

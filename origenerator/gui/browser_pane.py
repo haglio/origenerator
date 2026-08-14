@@ -38,6 +38,9 @@ _STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shel
 # user arrives at it, rather than after a visible stop.
 _RECENTS_PAGE = 50
 _RECENTS_REACH = 600
+# Vertical breathing room left around a tile a link scrolls to, so it lands with
+# its neighbors in view rather than flush against an edge of the pane.
+_REVEAL_MARGIN = 40
 
 
 def _unique_rows(rows) -> list[dict]:
@@ -387,13 +390,12 @@ class BrowserPane:
 
     def open_in_containing_folder(self, prompt_id: str):
         """Jump the browser pane to ``prompt_id``'s own folder and land on the item
-        itself — its tile picked and highlighted, as if you'd navigated in and
-        clicked it, not just auto-previewing the folder's first item. The double-
-        click gesture on every shelf tile, and the info pane's "Go to folder"."""
-        self._v._on_source_link(prompt_id)  # open the folder, previewing the item
-        # The navigation renders the folder's tiles; now pick this one so it reads
-        # as the selected item rather than an unhighlighted preview.
-        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        itself — its tile picked, highlighted and scrolled to, as if you'd navigated
+        in and clicked it, not just auto-previewing the folder's first item. The
+        double-click gesture on every shelf tile, and the info pane's "Go to
+        folder"; a followed link (:meth:`GalleryView._on_source_link`) lands the
+        same way."""
+        self._v._on_source_link(prompt_id)
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
@@ -616,6 +618,31 @@ class BrowserPane:
             self._selected_ids = {prompt_id}
             self._selection_anchor = prompt_id
         self._refresh_selection_highlights()
+
+    def reveal_tile(self, prompt_id: str):
+        """Land on a tile the way arriving from elsewhere should: picked, and
+        scrolled to if it sits outside the visible part of the pane. What a
+        followed link needs — a folder of dozens otherwise leaves you looking at
+        its newest items with the one you asked for highlighted off-screen."""
+        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        widget = self._thumb_widgets.get(prompt_id)
+        if widget is None:
+            return  # nothing drawn for it here (an in-flight row, a shelf page away)
+        self._scroll_to(widget)
+        # The pane it was just drawn in hasn't been laid out yet, so that first
+        # attempt had no real tile position to aim at — hence a second one once
+        # this turn's layout has run (as :meth:`_restore_scroll` does).
+        QTimer.singleShot(0, lambda: self._reapply_reveal(prompt_id, widget))
+
+    def _reapply_reveal(self, prompt_id: str, widget):
+        """Scroll to a revealed tile again after layout — unless the pane has since
+        been redrawn or navigated away from, in which case that tile is gone and
+        the user's new view is not ours to move."""
+        if self._thumb_widgets.get(prompt_id) is widget:
+            self._scroll_to(widget)
+
+    def _scroll_to(self, widget):
+        self._v._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():

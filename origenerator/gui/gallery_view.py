@@ -2652,8 +2652,14 @@ class GalleryView(QWidget):
         return gallery.animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR)
 
     def _on_source_link(self, prompt_id: str):
+        """Follow a link to another generation — a video's source image, an image's
+        animation, a "Go to folder". Opens the target's folder and lands on the
+        item itself: previewed, its tile picked and scrolled into view, so which of
+        the folder's items the link meant is visible rather than guessed at."""
         self._show_generation(prompt_id)
         self._record_visit(prompt_id)
+        # After the navigation, which renders the folder's tiles fresh.
+        self._browser.reveal_tile(prompt_id)
 
     # --- back/forward navigation ------------------------------------------
 

@@ -2328,36 +2328,12 @@ class GalleryView(QWidget):
         recording caller (a link) adds the real target itself afterward."""
         self._suppress_history = True
         try:
-            leaf = self._leaf_by_id.get(prompt_id) or self._nearest_folder_item(prompt_id)
+            leaf = self._leaf_by_id.get(prompt_id)
             if leaf is not None:
                 self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
             self._on_thumbnail_clicked(prompt_id)
         finally:
             self._suppress_history = False
-
-    def _nearest_folder_item(self, prompt_id: str):
-        """The tree row to land on for a generation that has no settings leaf of
-        its own, or ``None`` when even its media tier is absent.
-
-        An unreviewed background experiment is the case: the tree is the user's
-        curated space, so it holds the row out until a "keep" verdict admits it,
-        which left a double-click on the Experiments shelf with nowhere to go.
-        Its would-be folder chain is recomputed from the row and the deepest tier
-        that already exists wins — usually the LoRA or model folder, since a
-        mutated setting is precisely what makes its settings leaf new. So the jump
-        lands in the neighborhood the item joins, with the item itself still in the
-        info pane to compare against what's there.
-        """
-        row = self._db.get_generation(prompt_id)
-        if row is None:
-            return None
-        image_index = gallery.build_image_config_index(self._image_rows)
-        for level in ("settings", "source_image", "lora", "model", "workflow", "media"):
-            item = self._item_by_key.get(
-                gallery.folder_key_at_level(row, level, image_index))
-            if item is not None:
-                return item
-        return None
 
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""

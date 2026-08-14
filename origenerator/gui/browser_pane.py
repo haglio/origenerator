@@ -283,26 +283,21 @@ class BrowserPane:
         """Jump the browser pane to ``prompt_id``'s own folder and land on the item
         itself — its tile picked and highlighted, as if you'd navigated in and
         clicked it, not just auto-previewing the folder's first item. The double-
-        click gesture on every shelf tile, and the info pane's "Go to folder".
-
-        An unreviewed experiment has no folder of its own to land in (the tree
-        holds it out until it's kept), so the navigation stops at the nearest
-        existing ancestor and there is no tile of it to pick — hence the guard.
-        """
+        click gesture on every shelf tile, and the info pane's "Go to folder"."""
         self._v._on_source_link(prompt_id)  # open the folder, previewing the item
         # The navigation renders the folder's tiles; now pick this one so it reads
         # as the selected item rather than an unhighlighted preview.
-        if prompt_id in self._visible_ids:
-            self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
     def show_experiments_overview(self):
         """Render the Experiments shelf: what the background experimenter has come
         up with since the user last looked, newest first, each tile wearing
-        keep/reject hover controls. A kept item joins the gallery proper; a
-        rejected one is trashed and teaches the policy what to avoid. Clicking
-        previews the item right here, like the other shelves."""
+        keep/reject hover controls. A kept item just leaves the queue — it has been
+        in its own folder since it ran; a rejected one is trashed and teaches the
+        policy what to avoid. Clicking previews the item right here and
+        double-clicking opens its folder, like the other shelves."""
         self._v._title.set_display(EXPERIMENTS_LABEL)
         self._v._avg_label.setText("")
         self._v._clear_metadata()

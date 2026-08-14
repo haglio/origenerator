@@ -1064,10 +1064,11 @@ def test_build_gallery_tree_includes_a_pending_row():
     assert surfaced == {"q"}
 
 
-def test_build_gallery_tree_admits_experiments_only_once_approved():
-    # A background experiment stays out of the tree — completed or still in
-    # flight — until the user reviews it up; a rejected one never appears. The
-    # main gallery stays curated, with unvetted output confined to its shelf.
+def test_build_gallery_tree_nests_experiments_like_any_other_generation():
+    # An experiment is a generation, so it gets its settings folder whatever the
+    # review says — from the moment it starts running, before any verdict. A
+    # rejected one is absent only because rejecting it trashed its files, the
+    # same reason any output-less row is absent.
     def _experiment(prompt_id, verdict, **kw):
         kw.setdefault("status", "completed")
         kw.setdefault("output_files", json.dumps([{"filename": f"{prompt_id}.png"}]))
@@ -1079,12 +1080,12 @@ def test_build_gallery_tree_admits_experiments_only_once_approved():
         _img("mine", "a cat", 50, 1),
         _experiment("approved", "up"),
         _experiment("unreviewed", None),
-        _experiment("rejected", "down"),
+        _experiment("rejected", "down", output_files=None),
         _experiment("cooking", None, status="running", output_files="[]"),
     ]
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for media in tree for r in rows_under(media)}
-    assert surfaced == {"mine", "approved"}
+    assert surfaced == {"mine", "approved", "unreviewed", "cooking"}
 
 
 def test_unreviewed_experiments_lists_only_finished_unjudged_results():

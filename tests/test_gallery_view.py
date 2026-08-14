@@ -562,37 +562,38 @@ def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
     assert any("Reject" in t for t in tooltips)
 
 
-def test_double_clicking_an_experiment_lands_in_the_folder_it_would_join(qtbot):
-    # An unreviewed experiment has no settings folder of its own — the tree holds
-    # it out until it's kept, and its mutated setting would give it a brand-new
-    # leaf anyway — so the jump settles on the deepest tier that does exist: the
-    # LoRA folder its base sits under.
-    base = _image("i1", "a cat", 50, 1)
-    view = GalleryView(FakeDB([base, _experiment_row("e1", steps=30)]))
+def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
+    # An experiment has a folder like anything else, so the shelf's double-click
+    # is the same jump Recents and Starred make — no verdict needed first.
+    experiment = _experiment_row("e1", steps=30)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(view._experiments_item)
     view._thumb_widgets["e1"].double_clicked.emit("e1")
 
-    assert view._selected_folder_key() == gallery.folder_key_at_level(base, "lora")
-    assert view.selected_generation() == "e1"   # still previewed, to judge in place
+    assert view._selected_folder_key() == gallery.settings_folder_key(experiment)
+    assert view.visible_prompt_ids() == ["e1"]  # its own settings folder, not i1's
+    assert view.selected_prompt_ids() == ["e1"]  # landed selected
+    assert view._thumb_widgets["e1"].is_selected()
 
 
-def test_keeping_an_experiment_admits_it_to_the_gallery(qtbot):
+def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     db = FakeDB([_experiment_row("e1")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    # Unreviewed: on the shelf, not in the tree.
-    assert "Images" not in _top_level(view._tree)
+    # Unreviewed, but already filed in the tree — the shelf is a queue over it,
+    # not a holding pen outside it.
+    assert "Images" in _top_level(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(view._experiments_item)
     assert view.visible_prompt_ids() == []          # reviewed: off the shelf...
-    assert "Images" in _top_level(view._tree)       # ...and into the gallery tree
+    assert "Images" in _top_level(view._tree)       # ...and still in its folder
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):

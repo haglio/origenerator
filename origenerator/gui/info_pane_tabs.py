@@ -3,8 +3,9 @@
 Every tab is the same plain, editable :class:`GenerateConfigPanel` — pick a
 workflow and set params — with no special or permanent tab. New tabs fork via the
 "+" button or a thumbnail double-click; the first one is created on construction.
-The corner's "✕ All" empties the pane in one click, since a session that has
-spread across a dozen tabs otherwise costs a dozen clicks to clear.
+The corner's close-all — a tab's own ✕ beside the word "All" — empties the pane in
+one click, since a session that has spread across a dozen tabs otherwise costs a
+dozen clicks to clear.
 This owns every tab's lifecycle — add, close, rename, and session capture/restore
 of each tab's configuration.
 
@@ -29,8 +30,9 @@ import time
 
 from PyQt6.QtWidgets import (
     QTabWidget, QToolButton, QInputDialog, QApplication, QWidget, QHBoxLayout,
+    QStyle,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -40,6 +42,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.icons import tab_close_icon
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -64,13 +67,24 @@ class InfoPaneTabs(QTabWidget):
         self._add_btn.setToolTip("New configuration")
         self._add_btn.clicked.connect(lambda: self._add_subtab())
         self._close_all_btn = QToolButton()
-        self._close_all_btn.setText("✕ All")
+        # The tabs' own close mark, at the tabs' own size, rather than a ✕ typed
+        # into the label: one control that closes tabs, spelled one way.
+        indicator = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+        self._close_all_btn.setIcon(tab_close_icon())
+        self._close_all_btn.setIconSize(QSize(indicator, indicator))
+        self._close_all_btn.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self._close_all_btn.setText("All")
         self._close_all_btn.setToolTip("Close all configurations")
         self._close_all_btn.clicked.connect(self.close_all_subtabs)
         # A corner holds one widget, so both buttons share a row there. Close-all
         # goes to the LEFT of "+", which keeps "+" on the exact far-right pixel it
         # has always occupied, and the gap between them means a miss on the "+" a
         # user clicks constantly doesn't empty the pane instead.
+        # The icon makes close-all the taller button, so "+" is matched to it —
+        # two heights in a two-button row is the mismatch this pairing ends.
+        self._add_btn.setFixedHeight(self._close_all_btn.sizeHint().height())
         self._corner = QWidget()
         corner_row = QHBoxLayout(self._corner)
         corner_row.setContentsMargins(0, 0, 0, 0)

@@ -142,6 +142,37 @@ def test_close_subtab_removes_and_tears_down(tabs):
 
 # --- close all --------------------------------------------------------------
 
+def test_close_all_wears_the_tabs_own_close_mark(tabs):
+    # Two spellings of "close" in one row read as two different controls: the
+    # tabs' ✕ is the style's mark, so the corner button borrows it rather than
+    # typing a ✕ character of its own next to "All".
+    from origenerator.gui import icons
+
+    assert "✕" not in tabs._close_all_btn.text()
+    assert tabs._close_all_btn.text() == "All"
+    expected = icons.tab_close_icon().pixmap(tabs._close_all_btn.iconSize())
+    assert tabs._close_all_btn.icon().pixmap(
+        tabs._close_all_btn.iconSize()).toImage() == expected.toImage()
+
+
+def test_close_all_icon_matches_the_size_a_tab_draws_its_close_mark(tabs):
+    # Same mark at a different scale would still look like a different control.
+    from PyQt6.QtWidgets import QStyle
+
+    indicator = tabs.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+    assert tabs._close_all_btn.iconSize().width() == indicator
+
+
+def test_both_corner_buttons_stand_the_same_height(tabs):
+    # Close-all carries an icon and "+" a bare glyph, so left alone the two sit at
+    # different heights in one row — the same mismatched look this pairing is
+    # meant to end.
+    tabs.resize(900, 300)
+    tabs.show()
+    tabs._corner.layout().activate()
+    assert tabs._add_btn.height() == tabs._close_all_btn.height()
+
+
 def test_close_all_button_empties_the_pane_in_one_click(tabs):
     tabs._add_subtab()
     tabs._add_subtab()  # three open tabs

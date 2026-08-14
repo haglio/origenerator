@@ -12,11 +12,18 @@ same rects it paints. A row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the
 Starred and Recents shelves) draws that icon in its caret column so its label
 lines up with the sibling folders'. Which group a row holds is injected, so this
 stays free of the gallery model.
+
+Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
+set) and dragged onto a *collecting* row — one carrying its key under
+``DROP_KEY_ROLE``: the Starred shelf, or a custom folder. A drop emits
+``folders_dropped`` and is never applied to the tree itself, so nothing is ever
+reparented; what a collecting row does with the dropped folders is the view's
+business, not this widget's.
 """
 
-from PyQt6.QtWidgets import QTreeWidget
-from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
+from PyQt6.QtWidgets import QTreeWidget, QAbstractItemView
+from PyQt6.QtGui import QDrag, QIcon
+from PyQt6.QtCore import Qt, QItemSelectionModel, QMimeData, QRect, QSize, pyqtSignal
 
 from origenerator.gui import icons
 
@@ -28,6 +35,14 @@ _PAD = 4     # gap between the label and the icons, and between the two icons
 # of shifting a glyph into its label. Distinct from the injected group role (plain
 # UserRole).
 BRANCH_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
+# A row carrying its own key here collects dropped folders (Starred, a custom
+# folder). Rows without it refuse a drop, so a folder can never be dragged into
+# the derived hierarchy, whose shape belongs to the generations' settings.
+DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
+
+# The dragged folders' keys, newline-joined. A private type, so a drag out of the
+# tree lands nowhere except on a row that collects folders.
+FOLDER_KEYS_MIME = "application/x-origenerator-folder-keys"
 
 
 def _action_rects(content: QRect):
@@ -42,10 +57,13 @@ def _action_rects(content: QRect):
 
 
 class FolderTree(QTreeWidget):
-    """A QTreeWidget whose leaf rows carry star/delete actions in their left margin."""
+    """A QTreeWidget whose leaf rows carry star/delete actions in their left margin,
+    whose folders can be picked several at a time, and whose collecting rows accept
+    folders dragged onto them."""
 
     star_clicked = pyqtSignal(object)    # folder key
     delete_clicked = pyqtSignal(object)  # folder key
+    folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped folder keys
 
     def __init__(self, group_role, parent=None):
         super().__init__(parent)
@@ -56,6 +74,26 @@ class FolderTree(QTreeWidget):
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
         self.setMouseTracking(True)  # so hover is tracked without a button held
+        # Several folders at once: Shift takes a run, Ctrl a scattered set — the
+        # gesture that composes a custom folder.
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        # Folders drag out; only a collecting row takes them (see _drop_target_key).
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+
+    def setCurrentItem(self, item, column=0, command=None):
+        """Navigate to one row, replacing whatever was picked.
+
+        The default has to be spelled out because the tree allows several rows at
+        once: with no explicit command Qt reads the *live* keyboard modifiers, so a
+        programmatic move made while the user happens to be holding Ctrl or Shift
+        would toggle or extend the selection instead of replacing it — every caller
+        here means "go here", never "add this to the picked set".
+        """
+        if command is None:
+            command = QItemSelectionModel.SelectionFlag.ClearAndSelect
+        super().setCurrentItem(item, column, command)
 
     def _leaf_group(self, index):
         """The folder a leaf row holds (one with no sub-folders), else None — parent
@@ -118,3 +156,78 @@ class FolderTree(QTreeWidget):
                     self.star_clicked.emit(group.key)
                     return
         super().mousePressEvent(event)
+
+    # --- dragging folders onto a collecting row ----------------------------
+
+    def selected_folder_keys(self) -> list[str]:
+        """The keys of the picked folder rows, top-down. Shelf rows that hold no
+        folder of their own (Recents, Experiments) contribute nothing."""
+        keys = []
+        for item in self.selectedItems():
+            group = item.data(0, self._role)
+            if group is not None:
+                keys.append(group.key)
+        return keys
+
+    def startDrag(self, supported_actions):
+        """Drag the picked folders as their keys. Dragging one row that isn't in
+        the selection drags that row alone — the file-manager behavior, and what
+        keeps a stale multi-selection from being dropped by accident."""
+        pressed = self.currentItem()
+        group = pressed.data(0, self._role) if pressed is not None else None
+        if group is None:
+            return
+        keys = self.selected_folder_keys()
+        if group.key not in keys:
+            keys = [group.key]
+        mime = QMimeData()
+        mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.DropAction.CopyAction)
+
+    def _drop_target_key(self, pos) -> str | None:
+        """The key of the collecting row under ``pos``, or ``None`` where a drop
+        would land on an ordinary folder, a shelf that collects nothing, or the
+        empty space below the tree."""
+        index = self.indexAt(pos)
+        key = index.data(DROP_KEY_ROLE) if index.isValid() else None
+        return key if isinstance(key, str) else None
+
+    def _dragged_keys(self, event) -> list[str]:
+        data = event.mimeData().data(FOLDER_KEYS_MIME)
+        if data.isEmpty():
+            return []
+        return [key for key in bytes(data).decode("utf-8").split("\n") if key]
+
+    def dragEnterEvent(self, event):
+        if self._dragged_keys(event):
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Accept only over a collecting row, so the cursor says outright where the
+        folders can land."""
+        target = self._drop_target_key(event.position().toPoint())
+        keys = self._dragged_keys(event)
+        # A row can't collect itself, and dropping a folder back where it came from
+        # is nothing — refuse both rather than accept a no-op.
+        if target is not None and [k for k in keys if k != target]:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        """Hand the drop to the view and consume it. The base implementation is
+        deliberately not called: the tree's shape is derived from the generations,
+        so a drop must never move a row."""
+        target = self._drop_target_key(event.position().toPoint())
+        keys = [k for k in self._dragged_keys(event) if k != target]
+        if target is None or not keys:
+            event.ignore()
+            return
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+        self.folders_dropped.emit(target, keys)

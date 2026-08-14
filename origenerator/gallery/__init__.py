@@ -6,6 +6,7 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.signatures` — parse a row's params and reduce them to the canonical keys
   the tree groups by (settings, model, LoRA, and an i2v's start-frame config).
 * :mod:`.groups` — the folder-tier dataclasses and the helpers that walk them.
+* :mod:`.custom` — the folders the user composes by hand, over those tiers.
 * :mod:`.output` — what a generation produced on disk: media type, preview, files.
 * :mod:`.labels` — the human-facing folder and Generate-tab names.
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
@@ -17,7 +18,16 @@ import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X
 """
 
 from origenerator.gallery.combine import combined_params, curated_params
+from origenerator.gallery.custom import (
+    SELECTION_KEY,
+    build_custom_folders,
+    custom_folder_id,
+    custom_folder_key,
+    is_custom_key,
+    selection_group,
+)
 from origenerator.gallery.groups import (
+    CustomGroup,
     LoraGroup,
     MediaGroup,
     ModelGroup,

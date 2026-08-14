@@ -5,6 +5,12 @@ Renders the Recents and Starred shelves atop the media → workflow → model �
 the view navigates by. Pure tree rendering and lookups over a ``FolderTree`` the
 GalleryView owns and lays out; it has no database or refresh concerns — folder
 rename/star/delete live in the view, which rebuilds the tree through :meth:`populate`.
+
+The folders the user composed by hand ride between the shelves and the media
+roots, rendered flat like a shelf: a custom folder's members can sit anywhere in
+the hierarchy, so nesting them under it would draw the same folder twice and put
+two rows in ``item_by_key`` for one key. Its contents show as tiles in the browser
+pane instead, exactly as the Starred shelf shows its bookmarked folders.
 """
 
 from PyQt6.QtWidgets import QTreeWidgetItem
@@ -12,7 +18,7 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gui import icons
-from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
+from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
@@ -35,17 +41,20 @@ class GalleryTree:
         self.recents_item: QTreeWidgetItem | None = None   # the "Recents" shelf row
         self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
         self.experiments_item: QTreeWidgetItem | None = None  # the "Experiments" shelf row
+        self.custom_items: dict[str, QTreeWidgetItem] = {}  # custom folder key -> its row
         self._filter = ""                       # active filter query, lowercased
         self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
         self.seed_matches: dict[str, list[str]] = {}  # leaf key -> prompt_ids the query hit by seed
 
     def populate(self, tree_model, expanded_keys, *, show_recents: bool,
-                 experiment_count: int = 0):
+                 experiment_count: int = 0, custom_folders=()):
         """Rebuild the tree from ``tree_model``, restoring the folders in
         ``expanded_keys``. ``show_recents`` keeps the Recents shelf up even with no
         folders yet (in-flight work to show); Starred appears only once folders do.
         ``experiment_count`` (unreviewed background experiments) shows in the
-        Experiments shelf's label so waiting work is visible from anywhere."""
+        Experiments shelf's label so waiting work is visible from anywhere.
+        ``custom_folders`` are the user's own groupings, each getting a row of its
+        own between the shelves and the media roots."""
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
@@ -53,6 +62,7 @@ class GalleryTree:
         self.recents_item = None
         self.starred_item = None
         self.experiments_item = None
+        self.custom_items = {}
         root = self._tree.invisibleRootItem()
         # Synthetic shelves lead the tree: Recents (in-flight work plus recently
         # finished items) whenever there is anything to show — so a first-ever
@@ -68,13 +78,17 @@ class GalleryTree:
         if tree_model:
             self.starred_item = self._add_shelf(
                 root, STARRED_LABEL, STARRED_KEY, icons.star_icon(filled=True),
-                "Your starred folders"
+                "Your starred folders — drop a folder here to star it"
             )
+            # Starring is what Starred does with a dropped folder, so it collects.
+            self.starred_item.setData(0, DROP_KEY_ROLE, STARRED_KEY)
         label = EXPERIMENTS_LABEL + (f" ({experiment_count})" if experiment_count else "")
         self.experiments_item = self._add_shelf(
             root, label, EXPERIMENTS_KEY, icons.flask_icon(),
             "Background experiments awaiting your review"
         )
+        for custom in custom_folders:
+            self.custom_items[custom.key] = self._add_custom_folder(root, custom)
         for media in tree_model:
             self._add_node(media, root)
         # Folders default to collapsed; only restore folders the user had open.
@@ -92,6 +106,22 @@ class GalleryTree:
         item.setToolTip(0, tooltip)
         root.addChild(item)
         self.item_by_key[key] = item
+        return item
+
+    def _add_custom_folder(self, root, group) -> QTreeWidgetItem:
+        """Add a row for one of the user's own folders: a shelf-shaped row carrying
+        its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
+        treats it like any other folder), editable for an inline rename, and
+        collecting the folders dropped onto it."""
+        count = len(gallery.rows_under(group))
+        item = self._add_shelf(
+            root, group.label, group.key, icons.custom_folder_icon(),
+            f"{group.label} — {count} item{'s' if count != 1 else ''} "
+            "in a folder you made; drop folders here to add them",
+        )
+        item.setData(0, GROUP_ROLE, group)
+        item.setData(0, DROP_KEY_ROLE, group.key)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         return item
 
     def _add_node(self, group, parent_item) -> QTreeWidgetItem:
@@ -124,10 +154,11 @@ class GalleryTree:
         failing that (only in-flight work so far, no finished folders), the Recents
         shelf, so a first generation stays visible while it runs."""
         root = self._tree.invisibleRootItem()
-        shelves = (self.recents_item, self.starred_item, self.experiments_item)
+        skip = (self.recents_item, self.starred_item, self.experiments_item,
+                *self.custom_items.values())
         for i in range(root.childCount()):
             item = root.child(i)
-            if item not in shelves:
+            if item not in skip:
                 return item
         return self.recents_item
 

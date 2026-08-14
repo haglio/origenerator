@@ -18,7 +18,9 @@ rows are left untouched for a later launch to resolve.
 Also home to :func:`reconcile_folder_meta`, the other startup reconcile: it heals
 gallery bookmarks (stars and custom names) whose folder key drifted after a key
 formula changed, and stamps each live bookmark with the identity needed to survive
-the next such change.
+the next such change. :func:`reconcile_custom_folders` does the same for the
+membership of the folders the user composed by hand, which reference folders by
+the same drifting keys.
 """
 
 import json
@@ -192,6 +194,52 @@ def _repoint_target(row, current, rows_by_id, legacy_keys, image_index):
         if candidate in current:
             return candidate
     return legacy_keys.get(row["folder_key"])
+
+
+def reconcile_custom_folders(db) -> dict:
+    """Re-point custom-folder memberships whose folder key no longer matches a
+    folder, and stamp identity onto the ones that still do.
+
+    A custom folder gathers folders by key, so it drifts exactly the way a star
+    does when a key formula changes — and a grouping the user built by hand is
+    worth no less than a star. The three outcomes mirror
+    :func:`reconcile_folder_meta`: a live key gets its ``(level, ref)`` refreshed,
+    a dangling one is recomputed at its stored tier and moved, and one with no
+    usable identity is left in place (its folder may yet come back; a membership
+    is never silently dropped).
+
+    Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
+    """
+    members = db.custom_folder_members_full()
+    summary = {"refreshed": 0, "repointed": 0, "orphaned": 0}
+    if not members:
+        return summary
+    rows_by_id = {r["prompt_id"]: r for r in db.list_generations()}
+    image_index = gallery.build_image_config_index(
+        [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == "image"]
+    )
+    current, legacy_keys = _index_current_folders(rows_by_id.values(), image_index)
+
+    for member in members:
+        key, folder_id = member["folder_key"], member["folder_id"]
+        if key in current:
+            level, ref = current[key]
+            if (member["level"], member["ref_prompt_id"]) != (level, ref):
+                db.stamp_custom_folder_member(folder_id, key, level=level, ref_prompt_id=ref)
+                summary["refreshed"] += 1
+            continue
+        target = _repoint_target(member, current, rows_by_id, legacy_keys, image_index)
+        if target is None:
+            summary["orphaned"] += 1
+            continue
+        level, ref = current[target]
+        db.repoint_custom_folder_member(folder_id, key, target,
+                                        level=level, ref_prompt_id=ref)
+        summary["repointed"] += 1
+
+    logger.info("Reconciled custom folders: %(refreshed)d refreshed, "
+                "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
+    return summary
 
 
 def _move_bookmark(db, row, target, identity, meta_by_key):

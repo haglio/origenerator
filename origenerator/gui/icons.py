@@ -111,6 +111,12 @@ def flask_icon() -> QIcon:
     return _two_mode(_draw_flask)
 
 
+def custom_folder_icon() -> QIcon:
+    """A folder — the caret marker on a folder the user composed, and the toolbar
+    button that composes one out of the picked folders."""
+    return _two_mode(_draw_folder)
+
+
 @lru_cache(maxsize=None)
 def experiment_verdict_icon(verdict: str) -> QIcon:
     """An experiment tile's review hover-buttons: a check ("up" — keep it, it
@@ -466,6 +472,14 @@ def _draw_flask(painter: QPainter, color):
     painter.setBrush(color)
     painter.drawPolygon(QPointF(16.5, 27), QPointF(31.5, 27),
                         QPointF(34, 32.5), QPointF(14, 32.5))
+
+
+def _draw_folder(painter: QPainter, _color):
+    """A tabbed folder outline — the "a folder you made" marker."""
+    painter.drawPolyline(
+        QPointF(12, 34), QPointF(12, 15), QPointF(21, 15), QPointF(24, 19),
+        QPointF(36, 19), QPointF(36, 34), QPointF(12, 34),
+    )
 
 
 def _draw_verdict(painter: QPainter, verdict: str):

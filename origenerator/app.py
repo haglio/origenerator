@@ -320,9 +320,12 @@ def main():
         # automatically. Runs after the backfills above — they can move a generation's
         # folder by filling in its workflow/model/LoRA — so the tree it reconciles
         # against is final.
-        from origenerator.reconcile import reconcile_folder_meta
+        from origenerator.reconcile import reconcile_custom_folders, reconcile_folder_meta
         try:
             reconcile_folder_meta(db)
+            # The folders the user composed by hand gather members by the same
+            # keys, so they drift the same way and heal the same way.
+            reconcile_custom_folders(db)
         except Exception as e:
             logger.warning("Folder bookmark reconcile failed: %s", e)
 

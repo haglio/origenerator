@@ -85,7 +85,10 @@ def _is_deletable_folder(group) -> bool:
 
     Model, LoRA, source-image, and settings folders live within a workflow folder
     and are fair game; a whole workflow or media folder is off-limits, so a
-    workflow's entire history can never be wiped in one action.
+    workflow's entire history can never be wiped in one action. A custom folder is
+    off-limits too, and for a stronger reason: deleting one must remove the
+    grouping, never the generations it gathers, so it has its own path
+    (:meth:`GalleryView._remove_custom_folder`) rather than this one.
     """
     return isinstance(
         group,
@@ -197,6 +200,12 @@ class GalleryView(QWidget):
         # one job per folder — so the queue drains as completions pump it.
         self._enhance_queue: list[dict] = []
         self._editing_key: str | None = None  # folder being renamed inline
+        # The user's own folders, resolved against the live tree on each rebuild,
+        # and the throwaway one a multi-selection stands up (None with 0 or 1 row
+        # picked). Both are CustomGroups, so the pane, breadcrumb, and slideshow
+        # treat them exactly as they treat a derived folder.
+        self._custom_folders: list = []
+        self._selection_group = None
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
@@ -319,10 +328,15 @@ class GalleryView(QWidget):
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
+        # Picking several folders (Shift/Ctrl) shows them together, as the folder
+        # they would make; this fires after currentItemChanged, so it has the last
+        # word on what the panes show.
+        self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
         self._tree.itemChanged.connect(self._commit_inline_rename)
         self._tree.star_clicked.connect(self._toggle_star)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
+        self._tree.folders_dropped.connect(self._on_folders_dropped)
         toc = QWidget()
         toc_box = QVBoxLayout(toc)
         toc_box.setContentsMargins(*_PANE_MARGINS)
@@ -385,6 +399,14 @@ class GalleryView(QWidget):
             self._enhance_all,
         )
         self._enhance_all_btn.hide()  # shown only on a folder with images awaiting it
+        # Turn the folders picked in the tree into a folder of their own. Shown
+        # only while several are picked — that selection IS the folder, unsaved.
+        self._group_btn = self._tool_button(
+            icons.custom_folder_icon(),
+            "Group the selected folders into a folder of your own",
+            self._group_selection,
+        )
+        self._group_btn.hide()
         # A single global switch: while it's on, whatever scripted video is in the
         # front tab drives the OSR2. Always visible (it's app-wide), lit when on.
         self._osr2_btn = self._tool_button(
@@ -425,8 +447,8 @@ class GalleryView(QWidget):
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
                        self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
-                       self._audio_btn, self._osr2_btn, self._stroke_btn,
-                       self._delete_btn):
+                       self._group_btn, self._audio_btn, self._osr2_btn,
+                       self._stroke_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -1022,6 +1044,12 @@ class GalleryView(QWidget):
         expanded = self._tree_view.persisted_expanded_keys()
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._tree_view.selected_folder_key() or self._pending_key
+        # A live multi-selection is a folder the user is composing, so a rebuild
+        # (a poll, a completed generation) must not silently collapse it back to
+        # one row — the keys are re-picked once the tree is rebuilt.
+        multi_keys = self._tree.selected_folder_keys()
+        if len(multi_keys) < 2:
+            multi_keys = []
         selected_gen = self.selected_generation()
         # A running re-roll drives the info pane from live frames, not a saved row,
         # so capture it to restore afterward rather than let the folder's default
@@ -1038,6 +1066,9 @@ class GalleryView(QWidget):
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = gallery.unreviewed_experiments(rows)
+        self._custom_folders = gallery.build_custom_folders(
+            tree_model, self._db.list_custom_folders()
+        )
         self._browser.set_model(
             gallery.recent_generations(rows, self._recents_media_types()),
             gallery.starred_folders(tree_model),
@@ -1046,8 +1077,12 @@ class GalleryView(QWidget):
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()),
-                                 experiment_count=len(unreviewed))
+                                 experiment_count=len(unreviewed),
+                                 custom_folders=self._custom_folders)
         self._tree_view.reapply_filter()  # populate rebuilds un-filtered; re-narrow it
+        # The rows the old selection group pointed at are gone with the rebuild;
+        # _restore_multi_selection below stands a fresh one up from multi_keys.
+        self._selection_group = None
         self._clear_metadata()
         target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
@@ -1062,6 +1097,7 @@ class GalleryView(QWidget):
                 self._avg_label.setText("")
                 self._browser.show_empty()
                 self._selected_row = None  # nothing selected
+            self._restore_multi_selection(multi_keys)
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
@@ -1101,9 +1137,12 @@ class GalleryView(QWidget):
             self._reselect_generation(prompt_ids[0])
 
     def _on_folder_selected(self, current, _previous):
+        if self._selection_group is not None:
+            return  # a multi-selection owns the panes; the current row is one of many
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
         self._sync_enhance_all_button()  # enhance-all fits a folder with plain images
+        self._sync_group_button()      # grouping fits only a multi-selection
         # The image/video filter belongs to the Recents shelf alone; the
         # experimenter's switch to the Experiments shelf alone.
         self._recents_filter_bar.setVisible(current is self._recents_item)
@@ -1128,11 +1167,172 @@ class GalleryView(QWidget):
         self._note_folder_visit(group.key if group is not None else None)
         self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
+        self._show_group_contents(group)
+        self._sync_delete_button()
+
+    def _show_group_contents(self, group):
+        """Fill the browser pane with what a folder holds: its generations
+        (a settings leaf), the folders it gathers (one the user composed), or its
+        sub-folders (every other tier)."""
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)
+        elif isinstance(group, gallery.CustomGroup):
+            self._browser.show_custom_folder(group)
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group))
+
+    # --- several folders at once: the folder they would make ------------------
+
+    def _on_tree_selection_changed(self):
+        """Picking several folders shows them together — the same view a saved
+        custom folder gets, since that selection is exactly an unsaved one. Falling
+        back to a single row hands the panes to :meth:`_on_folder_selected`."""
+        groups = self._selected_groups()
+        if len(groups) > 1:
+            self._selection_group = gallery.selection_group(groups)
+            self._show_selection()
+            return
+        was_multi = self._selection_group is not None
+        self._selection_group = None
+        if was_multi:
+            self._on_folder_selected(self._tree.currentItem(), None)
+        else:
+            self._sync_group_button()
+
+    def _selected_groups(self) -> list:
+        """The folders the tree currently has picked, in tree order. A custom
+        folder is left out: gathering one into another would nest a grouping inside
+        a grouping, which the tree has nowhere to draw."""
+        return [
+            group for key in self._tree.selected_folder_keys()
+            if (group := self._group_for_key(key)) is not None
+            and not isinstance(group, gallery.CustomGroup)
+        ]
+
+    def _show_selection(self):
+        """Render the picked folders as the folder they would make: their tiles in
+        the browser pane, and the toolbar offering to save the grouping."""
+        group = self._selection_group
+        self._recents_filter_bar.hide()
+        self._experiments_bar.hide()
+        self._title.set_display(group.label)
+        self._update_folder_average(group)
+        self._browser.show_custom_folder(group)
+        self._auto_btn.hide()
+        self._enhance_all_btn.hide()
+        self._sync_slideshow_button()
+        self._sync_group_button()
         self._sync_delete_button()
+
+    def _restore_multi_selection(self, keys: list[str]):
+        """Re-pick the folders a rebuild dropped, and re-show them together.
+
+        The first is set as the current row, which clears whatever the rebuild's
+        own restore had picked — so what comes back is exactly what was picked
+        before, never that plus the folder the restore landed on."""
+        items = [item for key in keys if (item := self._item_by_key.get(key)) is not None]
+        if len(items) < 2:
+            return
+        self._tree.blockSignals(True)
+        try:
+            self._tree.setCurrentItem(items[0])
+            for item in items[1:]:
+                item.setSelected(True)
+        finally:
+            self._tree.blockSignals(False)
+        self._on_tree_selection_changed()
+
+    def _sync_group_button(self):
+        """Offer "group these" only while several folders are picked — one folder
+        is not a grouping, and the button would only ask what it meant."""
+        self._group_btn.setVisible(self._selection_group is not None)
+
+    def _group_selection(self):
+        """Save the picked folders as a folder of the user's own, under a name they
+        give, and open it."""
+        group = self._selection_group
+        if group is None:
+            return
+        members = gallery.child_groups(group)
+        name, ok = QInputDialog.getText(
+            self, "New Folder",
+            f"Name for a folder holding these {len(members)} folders:",
+        )
+        if not ok or not name.strip():
+            return
+        folder_id = self._actions.create_custom_folder(
+            name.strip(), [self._member_identity(m) for m in members]
+        )
+        self._open_custom_folder(folder_id)
+
+    def _member_identity(self, group) -> tuple:
+        """A gathered folder as ``(key, level, ref_prompt_id)`` — its key plus the
+        identity the reconcile re-derives it from when a key formula moves."""
+        rows = gallery.rows_under(group)
+        return (group.key, gallery.group_level(group),
+                rows[0]["prompt_id"] if rows else None)
+
+    def _open_custom_folder(self, folder_id: int):
+        """Rebuild so the folder has a row, then land on it — the end of every
+        action that makes or fills one."""
+        self._tree.clearSelection()
+        self._selection_group = None
+        self.refresh()
+        self._sync_undo_button()
+        item = self._item_by_key.get(gallery.custom_folder_key(folder_id))
+        if item is not None:
+            self._tree.setCurrentItem(item)
+
+    def _on_folders_dropped(self, target_key: str, keys: list):
+        """Folders dragged onto a collecting row: Starred stars them (the drag-and-
+        drop way to bookmark), a custom folder gathers them."""
+        groups = [g for key in keys if (g := self._group_for_key(key)) is not None]
+        if target_key == _STARRED_KEY:
+            for group in groups:
+                self._db.set_folder_starred(group.key, True)
+            self.refresh()
+            return
+        folder_id = gallery.custom_folder_id(target_key)
+        if folder_id is None:
+            return
+        self._actions.add_to_custom_folder(
+            folder_id, [self._member_identity(g) for g in groups]
+        )
+        self._open_custom_folder(folder_id)
+
+    def _new_custom_folder(self):
+        """Make an empty folder of the user's own — the tree's right-click action,
+        for when the folders to fill it with are easier dragged in than picked."""
+        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        if ok and name.strip():
+            self._open_custom_folder(self._actions.create_custom_folder(name.strip(), []))
+
+    def _remove_custom_folder(self, group):
+        """Delete a folder the user made. Only the grouping goes — its gathered
+        folders and their generations are untouched — so the confirmation says so
+        rather than reading like the delete that trashes files."""
+        count = len(gallery.child_groups(group))
+        plural = "s" if count != 1 else ""
+        if not self._confirm(
+            f"Remove the folder “{group.label}”?\n\n"
+            f"The {count} folder{plural} it holds, and their items, are kept."
+        ):
+            return
+        self._actions.delete_custom_folder(group.folder_id)
+        self._tree.clearSelection()
+        self._selection_group = None
+        self.refresh()
+        self._sync_undo_button()
+
+    def _remove_from_custom_folder(self, group, member_key: str):
+        """Drop one gathered folder out of the custom folder on screen."""
+        member = self._group_for_key(member_key)
+        identity = self._member_identity(member) if member is not None else (member_key, None, None)
+        self._actions.remove_from_custom_folder(
+            group.folder_id, member_key, level=identity[1], ref_prompt_id=identity[2]
+        )
+        self.refresh()
+        self._sync_undo_button()
 
     def _note_folder_visit(self, key: str | None):
         """Record a folder the user opened, so a delete can return to the most
@@ -1240,8 +1440,13 @@ class GalleryView(QWidget):
         return self._tree_view.selected_folder_key()
 
     def _current_group(self):
-        """The gallery group of the selected tree item, or ``None`` (a shelf or an
-        empty selection)."""
+        """The folder on screen, or ``None`` (a shelf or an empty selection).
+
+        While several folders are picked that's the unsaved folder they make, so
+        everything reading this — the slideshow, the title, the average, the delete
+        button — sees one folder whether or not it has been saved yet."""
+        if self._selection_group is not None:
+            return self._selection_group
         item = self._tree.currentItem()
         return item.data(0, _GROUP_ROLE) if item else None
 
@@ -2150,9 +2355,10 @@ class GalleryView(QWidget):
             self._delete_folder(group)
 
     def _current_deletable_folder(self):
-        """The selected tree folder if it may be deleted, else ``None``."""
-        item = self._tree.currentItem()
-        group = item.data(0, _GROUP_ROLE) if item else None
+        """The folder on screen if it may be deleted, else ``None`` — which covers
+        a multi-selection: its unsaved folder isn't deletable, so Delete stays dark
+        rather than quietly wiping whichever one row happens to be current."""
+        group = self._current_group()
         return group if _is_deletable_folder(group) else None
 
     def _delete_folder(self, group):
@@ -2246,21 +2452,60 @@ class GalleryView(QWidget):
     # --- rename & star -----------------------------------------------------
 
     def _on_tree_context_menu(self, pos: QPoint):
+        global_pos = self._tree.viewport().mapToGlobal(pos)
         item = self._tree.itemAt(pos)
         if item is None:
+            self._empty_tree_context_menu(global_pos)
             return
+        # Right-clicking inside a multi-selection offers what to do with the whole
+        # set; right-clicking outside it is about the one row under the cursor.
+        if self._selection_group is not None:
+            group = item.data(0, _GROUP_ROLE)
+            if group is not None and any(
+                m.key == group.key for m in gallery.child_groups(self._selection_group)
+            ):
+                self._selection_context_menu(global_pos)
+                return
         group = item.data(0, _GROUP_ROLE)
         if group is not None:
-            self._folder_context_menu(group.key, self._tree.viewport().mapToGlobal(pos))
+            self._folder_context_menu(group.key, global_pos)
+
+    def _empty_tree_context_menu(self, global_pos: QPoint):
+        """Below the last row there is no folder to act on, so the only thing on
+        offer is starting a new folder of your own."""
+        menu = QMenu(self)
+        new_action = menu.addAction("New folder…")
+        if menu.exec(global_pos) == new_action:
+            self._new_custom_folder()
+
+    def _selection_context_menu(self, global_pos: QPoint):
+        """The picked folders as a set: save them as a folder of your own."""
+        count = len(gallery.child_groups(self._selection_group))
+        menu = QMenu(self)
+        group_action = menu.addAction(f"Group {count} folders into a new folder…")
+        if menu.exec(global_pos) == group_action:
+            self._group_selection()
 
     def _folder_context_menu(self, key: str, global_pos: QPoint):
         item = self._item_by_key.get(key)
         if item is None:
             return
         group = item.data(0, _GROUP_ROLE)
+        if isinstance(group, gallery.CustomGroup):
+            self._custom_folder_context_menu(group, global_pos)
+            return
         menu = QMenu(self)
         rename_action = menu.addAction("Rename…")
         star_action = menu.addAction("Unstar" if group.starred else "Star")
+        # Inside a folder the user made, a member tile can also be dropped from it.
+        # Right-clicking the same folder in the tree offers nothing of the sort —
+        # it isn't in any grouping from there.
+        open_custom = self._current_group()
+        remove_action = None
+        if isinstance(open_custom, gallery.CustomGroup) and open_custom.folder_id is not None \
+                and any(m.key == key for m in gallery.child_groups(open_custom)):
+            remove_action = menu.addAction(f"Remove from “{open_custom.label}”")
+        add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
         if _is_deletable_folder(group):
             menu.addSeparator()
@@ -2270,15 +2515,47 @@ class GalleryView(QWidget):
             self._rename_folder(key)
         elif chosen == star_action:
             self._toggle_star(key)
+        elif remove_action is not None and chosen == remove_action:
+            self._remove_from_custom_folder(open_custom, key)
+        elif chosen in add_menu:
+            self._on_folders_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
             self._delete_folder(group)
+
+    def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
+        """An "Add to" sub-menu naming each of the user's folders — the menu route
+        to what a drag onto its row does, for when dragging is awkward (a long tree,
+        a folder scrolled out of sight). Returns ``{action: custom folder key}``,
+        empty when there are no folders of the user's own yet."""
+        targets = [f for f in self._custom_folders
+                   if not any(m.key == key for m in gallery.child_groups(f))]
+        if not targets:
+            return {}
+        submenu = menu.addMenu("Add to folder")
+        return {submenu.addAction(folder.label): folder.key for folder in targets}
+
+    def _custom_folder_context_menu(self, group, global_pos: QPoint):
+        """A folder the user made: rename it, or remove the grouping. It has no
+        star (a bookmark of a bookmark shelf collects nothing) and no delete —
+        removing it must never touch the generations it gathers."""
+        menu = QMenu(self)
+        rename_action = menu.addAction("Rename…")
+        menu.addSeparator()
+        remove_action = menu.addAction("Remove folder…")
+        chosen = menu.exec(global_pos)
+        if chosen == rename_action:
+            self._rename_folder(group.key)
+        elif chosen == remove_action:
+            self._remove_custom_folder(group)
 
     def _rename_folder(self, key: str):
         item = self._item_by_key.get(key)
         current = item.data(0, _GROUP_ROLE).label if item else ""
-        text, ok = QInputDialog.getText(
-            self, "Rename Folder", "Folder name (blank to reset):", text=current
-        )
+        # A derived folder's name is an overlay over the one its settings produce,
+        # so blank resets it; a custom folder's name is all it has, so it can't.
+        prompt = ("Folder name:" if gallery.is_custom_key(key)
+                  else "Folder name (blank to reset):")
+        text, ok = QInputDialog.getText(self, "Rename Folder", prompt, text=current)
         if ok:
             self._apply_rename(key, text)
 
@@ -2307,7 +2584,11 @@ class GalleryView(QWidget):
         QTimer.singleShot(0, self.refresh)
 
     def _begin_title_rename(self):
-        """Double-clicking the title bar edits the selected folder's name."""
+        """Double-clicking the title bar edits the selected folder's name — but not
+        while several are picked, where the title is a count of them and the rename
+        would land on whichever one happened to be current."""
+        if self._selection_group is not None:
+            return
         item = self._tree.currentItem()
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is not None:

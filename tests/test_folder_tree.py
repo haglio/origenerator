@@ -1,7 +1,10 @@
-from PyQt6.QtCore import Qt, QRect, QPoint
+from PyQt6.QtCore import Qt, QMimeData, QPoint, QPointF, QRect
+from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QTreeWidgetItem
 
-from origenerator.gui.folder_tree import FolderTree, _action_rects
+from origenerator.gui.folder_tree import (
+    DROP_KEY_ROLE, FOLDER_KEYS_MIME, FolderTree, _action_rects,
+)
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -101,3 +104,131 @@ def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
 
     assert fired == []
     assert tree.currentItem() is leaf  # a normal click still selects the row
+
+
+# --- picking several folders, and dragging them onto a collecting row ---------
+
+def _collecting_tree(qtbot):
+    """A tree with a collecting shelf row atop two ordinary folders."""
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    shelf = QTreeWidgetItem(["Starred"])
+    shelf.setData(0, DROP_KEY_ROLE, "__starred__")
+    a = QTreeWidgetItem(["A"]); a.setData(0, _ROLE, _Group("k/a"))
+    b = QTreeWidgetItem(["B"]); b.setData(0, _ROLE, _Group("k/b"))
+    for item in (shelf, a, b):
+        tree.addTopLevelItem(item)
+    tree.resize(320, 200)
+    tree.show()
+    qtbot.waitExposed(tree)
+    return tree, shelf, a, b
+
+
+def _drag(keys):
+    """The mime a folder drag carries. Every caller keeps it in a local of its
+    own: a synthetic drop event does not own its QMimeData, so letting it fall out
+    of scope frees it under the handler."""
+    mime = QMimeData()
+    mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
+    return mime
+
+
+def _drop_at(tree, item, mime):
+    pos = QPointF(tree.visualRect(tree.indexFromItem(item)).center())
+    event = QDropEvent(pos, Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    tree.dropEvent(event)
+    return event
+
+
+def _drag_move_at(tree, item, mime):
+    pos = QPointF(tree.visualRect(tree.indexFromItem(item)).center())
+    event = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
+                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    tree.dragMoveEvent(event)
+    return event
+
+
+def test_several_folders_can_be_picked_at_once(qtbot):
+    tree, _shelf, a, b = _collecting_tree(qtbot)
+
+    a.setSelected(True)
+    b.setSelected(True)
+
+    assert tree.selected_folder_keys() == ["k/a", "k/b"]
+
+
+def test_a_shelf_row_holding_no_folder_contributes_no_key(qtbot):
+    tree, shelf, a, _b = _collecting_tree(qtbot)
+
+    shelf.setSelected(True)
+    a.setSelected(True)
+
+    assert tree.selected_folder_keys() == ["k/a"]
+
+
+def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
+    # setCurrentItem reads the live keyboard modifiers unless told otherwise, so
+    # a programmatic move made while Ctrl is held would otherwise ADD the row.
+    tree, _shelf, a, b = _collecting_tree(qtbot)
+    a.setSelected(True)
+    b.setSelected(True)
+
+    tree.setCurrentItem(a)
+
+    assert tree.selected_folder_keys() == ["k/a"]
+
+
+def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
+    tree, shelf, a, b = _collecting_tree(qtbot)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+
+    mime = _drag(["k/a", "k/b"])
+
+    event = _drop_at(tree, shelf, mime)
+
+    assert dropped == [("__starred__", ["k/a", "k/b"])]
+    assert event.isAccepted()
+    # The tree's shape comes from the generations, so nothing was reparented.
+    assert tree.topLevelItemCount() == 3
+    assert shelf.childCount() == 0
+
+
+def test_an_ordinary_folder_refuses_a_drop(qtbot):
+    tree, _shelf, a, b = _collecting_tree(qtbot)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+
+    mime = _drag(["k/a"])
+
+    assert not _drag_move_at(tree, b, mime).isAccepted()
+    _drop_at(tree, b, mime)
+
+    assert dropped == []
+
+
+def test_a_collecting_row_refuses_a_drop_of_only_itself(qtbot):
+    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+
+    mime = _drag(["__starred__"])
+
+    assert not _drag_move_at(tree, shelf, mime).isAccepted()
+    _drop_at(tree, shelf, mime)
+
+    assert dropped == []
+
+
+def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
+    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    text = QMimeData()
+    text.setText("k/a")  # a plain-text drag from anywhere else
+
+    assert not _drag_move_at(tree, shelf, text).isAccepted()
+    _drop_at(tree, shelf, text)
+
+    assert dropped == []

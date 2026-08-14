@@ -147,6 +147,29 @@ class BrowserPane:
             self._add_folder_tile(flow, group, starred=group.starred)
         self.show_widget(container)
 
+    # --- a folder the user composed: its gathered folders, wherever they live ---
+
+    def show_custom_folder(self, group):
+        """Render a custom folder (saved, or the live multi-selection): a tile per
+        gathered folder, each captioned with its breadcrumb.
+
+        The breadcrumb is what makes this readable at all — a grouping can hold two
+        folders that are both called "30 steps" from opposite corners of the tree,
+        so the bare label the hierarchy relies on isn't enough here (the Starred
+        shelf shows its folders the same way, for the same reason).
+        """
+        members = gallery.child_groups(group)
+        container, flow = self._new_tile_pane()
+        for member in members:
+            item = self._v._item_by_key.get(member.key)
+            context = (self._v._tree_view.breadcrumb(item.parent())
+                       if item is not None and item.parent() is not None else "")
+            self._add_folder_tile(flow, member, starred=member.starred, context=context)
+        self.show_widget(container if members else self._empty_state(
+            f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
+            "pick several folders with Shift/Ctrl and group them."
+        ))
+
     # --- the Recents shelf: in-flight work, then recently finished items ----
 
     def show_recents_overview(self):

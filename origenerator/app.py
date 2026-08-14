@@ -93,7 +93,26 @@ def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump
         logger.warning("Failed to start ComfyUI server: %s", e)
 
 
+def _warm_onnxruntime() -> None:
+    """Load onnxruntime's native DLL before Qt gets a chance to poison it.
+
+    Once PyQt6 is imported, importing onnxruntime fails on Windows ("DLL
+    initialization routine failed" — Qt's bundled MSVC runtime wins the load
+    order), which silently disabled the stroke workflows' auto-aim: detection
+    is best-effort, so every in-app attempt just logged a warning and fell back
+    to the unaimed defaults. Imported the other way round, both coexist. The
+    aim module still imports lazily; this only fixes the order. Best-effort
+    like the aim itself — a machine without onnxruntime still boots (both an
+    absent module and a lost DLL race surface as ImportError).
+    """
+    try:
+        import onnxruntime  # noqa: F401
+    except ImportError:
+        pass
+
+
 def main():
+    _warm_onnxruntime()  # must precede any PyQt6 import, including transitive ones
     _init_windows_taskbar_identity()
 
     import logging

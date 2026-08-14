@@ -380,7 +380,7 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("generate_tabs", {"tabs": [
         {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
-         "title": None, "launched_run": "rr"},
+         "title": None, "launched_runs": ["rr"]},
     ], "current": 0})
     win = _window(qtbot, tmp_path, state)
     win._gallery_view.refresh()  # reconnects the run, then re-asserts the button

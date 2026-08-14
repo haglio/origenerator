@@ -4906,8 +4906,8 @@ def _front_panel(view):
 
 
 def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
-    # A Generate launched from a tab makes that tab offer to cancel it: Cancel
-    # shows and Generate greys, mirroring the folder's live re-roll tile.
+    # A Generate launched from a tab makes that tab offer to cancel it, mirroring
+    # the folder's live re-roll tile — with Generate still pressable for another.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -4918,7 +4918,7 @@ def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
 
     assert view._reroll_jobs                          # a run is in flight
     assert panel._cancel_btn.isHidden() is False      # the tab offers to cancel it
-    assert panel._generate_btn.isEnabled() is False
+    assert panel._generate_btn.isEnabled() is True
 
 
 def _two_image_db(tmp_path, prompts=("the first one", "a completely different one")):
@@ -5011,6 +5011,70 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     assert view._reroll_jobs == {}
     assert panel._cancel_btn.isHidden() is True
     assert panel._generate_btn.isEnabled() is True
+
+
+def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
+    # Generate twice from one tab and the tab owns two runs. Its bar follows the
+    # one being made, so its Cancel stops that one — the reported dead click was
+    # the tab having quietly swapped its claim to the run queued behind, so a
+    # press stopped something off screen and what was rendering carried on.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel.use_random_seed()
+    panel._on_generate()
+    panel._on_generate()
+    being_made, queued_behind = [job.prompt_id for job in view._reroll.all_jobs]
+
+    panel._cancel_btn.click()
+
+    assert [job.prompt_id for job in view._reroll.all_jobs] == [queued_behind]
+    assert view._db.get_generation(being_made) is None
+    assert panel._generating is True  # the one behind is still its run to watch
+
+    panel._cancel_btn.click()
+
+    assert view._reroll.all_jobs == []
+    assert panel._generating is False
+
+
+def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
+    # The path the user actually takes: click a picture in the browser, Generate,
+    # then Cancel. The tab is the one the click loaded, not one prefilled by hand.
+    db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    rows = {r["prompt_id"]: r for r in db.list_generations()}
+    panel = _click_thumbnail(view, rows["a"], list(rows.values()))
+    panel.use_random_seed()
+    panel._on_generate()
+    prompt_id = view._reroll.all_jobs[0].prompt_id
+    assert panel._cancel_btn.isHidden() is False
+
+    panel = _front_panel(view)
+    panel._cancel_btn.click()
+
+    assert view._reroll.all_jobs == []
+    assert view._db.get_generation(prompt_id) is None
+
+
+def test_clicking_the_tabs_cancel_button_stops_its_run(qtbot, tmp_path):
+    # The button itself, not the signal behind it: it is what the user presses.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel._on_generate()
+    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+
+    panel._cancel_btn.click()
+
+    assert view._reroll.all_jobs == []
+    assert view._db.get_generation(prompt_id) is None
 
 
 def test_canceling_from_the_front_tab_stops_the_reroll(qtbot, tmp_path):

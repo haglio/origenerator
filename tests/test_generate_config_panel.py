@@ -209,12 +209,13 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     assert panel._cancel_btn.isHidden()
 
 
-def test_set_generating_swaps_generate_for_cancel(panel):
+def test_set_generating_offers_cancel_beside_a_still_pressable_generate(panel):
     # While the tab's run is in flight the gallery marks it generating: Cancel
-    # appears and Generate greys out (no relaunching over a running slot).
+    # appears, and Generate stays pressable — ComfyUI takes a queue, so another
+    # press asks for another job rather than relaunching over the first.
     panel.set_generating(True)
     assert panel._cancel_btn.isHidden() is False
-    assert panel._generate_btn.isEnabled() is False
+    assert panel._generate_btn.isEnabled() is True
     panel.set_generating(False)
     assert panel._cancel_btn.isHidden() is True
     assert panel._generate_btn.isEnabled() is True

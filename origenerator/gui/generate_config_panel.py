@@ -88,7 +88,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
-        self._launched_run: str | None = None          # the run this tab's Generate started (see launched_run)
+        self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
@@ -369,12 +369,14 @@ class GenerateConfigPanel(QWidget):
 
         A Generate is conceptually a gallery re-roll: it emits the form's workflow
         and values (a Random seed already re-rolled by :meth:`ParamForm.get_values`)
-        as :attr:`generate_requested`, and the gallery launches the job in the
-        folder's own re-roll slot and navigates there. The panel keeps only the
-        form-level guard that an image workflow has its input picked.
+        as :attr:`generate_requested`, and the gallery launches the job in that
+        folder and navigates there. Pressing it again while a run of this tab's is
+        still in flight asks for another one — ComfyUI works through a queue — so
+        the panel keeps only the form-level guard that an image workflow has its
+        input picked.
         """
-        if self._client is None or self._generating:
-            return  # nothing to run against, or a run is already in flight
+        if self._client is None:
+            return  # nothing to run against
         key = self._workflow_combo.currentData()
         if not key or key not in WORKFLOW_REGISTRY:
             return
@@ -392,18 +394,28 @@ class GenerateConfigPanel(QWidget):
             return
         self.generate_requested.emit(key, params)
 
-    def launched_run(self) -> str | None:
-        """The run this tab's Generate started, if one is still its own.
+    def launched_runs(self) -> list[str]:
+        """The runs this tab's Generate started, oldest first.
 
-        Named by the prompt id the run *began* under, so a chained i2v (a frame,
-        then the video on it) stays one run to this tab. ``None`` once the tab has
-        been pointed at someone else's generation, or before it has generated.
+        Each named by the prompt id it *began* under, so a chained i2v (a frame,
+        then the video on it) stays one run to this tab. A tab can hold several:
+        ComfyUI takes a queue, so pressing Generate again asks for another. Empty
+        once the tab has been pointed at someone else's generation, or before it
+        has generated anything.
         """
-        return self._launched_run
+        return list(self._launched_runs)
 
-    def note_launched(self, origin: str | None):
-        """Claim (or, with ``None``, let go of) the run this tab's Generate started."""
-        self._launched_run = origin
+    def note_launched(self, origin: str):
+        """Claim a run this tab's Generate just started, at the back of its own."""
+        self._launched_runs.append(origin)
+
+    def forget_launched(self, origins=None):
+        """Let go of runs this tab claimed — all of them, or the named ones (those
+        that have finished, failed or been cancelled)."""
+        if origins is None:
+            self._launched_runs = []
+        else:
+            self._launched_runs = [r for r in self._launched_runs if r not in origins]
 
     def set_generating(self, generating: bool, prompt_id: str | None = None):
         """Reflect whether a run of this config's folder is in flight.
@@ -572,11 +584,11 @@ class GenerateConfigPanel(QWidget):
         the selection's own output. A workflow the app can't rebuild leaves the
         form as it was but still shows the preview and info.
 
-        Pointing the tab at someone else's generation ends its claim on a run it
-        launched: the button would otherwise sit mid-run over a picture that has
-        nothing to do with it, refusing a Generate of what is now on screen.
+        Pointing the tab at someone else's generation ends its claim on the runs
+        it launched: the bar would otherwise sit mid-run over a picture that has
+        nothing to do with it, and its Cancel would stop something off screen.
         """
-        self.note_launched(None)
+        self.forget_launched()
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))

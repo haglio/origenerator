@@ -17,9 +17,16 @@ def test_idle_reads_generate_with_no_fill(button):
 
 def test_start_enters_progress_mode(button):
     button.start()
-    assert button.text() == "Generating…"
     assert button._fraction == 0.0
-    assert not button.isEnabled()   # can't relaunch over a running job
+
+
+def test_a_run_in_flight_leaves_the_button_pressable(button):
+    # ComfyUI takes a queue now, so a second press while one run is in flight is
+    # a second job asked for, not a relaunch over the first — and the face keeps
+    # saying so rather than greying out under a "Generating…" label.
+    button.start()
+    assert button.isEnabled()
+    assert button.text() == "Generate"
 
 
 def test_set_progress_sets_the_fill_fraction(button):

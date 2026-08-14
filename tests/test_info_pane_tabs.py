@@ -237,13 +237,14 @@ def test_the_add_button_is_still_on_screen_with_no_tabs_left(tabs):
     assert tabs._close_all_btn.height() == standing
 
 
-def test_close_all_sits_left_of_the_add_button(tabs):
-    # The gap between them means a miss on the "+" a user clicks constantly
-    # doesn't empty the pane instead.
+def test_the_add_button_leads_the_row_then_close_all(tabs):
+    # "+" is leftmost and close-all next, ahead of every tab — so both controls
+    # stay in one place however many tabs are open and however wide they grow.
     row = tabs._corner.layout()
     assert [row.itemAt(i).widget() for i in range(row.count())] == [
-        tabs._close_all_btn, tabs._add_btn,
+        tabs._add_btn, tabs._close_all_btn,
     ]
+    assert tabs.cornerWidget(Qt.Corner.TopLeftCorner) is tabs._corner
 
 
 def _laid_out(tabs):
@@ -254,16 +255,17 @@ def _laid_out(tabs):
     QApplication.processEvents()
 
 
-def test_the_tab_row_buttons_follow_the_last_tab(tabs):
-    # They belong to the tab strip, so they stand where a browser's new-tab button
-    # stands — right after the tabs — rather than marooned at the far right with a
-    # gap of nothing between.
+def test_the_tab_row_buttons_open_the_row_and_the_tabs_follow(tabs):
+    # They lead the strip: the tabs begin where the buttons end, and adding a tab
+    # doesn't shift them.
     _laid_out(tabs)
-    assert tabs._corner.x() == tabs.tabBar().width()
+    assert tabs._corner.x() < tabs.tabBar().x()
+    assert tabs.tabBar().x() >= tabs._corner.geometry().right()
 
-    tabs._add_subtab()  # a second tab widens the row; the buttons move along with it
+    before = tabs._corner.geometry()
+    tabs._add_subtab()
     _laid_out(tabs)
-    assert tabs._corner.x() == tabs.tabBar().width()
+    assert tabs._corner.geometry() == before
 
 
 def test_the_tab_row_buttons_stand_exactly_as_tall_as_the_row(tabs):
@@ -276,13 +278,11 @@ def test_the_tab_row_buttons_stand_exactly_as_tall_as_the_row(tabs):
 
 
 def test_the_tabs_never_run_under_the_buttons(tabs):
-    # Enough tabs to fill the row must not slide beneath the two buttons, which
-    # are painted over the same strip and would swallow the last tab's ✕.
+    # Enough tabs to fill the row must not slide beneath the two buttons.
     for _ in range(12):
         tabs._add_subtab()
     _laid_out(tabs)
-    assert tabs.tabBar().width() <= tabs._corner.x()
-    assert tabs._corner.geometry().right() <= tabs.width()
+    assert tabs.tabBar().x() >= tabs._corner.geometry().right()
 
 
 def test_the_tab_row_buttons_wear_the_tab_style(tabs):
@@ -584,7 +584,7 @@ def test_the_run_a_tab_launched_survives_a_restart(tabs, qtbot):
     qtbot.addWidget(fresh)
     fresh.restore_state(tabs.capture_state())
 
-    assert fresh._config_panels()[0].launched_run() == "run-77"
+    assert fresh._config_panels()[0].launched_runs() == ["run-77"]
 
 
 def test_a_tab_that_never_generated_claims_no_run(tabs, qtbot):
@@ -592,7 +592,7 @@ def test_a_tab_that_never_generated_claims_no_run(tabs, qtbot):
     qtbot.addWidget(fresh)
     fresh.restore_state(tabs.capture_state())
 
-    assert fresh._config_panels()[0].launched_run() is None
+    assert fresh._config_panels()[0].launched_runs() == []
 
 
 def test_capture_state_lists_every_tab_and_current(tabs):

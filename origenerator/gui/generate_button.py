@@ -2,8 +2,10 @@
 
 Clicking it launches a re-roll; while that job is in flight the button itself
 fills left-to-right with ComfyUI's real per-step progress (no separate status
-bar). It also flashes a form guard — e.g. "select an input image" — when a
-Generate is blocked, so the panel needs no standing status line.
+bar) — and stays pressable, since another press queues another job rather than
+relaunching over the one running. It also flashes a form guard — e.g. "select an
+input image" — when a Generate is blocked, so the panel needs no standing status
+line.
 """
 
 from PyQt6.QtWidgets import QPushButton
@@ -36,11 +38,15 @@ class GenerateButton(QPushButton):
         self._guard_timer.timeout.connect(self._clear_guard)
 
     def start(self):
-        """Enter progress mode: disabled so a running job can't be relaunched over."""
+        """Enter progress mode: the face fills, and stays pressable.
+
+        ComfyUI works through a queue, so a press while a run is in flight asks
+        for another job rather than relaunching over the first — the button must
+        not grey out under a "Generating…" label the way it did when a folder
+        could only hold one run.
+        """
         self._guard_timer.stop()
         self._fraction = 0.0
-        self.setText("Generating…")
-        self.setEnabled(False)
         self.update()
 
     def set_progress(self, value: int, maximum: int):
@@ -48,8 +54,8 @@ class GenerateButton(QPushButton):
         self.update()
 
     def finish(self, enabled: bool):
-        """Back to the idle Generate button; ``enabled`` stays False in a read-only
-        gallery with no client to run against."""
+        """Back to the unfilled Generate button; ``enabled`` stays False in a
+        read-only gallery with no client to run against."""
         self._fraction = None
         self.setText("Generate")
         self.setEnabled(enabled)

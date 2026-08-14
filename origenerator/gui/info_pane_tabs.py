@@ -74,22 +74,21 @@ class InfoPaneTabs(QTabWidget):
             Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
         self._close_all_btn.clicked.connect(self.close_all_subtabs)
-        # Both buttons share a row that stands in the tab strip, immediately after
-        # the last tab — where a browser's new-tab button stands — rather than
-        # marooned at the far right with a gap of nothing between (see
-        # :meth:`_place_tab_row_buttons`). Close-all goes to the LEFT of "+", so
-        # the gap between them means a miss on the "+" a user clicks constantly
-        # doesn't empty the pane instead.
-        self._corner = QWidget(self)
+        # Both buttons share a row that opens the tab strip: "+" leftmost, then
+        # close-all, then the tabs. They lead the row rather than trailing it, so
+        # the two controls are always in the same place however many tabs are open
+        # and however wide they get.
+        self._corner = QWidget()
         corner_row = QHBoxLayout(self._corner)
         corner_row.setContentsMargins(0, 0, 0, 0)
         # A gap of bare strip between them: both are flat and share the row's
         # background, so the seam is invisible but unclickable — a miss on the "+"
         # a user hits constantly lands on nothing rather than emptying the pane.
         corner_row.setSpacing(8)
-        corner_row.addWidget(self._close_all_btn)
         corner_row.addWidget(self._add_btn)
+        corner_row.addWidget(self._close_all_btn)
         self._corner.setVisible(client is not None)  # nothing to run without a client
+        self.setCornerWidget(self._corner, Qt.Corner.TopLeftCorner)
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
@@ -115,24 +114,19 @@ class InfoPaneTabs(QTabWidget):
         return button
 
     def _place_tab_row_buttons(self):
-        """Stand the buttons in the tab row, immediately right of the last tab.
+        """Hold the button row to exactly the tab row's height.
 
-        A QTabWidget corner widget is pinned to an edge, so the buttons would sit
-        at the far right with a gap of nothing between them and the tabs — and Qt
-        centres it in a row it may be taller than, which left them hanging below
-        the strip into the pane underneath. Placed by hand instead: exactly the
-        row's height, right where the tabs end. The bar is capped so a crowded row
-        can never slide its tabs beneath them.
+        Qt lays a corner widget out at the left edge with the tabs starting after
+        it — the placement this wants — but it centres the widget in the row using
+        the height its layout *asks* for, which is what left these buttons hanging
+        below the strip into the pane underneath. So the ask itself is raised to
+        the bar's height: the buttons fill the row rather than floating in it, and
+        the centring has nothing left to do.
         """
-        bar = self.tabBar()
-        # A read-only gallery hides them, and reserving a strip of row for buttons
-        # that aren't there would just narrow the tabs for nothing.
-        width = self._corner.sizeHint().width() if not self._corner.isHidden() else 0
-        room = max(0, self.width() - width)
-        bar.setMaximumWidth(room)
-        self._corner.setGeometry(min(bar.sizeHint().width(), room), 0,
-                                 width, bar.sizeHint().height())
-        self._corner.raise_()
+        row_height = self.tabBar().sizeHint().height()
+        for button in (self._add_btn, self._close_all_btn):
+            button.setMinimumHeight(row_height)
+        self._corner.setFixedHeight(row_height)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -385,17 +379,17 @@ class InfoPaneTabs(QTabWidget):
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.
 
-        Each carries its configuration, any user-set custom title, and the run its
+        Each carries its configuration, any user-set custom title, and the runs its
         own Generate started; ``current`` is the active tab, so the same tab
-        reopens focused. The gallery reconnects a still-running re-roll itself —
-        the recorded run is only how a tab knows which of them is *its* one, so its
+        reopens focused. The gallery reconnects still-running re-rolls itself —
+        the recorded runs are only how a tab knows which of them are *its*, so its
         Cancel and progress fill come back on the right tab after a restart.
         """
         tabs = [
             {
                 "config": panel.current_config().to_dict(),
                 "title": panel.custom_title(),
-                "launched_run": panel.launched_run(),
+                "launched_runs": panel.launched_runs(),
             }
             for panel in self._config_panels()
         ]
@@ -419,11 +413,12 @@ class InfoPaneTabs(QTabWidget):
             if snapshot.workflow_name not in WORKFLOW_REGISTRY:
                 continue
             title = entry.get("title")
-            launched = entry.get("launched_run")
+            launched = entry.get("launched_runs")
             restored.append((
                 snapshot,
                 title if isinstance(title, str) and title.strip() else None,
-                launched if isinstance(launched, str) and launched else None,
+                [r for r in launched if isinstance(r, str) and r]
+                if isinstance(launched, list) else [],
             ))
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
@@ -434,9 +429,10 @@ class InfoPaneTabs(QTabWidget):
             panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
-            # A run this tab started and the app was closed on: the gallery
-            # reconnects it, and this is how the tab knows it is still its own.
-            panel.note_launched(launched)
+            # Runs this tab started and the app was closed on: the gallery
+            # reconnects them, and this is how the tab knows they are its own.
+            for origin in launched:
+                panel.note_launched(origin)
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self.count():
             self.setCurrentIndex(current)

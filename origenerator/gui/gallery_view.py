@@ -1082,26 +1082,39 @@ class GalleryView(QWidget):
     def _reconcile_generating(self):
         """Point every config tab's Cancel and progress fill at the run *it* launched.
 
-        A tab tracks its own Generate, not its settings folder: a folder can have
+        A tab tracks its own Generates, not its settings folder: a folder can have
         several runs queued at once (two pictures of one recipe, both wanted), and
-        a tab showing one of them must not claim the others — that is what left a
-        second image's Generate button mid-run and unpressable. A chained i2v is
-        two prompts but one run, so the tab follows its origin across the hand-off.
+        a tab showing one of them must not claim the others. Of its own it follows
+        the *oldest still alive* — the one nearest to being made, and so the one
+        whose progress the bar shows and whose run its Cancel stops. A press that
+        stopped the job queued behind the one on screen was the reported dead
+        click. A chained i2v is two prompts but one run, so a tab follows its
+        origin across the hand-off, and runs that have ended are let go here.
 
         Idempotent — driven by every re-roll lifecycle change and by switching the
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now behind another still shows there.
         """
         for panel in self._info_tabs._config_panels():
-            job = self._reroll.job_for_origin(panel.launched_run())
+            live = [(origin, job) for origin in panel.launched_runs()
+                    if (job := self._reroll.job_for_origin(origin)) is not None]
+            panel.forget_launched({origin for origin in panel.launched_runs()
+                                   if origin not in {o for o, _ in live}})
+            job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
                                  job.prompt_id if job is not None else None)
 
     def _cancel_panel_reroll(self, panel):
-        """Cancel the run this tab launched — its Cancel button."""
-        job = self._reroll.job_for_origin(panel.launched_run())
-        if job is not None:
-            self._cancel_job(job.prompt_id)
+        """Cancel the run this tab's bar is showing — its Cancel button.
+
+        The oldest of the tab's own still alive, so the press stops the thing on
+        screen rather than something queued behind it.
+        """
+        for origin in panel.launched_runs():
+            job = self._reroll.job_for_origin(origin)
+            if job is not None:
+                self._cancel_job(job.prompt_id)
+                return
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a

@@ -4,7 +4,7 @@ import random
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QPushButton, QToolButton, QSplitter,
+    QScrollArea, QToolButton, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -465,17 +465,6 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()  # shown only on the Experiments shelf
         self._sync_experiments_bar()
         browser_box.addWidget(self._experiments_bar)
-        # Shown only while a Recents item is previewed: that item's generation lives
-        # in a folder other than the shelf on screen, so this jumps the browser to
-        # it. Left-aligned at its natural width, and it collapses away when hidden.
-        self._containing_folder_btn = QPushButton("Go to containing folder")
-        self._containing_folder_btn.clicked.connect(self._browser.go_to_containing_folder)
-        self._containing_folder_btn.hide()
-        folder_row = QHBoxLayout()
-        folder_row.setContentsMargins(0, 0, 0, 0)
-        folder_row.addWidget(self._containing_folder_btn)
-        folder_row.addStretch(1)
-        browser_box.addLayout(folder_row)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
@@ -2308,7 +2297,6 @@ class GalleryView(QWidget):
             self._info_tabs.show_selection_preview(
                 gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR), prompt_id
             )
-        self._browser.sync_containing_folder_button()  # a Recents preview offers the jump
         shelf_key = self._current_shelf_key()
         if shelf_key is not None:
             # Previewing an item on a shelf is shelf state, not a navigation: it's
@@ -2340,12 +2328,36 @@ class GalleryView(QWidget):
         recording caller (a link) adds the real target itself afterward."""
         self._suppress_history = True
         try:
-            leaf = self._leaf_by_id.get(prompt_id)
+            leaf = self._leaf_by_id.get(prompt_id) or self._nearest_folder_item(prompt_id)
             if leaf is not None:
                 self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
             self._on_thumbnail_clicked(prompt_id)
         finally:
             self._suppress_history = False
+
+    def _nearest_folder_item(self, prompt_id: str):
+        """The tree row to land on for a generation that has no settings leaf of
+        its own, or ``None`` when even its media tier is absent.
+
+        An unreviewed background experiment is the case: the tree is the user's
+        curated space, so it holds the row out until a "keep" verdict admits it,
+        which left a double-click on the Experiments shelf with nowhere to go.
+        Its would-be folder chain is recomputed from the row and the deepest tier
+        that already exists wins — usually the LoRA or model folder, since a
+        mutated setting is precisely what makes its settings leaf new. So the jump
+        lands in the neighborhood the item joins, with the item itself still in the
+        info pane to compare against what's there.
+        """
+        row = self._db.get_generation(prompt_id)
+        if row is None:
+            return None
+        image_index = gallery.build_image_config_index(self._image_rows)
+        for level in ("settings", "source_image", "lora", "model", "workflow", "media"):
+            item = self._item_by_key.get(
+                gallery.folder_key_at_level(row, level, image_index))
+            if item is not None:
+                return item
+        return None
 
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""
@@ -2435,7 +2447,6 @@ class GalleryView(QWidget):
         current tab's preview."""
         self._selected_row = None
         self._info_tabs.clear_current_preview()
-        self._browser.sync_containing_folder_button()  # nothing selected: no jump to offer
 
     def _on_reuse(self):
         """Reuse the shown generation's parameters — fork a config tab from them.

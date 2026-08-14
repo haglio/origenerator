@@ -508,3 +508,72 @@ def test_the_caption_keeps_clear_of_the_drive_console(qtbot, tmp_path):
     note = win._note.geometry()
     assert note.top() > win.height() // 2          # bottom half, not the top
     assert abs(note.center().x() - win.width() // 2) <= 1   # centered
+
+# --- Up culls and Down bookmarks, as they do in the slideshow ----------------
+
+def _armed(qtbot, index=0):
+    """A fullscreen view paging a three-item folder that carries prompt ids."""
+    view = FullscreenPreview(("a.png", "image"), player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.png", "image", "gen-a"),
+                       ("b.png", "image", "gen-b"),
+                       ("c.png", "image", "gen-c")], index)
+    return view
+
+
+def test_up_asks_for_the_shown_item_to_be_deleted_and_pages_off_it(qtbot):
+    view = _armed(qtbot)
+    asked = []
+    view.delete_requested.connect(asked.append)
+
+    _press(view, Qt.Key.Key_Up)
+
+    assert asked == ["gen-a"]
+    assert view._items == [("b.png", "image", "gen-b"), ("c.png", "image", "gen-c")]
+    assert view._index == 0  # the one that followed it is on screen now
+
+
+def test_deleting_the_last_item_closes_the_view(qtbot):
+    view = FullscreenPreview(("a.png", "image"), player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.png", "image", "gen-a")], 0)
+    view.show()
+
+    _press(view, Qt.Key.Key_Up)
+
+    assert not view.isVisible()
+
+
+def test_down_bookmarks_the_shown_item_and_leaves_it_up(qtbot):
+    view = _armed(qtbot, index=1)
+    asked = []
+    view.star_requested.connect(asked.append)
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert asked == ["gen-b"]
+    assert view._index == 1  # starring is not a move
+
+
+def test_a_playlist_with_no_ids_ignores_up_and_down(qtbot):
+    # A lone item, or a folder armed without ids: nothing to name, nothing to do.
+    view = FullscreenPreview(("a.png", "image"), player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.png", "image"), ("b.png", "image")], 0)
+    asked = []
+    view.delete_requested.connect(asked.append)
+    view.star_requested.connect(asked.append)
+
+    _press(view, Qt.Key.Key_Up)
+    _press(view, Qt.Key.Key_Down)
+
+    assert asked == []
+    assert len(view._items) == 2
+
+
+def test_left_and_right_still_page_a_playlist_carrying_ids(qtbot):
+    view = _armed(qtbot)
+    _press(view, Qt.Key.Key_Right)
+    assert view._index == 1
+    _press(view, Qt.Key.Key_Left)
+    assert view._index == 0

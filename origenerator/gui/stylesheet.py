@@ -271,6 +271,24 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(BORDER_SUBTLE)};
     }}
+    /* A row in the bottom strip's queue: flat, and lit while hovered or while it
+       is the one being dragged, so a drag reads as something the strip meant to
+       offer rather than an accident. */
+    QWidget#queueRow {{
+        background-color: transparent;
+        border-radius: 3px;
+    }}
+    QWidget#queueRow:hover {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    QWidget#queueRow[dragging="true"] {{
+        background-color: {_h(BG_TERTIARY)};
+        color: {_h(TEXT_MUTED)};
+    }}
+    /* Compact enough to ride inside a queue row, which is barely taller. */
+    QPushButton#queueCancelBtn {{
+        padding: 0 8px;
+    }}
     QLabel#combineHeading {{
         color: {_h(TEXT_MUTED)};
         font-weight: bold;

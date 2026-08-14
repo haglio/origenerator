@@ -5,7 +5,7 @@ Three widgets show queued and running work — the Recents shelf's cards
 (:mod:`origenerator.gui.generation_queue`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
-builds per job, carrying what to draw and the two ways to go to it.
+builds per job, carrying what to draw, how to stop it, and how to go to it.
 
 :func:`queue_wait_text` is here for the same reason: what a wait on another app
 reads like is one wording, shared by every surface that has to say it.
@@ -33,10 +33,6 @@ class InFlightItem:
     # recent runs say a whole one takes.
     started_at: float | None = None
     typical_seconds: float | None = None
-    # Open (or bring forward) the job's settings as an editable tab in the
-    # generate pane — the other place a job "lives", and where the queue sends a
-    # click. None when nothing here can build that tab (a read-only gallery).
-    open_config: Callable[[], None] | None = None
 
 
 def queue_wait_text(foreign_ahead: int | None) -> str | None:

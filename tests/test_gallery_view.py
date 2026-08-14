@@ -4456,12 +4456,14 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
     qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the strip
 
     assert view._queue.isVisible()
-    assert view._queue.running_row().key == "gen1"
+    assert view._queue.keys() == ["gen1"]
+    assert view._queue.running_preview().key == "gen1"
 
     db.delete_generation("gen1")   # the job ends, its running row gone
     view._poll()
-    assert view._queue.isVisible()               # still holding its slot
-    assert view._queue.running_row().key is None  # but blank
+    assert view._queue.isVisible()                    # still holding its slot
+    assert view._queue.keys() == []                   # but blank
+    assert view._queue.running_preview().key is None
 
 
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
@@ -4495,21 +4497,23 @@ def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
         view._reroll._queue_order = ["running-one", "w1", "w2"]
         view.refresh()
 
-        view._queue.move_queued(1, 0)
+        view._queue.move_row(2, 1)
 
     reorder.assert_called_once_with(["running-one", "w2", "w1"])
 
 
-def test_clicking_a_queue_row_opens_that_jobs_tab(qtbot):
+def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
+    # A queue row is a place in the gallery, not a settings form: clicking it
+    # lands in the folder the job will appear in, with its live card selected.
     db = FakeDB([_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view.open_config_tab = MagicMock()
+    view._select_reroll = MagicMock()
 
-    view._inflight_items()[0].open_config()
+    view._inflight_items()[0].reveal()
 
-    view.open_config_tab.assert_called_once_with("gen1")
+    view._select_reroll.assert_called_once()
 
 
 def test_running_bar_times_the_job_against_the_workflows_recent_runs(qtbot):

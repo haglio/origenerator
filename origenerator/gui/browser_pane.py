@@ -388,7 +388,6 @@ class BrowserPane:
                 foreign_ahead=foreign,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),
-                open_config=lambda p=pid: self._v.open_config_tab(p),
             ))
         place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),

@@ -339,15 +339,17 @@ class InfoPaneTabs(QTabWidget):
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.
 
-        Each carries its configuration and any user-set custom title; ``current``
-        is the active tab, so the same tab reopens focused. A tab owns no job (a
-        Generate is a gallery re-roll), so nothing job-related is captured — the
-        gallery reconnects any still-running re-roll itself.
+        Each carries its configuration, any user-set custom title, and the run its
+        own Generate started; ``current`` is the active tab, so the same tab
+        reopens focused. The gallery reconnects a still-running re-roll itself —
+        the recorded run is only how a tab knows which of them is *its* one, so its
+        Cancel and progress fill come back on the right tab after a restart.
         """
         tabs = [
             {
                 "config": panel.current_config().to_dict(),
                 "title": panel.custom_title(),
+                "launched_run": panel.launched_run(),
             }
             for panel in self._config_panels()
         ]
@@ -371,19 +373,24 @@ class InfoPaneTabs(QTabWidget):
             if snapshot.workflow_name not in WORKFLOW_REGISTRY:
                 continue
             title = entry.get("title")
+            launched = entry.get("launched_run")
             restored.append((
                 snapshot,
                 title if isinstance(title, str) and title.strip() else None,
+                launched if isinstance(launched, str) and launched else None,
             ))
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
         self.close_all_subtabs()  # clear every tab before rebuilding from the snapshot
-        for snapshot, title in restored:
+        for snapshot, title, launched in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
             panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
+            # A run this tab started and the app was closed on: the gallery
+            # reconnects it, and this is how the tab knows it is still its own.
+            panel.note_launched(launched)
         current = state.get("current", 0)
         if isinstance(current, int) and 0 <= current < self.count():
             self.setCurrentIndex(current)

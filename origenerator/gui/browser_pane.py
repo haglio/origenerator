@@ -352,7 +352,8 @@ class BrowserPane:
         first poll still to come) they fall back to running-first, as they were.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
-                         for key, job in self._v._reroll.jobs.items()}
+                         for key, jobs in self._v._reroll.jobs_by_folder.items()
+                         for job in jobs}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         items = []
@@ -366,7 +367,7 @@ class BrowserPane:
                 frame, progress = job.last_preview, job.last_progress
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
-                cancel = lambda k=folder_key: self._v._cancel_reroll(k)
+                cancel = lambda p=pid: self._v._cancel_job(p)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)

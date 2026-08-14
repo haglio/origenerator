@@ -122,15 +122,44 @@ def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
     assert db.list_generations()[0]["source"] == "experiment"
 
 
-def test_start_prepared_is_a_noop_when_the_folder_is_already_running(qtbot, tmp_path):
+def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
+    # Two pictures of one recipe, both wanted: the second queues behind the first
+    # rather than being refused, which is what stopped them being made together.
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)
     controller.start_prepared("k", _I2V, _params(seed=3))
 
     again = controller.start_prepared("k", _I2V, _params(seed=99))
 
+    assert again is True
+    assert len(controller.all_jobs) == 2
+    assert client.submit_job.call_count == 2
+
+
+def test_the_folders_live_tile_still_follows_the_job_in_front(qtbot, tmp_path):
+    # Things keyed by folder — the one live re-roll tile, the selection that
+    # follows it — show the leading job, not a second one queued behind it.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    controller.start_prepared("k", _I2V, _params(seed=3))
+    leader = controller.job_for("k")
+    controller.start_prepared("k", _I2V, _params(seed=99))
+
+    assert controller.job_for("k") is leader
+    assert controller.jobs == {"k": leader}
+    assert controller.has("k") is True
+
+
+def test_an_experiment_never_stacks_onto_a_busy_folder(qtbot, tmp_path):
+    # Only work the user asked for may queue up; the background experimenter still
+    # takes an idle folder or none at all.
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.start_prepared("k", _I2V, _params(seed=3))
+
+    again = controller.start_prepared("k", _I2V, _params(seed=99), source="experiment")
+
     assert again is False
-    client.submit_job.assert_called_once()  # not submitted a second time
+    client.submit_job.assert_called_once()
 
 
 def test_start_prepared_returns_false_without_a_client(qtbot, tmp_path):
@@ -241,7 +270,8 @@ def test_start_reroll_from_image_regenerates_the_frame_then_runs_the_given_video
     assert vparams["noise_seed"] == 11 and vparams["seed"] == 22
 
 
-def test_start_reroll_from_image_is_a_noop_when_the_folder_is_already_running(qtbot, tmp_path):
+def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
+    # A chained image→video re-roll stacks like any other user launch now.
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)
     image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
@@ -249,8 +279,8 @@ def test_start_reroll_from_image_is_a_noop_when_the_folder_is_already_running(qt
 
     again = controller.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
 
-    assert again is False
-    client.submit_job.assert_called_once()
+    assert again is True
+    assert client.submit_job.call_count == 2
 
 
 # --- user work preempts background experiments --------------------------------

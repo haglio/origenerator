@@ -202,12 +202,12 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
-        # Standalone enhances waiting to launch (image_enhance params, in order).
-        # Enhances of one source config share a folder, and the controller runs
-        # one job per folder — so the queue drains as completions pump it.
-        self._enhance_queue: list[dict] = []
-        # The latest streamed frame of each running enhance, keyed like the jobs,
-        # so the info pane's version strip can show the level being made.
+        # The latest streamed frame of each running enhance, keyed by the folder
+        # its job runs under, so the info pane's version strip can show the level
+        # being made. One slot per folder is enough because ComfyUI renders one
+        # prompt at a time: a folder's other enhances are queued behind, and a
+        # queued one is shown as queued rather than lent this frame (see
+        # :meth:`_pending_enhancement_for`).
         self._enhance_frames: dict[str, bytes] = {}
         # What every enhance runs at, app-wide — the Enhance subpanel's value.
         # Restored from the session by set_enhance_settings; built before
@@ -630,7 +630,8 @@ class GalleryView(QWidget):
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link.
-        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video,
+        Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
+        and re-reads whether the tab still owns a run in flight,
         its ``fullscreen_opened`` hands the drive to a video popped open fullscreen,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
@@ -641,6 +642,9 @@ class GalleryView(QWidget):
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
         panel.displayed_changed.connect(self._reconcile_pending_enhancements)
+        # Pointing a tab at another generation drops its claim on the run it
+        # launched, so its Generate button has to be re-read straight away.
+        panel.displayed_changed.connect(self._reconcile_generating)
         # Its version strip's "+ Enhance" card runs through the same queue the
         # folder button and the context menu use.
         panel.enhance_requested.connect(lambda pid: self.enhance_items([pid]))
@@ -1076,24 +1080,28 @@ class GalleryView(QWidget):
         return self._folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Show the front config tab's Cancel button while a re-roll of its settings
-        folder is in flight, so the run it launched (or any re-roll of that folder)
-        can be stopped from the tab, not only the folder's tile. Passes the job's
-        prompt id along so the tab's progress fill tracks that run alone, not
-        whatever else the GPU is doing (a background experiment, another folder).
-        Idempotent — driven by every re-roll lifecycle change (including a chained
-        i2v swapping to its video-stage prompt) and by switching the front tab."""
-        panel = self._info_tabs.current_config_panel()
-        if panel is not None:
-            job = self._reroll.job_for(self._panel_reroll_key(panel))
-            panel.set_generating(job is not None, job.prompt_id if job is not None else None)
+        """Point every config tab's Cancel and progress fill at the run *it* launched.
+
+        A tab tracks its own Generate, not its settings folder: a folder can have
+        several runs queued at once (two pictures of one recipe, both wanted), and
+        a tab showing one of them must not claim the others — that is what left a
+        second image's Generate button mid-run and unpressable. A chained i2v is
+        two prompts but one run, so the tab follows its origin across the hand-off.
+
+        Idempotent — driven by every re-roll lifecycle change and by switching the
+        front tab. Every tab is reconciled, not just the front one, so a run
+        launched from a tab that is now behind another still shows there.
+        """
+        for panel in self._info_tabs._config_panels():
+            job = self._reroll.job_for_origin(panel.launched_run())
+            panel.set_generating(job is not None,
+                                 job.prompt_id if job is not None else None)
 
     def _cancel_panel_reroll(self, panel):
-        """Cancel the re-roll running in ``panel``'s settings folder — the tab's
-        Cancel button, the same stop the folder's re-roll tile performs."""
-        key = self._panel_reroll_key(panel)
-        if key in self._reroll_jobs:
-            self._cancel_reroll(key)
+        """Cancel the run this tab launched — its Cancel button."""
+        job = self._reroll.job_for_origin(panel.launched_run())
+        if job is not None:
+            self._cancel_job(job.prompt_id)
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
@@ -1110,13 +1118,17 @@ class GalleryView(QWidget):
         """A tab's Generate: launch it as a re-roll of its settings folder and land
         the browser there, its live tile showing the run.
 
-        Identical in outcome to clicking the folder's re-roll "+": the job runs in
-        that folder's single re-roll slot (its :class:`RerollTile` shows the live
-        frame), so an edited config's brand-new folder appears and is navigated to
-        at once — the running row it inserts gives the folder a tree node
-        immediately (see :func:`build_gallery_tree`). Missing form params are filled
-        from the workflow's defaults, exactly as the old Generate did. A no-op
-        without a client, an unknown workflow, or a folder already generating.
+        Identical in outcome to clicking the folder's re-roll "+": the job lands in
+        that folder (its :class:`RerollTile` shows the leading run's live frame), so
+        an edited config's brand-new folder appears and is navigated to at once —
+        the running row it inserts gives the folder a tree node immediately (see
+        :func:`build_gallery_tree`). A folder already generating takes the new run
+        too; ComfyUI works through them in turn and the bottom strip shows the line.
+        Missing form params are filled from the workflow's defaults, exactly as the
+        old Generate did. A no-op without a client or an unknown workflow.
+
+        The launched run is noted on the tab that asked for it, so that tab's
+        Cancel and progress fill follow its own Generate rather than its folder.
         """
         wf = WORKFLOW_REGISTRY.get(workflow_name)
         if self._client is None or wf is None:
@@ -1136,8 +1148,11 @@ class GalleryView(QWidget):
             panel = self._info_tabs.current_config_panel()
             if panel is not None:
                 panel.use_random_seed()
+        launching = self._info_tabs.current_config_panel()
         if not self._reroll.start_prepared(key, wf, params):
-            return  # no client, or this folder already has a re-roll running
+            return  # no client, or the submit failed
+        if launching is not None:
+            launching.note_launched(self._reroll.newest_job_for(key).origin)
         self._navigate_to_reroll(key)
 
     def _navigate_to_reroll(self, key: str):
@@ -1174,7 +1189,7 @@ class GalleryView(QWidget):
         # Backstop for a missed completion frame: finish any re-roll ComfyUI has
         # already completed so it lands here without a restart. Reconcile fires
         # each job's own finished/failed handler, which persists and refreshes.
-        for job in list(self._reroll_jobs.values()):
+        for job in self._reroll.all_jobs:
             job.reconcile()
             # And re-read what another app has in front of a job ComfyUI hasn't
             # started, so that wait shows a number instead of an unmoving bar
@@ -1848,17 +1863,40 @@ class GalleryView(QWidget):
         self._enqueue_enhancements([r for r in rows if r is not None])
 
     def _enqueue_enhancements(self, rows: list[dict]):
+        """Launch a standalone enhance of each of ``rows``, at the current settings.
+
+        All of them go to the controller at once: ComfyUI runs one prompt at a
+        time and the queue strip shows the line, so a batch of enhances is a
+        queue the user can watch — and cancel a row out of — rather than a
+        backlog held out of sight in here. (This view did hold one, because
+        enhances of a single folder's images share a settings key and the
+        controller took only one job per folder; it takes them all now, so the
+        buffer had nothing left to do but hide the work.)
+        """
+        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+        index = gallery.build_image_config_index(self._image_rows)
         for row in rows:
             params = gallery.enhance_params_for(row, self._enhance_settings)
             if params is None:
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
                 continue
-            logger.info("Enhance queued for %s on %s at %s",
-                        row.get("prompt_id"), params.get("input_image"),
-                        gallery.describe_enhance_params(params))
-            self._enhance_queue.append(params)
-        self._pump_enhance_queue()
+            key = gallery.settings_folder_key(
+                {"workflow_name": workflow.name, "workflow_version": workflow.version,
+                 "params_json": json.dumps(params)},
+                index,
+            )
+            prepared = randomize_seeds(params, workflow.seed_keys())
+            if self._reroll.start_prepared(key, workflow, prepared):
+                logger.info("Enhance launched for %s on %s at %s, under %s",
+                            row.get("prompt_id"), params.get("input_image"),
+                            gallery.describe_enhance_params(params), key)
+                continue
+            # Unlaunchable (no client, or the submit was refused). Logged rather
+            # than dropped in silence: a request the user made and never saw run
+            # is the one failure they cannot diagnose from the screen.
+            logger.warning("Enhance of %s dropped: could not launch under %s",
+                           params.get("input_image"), key)
 
     def _enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Holding a slide asked for it to be enhanced. Returns whether a run
@@ -1908,11 +1946,15 @@ class GalleryView(QWidget):
         The browser pane's tiles ask, so a folder generating with the Auto
         switch on reads honestly: the base render is out, on screen, and
         something better is on the way. Without it the folder looks like it is
-        turning out plain images and ignoring the switch."""
+        turning out plain images and ignoring the switch.
+
+        Every live job is searched, not each folder's leading one: a batch of
+        enhances goes out whole and its members share a settings key, so all but
+        the first would read as not-cooking off the folder-facing view."""
         return any(
             job.workflow.name == gallery.ENHANCE_WORKFLOW
             and gallery.enhance_targets_row(job.params.get("input_image"), row)
-            for job in self._reroll.jobs.values()
+            for job in self._reroll.all_jobs
         )
 
     def _reconcile_pending_enhancements(self):
@@ -1923,9 +1965,15 @@ class GalleryView(QWidget):
         the jobs are the gallery's, so the match is made here: every running
         standalone enhance against every tab's displayed row. Cheap enough to
         re-run on each frame; the panel updates its tile in place.
+
+        Every job of every folder, for the same reason :meth:`is_enhancing` reads
+        them all: a batch of enhances shares one settings key, and a tab showing
+        the third image of it must find its own run rather than the first.
         """
         running = [
-            (key, job) for key, job in self._reroll.jobs.items()
+            (key, job)
+            for key, jobs in self._reroll.jobs_by_folder.items()
+            for job in jobs
             if job.workflow.name == gallery.ENHANCE_WORKFLOW
         ]
         for panel in self._info_tabs._config_panels():
@@ -1941,11 +1989,17 @@ class GalleryView(QWidget):
         The settings ride along so the live tile can name what is being made the
         way a finished level names what made it — the panel may have moved on
         since the run was launched, so the job's own params are the only honest
-        answer."""
+        answer.
+
+        The frame goes only to a job actually rendering. :attr:`_enhance_frames`
+        holds one frame per folder, and a batch of enhances shares a folder — so
+        the frame there belongs to whichever of them ComfyUI is running, and
+        lending it to the ones queued behind would show each of them a picture of
+        a different image. Queued, the tile says so instead."""
         for key, job in running:
             if gallery.enhance_targets_row(job.params.get("input_image"), row):
-                return (job.state, self._enhance_frames.get(key),
-                        gallery.describe_enhance_params(job.params))
+                frame = self._enhance_frames.get(key) if job.state == "running" else None
+                return (job.state, frame, gallery.describe_enhance_params(job.params))
         return None
 
     def _auto_enhance_if_wanted(self, row: dict | None):
@@ -1964,40 +2018,6 @@ class GalleryView(QWidget):
         awaiting = gallery.rows_awaiting_enhancement([row], self._db.list_generations())
         if awaiting:
             self._enqueue_enhancements(awaiting)
-
-    def _pump_enhance_queue(self):
-        """Launch queued enhances through the re-roll controller.
-
-        Enhances of differently configured sources key to different folders and
-        submit at once (ComfyUI's own queue serializes the GPU); enhances of one
-        folder's images share a key, and the controller runs one job per folder
-        — so the head waits there, and every completion or failure pumps again.
-        """
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        index = gallery.build_image_config_index(self._image_rows)
-        while self._enhance_queue:
-            params = self._enhance_queue[0]
-            key = gallery.settings_folder_key(
-                {"workflow_name": workflow.name, "workflow_version": workflow.version,
-                 "params_json": json.dumps(params)},
-                index,
-            )
-            prepared = randomize_seeds(params, workflow.seed_keys())
-            if self._reroll.start_prepared(key, workflow, prepared):
-                logger.info("Enhance launched on %s under %s",
-                            params.get("input_image"), key)
-                self._enhance_queue.pop(0)
-                continue
-            if self._reroll.has(key):
-                logger.info("Enhance of %s waiting: %s is busy",
-                            params.get("input_image"), key)
-                return  # that folder is busy; the next finished/failed pumps again
-            # Unlaunchable (no client, or the submit was refused). Logged rather
-            # than dropped in silence: a request the user made and never saw run
-            # is the one failure they cannot diagnose from the screen.
-            logger.warning("Enhance of %s dropped: could not launch under %s",
-                           params.get("input_image"), key)
-            self._enhance_queue.pop(0)
 
     def _start_slideshow(self):
         """Open what's on screen — a folder, or the Recents/Starred shelf — as a
@@ -2439,13 +2459,31 @@ class GalleryView(QWidget):
         self._drop_reroll(key)
 
     def _drop_reroll(self, key: str):
-        """Cancel a folder's in-flight re-roll and redraw without it — shared by the
+        """Cancel the re-roll leading a folder and redraw without it — shared by the
         tile's Cancel and the montage's skip, which differ only in whether the loop
         stops or launches the next around this."""
         self._reroll.cancel(key)
+        self._after_a_job_left(key)
+
+    def _cancel_job(self, prompt_id: str):
+        """Stop one named run — a queue row's Cancel, and a config tab's.
+
+        A folder can hold several runs at once, so the one to stop is named rather
+        than inferred from its folder; the redraw afterwards is the same.
+        """
+        job = self._reroll.job_for_prompt(prompt_id)
+        key = next((k for k, jobs in self._reroll.jobs_by_folder.items()
+                    if job in jobs), None)
+        self._reroll.cancel_job(prompt_id)
+        if key is not None:
+            self._auto.stop(key)  # cancelling the in-flight job ends the loop too
+            self._after_a_job_left(key)
+
+    def _after_a_job_left(self, key: str):
+        """Redraw the folder a run has just been taken out of."""
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
-        self._reconcile_generating()  # the front tab's folder may have stopped running
+        self._reconcile_generating()  # a tab's run may have stopped
 
     def _abandon_reroll_preview(self, key: str):
         """Empty the info pane if it was mirroring a re-roll that has ended with no
@@ -2472,7 +2510,6 @@ class GalleryView(QWidget):
             # for review rather than moving the user's view — no front-tab load,
             # no montage feed, no auto-loop or combine bookkeeping.
             self.refresh()
-            self._pump_enhance_queue()  # the GPU freed up all the same
             return
         if finished_row is not None \
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
@@ -2508,7 +2545,6 @@ class GalleryView(QWidget):
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
         self._auto_enhance_if_wanted(finished_row)  # while the Auto switch is on
-        self._pump_enhance_queue()     # a same-folder enhance can go now
         self._sync_enhance_all_button()  # a landed enhance may retire the button
         self._reconcile_pending_enhancements()  # the live tile gives way to the level
 
@@ -2533,7 +2569,6 @@ class GalleryView(QWidget):
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
-        self._pump_enhance_queue()    # a failure must not strand the queued rest
         self._reconcile_pending_enhancements()  # nothing is cooking for it now
 
     def _rerender_current_leaf(self):

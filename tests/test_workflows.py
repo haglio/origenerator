@@ -1258,7 +1258,7 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
     # same seed yields the same actions no matter where the track points.
     import json as _json
 
-    import origenerator.workflows.wan21_ati_i2v as ati
+    import origenerator.workflows.stroke_authored as stroke_authored
     from origenerator.workflows.wan21_ati_i2v import (
         REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
     )
@@ -1266,7 +1266,8 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
     aim = {"stroke_x": 0.5, "stroke_top": 0.25, "stroke_bottom": 0.5,
            "anchor_x": 0.45, "anchor_y": 0.6}
     calls = []
-    monkeypatch.setattr(ati, "detect_grip_aim", lambda path: (calls.append(path), aim)[1])
+    monkeypatch.setattr(stroke_authored, "detect_grip_aim",
+                        lambda path: (calls.append(path), aim)[1])
 
     wf = Wan21AtiI2vWorkflow()
     params = dict(wf.default_params(), input_image="start.png", seed=9)

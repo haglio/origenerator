@@ -50,7 +50,11 @@ what happened on #33, 2026-08-13). Three delivery lessons from the session that
 forced this flow into existence (2026-08-12):
 
 - Launch the preview once yourself and confirm it comes up clean (the launcher
-  logs to `state\origenerator_launcher.log`) before handing it over.
+  logs to `state\origenerator_launcher.log`) before handing it over, then close
+  **that instance only**. Every Origenerator window is a `python` process titled
+  "Origenerator" — the user's live app and other agents' previews included — so
+  a close that matches on the title shuts his running app too (that happened,
+  2026-08-13). Snapshot the pids before launching and close only the new one.
 - Hand a `file:///` markdown link to the vbs FILE itself — never its folder,
   never a shell command, and never any launcher sharing a filename with the
   live app's. The user was once handed the worktree's `launch_origenerator.vbs`

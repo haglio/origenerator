@@ -53,14 +53,19 @@ def test_a_fresh_panel_reads_as_the_workflow_defaults_box_off(qtbot):
     assert settings.params["checkpoint"] == MATCH_SOURCE_MODEL
 
 
-def test_auto_enhance_is_an_on_off_switch(qtbot):
-    # A standing state — the app is either finishing new images or it isn't —
-    # so it reads as a switch rather than a field ticked among the knobs. And
-    # the settings are app-wide now, so it names no folder.
+def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
+    # The panel's power, not one of its dials: a bare switch on the title row,
+    # at the far end from the heading. What it does lives in its tooltip.
     panel, _ = _panel(qtbot)
     assert isinstance(panel._auto, ToggleSwitch)
     assert panel._auto.isCheckable()
-    assert "folder" not in panel._auto.text().lower()
+    assert panel._auto.text() == ""
+    assert panel._auto.toolTip()
+
+    title_row = panel.layout().itemAt(0).layout()
+    assert title_row.itemAt(0).widget().text() == "Enhance"      # the heading leads
+    assert title_row.itemAt(title_row.count() - 1).widget() is panel._auto
+    assert title_row.itemAt(1).spacerItem() is not None          # pushed to the right
 
 
 def test_the_switch_flips_and_reports(qtbot):

@@ -10,7 +10,9 @@ lands. It follows you rather than the folder, so it shows on the shelves
 (Recents, Starred, Experiments) exactly as it does on a settings folder.
 
 Editing writes straight back through ``on_change`` — there is no Apply button —
-and the settings persist with the rest of the session state.
+and the settings persist with the rest of the session state. Auto-enhance is a
+bare switch on the title row rather than a labeled checkbox among the knobs: it
+is the panel's power, not one of its dials.
 
 An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
@@ -72,17 +74,21 @@ class EnhancePanel(QWidget):
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(4)
+        # The title row, with the auto switch at its far right — a bare switch,
+        # the way a panel's power is a switch on its corner rather than a line
+        # of prose among its dials. What it does is in its tooltip; the knobs
+        # below are what it does it with.
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
         heading = QLabel("Enhance")
         heading.setStyleSheet("font-weight: 600;")
-        box.addWidget(heading)
-
-        # A switch, not a checkbox: this is a standing state — the app is either
-        # finishing new images or it isn't — rather than a field being filled in
-        # alongside the knobs under it.
-        self._auto = ToggleSwitch("Auto-enhance new images")
+        title_row.addWidget(heading)
+        title_row.addStretch(1)
+        self._auto = ToggleSwitch()
         self._auto.setToolTip(_AUTO_TOOLTIP)
         self._auto.toggled.connect(self._emit)
-        box.addWidget(self._auto)
+        title_row.addWidget(self._auto)
+        box.addLayout(title_row)
 
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)

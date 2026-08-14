@@ -22,7 +22,8 @@ from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.gui.inflight_card import InFlightCard, InFlightItem
+from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
     RECENTS_KEY, RECENTS_LABEL, STARRED_KEY, STARRED_LABEL,

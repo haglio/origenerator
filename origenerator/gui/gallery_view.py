@@ -42,7 +42,7 @@ from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.inflight_card import queue_wait_text
+from origenerator.gui.inflight import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver

@@ -14,8 +14,8 @@ job appearing never shifts the panes above it — and past ``_MAX_VISIBLE_ROWS``
 scrolls rather than growing into them.
 
 It's fed the same in-flight view-models the Recents shelf uses
-(:class:`InFlightItem`), refreshed on every poll so previews and progress stay
-live; a refresh updates the rows in place, so a drag in progress is never yanked
+(:class:`origenerator.gui.inflight.InFlightItem`), refreshed on every poll so
+previews and progress stay live; a refresh updates rows in place, so a drag is never yanked
 out from under the user. Reordering is asked for, not done here:
 :attr:`reorder_requested` carries the order the rows were dropped into, and
 whoever owns the jobs makes ComfyUI agree.
@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap, QDrag
 from PyQt6.QtCore import Qt, QMimeData, pyqtSignal
 
-from origenerator.gui.inflight_card import InFlightItem, queue_wait_text
+from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()

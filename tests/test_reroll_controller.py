@@ -405,6 +405,115 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     assert job.last_progress == (30, 50)
 
 
+# --- the order ComfyUI will work through the queue in -------------------------
+
+def test_queue_order_starts_out_empty(qtbot, tmp_path):
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    assert controller.queue_order == []
+
+
+def test_refresh_reads_the_order_from_comfyui(qtbot, tmp_path):
+    client = _client()
+    client.queue_order = MagicMock(return_value=["b", "a"])
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+
+    controller.refresh_queue_order()
+
+    assert controller.queue_order == ["b", "a"]
+
+
+def test_an_unreadable_queue_leaves_the_last_known_order(qtbot, tmp_path):
+    # Dropping to no order at all would reshuffle the strip on screen every time
+    # ComfyUI hiccups; the order it last gave is still the best answer there is.
+    client = _client()
+    client.queue_order = MagicMock(return_value=["b", "a"])
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.refresh_queue_order()
+
+    client.queue_order = MagicMock(side_effect=OSError("connection refused"))
+    controller.refresh_queue_order()
+
+    assert controller.queue_order == ["b", "a"]
+
+
+def test_refresh_without_a_client_is_harmless(qtbot, tmp_path):
+    controller = RerollController(Database(tmp_path / "test.db"), None)
+    controller.refresh_queue_order()
+    assert controller.queue_order == []
+
+
+# --- reordering what ComfyUI has waiting --------------------------------------
+
+def _three_queued(tmp_path):
+    """A controller holding three queued jobs, and their prompt ids in queue order."""
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    for i in range(3):
+        controller.start_prepared(f"k{i}", _I2V, _params(seed=i))
+    ids = [controller.job_for(f"k{i}").prompt_id for i in range(3)]
+    client.queue_order = MagicMock(return_value=list(ids))
+    client.cancel_prompt.reset_mock()
+    client.submit_job.reset_mock()
+    return controller, client, ids
+
+
+def test_reorder_requeues_only_from_where_the_order_first_differs(qtbot, tmp_path):
+    # Dragging the last job above the middle one leaves the head alone: requeuing
+    # a job that hasn't moved would push it behind another app's work for nothing.
+    controller, client, (a, b, c) = _three_queued(tmp_path)
+
+    controller.reorder([a, c, b])
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [c, b]
+    assert [call.args[0] for call in client.cancel_prompt.call_args_list] == [c, b]
+
+
+def test_reorder_that_changes_nothing_touches_the_queue(qtbot, tmp_path):
+    controller, client, ids = _three_queued(tmp_path)
+
+    controller.reorder(list(ids))
+
+    client.cancel_prompt.assert_not_called()
+    client.submit_job.assert_not_called()
+
+
+def test_reorder_never_moves_the_job_comfyui_is_running(qtbot, tmp_path):
+    # There is no place in front of what is executing, and dropping it would throw
+    # the work away rather than reorder it.
+    controller, client, (a, b, c) = _three_queued(tmp_path)
+    client.progress.emit(a, 1, 10)  # ComfyUI started the head of the queue
+
+    controller.reorder([c, a, b])
+
+    assert a not in [call.args[1] for call in client.submit_job.call_args_list]
+
+
+def test_reorder_ignores_ids_this_app_holds_no_job_for(qtbot, tmp_path):
+    # Another app's prompts share the queue; nothing here can move them.
+    controller, client, (a, b, c) = _three_queued(tmp_path)
+
+    controller.reorder(["some-other-apps-prompt", c, b, a])
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [c, b, a]
+
+
+def test_reorder_is_a_noop_when_the_queue_cannot_be_read(qtbot, tmp_path):
+    # Without knowing the order now, "from where it first differs" is unanswerable
+    # — better to leave the queue alone than reshuffle it on a guess.
+    controller, client, (a, b, c) = _three_queued(tmp_path)
+    client.queue_order = MagicMock(side_effect=OSError("connection refused"))
+
+    controller.reorder([c, b, a])
+
+    client.cancel_prompt.assert_not_called()
+    client.submit_job.assert_not_called()
+
+
+def test_reorder_without_a_client_is_harmless(qtbot, tmp_path):
+    controller = RerollController(Database(tmp_path / "test.db"), None)
+    controller.reorder(["anything"])  # nothing to reorder, nothing to raise
+
+
 def test_parse_progress_state_tolerates_absent_or_corrupt():
     from origenerator.gui.reroll_controller import _parse_progress_state
     assert _parse_progress_state(None) is None

@@ -9,8 +9,14 @@ Pure job/database machinery with no widget knowledge — it reports what the vie
 must redraw through signals (``changed`` to re-render the open folder, ``preview``
 to mirror a live frame, ``finished``/``failed`` for a job's outcome) so the
 GalleryView owns all presentation while this owns the lifecycle. View-initiated
-actions (:meth:`start`, :meth:`cancel`) let their sole caller drive the follow-up
-UI directly; the signals carry the events that arrive asynchronously from a job.
+actions (:meth:`start`, :meth:`cancel`, :meth:`reorder`) let their sole caller
+drive the follow-up UI directly; the signals carry the events that arrive
+asynchronously from a job.
+
+It also holds the order ComfyUI will work through its queue in
+(:attr:`queue_order`, re-read by :meth:`refresh_queue_order` on each poll), since
+that is what a display of the queue must sort by — a reorder moves jobs on the
+server without touching anything the database records about them.
 """
 
 import json
@@ -32,6 +38,15 @@ logger = logging.getLogger(__name__)
 # progress ticks fire per sampler step (sub-second for images); the persisted value
 # only needs to be recent enough that a restart resumes the bar near where it was.
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
+
+
+def _first_difference(current: list, wanted: list) -> int:
+    """The first index at which two orderings part company (their common length
+    when one is simply a prefix of the other)."""
+    for index, (now, then) in enumerate(zip(current, wanted)):
+        if now != then:
+            return index
+    return min(len(current), len(wanted))
 
 
 def _parse_progress_state(raw):
@@ -68,6 +83,7 @@ class RerollController(QObject):
         self._client = client
         self._jobs: dict[str, GenerationJob] = {}  # settings-folder key -> job
         self._progress_persist_at: dict[str, float] = {}  # prompt_id -> last-write time
+        self._queue_order: list[str] = []  # prompt ids as ComfyUI last listed them
 
     @property
     def jobs(self) -> dict:
@@ -322,6 +338,57 @@ class RerollController(QObject):
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
             return
         self._register(key, job, self._on_finished)
+
+    @property
+    def queue_order(self) -> list[str]:
+        """Prompt ids in the order ComfyUI will run them, as of the last refresh.
+
+        Whatever displays the queue orders itself by this rather than by when the
+        rows were made: a reorder moves jobs in ComfyUI without touching anything
+        the database records about them.
+        """
+        return self._queue_order
+
+    def refresh_queue_order(self):
+        """Re-read that order. A caller that polls invokes this each tick.
+
+        A read that fails leaves the last known order standing — dropping to none
+        would reshuffle the queue on screen every time ComfyUI hiccups, and the
+        order it last gave is still the best answer available.
+        """
+        if self._client is None:
+            return
+        try:
+            self._queue_order = self._client.queue_order()
+        except Exception as e:
+            logger.debug("Could not read the queue order: %s", e)
+
+    def reorder(self, prompt_ids: list[str]):
+        """Make ComfyUI work through this app's waiting jobs in ``prompt_ids`` order.
+
+        A job moves by leaving the queue and rejoining the back of it (see
+        :meth:`GenerationJob.requeue`), so only the jobs from the first position
+        that differs onward are touched — requeuing one that hasn't moved would
+        push it behind another app's work for nothing. Ids no live job here owns
+        (another app's prompts, a finished one) and any job ComfyUI has already
+        started are skipped: neither can be moved from here.
+
+        A queue that can't be read leaves everything alone: "from where it first
+        differs" has no answer without the order as it stands now, and a reshuffle
+        on a guess is worse than none.
+        """
+        if self._client is None:
+            return
+        jobs = {job.prompt_id: job for job in self._jobs.values()}
+        movable = {pid for pid, job in jobs.items() if job.state == "queued"}
+        wanted = [pid for pid in prompt_ids if pid in movable]
+        try:
+            current = [pid for pid in self._client.queue_order() if pid in movable]
+        except Exception as e:
+            logger.warning("Could not read the queue to reorder it: %s", e)
+            return
+        for pid in wanted[_first_difference(current, wanted):]:
+            jobs[pid].requeue()
 
     def cancel(self, key: str):
         """Stop and forget a folder's running re-roll, dropping its abandoned row.

@@ -4409,23 +4409,106 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
     assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
 
 
-def test_running_bar_shows_the_active_job_then_blanks_when_idle(qtbot):
-    # The slim bottom bar surfaces the one in-flight job from anywhere in the view,
-    # then blanks once nothing runs — keeping its slot so the panes never shift.
+def test_inflight_items_follow_the_order_comfyui_will_run_them_in(qtbot):
+    # A drag in the bottom strip moves jobs in ComfyUI without touching anything
+    # the database records, so the queue is ordered by what ComfyUI reports —
+    # here the reverse of the order the rows were made in.
+    db = FakeDB([
+        _row("first", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
+             status="pending", output_files="[]"),
+        _row("second", "sdxl_t2i", {"positive_prompt": "b"}, "b.png",
+             status="pending", output_files="[]"),
+    ])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._reroll._queue_order = ["second", "first"]
+    view.refresh()
+
+    assert [it.key for it in view._inflight_items()] == ["second", "first"]
+
+
+def test_a_job_comfyui_has_not_listed_yet_sorts_to_the_back(qtbot):
+    # A prompt submitted between polls isn't in the order yet; it waits at the end
+    # rather than jumping the queue on screen.
+    db = FakeDB([
+        _row("known", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
+             status="pending", output_files="[]"),
+        _row("brand-new", "sdxl_t2i", {"positive_prompt": "b"}, "b.png",
+             status="pending", output_files="[]"),
+    ])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._reroll._queue_order = ["known"]
+    view.refresh()
+
+    assert [it.key for it in view._inflight_items()] == ["known", "brand-new"]
+
+
+def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
+    # The bottom strip surfaces in-flight work from anywhere in the view, then
+    # empties once nothing runs — keeping its slot so the panes never shift.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.show()
-    qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the bar
+    qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the strip
 
-    assert view._running_bar.isVisible()
-    assert view._running_bar._item.key == "gen1"
+    assert view._queue.isVisible()
+    assert [row.key for row in view._queue.rows()] == ["gen1"]
 
     db.delete_generation("gen1")   # the job ends, its running row gone
     view._poll()
-    assert view._running_bar.isVisible()      # still holding its slot
-    assert view._running_bar._item is None    # but blank
+    assert view._queue.isVisible()        # still holding its slot
+    assert view._queue.rows() == []       # but empty
+
+
+def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
+    db = FakeDB([
+        _running_row("running-one", prompt="a dog"),
+        _row("waiting-one", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
+             status="pending", output_files="[]"),
+    ])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert len(view._queue.rows()) == 2
+
+
+def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
+    from unittest.mock import patch
+
+    from origenerator.gui.reroll_controller import RerollController
+
+    db = FakeDB([
+        _running_row("running-one", prompt="a dog"),
+        _row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
+             status="pending", output_files="[]"),
+        _row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
+             status="pending", output_files="[]"),
+    ])
+    with patch.object(RerollController, "reorder") as reorder:
+        view = GalleryView(db)
+        qtbot.addWidget(view)
+        view._reroll._queue_order = ["running-one", "w1", "w2"]
+        view.refresh()
+
+        view._queue.move_row(2, 1)
+
+    reorder.assert_called_once_with(["running-one", "w2", "w1"])
+
+
+def test_clicking_a_queue_row_opens_that_jobs_tab(qtbot):
+    db = FakeDB([_running_row("gen1", prompt="a dog")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view.open_config_tab = MagicMock()
+
+    view._inflight_items()[0].open_config()
+
+    view.open_config_tab.assert_called_once_with("gen1")
 
 
 def test_running_bar_times_the_job_against_the_workflows_recent_runs(qtbot):

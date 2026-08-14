@@ -3,12 +3,16 @@
 The gallery's Recents shelf leads with a card per generation currently queued or
 running — from a Generate tab or a gallery re-roll — so all in-flight work is
 visible in one place. Each card mirrors the job's latest live preview frame (or a
-"Generating…/Queued…" placeholder until one arrives) and, when clicked, reveals
-where the job actually lives: its Generate tab, or its gallery folder.
+"Generating…/Queued…" placeholder until one arrives) and, when clicked, opens the
+gallery folder the job is running in and selects its live tile.
 
 A card is fed by an :class:`InFlightItem`, a plain view-model each source builds
 for its own jobs — so this widget stays unaware of where a job comes from or how
 it is revealed. The gallery holds the items and calls ``reveal`` on a click.
+
+The same view-model feeds the bottom strip's generation queue
+(:mod:`origenerator.gui.generation_queue`), whose rows go the other way on a
+click — to the job's settings as an editable tab, through ``open_config``.
 """
 
 from dataclasses import dataclass
@@ -33,16 +37,20 @@ class InFlightItem:
     caption: str                 # what the card labels the job (workflow › prompt)
     status: str                  # "running" or "queued"
     frame: bytes | None          # latest live preview frame, if one has arrived
-    reveal: Callable[[], None]   # bring the job's own view forward (tab or folder)
+    reveal: Callable[[], None]   # show the job's gallery folder and its live tile
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
-    progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for the bottom bar
+    progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for a progress bar
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
-    # The two halves of the bottom bar's countdown: when ComfyUI began executing
+    # The two halves of the queue strip's countdown: when ComfyUI began executing
     # this job (None while it's still queued), and what this workflow's recent
     # runs say a whole one takes.
     started_at: float | None = None
     typical_seconds: float | None = None
+    # Open (or bring forward) the job's settings as an editable tab in the
+    # generate pane — the other place a job "lives", and where the queue sends a
+    # click. None when nothing here can build that tab (a read-only gallery).
+    open_config: Callable[[], None] | None = None
 
 
 def queue_wait_text(foreign_ahead: int | None) -> str | None:

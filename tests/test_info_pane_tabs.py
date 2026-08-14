@@ -331,6 +331,39 @@ def test_opening_tab_from_a_thumbnail_populates_strip_with_its_folder(tabs):
     assert _strip_ids(tabs) == ["cat2", "cat1"]  # the whole cat folder, newest first
 
 
+# --- bringing a generation's own tab forward -------------------------------
+
+def test_reveal_config_opens_a_tab_for_a_generation_with_none(tabs):
+    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4))
+    tabs.currentWidget().prefill("wan22_i2v", {})  # the open tab is a different folder
+
+    tabs.reveal_config("g1")
+
+    assert tabs.count() == 2
+    assert tabs.currentWidget()._param_form.get_values_static()["positive_prompt"] == "a heron"
+
+
+def test_reveal_config_brings_forward_a_tab_that_already_has_it(tabs):
+    # A queued job's row is clicked while its own tab sits behind another: that
+    # tab comes forward rather than a duplicate of it opening.
+    params = _sdxl_full(positive_prompt="a heron", seed=4)
+    _insert_gen(tabs._db, "g1", params)
+    tabs.currentWidget().prefill("sdxl_t2i", params)
+    its_tab = tabs.currentWidget()
+    tabs._add_subtab()  # some other tab is in front now
+
+    tabs.reveal_config("g1")
+
+    assert tabs.count() == 2  # no third tab
+    assert tabs.currentWidget() is its_tab
+
+
+def test_reveal_config_ignores_a_generation_that_is_gone(tabs):
+    count = tabs.count()
+    tabs.reveal_config("never-existed")
+    assert tabs.count() == count
+
+
 # --- load_selection: single-click a browser thumbnail ----------------------
 
 def test_load_selection_reuses_the_blank_current_tab(tabs):

@@ -351,6 +351,31 @@ class ComfyUIClient(QThread):
         """
         return self._queue_ids("queue_running")
 
+    def queue_order(self) -> list[str]:
+        """Every queued prompt id in the order ComfyUI will work through them.
+
+        What it's executing leads, then the pending ones by queue number — which
+        is what orders execution; ``/queue`` hands pending entries back
+        heap-ordered, so their position in the list says nothing. An entry with
+        no usable number sorts to the back rather than dropping out, so a
+        malformed one is still shown rather than silently missing.
+
+        This is the app's picture of the queue, foreign prompts included: they
+        occupy real places in it, and a display that skipped them would put the
+        user's own jobs in positions ComfyUI disagrees with.
+        """
+        data = self._fetch_queue_data()
+        pending = [
+            (_queue_number(item), pid) for item in data.get("queue_pending", [])
+            if (pid := _queue_prompt_id(item)) is not None
+        ]
+        pending.sort(key=lambda entry: (entry[0] is None, entry[0]))
+        running = [
+            pid for item in data.get("queue_running", [])
+            if (pid := _queue_prompt_id(item)) is not None
+        ]
+        return running + [pid for _number, pid in pending]
+
     def foreign_backlog(self, prompt_id: str) -> int | None:
         """How many prompts from *other* clients ComfyUI will run before ``prompt_id``.
 

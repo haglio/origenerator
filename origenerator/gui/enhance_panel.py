@@ -28,11 +28,8 @@ from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.no_wheel import (
     NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
 )
-from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows import WORKFLOW_REGISTRY
-
-ensure_shared_ui_on_path()
-from shared_ui.check_box import CheckBox  # noqa: E402
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
@@ -79,7 +76,10 @@ class EnhancePanel(QWidget):
         heading.setStyleSheet("font-weight: 600;")
         box.addWidget(heading)
 
-        self._auto = CheckBox("Auto-enhance new images in this folder")
+        # A switch, not a checkbox: this is a standing state — the app is either
+        # finishing new images or it isn't — rather than a field being filled in
+        # alongside the knobs under it.
+        self._auto = ToggleSwitch("Auto-enhance new images")
         self._auto.setToolTip(_AUTO_TOOLTIP)
         self._auto.toggled.connect(self._emit)
         box.addWidget(self._auto)

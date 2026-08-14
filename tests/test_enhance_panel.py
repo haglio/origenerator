@@ -11,10 +11,12 @@ from PyQt6.QtGui import QDropEvent
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL, EnhanceLevel, EnhanceSettings, default_enhance_params,
 )
+from origenerator.gui import enhance_versions as versions_module
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
-    EnhanceVersions, _LevelTile, enhance_level_mime, params_from_mime,
+    EnhanceVersions, _LevelTile, _PendingTile, enhance_level_mime, params_from_mime,
 )
+from origenerator.gui.toggle_switch import ToggleSwitch
 
 
 def _panel(qtbot):
@@ -49,6 +51,41 @@ def test_a_fresh_panel_reads_as_the_workflow_defaults_box_off(qtbot):
     assert settings.auto is False
     assert settings.params["enhance_scale"] == default_enhance_params()["enhance_scale"]
     assert settings.params["checkpoint"] == MATCH_SOURCE_MODEL
+
+
+def test_auto_enhance_is_an_on_off_switch(qtbot):
+    # A standing state — the app is either finishing new images or it isn't —
+    # so it reads as a switch rather than a field ticked among the knobs. And
+    # the settings are app-wide now, so it names no folder.
+    panel, _ = _panel(qtbot)
+    assert isinstance(panel._auto, ToggleSwitch)
+    assert panel._auto.isCheckable()
+    assert "folder" not in panel._auto.text().lower()
+
+
+def test_the_switch_flips_and_reports(qtbot):
+    switch = ToggleSwitch("Auto-enhance new images")
+    qtbot.addWidget(switch)
+    flips = []
+    switch.toggled.connect(flips.append)
+
+    switch.setChecked(True)
+    assert flips == [True]
+    switch.click()
+    assert flips == [True, False]
+
+
+def test_the_switch_draws_at_both_states(qtbot):
+    # It paints itself (a stylesheet cannot move a checkbox's indicator), so the
+    # paint path is worth exercising in both positions.
+    switch = ToggleSwitch("Auto")
+    qtbot.addWidget(switch)
+    switch.resize(switch.sizeHint())
+    off = switch.grab().toImage()
+    switch.setChecked(True)
+    on = switch.grab().toImage()
+    assert not off.isNull() and not on.isNull()
+    assert off != on            # the knob and the track visibly moved
 
 
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
@@ -170,6 +207,99 @@ def test_a_foreign_drag_carries_nothing_this_panel_wants():
     mime = QMimeData()
     mime.setText("just some text")
     assert params_from_mime(mime) is None
+
+
+def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, monkeypatch):
+    # The same gesture as dragging a gallery thumbnail onto Combine: the picture
+    # comes along under the cursor, so what is being dragged is never in doubt.
+    from PIL import Image
+
+    image = tmp_path / "e1.png"
+    Image.new("RGB", (16, 16), (200, 80, 40)).save(image)
+
+    dragged = {}
+
+    class _RecordingDrag:
+        def __init__(self, source):
+            dragged["source"] = source
+
+        def setMimeData(self, mime):
+            dragged["mime"] = mime
+
+        def setPixmap(self, pixmap):
+            dragged["pixmap"] = pixmap
+
+        def exec(self, _action):
+            return None
+
+    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
+
+    (level,) = _levels(1, {"enhance_scale": 2.0})[:1]
+    tile = _LevelTile(level, 0, image)
+    qtbot.addWidget(tile)
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tile, QPoint(90, 90))
+
+    assert "pixmap" in dragged and not dragged["pixmap"].isNull()
+    assert params_from_mime(dragged["mime"]) == {"enhance_scale": 2.0}
+
+
+def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
+    # A level whose file is gone still carries its settings; there is simply no
+    # image to trail, and that must not stop the drag.
+    class _RecordingDrag:
+        def __init__(self, source):
+            pass
+
+        def setMimeData(self, mime):
+            pass
+
+        def setPixmap(self, pixmap):
+            raise AssertionError("nothing to show, so nothing should be set")
+
+        def exec(self, _action):
+            return None
+
+    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
+
+    tile = _LevelTile(_levels(1, {"enhance_scale": 2.0})[0], 0, None)
+    qtbot.addWidget(tile)
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tile, QPoint(90, 90))
+
+
+# --- the enhancement being generated right now -----------------------------
+
+
+def test_a_running_enhance_leads_the_strip(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), ("running", None))
+    tiles = versions._host.findChildren((_PendingTile, _LevelTile))
+    assert isinstance(tiles[0], _PendingTile)   # newest first, and it's becoming that
+
+
+def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
+    # An image with only its original has no levels to choose between — but one
+    # being made for it is worth showing, so the strip appears for that alone.
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(0)), ("queued", None))
+    assert not versions.isHidden()
+
+
+def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), ("running", None))
+    tile = versions._pending
+
+    assert versions.update_pending(("running", b"not a real png")) is True
+    assert versions._pending is tile          # the same widget, fed in place
+
+    # A run starting or ending changes the strip's shape, which only a rebuild
+    # can do — the caller is told so rather than left with a stale strip.
+    assert versions.update_pending(None) is False
 
 
 def test_dropping_a_level_absorbs_its_settings(qtbot):

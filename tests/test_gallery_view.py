@@ -5136,6 +5136,33 @@ def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_pa
     assert job.params["enhance"] is False
 
 
+def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbot,
+                                                                            tmp_path):
+    # The level being made appears where the levels are, mirroring the run's
+    # frames like every other in-flight card in the app.
+    from origenerator.gui.enhance_versions import _PendingTile
+
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    row = db.get_generation("g0")
+    panel.show_saved_generation(row, view._image_rows)
+
+    view.enhance_items(["g0"])
+
+    assert panel._versions._host.findChildren(_PendingTile)
+    (key,) = view._reroll_jobs
+    view._reroll.preview.emit(key, b"a frame")
+    assert panel._pending_enhancement == ("queued", b"a frame")
+
+    # An enhance of a DIFFERENT image leaves this tab's strip alone.
+    panel.set_pending_enhancement(None)
+    view.enhance_items(["g1"])
+    assert panel._pending_enhancement is None
+
+
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
     # The enhance folds back onto the row it came from, and that row arrives
     # here again as "finished". Already-enhanced, it must not queue another —

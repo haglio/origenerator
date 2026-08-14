@@ -86,6 +86,9 @@ class GenerateConfigPanel(QWidget):
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
+        # (status, frame) of an enhancement running on the displayed image, fed
+        # from outside (the gallery owns the jobs); None when nothing is cooking.
+        self._pending_enhancement: tuple | None = None
         self._build_ui()
         self._connect_signals()
 
@@ -579,6 +582,7 @@ class GenerateConfigPanel(QWidget):
         an explicit selection."""
         self._metadata_block.hide()
         self._versions.hide()
+        self._pending_enhancement = None  # nothing on display to be enhancing
         self._source_tile.clear()
         self._animated_strip.hide()
         self._folder_btn.hide()
@@ -594,11 +598,36 @@ class GenerateConfigPanel(QWidget):
         self._metadata_block.show()
         # The preview is already on output_files[0] — the most-enhanced version —
         # so the strip leads with that level and offers the rest beside it.
-        self._versions.show_levels(self._version_items(row))
+        self._versions.show_levels(self._version_items(row), self._pending_enhancement)
         self._folder_btn.show()  # any saved generation has a containing folder to open
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)
+
+    def displayed_row(self) -> dict | None:
+        """The saved generation this tab is showing, or ``None``.
+
+        Whatever is in the preview — a browsed selection or an idle autoshow —
+        which is what the gallery matches its live enhance jobs against.
+        """
+        return self._displayed_row
+
+    def set_pending_enhancement(self, pending: tuple | None):
+        """Reflect an enhancement being generated for the image on display.
+
+        ``pending`` is ``(status, frame)`` while one is running, ``None``
+        otherwise. Fed from the gallery, which owns the jobs. A new frame
+        updates the tile in place; only a run starting or ending rebuilds the
+        strip, so a stream of frames doesn't thrash the layout.
+        """
+        if pending == self._pending_enhancement:
+            return
+        self._pending_enhancement = pending
+        if self._versions.update_pending(pending):
+            return
+        if self._displayed_row is not None:
+            self._versions.show_levels(
+                self._version_items(self._displayed_row), pending)
 
     @staticmethod
     def _level_path(level) -> Path:

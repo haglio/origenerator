@@ -7,13 +7,17 @@ two-mode approach the metadata panel's copy icon uses. The recipe-level badges
 a folder is; the media-type badges (:func:`media_type_badge`) are corner chips
 marking a Recents tile as an image or a video. All are drawn rather than glyphs so
 they render identically in any font and read clearly at a small size.
+
+:func:`tab_close_icon` is the one mark not drawn here: it is borrowed from the
+live style, so a button that closes tabs wears the very ✕ the tabs themselves do.
 """
 
 import math
 from functools import lru_cache
 
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QColor
-from PyQt6.QtCore import Qt, QRectF, QPointF
+from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
+from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
 
 from origenerator.paths import ensure_shared_ui_on_path
 
@@ -248,6 +252,28 @@ def _draw_regen_badge(painter: QPainter):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(_REROLL_GLYPH)
     painter.drawPolygon(QPointF(45, 33), QPointF(39, 31), QPointF(41, 38))  # arrowhead
+
+
+def tab_close_icon() -> QIcon:
+    """The close mark the live style paints on a closable tab.
+
+    Borrowed rather than drawn: a control that closes tabs (the config pane's
+    "All") should wear the tabs' own ✕ at the tabs' own size, so the two read as
+    one spelling of "close". A hand-drawn glyph — or the ✕ text character — is a
+    second spelling, which is what this replaces. Not cached: it follows the
+    style, which a theme change can swap under a running app.
+    """
+    style = QApplication.style()
+    size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    option = QStyleOption()
+    option.rect = QRect(0, 0, size, size)
+    option.state = QStyle.StateFlag.State_Enabled
+    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter)
+    painter.end()
+    return QIcon(pixmap)
 
 
 @lru_cache(maxsize=None)

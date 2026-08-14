@@ -1,6 +1,35 @@
 from origenerator.gui import icons
 
 
+def _style_tab_close_pixmap():
+    """The close mark the live style paints on a tab, drawn here independently."""
+    from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
+    from PyQt6.QtGui import QPixmap, QPainter
+    from PyQt6.QtCore import Qt, QRect
+
+    style = QApplication.style()
+    size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    option = QStyleOption()
+    option.rect = QRect(0, 0, size, size)
+    option.state = QStyle.StateFlag.State_Enabled
+    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter)
+    painter.end()
+    return pixmap
+
+
+def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
+    # The corner's close-all must wear a tab's own ✕, not a lookalike: the mark
+    # comes from the style primitive QTabBar draws, at the size it draws it, so
+    # the two controls read as one spelling of "close" rather than two.
+    expected = _style_tab_close_pixmap()
+    rendered = icons.tab_close_icon().pixmap(expected.size())
+    assert not rendered.isNull()
+    assert rendered.toImage() == expected.toImage()
+
+
 def test_level_badge_icons_render_for_each_level(qtbot):
     from PyQt6.QtCore import QSize
 

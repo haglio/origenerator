@@ -7,9 +7,18 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
-        "Prompts", "Seed", "Model & LoRA", "Sampling", "Enhance", "Stroke",
+        "Prompts", "Seed", "Model & LoRA", "Sampling", "Stroke",
         "Dimensions", "Frames", "Audio", "Output",
     ]
+
+
+def test_enhance_has_no_section_because_it_is_not_a_folder_setting():
+    # Every section here holds params that decide which gallery folder a run
+    # lands in. An enhancement doesn't — it's a finish applied afterward — so it
+    # is deliberately absent, and the gallery's Enhance subpanel owns it instead.
+    assert "Enhance" not in [s.title for s in ps.SECTIONS]
+    for key in ("enhance", "enhance_scale", "enhance_steps", "enhance_denoise"):
+        assert ps.section_title(key) == ps.OTHER_TITLE
 
 
 def test_section_title_places_each_kind_of_param_in_its_section():
@@ -23,9 +32,6 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("steps") == "Sampling"
     assert ps.section_title("scheduler") == "Sampling"
     assert ps.section_title("upscale_model") == "Model & LoRA"  # a model file slot
-    assert ps.section_title("enhance") == "Enhance"             # the toggle leads
-    assert ps.section_title("enhance_scale") == "Enhance"
-    assert ps.section_title("enhance_denoise") == "Enhance"
     assert ps.section_title("stroke_hz") == "Stroke"
     assert ps.section_title("anchor_y") == "Stroke"
     assert ps.section_title("width") == "Dimensions"
@@ -70,8 +76,11 @@ def test_default_collapse_leaves_only_prompts_and_seed_open():
 def test_every_workflow_param_maps_to_a_named_section(workflow_name):
     # The consistency guarantee: no registered workflow may carry a param that
     # falls through to "Other". A new param must be assigned a home in SECTIONS,
-    # so the form groups it the same way for every workflow that shares it.
+    # so the form groups it the same way for every workflow that shares it. The
+    # enhance params are the one exemption — the form hides them outright
+    # (ParamForm's hidden_keys), so they need no section to land in.
     wf = WORKFLOW_REGISTRY[workflow_name]
-    keys = set(wf.default_params()) | {pd.key for pd in wf.param_definitions()}
+    keys = (set(wf.default_params()) | {pd.key for pd in wf.param_definitions()}) \
+        - set(wf.enhance_keys())
     unmapped = sorted(k for k in keys if ps.section_title(k) == ps.OTHER_TITLE)
     assert unmapped == [], f"{workflow_name} params without a section: {unmapped}"

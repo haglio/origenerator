@@ -173,5 +173,5 @@ def test_metadata_labels_the_pre_enhance_file_original(tmp_path):
                                       "image_enhance_00001_.png"))
     (basic,) = build_sections(db.get_generation("src"))
     labels = [(item.label, item.value) for item in basic.items]
-    assert ("File", "image/image_enhance_00001_.png") == labels[0]
+    assert ("Enhance 1", "image/image_enhance_00001_.png") == labels[0]
     assert ("Original", "image/sdxl_t2i_src.png") == labels[1]

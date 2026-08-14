@@ -13,7 +13,7 @@ def test_expected_steps_sums_the_base_and_enhance_passes():
     # bar's total covers both, so it ramps once across the whole job.
     payload = WORKFLOW_REGISTRY["sdxl_t2i"].build_api_payload(
         {**WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
-         "steps": 50, "enhance_steps": 20}
+         "steps": 50, "enhance": True, "enhance_steps": 20}
     )
     assert expected_progress_steps(payload) == 70
 

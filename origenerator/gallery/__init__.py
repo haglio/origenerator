@@ -55,7 +55,14 @@ from origenerator.gallery.output import (
     row_output_files,
 )
 from origenerator.gallery.enhance import (
+    ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
+    MATCH_SOURCE_MODEL,
+    EnhanceLevel,
+    EnhanceSettings,
+    default_enhance_params,
+    describe_enhance_params,
+    enhance_levels,
     enhance_params_for,
     fold_completed_enhancements,
     fold_enhancement,

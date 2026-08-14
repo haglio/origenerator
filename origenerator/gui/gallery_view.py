@@ -28,6 +28,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
+from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
@@ -528,12 +529,24 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self._osr2_driving = None
         self._fullscreen_preview = None  # the open fullscreen view, top drive priority
-        # This window's own drive panel — genau's readout, copied — built into
-        # the bottom of the center (browser) pane, where it takes its own room
-        # rather than floating over anyone's buttons.
+        # The bottom of the center (browser) pane, shared by two panels that each
+        # take their own room rather than floating over anyone's buttons: genau's
+        # readout, copied, held to the left at its fixed size, and the open
+        # folder's Enhance settings taking the width left beside it.
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(0, 0, 0, 0)
+        bottom.setSpacing(12)
         self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
         self._stroke_panel.setVisible(self._osr2_stroke.active)
-        browser_box.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignHCenter)
+        bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
+        # What an enhancement of anything in the open folder runs at — the Enhance
+        # All button, a single image's Enhance, and (with its box on) each image
+        # the folder newly generates. Deliberately not on the Generate form: every
+        # setting there picks the folder a run lands in, and this one doesn't.
+        self._enhance_panel = EnhancePanel(self._on_enhance_settings_changed)
+        self._enhance_panel.hide()  # shown only on a settings folder holding images
+        bottom.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
+        browser_box.addLayout(bottom)
         # The live auto-generate slideshow (double-click the preview while a folder
         # loops), and the folder key it follows — None while none is open.
         self._auto_montage = None
@@ -1170,6 +1183,7 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
         self._sync_enhance_all_button()  # enhance-all fits a folder with plain images
         self._sync_group_button()      # grouping fits only a multi-selection
+        self._sync_enhance_panel()  # and its settings belong to that same folder
         # The image/video filter belongs to the Recents shelf alone; the
         # experimenter's switch to the Experiments shelf alone.
         self._recents_filter_bar.setVisible(current is self._recents_item)
@@ -1674,9 +1688,53 @@ class GalleryView(QWidget):
         )
         self._enhance_all_btn.setVisible(available)
 
+    def _sync_enhance_panel(self):
+        """Show the Enhance subpanel on a settings folder of images, filled with
+        that folder's own stored settings.
+
+        A folder of videos has nothing to enhance (the enhancer takes images), and
+        a parent tier isn't one folder's settings, so both hide it — the panel
+        always describes exactly the folder on screen."""
+        group = self._current_group()
+        holds_images = isinstance(group, gallery.SettingsGroup) and any(
+            gallery.is_enhanceable_row(row) for row in group.rows
+        )
+        self._enhance_panel.setVisible(holds_images)
+        if holds_images:
+            self._enhance_panel.show_settings(self._folder_enhance_settings(group.key))
+
+    def _folder_enhance_settings(self, folder_key: str) -> gallery.EnhanceSettings:
+        """One folder's stored enhancement settings, or the defaults for a folder
+        never configured."""
+        return gallery.EnhanceSettings.parse(
+            self._db.folder_enhance_map().get(folder_key)
+        )
+
+    def _on_enhance_settings_changed(self, settings):
+        """Persist an edit made in the Enhance subpanel against the open folder.
+
+        Written straight through rather than on an Apply, so the settings an
+        enhance launched a moment later runs with are the ones on screen."""
+        group = self._current_group()
+        if isinstance(group, gallery.SettingsGroup):
+            self._db.set_folder_enhance(group.key, settings.to_json())
+
+    def _enhance_settings_for_row(self, row: dict) -> gallery.EnhanceSettings:
+        """The settings an enhance of ``row`` should run at: its own folder's.
+
+        Enhancement configuration belongs to the folder, so a single image's
+        Enhance and its folder's Enhance All resolve to the same knobs however
+        they were launched — including from the Recents shelf, where the folder
+        on screen isn't the image's own."""
+        key = gallery.settings_folder_key(
+            row, gallery.build_image_config_index(self._image_rows)
+        )
+        return self._folder_enhance_settings(key)
+
     def _enhance_all(self):
         """The folder button's action: queue a standalone enhance for every
-        member image that isn't enhanced yet, then retire the button."""
+        member image that isn't enhanced yet, at the folder's own settings, then
+        retire the button."""
         group = self._current_group()
         if not isinstance(group, gallery.SettingsGroup):
             return
@@ -1688,16 +1746,34 @@ class GalleryView(QWidget):
     def enhance_items(self, prompt_ids: list[str]):
         """Queue a standalone enhance for each picked generation (the thumbnail
         context menu's action) — a deliberate pick, so already-enhanced images
-        are re-enhanced rather than skipped."""
+        are re-enhanced rather than skipped, landing as a further level beside
+        the ones already there."""
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
         self._enqueue_enhancements([r for r in rows if r is not None])
 
     def _enqueue_enhancements(self, rows: list[dict]):
         for row in rows:
-            params = gallery.enhance_params_for(row)
+            params = gallery.enhance_params_for(row, self._enhance_settings_for_row(row))
             if params is not None:
                 self._enhance_queue.append(params)
         self._pump_enhance_queue()
+
+    def _auto_enhance_if_wanted(self, row: dict | None):
+        """Enhance a just-finished image when its folder's Auto box is on.
+
+        The subpanel's standing instruction: a folder set to auto-enhance turns
+        out finished images rather than raw ones, without the user having to
+        press Enhance All after every run. The gate is Enhance All's own —
+        :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a
+        video, an already-enhanced image (inline or folded), and an image whose
+        enhance is still cooking are all passed over. That last part is what
+        stops the loop: the enhance this queues folds back onto the row it came
+        from and arrives here already enhanced."""
+        if row is None:
+            return
+        awaiting = gallery.rows_awaiting_enhancement([row], self._db.list_generations())
+        if awaiting and self._enhance_settings_for_row(row).auto:
+            self._enqueue_enhancements(awaiting)
 
     def _pump_enhance_queue(self):
         """Launch queued enhances through the re-roll controller.
@@ -2213,8 +2289,10 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(item)
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
+        self._auto_enhance_if_wanted(finished_row)  # a folder set to auto-enhance
         self._pump_enhance_queue()     # a same-folder enhance can go now
         self._sync_enhance_all_button()  # a landed enhance may retire the button
+        self._sync_enhance_panel()     # the folder may have gained its first image
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None):
         """After a re-roll finishes, load its result into the front config tab.

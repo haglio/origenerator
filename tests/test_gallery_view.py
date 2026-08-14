@@ -146,6 +146,14 @@ class FakeDB:
     def folder_meta_map(self):
         return {k: dict(v) for k, v in self._meta.items()}
 
+    def folder_enhance_map(self):
+        return {k: v["enhance_json"] for k, v in self._meta.items()
+                if v.get("enhance_json")}
+
+    def set_folder_enhance(self, key, enhance_json):
+        self._meta.setdefault(key, {"custom_name": None, "starred": False})
+        self._meta[key]["enhance_json"] = enhance_json
+
     def rename_folder(self, key, custom_name):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["custom_name"] = custom_name
@@ -4971,6 +4979,174 @@ def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
     assert len(view._enhance_queue) == 1
     (job,) = view._reroll_jobs.values()
     assert job.workflow.name == "image_enhance"
+
+
+# --- the Enhance subpanel: one folder's enhancement settings ----------------
+
+
+def _folder_settings(view, key, **fields):
+    """Store settings against a folder the way the subpanel's edits do."""
+    settings = gallery.EnhanceSettings(**fields)
+    view._db.set_folder_enhance(key, settings.to_json())
+    return settings
+
+
+def test_the_hud_holds_the_left_of_the_bottom_row_and_enhance_the_right(qtbot, tmp_path):
+    # Both panels share the bottom of the center pane: genau's console at its
+    # fixed size on the left, the Enhance settings taking the width beside it.
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    row = view._stroke_panel.parentWidget().layout().itemAt(
+        _row_index(view, view._stroke_panel)
+    )
+    assert row.itemAt(0).widget() is view._stroke_panel
+    assert row.itemAt(1).widget() is view._enhance_panel
+    assert row.stretch(0) == 0 and row.stretch(1) == 1
+
+
+def _row_index(view, widget):
+    """Which slot of the browser pane's column holds the row ``widget`` sits in."""
+    column = widget.parentWidget().layout()
+    for i in range(column.count()):
+        item = column.itemAt(i)
+        if item.layout() is not None and item.layout().indexOf(widget) >= 0:
+            return i
+    raise AssertionError("the stroke panel is not in a row of the browser pane")
+
+
+def test_enhance_panel_shows_on_an_image_folder_and_hides_elsewhere(qtbot, tmp_path):
+    # The panel always describes exactly the folder on screen: a settings folder
+    # of images has enhancement to configure, a tier above it does not.
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._enhance_panel.isHidden()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+    assert view._enhance_panel.isHidden()
+
+
+def test_enhance_panel_loads_the_open_folders_settings(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = gallery.settings_folder_key(db.get_generation("g0"))
+    _folder_settings(view, key, auto=True,
+                     params={"enhance_scale": 3.0, "enhance_steps": 42,
+                             "enhance_denoise": 0.4})
+
+    _select_first_leaf(view)
+
+    shown = view._enhance_panel.settings()
+    assert shown.auto is True
+    assert shown.params["enhance_scale"] == 3.0
+    assert shown.params["enhance_steps"] == 42
+
+
+def test_editing_the_panel_persists_against_the_open_folder(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    # No Apply button: an edit writes straight through, so the settings an
+    # enhance launched a moment later runs at are the ones on screen.
+    view._enhance_panel._steps.setValue(33)
+
+    assert gallery.EnhanceSettings.parse(
+        db.folder_enhance_map()[key]
+    ).params["enhance_steps"] == 33
+
+
+def test_enhance_all_runs_at_the_folders_own_settings(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = gallery.settings_folder_key(db.get_generation("g0"))
+    _folder_settings(view, key, params={"enhance_scale": 1.5, "enhance_steps": 44,
+                                        "enhance_denoise": 0.3})
+    _select_first_leaf(view)
+
+    view._enhance_all()
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_scale"] == 1.5
+    assert job.params["enhance_steps"] == 44
+    assert job.params["enhance_denoise"] == 0.3
+
+
+def test_a_single_enhance_runs_at_its_own_folders_settings(qtbot, tmp_path):
+    # An image picked from the Recents shelf is enhanced at the settings of the
+    # folder it lives in, not of whatever folder happens to be on screen.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _folder_settings(view, gallery.settings_folder_key(db.get_generation("g0")),
+                     params={"enhance_steps": 51})
+
+    view.enhance_items(["g0"])
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_steps"] == 51
+
+
+def test_auto_enhance_claims_a_newly_generated_image(qtbot, tmp_path):
+    # The box's standing instruction: a folder set to auto-enhance turns out
+    # finished images without the user pressing Enhance All after every run.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = gallery.settings_folder_key(db.get_generation("g0"))
+    _folder_settings(view, key, auto=True, params={"enhance_steps": 27})
+
+    view._on_reroll_finished(key, "g0")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_steps"] == 27
+
+
+def test_auto_enhance_leaves_a_folder_with_the_box_off_alone(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
+
+    assert view._reroll_jobs == {}
+    assert view._enhance_queue == []
+
+
+def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
+    # The enhance folds back onto the row it came from, and that row arrives
+    # here again as "finished". Already-enhanced, it must not queue another —
+    # otherwise an auto-enhance folder enhances forever.
+    db = _enhanceable_db(tmp_path, count=1)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = gallery.settings_folder_key(db.get_generation("g0"))
+    _folder_settings(view, key, auto=True)
+
+    view._on_reroll_finished(key, "g0")
+    (job,) = view._reroll_jobs.values()
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    assert view._reroll_jobs == {}
+    assert view._enhance_queue == []
+    upgraded = db.get_generation("g0")
+    assert gallery.is_enhanced_row(upgraded)
+    # One enhancement, one level above the original.
+    assert [lvl.label for lvl in gallery.enhance_levels(upgraded)] == \
+        ["Enhance 1", "Original"]
 
 
 def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_path):

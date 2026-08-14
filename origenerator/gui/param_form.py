@@ -81,6 +81,13 @@ class ParamForm(QWidget):
     sections, in the same place. Params a config carries but this workflow lays no
     field for (its hidden VAE/CLIP, an import's extras) round-trip untouched and
     show as read-only rows dropped into the matching section.
+
+    ``hidden_keys`` are params this form deliberately doesn't present at all —
+    no field, and no read-only row either. They round-trip at whatever value the
+    config carried (or the workflow's default), so a reused generation still
+    reproduces exactly. This is how the enhance params stay off a form whose
+    every other setting decides which gallery folder a run lands in: they belong
+    to the Enhance subpanel, which owns them per folder.
     """
 
     changed = pyqtSignal()          # any field's value changed
@@ -91,8 +98,15 @@ class ParamForm(QWidget):
         parent=None,
         *,
         size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
+        hidden_keys: tuple[str, ...] = (),
     ):
         super().__init__(parent)
+        # Params carried but never shown, and the values they currently carry —
+        # seeded from the definitions' own defaults so a fresh form emits them.
+        self._hidden_keys = frozenset(hidden_keys)
+        self._hidden = {
+            pd.key: pd.default for pd in param_defs if pd.key in self._hidden_keys
+        }
         # When set (an i2v workflow), the output size is derived from the input
         # image: the form shows a locked width/height pair filled from this
         # callable, which the user can unlock to override. ``None`` for a
@@ -140,8 +154,8 @@ class ParamForm(QWidget):
         # plus any read-only rows — so a passthrough row inserts at its canonical
         # slot rather than merely appending after the editable fields.
         self._present_keys: dict[str, list[str]] = {}
-        self._param_defs = param_defs
-        self._build(param_defs)
+        self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
+        self._build(self._param_defs)
 
     def _build(self, defs: list[ParamDef]):
         outer = QVBoxLayout(self)
@@ -637,10 +651,13 @@ class ParamForm(QWidget):
             _select_combo_value(w, str(value))
 
     def _collect(self, randomize_seed: bool) -> dict:
-        # Start from the hidden params (disjoint from the widget keys), then lay
-        # the live field values on top, then any unlocked size override — which is
-        # absent (so the payload derives the size) unless the user set one.
+        # Start from the params this form carries without showing — the extras it
+        # has no field for, then the deliberately hidden ones (both disjoint from
+        # the widget keys) — then lay the live field values on top, then any
+        # unlocked size override, which is absent (so the payload derives the
+        # size) unless the user set one.
         result = dict(self._passthrough)
+        result.update(self._hidden)
         for pd in self._param_defs:
             result[pd.key] = self._read_field(pd, randomize_seed)
         result.update(self._override_dimensions())
@@ -649,8 +666,15 @@ class ParamForm(QWidget):
     def set_values(self, params: dict):
         # Retain any params without a field so they survive the read-back, and show
         # them as read-only rows in the matching section; the rest are applied to
-        # their widgets.
-        self._passthrough = {k: v for k, v in params.items() if k not in self._widgets}
+        # their widgets. A hidden key is retained the same way but shown nowhere —
+        # it is off this form on purpose, not merely unrecognized.
+        for key in self._hidden_keys:
+            if key in params:
+                self._hidden[key] = params[key]
+        self._passthrough = {
+            k: v for k, v in params.items()
+            if k not in self._widgets and k not in self._hidden_keys
+        }
         self._render_readonly_rows(self._passthrough)
         for pd in self._param_defs:
             if pd.key in params:

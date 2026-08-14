@@ -548,10 +548,78 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     panel, _db = saved_panel
     assert panel._displayed_row is None
     assert panel._metadata_block.isHidden()
+    assert panel._versions.isHidden()
     assert panel._animated_strip.isHidden()
     assert panel._source_tile.isHidden()
     assert panel._folder_btn.isHidden()
     assert panel._evolver_btn.isHidden()
+
+
+def _enhanced_image_row(db, prompt_id="img1"):
+    """An image that has been enhanced once: the enhanced file leads, the
+    original stays listed, and the level's settings are recorded."""
+    row = _image_row(db, prompt_id)
+    db.update_generation(
+        prompt_id,
+        output_files=json.dumps([
+            {"filename": "image_enhance_00001_.png", "subfolder": "image"},
+            {"filename": "sdxl_img1.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": "sdxl_img1.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([
+            {"filename": "image_enhance_00001_.png",
+             "params": {"enhance_scale": 2.0, "enhance_steps": 20,
+                        "enhance_denoise": 0.15}},
+        ]),
+    )
+    return db.get_generation(prompt_id)
+
+
+def test_an_unenhanced_image_shows_no_version_list(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+    assert panel._versions.isHidden()   # one file: nothing to choose between
+
+
+def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
+    from PyQt6.QtWidgets import QPushButton
+
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+
+    assert not panel._versions.isHidden()
+    buttons = panel._versions._host.findChildren(QPushButton)
+    assert buttons[0].text().startswith("Enhance 1")
+    assert "2x · 20 steps · 0.15 denoise" in buttons[0].text()
+    assert buttons[1].text() == "Original"
+
+
+def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,
+                                                                          tmp_path,
+                                                                          monkeypatch):
+    # The levels are versions of one image, not separate generations: picking
+    # one is a look, so the row on display, its form and its footer all stay put.
+    from origenerator.gui import generate_config_panel as module
+
+    panel, db = saved_panel
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
+        (output_dir / "image" / name).write_bytes(b"x")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output_dir)
+
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+    panel._preview.show_media.reset_mock()
+
+    panel._show_level(1)   # the original
+
+    panel._preview.show_media.assert_called_once_with(
+        output_dir / "image" / "sdxl_img1.png", "image"
+    )
+    assert panel._displayed_row["prompt_id"] == "img1"
 
 
 def test_go_to_folder_shows_for_a_saved_generation_and_emits_its_id(saved_panel):

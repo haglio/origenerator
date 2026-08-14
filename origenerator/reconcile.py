@@ -244,14 +244,21 @@ def reconcile_custom_folders(db) -> dict:
 
 def _move_bookmark(db, row, target, identity, meta_by_key):
     """Move a bookmark's star/name onto ``target`` (merging into any bookmark
-    already there — a name and a star both survive), then drop its stale key."""
+    already there — a name and a star both survive), then drop its stale key.
+
+    The folder's enhancement settings ride along the same way: the target keeps
+    its own if it has any, else it inherits the moving folder's, so the Enhance
+    subpanel doesn't reset to defaults just because a key formula changed."""
     level, ref = identity
     existing = meta_by_key.get(target)
     name = (existing["custom_name"] if existing else None) or row["custom_name"]
     starred = bool((existing["starred"] if existing else False) or row["starred"])
+    enhance = (existing["enhance_json"] if existing else None) or row["enhance_json"]
     db.upsert_folder_meta(target, custom_name=name, starred=starred,
                           level=level, ref_prompt_id=ref)
+    if enhance is not None:
+        db.set_folder_enhance(target, enhance)
     db.delete_folder_meta(row["folder_key"])
     meta_by_key[target] = {"folder_key": target, "custom_name": name, "starred": starred,
-                           "level": level, "ref_prompt_id": ref}
+                           "level": level, "ref_prompt_id": ref, "enhance_json": enhance}
     meta_by_key.pop(row["folder_key"], None)

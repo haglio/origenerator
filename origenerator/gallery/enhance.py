@@ -12,14 +12,24 @@ listed (and on disk) as the original, and the transient row is deleted.
 completions that landed while the app was closed — and retroactively converting
 any older rows recorded as ``image_enhance`` generations.
 
-The thumbnail badge, the folder's Enhance All button, and the selection's
-Enhance action all decide off the helpers here, so "enhanced" means one thing
-everywhere: the row went through the upscale + low-denoise re-sample tail —
-inline (its workflow's ``enhance`` toggle) or folded in from a standalone run.
+Enhancement is a *layer*, and a row can carry several: each fold prepends its
+file and records the settings that made it (:func:`enhance_levels`), so an image
+shows its most-enhanced version by default while every level it has received
+stays listed and reachable.
+
+What an enhancement is configured with is a property of the FOLDER, not of any
+one image: :class:`EnhanceSettings` is what the gallery's Enhance subpanel edits
+and stores per settings folder, and :func:`enhance_params_for` is where it meets
+a particular row. The thumbnail badge, the folder's Enhance All button, and the
+selection's Enhance action all decide off the helpers here, so "enhanced" means
+one thing everywhere: the row went through the upscale + low-denoise re-sample
+tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
+run.
 """
 
 import json
 import logging
+from dataclasses import dataclass, field
 
 from origenerator.gallery.output import (
     media_type_of_row,
@@ -39,6 +49,147 @@ ENHANCE_WORKFLOW = "image_enhance"
 # The workflows that ran the enhance tail unconditionally, before it became a
 # toggle: their rows carry the tail's params but no ``enhance`` flag.
 _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
+
+# The knobs the Enhance subpanel offers, and so the only params a folder's
+# settings may override on an enhance run. Everything else about the job — the
+# input file, the prompts steering the added texture — is read off the image
+# being enhanced, and the seed is re-rolled per launch like any variation.
+ENHANCE_SETTING_KEYS = (
+    "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
+    "enhance_denoise",
+)
+
+# What a folder's settings leave to the source image rather than pinning: the
+# refining checkpoint, which by default is whichever one made the image, so an
+# enhanced image stays in its own style. The subpanel offers this as an option
+# on its model picker; picking a real checkpoint pins it instead.
+MATCH_SOURCE_MODEL = "(match the source image)"
+
+
+def default_enhance_params() -> dict:
+    """The ``image_enhance`` workflow's own defaults, narrowed to the knobs a
+    folder may set — what the subpanel shows for a folder that has never been
+    configured."""
+    defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
+    params = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
+    params["checkpoint"] = MATCH_SOURCE_MODEL
+    return params
+
+
+@dataclass(frozen=True)
+class EnhanceSettings:
+    """One folder's enhancement configuration.
+
+    ``auto`` is the subpanel's box: with it on, every image the folder newly
+    generates is enhanced as it lands, so a folder can be left to produce
+    finished images rather than raw ones. ``params`` holds the knobs
+    (:data:`ENHANCE_SETTING_KEYS`); a key absent from it falls back to the
+    workflow default, and a ``checkpoint`` of :data:`MATCH_SOURCE_MODEL` falls
+    back to whichever model made the image.
+    """
+
+    auto: bool = False
+    params: dict = field(default_factory=default_enhance_params)
+
+    @classmethod
+    def parse(cls, raw: str | None) -> "EnhanceSettings":
+        """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
+        an unconfigured folder is simply the defaults, box off."""
+        try:
+            data = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        stored = data.get("params")
+        params = default_enhance_params()
+        if isinstance(stored, dict):
+            params.update({k: v for k, v in stored.items() if k in ENHANCE_SETTING_KEYS})
+        return cls(auto=bool(data.get("auto")), params=params)
+
+    def to_json(self) -> str:
+        return json.dumps({"auto": self.auto, "params": self.params})
+
+
+def describe_enhance_params(params: dict) -> str:
+    """A one-line summary of an enhancement's knobs, for the levels list.
+
+    Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
+    distinguish one experiment from another. A pinned model is named after them;
+    the default (source-matched) one says nothing, since it is not a choice.
+    """
+    bits = []
+    scale = params.get("enhance_scale")
+    if scale is not None:
+        bits.append(f"{float(scale):g}x")
+    steps = params.get("enhance_steps")
+    if steps is not None:
+        bits.append(f"{steps} steps")
+    denoise = params.get("enhance_denoise")
+    if denoise is not None:
+        bits.append(f"{float(denoise):g} denoise")
+    checkpoint = params.get("checkpoint")
+    if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
+        bits.append(str(checkpoint))
+    return " · ".join(bits)
+
+
+@dataclass(frozen=True)
+class EnhanceLevel:
+    """One version of an image: its file, and how it came to be.
+
+    ``index`` counts enhancements from the original (0), so the labels read
+    "Original", "Enhance 1", "Enhance 2"… ``settings`` is empty for the original
+    and for any level folded in before the settings were recorded.
+    """
+
+    index: int
+    label: str
+    file: dict
+    settings: str = ""
+
+    @property
+    def is_original(self) -> bool:
+        return self.index == 0
+
+
+def enhance_levels(row: dict) -> list[EnhanceLevel]:
+    """Every version this image holds, most-enhanced first, or ``[]`` when it
+    has received no enhancement at all.
+
+    ``original_files`` is what says a row has been enhanced in place, and it
+    names the files the row held before its first enhance. Each fold prepends
+    the file it produced, so what sits ahead of those originals is exactly the
+    enhancements, newest first. Pairing them with the recorded settings
+    (:func:`fold_enhancement` writes ``enhance_history``) and numbering them is
+    what the info pane's version list shows.
+
+    Deliberately keyed off ``original_files`` rather than "more than one output
+    file": a batch generation saves several files from one run, and none of them
+    is a level of any other.
+    """
+    originals = parse_file_list(row.get("original_files"))
+    files = row_output_files(row)
+    if not originals or len(files) <= len(originals):
+        return []
+    history = {
+        entry.get("filename"): entry
+        for entry in parse_file_list(row.get("enhance_history"))
+        if isinstance(entry, dict)
+    }
+    enhanced = files[:len(files) - len(originals)]
+    levels = []
+    for position, f in enumerate(enhanced):
+        index = len(enhanced) - position  # the newest enhancement is the highest
+        entry = history.get(f.get("filename")) or {}
+        params = entry.get("params") if isinstance(entry.get("params"), dict) else {}
+        levels.append(EnhanceLevel(
+            index, f"Enhance {index}", f, describe_enhance_params(params)
+        ))
+    # The pre-enhance file, level 0 — the one a re-enhance runs from, and the
+    # one the list offers as "what this looked like before".
+    levels.append(EnhanceLevel(0, "Original", originals[0]))
+    return levels
 
 
 def is_enhanced_row(row: dict) -> bool:
@@ -97,17 +248,24 @@ def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     return awaiting
 
 
-def enhance_params_for(row: dict) -> dict | None:
+def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> dict | None:
     """The ``image_enhance`` params that enhance ``row``'s output: its file as
-    the input, its own prompts steering the added texture, and — when the
-    source recorded a checkpoint (the SDXL workflows) — that same checkpoint
-    doing the refining, so an enhanced image stays in its own style.
+    the input, its own prompts steering the added texture, and — unless the
+    folder pins a model — the checkpoint that made the source (the SDXL
+    workflows record one), so an enhanced image stays in its own style.
+
+    ``settings`` is the folder's own configuration, as its Enhance subpanel left
+    it: the knobs it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the
+    workflow defaults, so Enhance All, a single enhance, and an auto-enhance of
+    a newly generated image all run at whatever that folder is set to. Omitted,
+    the workflow's own defaults apply.
 
     An already-enhanced row re-enhances from its ORIGINAL file, not the
     enhanced one, so a deliberate re-enhance re-derives at a fresh seed rather
-    than compounding upscale upon upscale. ``None`` when the row has no output
-    file to enhance. The seed is left at the default; the launcher re-rolls it
-    like any variation."""
+    than compounding upscale upon upscale — and lands as another level beside
+    the ones already there. ``None`` when the row has no output file to
+    enhance. The seed is left at the default; the launcher re-rolls it like any
+    variation."""
     files = parse_file_list(row.get("original_files")) or row_output_files(row)
     input_ref = output_file_reference(files)
     if input_ref is None:
@@ -120,7 +278,24 @@ def enhance_params_for(row: dict) -> dict | None:
     checkpoint = src.get("checkpoint")
     if isinstance(checkpoint, str) and checkpoint:
         params["checkpoint"] = checkpoint
+    for key, value in (settings.params if settings else {}).items():
+        if key not in ENHANCE_SETTING_KEYS:
+            continue
+        if key == "checkpoint" and value == MATCH_SOURCE_MODEL:
+            continue  # leave the source's own model in place
+        params[key] = value
     return params
+
+
+def _history_entries(files: list[dict], params: dict) -> list[dict]:
+    """One ``enhance_history`` entry per file this enhance produced: the file's
+    name and the knobs that made it, so a level can name its own settings even
+    after the transient job row is gone."""
+    settings = {k: params[k] for k in ENHANCE_SETTING_KEYS if k in params}
+    return [
+        {"filename": f.get("filename"), "params": settings}
+        for f in files if f.get("filename")
+    ]
 
 
 def fold_enhancement(db, enhance_row: dict) -> str | None:
@@ -132,9 +307,12 @@ def fold_enhancement(db, enhance_row: dict) -> str | None:
     the pre-enhance original remains on disk, reachable from the metadata
     block, and no later import scan finds an orphan — and ``original_files``
     records what the row held before its first enhance, which is also what
-    marks it enhanced. Folder membership, star, params and identity are
-    untouched: enhancing never moves or duplicates a node. The transient
-    enhance row is deleted (row only — its file now belongs to the source).
+    marks it enhanced. The settings this run used are appended to
+    ``enhance_history``, so the level it just added can be told apart from the
+    ones already there (:func:`enhance_levels`). Folder membership, star,
+    params and identity are untouched: enhancing never moves or duplicates a
+    node. The transient enhance row is deleted (row only — its file now
+    belongs to the source).
 
     Returns the upgraded source's prompt_id, or ``None`` (and folds nothing)
     when the enhance produced no file or its source image is no longer in the
@@ -143,7 +321,8 @@ def fold_enhancement(db, enhance_row: dict) -> str | None:
     enhanced_files = row_output_files(enhance_row)
     if not enhanced_files:
         return None
-    input_image = parse_params(enhance_row.get("params_json")).get("input_image")
+    enhance_params = parse_params(enhance_row.get("params_json"))
+    input_image = enhance_params.get("input_image")
     image_rows = [
         r for r in db.list_generations()
         if r.get("prompt_id") != enhance_row.get("prompt_id")
@@ -155,6 +334,10 @@ def fold_enhancement(db, enhance_row: dict) -> str | None:
     source = db.get_generation(source_id)
     updates = {
         "output_files": json.dumps(enhanced_files + row_output_files(source)),
+        "enhance_history": json.dumps(
+            _history_entries(enhanced_files, enhance_params)
+            + parse_file_list(source.get("enhance_history"))
+        ),
     }
     if not source.get("original_files"):
         # First enhance: what the row holds now is the true original. A

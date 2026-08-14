@@ -132,6 +132,7 @@ class GalleryView(QWidget):
         self._reroll = RerollController(db, client)
         self._reroll.changed.connect(self._rerender_current_leaf)
         self._reroll.changed.connect(self._reconcile_generating)
+        self._reroll.changed.connect(self._reconcile_pending_enhancements)
         self._reroll.preview.connect(self._on_reroll_preview)
         self._reroll.finished.connect(self._on_reroll_finished)
         self._reroll.failed.connect(self._on_reroll_failed)
@@ -202,6 +203,9 @@ class GalleryView(QWidget):
         # Enhances of one source config share a folder, and the controller runs
         # one job per folder — so the queue drains as completions pump it.
         self._enhance_queue: list[dict] = []
+        # The latest streamed frame of each running enhance, keyed like the jobs,
+        # so the info pane's version strip can show the level being made.
+        self._enhance_frames: dict[str, bytes] = {}
         # What every enhance runs at, app-wide — the Enhance subpanel's value.
         # Restored from the session by set_enhance_settings; built before
         # _build_ui, whose panel opens on it.
@@ -624,6 +628,9 @@ class GalleryView(QWidget):
         panel.animated_activated.connect(self._on_source_link)
         panel.containing_folder_requested.connect(self._browser.open_in_containing_folder)
         panel.displayed_changed.connect(self._reconcile_osr2)
+        # A tab that just changed which image it shows needs the live enhance
+        # tile for THAT image, not the one it was showing a moment ago.
+        panel.displayed_changed.connect(self._reconcile_pending_enhancements)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
         panel.preview_double_clicked.connect(self._on_preview_double_clicked)
         # While the open folder is auto-generating, a preview double-click opens the
@@ -1737,6 +1744,33 @@ class GalleryView(QWidget):
                 self._enhance_queue.append(params)
         self._pump_enhance_queue()
 
+    def _reconcile_pending_enhancements(self):
+        """Show each tab the enhancement being made for the image it displays.
+
+        The info pane's version strip leads with a live tile while one is
+        cooking — the same in-flight treatment work gets everywhere else — and
+        the jobs are the gallery's, so the match is made here: every running
+        standalone enhance against every tab's displayed row. Cheap enough to
+        re-run on each frame; the panel updates its tile in place.
+        """
+        running = [
+            (key, job) for key, job in self._reroll.jobs.items()
+            if job.workflow.name == gallery.ENHANCE_WORKFLOW
+        ]
+        for panel in self._info_tabs._config_panels():
+            row = panel.displayed_row()
+            panel.set_pending_enhancement(
+                self._pending_enhancement_for(row, running) if row else None
+            )
+
+    def _pending_enhancement_for(self, row: dict, running) -> tuple | None:
+        """``(status, frame)`` of a standalone enhance running on ``row``'s own
+        image, or ``None``."""
+        for key, job in running:
+            if gallery.enhance_targets_row(job.params.get("input_image"), row):
+                return job.state, self._enhance_frames.get(key)
+        return None
+
     def _auto_enhance_if_wanted(self, row: dict | None):
         """Enhance a just-finished image while the Auto box is on.
 
@@ -2181,6 +2215,11 @@ class GalleryView(QWidget):
             self._last_reroll_frame = data
             self._info_tabs.show_reroll_frame(data)
         self._feed_montage_preview(key, data)
+        # An enhance's frames go to the version strip of whichever tab shows the
+        # image being enhanced, not to the pane — an enhancement isn't a
+        # generation taking the preview over.
+        self._enhance_frames[key] = data
+        self._reconcile_pending_enhancements()
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -2266,11 +2305,13 @@ class GalleryView(QWidget):
             item = self._item_by_key.get(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
+        self._enhance_frames.pop(key, None)   # this run's frames are spent
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
-        self._auto_enhance_if_wanted(finished_row)  # a folder set to auto-enhance
+        self._auto_enhance_if_wanted(finished_row)  # while the Auto switch is on
         self._pump_enhance_queue()     # a same-folder enhance can go now
         self._sync_enhance_all_button()  # a landed enhance may retire the button
+        self._reconcile_pending_enhancements()  # the live tile gives way to the level
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None):
         """After a re-roll finishes, load its result into the front config tab.
@@ -2289,10 +2330,12 @@ class GalleryView(QWidget):
         """A re-roll failed (recorded by the controller): release the info pane if
         it was showing this one, and redraw the folder without its tile."""
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
+        self._enhance_frames.pop(key, None)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._pump_enhance_queue()    # a failure must not strand the queued rest
+        self._reconcile_pending_enhancements()  # nothing is cooking for it now
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

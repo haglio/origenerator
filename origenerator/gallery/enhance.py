@@ -259,6 +259,19 @@ def enhanced_source_names(rows) -> set[str]:
     return names
 
 
+def enhance_targets_row(input_image: str | None, row: dict) -> bool:
+    """Whether an enhance running on ``input_image`` is an enhance of ``row``.
+
+    Compared by the same frame-name key an i2v start-frame lookup uses, against
+    every file the row holds — a first enhance runs on its output, a re-enhance
+    on the original still listed behind it, and both are this image.
+    """
+    name = _frame_name(input_image)
+    if not name:
+        return False
+    return name in {_frame_name(f.get("filename")) for f in row_output_files(row)}
+
+
 def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     """The members of a folder its Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked

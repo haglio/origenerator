@@ -603,6 +603,23 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     assert captions[1] == "Original"
 
 
+def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
+    from origenerator.gui.enhance_versions import _PendingTile
+
+    panel, db = saved_panel
+    image = _image_row(db, "img1")      # never enhanced: no levels of its own
+    panel.show_saved_generation(image, [image])
+    assert panel._versions.isHidden()
+
+    panel.set_pending_enhancement(("running", None))
+
+    assert not panel._versions.isHidden()
+    assert panel._versions._host.findChildren(_PendingTile)
+
+    panel.set_pending_enhancement(None)
+    assert panel._versions.isHidden()   # it landed (or failed); nothing to show
+
+
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,
                                                                           tmp_path,
                                                                           monkeypatch):

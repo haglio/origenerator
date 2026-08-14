@@ -12,13 +12,18 @@ A tile can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-Hidden entirely for an image with nothing but its original, which is most of
-them — the strip appears when there is actually a choice to make.
+An enhancement still cooking leads the strip as a live tile, mirroring the run's
+streamed frames the way the in-flight cards do everywhere else — so the level
+being made appears where the levels are, rather than the strip sitting unchanged
+until the fold lands.
+
+Hidden entirely for an image with nothing but its original and nothing running —
+the strip appears when there is actually something to look at.
 """
 
 import json
 
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtCore import QByteArray, QMimeData, Qt, pyqtSignal
 
@@ -29,6 +34,9 @@ from origenerator.gui.flow_layout import FlowLayout
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
 _TILE = 108  # the thumbnail box; a caption of settings sits under it
+# The in-flight edge the Recents shelf's cards wear, so work in progress reads
+# the same wherever it shows.
+_PENDING_BORDER = "2px solid #3080e0"
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -68,6 +76,7 @@ class _LevelTile(QWidget):
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(2)
         picture = QLabel()
+        self._picture = picture  # the image the drag carries under the cursor
         picture.setFixedSize(_TILE, _TILE)
         picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
@@ -106,11 +115,15 @@ class _LevelTile(QWidget):
         # was made by no enhancement, so there is nothing for the panel to take.
         if self._press_pos is None or not self._params:
             return
-        if (event.position().toPoint() - self._press_pos).manhattanLength() < 10:
-            return
+        moved = (event.position().toPoint() - self._press_pos).manhattanLength()
+        if moved < QApplication.startDragDistance():
+            return  # still a click, not yet a drag — a thumbnail's own threshold
         self._press_pos = None
         drag = QDrag(self)
         drag.setMimeData(enhance_level_mime(self._params))
+        pixmap = self._picture.pixmap()
+        if pixmap is not None and not pixmap.isNull():
+            drag.setPixmap(pixmap)  # the version's image trails the cursor
         drag.exec(Qt.DropAction.CopyAction)
 
     def mouseReleaseEvent(self, event):
@@ -119,12 +132,54 @@ class _LevelTile(QWidget):
             self.clicked.emit(self._position)
 
 
+class _PendingTile(QWidget):
+    """The enhancement being made right now: its live frame, or the stage it's at.
+
+    Wears the same blue "in progress" edge as the Recents shelf's in-flight
+    cards, so a level under construction reads the same here as work in flight
+    reads anywhere else in the app.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        box = QVBoxLayout(self)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(2)
+        self._picture = QLabel()
+        self._picture.setFixedSize(_TILE, _TILE)
+        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._picture.setWordWrap(True)
+        self._picture.setStyleSheet(
+            f"background-color: transparent; border: {_PENDING_BORDER};"
+            " border-radius: 3px;"
+        )
+        box.addWidget(self._picture)
+        caption = QLabel("Enhancing")
+        caption.setStyleSheet("font-weight: 600;")
+        box.addWidget(caption)
+        self.setToolTip("An enhancement of this image is being generated")
+
+    def update_pending(self, status: str, frame: bytes | None):
+        pixmap = QPixmap()
+        if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
+            self._picture.setPixmap(pixmap.scaled(
+                _TILE, _TILE,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        else:
+            self._picture.setText(
+                "Generating…" if status == "running" else "Queued…"
+            )
+
+
 class EnhanceVersions(QWidget):
     """The levels of one image, newest first, as a strip of thumbnails.
 
     ``show_levels`` takes :class:`~origenerator.gallery.enhance.EnhanceLevel`
     objects (as :func:`~origenerator.gallery.enhance.enhance_levels` produces
-    them) paired with the on-disk file to draw. Clicking a tile emits
+    them) paired with the on-disk file to draw, plus the ``(status, frame)`` of
+    an enhancement still running on this image. Clicking a level's tile emits
     ``level_selected`` with its position in that list, for the panel to put in
     the preview.
     """
@@ -143,20 +198,46 @@ class EnhanceVersions(QWidget):
         FlowLayout(self._host, spacing=6)
         box.addWidget(self._host)
         self._box = box
+        self._pending: _PendingTile | None = None
         self.hide()
 
-    def show_levels(self, items: list[tuple]):
-        """Rebuild the strip from ``(level, image_path)`` pairs, or hide when the
-        image has only its original (nothing to choose between)."""
+    def show_levels(self, items: list[tuple], pending: tuple | None = None):
+        """Rebuild the strip from ``(level, image_path)`` pairs, leading with the
+        enhancement in flight when ``pending`` is a ``(status, frame)`` pair.
+
+        Hidden when there is neither: an image with only its original, and
+        nothing being made for it, has nothing to show here.
+        """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
         # related-media strips use, so no tile outlives the row it described.
         self._box.removeWidget(self._host)
         self._host.deleteLater()
         self._host = QWidget()
         flow = FlowLayout(self._host, spacing=6)
+        self._pending = None
+        if pending is not None:
+            # Leads the strip: it is becoming the newest level, and the strip
+            # runs newest first.
+            self._pending = _PendingTile()
+            self._pending.update_pending(*pending)
+            flow.addWidget(self._pending)
         for position, (level, image_path) in enumerate(items):
             tile = _LevelTile(level, position, image_path)
             tile.clicked.connect(self.level_selected)
             flow.addWidget(tile)
         self._box.addWidget(self._host)
-        self.setVisible(len(items) > 1)
+        self.setVisible(len(items) > 1 or pending is not None)
+
+    def update_pending(self, pending: tuple | None) -> bool:
+        """Feed a new frame to the tile already standing, without rebuilding.
+
+        A run streams frames several times a second, and rebuilding the strip on
+        each would thrash the layout under the cursor mid-drag. Returns whether
+        the update landed; ``False`` means the strip's shape has to change (a run
+        started or ended) and the caller should rebuild.
+        """
+        if (self._pending is None) != (pending is None):
+            return False
+        if pending is not None:
+            self._pending.update_pending(*pending)
+        return True

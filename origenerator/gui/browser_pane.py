@@ -165,9 +165,10 @@ class BrowserPane:
     def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
         """Build one finished-item tile for a shelf (Recents/Starred/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
-        to a combine slot. Returns the tile so a caller can add a shelf-specific
-        action; ``corner_actions`` become the tile's hover controls (a review's
-        keep/reject)."""
+        to a combine slot, and right-click it for the same star / enhance / delete
+        menu a tile inside a folder offers. Returns the tile so a caller can add a
+        shelf-specific action; ``corner_actions`` become the tile's hover controls
+        (a review's keep/reject)."""
         tw = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
@@ -178,6 +179,9 @@ class BrowserPane:
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
         tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
+        # Every shelf gets the folder menu — an item is no less actionable for being
+        # listed by when it was made or by its bookmark rather than by its settings.
+        tw.context_requested.connect(self._thumbnail_context_menu)
         self._wire_drag(tw)
         flow.addWidget(tw)
         self._visible_ids.append(row["prompt_id"])
@@ -329,7 +333,6 @@ class BrowserPane:
         for row in self._experiment_rows:
             tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
             tw.corner_action_triggered.connect(self._v._on_experiment_verdict)
-            tw.context_requested.connect(self._thumbnail_context_menu)
         self.show_widget(container if self._experiment_rows
                          else self._empty_state(self._experiments_empty_hint()))
 
@@ -362,9 +365,7 @@ class BrowserPane:
     def _show_starred(self, groups, rows):
         container, flow = self._new_tile_pane()
         for row in rows:
-            tw = self._add_shelf_thumbnail(flow, row)
-            # Right-click to unstar (or delete) the item, straight from the shelf.
-            tw.context_requested.connect(self._thumbnail_context_menu)
+            self._add_shelf_thumbnail(flow, row)
         for group in groups:
             item = self._v._item_by_key.get(group.key)
             context = self._v._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""

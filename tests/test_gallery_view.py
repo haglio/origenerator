@@ -712,7 +712,7 @@ def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
     )
-    view._thumbnail_context_menu("i1", QPoint(0, 0))
+    _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
     assert view.visible_prompt_ids() == []  # gone from the shelf after the rebuild
@@ -815,6 +815,83 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
     assert view.selected_prompt_ids() == ["i2"]         # landed selected
     assert view._thumb_widgets["i2"].is_selected()
+
+
+def _right_click(view, prompt_id):
+    """Right-click a tile the way Qt does — through the widget's own custom-context
+    signal — so a menu the pane never connected registers as no menu at all."""
+    view._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
+
+
+def test_right_clicking_a_recent_item_offers_star_enhance_and_delete(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    labels = []
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: labels.extend(act.text() for act in menu.actions()),
+    )
+
+    _right_click(view, "i2")
+
+    # The shelf's tiles carry the same menu a folder's tiles do.
+    assert labels == ["Star 1 item", "Enhance 1 image", "Delete 1 item"]
+    assert view.selected_prompt_ids() == ["i2"]  # right-clicking picked it
+
+
+def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeypatch):
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    monkeypatch.setattr(  # Delete is the menu's last entry
+        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[-1]
+    )
+
+    _right_click(view, "i1")
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+
+
+def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeypatch):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    monkeypatch.setattr(  # Star/Unstar is the menu's first entry
+        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[0]
+    )
+
+    _right_click(view, "i1")
+
+    assert db.get_generation("i1")["starred"]                # persisted
+    assert view._showing_recents()                           # still on the shelf
+    assert view._thumb_widgets["i1"].is_starred() is True    # tile updated on rebuild
+
+
+def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    monkeypatch.setattr(  # Enhance sits between Star and Delete
+        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[1]
+    )
+
+    _right_click(view, "g0")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
 
 
 def test_recents_shelf_shows_empty_state_when_only_imports_exist(qtbot):

@@ -1,3 +1,4 @@
+from origenerator.content import load_content
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 from origenerator.workflows.stroke_authored import (
@@ -40,10 +41,18 @@ class Wan22FunStrokeI2vWorkflow(StrokeAuthoredWorkflow):
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "15"
 
+    # The proven act description, default because the Fun-Control pair needs
+    # it: the markers say WHERE motion happens, the prompt says WHAT performs
+    # it — a terse category-word prompt left the hands unclaimed and the model
+    # improvised the motion as anatomy stretching along the marker path. The
+    # side-by-side iterations landed on exact wording, and that wording is
+    # library vocabulary, so it lives in the content overlay, not in source.
+    _ACT_PROMPTS = load_content()["stroke_prompts"]
+
     def default_params(self) -> dict:
         return {
-            "positive_prompt": "",
-            "negative_prompt": "",
+            "positive_prompt": self._ACT_PROMPTS["positive"],
+            "negative_prompt": self._ACT_PROMPTS["negative"],
             "input_image": "",
             "seed": 0,
             "frame_count": 81,
@@ -83,8 +92,8 @@ class Wan22FunStrokeI2vWorkflow(StrokeAuthoredWorkflow):
         models = list_model_files("diffusion_models", [defaults["unet_high"], defaults["unet_low"]])
         loras = list_lora_files([defaults["lora_high"], defaults["lora_low"]])
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Input Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),

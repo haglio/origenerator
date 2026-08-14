@@ -1029,6 +1029,26 @@ def test_wan22_fun_stroke_funscript_is_the_same_authored_plan_as_ati():
     assert len(fun_actions) > 4
 
 
+def test_wan22_fun_stroke_defaults_describe_the_act():
+    # The Fun-Control pair needs the act described in words: the markers say
+    # where motion happens, the prompt says what performs it — a bare category
+    # word left the hands unclaimed and the model stretched anatomy along the
+    # marker path instead. The proven wording is library vocabulary, so it
+    # ships through the content overlay and lands as the untouched form's
+    # default, in both prompt fields.
+    from origenerator.content import load_content
+
+    wf = WORKFLOW_REGISTRY["wan22_fun_stroke_i2v"]
+    defaults = wf.default_params()
+    prompts = load_content()["stroke_prompts"]
+    assert defaults["positive_prompt"] == prompts["positive"]
+    assert defaults["negative_prompt"] == prompts["negative"]
+    assert "hand" in defaults["positive_prompt"]      # the hands are claimed
+    prompt_defs = {d.key: d for d in wf.param_definitions()}
+    assert prompt_defs["positive_prompt"].default == defaults["positive_prompt"]
+    assert prompt_defs["negative_prompt"].default == defaults["negative_prompt"]
+
+
 def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
     # video on a stroke track built from the stroke params, so the pixels follow

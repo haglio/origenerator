@@ -4456,12 +4456,12 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
     qtbot.waitExposed(view)   # showEvent -> refresh -> feeds the strip
 
     assert view._queue.isVisible()
-    assert [row.key for row in view._queue.rows()] == ["gen1"]
+    assert view._queue.running_row().key == "gen1"
 
     db.delete_generation("gen1")   # the job ends, its running row gone
     view._poll()
-    assert view._queue.isVisible()        # still holding its slot
-    assert view._queue.rows() == []       # but empty
+    assert view._queue.isVisible()               # still holding its slot
+    assert view._queue.running_row().key is None  # but blank
 
 
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
@@ -4474,7 +4474,7 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert len(view._queue.rows()) == 2
+    assert view._queue.keys() == ["running-one", "waiting-one"]
 
 
 def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
@@ -4495,7 +4495,7 @@ def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
         view._reroll._queue_order = ["running-one", "w1", "w2"]
         view.refresh()
 
-        view._queue.move_row(2, 1)
+        view._queue.move_queued(1, 0)
 
     reorder.assert_called_once_with(["running-one", "w2", "w1"])
 

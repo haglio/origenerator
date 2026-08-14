@@ -5,6 +5,9 @@ of filling in a form — the Enhance panel's auto-enhance, which is either runni
 or not. Reads at a glance from across the pane, which a checkbox in a column of
 other fields does not.
 
+Usually built bare, sitting at the corner of the panel it powers; the optional
+label is for a switch that has to say what it is on its own.
+
 Painted rather than styled, because a Qt stylesheet cannot move a checkbox's
 indicator; the colors are the suite's shared toggle tokens, so it looks like the
 switches Fun Time and the other apps draw.

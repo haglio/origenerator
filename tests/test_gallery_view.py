@@ -1403,14 +1403,15 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)
     assert not view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
 
+    _select_first_leaf(view)   # opening a folder is somewhere to come back from
     view._thumbnail_clicked("i1")
     view._thumbnail_clicked("i2")
     assert view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
 
-    view._go_back()
+    for _ in range(3):
+        view._go_back()
     assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
 
 
@@ -1563,6 +1564,8 @@ def test_a_followed_link_does_not_scroll_a_folder_moved_on_from(qtbot):
 
 
 def test_history_spans_folder_navigation(qtbot):
+    # Every place the user went is a stop: the folder they opened and the item they
+    # then viewed in it, so Back retraces the walk rather than skipping the folders.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -1572,6 +1575,8 @@ def test_history_spans_folder_navigation(qtbot):
     view._thumbnail_clicked("i1")                      # view its item
     assert view._selected["prompt_id"] == "i1"
 
+    view._go_back()                                    # the image folder
+    view._go_back()                                    # the video folder
     view._go_back()
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
@@ -1595,6 +1600,63 @@ def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot
     assert view.selected_generation() == "i2"
 
 
+def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
+    # The reported bug: a folder was no history stop at all, so leaving Recents by
+    # clicking one in the tree recorded nothing and Back had nowhere to go from —
+    # the shelf was on the stack, but the cursor was still sitting on it.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+
+    view._tree.setCurrentItem(
+        _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    )
+    assert view._showing_recents() is False
+    assert view._back_btn.isEnabled()
+
+    view._go_back()
+
+    assert view._showing_recents()
+
+
+def test_back_walks_folders_the_way_it_walks_generations(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    cat, dog = lora.child(0), lora.child(1)
+    view._tree.setCurrentItem(cat)
+    view._tree.setCurrentItem(dog)
+
+    view._go_back()
+
+    assert view._tree.currentItem() is cat
+
+    view._go_forward()
+
+    assert view._tree.currentItem() is dog
+
+
+def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
+    # A rebuild re-selects the open folder every poll; each must not pile onto the
+    # stack or Back would walk a hundred copies of where the user already is.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+    depth = len(view._history._stack)
+
+    view.refresh()
+    view._poll()
+
+    assert len(view._history._stack) == depth
+
+
 def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
@@ -1608,6 +1670,7 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     view._thumbnail_clicked("i2")                        # view an item there
     assert view._tree.currentItem() is not view._starred_item
 
+    view._go_back()                                      # the folder drilled into
     view._go_back()
     assert view._tree.currentItem() is view._starred_item  # Back returns to Starred
 

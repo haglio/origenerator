@@ -17,7 +17,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
-from origenerator.progress import ProgressTracker
+from origenerator.progress import ProgressTracker, sampler_node_ids
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,12 @@ class GenerationJob(QObject):
         # Fold ComfyUI's per-pass sampler progress into one 0-to-total ramp, so a
         # multi-stage video job doesn't report a bar that resets between passes.
         self._progress_tracker = ProgressTracker.for_payload(self.payload)
+        # Only these nodes' progress events are in the tracker's units; anything
+        # else (a control-video loader counting frames in, a tiled VAE counting
+        # tiles) would bank phantom steps and peg the ramp at full. Empty when no
+        # sampler is recognized — then nothing is filtered, matching the
+        # tracker's own raw-numbers fallback.
+        self._sampler_nodes = sampler_node_ids(self.payload)
         self._last_progress = (0, 0)
         self._last_preview: bytes | None = None
         # Jobs another app has in front of this one in ComfyUI, as of the last
@@ -262,10 +268,14 @@ class GenerationJob(QObject):
             self._foreign_ahead = None  # it's ours now: nothing left in front of it
             self.started.emit()
 
-    def _on_progress(self, prompt_id: str, value: int, max_val: int):
+    def _on_progress(self, prompt_id: str, node_id: str, value: int, max_val: int):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
+        # An event that names a non-sampler node still proves the job is running
+        # (hence _mark_running above), but its numbers aren't sampler steps.
+        if self._sampler_nodes and node_id and node_id not in self._sampler_nodes:
+            return
         self._last_progress = self._progress_tracker.update(value, max_val)
         self.progress.emit(*self._last_progress)
 

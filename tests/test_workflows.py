@@ -932,6 +932,123 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
 
 # ---- WAN 2.1 ATI (stroke-tracked image-to-video) ----
 
+# ---- WAN 2.2 Fun Stroke (control-video-conditioned image-to-video) ----
+
+def test_wan22_fun_stroke_payload_conditions_on_the_rendered_plan(monkeypatch):
+    # The Fun-Control variant expresses the authored plan as a rendered control
+    # video: payload build renders (or reuses) it and the graph conditions on
+    # it via Wan22FunControlToVideo — ref_image carrying the start frame,
+    # control_video carrying the plan — then samples with the standard WAN 2.2
+    # high/low pair split, each stage with its own optional LoRA, foley scoring
+    # the decoded frames into CreateVideo like every video workflow.
+    import origenerator.workflows.wan22_fun_stroke_i2v as fun
+    from origenerator.workflows.stroke_authored import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.wan22_fun_stroke_i2v import Wan22FunStrokeI2vWorkflow
+
+    wf = WORKFLOW_REGISTRY["wan22_fun_stroke_i2v"]
+    assert wf.__class__ is Wan22FunStrokeI2vWorkflow
+    assert wf.output_type == "video"
+    assert wf.looping is False
+    assert wf.derives_size_from_input is True
+    assert wf.model_keys == ("unet_high", "unet_low")
+    assert wf.lora_keys == ("lora_high", "lora_low")
+
+    rendered = []
+
+    def fake_render(positions, width, height, frame_rate):
+        rendered.append((len(positions), width, height, frame_rate))
+        return "X:/fake/stroke_abc.mp4"
+
+    monkeypatch.setattr(fun, "render_control_video", fake_render)
+
+    params = dict(
+        wf.default_params(),
+        positive_prompt="scene one",
+        input_image="start.png",   # nonexistent -> reference-size fallback
+        seed=6,
+        audio_seed=7,
+        lora_high="pair_high.safetensors",
+        lora_low="pair_low.safetensors",
+        lora_strength_low=0.7,
+    )
+    payload = wf.build_api_payload(params)
+
+    # The control video was rendered at the derived size for every frame and
+    # rides into the graph through the path loader.
+    assert rendered == [(params["frame_count"], REFERENCE_WIDTH, REFERENCE_HEIGHT, 16.0)]
+    loader_id = _node_id(payload, "VHS_LoadVideoPath")
+    assert payload[loader_id]["inputs"]["video"] == "X:/fake/stroke_abc.mp4"
+
+    cond = _find_node(payload, "Wan22FunControlToVideo")
+    load_id = _node_id(payload, "LoadImage")
+    assert cond["inputs"]["ref_image"] == [load_id, 0]
+    assert cond["inputs"]["control_video"] == [loader_id, 0]
+    assert cond["inputs"]["width"] == REFERENCE_WIDTH
+    assert cond["inputs"]["height"] == REFERENCE_HEIGHT
+    assert cond["inputs"]["length"] == params["frame_count"]
+
+    # Standard 2.2 dual-noise split, each stage's chain through its own LoRA.
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    assert len(samplers) == 2
+    early = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+    late = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+    assert early["inputs"]["end_at_step"] == params["steps"] // 2
+    assert all(n["inputs"]["noise_seed"] == 6 for n in samplers)
+
+    def chain_lora(sampler):
+        shift = payload[sampler["inputs"]["model"][0]]
+        assert shift["class_type"] == "ModelSamplingSD3"
+        loader = payload[shift["inputs"]["model"][0]]
+        assert loader["class_type"] == "LoraLoaderModelOnly"
+        return loader["inputs"]
+
+    assert chain_lora(early)["lora_name"] == "pair_high.safetensors"
+    assert chain_lora(late)["lora_name"] == "pair_low.safetensors"
+    assert chain_lora(late)["strength_model"] == 0.7
+
+    # Foley rides the decoded frames and CreateVideo muxes it.
+    sampler_id = _node_id(payload, "HunyuanFoleySampler")
+    decode_id = _node_id(payload, "VAEDecode")
+    assert payload[sampler_id]["inputs"]["image"] == [decode_id, 0]
+    assert payload[sampler_id]["inputs"]["seed"] == 7
+    assert _find_node(payload, "CreateVideo")["inputs"]["audio"] == [sampler_id, 0]
+
+
+def test_wan22_fun_stroke_funscript_is_the_same_authored_plan_as_ati():
+    # Both stroke-authored workflows write the identical funscript for the same
+    # plan params — the shared base is the single source, so switching between
+    # them never changes what the device does.
+    fun = WORKFLOW_REGISTRY["wan22_fun_stroke_i2v"]
+    ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    plan = dict(seed=11, stroke_hz=1.5, stroke_top=400, stroke_bottom=600,
+                frame_count=81, frame_rate=16.0)
+    fun_actions = fun.authored_actions(dict(fun.default_params(), **plan))
+    ati_actions = ati.authored_actions(dict(ati.default_params(), **plan))
+    assert fun_actions == ati_actions
+    assert fun_actions[0]["pos"] == 100
+    assert len(fun_actions) > 4
+
+
+def test_wan22_fun_stroke_defaults_describe_the_act():
+    # The Fun-Control pair needs the act described in words: the markers say
+    # where motion happens, the prompt says what performs it — a bare category
+    # word left the hands unclaimed and the model stretched anatomy along the
+    # marker path instead. The proven wording is library vocabulary, so it
+    # ships through the content overlay and lands as the untouched form's
+    # default, in both prompt fields.
+    from origenerator.content import load_content
+
+    wf = WORKFLOW_REGISTRY["wan22_fun_stroke_i2v"]
+    defaults = wf.default_params()
+    prompts = load_content()["stroke_prompts"]
+    assert defaults["positive_prompt"] == prompts["positive"]
+    assert defaults["negative_prompt"] == prompts["negative"]
+    assert "hand" in defaults["positive_prompt"]      # the hands are claimed
+    prompt_defs = {d.key: d for d in wf.param_definitions()}
+    assert prompt_defs["positive_prompt"].default == defaults["positive_prompt"]
+    assert prompt_defs["negative_prompt"].default == defaults["negative_prompt"]
+
+
 def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
     # video on a stroke track built from the stroke params, so the pixels follow
@@ -1258,7 +1375,7 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
     # same seed yields the same actions no matter where the track points.
     import json as _json
 
-    import origenerator.workflows.wan21_ati_i2v as ati
+    import origenerator.workflows.stroke_authored as stroke_authored
     from origenerator.workflows.wan21_ati_i2v import (
         REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
     )
@@ -1266,7 +1383,8 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
     aim = {"stroke_x": 0.5, "stroke_top": 0.25, "stroke_bottom": 0.5,
            "anchor_x": 0.45, "anchor_y": 0.6}
     calls = []
-    monkeypatch.setattr(ati, "detect_grip_aim", lambda path: (calls.append(path), aim)[1])
+    monkeypatch.setattr(stroke_authored, "detect_grip_aim",
+                        lambda path: (calls.append(path), aim)[1])
 
     wf = Wan21AtiI2vWorkflow()
     params = dict(wf.default_params(), input_image="start.png", seed=9)

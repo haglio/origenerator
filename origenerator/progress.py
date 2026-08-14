@@ -33,6 +33,18 @@ _SAMPLER_STEPS = {
 }
 
 
+def sampler_node_ids(payload: dict) -> set[str]:
+    """The payload's sampler node ids — the only nodes whose ``progress`` events
+    count in the units :func:`expected_progress_steps` totals. Other nodes
+    report progress in their own units (a video loader counts frames, a tiled
+    VAE counts tiles), so a tracker fed those banks phantom "steps" and pegs
+    the bar at full before sampling has begun."""
+    return {
+        node_id for node_id, node in payload.items()
+        if node.get("class_type") in _SAMPLER_STEPS
+    }
+
+
 def expected_progress_steps(payload: dict) -> int:
     """Total sampler steps ComfyUI will report for a workflow payload.
 

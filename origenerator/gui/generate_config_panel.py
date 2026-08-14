@@ -244,7 +244,7 @@ class GenerateConfigPanel(QWidget):
         except TypeError:
             pass
 
-    def _on_progress(self, prompt_id: str, value: int, max_val: int):
+    def _on_progress(self, prompt_id: str, _node_id: str, value: int, max_val: int):
         """Fill the Generate button with this tab's own run's progress.
 
         The client's progress is multiplexed across every job on the server, and

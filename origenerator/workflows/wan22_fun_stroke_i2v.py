@@ -1,67 +1,68 @@
-import json
-
+from origenerator.content import load_content
 from origenerator.workflows.base import ParamDef
-from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
+from origenerator.workflows.model_files import list_lora_files, list_model_files
 from origenerator.workflows.stroke_authored import (
     REFERENCE_HEIGHT,
     REFERENCE_WIDTH,
-    TRACK_POINTS,
     StrokeAuthoredWorkflow,
 )
+from origenerator.workflows.stroke_control_video import (
+    control_marker_positions,
+    render_control_video,
+)
 
-# The three cluster points ride the stroke slightly staggered (as derisked in
-# the PoC): enough spread to read as a hand, not so much it smears the patch.
-_CLUSTER_OFFSETS = ((-5.0, -30.0), (3.0, 0.0), (-3.0, 30.0))
 
+class Wan22FunStrokeI2vWorkflow(StrokeAuthoredWorkflow):
+    """WAN 2.2 Fun-Control image-to-video following an authored stroke plan.
 
-class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
-    """WAN 2.1 ATI image-to-video: the video follows an authored stroke track.
+    The other stroke-authored workflow (WAN 2.1 ATI) obeys its plan strictly
+    but runs a base that never learned this content's acts; this one trades a
+    little obedience for the full WAN 2.2 ecosystem — the same high/low UNET
+    pair layout and LoRA pairs as the standard i2v workflow — by expressing
+    the plan as a rendered control video (see stroke_control_video) that the
+    Fun-Control models condition on: a primary marker riding the stroke and a
+    secondary marker swaying at the base, one per hand. The plan also becomes
+    the funscript (:meth:`~StrokeAuthoredWorkflow.authored_actions`), and the
+    decoded frames get the HunyuanVideo-Foley scoring pass like every video
+    workflow.
 
-    Motion authorship is flipped relative to the other video workflows: a
-    stroke is authored first (``stroke_*`` params), ``WanTrackToVideo``
-    conditions the ATI-finetuned WAN 2.1 checkpoint on it, and the video obeys.
-    The same track then becomes the funscript (:meth:`authored_actions`) — one
-    source, exact by construction, no pixel measurement. The decoded frames
-    still get the HunyuanVideo-Foley scoring pass, muxed by ``CreateVideo``.
-
-    The output size is derived from the input image like the WAN 2.2 workflows,
-    but app-side rather than in-graph (see :meth:`build_api_payload`): its
-    ``WanTrackToVideo`` needs the integer size *and* a track whose coordinates
-    share that space, and an in-graph ``GetImageSize`` couldn't feed the track,
-    which is built here. The stroke is authored in a fixed 480×864 reference
-    frame and rescaled into the derived size, so one authored track fits any
-    aspect ratio. Frame count stops at 113 because ComfyUI's track resampler
-    faults at exactly 121 frames (its length-1=120 off-by-one).
-
-    LoRAs come as a high/low-noise pair like the WAN 2.2 workflows take,
-    emulated on this single 2.1 base by splitting the denoise into two
-    ``KSamplerAdvanced`` stages at ``steps // 2`` — the high-noise LoRA
-    patches the early-step model, the low-noise one the late-step model, both
-    branching off the one UNET. Either slot may be "None".
+    Size derives from the input image app-side (the control video and the
+    conditioning must share one pixel space), with the stroke coordinates
+    authored in the fixed reference frame and rescaled in — all inherited
+    from :class:`StrokeAuthoredWorkflow`, auto-aim included.
     """
 
-    name = "wan21_ati_i2v"
-    version = "v006"
-    display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
+    name = "wan22_fun_stroke_i2v"
+    version = "v001"
+    display_name = "WAN 2.2 Fun Stroke (I2V)"
     output_type = "video"
     derives_size_from_input = True
-    model_keys = ("unet",)
+    model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")
     output_node_id = "15"
 
+    # The proven act description, default because the Fun-Control pair needs
+    # it: the markers say WHERE motion happens, the prompt says WHAT performs
+    # it — a terse category-word prompt left the hands unclaimed and the model
+    # improvised the motion as anatomy stretching along the marker path. The
+    # side-by-side iterations landed on exact wording, and that wording is
+    # library vocabulary, so it lives in the content overlay, not in source.
+    _ACT_PROMPTS = load_content()["stroke_prompts"]
+
     def default_params(self) -> dict:
         return {
-            "positive_prompt": "",
-            "negative_prompt": "",
+            "positive_prompt": self._ACT_PROMPTS["positive"],
+            "negative_prompt": self._ACT_PROMPTS["negative"],
             "input_image": "",
             "seed": 0,
             "frame_count": 81,
             "batch_size": 1,
             "steps": 20,
-            "cfg": 5.0,
+            "cfg": 3.5,
             "sampler_name": "euler",
             "scheduler": "simple",
-            "shift": 8.0,
+            "shift_high": 8.0,
+            "shift_low": 8.0,
             "frame_rate": 16.0,
             "stroke_hz": 1.2,
             "stroke_x": 255,
@@ -75,23 +76,24 @@ class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
             "foley_model": "hunyuanvideo_foley_fp8_e4m3fn.safetensors",
             "foley_vae": "vae_128d_48k_fp16.safetensors",
             "foley_synchformer": "synchformer_state_dict_fp16.safetensors",
-            "filename_prefix": "video/wan21_ati_i2v",
+            "filename_prefix": "video/wan22_fun_stroke",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
-            "clip_vision_name": "clip_vision_h.safetensors",
-            "unet": "Wan2_1-I2V-ATI-14B_fp8_e4m3fn.safetensors",
-            "lora_high": NO_LORA,
+            "unet_high": "wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors",
+            "unet_low": "wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors",
+            "lora_high": "wan22-f4c3spl4sh-100epoc-high-k3nk.safetensors",
+            "lora_low": "wan22-f4c3spl4sh-154epoc-low-k3nk.safetensors",
             "lora_strength_high": 1.0,
-            "lora_low": NO_LORA,
             "lora_strength_low": 1.0,
         }
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        models = list_model_files("diffusion_models", [defaults["unet"]])
+        models = list_model_files("diffusion_models", [defaults["unet_high"], defaults["unet_low"]])
+        loras = list_lora_files([defaults["lora_high"], defaults["lora_low"]])
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Input Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
@@ -106,56 +108,48 @@ class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
             ParamDef("stroke_bottom", "Stroke Bottom Y", "int", 650, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
-            ParamDef("frame_count", "Frames", "int", 81, min_val=5, max_val=113, step=4),
+            ParamDef("frame_count", "Frames", "int", 81, min_val=5, max_val=121, step=4),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
-            ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("unet", "Model", "combo", defaults["unet"], options=models),
-            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=list_lora_files([])),
+            ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=models),
+            ParamDef("unet_low", "Model (Low)", "combo", defaults["unet_low"], options=models),
+            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras),
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=list_lora_files([])),
+            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
-            ParamDef("filename_prefix", "Output Prefix", "str", "video/wan21_ati_i2v"),
+            ParamDef("filename_prefix", "Output Prefix", "str", "video/wan22_fun_stroke"),
         ]
 
-    def _stroke_tracks(self, params: dict) -> str:
-        """The tracks JSON: three staggered points riding the authored stroke
-        series, plus one static point pinning the anchor. 121 points at 24fps,
-        ATI's fixed convention."""
-        amplitude = (params["stroke_bottom"] - params["stroke_top"]) / 2
-        series = self._stroke_series(params)
-        tracks = []
-        for x_off, y_off in _CLUSTER_OFFSETS:
-            spread = min(abs(y_off), amplitude * 0.4) * (1 if y_off >= 0 else -1)
-            tracks.append([
-                {"x": float(params["stroke_x"] + x_off), "y": float(y + spread)}
-                for y in series
-            ])
-        tracks.append(
-            [{"x": float(params["anchor_x"]), "y": float(params["anchor_y"])}] * TRACK_POINTS
+    def _control_video_path(self, stroke_params: dict, width: int, height: int) -> str:
+        """Render (or reuse) this plan's control video and return its path."""
+        positions = control_marker_positions(
+            self._stroke_series(stroke_params),
+            stroke_params["stroke_x"],
+            stroke_params["stroke_top"],
+            stroke_params["anchor_x"],
+            stroke_params["anchor_y"],
+            stroke_params["frame_count"],
         )
-        return json.dumps(tracks)
+        return str(render_control_video(positions, width, height, stroke_params["frame_rate"]))
 
     def build_api_payload(self, params: dict) -> dict:
-        # ATI can't derive its size in-graph (its WanTrackToVideo needs the
-        # integer size AND a track whose coordinates share that space), so both
-        # are built here: the size is the input image's derived size (or the
-        # unlocked override) and the authored stroke — auto-aimed at the
-        # detected anchor unless the user placed it — is rescaled into it.
+        # The control video and the conditioning must share one pixel space, so
+        # the size is derived app-side (or taken from the unlocked override) and
+        # the authored stroke — auto-aimed at the detected anchor unless the
+        # user placed it — is rescaled into it before rendering.
         params = self._auto_aim_params(params)
         width, height = self._output_size(params)
         stroke_params = self._scaled_stroke_params(params, width, height)
+        control_video = self._control_video_path(stroke_params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
-        # High/low-noise LoRA pair, emulated on the single 2.1 base: the
-        # denoise splits into two stages at steps//2, and each stage's model
-        # chain branches off the one UNET with its own optional LoRA ("None"
-        # omits that loader; the stage runs the base unmodified).
         lora_high, model_high = self.lora_model_input(
-            "10", ["4", 0], params["lora_high"], params["lora_strength_high"]
+            "5", ["3", 0], params["lora_high"], params["lora_strength_high"]
         )
         lora_low, model_low = self.lora_model_input(
-            "16", ["4", 0], params["lora_low"], params["lora_strength_low"]
+            "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
         )
         half_steps = params["steps"] // 2
         return {
@@ -175,65 +169,66 @@ class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
                 "inputs": {"vae_name": params["vae_name"]},
             },
             "3": {
-                "class_type": "CLIPVisionLoader",
-                "inputs": {"clip_name": params["clip_vision_name"]},
+                "class_type": "UNETLoader",
+                "inputs": {"unet_name": params["unet_high"], "weight_dtype": "default"},
             },
             "4": {
                 "class_type": "UNETLoader",
-                "inputs": {"unet_name": params["unet"], "weight_dtype": "default"},
+                "inputs": {"unet_name": params["unet_low"], "weight_dtype": "default"},
             },
-            "5": {
+            "7": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": model_high, "shift": params["shift"]},
+                "inputs": {"model": model_high, "shift": params["shift_high"]},
             },
-            "17": {
+            "8": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": model_low, "shift": params["shift"]},
+                "inputs": {"model": model_low, "shift": params["shift_low"]},
             },
-            "6": {
+            "9": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["1", 0], "text": params["positive_prompt"]},
             },
-            "7": {
+            "10": {
                 "class_type": "CLIPTextEncode",
                 "inputs": {"clip": ["1", 0], "text": params["negative_prompt"]},
             },
-            "8": {
+            "11": {
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
             },
-            "9": {
-                "class_type": "CLIPVisionEncode",
+            "12": {
+                "class_type": "VHS_LoadVideoPath",
                 "inputs": {
-                    "clip_vision": ["3", 0],
-                    "image": ["8", 0],
-                    "crop": "center",
+                    "video": control_video,
+                    "force_rate": 0,
+                    "custom_width": 0,
+                    "custom_height": 0,
+                    "frame_load_cap": 0,
+                    "skip_first_frames": 0,
+                    "select_every_nth": 1,
                 },
             },
-            "11": {
-                "class_type": "WanTrackToVideo",
+            "16": {
+                "class_type": "Wan22FunControlToVideo",
                 "inputs": {
-                    "positive": ["6", 0],
-                    "negative": ["7", 0],
+                    "positive": ["9", 0],
+                    "negative": ["10", 0],
                     "vae": ["2", 0],
-                    "tracks": self._stroke_tracks(stroke_params),
                     "width": width,
                     "height": height,
                     "length": params["frame_count"],
                     "batch_size": params["batch_size"],
-                    "temperature": 220.0,
-                    "topk": 2,
-                    "start_image": ["8", 0],
-                    "clip_vision_output": ["9", 0],
+                    "ref_image": ["11", 0],
+                    "control_video": ["12", 0],
                 },
             },
-            "18": {
+            "17": {
                 "class_type": "KSamplerAdvanced",
                 "inputs": {
-                    "model": ["5", 0],
-                    "positive": ["11", 0],
-                    "negative": ["11", 1],
-                    "latent_image": ["11", 2],
+                    "model": ["7", 0],
+                    "positive": ["16", 0],
+                    "negative": ["16", 1],
+                    "latent_image": ["16", 2],
                     "add_noise": "enable",
                     "noise_seed": params["seed"],
                     "steps": params["steps"],
@@ -245,13 +240,13 @@ class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
                     "return_with_leftover_noise": "enable",
                 },
             },
-            "12": {
+            "18": {
                 "class_type": "KSamplerAdvanced",
                 "inputs": {
-                    "model": ["17", 0],
-                    "positive": ["11", 0],
-                    "negative": ["11", 1],
-                    "latent_image": ["18", 0],
+                    "model": ["8", 0],
+                    "positive": ["16", 0],
+                    "negative": ["16", 1],
+                    "latent_image": ["17", 0],
                     "add_noise": "disable",
                     "noise_seed": params["seed"],
                     "steps": params["steps"],
@@ -265,7 +260,7 @@ class Wan21AtiI2vWorkflow(StrokeAuthoredWorkflow):
             },
             "13": {
                 "class_type": "VAEDecode",
-                "inputs": {"samples": ["12", 0], "vae": ["2", 0]},
+                "inputs": {"samples": ["18", 0], "vae": ["2", 0]},
             },
             "14": {
                 "class_type": "CreateVideo",

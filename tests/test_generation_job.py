@@ -47,18 +47,18 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     job.started.connect(lambda: started.append(True))
     job.progress.connect(lambda v, m: progress.append((v, m)))
 
-    client.progress.emit("comfy-OTHER", 5, 50)
+    client.progress.emit("comfy-OTHER", "5", 5, 50)
     assert started == [] and progress == []
 
     # SDXL runs a 50-step base pass then a 20-step enhance pass, so progress
     # forwards as value over the 70-step whole-run total.
-    client.progress.emit("comfy-A", 5, 50)
+    client.progress.emit("comfy-A", "5", 5, 50)
     assert started == [True]
     assert progress == [(5, 70)]
     assert job.state == "running"
     assert job.last_progress == (5, 70)
 
-    client.progress.emit("comfy-A", 7, 50)
+    client.progress.emit("comfy-A", "5", 7, 50)
     assert started == [True]  # started fires only once
 
 
@@ -77,11 +77,37 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
 
-    client.progress.emit("comfy-A", 10, 10)  # first pass finishes (10 of 20)
-    client.progress.emit("comfy-A", 1, 10)   # second pass restarts its own count
+    client.progress.emit("comfy-A", "15", 10, 10)  # first pass finishes (10 of 20)
+    client.progress.emit("comfy-A", "16", 1, 10)   # second pass restarts its own count
 
     assert seen == [(10, 20), (11, 20)]       # continues past the halfway mark
     assert job.last_progress == (11, 20)
+
+
+def test_progress_from_non_sampler_nodes_does_not_move_the_ramp(qtbot, tmp_path):
+    # The Fun-Control workflow's control-video loader reports per-frame progress
+    # before sampling starts — 81 frames against a 20-step total pegged the bar
+    # at full immediately. Such an event still proves the job is running, but
+    # only sampler nodes' events count as steps; one that names no node at all
+    # (an older server) is tolerated as before.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    client = _client()
+    job = GenerationJob(
+        client, wf, {**wf.default_params(), "steps": 20},
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    job.prompt_id = "comfy-A"
+    job.start()
+    seen = []
+    job.progress.connect(lambda v, m: seen.append((v, m)))
+
+    client.progress.emit("comfy-A", "3", 81, 81)   # a loader's frame count, not steps
+    assert seen == []
+    assert job.state == "running"                  # the event still marks it live
+
+    client.progress.emit("comfy-A", "15", 5, 10)   # a real sampler tick
+    client.progress.emit("comfy-A", "", 6, 10)     # no node id: counted as before
+    assert seen == [(5, 20), (6, 20)]
 
 
 def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):
@@ -272,8 +298,8 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
     job = GenerationJob(_client(), wf, {**wf.default_params(), "steps": 20},
                         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
     job.prompt_id = "pid"
-    job._on_progress("pid", 10, 10)   # first pass done
-    job._on_progress("pid", 3, 10)    # second pass at 3 -> 13/20
+    job._on_progress("pid", "15", 10, 10)   # first pass done
+    job._on_progress("pid", "16", 3, 10)    # second pass at 3 -> 13/20
 
     state = job.progress_state()
     assert state["last_progress"] == [13, 20]
@@ -292,7 +318,7 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
     )
     assert job.last_progress == (13, 20)     # bar resumes at its last spot immediately
 
-    job._on_progress("pid", 4, 10)           # next real tick from ComfyUI
+    job._on_progress("pid", "16", 4, 10)     # next real tick from ComfyUI
     assert job.last_progress == (14, 20)     # carries on, not back to 4/20
 
 
@@ -332,7 +358,7 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     client.foreign_backlog = MagicMock(return_value=3)
     job.refresh_backlog()
 
-    client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
+    client.progress.emit("comfy-A", "5", 1, 50)  # ComfyUI picked it up
 
     assert job.state == "running"
     assert job.foreign_ahead is None  # the count clears the moment it's ours

@@ -562,6 +562,23 @@ def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
     assert any("Reject" in t for t in tooltips)
 
 
+def test_double_clicking_an_experiment_lands_in_the_folder_it_would_join(qtbot):
+    # An unreviewed experiment has no settings folder of its own — the tree holds
+    # it out until it's kept, and its mutated setting would give it a brand-new
+    # leaf anyway — so the jump settles on the deepest tier that does exist: the
+    # LoRA folder its base sits under.
+    base = _image("i1", "a cat", 50, 1)
+    view = GalleryView(FakeDB([base, _experiment_row("e1", steps=30)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._experiments_item)
+    view._thumb_widgets["e1"].double_clicked.emit("e1")
+
+    assert view._selected_folder_key() == gallery.folder_key_at_level(base, "lora")
+    assert view.selected_generation() == "e1"   # still previewed, to judge in place
+
+
 def test_keeping_an_experiment_admits_it_to_the_gallery(qtbot):
     db = FakeDB([_experiment_row("e1")])
     view = GalleryView(db)
@@ -780,28 +797,6 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
     assert set(view.visible_prompt_ids()) == {"i1", "i2"}
 
 
-def test_go_to_containing_folder_button_appears_then_navigates(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    assert view._containing_folder_btn.isHidden()       # nothing picked yet
-    view._thumb_widgets["i2"].clicked.emit("i2")        # preview a recent item
-    assert not view._containing_folder_btn.isHidden()   # now a jump is on offer
-
-    view._containing_folder_btn.click()                 # take it
-    assert view.selected_generation() == "i2"
-    assert view._showing_recents() is False             # we left the shelf...
-    assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
-    # The item lands selected — its tile picked and highlighted, not merely
-    # previewed — as if we'd navigated in and clicked it.
-    assert view.selected_prompt_ids() == ["i2"]
-    assert view._thumb_widgets["i2"].is_selected()
-    assert view._containing_folder_btn.isHidden()       # and the button retires
-
-
 def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
@@ -809,10 +804,13 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    # Double-clicking a recent tile makes the same jump the button does.
+    # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._thumb_widgets["i2"].double_clicked.emit("i2")
+    assert view.selected_generation() == "i2"
     assert view._showing_recents() is False             # off the shelf...
     assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
+    # The item lands selected — its tile picked and highlighted, not merely
+    # previewed — as if we'd navigated in and clicked it.
     assert view.selected_prompt_ids() == ["i2"]         # landed selected
     assert view._thumb_widgets["i2"].is_selected()
 

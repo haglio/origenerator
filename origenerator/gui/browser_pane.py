@@ -131,9 +131,9 @@ class BrowserPane:
         or running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight card reveals where its job runs; a
         finished one previews in the info pane, right here on the shelf, the way a
-        thumbnail does inside a folder — and a "Go to containing folder" button
-        then offers the jump to its folder. Opens with the info pane cleared, so
-        it shows nothing until an item is picked."""
+        thumbnail does inside a folder — and double-clicking it jumps to its own
+        folder. Opens with the info pane cleared, so it shows nothing until an
+        item is picked."""
         self._v._title.set_display(RECENTS_LABEL)
         self._v._avg_label.setText("")
         self._v._clear_metadata()
@@ -283,29 +283,21 @@ class BrowserPane:
         if item is not None:
             item.reveal()
 
-    def go_to_containing_folder(self):
-        """The 'Go to containing folder' button's action: open the previewed Recents
-        item in its own folder, selected."""
-        if self._v._selected is not None:
-            self.open_in_containing_folder(self._v._selected["prompt_id"])
-
     def open_in_containing_folder(self, prompt_id: str):
         """Jump the browser pane to ``prompt_id``'s own folder and land on the item
         itself — its tile picked and highlighted, as if you'd navigated in and
-        clicked it, not just auto-previewing the folder's first item. Shared by the
-        button and a double-click on a Recents tile."""
+        clicked it, not just auto-previewing the folder's first item. The double-
+        click gesture on every shelf tile, and the info pane's "Go to folder".
+
+        An unreviewed experiment has no folder of its own to land in (the tree
+        holds it out until it's kept), so the navigation stops at the nearest
+        existing ancestor and there is no tile of it to pick — hence the guard.
+        """
         self._v._on_source_link(prompt_id)  # open the folder, previewing the item
         # The navigation renders the folder's tiles; now pick this one so it reads
         # as the selected item rather than an unhighlighted preview.
-        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-
-    def sync_containing_folder_button(self):
-        """Offer "Go to containing folder" only while the Recents shelf is showing
-        a previewed item: that's the one view whose info pane holds a generation
-        from a folder other than the one on screen."""
-        self._v._containing_folder_btn.setVisible(
-            self.showing_recents() and self._v._selected is not None
-        )
+        if prompt_id in self._visible_ids:
+            self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 

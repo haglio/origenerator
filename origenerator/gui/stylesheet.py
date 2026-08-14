@@ -250,6 +250,27 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
+    /* The config pane's close-all and "+" stand in the tab row, right after the
+       tabs, so they wear the tabs' own flat look rather than the raised, rounded,
+       bordered QToolButton default — which read as a separate little toolbar
+       bolted onto the strip. Same background, same muted text, same hover, and
+       the transparent bottom rule that keeps them level with an unselected tab. */
+    QToolButton#tabBarButton {{
+        background-color: {_h(BG_SECONDARY)};
+        color: {_h(TEXT_MUTED)};
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        padding: 0 14px;
+        font-weight: normal;
+    }}
+    QToolButton#tabBarButton:hover {{
+        color: {_h(TEXT_PRIMARY)};
+    }}
+    QToolButton#tabBarButton:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+        color: {_h(BORDER_SUBTLE)};
+    }}
     QLabel#combineHeading {{
         color: {_h(TEXT_MUTED)};
         font-weight: bold;

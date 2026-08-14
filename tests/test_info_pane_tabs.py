@@ -237,14 +237,57 @@ def test_the_add_button_is_still_on_screen_with_no_tabs_left(tabs):
     assert tabs._close_all_btn.height() == standing
 
 
-def test_the_add_button_keeps_the_far_right_corner(tabs):
-    # Close-all sits to the LEFT of "+", so the button the user clicks constantly
-    # stays where it has always been and a miss doesn't empty the pane.
-    assert tabs.cornerWidget(Qt.Corner.TopRightCorner) is tabs._corner
+def test_close_all_sits_left_of_the_add_button(tabs):
+    # The gap between them means a miss on the "+" a user clicks constantly
+    # doesn't empty the pane instead.
     row = tabs._corner.layout()
     assert [row.itemAt(i).widget() for i in range(row.count())] == [
         tabs._close_all_btn, tabs._add_btn,
     ]
+
+
+def _laid_out(tabs):
+    from PyQt6.QtWidgets import QApplication
+
+    tabs.resize(900, 300)
+    tabs.show()
+    QApplication.processEvents()
+
+
+def test_the_tab_row_buttons_follow_the_last_tab(tabs):
+    # They belong to the tab strip, so they stand where a browser's new-tab button
+    # stands — right after the tabs — rather than marooned at the far right with a
+    # gap of nothing between.
+    _laid_out(tabs)
+    assert tabs._corner.x() == tabs.tabBar().width()
+
+    tabs._add_subtab()  # a second tab widens the row; the buttons move along with it
+    _laid_out(tabs)
+    assert tabs._corner.x() == tabs.tabBar().width()
+
+
+def test_the_tab_row_buttons_stand_exactly_as_tall_as_the_row(tabs):
+    # Taller than the tabs, they hung below the strip into the pane underneath.
+    _laid_out(tabs)
+    row_height = tabs.tabBar().sizeHint().height()
+    assert tabs._corner.height() == row_height
+    assert tabs._add_btn.height() == row_height
+    assert tabs._close_all_btn.height() == row_height
+
+
+def test_the_tabs_never_run_under_the_buttons(tabs):
+    # Enough tabs to fill the row must not slide beneath the two buttons, which
+    # are painted over the same strip and would swallow the last tab's ✕.
+    for _ in range(12):
+        tabs._add_subtab()
+    _laid_out(tabs)
+    assert tabs.tabBar().width() <= tabs._corner.x()
+    assert tabs._corner.geometry().right() <= tabs.width()
+
+
+def test_the_tab_row_buttons_wear_the_tab_style(tabs):
+    assert tabs._add_btn.objectName() == "tabBarButton"
+    assert tabs._close_all_btn.objectName() == "tabBarButton"
 
 
 # --- a read-only gallery (no client) ---------------------------------------

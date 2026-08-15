@@ -13,8 +13,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-_MOVE_ATTEMPTS = 5      # a freshly-closed media file can stay locked for a beat
-_MOVE_RETRY_DELAY = 0.1
+_MOVE_ATTEMPTS = 12     # a freshly-closed media file can stay locked for a beat
+_MOVE_RETRY_DELAY = 0.15
 
 
 @dataclass
@@ -68,9 +68,13 @@ class Trash:
 def _move(src: Path, dest: Path) -> None:
     """Move a file into the trash, retrying briefly past a transient lock.
 
-    A video the preview only just stopped can stay open for a moment (and AV
-    scanners or the indexer can grab any file), so a one-shot move would fail
-    where a couple of retries succeed.
+    A video the preview only just let go of can stay open for a moment — the
+    media backend closes its source on its own thread, a beat after being told
+    to — and AV scanners or the indexer can grab any file, so a one-shot move
+    would fail where a second or two of retries succeeds. What retrying can't
+    outlast is a pane still *showing* the file: that handle never goes away on
+    its own, which is why the release runs first (see
+    ``GalleryActions._trash_files``).
     """
     for attempt in range(_MOVE_ATTEMPTS):
         try:

@@ -9,6 +9,7 @@ while the fullscreen view opts in to sound.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -24,6 +25,12 @@ from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
 
 _PLACEHOLDER = "Select a generation to preview"
+
+
+def _path_key(path) -> str:
+    """One comparable form for a file path, so two spellings of the same file —
+    a ``Path`` against a string, or Windows' case-blind pair — match."""
+    return os.path.normcase(os.path.abspath(str(path)))
 
 
 class PreviewWidget(QWidget):
@@ -237,6 +244,26 @@ class PreviewWidget(QWidget):
     def clear(self) -> None:
         self.show_message(_PLACEHOLDER)
         self._player.setSource(QUrl())  # release any held video file so it can be deleted
+
+    def is_showing_any(self, paths) -> bool:
+        """Whether the file on screen is one of ``paths``, however each is spelled."""
+        if self._media is None:
+            return False
+        return _path_key(self._media[0]) in {_path_key(p) for p in paths}
+
+    def release_media(self, paths) -> None:
+        """Let go of ``paths`` — files about to be moved or deleted.
+
+        A loaded video keeps its file open for as long as it's the player's
+        source, and Windows refuses to move a file anything holds open, so a
+        pane still showing a condemned item is what makes its own deletion
+        fail. Panes showing anything else are left exactly as they are: only
+        what's about to go is dropped, along with a fullscreen view of it.
+        """
+        if self._fullscreen is not None:
+            self._fullscreen.release_media(paths)
+        if self.is_showing_any(paths):
+            self.clear()
 
     def is_showing_video(self) -> bool:
         return self._stack.currentWidget() is self._video

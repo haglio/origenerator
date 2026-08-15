@@ -116,6 +116,13 @@ class FullscreenPreview(QWidget):
             self._stroke_panel.reposition()
             self._stroke_panel.show()
 
+    def release_media(self, paths) -> None:
+        """Dismiss the view when what it's showing is about to be deleted: its
+        video holds the file open, which would block the delete, and a
+        fullscreen view of a file that's going is nothing to keep up."""
+        if self._preview.is_showing_any(paths):
+            self.close()  # closeEvent clears the preview, releasing the file
+
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
         an image or a video with no funscript — mirrors the config panel's target so

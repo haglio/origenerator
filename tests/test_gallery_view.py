@@ -2566,6 +2566,41 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
     assert file_path.exists()
 
 
+def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
+    # The app holding a file open is what used to fail its own delete: Windows
+    # refuses to move one. Hung off the actions rather than any one caller, so it
+    # covers every delete there is — a picked tile, a folder, a rejected
+    # experiment, a slideshow's Up key.
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    assert view._actions._release_files == view._release_held_media
+
+
+def test_releasing_held_media_clears_a_pane_behind_the_one_in_front(qtbot, tmp_path):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    doomed = tmp_path / "doomed.png"
+    doomed.write_bytes(b"x")
+    behind = view._info_tabs.current_config_panel()
+    behind._preview.show_image(doomed)
+    view._info_tabs._add_subtab()  # a second tab takes the front
+
+    view._release_held_media([doomed])
+
+    assert not behind._preview.is_showing_any([doomed])
+
+
+def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
+    # Its Up key condemns the very item it's playing — the file it holds open.
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view._slideshow = MagicMock()
+
+    view._release_held_media([tmp_path / "clip.mp4"])
+
+    view._slideshow.release_media.assert_called_once()
+
+
 # --- re-roll ("+") tile -----------------------------------------------------
 
 

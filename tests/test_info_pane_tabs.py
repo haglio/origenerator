@@ -525,6 +525,24 @@ def test_restore_state_tolerates_malformed_blobs(tabs):
     assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
 
 
+def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
+    # Browsing generation after generation spreads them across tabs, and a tab
+    # out of sight holds its file open exactly as firmly as the front one — which
+    # is what used to make deleting a previewed item fail on Windows.
+    doomed = tmp_path / "doomed.png"
+    doomed.write_bytes(b"x")
+    kept = tmp_path / "kept.png"
+    kept.write_bytes(b"x")
+    behind, front = tabs.current_config_panel(), tabs._add_subtab()
+    behind._preview.show_image(doomed)
+    front._preview.show_image(kept)
+
+    tabs.release_media([doomed])
+
+    assert not behind._preview.is_showing_any([doomed])  # the tab behind let go
+    assert front._preview.is_showing_any([kept])         # the other one kept its item
+
+
 def test_capture_restore_round_trips_config_and_custom_title(tabs, qtbot):
     tabs.currentWidget().prefill("sdxl_t2i", {})  # a plain sdxl tab
     tabs.open_config("wan22_i2v", {"positive_prompt": "a fox", "seed": 7})  # current

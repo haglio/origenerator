@@ -21,11 +21,12 @@ genau's drive panel floated up top, so the device can run over a slideshow of
 stills.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
+from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
@@ -88,13 +89,9 @@ class SlideshowView(QWidget):
         # The items either side of this one, floated over the black surround.
         self._neighbors = NeighborPreviews(self)
 
-        # A translucent position/pause caption floating over the bottom of the media.
-        self._counter = QLabel(self)
-        self._counter.setStyleSheet(
-            "color: white; background: rgba(0, 0, 0, 140);"
-            " padding: 4px 10px; border-radius: 4px;"
-        )
-        self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # Where in the set this one is, floated over the bottom of the media —
+        # the same plate the plain fullscreen view wears.
+        self._counter = PositionCaption(self)
         # A note while an enhancement of the slide on screen is being made, and
         # again for a beat when the switch is flipped — the only way to tell, in
         # a view with no panels, that a press did anything. It sits just above
@@ -380,17 +377,10 @@ class SlideshowView(QWidget):
     def _update_counter(self):
         # Show the item's number within the set (its shuffled position), not the
         # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
-        text = f"{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
-        if self._playlist.locked:
-            text += "  ·  locked"
-        self._counter.setText(text)
-        self._reposition_counter()
-
-    def _reposition_counter(self):
-        self._counter.adjustSize()
-        x = (self.width() - self._counter.width()) // 2
-        y = self.height() - self._counter.height() - 24
-        self._counter.move(max(0, x), max(0, y))
+        self._counter.show_position(
+            self._playlist.order[self._playlist.index] + 1, len(self._playlist),
+            "  ·  locked" if self._playlist.locked else "",
+        )
 
     # --- Qt events ---------------------------------------------------------
 
@@ -419,7 +409,7 @@ class SlideshowView(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._reposition_counter()
+        self._counter.reposition()
         self._reposition_neighbors()
         self._reposition_note()
         if self._stroke_panel is not None:

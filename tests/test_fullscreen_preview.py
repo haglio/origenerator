@@ -636,3 +636,20 @@ def test_paging_moves_the_neighbours_with_it(qtbot):
     view = _armed(qtbot, index=0)
     _press(view, Qt.Key.Key_Right)
     assert view._neighbors._sources == ("a.png", "c.png")
+
+
+def test_a_folder_of_videos_shows_its_neighbours_from_their_thumbnails(qtbot):
+    # A video is no still of its own, so the neighbour either side of one can only
+    # be drawn from its stored thumbnail — without which a folder of videos got
+    # the counter and nothing else.
+    from origenerator.gui.neighbor_previews import still_for
+
+    view = FullscreenPreview(("a.mp4", "video"), player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.mp4", "video", "gen-a", "a-thumb.png"),
+                       ("b.mp4", "video", "gen-b", "b-thumb.png"),
+                       ("c.mp4", "video", "gen-c", "c-thumb.png")], 1)
+
+    assert still_for(view._items[0]) == "a-thumb.png"
+    assert view._neighbors._sources == ("a-thumb.png", "c-thumb.png")
+    assert view._counter.text() == "2 / 3"

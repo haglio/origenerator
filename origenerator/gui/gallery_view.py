@@ -790,28 +790,29 @@ class GalleryView(QWidget):
         the currently-shown item — the playlist a fullscreen view pages through.
 
         Each entry carries its generation's id alongside the media, so the view's
-        Up and Down can name what to trash and what to bookmark.
+        Up and Down can name what to trash and what to bookmark, and its stored
+        thumbnail, which is the only still a video has for the neighbor previews.
 
         Returns an empty list when the shown item isn't among them, so an armed
         playlist's starting item always matches what's already on screen."""
         selected_pid = self._selected["prompt_id"] if self._selected else None
         items, index, found = [], 0, False
-        for path, media_type, pid in self._folder_media():
-            if pid == selected_pid:
+        for entry in self._folder_media():
+            if entry[2] == selected_pid:
                 index, found = len(items), True
-            items.append((path, media_type, pid))
+            items.append(entry)
         return (items, index) if found else ([], 0)
 
     def _folder_media(self) -> list[tuple]:
-        """The visible folder's resolvable media in shown order, each with its own
-        generation id. In-flight and output-less rows have nothing to show
-        fullscreen, so they are left out."""
+        """The visible folder's resolvable media in shown order, each as
+        ``(path, media_type, prompt_id, thumbnail)``. In-flight and output-less
+        rows have nothing to show fullscreen, so they are left out."""
         media = []
         for pid in self._browser.visible_prompt_ids():
             row = self._db.get_generation(pid)
             preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
             if preview is not None:
-                media.append((preview[0], preview[1], pid))
+                media.append((preview[0], preview[1], pid, row.get("thumbnail_path")))
         return media
 
     def _on_fullscreen_closed(self, fullscreen):

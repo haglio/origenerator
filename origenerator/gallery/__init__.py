@@ -65,6 +65,7 @@ from origenerator.gallery.enhance import (
     enhance_levels,
     enhance_params_for,
     enhance_targets_row,
+    level_matching_settings,
     original_files_of,
     fold_completed_enhancements,
     fold_enhancement,

@@ -84,6 +84,20 @@ class SlideshowPlaylist:
         if not self._order or self._pos >= len(self._order):
             self._pos = 0
 
+    def replace_current(self, path, prompt_id) -> bool:
+        """Swap the current item's file for ``path``, if it is still that item.
+
+        An enhancement asked for from the slideshow lands minutes later, by
+        which time the show may have paged on — so the swap is guarded by the
+        id, and a stale arrival is simply dropped. Returns whether it landed.
+        """
+        item = self.current()
+        if item is None or len(item) < 3 or item[2] != prompt_id:
+            return False
+        index = self._order[self._pos]
+        self._items[index] = (path,) + tuple(item[1:])
+        return True
+
     @property
     def image_dwell_ms(self) -> int:
         """How long an image holds the screen. Settable, because Genau's console

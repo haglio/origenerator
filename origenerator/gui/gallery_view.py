@@ -631,6 +631,10 @@ class GalleryView(QWidget):
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
         panel.displayed_changed.connect(self._reconcile_pending_enhancements)
+        # Its version strip's "+ Enhance" card runs through the same queue the
+        # folder button and the context menu use.
+        panel.enhance_requested.connect(lambda pid: self.enhance_items([pid]))
+        panel.set_enhance_settings(self._enhance_settings)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
         panel.preview_double_clicked.connect(self._on_preview_double_clicked)
         # While the open folder is auto-generating, a preview double-click opens the
@@ -702,10 +706,33 @@ class GalleryView(QWidget):
 
     def _arm_fullscreen_navigation(self, fullscreen):
         """Give the fullscreen view the visible folder's media so Left/Right page
-        through it, starting on the item already on screen. Skipped for a lone item."""
+        through it, starting on the item already on screen. Skipped for a lone
+        item. Shift+Left/Right gets its own axis: the versions of whichever
+        image is on screen, so a level can be compared against the one below it
+        at full size rather than in a thumbnail."""
         items, index = self._folder_media_playlist()
         if len(items) > 1:
             fullscreen.set_playlist(items, index)
+        fullscreen.set_levels(self._folder_level_playlists())
+
+    def _folder_level_playlists(self) -> dict:
+        """Each visible image's versions, keyed by the file the folder shows it
+        under — newest first, matching the strip in the info pane."""
+        playlists = {}
+        for pid in self._browser.visible_prompt_ids():
+            row = self._db.get_generation(pid)
+            if row is None:
+                continue
+            levels = gallery.enhance_levels(row)
+            if len(levels) < 2:
+                continue  # one version is nothing to step between
+            paths = [
+                COMFYUI_OUTPUT_DIR / (lvl.file.get("subfolder") or "")
+                / (lvl.file.get("filename") or "")
+                for lvl in levels
+            ]
+            playlists[str(paths[0])] = [(p, "image") for p in paths]
+        return playlists
 
     def _folder_media_playlist(self):
         """The visible folder's resolvable media in shown order, and the index of
@@ -1706,6 +1733,16 @@ class GalleryView(QWidget):
         """Restore the enhancement settings a previous session left."""
         self._enhance_settings = gallery.EnhanceSettings.parse(raw)
         self._enhance_panel.show_settings(self._enhance_settings)
+        self._push_enhance_settings()
+
+    def _push_enhance_settings(self):
+        """Tell every config tab what the ``+ Enhance`` card would run at.
+
+        The panel holds the settings and the tabs hold the images, so the card
+        can only know whether it would be making a duplicate once the two meet —
+        here, on every edit and every rebuild."""
+        for panel in self._info_tabs._config_panels():
+            panel.set_enhance_settings(self._enhance_settings)
 
     def _on_enhance_settings_changed(self, settings):
         """Take an edit made in the Enhance subpanel.
@@ -1716,6 +1753,7 @@ class GalleryView(QWidget):
         Written through on each edit rather than on an Apply, so an enhance
         launched a moment later uses what is on screen."""
         self._enhance_settings = settings
+        self._push_enhance_settings()
 
     def _enhance_all(self):
         """The folder button's action: queue a standalone enhance for every
@@ -1749,6 +1787,46 @@ class GalleryView(QWidget):
                         gallery.describe_enhance_params(params))
             self._enhance_queue.append(params)
         self._pump_enhance_queue()
+
+    def _enhance_from_slideshow(self, prompt_id: str) -> bool:
+        """Holding a slide asked for it to be enhanced. Returns whether a run
+        started — the slideshow shows its corner note only if one did.
+
+        The decision is here rather than in the slideshow because it is this
+        side that holds the settings and the levels: an image that already
+        carries a version made at exactly the current settings wants nothing,
+        and neither does a video."""
+        row = self._db.get_generation(prompt_id)
+        if row is None or not gallery.is_enhanceable_row(row):
+            return False
+        if gallery.level_matching_settings(row, self._enhance_settings) is not None:
+            return False
+        if self.is_enhancing(row):
+            return False
+        self._enqueue_enhancements([row])
+        return True
+
+    def _feed_slideshow_enhanced(self, row: dict | None):
+        """Hand an enhancement the slideshow asked for back to it, so the slide
+        on screen becomes the better version without waiting for a new pass."""
+        if self._slideshow is None or row is None:
+            return
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is not None:
+            self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1])
+
+    def is_enhancing(self, row: dict) -> bool:
+        """Whether a standalone enhance of this image is running right now.
+
+        The browser pane's tiles ask, so a folder generating with the Auto
+        switch on reads honestly: the base render is out, on screen, and
+        something better is on the way. Without it the folder looks like it is
+        turning out plain images and ignoring the switch."""
+        return any(
+            job.workflow.name == gallery.ENHANCE_WORKFLOW
+            and gallery.enhance_targets_row(job.params.get("input_image"), row)
+            for job in self._reroll.jobs.values()
+        )
 
     def _reconcile_pending_enhancements(self):
         """Show each tab the enhancement being made for the image it displays.
@@ -1841,6 +1919,7 @@ class GalleryView(QWidget):
         if not items:
             return
         self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
+                                        on_enhance=self._enhance_from_slideshow,
                                         pace=self._pace,
                                         stroke=self._osr2_stroke)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
@@ -2307,6 +2386,8 @@ class GalleryView(QWidget):
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
                 finished_row = self._db.get_generation(source_id)
+                # A slideshow that asked for this one swaps the slide for it.
+                self._feed_slideshow_enhanced(finished_row)
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()

@@ -17,15 +17,19 @@ streamed frames the way the in-flight cards do everywhere else — so the level
 being made appears where the levels are, rather than the strip sitting unchanged
 until the fold lands.
 
-Every image the green badge marks shows this strip, down to one that kept no
-original and so lists a single enhancement: the badge says an enhancement
-happened, and this is where you find out which. Hidden only for an image that
-has received none, with none running.
+The strip is up for every image, even one with nothing but its original: it is
+where an image's versions live, and a place that appears only once you already
+have versions is a place you never find. It also closes with a ``+ Enhance``
+card that makes another at the current settings — dimmed when the image already
+holds one made at exactly those, and hovering the dimmed card lights the level
+it would have duplicated.
 """
 
 import json
 
-from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QApplication, QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget,
+)
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtCore import QByteArray, QMimeData, Qt, pyqtSignal
 
@@ -39,6 +43,10 @@ _TILE = 108  # the thumbnail box; a caption of settings sits under it
 # The in-flight edge the Recents shelf's cards wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = "2px solid #3080e0"
+# The dashed box of an empty slot waiting to be filled, and the lit edge a level
+# wears while the card that would duplicate it is hovered.
+_ADD_BORDER = "1px dashed #808080"
+_MATCH_BORDER = "2px solid #30a030"
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -106,6 +114,13 @@ class _LevelTile(QWidget):
         self.setToolTip(
             f"{level.settings}\nDrag onto Enhance to reuse these settings"
             if level.params else level.label
+        )
+
+    def set_highlighted(self, on: bool) -> None:
+        """Light this level's picture — what the ``+ Enhance`` card points at
+        when it is dimmed because this is the version it would duplicate."""
+        self._picture.setStyleSheet(
+            f"border: {_MATCH_BORDER}; border-radius: 3px;" if on else ""
         )
 
     def mousePressEvent(self, event):
@@ -188,6 +203,65 @@ class _PendingTile(QWidget):
         )
 
 
+class _AddTile(QWidget):
+    """The ``+ Enhance`` slot that closes the strip.
+
+    Live, it makes another version at whatever the Enhance panel currently says.
+    Dimmed, the image already holds one made at exactly those settings, and
+    hovering it lights that level rather than leaving you to compare numbers —
+    the answer to "why can't I press this" is the tile it points at.
+    """
+
+    clicked = pyqtSignal()
+    hovered = pyqtSignal(bool)
+
+    def __init__(self, settings: str, duplicate_of: int | None, parent=None):
+        super().__init__(parent)
+        self._enabled = duplicate_of is None
+        box = QVBoxLayout(self)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(2)
+        self._picture = QLabel("+")
+        self._picture.setFixedSize(_TILE, _TILE)
+        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._picture.setStyleSheet(
+            f"border: {_ADD_BORDER}; border-radius: 3px; font-size: 28px;"
+        )
+        box.addWidget(self._picture)
+        caption = QLabel("Enhance")
+        caption.setStyleSheet("font-weight: 600;")
+        box.addWidget(caption)
+        if settings:
+            detail = QLabel(settings.replace(" · ", "\n"))
+            detail.setObjectName("estimateLabel")
+            box.addWidget(detail)
+        # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
+        # events to a disabled widget, and the hover is exactly what the dimmed
+        # state is for — it is how the card explains why it cannot be pressed.
+        if not self._enabled:
+            effect = QGraphicsOpacityEffect(self)
+            effect.setOpacity(0.4)
+            self.setGraphicsEffect(effect)
+        self.setCursor(Qt.CursorShape.PointingHandCursor if self._enabled
+                       else Qt.CursorShape.ForbiddenCursor)
+        self.setToolTip(
+            f"Enhance this image at {settings}" if self._enabled
+            else "This image already has a version at exactly these settings"
+        )
+
+    def enterEvent(self, event):
+        self.hovered.emit(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.hovered.emit(False)
+        super().leaveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._enabled and event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+
+
 class EnhanceVersions(QWidget):
     """The levels of one image, newest first, as a strip of thumbnails.
 
@@ -200,6 +274,7 @@ class EnhanceVersions(QWidget):
     """
 
     level_selected = pyqtSignal(int)
+    enhance_requested = pyqtSignal()   # the "+ Enhance" card was pressed
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -214,17 +289,21 @@ class EnhanceVersions(QWidget):
         box.addWidget(self._host)
         self._box = box
         self._pending: _PendingTile | None = None
+        self._tiles: list[_LevelTile] = []
         self.hide()
 
-    def show_levels(self, items: list[tuple], pending: tuple | None = None):
-        """Rebuild the strip from ``(level, image_path)`` pairs, leading with the
-        enhancement in flight when ``pending`` is a ``(status, frame, settings)``
-        triple.
+    def show_levels(self, items: list[tuple], pending: tuple | None = None,
+                    add: tuple | None = None):
+        """Rebuild the strip from ``(level, image_path)`` pairs.
 
-        Hidden when there is neither — an image that has received no enhancement
-        and has none being made for it has nothing to show here. A single level
-        is enough to show: an image enhanced without an original kept still has
-        one enhancement worth naming and reusing.
+        ``pending`` is the ``(status, frame, settings)`` of an enhancement still
+        running, which leads the strip — it is becoming the newest level, and the
+        strip runs newest first. ``add`` is ``(settings, duplicate_of)`` for the
+        ``+ Enhance`` card that closes it: ``duplicate_of`` names the level those
+        settings would duplicate, or ``None`` when they would make something new.
+
+        Hidden only when there is nothing at all to show — no versions, nothing
+        running, and no card to press, which is what a video looks like.
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
         # related-media strips use, so no tile outlives the row it described.
@@ -233,18 +312,31 @@ class EnhanceVersions(QWidget):
         self._host = QWidget()
         flow = FlowLayout(self._host, spacing=6)
         self._pending = None
+        self._tiles = []
         if pending is not None:
-            # Leads the strip: it is becoming the newest level, and the strip
-            # runs newest first.
             self._pending = _PendingTile()
             self._pending.update_pending(*pending)
             flow.addWidget(self._pending)
         for position, (level, image_path) in enumerate(items):
             tile = _LevelTile(level, position, image_path)
             tile.clicked.connect(self.level_selected)
+            self._tiles.append(tile)
             flow.addWidget(tile)
+        if add is not None:
+            settings, duplicate_of = add
+            card = _AddTile(settings, duplicate_of)
+            card.clicked.connect(self.enhance_requested)
+            card.hovered.connect(
+                lambda on, at=duplicate_of: self._highlight_level(at, on))
+            flow.addWidget(card)
         self._box.addWidget(self._host)
-        self.setVisible(bool(items) or pending is not None)
+        self.setVisible(bool(items) or pending is not None or add is not None)
+
+    def _highlight_level(self, position: int | None, on: bool) -> None:
+        """Light the level the dimmed ``+ Enhance`` card would have duplicated."""
+        if position is None or not 0 <= position < len(self._tiles):
+            return
+        self._tiles[position].set_highlighted(on)
 
     def update_pending(self, pending: tuple | None) -> bool:
         """Feed a new frame to the tile already standing, without rebuilding.

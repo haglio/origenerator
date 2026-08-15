@@ -45,6 +45,13 @@ class FullscreenPreview(QWidget):
         # running generation — it has no file to page from yet.
         self._items: list[tuple] = [media] if media is not None else []
         self._index = 0
+        # The enhancement levels of each item that has any, keyed by the file
+        # the folder lists it under, so Shift+Left/Right steps the versions of
+        # whatever is on screen. The base path is remembered separately: once
+        # you have stepped onto a level, the file showing is no longer the key.
+        self._levels_by_path: dict[str, list[tuple]] = {}
+        self._level_base: str | None = None
+        self._level_index = 0
         # Following a generation still in flight: no media of its own, so the pane
         # that opened it feeds the frames and hands over the file that lands.
         self._live = media is None
@@ -107,6 +114,16 @@ class FullscreenPreview(QWidget):
         self._items = list(items)
         self._index = index
 
+    def set_levels(self, levels_by_path: dict) -> None:
+        """Arm Shift+Left/Right to step an image's enhancement levels.
+
+        ``levels_by_path`` maps the file the folder shows an image under to that
+        image's versions, newest first, as ``(path, media_type)``. Plain
+        Left/Right still pages the folder; the shifted pair moves within the one
+        image — its own axis, because a version is not a neighbor.
+        """
+        self._levels_by_path = {str(k): list(v) for k, v in levels_by_path.items()}
+
     def set_stroke(self, stroke) -> None:
         """Wire the shared OSR2 stroke keys and genau's drive panel in — so the
         device can run over a fullscreen image, which has no script."""
@@ -131,12 +148,13 @@ class FullscreenPreview(QWidget):
 
     def keyPressEvent(self, event):
         key = event.key()
+        shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
         if key == Qt.Key.Key_Escape:
             self.close()
         elif key == Qt.Key.Key_Left:
-            self._step(-1)
+            self._step_level(-1) if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
-            self._step(1)
+            self._step_level(1) if shifted else self._step(1)
         elif apply_stroke_key(self._stroke, key):
             self._stroke_panel.refresh()
         else:
@@ -153,8 +171,30 @@ class FullscreenPreview(QWidget):
             return
         self._live = False  # paged off a live generation: its frames stop landing here
         self._index = (self._index + delta) % len(self._items)
+        self._level_base = None  # a new image, so its own versions from the top
+        self._level_index = 0
         self._preview.show_media(*self._items[self._index])
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
+
+    def _step_level(self, delta: int) -> None:
+        """Step ``delta`` enhancement levels within the image on screen.
+
+        A no-op for an image with one version, and for a video — there is
+        nothing to compare it against, and silently doing nothing is better
+        than paging the folder when the shift was the whole point.
+        """
+        base = self._level_base
+        if base is None:
+            if not self._items:
+                return
+            base = str(self._items[self._index][0])
+        levels = self._levels_by_path.get(base) or []
+        if len(levels) <= 1:
+            return
+        self._live = False
+        self._level_base = base
+        self._level_index = (self._level_index + delta) % len(levels)
+        self._preview.show_media(*levels[self._level_index])
 
     def mouseDoubleClickEvent(self, event):
         self.close()  # a second double-click dismisses the fullscreen view

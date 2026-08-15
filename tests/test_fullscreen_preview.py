@@ -347,3 +347,60 @@ def test_the_shared_stroke_keys_work_here_too(qtbot, tmp_path):
     _press(win, Qt.Key.Key_Space)
     _press(win, Qt.Key.Key_J)
     assert stroke.calls == [("toggle", True), ("speed", -5)]
+
+
+# --- Shift+Left/Right: the versions of the image on screen -------------------
+
+def _shift(win, key):
+    win.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key,
+                                Qt.KeyboardModifier.ShiftModifier))
+
+
+def _plain(win, key):
+    win.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key,
+                                Qt.KeyboardModifier.NoModifier))
+
+
+def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
+    enhanced, original = tmp_path / "e1.png", tmp_path / "src.png"
+    for path in (enhanced, original):
+        _make_png(path)
+    win = FullscreenPreview((enhanced, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_levels({str(enhanced): [(enhanced, "image"), (original, "image")]})
+
+    _shift(win, Qt.Key.Key_Right)
+    assert win._preview._media[0] == original
+    # And back round: two versions wrap, so the pair is a toggle.
+    _shift(win, Qt.Key.Key_Right)
+    assert win._preview._media[0] == enhanced
+
+
+def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
+    lone = tmp_path / "only.png"
+    _make_png(lone)
+    win = FullscreenPreview((lone, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_levels({})
+
+    _shift(win, Qt.Key.Key_Right)
+
+    # Silently nothing, rather than paging the folder when the shift was the
+    # whole point of the press.
+    assert win._preview._media[0] == lone
+
+
+def test_paging_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_path):
+    first, second, second_base = (tmp_path / n for n in
+                                  ("a.png", "b.png", "b_base.png"))
+    for path in (first, second, second_base):
+        _make_png(path)
+    win = FullscreenPreview((first, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_playlist([(first, "image"), (second, "image")], 0)
+    win.set_levels({str(second): [(second, "image"), (second_base, "image")]})
+
+    _plain(win, Qt.Key.Key_Right)          # onto the second image
+    _shift(win, Qt.Key.Key_Right)          # its own versions, from the top
+
+    assert win._preview._media[0] == second_base

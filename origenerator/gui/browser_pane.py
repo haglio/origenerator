@@ -280,6 +280,7 @@ class BrowserPane:
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
+            enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -535,6 +536,7 @@ class BrowserPane:
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
                 enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
+                enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)

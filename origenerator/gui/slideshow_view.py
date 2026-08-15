@@ -30,9 +30,16 @@ class SlideshowView(QWidget):
     open_requested = pyqtSignal(str)
 
     def __init__(self, items, *, image_dwell_ms=None, shuffle=None, on_delete=None,
-                 player=None, stroke=None, pace=None, parent=None):
+                 on_enhance=None, player=None, stroke=None, pace=None, parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
+        # Holding a slide is also how you ask for it: Down enhances what is on
+        # screen if it hasn't already been made at the current settings, so the
+        # one you stopped on is the one that gets the better version. ``E``
+        # turns that off for the session, for when it is in the way.
+        self._on_enhance = on_enhance
+        self._enhance_on_hold = on_enhance is not None
+        self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
@@ -74,6 +81,19 @@ class SlideshowView(QWidget):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # A corner note while an enhancement of the slide on screen is being
+        # made, and again for a beat when the switch is flipped — the only way
+        # to tell, in a view with no panels, that a press did anything.
+        self._note = QLabel(self)
+        self._note.setStyleSheet(
+            "color: white; background: rgba(0, 0, 0, 160);"
+            " padding: 6px 12px; border-radius: 4px;"
+        )
+        self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._note.hide()
+        self._note_timer = QTimer(self)
+        self._note_timer.setSingleShot(True)
+        self._note_timer.timeout.connect(self._refresh_note)
         self._stroke_panel = StrokePanel(stroke, self, host=self) if stroke is not None else None
 
         self._timer = QTimer(self)
@@ -94,6 +114,7 @@ class SlideshowView(QWidget):
         self._preview.show_media(path, media_type)
         self._update_counter()
         self._update_neighbors()
+        self._refresh_note()  # the corner belongs to whatever is on screen now
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
@@ -142,7 +163,7 @@ class SlideshowView(QWidget):
         self._advance() if delta > 0 else self._back()
 
     def stroke_toggle_hold(self) -> None:
-        self._toggle_pause()
+        self._hold_current()
 
     def stroke_cull(self) -> None:
         self._delete_current()
@@ -162,12 +183,89 @@ class SlideshowView(QWidget):
         if not self._playlist.paused:
             self._advance()
 
-    def _toggle_pause(self):
+    def _hold_current(self):
+        """Down: hold the slide, and ask for it to be enhanced.
+
+        Stopping on a picture is the gesture that says you want it, so it is
+        also the one that asks for the better version — nothing extra to press,
+        and the run happens while you keep looking at it. Releasing the hold
+        asks for nothing; only stopping does.
+        """
+        held = self._toggle_pause()
+        if held:
+            self._enhance_current()
+
+    def _toggle_enhance_on_hold(self):
+        """E: stop (or resume) holding a slide meaning "enhance this"."""
+        if self._on_enhance is None:
+            return
+        self._enhance_on_hold = not self._enhance_on_hold
+        self._flash_note(
+            "Enhance on hold: on" if self._enhance_on_hold else "Enhance on hold: off"
+        )
+
+    def _enhance_current(self):
+        """Ask the gallery to enhance the slide on screen, if it wants one.
+
+        The gallery decides whether it does — it holds the settings, and it is
+        the one that knows whether this image already carries a version made at
+        exactly them. ``True`` back means a run started, and the corner says so
+        until the finished version arrives.
+        """
+        if self._on_enhance is None or not self._enhance_on_hold:
+            return
+        item = self._playlist.current()
+        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        if prompt_id is None or prompt_id in self._enhancing:
+            return
+        if self._on_enhance(prompt_id):
+            self._enhancing.add(prompt_id)
+            self._refresh_note()
+
+    def note_enhanced(self, prompt_id: str, path, media_type: str = "image") -> None:
+        """An enhancement this view asked for landed: show it in place.
+
+        The slide is replaced only while it is still the one on screen — pages
+        on, and the new version is simply what the folder holds next time round.
+        """
+        self._enhancing.discard(prompt_id)
+        replaced = self._playlist.replace_current(path, prompt_id)
+        if replaced:
+            self._preview.show_media(path, media_type)
+        self._refresh_note()
+
+    def _refresh_note(self):
+        """Show "Enhancing…" while the slide on screen has a run in flight."""
+        item = self._playlist.current()
+        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        if prompt_id is not None and prompt_id in self._enhancing:
+            self._note.setText("Enhancing…")
+            self._note.show()
+            self._reposition_note()
+        else:
+            self._note.hide()
+
+    def _flash_note(self, text: str, ms: int = 1500):
+        """Say something in the corner for a moment, then fall back to whatever
+        the corner would otherwise be saying."""
+        self._note.setText(text)
+        self._note.show()
+        self._reposition_note()
+        self._note_timer.start(ms)
+
+    def _reposition_note(self):
+        self._note.adjustSize()
+        self._note.move(24, 24)
+        self._note.raise_()
+
+    def _toggle_pause(self) -> bool:
+        """Flip the hold; returns whether the slide is now held."""
         if self._playlist.toggle_pause():
             self._timer.stop()  # hold on the current item
             self._update_counter()
-        else:
-            self._show_current()  # resume, re-arming the dwell timer
+            return True
+        self._show_current()  # resume, re-arming the dwell timer
+        return False
 
     def _open_current(self):
         """Enter: leave the slideshow and hand its item to the gallery, which
@@ -231,7 +329,9 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
-            self._toggle_pause()    # hold on the current item
+            self._hold_current()    # hold on the current item, and enhance it
+        elif key == Qt.Key.Key_E:
+            self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_stroke_key(self._stroke, key):
@@ -245,6 +345,7 @@ class SlideshowView(QWidget):
         super().resizeEvent(event)
         self._reposition_counter()
         self._reposition_neighbors()
+        self._reposition_note()
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
 

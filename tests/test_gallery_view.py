@@ -10,6 +10,7 @@ from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
 from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 
 from origenerator import gallery
+from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
@@ -685,6 +686,29 @@ def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
 
     view.set_experiments_enabled(True)
 
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
+
+
+def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
+    # Scheduling an absence is the live install's alone. A preview instance
+    # shares the same ComfyUI, so a batch queued as it closes outlives it as
+    # work the live app can neither see nor cancel — and the user's next
+    # Generate waits behind jobs "from another app" that were his own preview's.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db, client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.set_experiments_enabled(True)  # the switch a seeded session restores
+
+    assert view.experiments_enabled() is False   # forced off, however it was saved
+    assert not view._experiments_cb.isEnabled()  # greyed, with the reason beneath
+    assert "live app" in view._experiments_status.text()
+
+    view._experiments_cb.setChecked(True)  # and the gate holds even forced on
+
+    assert view.queue_experiments_for_absence() == 0
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 

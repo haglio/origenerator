@@ -5,6 +5,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 
 from origenerator import gallery
 from origenerator.app_state import AppState
+from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.main_window import OrigeneratorWindow
@@ -194,6 +195,26 @@ def test_closing_with_the_switch_off_queues_nothing(qtbot, tmp_path):
     assert client.submitted == []
 
 
+def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
+    # A preview's batch would outlive it in the shared ComfyUI as work the live
+    # app can neither see nor cancel — every Generate after it waits behind jobs
+    # "from another app" that were the user's own preview. Only the live install
+    # schedules an absence.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    db = Database(tmp_path / "t.db")
+    _completed_image(db)
+    client = _QueueSpyClient()
+    state = AppState(tmp_path / "ui.json")
+    state.set("experiments_enabled", True)  # seeded on from the live install
+    win = OrigeneratorWindow(client, db, state)
+    qtbot.addWidget(win)
+
+    win.close()
+
+    assert client.submitted == []
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
+
+
 def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_path):
     # Experiments belong to the closed app: whatever ComfyUI hadn't got through
     # is dropped as the window opens, so the GPU is the user's from the start.
@@ -213,6 +234,29 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     assert client.interrupts == 1  # it was mid-render — dequeuing alone wouldn't stop it
     assert db.get_generation("exp-1") is None
     assert win._gallery_view._reroll_jobs == {}  # and it is not adopted as a live job
+
+
+def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
+    # The other half of leaving experiments to the live install: a preview's
+    # database is a copy of the live one, so the rows it would "clear" are the
+    # live app's own experiments, running in the ComfyUI they share — dropping
+    # them (and interrupting the one mid-render) destroys the absence's work.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
+        workflow_json="{}", source="experiment",
+    )
+    db.update_generation("exp-1", status="running")
+    client = _QueueSpyClient(running=["exp-1"])
+
+    win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+
+    assert client.canceled == []
+    assert client.interrupts == 0
+    assert db.get_generation("exp-1") is not None
 
 
 def test_opening_with_unreviewed_experiments_presents_the_shelf(qtbot, tmp_path):

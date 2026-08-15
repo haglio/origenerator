@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
 from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
+from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
@@ -476,6 +477,9 @@ class GalleryView(QWidget):
         # filter, and appears only while that shelf is open.
         self._experiments_cb = CheckBox("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
+        # Scheduling an absence is the live install's alone, so a branch session
+        # can't reach the switch (see queue_experiments_for_absence).
+        self._experiments_cb.setEnabled(not is_branch_session())
         self._experiments_status = QLabel("")
         self._experiments_status.setObjectName("estimateLabel")
         self._experiments_bar = QWidget()
@@ -843,8 +847,10 @@ class GalleryView(QWidget):
         return self._experiments_cb.isChecked()
 
     def set_experiments_enabled(self, enabled):
-        """Restore the background experimenter's switch from a saved session."""
-        self._experiments_cb.setChecked(bool(enabled))
+        """Restore the background experimenter's switch from a saved session —
+        off in a branch session whatever was saved, since a branch session's
+        state is seeded from the live install's, switch position included."""
+        self._experiments_cb.setChecked(bool(enabled) and not is_branch_session())
 
     def queue_experiments_for_absence(self) -> int:
         """Hand ComfyUI a batch of experiments to run while the app is closed.
@@ -853,7 +859,18 @@ class GalleryView(QWidget):
         ComfyUI outlives the app and works through the batch alone, and the next
         launch finalizes what finished onto the Experiments shelf. A no-op with
         the switch off. Returns how many were queued.
+
+        Only the live install schedules an absence. A branch preview shares the
+        one ComfyUI, and its batch outlives it there as work no app can account
+        for: the live session cancels only the experiments its own database
+        records, so a preview's survive every launch, and each Generate after
+        them waits behind jobs "from another app" that were the user's own
+        preview. The GPU while Origenerator is closed belongs to the install
+        that is actually closed.
         """
+        if is_branch_session():
+            logger.info("Branch session: experiments left to the live app")
+            return 0
         if not self.experiments_enabled():
             return 0
         return queue_experiments(
@@ -875,6 +892,10 @@ class GalleryView(QWidget):
 
     def _sync_experiments_bar(self):
         """Say what the switch's current position means, under the switch."""
+        if is_branch_session():
+            self._experiments_status.setText(
+                "Off — a branch preview never queues experiments; that's the live app's")
+            return
         self._experiments_status.setText(
             "On — variations run after you close the app and land here for review"
             if self.experiments_enabled() else "Off — the GPU stays all yours"

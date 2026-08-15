@@ -11,6 +11,12 @@ backfills, the reconciles, the trash sweep — are the live app's job alone, so 
 branch session skips them (``origenerator.app.main`` gates on
 :func:`is_branch_session`).
 
+The same line divides what a preview may do to the *shared ComfyUI*: it
+generates on demand like any session, but it never schedules background
+experiments for the coming absence (``GalleryView.queue_experiments_for_absence``
+gates on the flag too). Those outlive the preview in a queue only the app that
+queued them can cancel, so they run on against a live app that can't see them.
+
 ``ORIGENERATOR_BRANCH_SESSION=1`` in the environment is what marks one; the
 preview launcher sets it, and the primary's launcher never does.
 """

@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QMainWindow
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 
 from origenerator.app_state import AppState
+from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
@@ -56,8 +57,12 @@ class OrigeneratorWindow(QMainWindow):
         self._restore_session()
         # Background experiments belong to the closed app, so the ones the last
         # absence left in ComfyUI's queue are dropped before anything is adopted:
-        # an open app never has one competing for the GPU.
-        cancel_experiments(db, client)
+        # an open app never has one competing for the GPU. The live install's
+        # alone, both ends of it — a branch session's database is a copy of the
+        # live one, so the rows it would clear are the live app's experiments
+        # running in the ComfyUI they share.
+        if not is_branch_session():
+            cancel_experiments(db, client)
         # Reconnect to any generation left running by the previous session. A tab's
         # Generate is itself a re-roll, so every in-flight row is the gallery's to
         # re-adopt — the tabs restore their configs only, owning no jobs.

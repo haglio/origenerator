@@ -268,13 +268,24 @@ def test_the_tab_row_buttons_open_the_row_and_the_tabs_follow(tabs):
     assert tabs._corner.geometry() == before
 
 
-def test_the_tab_row_buttons_stand_exactly_as_tall_as_the_row(tabs):
-    # Taller than the tabs, they hung below the strip into the pane underneath.
+def test_the_tab_row_buttons_cover_the_row_top_to_bottom(tabs):
+    # Shorter than the tabs and centred, they sat a pixel above them; taller and
+    # uncentred, they hung below the strip into the pane underneath. The row they
+    # occupy has to span the tabs' own band exactly.
     _laid_out(tabs)
-    row_height = tabs.tabBar().sizeHint().height()
-    assert tabs._corner.height() == row_height
-    assert tabs._add_btn.height() == row_height
-    assert tabs._close_all_btn.height() == row_height
+    bar = tabs.tabBar()
+    top, bottom = bar.y(), bar.y() + bar.height()
+    corner = tabs._corner.geometry()
+    assert corner.top() <= top and corner.bottom() >= bottom - 1
+    assert tabs._add_btn.height() == corner.height()
+    assert tabs._close_all_btn.height() == corner.height()
+
+
+def test_the_first_tab_is_spaced_off_the_buttons(tabs):
+    # The two buttons sit apart from each other, so the tabs must not be jammed
+    # against the second one.
+    _laid_out(tabs)
+    assert tabs.tabBar().x() - tabs._close_all_btn.geometry().right() >= 8
 
 
 def test_the_tabs_never_run_under_the_buttons(tabs):

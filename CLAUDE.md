@@ -31,12 +31,23 @@ runs THAT worktree's code as its own app instance: the primary checkout's venv,
 the worktree's own `state/`, and `ORIGENERATOR_BRANCH_SESSION=1` — under which
 the app seeds its database from the primary install's and skips the library
 maintenance only the live app should do (see `origenerator/branch_session.py`).
-Two things to tell the user when handing one over: copy the primary's
-`content.local.json` into the worktree root first (else the session comes up on
-the example overlay and finds no library), and close the live app first (two
-instances contend for ComfyUI). Generations made in a branch session are not
-lost to it: the live app's next launch adopts them out of the worktree's
-database as first-class rows (`branch_session.adopt_branch_rows`).
+Two things to do before handing one over: **re-copy the primary's
+`content.local.json` into the worktree root every time**, and tell the user to
+close the live app first (two instances contend for ComfyUI). Generations made
+in a branch session are not lost to it: the live app's next launch adopts them
+out of the worktree's database as first-class rows
+(`branch_session.adopt_branch_rows`).
+
+Re-copy, not copy-once. The overlay is where `project_roots` lives, and
+`seed_branch_db` finds the primary database through it — so a worktree carrying
+a copy taken weeks ago, from before a root moved or a key was added, resolves a
+primary that isn't there, **returns False without raising, and logs nothing at
+all**. The session then comes up on an empty database with no library: no seed
+line in `state/origenerator.log`, a ~36 KB `state/origenerator.db`, and a
+gallery showing nothing. That is the signature — if a preview has no content,
+diff the two `content.local.json` files before looking anywhere else. Renaming
+the branch database aside to force a fresh seed does nothing while the overlay
+is stale, because the seed was never the part that failed.
 
 The preview is part of delivering any user-facing change, not an extra: the
 user judges mergability by clicking through the real app, and skipping the

@@ -131,3 +131,65 @@ def test_another_apps_hold_wins_over_this_apps_own_count(bar):
         _item(key="b", status="queued"),
     ])
     assert bar._queued.text() == "Waiting behind 4 jobs from another app"
+
+
+# --- somebody else's queue, seen before Generate rather than after -----------
+
+def test_an_idle_bar_names_the_queue_another_app_is_holding(bar):
+    # The reported bug: the queue looked free right up until Generate, which then
+    # reported six jobs ahead of it out of nowhere. Idle no longer means free.
+    bar.set_items([], foreign_queued=6)
+    assert bar._caption.text() == "6 jobs from another app are queued on ComfyUI"
+    assert bar._clear.isVisible()
+    assert not bar._progress.isVisible()  # nothing of ours is running
+    assert not bar._cancel.isVisible()    # and nothing of ours to cancel
+
+
+def test_one_foreign_job_reads_in_the_singular(bar):
+    bar.set_items([], foreign_queued=1)
+    assert bar._caption.text() == "1 job from another app is queued on ComfyUI"
+
+
+def test_a_truly_empty_queue_still_blanks(bar):
+    bar.set_items([], foreign_queued=0)
+    assert bar._caption.text() == ""
+    assert not bar._clear.isVisible()
+
+
+def test_clear_is_offered_beside_a_running_job_too(bar):
+    # Their backlog is worth wiping whether or not it is ahead of ours, so the
+    # button rides on there being any — and says how much, since the caption
+    # beside it is the user's own job's title.
+    bar.set_items([_item(caption="my job")], foreign_queued=2)
+    assert bar._clear.isVisible()
+    assert "2 jobs" in bar._clear.toolTip()
+    assert bar._caption.text() == "my job"  # still the user's job on show
+
+
+def test_no_clear_button_when_the_whole_queue_is_ours(bar):
+    bar.set_items([_item(), _item(key="b", status="queued")])
+    assert not bar._clear.isVisible()
+
+
+def test_clear_button_asks_the_gallery_to_wipe_the_queue(bar):
+    asked = []
+    bar.clear_queue_requested.connect(lambda: asked.append(True))
+    bar.set_items([], foreign_queued=3)
+    bar._clear.click()
+    assert asked == [True]
+
+
+def test_a_cleared_queue_returns_the_bar_to_blank(bar):
+    bar.set_items([], foreign_queued=3)
+    bar.set_items([], foreign_queued=0)
+    assert bar._caption.text() == ""
+    assert not bar._clear.isVisible()
+
+
+def test_the_foreign_line_keeps_the_same_footprint(bar):
+    # Same reason the idle bar holds its slot: naming another app's queue must
+    # not shove the panes above it.
+    bar.set_items([])
+    idle = bar.sizeHint().height()
+    bar.set_items([], foreign_queued=6)
+    assert bar.sizeHint().height() == idle

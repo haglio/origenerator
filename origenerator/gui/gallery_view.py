@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
 from origenerator.branch_session import is_branch_session
-from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
     AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
@@ -211,6 +211,9 @@ class GalleryView(QWidget):
         self._history = NavigationHistory()  # back/forward across viewed locations
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
+        # What another app has on the shared ComfyUI, re-read on every poll so the
+        # bottom bar can say the server is busy before a Generate goes in behind it.
+        self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
         self._sync_undo_button()
         self._sync_nav_buttons()
@@ -576,6 +579,7 @@ class GalleryView(QWidget):
         # runs them one at a time), reachable from any folder or config tab. Hidden
         # until something runs; fed on every rebuild and poll.
         self._running_bar = RunningJobBar()
+        self._running_bar.clear_queue_requested.connect(self._clear_foreign_queue)
         layout.addWidget(self._running_bar)
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
@@ -1047,6 +1051,7 @@ class GalleryView(QWidget):
             # started, so that wait shows a number instead of an unmoving bar
             # (see GenerationJob.refresh_backlog).
             job.refresh_backlog()
+        self._refresh_foreign_queue()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)
@@ -2286,9 +2291,70 @@ class GalleryView(QWidget):
         return self._browser._inflight_items()
 
     def _update_running_bar(self):
-        """Feed the bottom bar the in-flight jobs (running first), so the active
-        generation shows from anywhere — the bar hides itself when nothing runs."""
-        self._running_bar.set_items(self._inflight_items())
+        """Feed the bottom bar the in-flight jobs (running first) plus whatever
+        another app has on ComfyUI, so the active generation shows from anywhere
+        and a queue that isn't ours is visible before Generate, not after."""
+        self._running_bar.set_items(self._inflight_items(), self._foreign_queue.total)
+
+    def _refresh_foreign_queue(self):
+        """Re-read what another app has on the shared ComfyUI.
+
+        Read whether or not anything of ours is in flight: the point is to see a
+        queue full of somebody else's work *before* pressing Generate, instead of
+        learning about it from a submit that reports six jobs ahead of it out of
+        nowhere. ComfyUI outlives every app that queues on it, so that backlog can
+        be a branch preview's background experiments that outlived the preview.
+        """
+        if self._client is None:
+            return
+        try:
+            self._foreign_queue = self._client.foreign_queue()
+        except Exception as e:
+            # Unreadable (server down, wedged, restarting): claim nothing rather
+            # than leave a stale count on screen offering to clear a queue we
+            # can no longer see.
+            logger.debug("Could not read ComfyUI's queue: %s", e)
+            self._foreign_queue = ForeignQueue(running=[], pending=[])
+
+    def _clear_foreign_queue(self):
+        """Wipe another app's work off ComfyUI, on the user's say-so.
+
+        The shared server accumulates jobs no window here can account for — a
+        branch preview's absence experiments outlive the preview that queued
+        them, and the live app cancels only the experiments its own database
+        records — so until now they could only be waited out. Only theirs go: the
+        user's own queue is what they asked for, and each of those has its own ✕.
+        """
+        if self._client is None:
+            return
+        total = self._foreign_queue.total
+        if not total or not self._confirm_clear_queue(total):
+            return
+        try:
+            dropped = self._client.clear_foreign_queue()
+        except Exception as e:
+            logger.exception("Failed to clear ComfyUI's queue")
+            QMessageBox.warning(
+                self, "Could not clear the queue",
+                f"ComfyUI would not drop the other app's jobs:\n\n{e}",
+            )
+            return
+        logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)
+        self._refresh_foreign_queue()
+        self._update_running_bar()  # the bar goes blank now rather than a poll later
+
+    def _confirm_clear_queue(self, total: int) -> bool:
+        """Ask before dropping it: the jobs are somebody's work, and one of them
+        may be part-rendered. Spelled out, since the button sits beside a caption
+        that is often the user's own running job."""
+        reply = QMessageBox.question(
+            self, "Clear ComfyUI's queue",
+            f"Drop the {total} job{'' if total == 1 else 's'} another app has"
+            " queued on ComfyUI?\n\nAnything you queued from here is left alone;"
+            " one of theirs already running is interrupted.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
 
     # --- session persistence ----------------------------------------------
 

@@ -229,6 +229,129 @@ def test_an_entry_with_no_client_id_counts_as_someone_elses():
         assert client.foreign_backlog("ours") == 1
 
 
+# --- the whole of somebody else's queue: seeing it, and wiping it -----------
+
+
+def test_foreign_queue_separates_theirs_running_from_theirs_pending():
+    # Split because they're cleared differently: pending ones are deleted out of
+    # the queue, the executing one can only be interrupted.
+    client, urlopen = _queue_client({
+        "queue_running": [_entry(0, "theirs-running", "some-other-app")],
+        "queue_pending": [_entry(1, "theirs-next", "some-other-app"),
+                          _entry(2, "ours", "ours-client"),
+                          _entry(3, "theirs-later", "some-other-app")],
+    })
+    with urlopen:
+        foreign = client.foreign_queue()
+
+    assert foreign.running == ["theirs-running"]
+    assert foreign.pending == ["theirs-next", "theirs-later"]  # never "ours"
+    assert foreign.total == 3
+
+
+def test_foreign_queue_is_empty_when_the_queue_is_all_ours():
+    client, urlopen = _queue_client({
+        "queue_running": [_entry(0, "mine-running", "ours-client")],
+        "queue_pending": [_entry(1, "mine-next", "ours-client")],
+    })
+    with urlopen:
+        assert client.foreign_queue().total == 0
+
+
+def test_clear_foreign_queue_drops_theirs_and_interrupts_the_one_running():
+    # The reported mess: a batch of background experiments from a branch preview
+    # sitting on the shared server, in nobody's ledger, in the way of every
+    # Generate. Deleting the pending ones alone would leave the one mid-render
+    # holding the GPU, so what's executing is stopped too.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host, client.port, client.client_id = "127.0.0.1", 8188, "ours-client"
+    queue = {
+        "queue_running": [_entry(0, "theirs-running", "some-other-app")],
+        "queue_pending": [_entry(1, "theirs-a", "some-other-app"),
+                          _entry(2, "ours", "ours-client"),
+                          _entry(3, "theirs-b", "some-other-app")],
+    }
+    posted = []
+
+    def fake_urlopen(req, **kwargs):
+        # A body — even the empty one /interrupt posts — marks a write, not a read.
+        if not isinstance(req, str) and req.data is not None:
+            posted.append((req.full_url, req.data))
+            return _mock_response(200, b"{}")
+        return _mock_response(200, json.dumps(queue).encode())
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        dropped = client.clear_foreign_queue()
+
+    assert dropped == 3  # two pending of theirs, plus the one they had running
+    deletes = [json.loads(d) for u, d in posted if u.endswith("/queue")]
+    assert deletes == [{"delete": ["theirs-a", "theirs-b"]}]  # one call, never "ours"
+    assert [u for u, _ in posted if u.endswith("/interrupt")]
+
+
+def test_clear_foreign_queue_leaves_our_own_running_job_alone():
+    # /interrupt stops whatever is executing right now, so between reading the
+    # queue and calling it their job can have finished and ours have started.
+    # Re-reading first is what keeps a clear from killing the user's own run.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host, client.port, client.client_id = "127.0.0.1", 8188, "ours-client"
+    states = [
+        {"queue_running": [_entry(0, "theirs-running", "some-other-app")],
+         "queue_pending": [_entry(1, "theirs-a", "some-other-app")]},
+        {"queue_running": [_entry(2, "ours", "ours-client")], "queue_pending": []},
+    ]
+    posted = []
+
+    def fake_urlopen(req, **kwargs):
+        if not isinstance(req, str) and req.data is not None:
+            posted.append(req.full_url)
+            return _mock_response(200, b"{}")
+        state = states.pop(0) if len(states) > 1 else states[0]
+        return _mock_response(200, json.dumps(state).encode())
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        dropped = client.clear_foreign_queue()
+
+    assert dropped == 1  # only the pending one they had; nothing was interrupted
+    assert not [u for u in posted if u.endswith("/interrupt")]
+
+
+def test_clear_foreign_queue_touches_nothing_when_the_queue_is_all_ours():
+    client, urlopen = _queue_client({
+        "queue_running": [_entry(0, "mine", "ours-client")],
+        "queue_pending": [_entry(1, "mine-next", "ours-client")],
+    })
+    with urlopen as m:
+        assert client.clear_foreign_queue() == 0
+    assert not [c for c in m.call_args_list if getattr(c[0][0], "data", None)]
+
+
+def test_cancel_prompts_deletes_a_whole_backlog_in_one_call():
+    # One round trip, not one per job — the caller is the GUI thread and the
+    # backlog can be another app's whole batch.
+    client = ComfyUIClient.__new__(ComfyUIClient)
+    client.host, client.port = "127.0.0.1", 8188
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
+        client.cancel_prompts(["a", "b", "c"])
+
+    assert m.call_count == 1
+    assert json.loads(m.call_args[0][0].data) == {"delete": ["a", "b", "c"]}
+
+
+def test_queue_reads_on_the_poll_path_use_the_short_timeout():
+    # These run on the GUI thread every couple of seconds. Under the generous
+    # _HTTP_TIMEOUT_S a wedged server would freeze the window half a minute at a
+    # time; the shorter deadline costs a skipped reading instead.
+    from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
+
+    assert _POLL_TIMEOUT_S < _HTTP_TIMEOUT_S
+    client, urlopen = _queue_client({"queue_running": [], "queue_pending": []})
+    for call in (client.foreign_queue, lambda: client.foreign_backlog("x")):
+        with urlopen as m:
+            call()
+        assert m.call_args.kwargs.get("timeout") == _POLL_TIMEOUT_S
+
+
 def test_parse_ws_executing_none_signals_completion():
     client = ComfyUIClient.__new__(ComfyUIClient)
     messages = []

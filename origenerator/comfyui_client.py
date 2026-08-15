@@ -5,6 +5,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from typing import NamedTuple
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -23,6 +24,29 @@ _PREVIEW_IMAGE_OFFSET = 8
 # answering can legitimately take a while; it's a socket-inactivity limit, not a
 # total-transfer one, so even a large /view download streams fine under it.
 _HTTP_TIMEOUT_S = 30.0
+
+# Queue reads the GUI repeats on its poll timer get a much tighter deadline. They
+# run on the GUI thread every couple of seconds, so a wedged server under the
+# generous limit above would freeze the window for half a minute at a time; under
+# this one it costs a skipped reading.
+_POLL_TIMEOUT_S = 2.0
+
+
+class ForeignQueue(NamedTuple):
+    """What clients other than this one have on ComfyUI's queue right now.
+
+    ``running`` is what ComfyUI is executing for them (at most one), ``pending``
+    what waits behind it. Split because they're cleared differently: a pending
+    prompt is deleted out of the queue, while the executing one can only be
+    interrupted.
+    """
+
+    running: list[str]
+    pending: list[str]
+
+    @property
+    def total(self) -> int:
+        return len(self.running) + len(self.pending)
 
 
 def format_prompt_error(body: str) -> str:
@@ -267,7 +291,16 @@ class ComfyUIClient(QThread):
 
     def cancel_prompt(self, prompt_id: str):
         """Remove a still-queued prompt so it never starts executing."""
-        body = json.dumps({"delete": [prompt_id]}).encode()
+        self.cancel_prompts([prompt_id])
+
+    def cancel_prompts(self, prompt_ids):
+        """Remove several still-queued prompts at once.
+
+        ``/queue`` takes a list, so clearing a backlog is one round trip rather
+        than one per job — which matters when the caller is the GUI thread and
+        the backlog is a whole batch of another app's experiments.
+        """
+        body = json.dumps({"delete": list(prompt_ids)}).encode()
         req = urllib.request.Request(
             f"{self.base_url}/queue",
             data=body,
@@ -329,7 +362,7 @@ class ComfyUIClient(QThread):
         can neither see here nor cancel. ``None`` when the prompt isn't queued at
         all: ComfyUI is executing it already, or it has left the queue.
         """
-        data = self._fetch_queue_data()
+        data = self._fetch_queue_data(timeout=_POLL_TIMEOUT_S)
         pending = data.get("queue_pending", [])
         mine = next((it for it in pending if _queue_prompt_id(it) == prompt_id), None)
         if mine is None:
@@ -347,6 +380,53 @@ class ComfyUIClient(QThread):
             ]
         return sum(1 for it in ahead if _queue_client_id(it) != self.client_id)
 
+    def foreign_queue(self) -> ForeignQueue:
+        """Everything on ComfyUI's queue that this app did not submit.
+
+        ComfyUI is a shared server that outlives whatever queued on it, so its
+        queue can be full of work no window here accounts for — another
+        Origenerator instance, a branch preview whose background experiments
+        outlived it, another app entirely. Until it's read, the first sign of it
+        is a fresh Generate landing behind a pile of jobs the user never asked
+        for. Reading it lets a surface say so beforehand, and
+        :meth:`clear_foreign_queue` is what gets rid of it.
+        """
+        data = self._fetch_queue_data(timeout=_POLL_TIMEOUT_S)
+        return ForeignQueue(running=self._their_ids(data, "queue_running"),
+                            pending=self._their_ids(data, "queue_pending"))
+
+    def clear_foreign_queue(self) -> int:
+        """Drop another app's work off ComfyUI, and report how much went.
+
+        This app's own jobs are never touched: those are what the user asked
+        for, and they're visible and cancellable here already. Pending ones go
+        by deletion; one already executing can only be stopped by ``/interrupt``,
+        which stops whatever is running *now* — so what's executing is re-read
+        after the deletion and interrupted only if it's still one of theirs,
+        rather than a job of ours that has since started.
+        """
+        foreign = self.foreign_queue()
+        if not foreign.total:
+            return 0
+        if foreign.pending:
+            self.cancel_prompts(foreign.pending)
+        theirs_still_running = self.fetch_running() & set(foreign.running)
+        if theirs_still_running:
+            self.interrupt()
+        return len(foreign.pending) + len(theirs_still_running)
+
+    def _their_ids(self, data: dict, section: str) -> list[str]:
+        """The prompt ids in a ``/queue`` section some other client submitted.
+
+        We only ever recognize our own id, so an entry with none — a client that
+        didn't identify itself — counts as someone else's rather than ours.
+        """
+        return [
+            pid for item in data.get(section, [])
+            if (pid := _queue_prompt_id(item)) is not None
+            and _queue_client_id(item) != self.client_id
+        ]
+
     def _queue_ids(self, *sections: str) -> set[str]:
         """The prompt ids in the named ``/queue`` sections."""
         data = self._fetch_queue_data()
@@ -355,11 +435,12 @@ class ComfyUIClient(QThread):
             if (pid := _queue_prompt_id(item)) is not None
         }
 
-    def _fetch_queue_data(self) -> dict:
+    def _fetch_queue_data(self, timeout: float = _HTTP_TIMEOUT_S) -> dict:
         """``/queue`` as ``{queue_running: [...], queue_pending: [...]}``, each
-        entry a tuple of ``(number, prompt_id, prompt, ...)``."""
+        entry a tuple of ``(number, prompt_id, prompt, ...)``. Callers that read
+        it on the GUI's poll timer pass the shorter ``_POLL_TIMEOUT_S``."""
         url = f"{self.base_url}/queue"
-        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
             return json.loads(resp.read())
 
     def fetch_output_file(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:

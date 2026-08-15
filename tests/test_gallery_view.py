@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 
 from origenerator import gallery
 from origenerator.branch_session import ENV_FLAG
-from origenerator.comfyui_client import ComfyUIClient
+from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
@@ -5837,3 +5837,138 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
 
     assert view._selection_group is not None
     assert len(view.visible_folder_keys()) == 2
+
+
+# --- somebody else's queue on the shared ComfyUI ----------------------------
+
+class _QueueClient(ComfyUIClient):
+    """A client whose ComfyUI queue holds ``foreign`` jobs of another app's."""
+
+    def __init__(self, foreign=ForeignQueue(running=[], pending=[]), fail=None):
+        super().__init__()
+        self._foreign = foreign
+        self._fail = fail
+        self.cleared = 0
+
+    def foreign_queue(self):
+        return self._foreign
+
+    def clear_foreign_queue(self):
+        if self._fail is not None:
+            raise self._fail
+        self.cleared += 1
+        return self._foreign.total
+
+
+def _queue_view(qtbot, client):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    return view
+
+
+def test_the_bar_names_another_apps_queue_before_generate_is_pressed(qtbot):
+    # The reported bug: the queue read as free, then Generate reported six jobs
+    # ahead of it out of nowhere. Polling the server's own queue is what lets the
+    # bar say so while nothing of ours is in flight at all.
+    client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
+    view = _queue_view(qtbot, client)
+
+    view._poll()
+
+    assert view._running_bar._caption.text() == (
+        "3 jobs from another app are queued on ComfyUI")
+    assert not view._running_bar._clear.isHidden()
+
+
+def test_a_queue_of_our_own_leaves_the_bar_as_it_was(qtbot):
+    view = _queue_view(qtbot, _QueueClient())
+
+    view._poll()
+
+    assert view._running_bar._caption.text() == ""
+    assert view._running_bar._clear.isHidden()
+
+
+def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
+    # ComfyUI restarting mid-poll must not leave a count on screen offering to
+    # clear a queue the app can no longer see.
+    class Wedged(_QueueClient):
+        def foreign_queue(self):
+            raise OSError("connection refused")
+
+    view = _queue_view(qtbot, _QueueClient(ForeignQueue(running=[], pending=["a"])))
+    view._poll()
+    assert not view._running_bar._clear.isHidden()
+
+    view._client = Wedged()
+    view._poll()
+
+    assert view._foreign_queue.total == 0
+    assert view._running_bar._clear.isHidden()
+
+
+def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot):
+    # What the user asked for: a way out from under a queue he didn't fill,
+    # instead of waiting out a batch no window here can account for.
+    client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    view._confirm_clear_queue = lambda total: True
+
+    view._running_bar._clear.click()
+
+    assert client.cleared == 1
+
+
+def test_clearing_can_be_declined_at_the_prompt(qtbot):
+    client = _QueueClient(ForeignQueue(running=[], pending=["a"]))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    view._confirm_clear_queue = lambda total: False  # user says no
+
+    view._running_bar._clear.click()
+
+    assert client.cleared == 0
+
+
+def test_the_prompt_says_how_many_jobs_go(qtbot):
+    client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    asked = []
+    view._confirm_clear_queue = lambda total: asked.append(total) or False
+
+    view._running_bar._clear.click()
+
+    assert asked == [3]
+
+
+def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, monkeypatch):
+    client = _QueueClient(ForeignQueue(running=[], pending=["a"]),
+                          fail=OSError("ComfyUI is not responding"))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    view._confirm_clear_queue = lambda total: True
+    warned = []
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMessageBox.warning",
+        lambda *a, **k: warned.append(a),
+    )
+
+    view._running_bar._clear.click()  # must not raise
+
+    assert warned
+
+
+def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
+    client = _QueueClient(ForeignQueue(running=[], pending=["a", "b"]))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    view._confirm_clear_queue = lambda total: True
+
+    client._foreign = ForeignQueue(running=[], pending=[])  # the clear empties it
+    view._running_bar._clear.click()
+
+    assert view._running_bar._caption.text() == ""
+    assert view._running_bar._clear.isHidden()

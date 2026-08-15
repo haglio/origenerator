@@ -14,6 +14,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui import param_sections
+from origenerator.gui.param_help import param_help
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
@@ -189,12 +190,25 @@ class ParamForm(QWidget):
     def _add_row(self, key: str, label: str, field):
         """Insert one row (a field cell or a read-only value) into its section at
         the canonical position among the rows already there. ``field`` is a
-        ``QWidget`` or a ``QLayout`` (a field paired with its trailing controls)."""
+        ``QWidget`` or a ``QLayout`` (a field paired with its trailing controls).
+
+        The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
+        as well as its input: the label is what you are looking at when you
+        wonder what a setting is, and hovering the word is the natural move."""
         title = param_sections.section_title(key)
         keys = self._present_keys[title]
         index = self._insert_index(keys, key)
-        self._sections[title].content_form().insertRow(index, label, field)
+        form = self._sections[title].content_form()
+        form.insertRow(index, label, field)
         keys.insert(index, key)
+        help_text = param_help(key)
+        if help_text:
+            label_widget = form.itemAt(index, form.ItemRole.LabelRole)
+            if label_widget is not None and label_widget.widget() is not None:
+                label_widget.widget().setToolTip(help_text)
+            widget = self._widgets.get(key)
+            if widget is not None:
+                widget.setToolTip(help_text)
 
     @staticmethod
     def _insert_index(present: list[str], key: str) -> int:
@@ -697,6 +711,9 @@ class ParamForm(QWidget):
             display.setObjectName("readonlyParamValue")
             display.setWordWrap(True)
             display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            # A row you cannot change is the one you most want explained, so a
+            # passthrough gets the same tooltip an editable field would.
+            display.setToolTip(param_help(key))
             self._add_row(key, key, display)
             self._readonly_rows.append((param_sections.section_title(key), key, display))
         self._refresh_section_visibility()

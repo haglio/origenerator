@@ -156,12 +156,19 @@ class _PendingTile(QWidget):
             " border-radius: 3px;"
         )
         box.addWidget(self._picture)
-        caption = QLabel("Enhancing")
-        caption.setStyleSheet("font-weight: 600;")
-        box.addWidget(caption)
+        self._caption = QLabel("Enhancing")
+        self._caption.setStyleSheet("font-weight: 600;")
+        box.addWidget(self._caption)
+        # The settings under the caption, exactly where a finished level carries
+        # its own: what is being made is as much a question of "at what" as the
+        # levels already there, and it is the only place to read it back before
+        # the run lands.
+        self._detail = QLabel()
+        self._detail.setObjectName("estimateLabel")
+        box.addWidget(self._detail)
         self.setToolTip("An enhancement of this image is being generated")
 
-    def update_pending(self, status: str, frame: bytes | None):
+    def update_pending(self, status: str, frame: bytes | None, settings: str = ""):
         pixmap = QPixmap()
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
             self._picture.setPixmap(pixmap.scaled(
@@ -173,6 +180,12 @@ class _PendingTile(QWidget):
             self._picture.setText(
                 "Generating…" if status == "running" else "Queued…"
             )
+        self._detail.setText(settings.replace(" · ", "\n"))
+        self._detail.setVisible(bool(settings))
+        self.setToolTip(
+            f"An enhancement of this image is being generated at {settings}"
+            if settings else "An enhancement of this image is being generated"
+        )
 
 
 class EnhanceVersions(QWidget):
@@ -205,7 +218,8 @@ class EnhanceVersions(QWidget):
 
     def show_levels(self, items: list[tuple], pending: tuple | None = None):
         """Rebuild the strip from ``(level, image_path)`` pairs, leading with the
-        enhancement in flight when ``pending`` is a ``(status, frame)`` pair.
+        enhancement in flight when ``pending`` is a ``(status, frame, settings)``
+        triple.
 
         Hidden when there is neither — an image that has received no enhancement
         and has none being made for it has nothing to show here. A single level

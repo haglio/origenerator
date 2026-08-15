@@ -296,7 +296,7 @@ def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
 def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), ("running", None))
+    versions.show_levels(_items(_levels(1)), ("running", None, "2x"))
     tiles = versions._host.findChildren((_PendingTile, _LevelTile))
     assert isinstance(tiles[0], _PendingTile)   # newest first, and it's becoming that
 
@@ -306,17 +306,32 @@ def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
     # being made for it is worth showing, so the strip appears for that alone.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(0)), ("queued", None))
+    versions.show_levels(_items(_levels(0)), ("queued", None, "2x"))
     assert not versions.isHidden()
+
+
+def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
+    # "Enhancing" alone says nothing you didn't already know; the numbers are
+    # the only thing worth reading off a tile that has no picture yet.
+    from PyQt6.QtWidgets import QLabel
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)),
+                         ("queued", None, "3x · 40 steps · 0.35 denoise"))
+    texts = [lbl.text() for lbl in versions._pending.findChildren(QLabel)]
+    assert "Queued…" in texts
+    assert any("40 steps" in t and "0.35 denoise" in t for t in texts)
+    assert "3x · 40 steps · 0.35 denoise" in versions._pending.toolTip()
 
 
 def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), ("running", None))
+    versions.show_levels(_items(_levels(1)), ("running", None, "2x"))
     tile = versions._pending
 
-    assert versions.update_pending(("running", b"not a real png")) is True
+    assert versions.update_pending(("running", b"not a real png", "2x")) is True
     assert versions._pending is tile          # the same widget, fed in place
 
     # A run starting or ending changes the strip's shape, which only a rebuild

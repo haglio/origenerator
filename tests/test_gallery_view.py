@@ -5155,7 +5155,11 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     assert panel._versions._host.findChildren(_PendingTile)
     (key,) = view._reroll_jobs
     view._reroll.preview.emit(key, b"a frame")
-    assert panel._pending_enhancement == ("queued", b"a frame")
+    status, frame, settings = panel._pending_enhancement
+    assert (status, frame) == ("queued", b"a frame")
+    # The tile names what is being made, the way a finished level names what
+    # made it — read off the job, not the panel, which may have moved on since.
+    assert settings.startswith("2x · 20 steps · 0.15 denoise")
 
     # An enhance of a DIFFERENT image leaves this tab's strip alone.
     panel.set_pending_enhancement(None)

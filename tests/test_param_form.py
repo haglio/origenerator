@@ -721,6 +721,31 @@ def test_hidden_params_get_no_field_and_no_read_only_row(qtbot):
     assert "enhance" not in form._widgets
 
 
+def test_every_field_and_its_label_carry_the_params_help(qtbot):
+    # The tooltip goes on the label as well as the input: the word is what you
+    # are looking at when you wonder what a setting does.
+    from origenerator.gui.param_help import param_help
+
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
+    qtbot.addWidget(form)
+    for key, widget in form._widgets.items():
+        assert widget.toolTip() == param_help(key), key
+    section = form._sections["Sampling"].content_form()
+    label = section.labelForField(form._widgets["steps"])
+    assert label.toolTip() == param_help("steps")
+
+
+def test_a_read_only_passthrough_row_is_explained_too(qtbot):
+    from origenerator.gui.param_help import param_help
+
+    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
+    qtbot.addWidget(form)
+    form.set_values({"steps": 20, "vae": "ae.safetensors"})
+    (_title, _key, value_label) = form._readonly_rows[0]
+    assert value_label.toolTip() == param_help("vae")
+
+
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     # Loading an old enhanced run into a tab must not arm its enhancement for
     # the next Generate: enhancement is the Enhance subpanel's, applied

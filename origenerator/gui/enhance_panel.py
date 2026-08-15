@@ -27,6 +27,7 @@ from origenerator.gallery import (
     ENHANCE_SETTING_KEYS, ENHANCE_WORKFLOW, MATCH_SOURCE_MODEL, EnhanceSettings,
 )
 from origenerator.gui.enhance_versions import params_from_mime
+from origenerator.gui.param_help import param_help
 from origenerator.gui.no_wheel import (
     NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
 )
@@ -100,14 +101,20 @@ class EnhancePanel(QWidget):
         self._model.addItem(MATCH_SOURCE_MODEL)
         self._model.addItems(self._options("checkpoint"))
         self._model.currentIndexChanged.connect(self._emit)
+        self._model.setToolTip(
+            "Which model does the refining. Left at "
+            f"\"{MATCH_SOURCE_MODEL}\" each image is enhanced by whatever made "
+            "it, so it stays in its own style; pick one to pin it instead."
+        )
         self._widgets["checkpoint"] = self._model
-        form.addRow("Model:", self._model)
+        form.addRow(self._labeled("Model:", self._model), self._model)
 
         self._upscaler = NoWheelComboBox()
         self._upscaler.addItems(self._options("upscale_model"))
         self._upscaler.currentIndexChanged.connect(self._emit)
+        self._upscaler.setToolTip(param_help("upscale_model"))
         self._widgets["upscale_model"] = self._upscaler
-        form.addRow("Upscaler:", self._upscaler)
+        form.addRow(self._labeled("Upscaler:", self._upscaler), self._upscaler)
 
         # The three numbers on one line: they are read together (how much bigger,
         # how long, how far from the source) and the pane is not wide.
@@ -119,11 +126,19 @@ class EnhancePanel(QWidget):
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
         for label, widget in (("Scale", self._scale), ("Steps", self._steps),
                               ("Denoise", self._denoise)):
-            numbers.addWidget(QLabel(label))
+            numbers.addWidget(self._labeled(label, widget))
             numbers.addWidget(widget, 1)
         form.addRow(numbers)
         box.addLayout(form)
         box.addStretch(1)
+
+    @staticmethod
+    def _labeled(text: str, widget) -> QLabel:
+        """A field's caption, carrying the field's own tooltip — the word is what
+        you are looking at when you wonder what a setting does."""
+        label = QLabel(text)
+        label.setToolTip(widget.toolTip())
+        return label
 
     def _options(self, key: str) -> list:
         """The installed files a picker offers, from the enhancer's own ParamDef."""
@@ -141,9 +156,10 @@ class EnhancePanel(QWidget):
             if isinstance(widget, NoWheelDoubleSpinBox):
                 widget.setDecimals(2)
             widget.setValue(pd.default)
+        widget.setToolTip(param_help(key))
         # Three to a line in a pane that can tile narrow: a floor each, so they
         # stay readable rather than squeezing down to their arrows.
-        widget.setMinimumWidth(52)
+        widget.setMinimumWidth(70)
         widget.valueChanged.connect(self._emit)
         self._widgets[key] = widget
         return widget

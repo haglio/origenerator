@@ -1740,8 +1740,14 @@ class GalleryView(QWidget):
     def _enqueue_enhancements(self, rows: list[dict]):
         for row in rows:
             params = gallery.enhance_params_for(row, self._enhance_settings)
-            if params is not None:
-                self._enhance_queue.append(params)
+            if params is None:
+                logger.warning("Enhance skipped for %s: no output file to enhance",
+                               row.get("prompt_id"))
+                continue
+            logger.info("Enhance queued for %s on %s at %s",
+                        row.get("prompt_id"), params.get("input_image"),
+                        gallery.describe_enhance_params(params))
+            self._enhance_queue.append(params)
         self._pump_enhance_queue()
 
     def _reconcile_pending_enhancements(self):
@@ -1764,11 +1770,17 @@ class GalleryView(QWidget):
             )
 
     def _pending_enhancement_for(self, row: dict, running) -> tuple | None:
-        """``(status, frame)`` of a standalone enhance running on ``row``'s own
-        image, or ``None``."""
+        """``(status, frame, settings)`` of a standalone enhance running on
+        ``row``'s own image, or ``None``.
+
+        The settings ride along so the live tile can name what is being made the
+        way a finished level names what made it — the panel may have moved on
+        since the run was launched, so the job's own params are the only honest
+        answer."""
         for key, job in running:
             if gallery.enhance_targets_row(job.params.get("input_image"), row):
-                return job.state, self._enhance_frames.get(key)
+                return (job.state, self._enhance_frames.get(key),
+                        gallery.describe_enhance_params(job.params))
         return None
 
     def _auto_enhance_if_wanted(self, row: dict | None):
@@ -1807,11 +1819,20 @@ class GalleryView(QWidget):
             )
             prepared = randomize_seeds(params, workflow.seed_keys())
             if self._reroll.start_prepared(key, workflow, prepared):
+                logger.info("Enhance launched on %s under %s",
+                            params.get("input_image"), key)
                 self._enhance_queue.pop(0)
                 continue
             if self._reroll.has(key):
+                logger.info("Enhance of %s waiting: %s is busy",
+                            params.get("input_image"), key)
                 return  # that folder is busy; the next finished/failed pumps again
-            self._enhance_queue.pop(0)  # unlaunchable (no client / submit failed)
+            # Unlaunchable (no client, or the submit was refused). Logged rather
+            # than dropped in silence: a request the user made and never saw run
+            # is the one failure they cannot diagnose from the screen.
+            logger.warning("Enhance of %s dropped: could not launch under %s",
+                           params.get("input_image"), key)
+            self._enhance_queue.pop(0)
 
     def _start_slideshow(self):
         """Open what's on screen — a folder, or the Recents/Starred shelf — as a

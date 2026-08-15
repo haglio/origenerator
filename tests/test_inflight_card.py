@@ -89,3 +89,14 @@ def test_a_frame_still_wins_over_the_wait_text(qtbot):
     card = InFlightCard(_item(status="running", frame=_png_bytes(), foreign_ahead=2))
     qtbot.addWidget(card)
     assert not card._image.pixmap().isNull()
+
+
+def test_foreign_queue_text_counts_the_whole_of_somebody_elses_queue():
+    # Not "ahead of ours" — everything of theirs on the shared server, which is
+    # what a surface needs to say while nothing of ours is in flight at all.
+    from origenerator.gui.inflight_card import foreign_queue_text
+
+    assert foreign_queue_text(6) == "6 jobs from another app are queued on ComfyUI"
+    assert foreign_queue_text(1) == "1 job from another app is queued on ComfyUI"
+    assert foreign_queue_text(0) is None
+    assert foreign_queue_text(None) is None

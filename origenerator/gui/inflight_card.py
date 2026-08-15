@@ -56,6 +56,21 @@ def queue_wait_text(foreign_ahead: int | None) -> str | None:
     return f"Waiting behind {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
 
 
+def foreign_queue_text(total: int | None) -> str | None:
+    """What ComfyUI is holding for someone else while nothing of ours is in flight.
+
+    The line to read *before* pressing Generate. The server is shared and
+    outlives whatever queues on it, so its queue can hold a pile of work this
+    session never launched — and with nothing on screen to say so, the first
+    sign of it used to be a fresh submit reporting six jobs ahead of it out of
+    nowhere. ``None`` when the queue holds nothing foreign.
+    """
+    if not total:
+        return None
+    return (f"{total} job{'' if total == 1 else 's'} from another app "
+            f"{'is' if total == 1 else 'are'} queued on ComfyUI")
+
+
 class InFlightCard(QWidget):
     """A clickable card mirroring one in-flight generation's live frame and status."""
 

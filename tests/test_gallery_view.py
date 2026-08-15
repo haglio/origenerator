@@ -3472,7 +3472,11 @@ class _FakeLiveFullscreen(QWidget):
         self.media = media
         self.frames = [frame] if frame is not None else []
         self.landed = None
+        self.levels = None
         self._live = media is None
+
+    def set_levels(self, levels_by_path):
+        self.levels = levels_by_path
 
     def is_live(self):
         return self._live
@@ -5359,8 +5363,12 @@ class _FakeFullscreen(QObject):
         self._live = live
         self.playlist = None       # the items set_playlist was armed with, if any
         self.playlist_index = None
+        self.levels = None         # the per-image version playlists (Shift+arrows)
         self.stroke = None         # the shared stroke driver the gallery wires in
         self.closes = 0
+
+    def set_levels(self, levels_by_path):
+        self.levels = levels_by_path
 
     def osr2_drive_target(self):
         return self._target
@@ -6190,3 +6198,79 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
 
     assert view._running_bar._caption.text() == ""
     assert view._running_bar._clear.isHidden()
+
+def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_path):
+    # A folder generating with the Auto switch on has to read honestly: the base
+    # render is out and on screen, and something better is on the way.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    tile = view._browser._thumb_widgets["g0"]
+    assert not tile.is_enhancing()
+
+    view.enhance_items(["g0"])
+    view._rerender_current_leaf()
+
+    assert view._browser._thumb_widgets["g0"].is_enhancing()
+
+
+def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    _set_enhance(view, params={"enhance_steps": 29})
+
+    panel._versions.enhance_requested.emit()
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_steps"] == 29
+
+
+def test_holding_a_slide_enhances_it_unless_it_already_has_that_version(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._enhance_from_slideshow("g0") is True
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+
+    # Asked again while that one is still cooking: nothing new is started.
+    assert view._enhance_from_slideshow("g0") is False
+
+
+def test_a_slideshow_hold_on_a_video_asks_for_nothing(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps(
+        [{"filename": "clip.mp4", "subfolder": "video", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    assert view._enhance_from_slideshow("g0") is False
+
+
+def test_the_fullscreen_view_is_armed_with_each_images_versions(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps([
+        {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"},
+    ]), original_files=json.dumps(
+        [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    fs = _FakeFullscreen(None)
+
+    view._on_fullscreen_opened(fs)
+
+    (levels,) = fs.levels.values()
+    assert [p.name for p, _kind in levels] == \
+        ["image_enhance_1.png", "sdxl_t2i_g0.png"]

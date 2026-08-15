@@ -14,7 +14,8 @@ from origenerator.gallery import (
 from origenerator.gui import enhance_versions as versions_module
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
-    EnhanceVersions, _LevelTile, _PendingTile, enhance_level_mime, params_from_mime,
+    EnhanceVersions, _AddTile, _LevelTile, _PendingTile, enhance_level_mime,
+    params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
 
@@ -217,6 +218,56 @@ def test_rebuilding_for_another_image_drops_the_old_tiles(qtbot):
 
 
 # --- dragging a level onto the panel to reuse its settings -----------------
+
+
+# --- the "+ Enhance" card ---------------------------------------------------
+
+
+def test_the_add_card_closes_the_strip_and_reports_its_press(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    tiles = versions._host.findChildren((_LevelTile, _AddTile))
+    assert isinstance(tiles[-1], _AddTile)   # it closes the strip
+
+    pressed = []
+    versions.enhance_requested.connect(lambda: pressed.append(True))
+    qtbot.mouseRelease(tiles[-1], Qt.MouseButton.LeftButton)
+    assert pressed == [True]
+
+
+def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels([], add=("2x", None))
+    assert not versions.isHidden()
+    assert versions._host.findChildren(_AddTile)
+
+
+def test_the_card_dims_when_it_would_only_duplicate_a_level(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", 0))
+    (card,) = versions._host.findChildren(_AddTile)
+
+    pressed = []
+    versions.enhance_requested.connect(lambda: pressed.append(True))
+    qtbot.mouseRelease(card, Qt.MouseButton.LeftButton)
+    assert pressed == []                       # it makes nothing new, so it does nothing
+    assert "already has a version" in card.toolTip()
+
+
+def test_hovering_the_dimmed_card_lights_the_level_it_would_duplicate(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(2)), add=("2x", 1))
+    duplicate = versions._tiles[1]
+    assert duplicate._picture.styleSheet() == ""
+
+    versions._highlight_level(1, True)
+    assert "border" in duplicate._picture.styleSheet()
+    versions._highlight_level(1, False)
+    assert duplicate._picture.styleSheet() == ""
 
 
 def test_a_level_carries_its_settings_as_a_drag_payload():

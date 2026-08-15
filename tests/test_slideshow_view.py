@@ -185,3 +185,82 @@ def test_a_single_item_slideshow_shows_no_neighbors(qtbot, tmp_path):
 
     assert view._neighbors._sources == (None, None)  # itself is no neighbor
     assert all(label.isHidden() for label in view._neighbors._labels)
+
+
+# --- holding a slide asks for it to be enhanced -----------------------------
+
+_KEYED = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
+
+
+def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
+    # Stopping on a picture is the gesture that says you want it, so it is also
+    # the one that asks for the better version.
+    asked = []
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert asked == ["id-a"]
+    assert view._playlist.paused
+    assert not view._note.isHidden() and "Enhancing" in view._note.text()
+
+
+def test_releasing_the_hold_asks_for_nothing(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+    _press(view, Qt.Key.Key_Down)   # hold
+    _press(view, Qt.Key.Key_Down)   # release
+    assert asked == ["id-a"]        # only the stop asked, not the resume
+
+
+def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
+    # It already has a version at these settings, or it is a video: the refusal
+    # comes from the side that holds the settings, and the corner stays quiet.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: False)
+    _press(view, Qt.Key.Key_Down)
+    assert view._note.isHidden()
+
+
+def test_e_turns_the_whole_behavior_off(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+
+    _press(view, Qt.Key.Key_E)
+    _press(view, Qt.Key.Key_Down)
+    assert asked == []
+    assert "off" in view._note.text()
+
+    _press(view, Qt.Key.Key_E)      # and back on
+    _press(view, Qt.Key.Key_Down)   # release the hold
+    _press(view, Qt.Key.Key_Down)   # hold again
+    assert asked == ["id-a"]
+
+
+def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    _press(view, Qt.Key.Key_Down)
+    better = _png(tmp_path / "a_enhanced.png")
+
+    view.note_enhanced("id-a", better)
+
+    assert view._playlist.current()[0] == better
+    assert view._note.isHidden()   # nothing cooking for this slide any more
+
+
+def test_an_enhancement_that_lands_after_paging_on_is_dropped(qtbot, tmp_path):
+    # It arrives minutes later; by then the show may have moved. The swap is
+    # guarded by the id, so a stale arrival changes nothing on screen.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    _press(view, Qt.Key.Key_Down)
+    _press(view, Qt.Key.Key_Right)
+
+    view.note_enhanced("id-a", _png(tmp_path / "a_enhanced.png"))
+
+    assert view._playlist.current()[0] == "b.png"
+
+
+def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
+    view = _view(qtbot, _KEYED)     # no on_enhance wired
+    _press(view, Qt.Key.Key_Down)
+    assert view._playlist.paused
+    assert view._note.isHidden()

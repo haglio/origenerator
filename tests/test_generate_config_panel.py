@@ -575,11 +575,30 @@ def _enhanced_image_row(db, prompt_id="img1"):
     return db.get_generation(prompt_id)
 
 
-def test_an_unenhanced_image_shows_no_version_list(saved_panel):
+def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
+    # This is where an image's versions live, so it has to be somewhere you can
+    # already see before the first enhancement makes a second one — not least
+    # because the enhance you just launched replaces the strip's only other
+    # content while it runs.
+    from PyQt6.QtWidgets import QLabel
+
+    from origenerator.gui.enhance_versions import _AddTile, _LevelTile
+
     panel, db = saved_panel
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
-    assert panel._versions.isHidden()   # one file: nothing to choose between
+    assert not panel._versions.isHidden()
+    (tile,) = panel._versions._host.findChildren(_LevelTile)
+    assert "Original" in [lbl.text() for lbl in tile.findChildren(QLabel)]
+    assert panel._versions._host.findChildren(_AddTile)
+
+
+def test_a_video_has_no_version_strip(saved_panel):
+    # The enhancer takes images; a video has no versions and no card to press.
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    panel.show_saved_generation(video, [])
+    assert panel._versions.isHidden()
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
@@ -609,15 +628,19 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1")      # never enhanced: no levels of its own
     panel.show_saved_generation(image, [image])
-    assert panel._versions.isHidden()
+    assert not panel._versions._host.findChildren(_PendingTile)
 
     panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 denoise"))
 
     assert not panel._versions.isHidden()
     assert panel._versions._host.findChildren(_PendingTile)
+    # The original stays beside it — the base render is out and worth looking at
+    # while its enhancement is made, which is the point of generating it first.
+    from origenerator.gui.enhance_versions import _LevelTile
+    assert panel._versions._host.findChildren(_LevelTile)
 
     panel.set_pending_enhancement(None)
-    assert panel._versions.isHidden()   # it landed (or failed); nothing to show
+    assert not panel._versions._host.findChildren(_PendingTile)
 
 
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,

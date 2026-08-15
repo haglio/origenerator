@@ -281,6 +281,28 @@ def enhanced_source_names(rows) -> set[str]:
     return names
 
 
+def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int | None:
+    """The position in :func:`enhance_levels` of the version this row already
+    holds at ``settings``, or ``None`` when it holds none.
+
+    Compared against the params an enhance would actually run with
+    (:func:`enhance_params_for`), not against the panel's raw values, so the
+    source-matched model resolves to this row's own checkpoint before the
+    comparison — otherwise "the same settings" would read as different for every
+    image the default is left on.
+
+    What tells the ``+ Enhance`` card it would only be making a duplicate.
+    """
+    wanted = enhance_params_for(row, settings)
+    if wanted is None:
+        return None
+    knobs = {k: wanted[k] for k in ENHANCE_SETTING_KEYS if k in wanted}
+    for position, level in enumerate(enhance_levels(row)):
+        if level.params and level.params == knobs:
+            return position
+    return None
+
+
 def enhance_targets_row(input_image: str | None, row: dict) -> bool:
     """Whether an enhance running on ``input_image`` is an enhance of ``row``.
 

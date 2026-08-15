@@ -55,12 +55,14 @@ class ThumbnailWidget(QWidget):
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, starred: bool = False,
-                 enhanced: bool = False, corner_actions: list | None = None):
+                 enhanced: bool = False, enhancing: bool = False,
+                 corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
         self._highlighted = False
         self._starred = starred
+        self._enhancing = enhancing
         self._corner_buttons: list[QPushButton] = []
         self._press_pos: QPoint | None = None  # left-press origin, for drag detection
         self.setObjectName("thumbnailTile")
@@ -129,6 +131,21 @@ class ThumbnailWidget(QWidget):
             image_bottom = layout.contentsMargins().top() + _IMAGE_SIZE.height()
             self._enhanced_badge = EnhancedBadge(self, image_bottom)
 
+        # While an enhancement of this image is cooking, a scrim over the picture
+        # says so without hiding it: the base render is out and worth looking at
+        # — that is the point of generating it first — and only the caption tells
+        # you a better version is coming.
+        self._enhancing_overlay = QLabel("Enhancing…", self)
+        self._enhancing_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._enhancing_overlay.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 0.45); color: white;"
+            " font-weight: 600; border-radius: 3px;"
+        )
+        self._enhancing_overlay.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._enhancing_overlay.setGeometry(self._image_label.geometry())
+        self._enhancing_overlay.setVisible(self._enhancing)
+
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.
         self._build_corner_actions(corner_actions or [])
@@ -152,6 +169,18 @@ class ThumbnailWidget(QWidget):
             return
         self._starred = starred
         self._star_badge.setVisible(starred)
+
+    def is_enhancing(self) -> bool:
+        return self._enhancing
+
+    def set_enhancing(self, enhancing: bool):
+        """Show or clear the "Enhancing…" scrim as a run starts and lands."""
+        if enhancing == self._enhancing:
+            return
+        self._enhancing = enhancing
+        self._enhancing_overlay.setGeometry(self._image_label.geometry())
+        self._enhancing_overlay.setVisible(enhancing)
+        self._enhancing_overlay.raise_()
 
     def is_highlighted(self) -> bool:
         return self._highlighted

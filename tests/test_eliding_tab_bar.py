@@ -82,3 +82,70 @@ def test_a_bar_that_never_held_a_tab_asks_for_no_row(qtbot):
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
     assert bar.sizeHint().height() == 0
+
+
+# --- each tab's own close button ---------------------------------------------
+
+def _closable_bar(qtbot, count=2):
+    bar = ElidingTabBar()
+    bar.setTabsClosable(True)
+    qtbot.addWidget(bar)
+    for i in range(count):
+        bar.addTab(f"tab {i}")
+    return bar
+
+
+def _close_button(bar, index):
+    from PyQt6.QtWidgets import QTabBar
+    return bar.tabButton(index, QTabBar.ButtonPosition.RightSide)
+
+
+def test_every_tab_wears_the_bars_own_close_button(qtbot):
+    # The stock one is painted red by the platform style on the tab in front, and
+    # pushed flush against the tab's right edge.
+    bar = _closable_bar(qtbot)
+    assert [_close_button(bar, i).objectName() for i in range(2)] == [
+        "tabCloseButton", "tabCloseButton",
+    ]
+
+
+def test_the_close_mark_is_padded_off_the_tabs_edge(qtbot):
+    from PyQt6.QtWidgets import QStyle
+
+    bar = _closable_bar(qtbot)
+    button = _close_button(bar, 0)
+    mark = bar.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+    assert button.iconSize().width() == mark
+    assert button.width() > mark  # room either side of the mark
+
+
+def test_the_same_mark_whichever_tab_is_in_front(qtbot):
+    bar = _closable_bar(qtbot)
+    bar.setCurrentIndex(0)
+    front, behind = _close_button(bar, 0), _close_button(bar, 1)
+    size = front.iconSize()
+    assert (front.icon().pixmap(size).toImage()
+            == behind.icon().pixmap(size).toImage())
+
+
+def test_clicking_a_close_button_asks_for_that_tab(qtbot):
+    bar = _closable_bar(qtbot, count=3)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+
+    _close_button(bar, 1).click()
+
+    assert asked == [1]
+
+
+def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
+    # Its index is looked up at click time, because tabs shift under it.
+    bar = _closable_bar(qtbot, count=3)
+    last = _close_button(bar, 2)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+    bar.removeTab(0)
+
+    last.click()
+
+    assert asked == [1]  # it is the second tab now, and says so

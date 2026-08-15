@@ -80,7 +80,9 @@ class InfoPaneTabs(QTabWidget):
         # and however wide they get.
         self._corner = QWidget()
         corner_row = QHBoxLayout(self._corner)
-        corner_row.setContentsMargins(0, 0, 0, 0)
+        # The same gap after close-all as between the two buttons, so the first
+        # tab isn't jammed against it while they sit spaced from each other.
+        corner_row.setContentsMargins(0, 0, 8, 0)
         # A gap of bare strip between them: both are flat and share the row's
         # background, so the seam is invisible but unclickable — a miss on the "+"
         # a user hits constantly lands on nothing rather than emptying the pane.
@@ -119,14 +121,17 @@ class InfoPaneTabs(QTabWidget):
         Qt lays a corner widget out at the left edge with the tabs starting after
         it — the placement this wants — but it centres the widget in the row using
         the height its layout *asks* for, which is what left these buttons hanging
-        below the strip into the pane underneath. So the ask itself is raised to
-        the bar's height: the buttons fill the row rather than floating in it, and
-        the centring has nothing left to do.
+        below the strip into the pane underneath. So the ask itself is raised past
+        the bar's height: the buttons fill the row rather than floating in it.
         """
         row_height = self.tabBar().sizeHint().height()
         for button in (self._add_btn, self._close_all_btn):
             button.setMinimumHeight(row_height)
-        self._corner.setFixedHeight(row_height)
+        # Two pixels taller than the row, because Qt centres the corner using a
+        # height it measures a little short of the bar's and the buttons ended up
+        # sitting a pixel above the tabs. Overshooting and letting the ends clip
+        # covers the row exactly, and needs no second guess at Qt's arithmetic.
+        self._corner.setFixedHeight(row_height + 2)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

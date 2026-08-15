@@ -152,9 +152,10 @@ class FullscreenPreview(QWidget):
     def set_playlist(self, items: list[tuple], index: int) -> None:
         """Arm Left/Right to page across the folder the view was opened from.
 
-        ``items`` is the folder's media in shown order as ``(path, media_type)``
-        or ``(path, media_type, prompt_id)`` — the id is what Up and Down act on,
-        so a curated folder can be culled and bookmarked without leaving the view.
+        ``items`` is the folder's media in shown order as ``(path, media_type)``,
+        optionally followed by its ``prompt_id`` — what Up and Down act on, so a
+        folder can be culled and bookmarked without leaving the view — and its
+        stored thumbnail, the only still a video has for the neighbor previews.
         ``index`` is the one already on screen. Until this is called the view holds
         a lone item and paging is inert.
         """

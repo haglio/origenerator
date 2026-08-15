@@ -6024,8 +6024,9 @@ def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeyp
 
     order = view._browser.visible_prompt_ids()
     # Each entry carries its generation's id, so the view's Up and Down can name
-    # what to trash and what to bookmark.
-    assert fs.playlist == [(f"{pid}.png", "image", pid) for pid in order]
+    # what to trash and what to bookmark, and its stored thumbnail, which is the
+    # only still a video has for the neighbor previews.
+    assert fs.playlist == [(f"{pid}.png", "image", pid, None) for pid in order]
     assert fs.playlist_index == order.index("i2")  # opened on the shown item
 
 

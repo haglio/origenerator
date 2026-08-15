@@ -29,11 +29,12 @@ def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=Non
     return db.get_generation(pid)
 
 
-def _actions(tmp_path, limit=50):
+def _actions(tmp_path, limit=50, release_files=None):
     db = Database(tmp_path / "test.db")
     output_dir = tmp_path / "output"
     trash = Trash(tmp_path / "trash")
-    return GalleryActions(db, output_dir, trash, limit=limit), db, output_dir
+    return GalleryActions(db, output_dir, trash, limit=limit,
+                          release_files=release_files), db, output_dir
 
 
 def test_delete_removes_the_row_and_its_file(tmp_path):
@@ -194,6 +195,36 @@ def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
     assert kept["output_files"] is None and kept["thumbnail_path"] is None
     assert not file_path.exists() and not thumb_path.exists()  # the junk is gone
     assert actions.can_undo() and actions.undo_label() == "Reject experiment"
+
+
+def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
+    # Windows refuses to move a file the app itself still holds open — a video
+    # being previewed keeps its file open — so every doomed path is handed over
+    # to be released first, while it's still where the app is showing it.
+    seen = []
+    actions, db, output_dir = _actions(
+        tmp_path,
+        release_files=lambda paths: seen.append([(p, p.exists()) for p in paths]),
+    )
+    row = _completed_row(db, output_dir, "v1", "clip.mp4", subfolder="video",
+                         thumb_dir=tmp_path / "thumbs")
+
+    actions.delete_rows([row])
+
+    assert seen == [[(output_dir / "video" / "clip.mp4", True),
+                     (tmp_path / "thumbs" / "v1.jpg", True)]]
+
+
+def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
+    # The Experiments shelf's reject trashes files like any delete, so it needs
+    # the same release — the shelf is where an item is most likely on screen.
+    seen = []
+    actions, db, output_dir = _actions(tmp_path, release_files=seen.extend)
+    row = _completed_row(db, output_dir, "e1", "exp.mp4", subfolder="video")
+
+    actions.reject_experiment(row)
+
+    assert seen == [output_dir / "video" / "exp.mp4"]
 
 
 def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):

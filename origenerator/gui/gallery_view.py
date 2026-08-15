@@ -175,7 +175,8 @@ class GalleryView(QWidget):
         # only when the number actually moves.
         self._shown_wait_note: str | None = None
         self._actions = actions or GalleryActions(
-            db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash")
+            db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash"),
+            release_files=self._release_held_media,
         )
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's
@@ -2403,12 +2404,24 @@ class GalleryView(QWidget):
             stack.extend(node.child(i) for i in range(node.childCount()))
         return keys
 
+    def _release_held_media(self, paths):
+        """Drop every on-screen view of ``paths`` — the files a delete is about to
+        move — so nothing in this app is still holding one open.
+
+        Wired into :class:`GalleryActions` itself, so it runs for every delete
+        there is: a picked tile, a whole folder, a rejected experiment, a
+        slideshow's Up key. Windows won't move a file while any handle on it is
+        open, and a video preview holds one for as long as it's loaded — so an
+        item still showing anywhere blocks its own deletion. Panes showing
+        something else keep it.
+        """
+        self._info_tabs.release_media(paths)
+        if self._slideshow is not None:
+            self._slideshow.release_media(paths)
+
     def _delete_rows(self, rows):
         if not rows:
             return
-        deleted_ids = {r["prompt_id"] for r in rows}
-        if self._selected and self._selected.get("prompt_id") in deleted_ids:
-            self._info_tabs.clear_current_preview()  # release any file handle before the files move
         try:
             self._actions.delete_rows(rows)
         except Exception as e:

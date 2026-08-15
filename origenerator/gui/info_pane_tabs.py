@@ -294,6 +294,17 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel._preview.clear()
 
+    def release_media(self, paths):
+        """Let every tab go of any of ``paths`` it's showing — files about to be
+        moved or deleted.
+
+        Every tab, not just the one in front: browsing generation after
+        generation spreads them across tabs, and a tab out of sight holds its
+        video's file open exactly as firmly as the front one does.
+        """
+        for panel in self._config_panels():
+            panel._preview.release_media(paths)
+
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.
 

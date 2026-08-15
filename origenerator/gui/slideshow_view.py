@@ -102,6 +102,11 @@ class SlideshowView(QWidget):
         self._playlist.advance()
         self._show_current()
 
+    def release_media(self, paths):
+        """Let go of any of ``paths`` on screen — a file about to be deleted (its
+        own Up key condemns the item it's playing)."""
+        self._preview.release_media(paths)
+
     def _delete_current(self):
         """Delete the current item (if a deleter is wired) and advance to the next."""
         item = self._playlist.current()

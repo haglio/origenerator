@@ -26,11 +26,13 @@ class _UndoEntry:
 
 
 class GalleryActions:
-    def __init__(self, db, output_dir: Path, trash, limit: int = 50):
+    def __init__(self, db, output_dir: Path, trash, limit: int = 50,
+                 release_files: Callable[[list[Path]], None] | None = None):
         self._db = db
         self._output_dir = Path(output_dir)
         self._trash = trash
         self._limit = limit
+        self._release_files = release_files
         self._stack: list[_UndoEntry] = []
 
     # --- deletion ----------------------------------------------------------
@@ -40,7 +42,7 @@ class GalleryActions:
         if not rows:
             return
         # Move files out before touching the DB: if a move fails, nothing is lost.
-        batch = self._trash.store(self._files_for_rows(rows))
+        batch = self._trash_files(rows)
         for row in rows:
             self._db.delete_generation(row["prompt_id"])
 
@@ -53,6 +55,22 @@ class GalleryActions:
             return captured[0]["prompt_id"]  # a restored item to navigate back to
 
         self._push(_UndoEntry(_delete_label(len(rows)), undo, batch.purge))
+
+    def _trash_files(self, rows: list[dict]):
+        """Move every file ``rows`` own into the trash, after telling the app to
+        let go of them.
+
+        The release comes first because a file the app itself still holds open
+        can't be moved on Windows at all: a preview keeps its video's file open
+        for as long as it's showing it, so deleting what's on screen — in any
+        tab, a slideshow, or a fullscreen view — would otherwise fail outright.
+        Every path in and out of the trash runs through here so no caller can
+        forget it.
+        """
+        files = self._files_for_rows(rows)
+        if self._release_files is not None:
+            self._release_files(files)
+        return self._trash.store(files)
 
     def _files_for_rows(self, rows: list[dict]) -> list[Path]:
         """Every on-disk file the rows own — outputs, sidecars, thumbnails."""
@@ -79,7 +97,7 @@ class GalleryActions:
         rejection is one reversible unit rather than half in the view.
         """
         prompt_id = row["prompt_id"]
-        batch = self._trash.store(self._files_for_rows([row]))
+        batch = self._trash_files([row])
         self._db.set_experiment_verdict(prompt_id, "down")
         self._db.update_generation(
             prompt_id, output_files=None, thumbnail_path=None

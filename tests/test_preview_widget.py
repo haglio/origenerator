@@ -156,6 +156,52 @@ def test_clear_releases_the_video_file(make_preview, tmp_path):
     w._player.setSource.assert_called_with(QUrl())
 
 
+# --- letting go of files a delete is about to move --------------------------
+
+def test_release_media_drops_the_file_it_is_showing(make_preview, tmp_path):
+    w = make_preview()
+    clip = tmp_path / "clip.mp4"
+    w.show_video(clip)
+
+    w.release_media([clip])
+
+    assert not w.is_showing_any([clip])
+    w._player.setSource.assert_called_with(QUrl())  # the handle is let go
+
+
+def test_release_media_leaves_a_pane_showing_something_else_alone(make_preview, tmp_path):
+    # Only what's about to be deleted is dropped: a pane on another item keeps it.
+    w = make_preview()
+    kept = tmp_path / "kept.mp4"
+    w.show_video(kept)
+
+    w.release_media([tmp_path / "doomed.mp4"])
+
+    assert w.is_showing_any([kept])
+
+
+def test_release_media_matches_the_same_file_spelled_differently(make_preview, tmp_path):
+    w = make_preview()
+    clip = tmp_path / "clip.mp4"
+    w.show_video(clip)
+
+    w.release_media([tmp_path / "sub" / ".." / "clip.mp4"])  # same file, other spelling
+
+    assert not w.is_showing_any([clip])
+
+
+def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_path):
+    # A fullscreen view built over this pane holds the file open too.
+    w = make_preview()
+    clip = tmp_path / "clip.mp4"
+    w.show_video(clip)
+    w._fullscreen = MagicMock()
+
+    w.release_media([clip])
+
+    w._fullscreen.release_media.assert_called_once_with([clip])
+
+
 def test_video_preview_is_muted(make_preview):
     w = make_preview()
     assert w._audio.isMuted() is True

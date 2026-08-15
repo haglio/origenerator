@@ -97,6 +97,30 @@ def test_closing_releases_the_video_file(qtbot, tmp_path):
     win._preview._player.setSource.assert_called_with(QUrl())
 
 
+def test_a_view_of_a_condemned_file_dismisses_itself(qtbot, tmp_path):
+    # Deleting what's up fullscreen: the view holds the file open, which would
+    # block the move to trash, and there'd be nothing left to show anyway.
+    clip = tmp_path / "c.mp4"
+    win = FullscreenPreview((clip, "video"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.showFullScreen()
+
+    win.release_media([clip])
+
+    assert not win.isVisible()
+    win._preview._player.setSource.assert_called_with(QUrl())
+
+
+def test_a_view_of_another_file_stays_up(qtbot, tmp_path):
+    win = FullscreenPreview((tmp_path / "kept.mp4", "video"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.showFullScreen()
+
+    win.release_media([tmp_path / "doomed.mp4"])
+
+    assert win.isVisible()
+
+
 def test_the_fullscreen_preview_does_not_nest_another(qtbot, tmp_path):
     win = FullscreenPreview((_make_png(tmp_path / "p.png"), "image"), player=MagicMock())
     qtbot.addWidget(win)

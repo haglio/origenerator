@@ -254,24 +254,30 @@ def _draw_regen_badge(painter: QPainter):
     painter.drawPolygon(QPointF(45, 33), QPointF(39, 31), QPointF(41, 38))  # arrowhead
 
 
-def tab_close_icon() -> QIcon:
-    """The close mark the live style paints on a closable tab.
+def tab_close_icon(widget=None) -> QIcon:
+    """The close mark the live style paints on a closable tab, at rest.
 
-    Borrowed rather than drawn: a control that closes tabs (the config pane's
-    "All") should wear the tabs' own ✕ at the tabs' own size, so the two read as
-    one spelling of "close". A hand-drawn glyph — or the ✕ text character — is a
-    second spelling, which is what this replaces. Not cached: it follows the
-    style, which a theme change can swap under a running app.
+    Borrowed rather than drawn, so every control that closes a tab wears one ✕ —
+    the tabs' own, and the config pane's "All" beside them. A hand-drawn glyph, or
+    the ✕ text character, is a second spelling of the same act.
+
+    Built the way QTabBar builds its own close button — the widget's palette, and
+    the auto-raise a flat little button paints with — but always in the resting
+    state, never the selected one the platform style turns red. Not cached: it
+    follows the style, which a theme change can swap under a running app.
     """
-    style = QApplication.style()
+    style = (widget.style() if widget is not None else QApplication.style())
     size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     option = QStyleOption()
+    if widget is not None:
+        option.initFrom(widget)
     option.rect = QRect(0, 0, size, size)
-    option.state = QStyle.StateFlag.State_Enabled
-    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter)
+    option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_AutoRaise
+    style.drawPrimitive(QStyle.PrimitiveElement.PE_IndicatorTabClose, option, painter,
+                        widget)
     painter.end()
     return QIcon(pixmap)
 

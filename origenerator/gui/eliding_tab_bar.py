@@ -5,7 +5,7 @@ from origenerator.gui.icons import tab_close_icon
 
 # How much wider than its mark a tab's close button sits, so the ✕ isn't flush
 # against the tab's right edge.
-_CLOSE_PADDING = 8
+_CLOSE_PADDING = 12
 
 
 class ElidingTabBar(QTabBar):
@@ -77,7 +77,7 @@ class ElidingTabBar(QTabBar):
         mark = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
         button = QToolButton(self)
         button.setObjectName("tabCloseButton")
-        button.setIcon(tab_close_icon())
+        button.setIcon(tab_close_icon(self))
         button.setIconSize(QSize(mark, mark))
         button.setFixedSize(mark + _CLOSE_PADDING, mark)
         button.setCursor(Qt.CursorShape.PointingHandCursor)

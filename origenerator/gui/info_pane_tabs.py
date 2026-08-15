@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QToolButton, QInputDialog, QApplication, QWidget, QHBoxLayout,
     QStyle, QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -119,19 +119,22 @@ class InfoPaneTabs(QTabWidget):
         """Hold the button row to exactly the tab row's height.
 
         Qt lays a corner widget out at the left edge with the tabs starting after
-        it — the placement this wants — but it centres the widget in the row using
-        the height its layout *asks* for, which is what left these buttons hanging
-        below the strip into the pane underneath. So the ask itself is raised past
-        the bar's height: the buttons fill the row rather than floating in it.
+        it — the placement this wants — but it places it by arithmetic of its own
+        that lands a pixel or three off the tabs, differently on each style. So
+        the height is set here and the position is corrected once Qt has finished:
+        guessing at that arithmetic is what left the buttons sitting off the line
+        twice already.
         """
-        row_height = self.tabBar().sizeHint().height()
+        bar = self.tabBar()
+        row_height = bar.height() or bar.sizeHint().height()
         for button in (self._add_btn, self._close_all_btn):
             button.setMinimumHeight(row_height)
-        # Two pixels taller than the row, because Qt centres the corner using a
-        # height it measures a little short of the bar's and the buttons ended up
-        # sitting a pixel above the tabs. Overshooting and letting the ends clip
-        # covers the row exactly, and needs no second guess at Qt's arithmetic.
-        self._corner.setFixedHeight(row_height + 2)
+        self._corner.setFixedHeight(row_height)
+        QTimer.singleShot(0, self._align_tab_row_buttons)
+
+    def _align_tab_row_buttons(self):
+        """Sit the button row on the tabs' own line, after Qt has placed it."""
+        self._corner.move(self._corner.x(), self.tabBar().y())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

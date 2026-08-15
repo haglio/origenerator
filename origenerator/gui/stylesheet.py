@@ -267,6 +267,15 @@ def build_stylesheet() -> str:
     QToolButton#tabBarButton:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
+    /* A tab's close button. Flat and bare, because all it is is the style's own
+       ✕ sitting on the tab: the QToolButton rule above would otherwise wrap it in
+       a raised, rounded, bordered box that looks nothing like a tab's mark. */
+    QToolButton#tabCloseButton {{
+        background-color: transparent;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+    }}
     QToolButton#tabBarButton:disabled {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(BORDER_SUBTLE)};

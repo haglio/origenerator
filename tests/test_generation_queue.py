@@ -365,3 +365,23 @@ def test_a_drop_carrying_something_else_is_ignored(queue):
 def test_rows_are_the_height_that_shows_about_two_at_a_time(queue):
     _four(queue)
     assert all(row.height() == QueueRow.HEIGHT for row in queue.rows())
+
+
+def test_cancel_leads_each_row_so_a_long_name_cannot_bury_it(queue):
+    # The names run long and elide; a button behind one of those was pushed out of
+    # sight at the right-hand end, which read as no way to cancel a queued item.
+    from PyQt6.QtWidgets import QApplication
+
+    _four(queue)
+    QApplication.processEvents()
+    row = queue.rows()[1]
+    assert row._cancel.x() < row._caption.x()
+
+
+def test_the_bar_leaves_the_strip_to_the_queue(queue):
+    # It only has to read as a bar; the line beside it carries the long names.
+    from PyQt6.QtWidgets import QApplication
+
+    _four(queue)
+    QApplication.processEvents()
+    assert queue._scroll.width() > queue.running_preview().width()

@@ -1,11 +1,12 @@
 """The generation queue, as one strip along the bottom of the gallery.
 
 Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering and a fat progress bar under it,
-nothing else. On the right, *what is queued*: every in-flight job as a row of its
-own — the one being made at the top — each with a Cancel, each opening its folder
-on a click, and each draggable to a new place in the line. Only the top row is
-fixed: nothing can be moved in front of what is already rendering.
+live frame of the job ComfyUI is rendering and a fat progress bar beside it,
+nothing else, and no wider than a bar needs to be. On the right, taking the rest
+of the strip, *what is queued*: every in-flight job as a row of its own — the one
+being made at the top — each led by a Cancel, each opening its folder on a click,
+and each draggable to a new place in the line. Only the top row is fixed: nothing
+can be moved in front of what is already rendering.
 
 The whole strip is one progress bar tall whatever the queue's length, so the panes
 above it never move; about two rows show at a time and the rest are a scroll away.
@@ -31,8 +32,10 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
 
-_PREVIEW = 40   # a small live thumbnail; the full-size preview is one click away
-_QUEUE_WIDTH = 340  # how much of the strip the line takes
+_PREVIEW = 80   # the live thumbnail; the full-size preview is one click away
+# The bar needs only enough width to read as a bar; the queue's names are long,
+# so the rest of the strip goes to the line.
+_BAR_WIDTH = 150
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
@@ -55,7 +58,8 @@ class RunningPreview(QWidget):
         self._progress = QProgressBar()
         self._progress.setTextVisible(False)
         self._progress.setFixedHeight(16)  # the fat, important one
-        layout.addWidget(self._progress, 1)
+        self._progress.setFixedWidth(_BAR_WIDTH)
+        layout.addWidget(self._progress)
 
         self.show_item(None)
 
@@ -108,11 +112,10 @@ class QueueRow(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 1, 4, 1)
+        layout.setContentsMargins(4, 1, 6, 1)
         layout.setSpacing(6)
-        self._caption = QLabel()
-        self._caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        layout.addWidget(self._caption, 1)
+        # Cancel leads the row: the names run long and elide, and a button behind
+        # one of those was pushed out of sight at the right-hand end.
         self._cancel = QPushButton("Cancel")
         self._cancel.setObjectName("queueCancelBtn")
         self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -120,6 +123,9 @@ class QueueRow(QWidget):
         self._cancel.setFixedHeight(self.HEIGHT - 6)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
+        self._caption = QLabel()
+        self._caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(self._caption, 1)
 
         self.update_item(item)
 
@@ -196,13 +202,12 @@ class GenerationQueue(QWidget):
         layout.setContentsMargins(4, 2, 4, 2)
         layout.setSpacing(8)
         self._running = RunningPreview()
-        layout.addWidget(self._running, 1)
+        layout.addWidget(self._running)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setFixedWidth(_QUEUE_WIDTH)
         self._scroll.setFixedHeight(self._running.sizeHint().height())
         self._host = QWidget()
         self._rows_box = QVBoxLayout(self._host)
@@ -210,7 +215,7 @@ class GenerationQueue(QWidget):
         self._rows_box.setSpacing(0)
         self._rows_box.addStretch(1)  # rows stack from the top
         self._scroll.setWidget(self._host)
-        layout.addWidget(self._scroll)
+        layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
 
         self.set_items([])
 

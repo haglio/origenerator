@@ -577,3 +577,62 @@ def test_left_and_right_still_page_a_playlist_carrying_ids(qtbot):
     assert view._index == 1
     _press(view, Qt.Key.Key_Left)
     assert view._index == 0
+
+
+# --- the slideshow's furnishings: where you are, and what's either side -------
+
+def test_the_view_says_where_in_the_folder_it_is(qtbot):
+    view = _armed(qtbot, index=1)
+    assert view._counter.text() == "2 / 3"
+    assert view._counter.isHidden() is False
+
+
+def test_paging_moves_the_counter_with_it(qtbot):
+    view = _armed(qtbot, index=0)
+    _press(view, Qt.Key.Key_Right)
+    assert view._counter.text() == "2 / 3"
+    _press(view, Qt.Key.Key_Left)
+    assert view._counter.text() == "1 / 3"
+
+
+def test_culling_an_item_renumbers_what_is_left(qtbot):
+    view = _armed(qtbot, index=0)
+    _press(view, Qt.Key.Key_Up)
+    assert view._counter.text() == "1 / 2"
+
+
+def test_a_lone_item_is_not_counted(qtbot):
+    view = FullscreenPreview(("a.png", "image"), player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.png", "image", "gen-a")], 0)
+    assert view._counter.isHidden()
+
+
+def test_a_view_following_a_generation_counts_nothing_until_it_pages_off(qtbot):
+    # It has no place among the folder's files while it is still being made.
+    view = FullscreenPreview(None, player=MagicMock())
+    qtbot.addWidget(view)
+    view.set_playlist([("a.png", "image", "gen-a"), ("b.png", "image", "gen-b")], 0)
+    assert view._counter.isHidden()
+
+    _press(view, Qt.Key.Key_Right)
+
+    assert view._counter.isHidden() is False
+    assert view._counter.text() == "2 / 2"
+
+
+def test_the_items_either_side_are_drawn(qtbot, tmp_path):
+    from origenerator.gui.neighbor_previews import still_for
+
+    view = _armed(qtbot, index=1)
+    # The neighbours are asked for by the same helper the slideshow uses, so an
+    # image item stands in for itself.
+    assert still_for(view._items[0]) == "a.png"
+    assert still_for(view._items[2]) == "c.png"
+    assert view._neighbors._sources == ("a.png", "c.png")
+
+
+def test_paging_moves_the_neighbours_with_it(qtbot):
+    view = _armed(qtbot, index=0)
+    _press(view, Qt.Key.Key_Right)
+    assert view._neighbors._sources == ("a.png", "c.png")

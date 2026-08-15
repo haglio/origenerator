@@ -5,7 +5,9 @@ Armed with the folder it was opened from (:meth:`set_playlist`) it is the
 slideshow without the shuffling and the clock: Left/Right page through that
 folder, Up culls the item on screen and Down keeps it — bookmarking it and asking
 for it to be enhanced, exactly as the slideshow's Down does — so the two
-fullscreen views are one thing to learn. Shift+Left/Right is the axis this one
+fullscreen views are one thing to learn. It wears the slideshow's two furnishings
+for the same reason: the "3 / 17" plate over the bottom of the media and the
+stills of the items either side of it. Shift+Left/Right is the axis this one
 adds: the enhancement levels of the image on screen.
 
 It also opens over a generation that's still running: built with no media, it
@@ -32,7 +34,9 @@ from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
+from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
+from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
@@ -108,6 +112,12 @@ class FullscreenPreview(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
+        # The same two furnishings the slideshow floats over its media: where in
+        # the folder this one is, and the items either side of it.
+        self._counter = PositionCaption(self)
+        self._counter.hide()  # nothing to count until a playlist is armed
+        self._neighbors = NeighborPreviews(self)
+        self._preview.media_resized.connect(self._reposition_neighbors)
         if media is not None:
             self._preview.show_media(media[0], media[1])
         elif frame is not None:
@@ -136,6 +146,7 @@ class FullscreenPreview(QWidget):
         self._items = [media]
         self._index = 0
         self._preview.show_media(media[0], media[1])
+        self._show_surroundings()
         self.media_changed.emit()
 
     def set_playlist(self, items: list[tuple], index: int) -> None:
@@ -149,6 +160,35 @@ class FullscreenPreview(QWidget):
         """
         self._items = list(items)
         self._index = index
+        self._show_surroundings()
+
+    def _show_surroundings(self) -> None:
+        """Say where in the folder this is, and draw the items either side of it.
+
+        Nothing to say for a folder of one — or for a view following a generation
+        still being made, which has no place among the folder's files until an
+        arrow leaves it for one.
+        """
+        if len(self._items) < 2 or self._live:
+            self._counter.hide()
+            self._neighbors.set_neighbors(None, None)
+            return
+        self._counter.show()
+        self._counter.show_position(self._index + 1, len(self._items))
+        self._neighbors.set_neighbors(
+            still_for(self._items[(self._index - 1) % len(self._items)]),
+            still_for(self._items[(self._index + 1) % len(self._items)]),
+            media_rect=self._media_rect(),
+        )
+
+    def _reposition_neighbors(self) -> None:
+        self._neighbors.reposition(self._media_rect())
+
+    def _media_rect(self):
+        """Where the media is drawn, in this view's coordinates."""
+        rect = self._preview.media_rect()
+        rect.moveTopLeft(self._preview.mapTo(self, rect.topLeft()))
+        return rect
 
     def set_levels(self, levels_by_path: dict) -> None:
         """Arm Shift+Left/Right to step an image's enhancement levels.
@@ -233,11 +273,15 @@ class FullscreenPreview(QWidget):
         self._reposition_note()
 
     def _reposition_note(self) -> None:
-        """Bottom center — the same place the slideshow keeps its counter, so a
-        caption means the same thing wherever a picture is full screen."""
+        """Centered just above the position plate, exactly as the slideshow
+        stacks its own — everything a fullscreen view says about the item on
+        screen reads as one group at the bottom, clear of genau's console in the
+        top-left corner."""
         self._note.adjustSize()
+        self._counter.adjustSize()
+        floor = self._counter.height() if not self._counter.isHidden() else 0
         self._note.move((self.width() - self._note.width()) // 2,
-                        max(0, self.height() - self._note.height() - 24))
+                        max(0, self.height() - floor - self._note.height() - 30))
         self._note.raise_()
 
     def _flash_note(self, text: str, ms: int = 1500) -> None:
@@ -269,6 +313,7 @@ class FullscreenPreview(QWidget):
             return
         self._index %= len(self._items)
         self._preview.show_media(*self._items[self._index][:2])
+        self._show_surroundings()
         self.media_changed.emit()
 
     def _star_current(self) -> None:
@@ -332,6 +377,8 @@ class FullscreenPreview(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._counter.reposition()
+        self._reposition_neighbors()
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
         if not self._note.isHidden():
@@ -347,6 +394,7 @@ class FullscreenPreview(QWidget):
         self._level_index = 0
         self._preview.show_media(*self._items[self._index][:2])
         self._refresh_note()
+        self._show_surroundings()
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     def _step_level(self, delta: int) -> None:

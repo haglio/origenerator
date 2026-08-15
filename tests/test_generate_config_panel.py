@@ -611,7 +611,7 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     panel.show_saved_generation(image, [image])
     assert panel._versions.isHidden()
 
-    panel.set_pending_enhancement(("running", None))
+    panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 denoise"))
 
     assert not panel._versions.isHidden()
     assert panel._versions._host.findChildren(_PendingTile)

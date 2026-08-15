@@ -3,7 +3,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON,
+    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_KEYCAP,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
     BORDER_SUBTLE, BORDER_PANEL, BLUE,
 )
@@ -46,6 +46,58 @@ def build_stylesheet() -> str:
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
         padding: 4px;
+    }}
+    QSpinBox, QDoubleSpinBox {{
+        /* Room for the step buttons, so the value never runs under them. */
+        padding-right: 18px;
+    }}
+    /* Styling a spin box at all hands Qt the whole widget, step buttons
+       included — and the default it falls back to for them has no size, so the
+       arrows render as dead slivers you cannot hit. Give them a real box and a
+       drawn arrow and they work again. */
+    QSpinBox::up-button, QDoubleSpinBox::up-button,
+    QSpinBox::down-button, QDoubleSpinBox::down-button {{
+        subcontrol-origin: border;
+        width: 16px;
+        background-color: {_h(BG_BUTTON)};
+        border-left: 1px solid {_h(BORDER_SUBTLE)};
+    }}
+    QSpinBox::up-button, QDoubleSpinBox::up-button {{
+        subcontrol-position: top right;
+        border-top-right-radius: 3px;
+    }}
+    QSpinBox::down-button, QDoubleSpinBox::down-button {{
+        subcontrol-position: bottom right;
+        border-top: 1px solid {_h(BORDER_SUBTLE)};
+        border-bottom-right-radius: 3px;
+    }}
+    QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+    QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+        background-color: {_h(BG_KEYCAP)};
+    }}
+    QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
+    QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+        background-color: {_h(BLUE)};
+    }}
+    /* Triangles drawn out of borders — the app ships no arrow images, and an
+       unstyled arrow under a styled button is invisible. */
+    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+        width: 0; height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-bottom: 5px solid {_h(TEXT_PRIMARY)};
+    }}
+    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+        width: 0; height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 5px solid {_h(TEXT_PRIMARY)};
+    }}
+    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
+        border-bottom-color: {_h(TEXT_MUTED)};
+    }}
+    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        border-top-color: {_h(TEXT_MUTED)};
     }}
     QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
         border: 1px solid {_h(BLUE)};

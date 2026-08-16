@@ -12,6 +12,11 @@ from origenerator import config
 # diffusion models UnetLoaderGGUF loads.
 _MODEL_SUFFIXES = (".safetensors", ".ckpt", ".pt", ".gguf")
 
+# Where the enhance graph's detail pass finds its face/hand detectors: the
+# directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, so a
+# model dropped in for ComfyUI is the same one this app offers.
+_DETECTOR_CATEGORY = "ultralytics/bbox"
+
 # The picker option that means "no LoRA": choosing it builds the graph with no
 # LoraLoader for that slot (see the workflows' ``build_api_payload``), so the
 # base model runs unmodified. Never a real filename — a file's option always
@@ -45,6 +50,18 @@ def list_lora_files(fallback: list[str]) -> list[str]:
     :data:`NO_LORA`), so every LoRA picker can opt out of applying one.
     """
     return [NO_LORA, *list_model_files("loras", fallback)]
+
+
+def list_detector_files() -> list[str]:
+    """The face/hand detectors installed for the enhance graph's detail pass.
+
+    No fallback, unlike every other picker here: a checkpoint the app names but
+    ComfyUI lacks is a rare accident, whereas an install with no detector at all
+    is the ordinary starting state — and the Enhance panel has to be able to see
+    it, so it can dim the detail pass rather than offer a run that would be
+    rejected on submit.
+    """
+    return list_model_files(_DETECTOR_CATEGORY, [])
 
 
 def is_no_lora(value) -> bool:

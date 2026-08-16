@@ -1,9 +1,14 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import list_detector_files, list_model_files
 
 _DEFAULT_CHECKPOINT = "reapony_v80.safetensors"
 _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
+# The detail pass's detectors. Named rather than derived so a run records which
+# model found its regions; an install with neither dims the pass instead (see
+# :func:`~origenerator.workflows.model_files.list_detector_files`).
+_DEFAULT_FACE_DETECTOR = "face_yolov8m.pt"
+_DEFAULT_HAND_DETECTOR = "hand_yolov8s.pt"
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
@@ -20,6 +25,15 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     whose maker is unknown). The prompts steer that texture; a batch enhance
     seeds them from the source generation's own prompts.
 
+    That tail's gentleness is also its ceiling: it cannot mend a mouth fused
+    into its teeth or a hand with a finger too many, because the denoise that
+    would redraw them redraws everything else too. ``detail_fix`` adds a second
+    stage past it (:meth:`WorkflowTemplate.detail_fix_nodes`) that finds the
+    faces and hands and re-samples each one alone, at its own much higher
+    denoise, leaving every pixel outside those regions exactly as the tail left
+    it. Off by default: it needs detectors installed, and it costs a sampling
+    run per region found.
+
     Machinery, not a peer workflow (``selectable`` False): its results are
     upgrades of existing images, not generations with a shared nature, so it
     never appears in the Generate dropdown and its finished rows never live in
@@ -30,7 +44,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     """
 
     name = "image_enhance"
-    version = "v001"
+    version = "v002"
     display_name = "Image Enhance"
     output_type = "image"
     derives_size_from_input = True
@@ -53,12 +67,17 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
+            "detail_fix": False,
+            "detail_denoise": 0.45,
+            "face_detector": _DEFAULT_FACE_DETECTOR,
+            "hand_detector": _DEFAULT_HAND_DETECTOR,
             "filename_prefix": "image/image_enhance",
         }
 
     def param_definitions(self) -> list[ParamDef]:
         checkpoints = list_model_files("checkpoints", [_DEFAULT_CHECKPOINT])
         upscalers = list_model_files("upscale_models", [_DEFAULT_UPSCALE_MODEL])
+        detectors = list_detector_files()
         return [
             ParamDef("input_image", "Image", "image", ""),
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
@@ -73,6 +92,15 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
+            ParamDef("detail_fix", "Fix Faces & Hands", "bool", False),
+            # Floored above zero: the detailer node rejects 0, and a pass that
+            # repaints nothing is a slower way of not running one.
+            ParamDef("detail_denoise", "Detail Denoise", "float", 0.45,
+                     min_val=0.05, max_val=1.0, step=0.05),
+            ParamDef("face_detector", "Face Detector", "combo",
+                     _DEFAULT_FACE_DETECTOR, options=detectors),
+            ParamDef("hand_detector", "Hand Detector", "combo",
+                     _DEFAULT_HAND_DETECTOR, options=detectors),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/image_enhance"),
         ]
 
@@ -109,6 +137,12 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                     "crop": "disabled",
                 },
             }
+        detail, saved_ref = self.detail_fix_nodes(
+            ("13", "14", "15"), ("16", "17", "18"),
+            image_ref=enhanced_ref, model_ref=["2", 0], clip_ref=["2", 1],
+            vae_ref=["5", 0], positive_ref=["3", 0], negative_ref=["4", 0],
+            params=params,
+        )
         return {
             "1": {
                 "class_type": "LoadImage",
@@ -131,10 +165,11 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "inputs": {"vae_name": params["vae"]},
             },
             **tail,
+            **detail,
             "12": {
                 "class_type": "SaveImage",
                 "inputs": {
-                    "images": enhanced_ref,
+                    "images": saved_ref,
                     "filename_prefix": params["filename_prefix"],
                 },
             },

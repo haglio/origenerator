@@ -172,6 +172,26 @@ PARAM_HELP: dict[str, str] = {
         "skin and fabric texture; by 0.3 it starts re-imagining anatomy, which is "
         "where creases turn into wounds."
     ),
+    "detail_fix": (
+        "Whether the enhance goes back over the faces and hands it finds and "
+        "redraws each one on its own. That is what mends a mouth melted into "
+        "its teeth or a finger too many — damage the whole-picture pass is far "
+        "too gentle to reach."
+    ),
+    "detail_denoise": (
+        "How far the face and hand pass may stray from what it found. It can "
+        "afford to be bold where the whole-picture pass cannot, since nothing "
+        "outside those regions is touched: around 0.45 actually re-forms a bad "
+        "hand, while below 0.3 it only tidies the one it was given."
+    ),
+    "face_detector": (
+        "The model that finds the faces to redraw. Drop more into ComfyUI's "
+        "models/ultralytics/bbox folder and they appear here."
+    ),
+    "hand_detector": (
+        "The model that finds the hands to redraw. Hands are the harder find of "
+        "the two, so a miss here means that hand is simply left as it was."
+    ),
 
     # --- structure transfer ---
     "control_mode": (

@@ -66,6 +66,7 @@ class GenerateConfigPanel(QWidget):
     """
 
     title_changed = pyqtSignal(str)     # current tab title
+    form_replaced = pyqtSignal()        # a new workflow swapped the param form out
     strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
@@ -355,6 +356,14 @@ class GenerateConfigPanel(QWidget):
         self._param_form = form
         self._param_form.changed.connect(self._emit_title)
         self._form_host_box.addWidget(self._param_form)
+        # Announced while the outgoing form is still alive (Qt defers the actual
+        # deletion), so an open find can let go of its fields before they die.
+        self.form_replaced.emit()
+
+    def prompt_fields(self) -> list:
+        """This tab's prompt inputs, for a find over the words it would generate
+        from. Empty until a workflow's form is installed."""
+        return self._param_form.text_fields() if self._param_form is not None else []
 
     def _emit_title(self):
         self.title_changed.emit(self.title())

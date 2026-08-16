@@ -279,6 +279,18 @@ class ParamForm(QWidget):
             return w.toPlainText()
         return w.text()
 
+    def text_fields(self) -> list[QPlainTextEdit]:
+        """The form's multiline text inputs — its prompts — in the order they lay
+        out down the form.
+
+        Every prompt this app has is a multiline ``str`` field (positive, negative,
+        and the Foley audio pair) and nothing else is one, so asking the widgets
+        what they are rather than naming keys means a workflow that grows another
+        prompt is searchable the day it lands. What Ctrl+F searches; see
+        :mod:`origenerator.gui.prompt_find`.
+        """
+        return [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
+
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)
 

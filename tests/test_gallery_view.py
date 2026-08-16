@@ -594,35 +594,120 @@ def test_a_prompt_match_narrows_the_tree_without_navigating(qtbot):
     assert view.selected_generation() is None
 
 
-def test_ctrl_f_puts_the_cursor_in_the_find_box(qtbot, tmp_path, monkeypatch):
-    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    # A widget another test left behind can still read as the active window here,
-    # which the find yields to exactly as Esc does; that guard has its own tests.
-    # This one is about the chord reaching the box at all, app-wide.
+def _press_ctrl_f(view, monkeypatch):
+    """Ctrl+F through the app-wide event filter, with the other-window guard
+    stood down: a widget another test left behind can still read as the active
+    window here, and that guard (shared with Esc) has its own tests."""
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    view._tree.setFocus()
-
-    qtbot.keyClick(view, Qt.Key.Key_F, Qt.KeyboardModifier.ControlModifier)
-
-    assert view.focusWidget() is view._filter_edit
-
-
-def test_ctrl_f_selects_the_old_query_and_works_where_the_gallery_yields_keys(
-        qtbot, tmp_path, monkeypatch):
-    # Focus in a prompt field or a rename editor hands Delete and Undo back to the
-    # widget; Ctrl+F still has to arrive, and it selects what's already there so
-    # the next keystroke starts a fresh search instead of appending to the last.
-    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    view._filter_edit.setText("cat")
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: False)
-
-    handled = view.eventFilter(
+    return view.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, _CTRL))
 
+
+def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    assert not view._find_bar.isVisible()
+
+    assert _press_ctrl_f(view, monkeypatch) is True
+
+    assert view._find_bar.isVisible()
+    assert view._find.fields() == view._info_tabs.current_config_panel().prompt_fields()
+
+
+def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, monkeypatch):
+    # Focus in a prompt field hands Delete and Undo back to the widget; Ctrl+F
+    # still has to arrive, since the field you're typing in is exactly where you
+    # reach for a find.
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: False)
+
+    assert _press_ctrl_f(view, monkeypatch) is True
+
+    assert view._find_bar.isVisible()
+
+
+def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    positive, _negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive.setPlainText("a cat on a windowsill, watching sparrows and more sparrows")
+    _press_ctrl_f(view, monkeypatch)
+
+    view._find_bar._query.setText("sparrows")
+
+    assert view._find.count() == 2
+    assert view._find.position() == 1
+    assert view._find.current_field() is positive
+    assert positive.textCursor().position() == positive.toPlainText().find("sparrows")
+
+
+def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    positive, negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive.setPlainText("a cat")
+    negative.setPlainText("no cat")
+    _press_ctrl_f(view, monkeypatch)
+    view._find_bar._query.setText("cat")
+    assert (view._find.position(), view._find.count()) == (1, 2)
+
+    view._find_bar.step_requested.emit(1)
+    assert view._find.position() == 2
+    assert view._find.current_field() is negative  # on into the next field
+
+    view._find_bar.step_requested.emit(1)
+    assert view._find.position() == 1              # and around again
+    assert view._find.current_field() is positive
+
+
+def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    positive, _negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive.setPlainText("a cat")
+    _press_ctrl_f(view, monkeypatch)
+    view._find_bar._query.setText("cat")
+    assert positive.extraSelections()
+
+    handled = view.eventFilter(
+        view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
+
     assert handled is True
+    assert not view._find_bar.isVisible()
+    assert not positive.extraSelections()  # a closed find leaves no marks behind
+
+
+def test_ctrl_f_falls_back_to_the_tree_find_with_no_tab_open(qtbot, tmp_path, monkeypatch):
+    # Close-all empties the pane, so there are no prompts to search; the chord
+    # goes to the one search the window still has rather than doing nothing.
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    view._info_tabs.close_all_subtabs()
+
+    _press_ctrl_f(view, monkeypatch)
+
+    assert not view._find_bar.isVisible()
     assert view.focusWidget() is view._filter_edit
-    assert view._filter_edit.selectedText() == "cat"
+
+
+def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    first = view._info_tabs.current_config_panel()
+    first.prompt_fields()[0].setPlainText("a cat")
+    _press_ctrl_f(view, monkeypatch)
+    view._find_bar._query.setText("cat")
+    assert view._find.count() == 1
+
+    second = view._info_tabs._add_subtab()  # a fresh tab, its prompts still empty
+
+    assert view._find.fields() == second.prompt_fields()
+    assert view._find.count() == 0
+    assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
+
+
+def test_closing_the_last_tab_puts_an_open_find_away(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _press_ctrl_f(view, monkeypatch)
+    assert view._find_bar.isVisible()
+
+    view._info_tabs.close_all_subtabs()
+
+    assert not view._find_bar.isVisible()
 
 
 def test_renaming_a_folder_persists_and_relabels_it(qtbot):
@@ -2228,7 +2313,9 @@ def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     # special or permanent tab. The first one opens on construction, hosting the
     # preview a selection lands in.
     assert isinstance(view._info_tabs, QTabWidget)
-    assert view._panes.widget(2) is view._info_tabs
+    # The pane is the tabs plus the find strip that searches them, so the splitter
+    # holds a wrapper rather than the tab widget itself.
+    assert view._panes.widget(2).isAncestorOf(view._info_tabs)
     assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
     assert view._info_tabs.widget(0).isAncestorOf(view._preview)
 

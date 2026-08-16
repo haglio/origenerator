@@ -31,7 +31,9 @@ from origenerator.generation_config import (
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.gui.find_bar import FindBar
 from origenerator.gui.folder_tree import FolderTree
+from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.auto_generate_view import AutoGenerateView
@@ -281,15 +283,21 @@ class GalleryView(QWidget):
             # Esc has to reach the device (and any auto loop) from there too.
             if event.key() == Qt.Key.Key_Escape and self._handle_escape():
                 return True
-            # Ctrl+F reaches the find box from wherever focus happens to be —
-            # including a config tab's prompt field and the tree's own rename
-            # editor, which the gallery otherwise hands its keys to. Searching is
-            # what the chord means everywhere else, and nothing in this window
-            # competes for it, so it is answered before that yielding happens.
+            # Esc puts the find away — after the panic-stop above has had it, so a
+            # running device still stops on the first press whatever is open.
+            if (event.key() == Qt.Key.Key_Escape and self._find_bar.isVisible()
+                    and not self._other_window_owns_keys()):
+                self._close_find()
+                return True
+            # Ctrl+F opens the find from wherever focus happens to be — including
+            # the prompt field it will search, and the tree's rename editor, both
+            # of which the gallery otherwise hands its keys to. Searching is what
+            # the chord means everywhere else and nothing in this window competes
+            # for it, so it is answered before that yielding happens.
             if (event.key() == Qt.Key.Key_F
                     and event.modifiers() & Qt.KeyboardModifier.ControlModifier
                     and self.isVisible() and not self._other_window_owns_keys()):
-                self._focus_find()
+                self._open_find()
                 return True
             if self._gallery_owns_keys():
                 # Delete removes the selection. Insert does too: some keyboards send
@@ -400,13 +408,15 @@ class GalleryView(QWidget):
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
         toc_box.addWidget(self._voice_status)
-        # The gallery's find, and what Ctrl+F lands in: type any of a folder's
-        # name (prompt / model / LoRA / workflow) to narrow the tree to matching
-        # branches, a word from anywhere in a generation's positive or negative
-        # prompt — past the headline the folder label truncates to — or a seed to
-        # jump straight to that one generation. Sits above the tree it searches.
+        # The find over the tree: type any of a folder's name (prompt / model /
+        # LoRA / workflow) to narrow it to matching branches, a word from anywhere
+        # in a generation's positive or negative prompt — past the headline the
+        # folder label truncates to — or a seed to jump straight to that one
+        # generation. Sits above the tree it searches. Its counterpart is the find
+        # strip below the info pane, which searches *inside* the open tab's
+        # prompts rather than across the gallery's folders.
         self._filter_edit = QLineEdit()
-        self._filter_edit.setPlaceholderText("Find…  (Ctrl+F)")
+        self._filter_edit.setPlaceholderText("Find a folder…")
         self._filter_edit.setToolTip(
             "Find folders by name, generations by anything in their prompt, or "
             "one generation by its seed"
@@ -636,7 +646,20 @@ class GalleryView(QWidget):
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
-        self._panes.addWidget(self._info_tabs)
+        # The find strip, at the foot of the info pane where the prompts it
+        # searches are. Ctrl+F opens it over the front tab's prompt fields; it
+        # takes no room until then, and closing it clears every mark it painted.
+        self._find = PromptFind()
+        self._find_bar = FindBar()
+        self._find_bar.query_changed.connect(self._on_find_query)
+        self._find_bar.step_requested.connect(self._on_find_step)
+        self._find_bar.dismissed.connect(self._close_find)
+        info_pane = QWidget()
+        info_box = QVBoxLayout(info_pane)
+        info_box.setContentsMargins(0, 0, 0, 0)
+        info_box.addWidget(self._info_tabs, 1)
+        info_box.addWidget(self._find_bar)
+        self._panes.addWidget(info_pane)
         # A thumbnail double-click reuses its parameters by forking an editable
         # config tab in this same pane (a no-op without a client — nothing to run);
         # the fork's footer links are wired via tab_added like every other tab.
@@ -651,6 +674,7 @@ class GalleryView(QWidget):
         toc.setMinimumWidth(120)
         browser.setMinimumWidth(210)
         self._info_tabs.setMinimumWidth(300)
+        info_pane.setMinimumWidth(300)  # the pane in the splitter is the wrapper now
         self._panes.setStretchFactor(0, 0)
         self._panes.setStretchFactor(1, 3)
         self._panes.setStretchFactor(2, 2)
@@ -712,6 +736,13 @@ class GalleryView(QWidget):
         # browser thumbnail (see :meth:`_on_generation_drag_started`).
         panel.preview_drag_started.connect(self._on_generation_drag_started)
         panel.preview_drag_ended.connect(self._on_generation_drag_ended)
+        # Picking a different workflow builds a whole new form, so an open find
+        # has to let go of the fields it was holding before they're destroyed.
+        panel.form_replaced.connect(self._retarget_find)
+        # A tab's title is recomputed from its prompt on every keystroke, so this
+        # is also the signal that the text an open find is marking up has moved
+        # under it — re-run rather than leave highlights on words that shifted.
+        panel.title_changed.connect(self._refresh_find)
 
     # --- Drive OSR2: a single global toggle following the front video ----------
 
@@ -985,10 +1016,12 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
-        """The front config tab changed: re-aim the OSR2 drive at its video, and
-        re-evaluate whether that tab's folder is generating (its Cancel button)."""
+        """The front config tab changed: re-aim the OSR2 drive at its video,
+        re-evaluate whether that tab's folder is generating (its Cancel button),
+        and point an open find at the prompts now in front."""
         self._reconcile_osr2()
         self._reconcile_generating()
+        self._retarget_find()
 
     def osr2_enabled(self) -> bool:
         """Whether the global OSR2 toggle is on (for session persistence)."""
@@ -1391,13 +1424,67 @@ class GalleryView(QWidget):
         if prompt_id and prompt_id in self._browser.visible_prompt_ids():
             self._on_thumbnail_clicked(prompt_id)
 
-    def _focus_find(self):
-        """Put the cursor in the find box with whatever is there selected, so
-        Ctrl+F starts a fresh search — the old query stays on screen and in force
-        until the first keystroke replaces it, and Ctrl+F on an already-focused box
-        re-selects rather than doing nothing."""
-        self._filter_edit.setFocus(Qt.FocusReason.ShortcutFocusReason)
-        self._filter_edit.selectAll()
+    # --- find in the open tab's prompts (Ctrl+F) ------------------------------
+
+    def _open_find(self):
+        """Ctrl+F: open the find strip over the front tab's prompt fields, its
+        standing query re-run against them.
+
+        With no tab open — the pane emptied by close-all — there are no prompts to
+        search, so the chord goes to the tree's own find instead: the one search
+        the window still has. It never does nothing.
+        """
+        fields = self._prompt_fields()
+        if not fields:
+            self._filter_edit.setFocus(Qt.FocusReason.ShortcutFocusReason)
+            self._filter_edit.selectAll()
+            return
+        self._find.set_fields(fields)
+        self._find_bar.open_find()
+        self._on_find_query(self._find_bar.query())
+
+    def _prompt_fields(self) -> list:
+        """The prompt inputs of the config tab in front — what a find searches."""
+        panel = self._info_tabs.current_config_panel()
+        return panel.prompt_fields() if panel is not None else []
+
+    def _on_find_query(self, text: str):
+        self._find.search(text)
+        self._sync_find_count()
+
+    def _on_find_step(self, delta: int):
+        self._find.step(delta)
+        self._sync_find_count()
+
+    def _sync_find_count(self):
+        self._find_bar.show_count(self._find.position(), self._find.count())
+
+    def _retarget_find(self):
+        """Point an open find at the front tab's prompts — after a tab switch, a
+        tab closing, or a workflow swap replacing the form under it. With nothing
+        left to search it puts itself away rather than sitting over an empty pane."""
+        if not self._find_bar.isVisible():
+            return
+        fields = self._prompt_fields()
+        if not fields:
+            self._close_find()
+            return
+        self._find.set_fields(fields)
+        self._on_find_query(self._find_bar.query())
+
+    def _refresh_find(self):
+        """Re-run the open find over a prompt the user has just edited, keeping
+        their place in the results — highlights left over a changed prompt would
+        be marking words that have moved."""
+        if self._find_bar.isVisible():
+            self._find.refresh()
+            self._sync_find_count()
+
+    def _close_find(self):
+        """Put the find away: the strip hidden and every highlight it painted
+        gone, so a closed find leaves no marks in the prompts."""
+        self._find.clear()
+        self._find_bar.hide()
 
     def _on_filter_changed(self, text: str):
         self._tree_view.apply_filter(text)

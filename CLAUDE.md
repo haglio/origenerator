@@ -49,13 +49,21 @@ courtesy notice: the queue lands the change while he is still clicking (that is
 what happened on #33, 2026-08-13). Three delivery lessons from the session that
 forced this flow into existence (2026-08-12):
 
-- Launch the preview once yourself and confirm it comes up clean (the launcher
-  logs to `state\origenerator_launcher.log`) before handing it over, then close
-  **that instance only**. Every Origenerator window is a `python` process titled
-  "Origenerator" — the user's live app and other agents' previews included — so
-  a close that matches on the title shuts his running app too (that happened,
-  2026-08-13). Snapshot the pids before launching and close only the new one.
-- Hand a `file:///` markdown link to the vbs FILE itself — never its folder,
+- **NEVER launch the preview yourself. Hand the link and stop.** Running the vbs
+  puts an app window over whatever he is doing and takes his focus — something
+  popping up unannounced, which he closes in irritation, and his live app goes
+  with it (both instances I launched and his running app were gone inside two
+  minutes, 2026-08-15; he asked for this law by name). Launching is HIS act, on
+  his schedule: the green suite is the pre-handoff check, and a launcher that
+  fails he will tell you about in one line. This overrides the older "launch it
+  once yourself to confirm it comes up clean" rule, which is what produced the
+  failure. Same reason his live app must never be closed by you — every
+  Origenerator window is a `python` process titled "Origenerator", so a
+  title-matched close shuts his app too (2026-08-13). The near miss that still
+  counts: launching it "just for a few seconds" to read
+  `state\origenerator_launcher.log` — those seconds are the window on his screen,
+  and that is the whole failure.
+- Hand a launcher link to the vbs FILE itself — never its folder,
   never a shell command, and never any launcher sharing a filename with the
   live app's. The user was once handed the worktree's `launch_origenerator.vbs`
   by that name; he clicked the identically named launcher he runs daily, and a

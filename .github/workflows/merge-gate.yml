@@ -11,6 +11,12 @@ name: merge gate (full suite)
 # mode -- the repo dir shares the package's name and would otherwise win as a
 # namespace shadow.
 #
+# app_support is a sibling package too, and unlike the other two it IS installed:
+# origenerator asks it to name this process in the task list, and the tests read
+# the naming rules from it rather than restating them. The app's own import of it
+# is guarded -- a missing app_support costs the name and nothing else -- but a
+# test suite that cannot import it cannot check the rules at all.
+#
 # shared_ui and player_core are sibling packages origenerator imports via
 # sys.path (paths.py walks up to the directory that contains each), NOT pip
 # dependencies. So we check them out ADJACENT to origenerator under the
@@ -63,12 +69,18 @@ jobs:
         with:
           repository: haglio/player_core
           path: player_core
+      - name: Check out app_support adjacent (installed below)
+        uses: actions/checkout@v4
+        with:
+          repository: haglio/app_support
+          path: app_support
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install (editable, compat mode)
         run: |
           python -m pip install --upgrade pip
+          pip install -e ../app_support --config-settings editable_mode=compat
           pip install -e ".[dev]" --config-settings editable_mode=compat
       - name: Run the suite
         run: python -m pytest -q

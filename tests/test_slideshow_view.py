@@ -264,3 +264,15 @@ def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.paused
     assert view._note.isHidden()
+
+
+def test_the_enhancing_note_sits_above_the_counter_not_over_the_console(qtbot):
+    # genau's console holds the top-left corner of this view too.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view.resize(800, 600)
+    _press(view, Qt.Key.Key_Down)
+
+    note, counter = view._note.geometry(), view._counter.geometry()
+    assert note.top() > view.height() // 2      # bottom half, clear of the console
+    assert note.bottom() <= counter.top()       # stacked with it, not over it
+    assert abs(note.center().x() - view.width() // 2) <= 1

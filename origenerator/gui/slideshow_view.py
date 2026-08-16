@@ -235,30 +235,41 @@ class SlideshowView(QWidget):
         """
         if self._on_enhance is None or not self._enhance_on_hold:
             return
-        item = self._playlist.current()
-        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        prompt_id = self._current_prompt_id()
         if prompt_id is None or prompt_id in self._enhancing:
             return
         if self._on_enhance(prompt_id):
             self._enhancing.add(prompt_id)
             self._refresh_note()
 
-    def note_enhanced(self, prompt_id: str, path, media_type: str = "image") -> None:
-        """An enhancement this view asked for landed: show it in place.
+    def note_enhanced(self, prompt_id: str, path, media_type: str = "image",
+                      still=None) -> None:
+        """An enhancement of one of these items landed: the show points at it
+        from here on, wherever that item sits in the running order.
 
-        The slide is replaced only while it is still the one on screen — pages
-        on, and the new version is simply what the folder holds next time round.
+        Not only while it is the one on screen. It was asked for minutes ago and
+        the show has paged on since; and the playlist is the fixed set the show
+        opened with — nothing re-reads the folder — so a swap confined to the
+        current slide would leave every later pass replaying the version this
+        one replaced. What is on screen changes only when the upgraded item is
+        what's on it.
         """
         self._enhancing.discard(prompt_id)
-        replaced = self._playlist.replace_current(path, prompt_id)
-        if replaced:
-            self._preview.show_media(path, media_type)
+        if self._playlist.replace_item(prompt_id, path, media_type, still):
+            if self._current_prompt_id() == prompt_id:
+                self._preview.show_media(path, media_type)
+            self._update_neighbors()  # it may be the still riding either side
         self._refresh_note()
+
+    def _current_prompt_id(self):
+        """The id of the item on screen, or ``None`` — a playlist assembled
+        without ids (a test's) names nothing."""
+        item = self._playlist.current()
+        return item[2] if item is not None and len(item) > 2 else None
 
     def _refresh_note(self):
         """Show "Enhancing…" while the slide on screen has a run in flight."""
-        item = self._playlist.current()
-        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        prompt_id = self._current_prompt_id()
         if prompt_id is not None and prompt_id in self._enhancing:
             self._note.setText("Enhancing…")
             self._note.show()
@@ -297,8 +308,7 @@ class SlideshowView(QWidget):
         """Enter: leave the slideshow and hand its item to the gallery, which
         opens the folder it lives in — the way out of a shelf's slideshow, where
         what you're watching came from folders all over the tree."""
-        item = self._playlist.current()
-        prompt_id = item[2] if item is not None and len(item) > 2 else None
+        prompt_id = self._current_prompt_id()
         self.close()
         if prompt_id is not None:
             self.open_requested.emit(prompt_id)

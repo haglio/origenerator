@@ -136,6 +136,33 @@ def test_a_completion_takes_over_the_live_slot_on_screen(qtbot, tmp_path):
     assert view._playlist.live             # ...with the next launch's slot trailing
 
 
+def test_an_enhancement_upgrades_its_item_on_screen(qtbot, tmp_path):
+    # With the Enhance panel's Auto box on, an item joins the rotation as its
+    # base render and is upgraded minutes later — on screen right there when it
+    # is what's showing.
+    view = _view(qtbot, seeded=1, tmp_path=tmp_path)
+    _press(view, Qt.Key.Key_Left)  # onto id-0
+    better = _png(tmp_path / "seed0_enhanced.png")
+
+    view.note_enhanced("id-0", better)
+
+    assert view._preview._media == (better, "image")
+    assert view._playlist.current()[0] == better
+
+
+def test_an_enhancement_of_an_item_off_screen_upgrades_it_where_it_sits(
+        qtbot, tmp_path):
+    view = _view(qtbot, seeded=2, tmp_path=tmp_path)  # on the live slot
+    better = _png(tmp_path / "seed0_enhanced.png")
+    better_thumb = _png(tmp_path / "seed0_enhanced_thumb.png")
+
+    view.note_enhanced("id-0", better, still=better_thumb)
+
+    assert view._preview._media is None                 # the live slot is untouched
+    assert view._playlist.peek(1)[0] == better          # it comes round upgraded
+    assert better_thumb in view._neighbors._sources     # and rides along as its new still
+
+
 def test_up_on_the_live_slot_asks_to_cancel(qtbot):
     view = _view(qtbot)
     view.show_live_frame(_png_bytes())

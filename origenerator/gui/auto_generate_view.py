@@ -5,7 +5,8 @@ view cycles through everything the loop has produced so far — each finished it
 in the order it was generated, plus a trailing slot showing the low-res frames
 of the generation currently streaming — instead of staring only at the in-flight
 image. It is a dumb display driven by the gallery, which seeds it, feeds it the
-loop's live frames and finished items, and reacts to its signals.
+loop's live frames, its finished items and the enhancements that later land on
+them, and reacts to its signals.
 
 The arrow keys are laid out like a Fun Time satellite's controls:
 
@@ -126,6 +127,23 @@ class AutoGenerateView(QWidget):
         else:
             self._update_counter()
             self._update_neighbors()
+
+    def note_enhanced(self, prompt_id: str, path, media_type: str = "image",
+                      still=None) -> None:
+        """An enhancement of one of the finished items landed: the rotation
+        points at it from here on — on screen if that item is what's showing,
+        and as its own neighbor still either way.
+
+        A loop running with the Enhance panel's Auto box on enhances everything
+        it lands, so an item joins the rotation as its base render and is
+        upgraded a few minutes later; the ids are what tie the two together.
+        """
+        if not self._playlist.replace_item(prompt_id, path, media_type, still):
+            return
+        current = self._playlist.current()
+        if current is not None and current is not LIVE and current[2] == prompt_id:
+            self._preview.show_media(path, media_type)
+        self._update_neighbors()
 
     def set_generating(self, generating: bool) -> None:
         """Add or drop the rotation's live slot as the loop starts or ends."""

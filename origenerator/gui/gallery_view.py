@@ -1860,17 +1860,28 @@ class GalleryView(QWidget):
         return True
 
     def _feed_slideshow_enhanced(self, row: dict | None):
-        """Hand a landed enhancement back to whichever full-screen surface asked
-        for it, so what is on screen becomes the better version without waiting
-        for a new pass. Both are told; each ignores an id it isn't showing."""
+        """Hand a landed enhancement to every full-screen surface, so the item
+        becomes the better version there rather than the version it was made
+        from. All three are told; each ignores an id it isn't holding.
+
+        Not only the surface that asked for it, and not only while that item is
+        the one on screen: a running slideshow plays a set fixed when it opened,
+        so an upgrade it doesn't take here it never takes at all. The two
+        rotations also draw each item small as a neighbor, so they take the new
+        thumbnail with the file; the fullscreen view shows only the file.
+        """
         if row is None:
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
-        for surface in (self._slideshow, self._fullscreen_preview):
-            if surface is not None:
-                surface.note_enhanced(row["prompt_id"], preview[0], preview[1])
+        for rotation in (self._slideshow, self._auto_montage):
+            if rotation is not None:
+                rotation.note_enhanced(row["prompt_id"], preview[0], preview[1],
+                                       still=row.get("thumbnail_path"))
+        if self._fullscreen_preview is not None:
+            self._fullscreen_preview.note_enhanced(row["prompt_id"], preview[0],
+                                                   preview[1])
 
     def is_enhancing(self, row: dict) -> bool:
         """Whether a standalone enhance of this image is running right now.

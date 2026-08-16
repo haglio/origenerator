@@ -174,12 +174,18 @@ class GenerateConfigPanel(QWidget):
         self._form_host_box = QVBoxLayout(self._form_host)
         self._form_host_box.setContentsMargins(0, 0, 0, 0)
         body.addWidget(self._form_host)
-        body.addStretch(1)  # push the related-media tiles below to the bottom
 
-        # The displayed generation's related media, at the bottom of the scroll just
-        # above the buttons: a clickable source-image tile for a video, or the
-        # "animated in" strip for an image. Mutually exclusive; both hidden when the
-        # tab isn't showing a saved generation.
+        # The displayed generation's related media, below the form: a clickable
+        # source-image tile for a video, or the "animated in" strip for an image.
+        # Mutually exclusive; both hidden when the tab isn't showing a saved
+        # generation.
+        #
+        # Stacked straight under it, with no stretch between. A stretch here used
+        # to push these to the bottom of the viewport, which meant folding a form
+        # section opened an elastic gap above them — the space growing by exactly
+        # what the fold saved, so the closer the form got the further away they
+        # went. Every gap in this column is the layout's spacing now, the same as
+        # between the form's own sections.
         self._source_tile = SourceImageTile()
         self._source_tile.activated.connect(self.source_activated)
         body.addWidget(self._source_tile)
@@ -195,6 +201,9 @@ class GenerateConfigPanel(QWidget):
         self._versions.level_selected.connect(self._show_level)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         body.addWidget(self._versions)
+        # The slack goes here, under everything, so a short column rests at the
+        # top of the scroll rather than spreading itself out.
+        body.addStretch(1)
 
         self._scroll.setWidget(body_host)
         main_box.addWidget(self._scroll, 4)

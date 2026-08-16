@@ -1056,3 +1056,25 @@ def test_send_to_evolver_warns_and_survives_a_failed_copy(saved_panel, monkeypat
     panel._on_send_to_evolver()  # must not raise
 
     warn.assert_called_once()
+
+
+def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
+    # A stretch between the form and the sections under it grew by exactly what
+    # each fold saved, so the closer the form got the further away they went.
+    panel, db = saved_panel
+    panel.show_saved_generation(_enhanced_image_row(db), [])
+    panel.resize(480, 900)
+    panel.show()
+
+    def gap():
+        form = panel._form_host
+        return panel._versions.mapTo(panel, panel._versions.rect().topLeft()).y() \
+            - (form.mapTo(panel, form.rect().topLeft()).y() + form.height())
+
+    before = gap()
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(True)
+    panel._param_form.adjustSize()
+    panel.layout().activate()
+
+    assert gap() == before   # the column closed up; the space did not move down

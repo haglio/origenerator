@@ -429,6 +429,10 @@ class BrowserPane:
         self.show_widget(container if self._experiment_rows
                          else self._empty_state(self._experiments_empty_hint()))
 
+    def showing_experiments(self) -> bool:
+        return (self._v._experiments_item is not None
+                and self._v._tree.currentItem() is self._v._experiments_item)
+
     def _experiments_empty_hint(self) -> str:
         if is_branch_session():
             return ("Reviewing experiments is the live app's.\n\nA preview's "
@@ -503,10 +507,11 @@ class BrowserPane:
         off the shelves, where a folder is what's on screen instead.
 
         The slideshow plays these, so they have to match the tiles: Recents is its
-        listed items (the media-type filter already applied), and Starred is its
+        listed items (the media-type filter already applied), Starred is its
         starred items plus everything under each bookmarked folder, since a folder
-        tile there stands for its whole folder. A starred item inside a starred
-        folder is one item, so repeats drop out.
+        tile there stands for its whole folder, and Experiments is its unreviewed
+        queue. A starred item inside a starred folder is one item, so repeats drop
+        out.
         """
         if self.showing_recents():
             return list(self._recent_rows)
@@ -514,6 +519,8 @@ class BrowserPane:
             return _unique_rows(self._starred_rows + [
                 row for group in self._starred_groups for row in gallery.rows_under(group)
             ])
+        if self.showing_experiments():
+            return list(self._experiment_rows)
         return None
 
     # --- the thumbnail grid: a settings leaf's generations ------------------

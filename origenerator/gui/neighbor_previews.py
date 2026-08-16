@@ -90,6 +90,10 @@ class NeighborPreviews:
             "background: rgba(0, 0, 0, 140); padding: 4px; border-radius: 4px;"
         )
         label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # Native, because a video surface is a native window on Windows and a
+        # plain sibling cannot paint over one however it is stacked — which is
+        # why these stills showed beside an image and vanished beside a clip.
+        label.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         label.hide()
         return label
 

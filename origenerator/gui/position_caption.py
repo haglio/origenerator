@@ -21,6 +21,11 @@ class PositionCaption(QLabel):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # A video surface is a native window on Windows, and a plain sibling
+        # widget cannot paint over one however it is stacked — which is why this
+        # plate showed over an image and vanished over a clip. Native itself, it
+        # stacks against the video by Z-order like any other window.
+        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
 
     def show_position(self, position: int, total: int, suffix: str = "") -> None:
         """Say the 1-based ``position`` out of ``total``, plus any ``suffix``."""
@@ -33,3 +38,4 @@ class PositionCaption(QLabel):
         x = (host.width() - self.width()) // 2
         y = host.height() - self.height() - _BOTTOM_MARGIN
         self.move(max(0, x), max(0, y))
+        self.raise_()  # over the media, video surface included

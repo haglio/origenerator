@@ -54,8 +54,10 @@ def session_trash(root: Path):
 
     Its ``purge_orphans`` does nothing for the same reason, which also spares
     the trash previews filled before they stopped taking files: those batches
-    hold the only copies left of what they took. The recovery bin is out of a
-    preview's reach on the same grounds — see ``GalleryView._bin_records``.
+    hold the only copies left of what they took. Taking no files is also what
+    keeps a preview's own deletes recoverable *within* the preview while the
+    live install's held deletes stay out of reach — see
+    ``GalleryView._bin_records``.
     """
     from origenerator.trash import NoTrash, Trash
     return NoTrash() if is_branch_session() else Trash(root)

@@ -71,7 +71,7 @@ def test_down_toggles_the_lock_and_the_caption_reflects_it(qtbot):
 
 def test_stepping_away_releases_the_lock(qtbot):
     # Right off a held slide is the way out of the hold — no second Down needed,
-    # matching the auto-generate slideshow and Fun Time's next/prev.
+    # matching Fun Time's next/prev.
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Right)

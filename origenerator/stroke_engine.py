@@ -1,7 +1,7 @@
 """The stroke this app drives the OSR2 with — genau's, plus the phase.
 
-The auto-generate slideshow shows images, and an image gives the device nothing
-to follow, so this supplies the motion instead. None of the motion is written
+The slideshow shows images, and an image gives the device nothing to follow, so
+this supplies the motion instead. None of the motion is written
 here: the waveform, the speed dial's exponential map, the amplitude and centre
 arithmetic and the hands-free variation of all three are
 :mod:`player_core.direct_control` and :mod:`player_core.cruise_control` — genau's

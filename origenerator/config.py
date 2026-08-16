@@ -97,6 +97,13 @@ COMFYUI_PORT = 8188
 EVOLVER_INBOX_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 
+# The curated pose references the SDXL Pose Transfer workflow is steered by. Its
+# Structure Image picker opens here rather than in ComfyUI's input folder, which
+# collects generated frames instead; LoadImage takes the absolute path back
+# unchanged, so drawing the input from outside costs nothing. Built from the
+# library root because that root is private and must stay out of source.
+CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
+
 THUMB_SIZE = (256, 256)
 
 # --- Funscript / OSR2 -------------------------------------------------------

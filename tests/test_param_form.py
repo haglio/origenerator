@@ -596,6 +596,44 @@ def test_param_form_browse_defaults_to_input_dir(qtbot, monkeypatch):
     assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
 
 
+def test_param_form_browse_opens_in_the_folder_the_param_names(qtbot, monkeypatch, tmp_path):
+    # A workflow whose source images live outside ComfyUI's input folder names
+    # that folder on its ParamDef, and the picker opens there instead.
+    poses = tmp_path / "custom_poses"
+    poses.mkdir()
+    captured = {}
+    _stub_file_dialog(monkeypatch, "", captured)
+
+    form = ParamForm(
+        [ParamDef("input_image", "Structure Image", "image", "", browse_dir=poses)]
+    )
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert captured["dir"] == str(poses)
+
+
+def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
+    qtbot, monkeypatch, tmp_path
+):
+    # A checkout without the media library has no such folder; opening the dialog
+    # on a path that isn't there drops it wherever the process happens to sit, so
+    # the picker falls back to ComfyUI's input folder.
+    import origenerator.gui.param_form as pf
+
+    captured = {}
+    _stub_file_dialog(monkeypatch, "", captured)
+
+    form = ParamForm([
+        ParamDef("input_image", "Structure Image", "image", "",
+                 browse_dir=tmp_path / "not_installed"),
+    ])
+    qtbot.addWidget(form)
+    form._browse_buttons["input_image"].click()
+
+    assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
+
+
 def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, tmp_path):
     img = tmp_path / "cat.png"
     img.write_bytes(b"\x89PNG")

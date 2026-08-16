@@ -40,15 +40,15 @@ it would have duplicated.
 import json
 
 from PyQt6.QtWidgets import (
-    QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu,
-    QVBoxLayout, QWidget,
+    QApplication, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
+    QMenu, QVBoxLayout, QWidget,
 )
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.metadata_block import label_column_width, meta_row
+from origenerator.gui.metadata_block import label_column_width, meta_cells
 
 # A dragged enhancement level carries the params that produced it under this
 # type; the Enhance subpanel reads it to absorb those settings.
@@ -62,13 +62,20 @@ _PENDING_BORDER = "2px solid #3080e0"
 # wears while the row that would duplicate it is hovered.
 _ADD_BORDER = "1px dashed #808080"
 _MATCH_BORDER = "2px solid #30a030"
+# Which grid column a fact's value sits in: the one that stretches, and the one
+# cell of a line that fills its height rather than sitting at the top of it.
+_VALUE_COLUMN = 1
+# Every key a row can carry. Each row is its own grid, so its key column would
+# otherwise size to its own longest key — and the values would step in and out
+# down the list as rows gain or lose the Enhancement line (the original has
+# none). Sized to the widest of these, they line up all the way down.
+_FACT_KEYS = ("Enhancement", "File", "Created")
 # A picked row lightens, the way a picked thumbnail does — same fill, so "this
-# one is selected" reads the same in both places. The children have to be made
+# one is selected" reads the same in both places. The labels have to be made
 # transparent for it to show at all: the app's global ``QWidget`` background
-# paints every label and container opaque over whatever the row fills with, and
-# the fill would otherwise appear only in the gaps between them.
-_ROW_CSS = ("#levelRow QLabel, #levelRow #levelFactRow"
-            " { background-color: transparent; }")
+# paints every one of them opaque over whatever the row fills with, and the fill
+# would otherwise appear only in the gaps between them.
+_ROW_CSS = "#levelRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
     "#levelRow { background-color: #3a3a3a; border-radius: 4px; }" + _ROW_CSS
 )
@@ -93,6 +100,23 @@ def params_from_mime(mime) -> dict | None:
     return params if isinstance(params, dict) else None
 
 
+def _pass_mouse_through(widget) -> None:
+    """Let clicks, hovers and right-clicks on this child reach the row it is in.
+
+    A row is one thing to click — anywhere on it picks that version — but its
+    picture and its lines of text cover nearly all of it, and a child widget
+    takes the press by default. That left only the margins around them live.
+
+    It also settles which context menu a right-click gets. The value labels come
+    from the metadata block, where they are selectable text, and Qt gives
+    selectable text its own Copy / Select All menu; over a version that menu is
+    both meaningless (there is a Copy button on the row, for the one value worth
+    copying) and in the way of the row's own Delete.
+    """
+    widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+    widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+
+
 class _Row(QWidget):
     """The shape every entry in the list shares: a picture, then a bold title
     over a column of ``label: value`` facts.
@@ -115,32 +139,53 @@ class _Row(QWidget):
         self._picture.setFixedSize(_TILE, _TILE)
         self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._picture.setWordWrap(True)
+        _pass_mouse_through(self._picture)
         box.addWidget(self._picture, 0, Qt.AlignmentFlag.AlignTop)
-        facts = QVBoxLayout()
+        # A grid rather than a row of rows: a container widget per fact would
+        # take every click landing on it, and Qt's hit test skips a container
+        # marked transparent along with the buttons inside it — so there would be
+        # no arrangement of that shape where both the row and its buttons are
+        # clickable. Laid straight into the grid, the only children are labels
+        # (which pass clicks through) and the buttons themselves. The columns
+        # line the keys up across the facts for free.
+        facts = QGridLayout()
         facts.setContentsMargins(0, 0, 0, 0)
-        facts.setSpacing(3)
-        facts.setAlignment(Qt.AlignmentFlag.AlignTop)
+        facts.setHorizontalSpacing(8)
+        facts.setVerticalSpacing(3)
+        facts.setColumnStretch(_VALUE_COLUMN, 1)
         self._title = QLabel(title)
         self._title.setStyleSheet("font-weight: 600; background: transparent;")
-        facts.addWidget(self._title)
+        _pass_mouse_through(self._title)
+        facts.addWidget(self._title, 0, 0, 1, 4)
         self._facts = facts
-        self._fact_rows: list[QWidget] = []
+        self._fact_cells: list[QWidget] = []
         box.addLayout(facts, 1)
 
     def _show_facts(self, items: list[MetaItem]) -> None:
-        """Lay this row's facts out as the same ``label: value`` rows a metadata
-        block uses — so the enhancement that made a version, the file it wrote
+        """Lay this row's facts out as the same ``label: value`` cells a metadata
+        block builds — so the enhancement that made a version, the file it wrote
         and when it was written all read alike, and the file line keeps its copy
         and Show-in-Explorer buttons. Replaces whatever was there."""
-        for widget in self._fact_rows:
+        for widget in self._fact_cells:
             self._facts.removeWidget(widget)
             widget.setParent(None)
             widget.deleteLater()
-        width = label_column_width(items)
-        self._fact_rows = [meta_row(item, width) for item in items]
-        for widget in self._fact_rows:
-            widget.setObjectName("levelFactRow")  # so a selected row shows through it
-            self._facts.addWidget(widget)
+        self._fact_cells = []
+        key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
+        for line, item in enumerate(items, start=1):
+            for column, widget in enumerate(meta_cells(item, key_width)):
+                if widget is None:
+                    continue
+                if isinstance(widget, QLabel):
+                    _pass_mouse_through(widget)
+                # The value fills its cell so it can wrap; a key and a button sit
+                # at the top of a line the value has grown taller than.
+                if column == _VALUE_COLUMN:
+                    self._facts.addWidget(widget, line, column)
+                else:
+                    self._facts.addWidget(widget, line, column,
+                                          Qt.AlignmentFlag.AlignTop)
+                self._fact_cells.append(widget)
 
     def _show_picture(self, pixmap: QPixmap) -> None:
         self._picture.setPixmap(pixmap.scaled(

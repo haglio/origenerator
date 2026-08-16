@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
-from origenerator import gallery, recipe_match, timing
+from origenerator import gallery, recipe_match, recovery, timing
 from origenerator.gui import icons
 from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
@@ -60,6 +60,7 @@ from origenerator.gui.gallery_tree import (
     RECENTS_LABEL as _RECENTS_LABEL,
     STARRED_KEY as _STARRED_KEY,
     STARRED_LABEL as _STARRED_LABEL,
+    TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.navigation import NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
@@ -72,6 +73,10 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
+# The synthetic shelves, as back/forward history locations: each is a place the
+# user can be standing, so a visit to one is recorded and restored by key rather
+# than by the generation that happened to be picked there.
+_SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _TRASH_KEY)
 
 
 def _is_reusable_workflow(workflow_name) -> bool:
@@ -1280,6 +1285,7 @@ class GalleryView(QWidget):
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = self._review_queue(rows)
+        held = recovery.bin_items(self._bin_records())
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
         )
@@ -1288,10 +1294,12 @@ class GalleryView(QWidget):
             gallery.starred_folders(tree_model),
             gallery.starred_generations(rows),
             unreviewed,
+            held,
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()),
                                  experiment_count=len(unreviewed),
+                                 trash_count=len(held),
                                  custom_folders=self._custom_folders)
         self._tree_view.reapply_filter()  # populate rebuilds un-filtered; re-narrow it
         # The rows the old selection group pointed at are gone with the rebuild;
@@ -1376,6 +1384,9 @@ class GalleryView(QWidget):
         if current is self._experiments_item:
             self._sync_experiments_bar()
             self._browser.show_experiments_overview()
+            return
+        if current is self._trash_item:
+            self._browser.show_trash_overview()
             return
         group = current.data(0, _GROUP_ROLE)
         self._note_folder_visit(group.key if group is not None else None)
@@ -1652,6 +1663,10 @@ class GalleryView(QWidget):
     @property
     def _experiments_item(self):
         return self._tree_view.experiments_item
+
+    @property
+    def _trash_item(self):
+        return self._tree_view.trash_item
 
     def _selected_folder_key(self) -> str | None:
         """The selected folder's key (or a shelf's), from the tree renderer."""
@@ -2830,7 +2845,16 @@ class GalleryView(QWidget):
         self.refresh()
 
     def _delete_selection(self):
-        """Delete picked thumbnails, or the current folder if none are picked."""
+        """Delete picked thumbnails, or the current folder if none are picked.
+
+        On the Trash shelf the picked items are already deleted, so Delete means
+        the only deletion left: ending them for good. Same button, same key, the
+        one meaning it can have where it is standing — rather than a control that
+        looks live and quietly does nothing.
+        """
+        if self._browser.showing_trash():
+            self.purge_from_trash(self.selected_prompt_ids())
+            return
         if self._browser.selected_ids:
             rows = [self._db.get_generation(pid) for pid in self.selected_prompt_ids()]
             self._delete_rows([r for r in rows if r])
@@ -2838,6 +2862,71 @@ class GalleryView(QWidget):
         group = self._current_deletable_folder()
         if group is not None:
             self._delete_folder(group)
+
+    # --- the Trash shelf: restoring a delete, or ending it -------------------
+
+    def _bin_records(self) -> list[dict]:
+        """The held deletions the Trash shelf offers — none in a branch session.
+
+        A preview's database is a copy, so it inherits the live install's held
+        deletions, and every path in them points into the live install's trash:
+        restoring from here would move the live app's files out from under rows
+        it is still showing, and purging would destroy the only copies it has.
+        Recovery is the live app's, as reviewing and scheduling are.
+        """
+        return [] if is_branch_session() else self._db.list_deletions()
+
+    def _on_trash_action(self, prompt_id: str, action_id: str):
+        """A Trash tile's hover control: restore this item, or end it now."""
+        if action_id == "restore":
+            self.restore_from_trash([prompt_id])
+        else:
+            self.purge_from_trash([prompt_id])
+
+    def restore_from_trash(self, prompt_ids):
+        """Bring deleted items back — files to where they were, rows to the
+        gallery — and land on one of them in its own folder, so a restore ends
+        with the thing you recovered in front of you rather than on the shelf it
+        just left."""
+        if not prompt_ids:
+            return
+        try:
+            restored = self._actions.restore_deleted(prompt_ids)
+        except Exception as e:
+            logger.exception("Failed to restore %d deleted item(s)", len(prompt_ids))
+            QMessageBox.warning(
+                self, "Restore failed",
+                f"Could not restore the selected item(s):\n\n{e}",
+            )
+            return
+        self._browser.clear_selection()
+        self.refresh()
+        if restored and restored in self._leaf_by_id:
+            self._show_generation(restored)
+
+    def purge_from_trash(self, prompt_ids):
+        """End deleted items now instead of waiting out their window. Confirmed
+        first, and pointedly: this is the one action in the gallery with no undo
+        and no second copy behind it."""
+        if not prompt_ids:
+            return
+        count = len(prompt_ids)
+        plural = "s" if count != 1 else ""
+        if not self._confirm(
+            f"Permanently delete {count} item{plural}? This cannot be undone."
+        ):
+            return
+        try:
+            self._actions.purge_deleted(prompt_ids)
+        except Exception as e:
+            logger.exception("Failed to permanently delete %d item(s)", count)
+            QMessageBox.warning(
+                self, "Delete failed",
+                f"Could not permanently delete the selected item(s):\n\n{e}",
+            )
+            return
+        self._browser.clear_selection()
+        self.refresh()
 
     def _current_deletable_folder(self):
         """The folder on screen if it may be deleted, else ``None`` — which covers
@@ -3177,7 +3266,7 @@ class GalleryView(QWidget):
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""
         key = self._selected_folder_key()
-        return key if key in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY) else None
+        return key if key in _SHELF_KEYS else None
 
     def _current_location(self) -> str | None:
         """The history key for the view on screen — a shelf key on a shelf, the
@@ -3213,7 +3302,7 @@ class GalleryView(QWidget):
     def _restore_location(self, location: str):
         """Re-show a history location without recording the move — a shelf overview
         (Recents/Starred), a folder, or a generation in its folder."""
-        if location in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY):
+        if location in _SHELF_KEYS:
             self._return_to_shelf(location)
         elif location in self._item_by_key:
             self._return_to_folder(location)
@@ -3259,7 +3348,15 @@ class GalleryView(QWidget):
         current deletable folder — and say which in its tooltip."""
         count = len(self._browser.selected_ids)
         folder = self._current_deletable_folder()
-        if count:
+        if self._browser.showing_trash():
+            # Already deleted: the button's one remaining meaning is "for good",
+            # and the tooltip has to say so before it's clicked.
+            self._delete_btn.setEnabled(bool(count))
+            self._delete_btn.setToolTip(
+                f"Permanently delete {count} item{'s' if count != 1 else ''}"
+                if count else "Pick an item to delete permanently"
+            )
+        elif count:
             self._delete_btn.setEnabled(True)
             self._delete_btn.setToolTip(f"Delete {count} item{'s' if count != 1 else ''}")
         elif folder is not None:

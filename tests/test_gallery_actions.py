@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from origenerator.branch_session import ENV_FLAG, session_trash
 from origenerator.db import Database
@@ -166,7 +167,7 @@ def test_undo_label_describes_the_most_recent_action(tmp_path):
     assert "2" in actions.undo_label()
 
 
-def test_eviction_past_the_limit_purges_the_oldest_trash(tmp_path):
+def test_eviction_past_the_limit_leaves_the_oldest_in_the_bin(tmp_path):
     actions, db, output_dir = _actions(tmp_path, limit=1)
     first = _completed_row(db, output_dir, "p1", "a.png")
     second = _completed_row(db, output_dir, "p2", "b.png")
@@ -174,12 +175,98 @@ def test_eviction_past_the_limit_purges_the_oldest_trash(tmp_path):
     actions.delete_rows([first])   # batch 1 on the stack
     actions.delete_rows([second])  # pushes batch 1 off the (size-1) stack
 
-    # Only the newest deletion remains undoable; the evicted one is gone for good.
+    # Only the newest deletion is still undoable...
     assert actions.undo_label() is not None
     actions.undo()
     assert db.get_generation("p2") is not None
-    assert db.get_generation("p1") is None  # batch 1 was committed, not recoverable
+    assert db.get_generation("p1") is None
     assert not actions.can_undo()
+    # ...but falling off the stack no longer ends anything: the evicted delete is
+    # held in the bin, files and all, and is restorable from the Trash shelf.
+    assert [r["prompt_id"] for r in db.list_deletions()] == ["p1"]
+    actions.restore_deleted(["p1"])
+    assert db.get_generation("p1") == first
+    assert (output_dir / "a.png").read_bytes() == b"data"
+
+
+def test_a_delete_is_held_in_the_bin_with_the_row_it_dropped(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png", thumb_dir=tmp_path / "thumbs")
+
+    actions.delete_rows([row])
+
+    (held,) = db.list_deletions()
+    assert held["prompt_id"] == "p1"
+    assert held["row"] == row              # the whole row, ready to be put back
+    assert held["deleted_at"]              # stamped, so it can age out
+    # And the batch says where each file went, so a later session can move it back.
+    moved = dict(held["batch"]["moves"])
+    assert set(moved) == {str(output_dir / "a.png"), str(tmp_path / "thumbs" / "p1.jpg")}
+    assert all(Path(dest).exists() for dest in moved.values())
+
+
+def test_undoing_a_delete_takes_it_back_out_of_the_bin(tmp_path):
+    # Otherwise the Trash shelf would go on offering to restore an item that is
+    # already back in the gallery.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    actions.delete_rows([row])
+
+    actions.undo()
+
+    assert db.list_deletions() == []
+
+
+def test_each_deleted_item_is_held_on_its_own(tmp_path):
+    # A folder's delete is one undo step but many bin entries, so one item can be
+    # brought back weeks later without dragging the rest of the folder with it.
+    actions, db, output_dir = _actions(tmp_path)
+    rows = [_completed_row(db, output_dir, "p1", "a.png"),
+            _completed_row(db, output_dir, "p2", "b.png")]
+    actions.delete_rows(rows)
+
+    actions.restore_deleted(["p2"])
+
+    assert db.get_generation("p2") is not None
+    assert (output_dir / "b.png").exists()
+    assert db.get_generation("p1") is None            # its neighbor stays deleted...
+    assert [r["prompt_id"] for r in db.list_deletions()] == ["p1"]  # ...and held
+
+
+def test_restoring_returns_the_row_and_the_files_and_clears_the_record(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    thumb_dir = tmp_path / "thumbs"
+    row = _completed_row(db, output_dir, "p1", "a.png", thumb_dir=thumb_dir)
+    actions.delete_rows([row])
+
+    assert actions.restore_deleted(["p1"]) == "p1"  # the item to navigate back to
+
+    assert db.get_generation("p1") == row  # whole row back, verbatim
+    assert (output_dir / "a.png").read_bytes() == b"data"
+    assert (thumb_dir / "p1.jpg").read_bytes() == b"thumb"
+    assert db.list_deletions() == []
+
+
+def test_purging_ends_the_files_and_the_record_for_good(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    actions.delete_rows([row])
+    (held,) = db.list_deletions()
+    trashed = Path(held["batch"]["moves"][0][1])
+    assert trashed.exists()
+
+    actions.purge_deleted(["p1"])
+
+    assert not trashed.exists()
+    assert not (output_dir / "a.png").exists()  # purge is not restore
+    assert db.list_deletions() == []
+    assert db.get_generation("p1") is None
+
+
+def test_restoring_or_purging_an_item_the_bin_no_longer_holds_is_a_noop(tmp_path):
+    actions, db, _ = _actions(tmp_path)
+    assert actions.restore_deleted(["never-deleted"]) is None
+    actions.purge_deleted(["never-deleted"])  # must not raise
 
 
 def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
@@ -245,6 +332,17 @@ def test_a_branch_session_deletes_no_files(tmp_path, monkeypatch):
     assert db.get_generation("p1") is None            # off the preview's own shelf
     assert (output_dir / "a.png").exists()            # the live install's file stays
     assert (tmp_path / "thumbs" / "p1.jpg").exists()  # and the thumbnail it shows
+
+
+def test_rejecting_an_experiment_files_nothing_in_the_bin(tmp_path):
+    # The bin holds deleted rows so they can be put back; a rejection keeps its
+    # row (verdict and all), so there is no orphan for the Trash shelf to offer.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "e1", "exp.png")
+
+    actions.reject_experiment(row)
+
+    assert db.list_deletions() == []
 
 
 def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):

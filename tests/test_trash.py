@@ -1,4 +1,6 @@
-from origenerator.trash import Trash
+import json
+
+from origenerator.trash import Trash, TrashedBatch
 
 
 def _file(path, data=b"x"):
@@ -98,12 +100,50 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
     assert batch.moves[0][1].exists()
 
 
-def test_sweep_clears_everything_left_in_the_trash(tmp_path):
+def test_purge_orphans_clears_only_the_batches_nothing_names(tmp_path):
+    # The recovery bin names the batches it still holds; everything else in the
+    # trash is unreachable and is what this reclaims.
+    trash = Trash(tmp_path / "trash")
+    held = trash.store([_file(tmp_path / "out" / "held.png")])
+    orphan = trash.store([_file(tmp_path / "out" / "orphan.png")])
+
+    assert trash.purge_orphans([held.subdir]) == 1
+
+    assert held.subdir.exists()
+    assert not orphan.subdir.exists()
+
+
+def test_purge_orphans_on_an_untouched_trash_is_a_harmless_noop(tmp_path):
+    assert Trash(tmp_path / "never-used").purge_orphans([]) == 0
+
+
+def test_a_batch_survives_the_session_that_made_it(tmp_path):
+    # The bin stores a batch as plain data and re-makes it launches later, so a
+    # delete stays undoable long after the objects that performed it are gone.
+    src = _file(tmp_path / "out" / "a.png", b"hello")
+    trash = Trash(tmp_path / "trash")
+    record = trash.store([src]).record()
+
+    TrashedBatch.from_record(json.loads(json.dumps(record))).restore()
+
+    assert src.read_bytes() == b"hello"
+
+
+def test_a_re_made_batch_can_purge_what_it_holds(tmp_path):
     src = _file(tmp_path / "out" / "a.png")
     trash = Trash(tmp_path / "trash")
-    trash.store([src])
-    assert any((tmp_path / "trash").iterdir())
+    batch = trash.store([src])
 
-    trash.sweep()
+    TrashedBatch.from_record(batch.record()).purge()
 
-    assert not (tmp_path / "trash").exists() or not any((tmp_path / "trash").iterdir())
+    assert not batch.subdir.exists()
+    assert not src.exists()
+
+
+def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
+    # What a branch session's NoTrash records: nothing was taken, so nothing is
+    # restored or purged, and neither call may raise.
+    batch = TrashedBatch.from_record({"moves": [], "subdir": None})
+    batch.restore()
+    batch.purge()
+    assert batch.moves == []

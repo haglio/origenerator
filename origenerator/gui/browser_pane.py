@@ -1,8 +1,9 @@
 """The gallery's browser pane — the middle column showing a folder's contents.
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
-settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Starred
-shelf overviews. Owns the thumbnail multi-selection and the live in-flight cards.
+settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Starred /
+Experiments / Trash shelf overviews. Owns the thumbnail multi-selection and the
+live in-flight cards.
 
 It drives the surrounding pieces it doesn't own — the info pane on a click, the
 tree on a drill, the re-roll tile, the delete action — so it holds a reference to
@@ -27,7 +28,9 @@ from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
     RECENTS_KEY, RECENTS_LABEL, STARRED_KEY, STARRED_LABEL,
+    TRASH_KEY, TRASH_LABEL,
 )
+from origenerator.recovery import RETENTION_DAYS
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +86,16 @@ class BrowserPane:
         self._starred_groups: list = []     # folders the Starred shelf collects
         self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
+        self._trash_rows: list[dict] = []   # held deletions, newest first
 
-    def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows):
+    def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
+                  trash_rows):
         """Take the newly rebuilt gallery model the shelves render from."""
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
         self._starred_rows = starred_rows
         self._experiment_rows = experiment_rows
+        self._trash_rows = trash_rows
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
@@ -475,6 +481,117 @@ class BrowserPane:
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
 
+    # --- the Trash shelf: deleted items, still recoverable -------------------
+
+    def show_trash_overview(self):
+        """Render the Trash shelf: every deleted item the recovery bin is still
+        holding, newest first, each tile wearing restore / delete-permanently
+        hover controls and captioned with how long it has left. A restored item
+        returns to its own folder, files and all; a purged one is gone for good,
+        which is what the whole shelf exists to make deliberate rather than
+        automatic."""
+        self._v._title.set_display(TRASH_LABEL)
+        self._v._avg_label.setText(self._trash_note())
+        self._v._clear_metadata()
+        self._render_trash()
+        self._v._sync_delete_button()
+        self._v._record_location(TRASH_KEY)  # so Back can return to the shelf
+
+    def _render_trash(self):
+        container, flow = self._new_tile_pane()
+        actions = [
+            ("restore", icons.recovery_action_icon("restore"),
+             "Restore — put it and its files back where they were"),
+            ("purge", icons.recovery_action_icon("purge"),
+             "Delete permanently — end it now, without waiting out its window"),
+        ]
+        for row in self._trash_rows:
+            tile = self._add_trash_thumbnail(flow, row, list(actions))
+            tile.corner_action_triggered.connect(self._v._on_trash_action)
+        self.show_widget(container if self._trash_rows
+                         else self._empty_state(self._trash_empty_hint()))
+
+    def _add_trash_thumbnail(self, flow, row, corner_actions):
+        """One deleted item's tile — tracked for selection like any other, but
+        wired to almost nothing.
+
+        There is no database row behind it and no folder to open, so the gestures
+        every other shelf tile carries (preview in the info pane, double-click to
+        its folder, star / enhance / delete, drag to a combine slot) have nothing
+        to act on. What is left is picking it and the two things the corners and
+        the right-click menu offer: restore, or end it.
+        """
+        tile = ThumbnailWidget(
+            row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
+            media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+            starred=bool(row.get("starred")),
+            corner_actions=corner_actions,
+        )
+        tile.clicked.connect(self._trash_thumbnail_clicked)
+        tile.context_requested.connect(self._trash_context_menu)
+        flow.addWidget(tile)
+        self._visible_ids.append(row["prompt_id"])
+        self._thumb_widgets[row["prompt_id"]] = tile
+        return tile
+
+    def _trash_thumbnail_clicked(self, prompt_id: str):
+        """Pick a deleted tile — the multi-selection the restore and purge actions
+        work over. It only selects: with the row gone there is nothing for the
+        info pane to show."""
+        self.apply_selection(prompt_id, QApplication.keyboardModifiers())
+
+    def _trash_context_menu(self, prompt_id: str, global_pos):
+        """Right-click a deleted tile: restore or permanently delete the picked
+        items — the same two actions its hover corners carry, reachable for a
+        whole selection at once. Right-clicking a tile outside the selection
+        first narrows to it, as the gallery's own tile menu does."""
+        if prompt_id not in self._selected_ids:
+            self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        ids = self.selected_prompt_ids()
+        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
+        menu = QMenu(self._v)
+        restore_action = menu.addAction("Restore" + suffix)
+        purge_action = menu.addAction("Delete" + suffix + " permanently")
+        chosen = menu.exec(global_pos)
+        if chosen is restore_action:
+            self._v.restore_from_trash(ids)
+        elif chosen is purge_action:
+            self._v.purge_from_trash(ids)
+
+    @staticmethod
+    def _trash_caption(row) -> str:
+        """A deleted tile's caption: what the item was, then how long it has left.
+
+        The remaining time is the one fact a gallery caption can't carry and this
+        shelf can't do without — an item is only recoverable until it isn't.
+        """
+        days = row.get("days_left")
+        return f"{BrowserPane._thumbnail_caption(row)} · {days}d left" if days \
+            else f"{BrowserPane._thumbnail_caption(row)} · expiring"
+
+    def _trash_note(self) -> str:
+        """The line under the header stating the retention promise — shown only
+        with something on the shelf, since the empty state already says it."""
+        if not self._trash_rows:
+            return ""
+        return (f"Deleted items are held here for {RETENTION_DAYS} days, then "
+                "removed for good.")
+
+    def _trash_empty_hint(self) -> str:
+        if is_branch_session():
+            return ("Recovering deleted items is the live app's.\n\nA preview's "
+                    "database is a copy and its own deletes take no files, so "
+                    "everything held here belongs to the live install — restoring "
+                    "or purging it from a preview would reach into the library "
+                    "that app is still showing.")
+        return (f"Nothing deleted.\n\nItems you delete wait here for "
+                f"{RETENTION_DAYS} days — restore one, or end it early — before "
+                "they're removed for good.")
+
+    def showing_trash(self) -> bool:
+        return (self._v._trash_item is not None
+                and self._v._tree.currentItem() is self._v._trash_item)
+
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
     def show_starred_overview(self):
@@ -510,7 +627,7 @@ class BrowserPane:
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
-        """A centered hint filling an otherwise-blank shelf pane (Recents/Starred)."""
+        """A centered hint filling an otherwise-blank shelf pane."""
         label = QLabel(text)
         label.setObjectName("estimateLabel")
         label.setWordWrap(True)

@@ -1,8 +1,8 @@
 """Builds and queries the gallery's folder-tree widget — the left TOC pane.
 
-Renders the Recents and Starred shelves atop the media → workflow → model → LoRA →
-[source image] → settings folders, and keeps the key→item and prompt-id→item maps
-the view navigates by. Pure tree rendering and lookups over a ``FolderTree`` the
+Renders the Recents, Starred, Experiments and Trash shelves atop the media →
+workflow → model → LoRA → [source image] → settings folders, and keeps the
+key→item and prompt-id→item maps the view navigates by. Pure tree rendering and lookups over a ``FolderTree`` the
 GalleryView owns and lays out; it has no database or refresh concerns — folder
 rename/star/delete live in the view, which rebuilds the tree through :meth:`populate`.
 
@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt
 from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE
+from origenerator.recovery import RETENTION_DAYS
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
@@ -27,6 +28,8 @@ STARRED_KEY = "__starred__"   # synthetic tree node collecting every starred fol
 STARRED_LABEL = "Starred"     # its row label; the star is drawn in the caret column
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"    # its row label; a flask is drawn in the caret column
+TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
+TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
 
 
 class GalleryTree:
@@ -41,20 +44,22 @@ class GalleryTree:
         self.recents_item: QTreeWidgetItem | None = None   # the "Recents" shelf row
         self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
         self.experiments_item: QTreeWidgetItem | None = None  # the "Experiments" shelf row
+        self.trash_item: QTreeWidgetItem | None = None     # the "Trash" shelf row
         self.custom_items: dict[str, QTreeWidgetItem] = {}  # custom folder key -> its row
         self._filter = ""                       # active filter query, lowercased
         self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
         self.seed_matches: dict[str, list[str]] = {}  # leaf key -> prompt_ids the query hit by seed
 
     def populate(self, tree_model, expanded_keys, *, show_recents: bool,
-                 experiment_count: int = 0, custom_folders=()):
+                 experiment_count: int = 0, trash_count: int = 0, custom_folders=()):
         """Rebuild the tree from ``tree_model``, restoring the folders in
         ``expanded_keys``. ``show_recents`` keeps the Recents shelf up even with no
         folders yet (in-flight work to show); Starred appears only once folders do.
-        ``experiment_count`` (unreviewed background experiments) shows in the
-        Experiments shelf's label so waiting work is visible from anywhere.
-        ``custom_folders`` are the user's own groupings, each getting a row of its
-        own between the shelves and the media roots."""
+        ``experiment_count`` (unreviewed background experiments) and
+        ``trash_count`` (deleted items still recoverable) show in their shelves'
+        labels so waiting work is visible from anywhere. ``custom_folders`` are
+        the user's own groupings, each getting a row of its own between the
+        shelves and the media roots."""
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
@@ -62,15 +67,19 @@ class GalleryTree:
         self.recents_item = None
         self.starred_item = None
         self.experiments_item = None
+        self.trash_item = None
         self.custom_items = {}
         root = self._tree.invisibleRootItem()
         # Synthetic shelves lead the tree: Recents (in-flight work plus recently
         # finished items) whenever there is anything to show — so a first-ever
         # generation is visible while it runs, before any folder exists — then
-        # Starred (bookmarked folders) once folders do, then Experiments (always:
-        # it hosts the background experimenter's switch and review queue). Each is
-        # reachable in one click however the tree is scrolled, and draws its marker
-        # in the caret column so its label lines up with the media folders below.
+        # Starred (bookmarked folders) once folders do, then Experiments and
+        # Trash, both always present: one hosts the background experimenter's
+        # switch and review queue, the other is where every delete goes, and a
+        # bin you can only find once you have something to recover is no use.
+        # Each is reachable in one click however the tree is scrolled, and draws
+        # its marker in the caret column so its label lines up with the media
+        # folders below.
         if show_recents:
             self.recents_item = self._add_shelf(
                 root, RECENTS_LABEL, RECENTS_KEY, icons.clock_icon(), "Recently generated"
@@ -86,6 +95,11 @@ class GalleryTree:
         self.experiments_item = self._add_shelf(
             root, label, EXPERIMENTS_KEY, icons.flask_icon(),
             "Background experiments awaiting your review"
+        )
+        label = TRASH_LABEL + (f" ({trash_count})" if trash_count else "")
+        self.trash_item = self._add_shelf(
+            root, label, TRASH_KEY, icons.trash_icon(),
+            f"Deleted items — restorable here for {RETENTION_DAYS} days"
         )
         for custom in custom_folders:
             self.custom_items[custom.key] = self._add_custom_folder(root, custom)
@@ -155,7 +169,7 @@ class GalleryTree:
         shelf, so a first generation stays visible while it runs."""
         root = self._tree.invisibleRootItem()
         skip = (self.recents_item, self.starred_item, self.experiments_item,
-                *self.custom_items.values())
+                self.trash_item, *self.custom_items.values())
         for i in range(root.childCount()):
             item = root.child(i)
             if item not in skip:
@@ -254,6 +268,8 @@ class GalleryTree:
             return STARRED_KEY  # so a rebuild keeps the shelf selected
         if item is self.experiments_item:
             return EXPERIMENTS_KEY  # so a rebuild keeps the shelf selected
+        if item is self.trash_item:
+            return TRASH_KEY  # so a rebuild keeps the shelf selected
         group = item.data(0, GROUP_ROLE)
         return group.key if group else None
 

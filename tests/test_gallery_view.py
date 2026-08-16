@@ -800,12 +800,22 @@ def test_a_branch_session_says_why_its_experiments_shelf_is_empty(qtbot, monkeyp
 # --- the Trash shelf: deleted items, still recoverable ----------------------
 
 
-def _bin_db(rows=(), held=()):
+def _bin_db(rows=(), held=(), inherited=()):
     """A gallery whose bin already holds ``held`` — ``(prompt_id, row)`` pairs,
-    oldest first — the way a previous session's deletes would have left it."""
+    oldest first — the way a previous session's deletes would have left it.
+
+    ``inherited`` takes the same shape but files each as a delete that moved real
+    files: what a preview's copied database carries over from the live install,
+    and the only thing a preview may not touch.
+    """
     db = FakeDB(list(rows))
     for prompt_id, row in held:
         db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+    for prompt_id, row in inherited:
+        db.record_deletion(prompt_id, row, {
+            "moves": [[f"out/{prompt_id}.png", f"trash/{prompt_id}/0_{prompt_id}.png"]],
+            "subdir": f"trash/{prompt_id}",
+        })
     return db
 
 
@@ -1018,19 +1028,40 @@ def test_the_trash_shelf_is_a_place_back_returns_to(qtbot):
     assert view._tree.currentItem() is view._trash_item
 
 
-def test_a_branch_session_offers_no_recovery_at_all(qtbot, monkeypatch):
+def test_a_preview_hides_the_deletions_it_inherited(qtbot, monkeypatch):
     # A preview's database is a copy, so the deletions it inherits point into the
     # LIVE install's trash: restoring would move the live app's files out from
     # under rows it is still showing, and purging would destroy its only copies.
     monkeypatch.setenv(ENV_FLAG, "1")
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    view = GalleryView(_bin_db(inherited=[("live", _image("live", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(view._trash_item)
 
     assert view.visible_prompt_ids() == []
-    assert "live" in view._browser._trash_empty_hint()
+    assert "Nothing deleted in this preview" in view._browser._trash_empty_hint()
+
+
+def test_a_preview_still_recovers_what_it_deleted_itself(qtbot, monkeypatch):
+    # Judging the shelf means using it. A preview's own delete takes no files at
+    # all, so its held deletion holds nothing of the live install's: listing it
+    # is safe, and restoring it only puts the row back in the throwaway copy.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
+                 inherited=[("live", _image("live", "a cat", 50, 1))])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert view.visible_prompt_ids() == ["mine"]  # its own, and only its own
+
+    view.restore_from_trash(["mine"])
+
+    assert db.get_generation("mine") is not None
+    assert db.get_deletion("mine") is None
+    assert db.get_deletion("live") is not None  # the live app's is left where it is
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):

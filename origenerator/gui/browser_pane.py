@@ -579,11 +579,11 @@ class BrowserPane:
 
     def _trash_empty_hint(self) -> str:
         if is_branch_session():
-            return ("Recovering deleted items is the live app's.\n\nA preview's "
-                    "database is a copy and its own deletes take no files, so "
-                    "everything held here belongs to the live install — restoring "
-                    "or purging it from a preview would reach into the library "
-                    "that app is still showing.")
+            return ("Nothing deleted in this preview.\n\nDelete something and it "
+                    "waits here to be restored, the way it would in the live app. "
+                    "What the live app is holding stays out of reach: those files "
+                    "sit in its trash, and a preview reaching in would move them "
+                    "out from under the rows it is still showing.")
         return (f"Nothing deleted.\n\nItems you delete wait here for "
                 f"{RETENTION_DAYS} days — restore one, or end it early — before "
                 "they're removed for good.")

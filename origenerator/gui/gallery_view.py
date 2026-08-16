@@ -2866,15 +2866,24 @@ class GalleryView(QWidget):
     # --- the Trash shelf: restoring a delete, or ending it -------------------
 
     def _bin_records(self) -> list[dict]:
-        """The held deletions the Trash shelf offers — none in a branch session.
+        """The held deletions the Trash shelf offers — every one in the live app,
+        and in a preview only the ones that hold no files.
 
-        A preview's database is a copy, so it inherits the live install's held
-        deletions, and every path in them points into the live install's trash:
-        restoring from here would move the live app's files out from under rows
-        it is still showing, and purging would destroy the only copies it has.
-        Recovery is the live app's, as reviewing and scheduling are.
+        That reduces, in a preview, to the deletes it made itself. Its database
+        is a copy, so it inherits the live install's held deletions, and every
+        path in those points into the live install's trash: restoring one would
+        move the live app's files out from under rows it is still showing, and
+        purging one would take its only copies. A preview's own delete takes no
+        files at all (see :func:`~origenerator.branch_session.session_trash`), so
+        it holds nothing that isn't already the copy's — putting one back only
+        re-inserts the row, and ending one only forgets it. Which is what leaves
+        the shelf usable for judging it, rather than a wall saying come back to
+        the live app.
         """
-        return [] if is_branch_session() else self._db.list_deletions()
+        records = self._db.list_deletions()
+        if not is_branch_session():
+            return records
+        return [r for r in records if not (r.get("batch") or {}).get("moves")]
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
         """A Trash tile's hover control: restore this item, or end it now."""

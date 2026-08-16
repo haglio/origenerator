@@ -241,6 +241,8 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_MUTED)};
         padding: 8px 20px;
         border: none;
+        /* A hairline between tabs, so it reads which ✕ belongs to which. */
+        border-right: 1px solid {_h(BORDER_SUBTLE)};
         border-bottom: 2px solid transparent;
     }}
     QTabBar::tab:selected {{
@@ -259,9 +261,12 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
         border: none;
+        border-right: 1px solid {_h(BORDER_SUBTLE)};
         border-bottom: 2px solid transparent;
         border-radius: 0;
-        padding: 0 14px;
+        /* The tabs' own vertical padding, so a label and a tab's label are laid
+           out in boxes of the same height and sit on the same line. */
+        padding: 8px 14px;
         font-weight: normal;
     }}
     QToolButton#tabBarButton:hover {{

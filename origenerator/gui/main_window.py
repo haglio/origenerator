@@ -9,6 +9,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
+from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.experiments.background import cancel_experiments
 from origenerator.gui.gallery_view import GalleryView
 
@@ -66,6 +67,12 @@ class OrigeneratorWindow(QMainWindow):
         # running in the ComfyUI they share.
         if not is_branch_session():
             cancel_experiments(db, client)
+        # The same absence carried a batch of base re-renders. Fold the ones that
+        # finished into the images they repair — before the first refresh builds
+        # the tree, so a repaired image is already showing both its versions when
+        # it is drawn — and drop the rest: the GPU is the user's again.
+        fold_completed_base_renders(db)
+        cancel_base_renders(db, client)
         # Reconnect to any generation left running by the previous session. A tab's
         # Generate is itself a re-roll, so every in-flight row is the gallery's to
         # re-adopt — the tabs restore their configs only, owning no jobs.
@@ -110,6 +117,7 @@ class OrigeneratorWindow(QMainWindow):
         persist the session (open config tabs, gallery folder/selection) and the
         window geometry so the next launch reopens as it was."""
         self._gallery_view.queue_experiments_for_absence()
+        self._gallery_view.queue_base_renders_for_absence()
         self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())

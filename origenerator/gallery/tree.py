@@ -27,7 +27,7 @@ Qt dependency so it can be unit-tested directly.
 import hashlib
 import json
 
-from origenerator.gallery.enhance import ENHANCE_WORKFLOW
+from origenerator.gallery.enhance import BASE_RENDER_SOURCE, ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     LoraGroup,
     MediaGroup,
@@ -468,6 +468,10 @@ def build_gallery_tree(
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
         and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
+        # A re-derived base render is a repair of an existing image, not an
+        # image of its own: it folds into its target and vanishes, so it never
+        # earns a tile — least of all a duplicate one beside what it repairs.
+        and row.get("source") != BASE_RENDER_SOURCE
     ]
     # Only finished images have a file to condition an i2v's frame on, so the
     # index that keys image-conditioned folders is built from those alone.

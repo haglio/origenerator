@@ -19,6 +19,8 @@ from origenerator.config import (
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
+from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
+from origenerator.base_backfill import queue_base_renders
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.gallery_actions import GalleryActions
@@ -954,6 +956,35 @@ class GalleryView(QWidget):
             self._db.list_generations(), self._experiment_policy,
             self._launch_experiment,
         )
+
+    def queue_base_renders_for_absence(self) -> int:
+        """Hand ComfyUI a batch of base re-renders to run while the app is closed.
+
+        Called from the window's close beside the experiments batch, and for the
+        same reason: this is a full render per repaired image and there are a
+        great many of them, so putting one in front of the user's own work would
+        be the whole cost of the feature. The next launch folds what finished and
+        drops what hadn't started. Returns how many were queued.
+
+        A branch preview queues none, exactly as it queues no experiments: its
+        batch would outlive it in the one shared ComfyUI as work no app can
+        account for, and the repairs belong to the live library anyway.
+        """
+        if is_branch_session():
+            logger.info("Branch session: base re-renders left to the live app")
+            return 0
+        return queue_base_renders(self._db.list_generations(), self._launch_base_render)
+
+    def _launch_base_render(self, workflow, params):
+        """The batch's launch adapter: submit one re-render as a normal re-roll
+        job tagged ``source="base_render"``, keyed to a folder of its own so it
+        can never displace the user's work under a folder they might re-roll.
+        Returns its prompt_id, or ``None`` when the launch didn't take."""
+        key = f"base_render/{params[BASE_RENDER_TARGET_KEY]}"
+        if not self._reroll.start_prepared(key, workflow, params,
+                                           source=gallery.BASE_RENDER_SOURCE):
+            return None
+        return self._reroll.jobs[key].prompt_id
 
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()

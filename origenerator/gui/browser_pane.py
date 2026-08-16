@@ -97,6 +97,21 @@ class BrowserPane:
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
 
+    def show_enhancing(self, frames: dict):
+        """Mark every visible tile whose image is being enhanced, and stream the
+        run's latest frame onto it.
+
+        ``frames`` is ``{prompt_id: latest frame or None}`` for the enhances
+        running right now. The tile keeps its own picture until a frame arrives
+        — the base render is out and worth looking at, which is the point of
+        generating it first — and gets it back when the run ends.
+        """
+        for prompt_id, tile in self._thumb_widgets.items():
+            frame = frames.get(prompt_id)
+            tile.set_enhancing(prompt_id in frames)
+            if frame:
+                tile.show_enhancing_frame(frame)
+
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
         shelf is open, redraw it — the media-type filter changing between rebuilds.

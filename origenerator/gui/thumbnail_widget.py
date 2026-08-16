@@ -63,6 +63,9 @@ class ThumbnailWidget(QWidget):
         self._highlighted = False
         self._starred = starred
         self._enhancing = enhancing
+        # The tile's own picture, held aside while a running enhancement streams
+        # its frames over the top, so the end of the run restores it.
+        self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
         self._press_pos: QPoint | None = None  # left-press origin, for drag detection
         self.setObjectName("thumbnailTile")
@@ -174,12 +177,39 @@ class ThumbnailWidget(QWidget):
         return self._enhancing
 
     def set_enhancing(self, enhancing: bool):
-        """Show or clear the "Enhancing…" scrim as a run starts and lands."""
+        """Show or clear the "Enhancing…" scrim as a run starts and lands.
+
+        A run that ends puts the tile's own picture back: the streamed frames
+        are a partial render of a file that doesn't exist yet, so once the run
+        is over they are no longer of anything. (A landed enhancement folds onto
+        the row and the rebuild redraws the tile from the new file; a cancelled
+        one leaves the base render, which is what was there before.)"""
         if enhancing == self._enhancing:
             return
         self._enhancing = enhancing
+        if not enhancing and self._resting_pixmap is not None:
+            self._image_label.setPixmap(self._resting_pixmap)
+            self._resting_pixmap = None
         self._enhancing_overlay.setGeometry(self._image_label.geometry())
         self._enhancing_overlay.setVisible(enhancing)
+        self._enhancing_overlay.raise_()
+
+    def show_enhancing_frame(self, frame: bytes):
+        """Paint the latest frame of the enhancement being made of this image.
+
+        The tile is where the user is looking while a folder enhances itself, so
+        the run streams here as well as in the info pane — the scrim stays over
+        the top, because what is on the tile is still not the finished file."""
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(frame) or pixmap.isNull():
+            return
+        if self._resting_pixmap is None:
+            self._resting_pixmap = self._image_label.pixmap()
+        self._image_label.setPixmap(
+            pixmap.scaled(_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+                          Qt.TransformationMode.SmoothTransformation)
+        )
+        self._enhancing_overlay.setGeometry(self._image_label.geometry())
         self._enhancing_overlay.raise_()
 
     def is_highlighted(self) -> bool:

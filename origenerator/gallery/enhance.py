@@ -214,6 +214,12 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     own (``enhance_history``), an inline one is described by the row's params,
     which are the very knobs its tail ran at. That is what makes a level worth
     dragging onto the Enhance panel even when it stands alone.
+
+    A third shape appears once levels can be deleted (:func:`remove_enhance_levels`):
+    the original binned out from under two or more enhancements. There is no
+    "before" left to count back from, so the files the history names are the
+    levels — which is also why the history entry, not the file's position, is
+    what identifies one.
     """
     files = row_output_files(row)
     if not files:
@@ -247,6 +253,13 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
         # the one the list offers as "what this looked like before".
         levels.append(EnhanceLevel(0, "Original", originals[0]))
         return levels
+    if not originals and history:
+        # The original was deleted out from under the enhancements: what is left
+        # is levels all the way down, named by the history rather than by how
+        # many files sit ahead of a "before" that no longer exists.
+        enhanced = [f for f in files if f.get("filename") in history]
+        if enhanced:
+            return [level(len(enhanced) - i, f) for i, f in enumerate(enhanced)]
     if is_enhanced_row(row):
         # Enhanced with nothing kept behind it: the row's leading file IS the
         # enhancement. Only that one — a batch's other files are its siblings,
@@ -259,10 +272,13 @@ def is_enhanced_row(row: dict) -> bool:
     """Whether this generation carries enhanced pixels — what the green
     thumbnail badge marks. A folded-in standalone enhance (``original_files``
     set) counts, as does an inline run that kept its base render beside the
-    enhanced one; an explicit ``enhance`` param is authoritative for the rest of
-    the inline runs; an SDXL row from the era the tail ran unconditionally (tail
-    params stored, no flag yet) counts too."""
+    enhanced one; a recorded ``enhance_history`` counts on its own, which is the
+    row whose original has since been deleted; an explicit ``enhance`` param is
+    authoritative for the rest of the inline runs; an SDXL row from the era the
+    tail ran unconditionally (tail params stored, no flag yet) counts too."""
     if original_files_of(row):
+        return True
+    if parse_file_list(row.get("enhance_history")):
         return True
     workflow = row.get("workflow_name") or ""
     if workflow == ENHANCE_WORKFLOW:
@@ -271,6 +287,68 @@ def is_enhanced_row(row: dict) -> bool:
     if "enhance" in params:
         return bool(params["enhance"])
     return workflow in _ALWAYS_ENHANCED and "enhance_denoise" in params
+
+
+def displayed_levels(row: dict) -> list[EnhanceLevel]:
+    """The versions the info pane lists for ``row`` — what :func:`enhance_levels`
+    finds, or the row's one file as ``Original`` when it has received no
+    enhancement yet.
+
+    An image's versions are listed even before there are two of them: a place
+    that appears only once you already have versions is a place you never find,
+    and the enhance you just launched replaces the strip's only other content
+    while it runs. ``[]`` for a video, which has no versions and no enhancer.
+
+    Each version carries its own file, so the file rows live beside the level
+    that produced them rather than in one undifferentiated block at the top —
+    which is why :mod:`origenerator.generation_metadata` asks this what it no
+    longer has to list.
+    """
+    if media_type_of_row(row) != "image":
+        return []
+    levels = enhance_levels(row)
+    if levels:
+        return levels
+    files = row_output_files(row)
+    return [EnhanceLevel(0, "Original", files[0])] if files else []
+
+
+def remove_enhance_levels(row: dict, filenames) -> dict:
+    """The column updates that drop the named versions from ``row``.
+
+    Deleting a level is a file-level edit of one image, not a delete of the
+    generation: the row keeps its folder, star, params and identity, and only
+    the versions it lists change. So the file leaves ``output_files``, and its
+    ``original_files`` / ``enhance_history`` bookkeeping goes with it.
+
+    ``{}`` — change nothing — when the names match no file, or when they would
+    take every version: a generation with no file is a generation deleted, which
+    is the gallery's own action and not something a version list should do
+    quietly.
+
+    Deleting the last enhancement leaves a plain image, so the enhancement
+    bookkeeping is cleared out with it — the column, the history, and the
+    ``role`` tag an inline run left on its base render. Left behind, any of the
+    three would make the one remaining file read as an enhancement of itself.
+    """
+    doomed = {name for name in filenames if name}
+    files = row_output_files(row)
+    kept = [f for f in files if f.get("filename") not in doomed]
+    if len(kept) == len(files) or not kept:
+        return {}
+    originals = [f for f in parse_file_list(row.get("original_files"))
+                 if f.get("filename") not in doomed]
+    history = [e for e in parse_file_list(row.get("enhance_history"))
+               if isinstance(e, dict) and e.get("filename") not in doomed]
+    original_names = {f.get("filename") for f in original_files_of(row)}
+    if not [f for f in kept if f.get("filename") not in original_names]:
+        originals, history = [], []
+        kept = [{k: v for k, v in f.items() if k != "role"} for f in kept]
+    return {
+        "output_files": json.dumps(kept),
+        "original_files": json.dumps(originals) if originals else None,
+        "enhance_history": json.dumps(history) if history else None,
+    }
 
 
 def is_enhanceable_row(row: dict) -> bool:

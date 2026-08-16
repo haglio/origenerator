@@ -120,18 +120,23 @@ def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str |
     return str(result) if result is not None else None
 
 
-def output_disk_files(row: dict, output_dir: Path) -> list[Path]:
+def output_disk_files(row: dict, output_dir: Path,
+                      names: set[str] | None = None) -> list[Path]:
     """Every on-disk output file a row owns, for deletion.
 
     The referenced output file plus any same-stem sidecar of the other media
     type — a video's VHS_VideoCombine metadata PNG, say. Removing the sidecar
     too is what stops a later import from resurrecting the orphan as its own
     entry. Files already absent are skipped.
+
+    ``names`` narrows it to the given filenames (and their sidecars), for a
+    delete that takes some of a row's files rather than the row: binning one
+    enhancement level leaves the generation and its other versions alone.
     """
     paths: list[Path] = []
     for f in row_output_files(row):
         filename = f.get("filename")
-        if not filename:
+        if not filename or (names is not None and filename not in names):
             continue
         full = output_dir / f.get("subfolder", "") / filename
         if not full.exists():

@@ -12,9 +12,9 @@ from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    EnhanceLevel, EnhanceSettings, animated_preview_path,
+    EnhanceSettings, animated_preview_path,
     build_image_config_index, config_tab_title, describe_enhance_params,
-    enhance_levels, enhance_params_for, find_source_image_id,
+    displayed_levels, enhance_params_for, find_source_image_id,
     level_matching_settings, media_type_of_row, resolve_preview,
     row_output_files, rows_in_settings, settings_signature,
     videos_from_source_image,
@@ -77,7 +77,8 @@ class GenerateConfigPanel(QWidget):
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
     preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     preview_double_clicked = pyqtSignal()   # the preview was double-clicked with no fullscreen to open
-    enhance_requested = pyqtSignal(str)      # the version strip's "+ Enhance" was pressed (prompt_id)
+    enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
+    levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -201,6 +202,7 @@ class GenerateConfigPanel(QWidget):
         self._versions = EnhanceVersions()
         self._versions.level_selected.connect(self._show_level)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
+        self._versions.delete_requested.connect(self._on_levels_delete_requested)
         body.addWidget(self._versions)
         # The slack goes here, under everything, so a short column rests at the
         # top of the scroll rather than spreading itself out.
@@ -641,8 +643,10 @@ class GenerateConfigPanel(QWidget):
         video, and the animations strip for an image. ``preview`` is the already-
         resolved ``(path, media_type)`` (or ``None``), so Evolver keys off the same
         on-disk lookup."""
-        self._metadata_block.show_row(row)
-        self._metadata_block.show()
+        # Only files no version claims are left for this block, which for an
+        # image is usually none of them — so it shows only when it has content
+        # rather than opening a bare gap above the form.
+        self._metadata_block.setVisible(self._metadata_block.show_row(row))
         self._refresh_versions()
         self._folder_btn.show()  # any saved generation has a containing folder to open
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
@@ -662,15 +666,39 @@ class GenerateConfigPanel(QWidget):
 
         ``pending`` is ``(status, frame, settings)`` while one is running,
         ``None`` otherwise. Fed from the gallery, which owns the jobs. A new
-        frame updates the tile in place; only a run starting or ending rebuilds
-        the strip, so a stream of frames doesn't thrash the layout.
+        frame updates the level's row in place; only a run starting or ending
+        rebuilds the list, so a stream of frames doesn't thrash the layout.
+
+        The frame also goes up to the preview — a run of this image is a run
+        you are watching, and the pane at the top of the tab is where this app
+        shows you what is being made. It was the one surface that stayed on the
+        old picture while the little row beside it streamed. When the run ends,
+        the preview goes back to the image itself (by then the enhanced one).
         """
         if pending == self._pending_enhancement:
             return
+        was_running = self._pending_enhancement is not None
         self._pending_enhancement = pending
+        if pending is not None:
+            frame = pending[1]
+            if frame:
+                self._preview.show_frame(frame)
+        elif was_running:
+            self._restore_preview()
         if self._versions.update_pending(pending):
             return
         self._refresh_versions()
+
+    def _restore_preview(self):
+        """Put the displayed generation's own output back in the preview, after
+        a live enhancement of it has finished streaming over the top."""
+        row = self._displayed_row
+        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
+        if preview is None:
+            self._preview.clear()
+            return
+        self._preview.show_media(*preview)
+        self._preview.set_draggable_id(row["prompt_id"])
 
     def set_enhance_settings(self, settings: EnhanceSettings):
         """The app-wide enhance settings the ``+ Enhance`` card would run at.
@@ -688,13 +716,29 @@ class GenerateConfigPanel(QWidget):
         if self._displayed_row is not None:
             self.enhance_requested.emit(self._displayed_row["prompt_id"])
 
+    def _on_levels_delete_requested(self, positions: list):
+        """Relay a version-list delete by filename, not by position.
+
+        The list is rebuilt from the row on every refresh, so a position is only
+        good for as long as the widget that produced it — the gallery does the
+        deleting and it must be told *which files*, resolved here while the list
+        and the row still agree."""
+        row = self._displayed_row
+        if row is None:
+            return
+        levels = displayed_levels(row)
+        names = [levels[p].file.get("filename") for p in positions
+                 if 0 <= p < len(levels)]
+        if names:
+            self.levels_delete_requested.emit(row["prompt_id"], names)
+
     def _refresh_versions(self):
-        """Rebuild the version strip for whatever this tab is displaying.
+        """Rebuild the version list for whatever this tab is displaying.
 
         The preview is already on ``output_files[0]`` — the most-enhanced
-        version — so the strip leads with that level and offers the rest beside
-        it, closing with the ``+ Enhance`` card. A video has no versions and no
-        card: the enhancer takes images.
+        version — so the list leads with that level and offers the rest below
+        it, under the ``+ Enhance`` row. A video has no versions and no row to
+        press: the enhancer takes images.
         """
         row = self._displayed_row
         if row is None or media_type_of_row(row) != "image":
@@ -702,11 +746,11 @@ class GenerateConfigPanel(QWidget):
             return
         self._versions.show_levels(
             self._version_items(row), self._pending_enhancement,
-            self._add_card_for(row),
+            self._add_card_for(row), str(row.get("created_at", "")),
         )
 
     def _add_card_for(self, row: dict) -> tuple:
-        """``(settings, duplicate_of)`` for the ``+ Enhance`` card on ``row``."""
+        """``(settings, duplicate_of)`` for the ``+ Enhance`` row on ``row``."""
         params = enhance_params_for(row, self._enhance_settings)
         return (describe_enhance_params(params or {}),
                 level_matching_settings(row, self._enhance_settings))
@@ -718,20 +762,11 @@ class GenerateConfigPanel(QWidget):
                 / (level.file.get("filename") or ""))
 
     def _version_items(self, row: dict) -> list[tuple]:
-        """``(level, image path)`` for each version this image holds — the strip
-        draws each tile from the file itself, so a level shows what it actually
-        looks like rather than the row's one shared thumbnail.
-
-        An image that has received no enhancement still shows its one file as
-        ``Original``: this is where an image's versions live, and it has to be
-        somewhere you can already see before the first enhancement makes a
-        second one — not least because the enhance you just launched replaces
-        the strip's only other content while it runs."""
-        levels = enhance_levels(row)
-        if not levels:
-            files = row_output_files(row)
-            levels = [EnhanceLevel(0, "Original", files[0])] if files else []
-        return [(level, self._level_path(level)) for level in levels]
+        """``(level, image path)`` for each version this image holds — the list
+        draws each picture from the file itself, so a level shows what it
+        actually looks like rather than the row's one shared thumbnail."""
+        return [(level, self._level_path(level))
+                for level in displayed_levels(row)]
 
     def _show_level(self, position: int):
         """Put one of the displayed image's enhancement levels in the preview.
@@ -743,7 +778,7 @@ class GenerateConfigPanel(QWidget):
         """
         if self._displayed_row is None:
             return
-        levels = enhance_levels(self._displayed_row)
+        levels = displayed_levels(self._displayed_row)
         if not 0 <= position < len(levels):
             return
         path = self._level_path(levels[position])

@@ -359,3 +359,117 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
     assert restored["thumbnail_path"] == row["thumbnail_path"]
     assert (output_dir / "exp.png").exists()
     assert (tmp_path / "thumbs" / "e1.jpg").exists()
+
+
+# --- deleting some of one image's versions ---------------------------------
+
+def _enhanced_row(db, output_dir, pid="p1"):
+    """An image enhanced once: the enhanced file leads, the original stays."""
+    row = _completed_row(db, output_dir, pid, "base.png", subfolder="image")
+    (output_dir / "image" / "enhanced.png").write_bytes(b"better")
+    db.update_generation(
+        pid,
+        output_files=json.dumps([
+            {"filename": "enhanced.png", "subfolder": "image"},
+            {"filename": "base.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([
+            {"filename": "enhanced.png", "params": {"enhance_scale": 2.0}},
+        ]),
+    )
+    return db.get_generation(pid)
+
+
+def test_deleting_a_version_keeps_the_generation(tmp_path):
+    # A level is a file, not a generation: the image stays where it is, in its
+    # folder, with the versions that weren't picked.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+
+    assert actions.delete_enhance_levels(row, ["enhanced.png"]) is True
+
+    updated = db.get_generation("p1")
+    assert updated is not None
+    assert not (output_dir / "image" / "enhanced.png").exists()
+    assert (output_dir / "image" / "base.png").exists()
+    assert json.loads(updated["output_files"]) == [
+        {"filename": "base.png", "subfolder": "image"}
+    ]
+
+
+def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
+    # With nothing enhanced left, the bookkeeping goes too — otherwise the one
+    # remaining file would read as an enhancement of itself.
+    from origenerator.gallery import enhance_levels, is_enhanced_row
+
+    actions, db, output_dir = _actions(tmp_path)
+    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["enhanced.png"])
+
+    updated = db.get_generation("p1")
+    assert updated["original_files"] is None
+    assert updated["enhance_history"] is None
+    assert not is_enhanced_row(updated)   # and the green badge is gone with it
+    assert enhance_levels(updated) == []
+
+
+def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
+    # Binning the pre-enhance file to save the space is a fair thing to want;
+    # what is left is still an enhancement, and still says what made it.
+    from origenerator.gallery import enhance_levels
+
+    actions, db, output_dir = _actions(tmp_path)
+    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["base.png"])
+
+    updated = db.get_generation("p1")
+    (level,) = enhance_levels(updated)
+    assert level.label == "Enhance 1"
+    assert level.params == {"enhance_scale": 2.0}
+
+
+def test_deleting_every_version_is_refused(tmp_path):
+    # An image with no file left is a deleted generation, and deleting a
+    # generation is the gallery's own action — not something a version list does.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+
+    assert actions.delete_enhance_levels(row, ["enhanced.png", "base.png"]) is False
+
+    assert db.get_generation("p1")["output_files"] == row["output_files"]
+    assert (output_dir / "image" / "enhanced.png").exists()
+    assert not actions.can_undo()
+
+
+def test_undoing_a_version_delete_puts_it_back(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+    actions.delete_enhance_levels(row, ["enhanced.png"])
+
+    actions.undo()
+
+    restored = db.get_generation("p1")
+    assert restored["output_files"] == row["output_files"]
+    assert restored["original_files"] == row["original_files"]
+    assert restored["enhance_history"] == row["enhance_history"]
+    assert (output_dir / "image" / "enhanced.png").read_bytes() == b"better"
+
+
+def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
+    # Only the picked files go: the thumbnail is the row's, and the row stays.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "base.png", subfolder="image",
+                         thumb_dir=tmp_path / "thumbs")
+    (output_dir / "image" / "enhanced.png").write_bytes(b"better")
+    db.update_generation(
+        "p1",
+        output_files=json.dumps([
+            {"filename": "enhanced.png", "subfolder": "image"},
+            {"filename": "base.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]),
+    )
+
+    actions.delete_enhance_levels(db.get_generation("p1"), ["enhanced.png"])
+
+    assert (tmp_path / "thumbs" / "p1.jpg").exists()
+    assert row["thumbnail_path"] == str(tmp_path / "thumbs" / "p1.jpg")

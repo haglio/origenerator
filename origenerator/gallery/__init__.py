@@ -62,6 +62,7 @@ from origenerator.gallery.enhance import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    displayed_levels,
     enhance_levels,
     enhance_params_for,
     enhance_targets_row,
@@ -71,6 +72,7 @@ from origenerator.gallery.enhance import (
     fold_enhancement,
     is_enhanceable_row,
     is_enhanced_row,
+    remove_enhance_levels,
     rows_awaiting_enhancement,
 )
 from origenerator.gallery.signatures import (

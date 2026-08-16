@@ -502,6 +502,36 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     assert effective_min_width <= 704
 
 
+def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
+    # The version list is the widest thing the info pane holds — a picture beside
+    # a file row with its copy and Show-in-Explorer buttons, per level. It has to
+    # scroll and wrap rather than widen the window, or displaying any enhanced
+    # image would knock the whole app out of a tiling slot.
+    import json
+
+    win = _window(qtbot, tmp_path)
+    db = win._gallery_view._db
+    db.insert_generation(prompt_id="img1", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}")
+    db.update_generation(
+        "img1", status="completed",
+        output_files=json.dumps([
+            {"filename": "image_enhance_00001_.png", "subfolder": "image"},
+            {"filename": "sdxl_t2i_img1.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_img1.png",
+                                    "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "image_enhance_00001_.png",
+                                     "params": {"enhance_scale": 2.0,
+                                                "enhance_steps": 20}}]),
+    )
+    row = db.get_generation("img1")
+    win._gallery_view._info_tabs.current_config_panel().show_saved_generation(row, [row])
+
+    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    assert effective_min_width <= 704
+
+
 def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
     # A config tab's preview-over-form column is wider than the Inspect page, so it
     # governs the info pane's floor. Even with one open, the window must still fit a

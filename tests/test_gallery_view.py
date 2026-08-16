@@ -5918,7 +5918,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
                                                                             tmp_path):
     # The level being made appears where the levels are, mirroring the run's
     # frames like every other in-flight card in the app.
-    from origenerator.gui.enhance_versions import _PendingTile
+    from origenerator.gui.enhance_versions import _PendingRow
 
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
@@ -5930,7 +5930,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
 
     view.enhance_items(["g0"])
 
-    assert panel._versions._host.findChildren(_PendingTile)
+    assert panel._versions._host.findChildren(_PendingRow)
     (job,) = view._reroll_jobs.values()
     view._client.preview_image.emit(job.prompt_id, b"a frame")
     status, frame, settings = panel._pending_enhancement
@@ -5975,6 +5975,88 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     # The tab whose image is still waiting shows a queued tile, not that frame.
     assert second._pending_enhancement == (
         "queued", None, gallery.describe_enhance_params(follower.params))
+
+
+def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path):
+    # The middle column is where the user is looking while a folder enhances
+    # itself, so the run streams there too — under the scrim, which stays up
+    # because what is on the tile is still not the finished file.
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert not view._browser._thumb_widgets["g0"].is_enhancing()
+
+    view.enhance_items(["g0"])
+
+    # The launch redraws the folder, so the tile to watch is the one now up.
+    tile = view._browser._thumb_widgets["g0"]
+    assert tile.is_enhancing()
+    assert not view._browser._thumb_widgets["g1"].is_enhancing()
+
+    (key,) = view._reroll_jobs
+    view._reroll.preview.emit(key, _png_bytes())
+    tile = view._browser._thumb_widgets["g0"]
+    assert tile._image_label.pixmap() is not None
+    assert not tile._image_label.pixmap().isNull()
+
+    # The run ending puts the tile's own picture back: those frames were a
+    # partial render of a file that never landed.
+    view._reroll_jobs.clear()
+    view._reconcile_pending_enhancements()
+    assert not tile.is_enhancing()
+
+
+def _png_bytes() -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (120, 30, 30)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def _enhanced_in_place(db, pid="g0"):
+    """Fold a level onto ``pid``: the enhanced file leads, the original stays."""
+    db.update_generation(
+        pid,
+        output_files=json.dumps([
+            {"filename": "image_enhance_00001_.png", "subfolder": "image"},
+            {"filename": f"sdxl_t2i_{pid}.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png",
+                                    "subfolder": "image"}]),
+        enhance_history=json.dumps([
+            {"filename": "image_enhance_00001_.png",
+             "params": {"enhance_scale": 2.0}},
+        ]),
+    )
+    return db.get_generation(pid)
+
+
+def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp_path):
+    # A level is a file, not a generation: the image keeps its row, its folder
+    # and its other versions, and the delete lands on the same undo stack as
+    # every other delete in the gallery.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    row = _enhanced_in_place(db)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel.show_saved_generation(row, view._image_rows)
+
+    panel._versions.delete_requested.emit([0])   # the enhancement, not the original
+
+    updated = db.get_generation("g0")
+    assert json.loads(updated["output_files"]) == [
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image"}
+    ]
+    assert not gallery.is_enhanced_row(updated)   # the badge goes with the level
+    assert view._actions.can_undo()
+    assert not view._undo_btn.isHidden()
 
 
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):

@@ -3066,7 +3066,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot):
     assert not view._slideshow_btn.isHidden()
     assert "Starred" in view._slideshow_btn.toolTip()
 
-    # ...while a shelf holding no media of its own doesn't offer one.
+    # ...while a shelf holding nothing at all doesn't offer one.
     view._tree.setCurrentItem(view._experiments_item)
     assert view._slideshow_btn.isHidden()
 
@@ -3102,6 +3102,45 @@ def test_recents_slideshow_honors_the_media_type_filter(qtbot, monkeypatch):
 
     view._recents_image_cb.setChecked(False)  # nothing left on the shelf to play
     assert view._slideshow_btn.isHidden()
+
+
+def test_slideshow_plays_the_experiments_shelf(qtbot, monkeypatch):
+    # Reviewing a batch of experiments is exactly what a slideshow is for: full
+    # screen, one at a time, rather than squinting at a grid of thumbnails.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([
+        _experiment_row("e1"),
+        _experiment_row("e2", seed=10),
+        _experiment_row("e3", verdict="up", seed=11),  # reviewed: off the shelf
+    ]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._experiments_item)
+    assert not view._slideshow_btn.isHidden()
+    assert "Experiments" in view._slideshow_btn.toolTip()
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    # What the shelf shows, so the judged one stays out of the rotation.
+    assert {item[2] for item in view._slideshow._playlist._items} == {"e1", "e2"}
+    view._slideshow.close()
+
+
+def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
+    # Up on an unreviewed experiment is the shelf's Reject, not a plain delete:
+    # the row survives to teach the policy what to steer away from.
+    db = FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
+    actions = FakeActions()
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._trash_generation("e1")
+    view._trash_generation("i1")
+
+    assert [r["prompt_id"] for r in actions.rejected] == ["e1"]
+    assert [r["prompt_id"] for batch in actions.deleted for r in batch] == ["i1"]
 
 
 def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypatch):

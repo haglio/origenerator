@@ -54,6 +54,7 @@ from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
+    EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
     GROUP_ROLE as _GROUP_ROLE,
     RECENTS_KEY as _RECENTS_KEY,
     RECENTS_LABEL as _RECENTS_LABEL,
@@ -1752,8 +1753,9 @@ class GalleryView(QWidget):
 
     def _sync_slideshow_button(self):
         """Offer the slideshow on anything that holds media: a folder, or the
-        Recents/Starred shelf — each a collection of generations like a folder,
-        just gathered rather than nested. The tooltip names what it would play."""
+        Recents/Starred/Experiments shelf — each a collection of generations like a
+        folder, just gathered rather than nested. The tooltip names what it would
+        play."""
         self._slideshow_btn.setVisible(bool(self._slideshow_rows()))
         self._slideshow_btn.setToolTip(f"Play {self._slideshow_subject()} as a slideshow")
 
@@ -1768,7 +1770,8 @@ class GalleryView(QWidget):
 
     def _slideshow_subject(self) -> str:
         """What the slideshow button would play, named for its tooltip."""
-        return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL}.get(
+        return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
+                _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL}.get(
             self._current_shelf_key(), "this folder"
         )
 
@@ -2013,9 +2016,19 @@ class GalleryView(QWidget):
 
     def _trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same
-        undoable delete as anywhere else."""
+        undoable delete as anywhere else.
+
+        An unreviewed experiment is rejected instead of deleted: the Experiments
+        shelf plays as a slideshow, so Up there is the shelf's own Reject, and
+        that keeps the row whose params the policy learns to steer away from.
+        """
         row = self._db.get_generation(prompt_id)
-        if row is not None:
+        if row is None:
+            return
+        if gallery.unreviewed_experiments([row]):
+            self._actions.reject_experiment(row)
+            self._sync_undo_button()
+        else:
             self._actions.delete_rows([row])
 
     def _reroll_item_seed(self, prompt_id: str, which: str):

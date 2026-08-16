@@ -5527,6 +5527,7 @@ def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeyp
 def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
     # Paging to another clip re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
+    view._osr2_btn.setChecked(True)
     fs = _FakeFullscreen(("A.mp4", "pA", "aA"))
     view._on_fullscreen_opened(fs)
     assert driver.started[-1] == ("pA", "aA")
@@ -5732,19 +5733,41 @@ def test_the_loop_ending_drops_the_montage_live_slot(qtbot, monkeypatch):
     view._auto_montage.close()
 
 
-def test_watching_a_video_fullscreen_drives_it_with_the_toggle_off(qtbot):
-    # Double-clicking a clip to fullscreen drives the device even though the global
-    # Drive-OSR2 toggle is off — watching it IS the intent to feel it.
+def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
+    # The toggle governs the fullscreen view as much as the tab preview: double-
+    # clicking a clip to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view._osr2_btn.isChecked()
 
     view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
 
+    assert driver.started == []
+
+
+def test_turning_the_toggle_on_over_an_open_fullscreen_drives_its_video(qtbot):
+    # …and turning it on while one is up drives what's on screen, without closing it.
+    view, driver, _panel = _osr2_view(qtbot)
+    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+
+    view._osr2_btn.setChecked(True)
+
     assert driver.started[-1] == ("pF", "aF")
 
 
-def test_closing_the_fullscreen_stops_driving_when_the_toggle_is_off(qtbot):
+def test_untoggling_while_a_fullscreen_video_drives_stops_the_device(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
+    view._osr2_btn.setChecked(True)
+    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+    assert driver.started
+
+    view._osr2_btn.setChecked(False)
+
+    assert driver.stopped >= 1
+
+
+def test_closing_the_fullscreen_stops_driving_with_no_tab_video_behind_it(qtbot):
+    view, driver, _panel = _osr2_view(qtbot)
+    view._osr2_btn.setChecked(True)
     fs = _FakeFullscreen(("F.mp4", "pF", "aF"))
     view._on_fullscreen_opened(fs)
     assert driver.started

@@ -423,11 +423,13 @@ class GalleryView(QWidget):
             self._group_selection,
         )
         self._group_btn.hide()
-        # A single global switch: while it's on, whatever scripted video is in the
-        # front tab drives the OSR2. Always visible (it's app-wide), lit when on.
+        # A single global switch: while it's on, whatever scripted video is in front
+        # drives the OSR2 — in the generate tab, or one opened fullscreen over it.
+        # Always visible (it's app-wide), lit when on.
         self._osr2_btn = self._tool_button(
             icons.osr2_icon(),
-            "Drive the OSR2 from the video open in the generate tab (Esc to stop)",
+            "Drive the OSR2 from the video in front — the generate tab's, or one "
+            "opened fullscreen (Esc to stop)",
             self._on_osr2_toggle, checkable=True,
         )
         self._osr2_btn.setStyleSheet(
@@ -526,10 +528,10 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db)
-        # One OSR2 driver for the whole view. It follows whichever video is foreground:
-        # an open fullscreen view (which drives regardless of the toggle — watching a
-        # clip IS the intent to feel it), else — only while the global toggle
-        # (self._osr2_btn) is on — whatever scripted video is in the front tab.
+        # One OSR2 driver for the whole view, under the one global toggle
+        # (self._osr2_btn): while that's on it follows whichever video is foreground —
+        # an open fullscreen view, else whatever scripted video is in the front tab —
+        # and with it off nothing drives on either surface.
         # Switching tabs/videos or opening/closing the fullscreen view re-aims it; with
         # nothing to drive it stops. self._osr2_driving is the (video, player) currently
         # driven, so a redundant reconcile doesn't churn the device. Built before the
@@ -675,11 +677,14 @@ class GalleryView(QWidget):
 
     def _osr2_drive_source(self):
         """The drive target the device should follow, or ``None``. The auto-generate
-        slideshow's stroke engine owns the device outright while it runs; else a
-        fullscreen view wins when it's showing a scripted video (it drives regardless
-        of the toggle); otherwise the front tab's video, but only while the toggle is
-        on."""
-        if self._osr2_stroke.active:
+        slideshow's stroke engine owns the device outright while it runs; else, while
+        the toggle is on, a fullscreen view wins when it's showing a scripted video,
+        otherwise the front tab's video.
+
+        The toggle governs both surfaces alike: double-clicking a clip open fullscreen
+        used to take the device on its own, so a clip watched with the switch off drove
+        anyway — the switch is what decides now, whichever surface the video is on."""
+        if self._osr2_stroke.active or not self._osr2_enabled:
             return None
         fullscreen = self._fullscreen_preview
         if fullscreen is not None:
@@ -687,15 +692,16 @@ class GalleryView(QWidget):
             if target is not None:
                 return target
         panel = self._info_tabs.current_config_panel()
-        if self._osr2_enabled and panel is not None:
+        if panel is not None:
             return panel.osr2_drive_target()
         return None
 
     def _on_fullscreen_opened(self, fullscreen):
-        """A double-click popped a video open fullscreen. It drives the OSR2 for its
-        lifetime — regardless of the global toggle — then hands the device back when it
-        closes. (An image or unscripted video simply has no target, so nothing drives
-        and the toggle's video, if any, keeps going.)
+        """A double-click popped a video open fullscreen. While the global toggle is on
+        it takes over the drive for its lifetime, then hands the device back when it
+        closes; with the toggle off it drives nothing, exactly like the tab preview it
+        was opened from. (An image or unscripted video simply has no target, so nothing
+        drives and the toggle's video, if any, keeps going.)
 
         It's also armed to page Left/Right through the folder it was opened from, and
         each such page re-aims the device at whatever clip it lands on."""

@@ -222,6 +222,43 @@ def test_a_single_item_slideshow_shows_no_neighbors(qtbot, tmp_path):
     assert all(label.isHidden() for label in view._neighbors._labels)
 
 
+# --- a generation that lands while the show runs ----------------------------
+
+def test_a_generation_that_lands_joins_the_show(qtbot):
+    # Watching a folder that is still generating is the case this is for: the
+    # loop's next item joins the set and comes up next, without disturbing the
+    # slide being looked at.
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+
+    view.note_added("new.png", "image", "id-new", None)
+
+    assert len(view._playlist) == 2
+    assert view._playlist.current()[2] == "id-a"
+    assert view._playlist.peek(1)[2] == "id-new"
+
+
+def test_a_generation_already_playing_does_not_join_twice(qtbot):
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+
+    view.note_added("a.png", "image", "id-a", None)
+
+    assert len(view._playlist) == 1
+
+
+def test_an_arrival_takes_its_place_beside_the_slide_on_screen(qtbot, tmp_path):
+    # The neighbor stills are what say a show has more than one item in it, so a
+    # show that was alone until now has to redraw them.
+    thumb = _png(tmp_path / "new_thumb.png")
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")])
+    view.resize(800, 600)
+    assert view._neighbors._sources == (None, None)
+
+    view.note_added("new.mp4", "video", "id-new", thumb)
+
+    assert view._neighbors._sources == (thumb, thumb)
+    assert "2" in view._counter.text()  # and the counter counts it
+
+
 # --- holding a slide asks for it to be enhanced -----------------------------
 
 _KEYED = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
@@ -382,38 +419,6 @@ def test_double_clicking_leaves_the_slideshow(qtbot):
     view._preview._on_double_click()
     assert not view.isVisible()
     assert closes == [True]  # the dismissal reaches the gallery, like Escape's
-
-
-# --- an item still being made ------------------------------------------------
-
-def test_an_item_with_no_file_yet_says_it_is_being_made(qtbot):
-    view = _view(qtbot, items=[(None, "image", "gen-live", None)])
-    assert view._playlist.current()[2] == "gen-live"
-    assert view._preview.is_showing_video() is False
-
-
-def test_a_streamed_frame_lands_on_the_item_being_made(qtbot, tmp_path):
-    from PIL import Image
-    from io import BytesIO
-
-    buffer = BytesIO()
-    Image.new("RGB", (8, 8), (10, 20, 30)).save(buffer, "PNG")
-    view = _view(qtbot, items=[(None, "image", "gen-live", None)])
-
-    view.show_live_frame("gen-live", buffer.getvalue())
-
-    assert view._preview._live_frame == buffer.getvalue()
-
-
-def test_a_frame_for_something_else_is_kept_but_not_shown(qtbot):
-    # It rides along for when the rotation reaches that item, without disturbing
-    # the one on screen.
-    view = _view(qtbot, items=[("a.png", "image", "gen-a", None),
-                               (None, "image", "gen-live", None)])
-
-    view.show_live_frame("gen-live", b"not-a-real-png")
-
-    assert view._frames["gen-live"] == b"not-a-real-png"
 
 
 def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):

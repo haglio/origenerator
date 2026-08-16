@@ -1984,8 +1984,14 @@ class GalleryView(QWidget):
         """Offer the slideshow on anything that holds media: a folder, or the
         Recents/Starred/Experiments shelf — each a collection of generations like a
         folder, just gathered rather than nested. The tooltip names what it would
-        play."""
-        self._slideshow_btn.setVisible(bool(self._slideshow_rows()))
+        play.
+
+        Media, not rows: a folder gets its node the moment a generation starts, so
+        a folder being filled can hold nothing anyone can look at yet, and a button
+        that opens an empty show is worse than no button."""
+        self._slideshow_btn.setVisible(
+            bool(self._slideshow_items(self._slideshow_rows()))
+        )
         self._slideshow_btn.setToolTip(f"Play {self._slideshow_subject()} as a slideshow")
 
     def _slideshow_rows(self) -> list[dict]:
@@ -2373,17 +2379,36 @@ class GalleryView(QWidget):
         draws for the item while it's a neighbor rather than the one on screen (a
         video has no other still).
 
-        A row still being made has no file, and takes a ``None`` path: the view
-        shows its streamed frames instead. A folder whose only item is cooking is
-        still a folder worth watching, which is why it isn't simply skipped."""
+        A row with no file is left out, whether it never got one or is still
+        being made: a slide with nothing to look at is a gap between pictures,
+        and one still cooking joins the running show the moment it lands (see
+        :meth:`_feed_slideshow_finished`)."""
         items = []
         for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-            if resolved is None and row.get("status") not in ("running", "pending"):
-                continue  # finished with no file: nothing to show, ever
-            path, media_type = resolved if resolved else (None, gallery.media_type_of_row(row))
-            items.append((path, media_type, row["prompt_id"], row.get("thumbnail_path")))
+            if resolved is None:
+                continue  # nothing to look at yet, or ever
+            items.append((resolved[0], resolved[1], row["prompt_id"],
+                          row.get("thumbnail_path")))
         return items
+
+    def _feed_slideshow_finished(self, row: dict | None):
+        """A generation landed: it joins an open slideshow if that show would be
+        playing it had it opened now.
+
+        Which is the whole point of watching a folder that is auto-generating —
+        the playlist is otherwise the fixed set the show opened with, so the
+        items the loop makes while it runs are exactly the ones it never reaches.
+        Asked of the rows on screen rather than of a folder key remembered at
+        open time, so a shelf's show and a parent folder's answer it the same way
+        their tiles would.
+        """
+        if self._slideshow is None or row is None:
+            return
+        if not any(r["prompt_id"] == row["prompt_id"] for r in self._slideshow_rows()):
+            return
+        for item in self._slideshow_items([row]):
+            self._slideshow.note_added(*item)
 
     def _open_from_slideshow(self, prompt_id: str):
         """Enter in a slideshow: land in the item's own folder with it selected —
@@ -2774,19 +2799,11 @@ class GalleryView(QWidget):
             self._last_reroll_frame = data
             self._info_tabs.show_reroll_frame(data)
         self._feed_montage_preview(key, data)
-        self._feed_slideshow_preview(key, data)
         # An enhance's frames go to the version strip of whichever tab shows the
         # image being enhanced, not to the pane — an enhancement isn't a
         # generation taking the preview over.
         self._enhance_frames[key] = data
         self._reconcile_pending_enhancements()
-
-    def _feed_slideshow_preview(self, key: str, data: bytes):
-        """Mirror a re-roll's live frame into an open slideshow, if that run is one
-        of the items it is playing."""
-        job = self._reroll.job_for(key)
-        if self._slideshow is not None and job is not None:
-            self._slideshow.show_live_frame(job.prompt_id, data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -2876,6 +2893,7 @@ class GalleryView(QWidget):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_montage_finished(key)  # a live montage gains this item's thumbnail
+        self._feed_slideshow_finished(finished_row)  # so does a show of its folder
         self._show_reroll_result_in_tab(finished_row)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.

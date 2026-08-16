@@ -120,6 +120,30 @@ def test_peek_names_the_items_either_side_wrapping():
     assert SlideshowPlaylist([]).peek(1) is None
 
 
+# --- an item that lands while the show runs ---------------------------------
+
+def test_an_item_that_lands_mid_pass_comes_up_next():
+    # Watching a folder fill is watching for the new one, and at the end of a
+    # hundred-item pass it would be an hour away.
+    playlist = SlideshowPlaylist(
+        [("a", "image", "id-a"), ("b", "image", "id-b"), ("c", "image", "id-c")],
+        shuffle=lambda order: None,
+    )  # order == [0, 1, 2], current == a
+
+    assert playlist.add(("d", "image", "id-d")) is True
+
+    assert len(playlist) == 4
+    assert playlist.current()[0] == "a"     # what's on screen is undisturbed
+    assert playlist.advance()[0] == "d"     # and the arrival is what follows
+    assert playlist.advance()[0] == "b"     # then the pass resumes where it was
+
+
+def test_an_item_the_playlist_already_holds_is_not_added_twice():
+    playlist = SlideshowPlaylist([("a", "image", "id-a")], shuffle=lambda order: None)
+    assert playlist.add(("a", "image", "id-a")) is False
+    assert len(playlist) == 1
+
+
 # --- an item that gets enhanced while the show runs -------------------------
 
 def _keyed(**kw):

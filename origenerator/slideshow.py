@@ -94,6 +94,23 @@ class SlideshowPlaylist:
             self._pos = (self._pos - 1) % len(self._items)
         return self.current()
 
+    def add(self, item) -> bool:
+        """Take in an item that has landed since the show opened, and queue it to
+        come up next. Returns whether it was new here.
+
+        Next rather than at the end of the pass: this is how a generation made
+        while the show runs reaches the screen, and watching a folder fill is
+        watching for the new one — parked behind a hundred others it would be an
+        hour away. The rest of the pass then carries on where it left off.
+        """
+        prompt_id = item[2] if len(item) > 2 else None
+        if prompt_id is not None and any(len(held) > 2 and held[2] == prompt_id
+                                         for held in self._items):
+            return False
+        self._items.append(item)
+        self._order.insert(self._pos + 1, len(self._items) - 1)
+        return True
+
     def remove_current(self):
         """Drop the current item; the item that followed it becomes current."""
         if not self._items:

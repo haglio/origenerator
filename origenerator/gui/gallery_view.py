@@ -153,16 +153,17 @@ class GalleryView(QWidget):
         self._voice.edited.connect(self._on_voice_edited)
         self._voice.error.connect(self._on_voice_error)
         self._voice_target_key: str | None = None
-        # A floating caption over the top of the gallery showing what voice heard and
-        # did, so it's visible without reading the log. A free child, positioned by
-        # hand; transient messages revert to the idle "Listening…" after a moment.
+        # A caption showing what voice heard and did, so it's visible without reading
+        # the log. It rides at the top of the left pane, taking its own room rather
+        # than floating over the header buttons it used to land on; transient
+        # messages revert to the idle "Listening…" after a moment.
         self._voice_status = QLabel(self)
         self._voice_status.setObjectName("voiceStatus")
+        self._voice_status.setWordWrap(True)  # a long utterance grows down, not sideways
         self._voice_status.setStyleSheet(
             "#voiceStatus { color: white; background: rgba(20, 20, 20, 225);"
-            " padding: 8px 16px; border-radius: 6px; }"
+            " padding: 6px 10px; border-radius: 6px; }"
         )
-        self._voice_status.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._voice_status.hide()
         self._voice_status_timer = QTimer(self)
         self._voice_status_timer.setSingleShot(True)
@@ -356,6 +357,9 @@ class GalleryView(QWidget):
         toc = QWidget()
         toc_box = QVBoxLayout(toc)
         toc_box.setContentsMargins(*_PANE_MARGINS)
+        # Voice's caption sits above everything else in this pane — the top-left
+        # corner of the view, where it obscures no control while it's up.
+        toc_box.addWidget(self._voice_status)
         # A filter over the tree: type a folder name (prompt / model / LoRA /
         # workflow) to narrow it to matching branches, or a seed to jump straight
         # to that one generation. Sits above the tree so it reads as its search box.
@@ -1706,10 +1710,7 @@ class GalleryView(QWidget):
 
     def _show_voice_status(self, text: str, *, transient: bool):
         self._voice_status.setText(text)
-        self._voice_status.adjustSize()
-        self._reposition_voice_status()
         self._voice_status.show()
-        self._voice_status.raise_()
         if transient:
             self._voice_status_timer.start(4000)  # then revert to the idle caption
         else:
@@ -1721,9 +1722,6 @@ class GalleryView(QWidget):
         else:
             self._voice_status.hide()
 
-    def _reposition_voice_status(self):
-        self._voice_status.move(max(0, (self.width() - self._voice_status.width()) // 2), 12)
-
     def _on_voice_heard(self, text: str):
         if any(char.isalpha() for char in text):
             self._show_voice_status(f"🎤 heard: “{text}”", transient=True)
@@ -1733,11 +1731,6 @@ class GalleryView(QWidget):
 
     def _on_voice_error(self, message: str):
         self._show_voice_status(f"🎤 {message}", transient=True)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if self._voice_status.isVisible():
-            self._reposition_voice_status()
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,

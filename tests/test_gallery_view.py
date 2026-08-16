@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint, QObject, QEvent, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
 from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 
@@ -3007,6 +3007,30 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
 
     view._toggle_auto(False)
     assert view._voice_status.isHidden()
+
+
+def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
+    # It used to float centered over the top of the view, landing squarely on the
+    # header toolbar the user was trying to click. It now takes its own room at
+    # the top of the left pane, so it covers nothing however long the message.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.resize(1200, 800)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    view._voice.heard.emit("give her a much longer caption than the idle one")
+    qtbot.wait(1)  # let the layout settle around the grown caption
+
+    caption = QRect(view._voice_status.mapTo(view, QPoint(0, 0)), view._voice_status.size())
+    for button in (view._back_btn, view._forward_btn, view._undo_btn, view._delete_btn):
+        assert not caption.intersects(
+            QRect(button.mapTo(view, QPoint(0, 0)), button.size())
+        )
+    assert caption.bottom() <= view._filter_edit.mapTo(view, QPoint(0, 0)).y()
 
 
 def test_esc_stops_auto_generate(qtbot, tmp_path):

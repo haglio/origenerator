@@ -702,7 +702,12 @@ class ParamForm(QWidget):
             k: v for k, v in params.items()
             if k not in self._widgets and k not in self._hidden_keys
         }
-        self._render_readonly_rows(self._passthrough)
+        # The plumbing params are the other way round: kept for the round-trip at
+        # whatever the config held, but given no row — see param_sections.HIDDEN_KEYS.
+        self._render_readonly_rows(
+            {k: v for k, v in self._passthrough.items()
+             if k not in param_sections.HIDDEN_KEYS}
+        )
         for pd in self._param_defs:
             if pd.key in params:
                 self._write_field(pd, params[pd.key])

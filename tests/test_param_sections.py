@@ -8,7 +8,7 @@ def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
         "Prompts", "Seed", "Model & LoRA", "Sampling", "Stroke",
-        "Dimensions", "Frames", "Audio", "Output",
+        "Dimensions", "Frames", "Audio",
     ]
 
 
@@ -40,13 +40,12 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("audio_prompt") == "Audio"
     assert ps.section_title("audio_seed") == "Audio"
     assert ps.section_title("foley_model") == "Audio"       # passthrough model file
-    assert ps.section_title("filename_prefix") == "Output"
 
 
 def test_unknown_key_falls_into_the_other_section_sorted_last():
     assert ps.section_title("mystery_param") == ps.OTHER_TITLE
     # It ranks after every mapped key, so it renders in a trailing catch-all.
-    assert ps.key_rank("mystery_param") > ps.key_rank("filename_prefix")
+    assert ps.key_rank("mystery_param") > ps.key_rank("audio_seed")
 
 
 def test_key_rank_orders_across_and_within_sections():
@@ -77,10 +76,20 @@ def test_every_workflow_param_maps_to_a_named_section(workflow_name):
     # The consistency guarantee: no registered workflow may carry a param that
     # falls through to "Other". A new param must be assigned a home in SECTIONS,
     # so the form groups it the same way for every workflow that shares it. The
-    # enhance params are the one exemption — the form hides them outright
-    # (ParamForm's hidden_keys), so they need no section to land in.
+    # enhance params and the plumbing ones are the two exemptions — the form
+    # hides both outright (ParamForm's hidden_keys, and ps.HIDDEN_KEYS), so
+    # neither needs a section to land in.
     wf = WORKFLOW_REGISTRY[workflow_name]
     keys = (set(wf.default_params()) | {pd.key for pd in wf.param_definitions()}) \
-        - set(wf.enhance_keys())
+        - set(wf.enhance_keys()) - ps.HIDDEN_KEYS
     unmapped = sorted(k for k in keys if ps.section_title(k) == ps.OTHER_TITLE)
     assert unmapped == [], f"{workflow_name} params without a section: {unmapped}"
+
+
+def test_the_plumbing_params_are_hidden_rather_than_sectioned():
+    # They stay in every workflow's defaults so payloads and the grouping key are
+    # unchanged; the form simply gives them no row, editable or read-only.
+    assert ps.HIDDEN_KEYS == {"batch_size", "crf", "filename_prefix"}
+    for workflow in WORKFLOW_REGISTRY.values():
+        shown = {pd.key for pd in workflow.param_definitions()}
+        assert not (shown & ps.HIDDEN_KEYS)

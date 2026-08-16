@@ -64,8 +64,15 @@ SECTIONS: tuple[Section, ...] = (
         "audio_prompt", "audio_negative_prompt", "audio_seed",
         "foley_model", "foley_vae", "foley_synchformer",
     ), collapsed=True),
-    Section("Output", ("batch_size", "crf", "filename_prefix"), collapsed=True),
 )
+
+# Plumbing the form never shows, editable or read-only. A batch renders N of one
+# recipe in a single prompt, which the queue now does a job at a time and in the
+# open; the prefix and the video CRF only name and encode the file ComfyUI
+# writes, and the gallery groups by settings rather than by filename. They stay
+# in every workflow's defaults, so payloads are unchanged and the grouping key
+# (which reads those defaults) never moves — they simply have no row.
+HIDDEN_KEYS: frozenset[str] = frozenset({"batch_size", "crf", "filename_prefix"})
 
 # Where an unmapped param lands: a trailing catch-all so a newly added key still
 # renders (and round-trips) instead of vanishing. A guard test keeps every

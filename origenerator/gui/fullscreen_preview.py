@@ -166,16 +166,20 @@ class FullscreenPreview(QWidget):
     def _show_surroundings(self) -> None:
         """Say where in the folder this is, and draw the items either side of it.
 
-        Nothing to say for a folder of one — or for a view following a generation
-        still being made, which has no place among the folder's files until an
-        arrow leaves it for one.
+        A folder of one still says so — "1 / 1" — since where you are is worth
+        knowing whatever the folder holds; it just has no neighbors to draw. A
+        view following a generation still being made says nothing at all: it has
+        no place among the folder's files until an arrow leaves it for one.
         """
-        if len(self._items) < 2 or self._live:
+        if not self._items or self._live:
             self._counter.hide()
             self._neighbors.set_neighbors(None, None)
             return
         self._counter.show()
         self._counter.show_position(self._index + 1, len(self._items))
+        if len(self._items) < 2:
+            self._neighbors.set_neighbors(None, None)
+            return
         self._neighbors.set_neighbors(
             still_for(self._items[(self._index - 1) % len(self._items)]),
             still_for(self._items[(self._index + 1) % len(self._items)]),

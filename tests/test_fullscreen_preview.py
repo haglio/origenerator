@@ -601,11 +601,16 @@ def test_culling_an_item_renumbers_what_is_left(qtbot):
     assert view._counter.text() == "1 / 2"
 
 
-def test_a_lone_item_is_not_counted(qtbot):
+def test_a_lone_item_still_says_where_you_are(qtbot):
+    # Most video folders here hold exactly one, and "1 / 1" over one of those is
+    # what makes a video folder behave like an image folder rather than like a
+    # view with nothing on it.
     view = FullscreenPreview(("a.png", "image"), player=MagicMock())
     qtbot.addWidget(view)
     view.set_playlist([("a.png", "image", "gen-a")], 0)
-    assert view._counter.isHidden()
+    assert view._counter.isHidden() is False
+    assert view._counter.text() == "1 / 1"
+    assert view._neighbors._sources == (None, None)  # nothing either side of it
 
 
 def test_a_view_following_a_generation_counts_nothing_until_it_pages_off(qtbot):

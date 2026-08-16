@@ -24,6 +24,19 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         typical_seconds=typical_seconds)
 
 
+def _png_bytes(side=200):
+    """A plain square PNG, standing in for a live frame off ComfyUI."""
+    from PyQt6.QtCore import QBuffer
+    from PyQt6.QtGui import QPixmap
+
+    pixmap = QPixmap(side, side)
+    pixmap.fill()
+    buffer = QBuffer()
+    buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+    pixmap.save(buffer, "PNG")
+    return bytes(buffer.data())
+
+
 def _four(queue):
     queue.set_items([_item(key="a"), _item(key="b", status="queued"),
                      _item(key="c", status="queued"), _item(key="d", status="queued")])
@@ -46,6 +59,46 @@ def test_a_queue_of_any_length_is_one_progress_bar_tall(queue):
     queue.set_items([_item(key=f"j{i}", status="queued") for i in range(12)])
     assert queue.sizeHint().height() == idle
     assert len(queue.rows()) == 12  # all of them, the rest a scroll away
+
+
+def test_the_clock_reads_above_the_bar_it_measures(queue):
+    # Stacked, not side by side: the numbers sit over the bar they explain, and
+    # neither is made to give up width to the other.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(status="running", progress=(10, 20),
+                           started_at=time.time() - 90.5, typical_seconds=725.0)])
+    QApplication.processEvents()
+    preview = queue.running_preview()
+
+    assert preview._caption.geometry().bottom() <= preview._progress.geometry().top()
+    assert preview._caption.x() == preview._progress.x()  # and they line up
+
+
+def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
+    # The live frame is what the left half is for, so it takes the biggest square
+    # the strip has room for — the strip's own height — right into its corner.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(status="running")])
+    QApplication.processEvents()
+    frame = queue.running_preview()._frame
+    corner = frame.mapTo(queue, frame.rect().bottomLeft())
+
+    assert frame.width() == frame.height() == queue.height()
+    assert (corner.x(), corner.y()) == (0, queue.height() - 1)
+
+
+def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
+    # Sizing the label alone would leave the picture its old size in the middle
+    # of a bigger blank square.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(status="running", frame=_png_bytes())])
+    QApplication.processEvents()
+    frame = queue.running_preview()._frame
+
+    assert frame.pixmap().height() == frame.height()
 
 
 def test_the_left_half_follows_the_job_being_made(queue):
@@ -170,7 +223,7 @@ def _timing(queue) -> str:
 
 
 def test_shows_the_elapsed_time_and_what_is_left(queue):
-    # A 12-minute video job 90 seconds in: the bar now has both numbers beside it
+    # A 12-minute video job 90 seconds in: the bar now has both numbers above it
     # instead of creeping along with nothing to measure it against. The
     # half-seconds keep both readings a clear half-second off a rollover, so the
     # time the test itself takes can't tip either one.
@@ -214,7 +267,7 @@ def test_the_clock_stops_when_the_queue_empties(queue):
 
 
 def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
-    # The clock and the foreign-queue line share the space beside the bar: ours
+    # The clock and the foreign-queue line share the line above the bar: ours
     # while we have a job, theirs when we don't.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
     assert "elapsed" in _timing(queue)
@@ -225,8 +278,8 @@ def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
 
 
 def test_the_clock_keeps_the_strip_the_same_height(queue):
-    # Same reason the idle strip holds its slot: the clock rides beside the bar
-    # rather than adding a line that would shove the panes above it.
+    # Same reason the idle strip holds its slot: the clock rides in the strip's
+    # own height rather than adding a line that would shove the panes above it.
     queue.set_items([])
     idle = queue.sizeHint().height()
     queue.set_items([_item(status="running", progress=(10, 20),

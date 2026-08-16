@@ -1,10 +1,11 @@
 """The generation queue, as one strip along the bottom of the gallery.
 
 Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering, a fat progress bar beside it, and its
-clock — "1:30 elapsed · ~10:34 left", so the bar has something to be measured
-against — no wider than a bar needs to be. With nothing of ours in flight the same
-half says what the shared server is busy with instead, and offers a Clear for it.
+live frame of the job ComfyUI is rendering, filling the strip's whole height out
+of its bottom-left corner, and beside it a column no wider than a bar needs to be
+— the job's clock, "1:30 elapsed · ~10:34 left", reading directly above the fat
+progress bar it measures. With nothing of ours in flight the same half says what
+the shared server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click, and each draggable to a new place in the line. Only
@@ -39,10 +40,15 @@ from origenerator.timing import progress_time_label
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
 
-_PREVIEW = 80   # the live thumbnail; the full-size preview is one click away
-# The bar needs only enough width to read as a bar; the queue's names are long,
-# so the rest of the strip goes to the line.
-_BAR_WIDTH = 150
+# The strip's height, and so the side of the square the live thumbnail fills: it
+# takes the bottom-left corner whole, being the one thing here worth looking at
+# (the full-size preview is still one click away). Fixed, so the panes above the
+# strip never move however long the line gets.
+_STRIP_HEIGHT = 88
+# The clock and the bar beneath it share one column, wide enough to read a line
+# of the clock and for the bar to read as a bar. The queue's names are long, so
+# the rest of the strip goes to the line.
+_BAR_WIDTH = 200
 # How often the running half re-reads the clock. Its own timer rather than the
 # gallery's 1.5s poll, which would make a seconds count skip every other tick.
 _TICK_MS = 1000
@@ -52,7 +58,7 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
 class RunningPreview(QWidget):
-    """What is being made: its live frame, a fat bar beside it, and its clock."""
+    """What is being made: its live frame, and beside it a clock over a fat bar."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -60,25 +66,36 @@ class RunningPreview(QWidget):
         self._item = None
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
+        # No margins: the frame is meant to reach the strip's edges, and the
+        # column beside it centers itself in the same height.
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         self._frame = QLabel()
-        self._frame.setFixedSize(_PREVIEW, _PREVIEW)
+        self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._frame)
+
+        column = QVBoxLayout()
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(3)
+        column.addStretch(1)
+        # Above the bar: how long this run has been going and how much longer it
+        # has, so a bar creeping along has something to be measured against. It
+        # reads over the bar rather than beside it — two readings of the one run,
+        # neither made to give up width to the other. With nothing of ours being
+        # made the same line is free to say what the shared server is busy with.
+        self._caption = QLabel()
+        self._caption.setObjectName("estimateLabel")  # muted secondary text
+        self._caption.setWordWrap(True)
+        self._caption.setFixedWidth(_BAR_WIDTH)  # a long line wraps, not widens
+        column.addWidget(self._caption)
         self._progress = QProgressBar()
         self._progress.setTextVisible(False)
         self._progress.setFixedHeight(16)  # the fat, important one
         self._progress.setFixedWidth(_BAR_WIDTH)
-        layout.addWidget(self._progress)
-        # Beside the bar: how long this run has been going and how much longer it
-        # has, so a bar creeping along has something to be measured against. With
-        # nothing of ours being made the same slot is free to say what the shared
-        # server is busy with instead.
-        self._caption = QLabel()
-        self._caption.setObjectName("estimateLabel")  # muted secondary text
-        self._caption.setWordWrap(True)
-        layout.addWidget(self._caption, 1)
+        column.addWidget(self._progress)
+        column.addStretch(1)
+        layout.addLayout(column)
 
         # Its own clock rather than the gallery's poll, so the count advances a
         # second at a time whether or not a refresh has landed.
@@ -130,14 +147,27 @@ class RunningPreview(QWidget):
         ))
 
     def _render_frame(self, frame):
+        side = self._frame.width()
         pixmap = QPixmap()
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
             self._frame.setPixmap(pixmap.scaled(
-                _PREVIEW, _PREVIEW, Qt.AspectRatioMode.KeepAspectRatio,
+                side, side, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             ))
         else:
             self._frame.clear()  # no frame yet — a blank square, not a stale one
+
+    def resizeEvent(self, event):
+        """Keep the frame the largest square the strip's height leaves room for.
+
+        Taken off the height rather than a size of its own, so the thumbnail is
+        always as big as the corner it sits in: a strip laid out any other height
+        grows it to match instead of stranding it in an empty square.
+        """
+        super().resizeEvent(event)
+        if self.height() != self._frame.width():
+            self._frame.setFixedSize(self.height(), self.height())
+            self._render_frame(None if self._item is None else self._item.frame)
 
 
 class QueueRow(QWidget):
@@ -246,11 +276,14 @@ class GenerationQueue(QWidget):
             f"#generationQueue {{ border-top: 1px solid {BORDER_SUBTLE.name()}; }}"
         )
         self.setAcceptDrops(True)  # a row dropped anywhere on the strip reorders it
+        self.setFixedHeight(_STRIP_HEIGHT)
         self._items: list = []
         self._drop_at: int | None = None  # where a drag in progress would land
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
+        # Flush at the left and both ends, so the live frame fills the strip's
+        # bottom-left corner; only the far right is held off the window edge.
+        layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(8)
         self._running = RunningPreview()
         layout.addWidget(self._running)
@@ -266,7 +299,7 @@ class GenerationQueue(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setFixedHeight(self._running.sizeHint().height())
+        self._scroll.setFixedHeight(_STRIP_HEIGHT)
         self._host = QWidget()
         self._rows_box = QVBoxLayout(self._host)
         self._rows_box.setContentsMargins(0, 0, 0, 0)

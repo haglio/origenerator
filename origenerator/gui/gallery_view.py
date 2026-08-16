@@ -2688,8 +2688,10 @@ class GalleryView(QWidget):
 
     def _update_queue(self):
         """Feed the bottom strip every in-flight job, in the order ComfyUI will
-        work through them, so the whole queue shows from anywhere in the view."""
-        self._queue.set_items(self._inflight_items())
+        work through them, plus whatever another app has on ComfyUI — so the whole
+        queue shows from anywhere, and one that isn't ours is visible before
+        Generate rather than after."""
+        self._queue.set_items(self._inflight_items(), self._foreign_queue.total)
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.

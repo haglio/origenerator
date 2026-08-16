@@ -79,7 +79,6 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
-            ParamDef("filename_prefix", "Output Prefix", "str", "image/flux_t2i_upscaled"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:

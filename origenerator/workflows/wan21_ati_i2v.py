@@ -129,7 +129,6 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=list_lora_files([])),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
-            ParamDef("filename_prefix", "Output Prefix", "str", "video/wan21_ati_i2v"),
         ]
 
     # The aim params auto-detection may fill; leaving ALL of them untouched is

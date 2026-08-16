@@ -101,7 +101,6 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                      _DEFAULT_FACE_DETECTOR, options=detectors),
             ParamDef("enhance_hand_detector", "Hand Detector", "combo",
                      _DEFAULT_HAND_DETECTOR, options=detectors),
-            ParamDef("filename_prefix", "Output Prefix", "str", "image/image_enhance"),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:

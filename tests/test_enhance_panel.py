@@ -322,6 +322,57 @@ def _click(qtbot, row, modifier=Qt.KeyboardModifier.NoModifier):
     qtbot.mouseRelease(row, Qt.MouseButton.LeftButton, modifier)
 
 
+def test_clicking_anywhere_on_a_row_picks_it(qtbot):
+    # A row is one thing to click. Its picture and its lines of text cover
+    # nearly all of it, and a child widget takes the press by default — which
+    # left only the margins around them live.
+    from PyQt6.QtWidgets import QLabel
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), created_fallback="2026-08-01")
+    row = _rows(versions)[0]
+
+    targets = [row._picture, row._title]
+    targets += [lbl for lbl in row.findChildren(QLabel) if lbl.text() == "File"]
+    for target in targets:
+        assert row.childAt(target.mapTo(row, QPoint(3, 3))) is None, target.text()
+
+
+def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
+    # The pass-through must stop at the copy and Show-in-Explorer buttons: Qt's
+    # hit test skips a container marked transparent along with everything inside
+    # it, so these are laid into the row's grid rather than into one.
+    from PyQt6.QtWidgets import QPushButton
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)))
+    row = _rows(versions)[0]
+
+    buttons = row.findChildren(QPushButton)
+    assert {b.objectName() for b in buttons} == {"copyButton", "revealButton"}
+    for button in buttons:
+        assert row.childAt(button.mapTo(row, QPoint(3, 3))) is button
+
+
+def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
+    # The value labels come from the metadata block, where they are selectable
+    # text — and Qt gives selectable text its own Copy / Select All menu. Over a
+    # version that menu means nothing (the row has a Copy button for the one
+    # value worth copying) and it is in the way of the row's own Delete.
+    from PyQt6.QtWidgets import QLabel
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), created_fallback="2026-08-01")
+    row = _rows(versions)[0]
+
+    for label in row.findChildren(QLabel):
+        assert label.contextMenuPolicy() == Qt.ContextMenuPolicy.NoContextMenu
+    assert row.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
+
+
 def test_a_plain_click_picks_one_level_at_a_time(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)

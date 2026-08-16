@@ -109,24 +109,38 @@ def label_column_width(items: list[MetaItem]) -> int:
     return max(metrics.horizontalAdvance(text) for text in labels) + 12
 
 
+def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
+    """One item's four cells — ``(label, value, copy, reveal)`` — the last two
+    ``None`` unless the item declares copyable text or a path to reveal.
+
+    Public as cells rather than only as a finished row because the version list
+    lays these into a grid of its own: a level's File line carries the same
+    copy and Show-in-Explorer buttons as one in a metadata block because it is
+    built from the same widgets, and a grid puts nothing between them and the
+    row, which is one thing to click.
+    """
+    return (
+        _label_widget(item.label, label_width),
+        _value_widget(item),
+        CopyButton(item.copy) if item.copy is not None else None,
+        _reveal_button(item.reveal) if item.reveal is not None else None,
+    )
+
+
 def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     """A ``label: value`` row, gaining a copy-to-clipboard button when the item
-    declares copyable text. ``label_width`` aligns keys within the section.
-
-    Public because a file's row belongs wherever that file is listed: the
-    version strip builds its own rows from this, so a level's File line carries
-    the same copy and Show-in-Explorer buttons as one in a metadata block."""
+    declares copyable text. ``label_width`` aligns keys within the section."""
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(8)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    layout.addWidget(_label_widget(item.label, label_width))
-    layout.addWidget(_value_widget(item), 1)
-    if item.copy is not None:
-        layout.addWidget(CopyButton(item.copy), 0, Qt.AlignmentFlag.AlignTop)
-    if item.reveal is not None:
-        layout.addWidget(_reveal_button(item.reveal), 0, Qt.AlignmentFlag.AlignTop)
+    label, value, copy, reveal = meta_cells(item, label_width)
+    layout.addWidget(label)
+    layout.addWidget(value, 1)
+    for button in (copy, reveal):
+        if button is not None:
+            layout.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
     return row
 
 

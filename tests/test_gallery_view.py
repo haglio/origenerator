@@ -6011,17 +6011,38 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     assert tile.is_enhancing()
     assert not view._browser._thumb_widgets["g1"].is_enhancing()
 
-    (key,) = view._reroll_jobs
-    view._reroll.preview.emit(key, _png_bytes())
+    (job,) = view._reroll.all_jobs
+    view._client.preview_image.emit(job.prompt_id, _png_bytes())
     tile = view._browser._thumb_widgets["g0"]
     assert tile._image_label.pixmap() is not None
     assert not tile._image_label.pixmap().isNull()
 
     # The run ending puts the tile's own picture back: those frames were a
     # partial render of a file that never landed.
-    view._reroll_jobs.clear()
+    view._reroll._jobs.clear()
     view._reconcile_pending_enhancements()
     assert not tile.is_enhancing()
+
+
+def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
+    # A batch shares one folder and so one frame slot: the frame there belongs
+    # to whichever of them ComfyUI is running, and lending it to the tiles queued
+    # behind would show each of those a picture of a different image.
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view.enhance_items(["g0", "g1"])
+    leader, follower = view._reroll.all_jobs
+    view._client.preview_image.emit(leader.prompt_id, _png_bytes())
+
+    tiles = view._browser._thumb_widgets
+    assert tiles["g0"].is_enhancing() and tiles["g1"].is_enhancing()
+    assert not tiles["g0"]._image_label.pixmap().isNull()
+    assert follower.state == "queued"
+    assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
 
 
 def _png_bytes() -> bytes:

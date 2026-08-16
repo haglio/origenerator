@@ -24,6 +24,33 @@ def resolve_comfyui_client_id(app_state) -> str:
     return client_id
 
 
+def _name_this_process() -> None:
+    """Leave the launcher an interpreter that says "Origenerator" next time.
+
+    Windows takes what it shows about a process from the file it was started
+    from -- the Details tab's name, the Processes tab's description, the icon
+    beside it -- so a plain ``python.exe`` puts Origenerator in the task list as
+    one more anonymous "Python", indistinguishable from every other Python app
+    on the machine.  That only matters until something strands a process, and
+    then it is the whole difference between ending the right row and guessing.
+
+    Naming this process on the way in is the one thing that cannot be done:
+    writing the copy takes the very interpreter being named.  So each run makes
+    it for the run after and ``launch_origenerator.vbs`` picks it up, which
+    costs one launch, once.  The console interpreter, because that is the one
+    the launcher runs -- it redirects the app's output into the launcher log.
+    """
+    try:
+        from app_support.process_identity import ProcessNamer
+        from pathlib import Path as _Path
+
+        icon = _Path(__file__).resolve().parent.parent / "icon.ico"
+        ProcessNamer("Origenerator", icon=icon).prepare_launcher(
+            "Origenerator", _Path(sys.executable).with_name("python.exe"))
+    except Exception:
+        pass  # Cosmetic: costs a name in the task list, never a launch.
+
+
 def _init_windows_taskbar_identity() -> None:
     """Give Origenerator its own taskbar identity so the pinned launcher icon
     activates this window instead of spawning a second taskbar button.
@@ -115,6 +142,7 @@ def _warm_voice_runtimes() -> None:
 def main():
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
     _init_windows_taskbar_identity()
+    _name_this_process()
 
     import logging
 

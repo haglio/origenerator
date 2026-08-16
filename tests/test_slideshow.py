@@ -120,6 +120,49 @@ def test_peek_names_the_items_either_side_wrapping():
     assert SlideshowPlaylist([]).peek(1) is None
 
 
+# --- an item that gets enhanced while the show runs -------------------------
+
+def _keyed(**kw):
+    kw.setdefault("shuffle", lambda order: None)
+    return SlideshowPlaylist(
+        [("a.png", "image", "id-a", "a_thumb.png"),
+         ("b.png", "image", "id-b", "b_thumb.png")], **kw,
+    )
+
+
+def test_an_enhanced_item_is_replaced_wherever_it_sits():
+    # The show paged on long before the enhancement landed. The playlist is the
+    # fixed set the show opened with, so an arrival dropped for being late would
+    # play the pre-enhance file every pass from here on.
+    playlist = _keyed()
+    playlist.advance()  # on b now; the enhancement of a arrives
+
+    assert playlist.replace_item("id-a", "a_better.png") is True
+
+    assert playlist.current()[0] == "b.png"        # what's on screen is untouched
+    assert playlist.back()[0] == "a_better.png"    # and a comes round upgraded
+
+
+def test_replacing_an_item_the_playlist_does_not_hold_reports_nothing():
+    # Every landed enhancement is offered to every open show; one that belongs
+    # to a folder this show isn't playing simply isn't here.
+    assert _keyed().replace_item("id-elsewhere", "x.png") is False
+
+
+def test_an_upgraded_item_keeps_its_id_and_media_type():
+    playlist = _keyed()
+    playlist.replace_item("id-a", "a_better.png")
+    assert playlist.current() == ("a_better.png", "image", "id-a", "a_thumb.png")
+
+
+def test_an_upgraded_item_takes_the_new_thumbnail_when_one_comes_with_it():
+    # The still is what the item is drawn as while it's a neighbor; the one it
+    # arrived with is of the version the swap just retired.
+    playlist = _keyed()
+    playlist.replace_item("id-a", "a_better.png", "image", "a_better_thumb.png")
+    assert playlist.current()[3] == "a_better_thumb.png"
+
+
 # --- AutoGeneratePlaylist: the growing rotation behind the auto-generate view
 
 
@@ -227,3 +270,24 @@ def test_finished_videos_advance_on_their_end_not_a_timer():
     playlist.add_finished("clip.mp4", "video", "id-v", stay_live=True)
     playlist.back()  # onto the video
     assert playlist.dwell_ms() is None
+
+
+def test_an_enhanced_item_is_replaced_in_the_rotation():
+    # With the Auto box on, every item the loop lands is enhanced a few minutes
+    # later — so the rotation has to take the upgrade or replay base renders.
+    playlist = _grown(2)  # id-0 and id-1, sitting on the live slot
+
+    assert playlist.replace_item("id-0", "item0_better.png",
+                                 still="item0_better_thumb.png") is True
+
+    playlist.advance()  # wraps onto the oldest item
+    assert playlist.current() == ("item0_better.png", "image", "id-0",
+                                  "item0_better_thumb.png")
+
+
+def test_replacing_an_item_the_rotation_does_not_hold_reports_nothing():
+    # Including the live slot, which stands for a generation with no file yet.
+    playlist = _grown(1)
+    assert playlist.on_live()
+    assert playlist.replace_item("id-elsewhere", "x.png") is False
+    assert playlist.current() is LIVE

@@ -22,6 +22,25 @@ import random
 DEFAULT_IMAGE_DWELL_MS = 4000
 
 
+def _upgraded(item: tuple, path, media_type=None, still=None) -> tuple:
+    """``item`` pointing at a better version of itself.
+
+    The new file, its media type (kept as it was when the caller names none),
+    the same id — an enhancement is the same item, not a new one — and the new
+    thumbnail when one came with it: the still is what the item is drawn as
+    while it's a neighbor, and the one it arrived with is of the version this
+    swap just retired.
+    """
+    fields = list(item)
+    fields[0] = path
+    if media_type is not None:
+        fields[1] = media_type
+    if still is not None:
+        fields += [None] * (4 - len(fields))
+        fields[3] = still
+    return tuple(fields)
+
+
 class SlideshowPlaylist:
     def __init__(self, items, *, image_dwell_ms=DEFAULT_IMAGE_DWELL_MS,
                  shuffle=random.shuffle):
@@ -85,19 +104,23 @@ class SlideshowPlaylist:
         if not self._order or self._pos >= len(self._order):
             self._pos = 0
 
-    def replace_current(self, path, prompt_id) -> bool:
-        """Swap the current item's file for ``path``, if it is still that item.
+    def replace_item(self, prompt_id, path, media_type=None, still=None) -> bool:
+        """Point the item with this id at a better version of itself — an
+        enhancement of it that has landed. Returns whether it was here at all.
 
-        An enhancement asked for from the slideshow lands minutes later, by
-        which time the show may have paged on — so the swap is guarded by the
-        id, and a stale arrival is simply dropped. Returns whether it landed.
+        Matched by id wherever the item sits, not only while it is the one on
+        screen. An enhancement asked for from a slideshow lands minutes later,
+        by which time the show has long paged on; and this playlist is the fixed
+        set the show opened with — nothing re-reads the folder — so an arrival
+        dropped for being late would leave the pre-enhance file playing every
+        pass for the rest of the session.
         """
-        item = self.current()
-        if item is None or len(item) < 3 or item[2] != prompt_id:
-            return False
-        index = self._order[self._pos]
-        self._items[index] = (path,) + tuple(item[1:])
-        return True
+        replaced = False
+        for index, item in enumerate(self._items):
+            if len(item) > 2 and item[2] == prompt_id:
+                self._items[index] = _upgraded(item, path, media_type, still)
+                replaced = True
+        return replaced
 
     @property
     def image_dwell_ms(self) -> int:
@@ -214,6 +237,22 @@ class AutoGeneratePlaylist:
         self._live = present
         if not present and self._pos >= len(self._items):
             self._pos = max(0, len(self._items) - 1)
+
+    def replace_item(self, prompt_id, path, media_type=None, still=None) -> bool:
+        """Point the finished item with this id at a better version of itself —
+        an enhancement of it that has landed. Returns whether it was found.
+
+        The ordinary case here rather than the rare one: a loop running with the
+        Enhance panel's Auto box on enhances every image it lands, so without
+        this the rotation would replay the base render of each item for as long
+        as it stayed open. The live slot holds no file and is never a match.
+        """
+        replaced = False
+        for index, item in enumerate(self._items):
+            if item[2] == prompt_id:
+                self._items[index] = _upgraded(item, path, media_type, still)
+                replaced = True
+        return replaced
 
     def remove_current(self) -> None:
         """Drop the finished item on screen; the item after it becomes current

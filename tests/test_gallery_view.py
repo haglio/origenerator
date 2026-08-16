@@ -6380,6 +6380,40 @@ def test_holding_a_slide_enhances_it_unless_it_already_has_that_version(qtbot, t
     assert view._enhance_from_slideshow("g0") is False
 
 
+def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(
+        qtbot, tmp_path, monkeypatch):
+    # The whole point of enhancing from a show: what plays becomes the better
+    # version. It lands minutes after the ask, so no surface is still on the
+    # item that asked — each takes the upgrade wherever that item sits.
+    paths = {"g0": "g0.png", "g1": "g1.png"}
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (paths[row["prompt_id"]], "image"))
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    montage = AutoGenerateView(player=MagicMock())
+    qtbot.addWidget(montage)
+    montage.add_finished("g0.png", "image", "g0")
+    view._auto_montage = montage
+    view._fullscreen_preview = _FakeFullscreen(None)
+
+    # The fold has happened: the row now leads with the enhanced file and wears
+    # its thumbnail. That upgraded row is what reaches the shows.
+    paths["g0"] = "g0_enhanced.png"
+    db.update_generation("g0", thumbnail_path="g0_enhanced_thumb.png")
+    view._feed_slideshow_enhanced(db.get_generation("g0"))
+
+    upgraded = ("g0_enhanced.png", "image", "g0", "g0_enhanced_thumb.png")
+    assert upgraded in view._slideshow._playlist._items
+    assert upgraded in montage._playlist._items
+    assert view._fullscreen_preview.enhanced == ("g0", "g0_enhanced.png", "image")
+    view._slideshow.close()
+
+
 def test_a_slideshow_hold_on_a_video_asks_for_nothing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps(

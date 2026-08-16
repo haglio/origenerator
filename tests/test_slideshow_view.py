@@ -282,16 +282,45 @@ def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
     assert view._note.isHidden()   # nothing cooking for this slide any more
 
 
-def test_an_enhancement_that_lands_after_paging_on_is_dropped(qtbot, tmp_path):
-    # It arrives minutes later; by then the show may have moved. The swap is
-    # guarded by the id, so a stale arrival changes nothing on screen.
+def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(
+        qtbot, tmp_path):
+    # It arrives minutes later, by which time the show has moved — and the show
+    # plays a set fixed when it opened, so an arrival dropped for being late
+    # would replay the pre-enhance file every pass from here on.
     view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Right)
+    better = _png(tmp_path / "a_enhanced.png")
 
-    view.note_enhanced("id-a", _png(tmp_path / "a_enhanced.png"))
+    view.note_enhanced("id-a", better)
 
-    assert view._playlist.current()[0] == "b.png"
+    assert view._playlist.current()[0] == "b.png"   # the slide on screen is left alone
+    _press(view, Qt.Key.Key_Left)                   # and a comes round upgraded
+    assert view._playlist.current()[0] == better
+
+
+def test_an_enhancement_of_another_folders_item_changes_nothing(qtbot, tmp_path):
+    # Every landed enhancement is offered to every open show; this one belongs
+    # to a folder this show isn't playing.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+
+    view.note_enhanced("id-elsewhere", _png(tmp_path / "other.png"))
+
+    assert [item[0] for item in view._playlist._items] == ["a.png", "b.png"]
+
+
+def test_the_upgraded_item_is_drawn_as_its_new_still_beside_the_slide(
+        qtbot, tmp_path):
+    # An item rides along as a small still while its neighbor is on screen; the
+    # thumbnail it arrived with is of the version the swap just retired.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view.resize(800, 600)
+    better_thumb = _png(tmp_path / "b_enhanced_thumb.png")
+
+    view.note_enhanced("id-b", _png(tmp_path / "b_enhanced.png"),
+                       still=better_thumb)
+
+    assert better_thumb in view._neighbors._sources
 
 
 def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):

@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from origenerator.gui.inflight import queue_wait_text
+from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 
 _CARD_SIZE = (180, 200)   # matches ThumbnailWidget so cards flow with finished tiles

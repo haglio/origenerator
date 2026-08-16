@@ -1,7 +1,8 @@
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
 )
-from origenerator.workflows.model_files import list_checkpoint_files, list_model_files
+from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_files import ANY, list_model_files
 
 _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
 
@@ -61,8 +62,15 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        checkpoints = list_checkpoint_files(["reapony_v80.safetensors"])
-        upscalers = list_model_files("upscale_models", [_DEFAULT_UPSCALE_MODEL])
+        # SD1.5 alongside SDXL: it carries its own CLIP and runs here, just
+        # against the SDXL VAE this graph pairs it with. The video models filed
+        # under checkpoints carry no text encoder for node 2/3 to read at all.
+        checkpoints = list_model_files(
+            "checkpoints", ["reapony_v80.safetensors"], accepts=(SDXL, SD15),
+        )
+        upscalers = list_model_files(
+            "upscale_models", [_DEFAULT_UPSCALE_MODEL], accepts=ANY,
+        )
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),

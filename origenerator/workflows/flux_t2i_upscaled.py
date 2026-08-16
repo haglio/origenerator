@@ -1,4 +1,5 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import list_model_files
 
 _DEFAULT_UNET = "ultrarealFineTune_v4_fp16.gguf"
@@ -62,8 +63,9 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        # GGUF Flux models live under diffusion_models, alongside the WAN UNETs.
-        unets = list_model_files("diffusion_models", [_DEFAULT_UNET])
+        # GGUF Flux models live under diffusion_models, alongside the WAN UNETs
+        # and a few bare SDXL and Qwen ones — hence the filter.
+        unets = list_model_files("diffusion_models", [_DEFAULT_UNET], accepts=(FLUX,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("unet", "Model", "combo", _DEFAULT_UNET, options=unets),

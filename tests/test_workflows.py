@@ -64,8 +64,8 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     from origenerator.workflows.model_files import NO_LORA
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
-    monkeypatch.setattr(i2v, "list_lora_files", lambda fallback: options)
-    monkeypatch.setattr(flf, "list_lora_files", lambda fallback: options)
+    monkeypatch.setattr(i2v, "list_lora_files", lambda fallback, **terms: options)
+    monkeypatch.setattr(flf, "list_lora_files", lambda fallback, **terms: options)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -125,7 +125,7 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
     }
-    picker = lambda category, fallback: installed[category]
+    picker = lambda category, fallback, **terms: installed[category]
     monkeypatch.setattr(i2v, "list_model_files", picker)
     monkeypatch.setattr(flf, "list_model_files", picker)
 
@@ -642,7 +642,7 @@ def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
     import origenerator.workflows.sdxl_t2i as t2i
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
-    picker = lambda category, fallback: installed.get(category, list(fallback))
+    picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
     monkeypatch.setattr(t2i, "list_model_files", picker)
     monkeypatch.setattr(pose, "list_model_files", picker)
 
@@ -665,27 +665,63 @@ def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
         assert denoise.default == 0.15
 
 
-def test_checkpoint_pickers_route_through_the_filtered_listing(monkeypatch):
-    # Every graph here takes its CLIP from the checkpoint loader, so the Model
-    # dropdown must come from the listing that drops the diffusion-only files
-    # (WAN 2.2's high/low pairs, LTX) rather than from the raw folder scan — those
-    # cannot supply a text encoder, and a run picking one only errors.
-    import origenerator.workflows.image_enhance as enhance
-    import origenerator.workflows.sdxl_pose_transfer as pose
-    import origenerator.workflows.sdxl_t2i as t2i
+_FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "ltx")
+# The categories that hold more than one architecture. upscale_models is left
+# out on purpose: the ESRGAN upscalers are architecture-neutral, and a picker
+# over them is meant to list everything.
+_MIXED_CATEGORIES = ("checkpoints", "diffusion_models", "controlnet", "loras")
 
-    filtered = ["with_clip.safetensors"]
-    for module in (t2i, pose, enhance):
-        monkeypatch.setattr(module, "list_checkpoint_files", lambda fallback: filtered)
-        monkeypatch.setattr(
-            module, "list_model_files",
-            lambda category, fallback: pytest.fail(f"checkpoints read raw in {category}")
-            if category == "checkpoints" else list(fallback),
-        )
 
-    for name in ("sdxl_t2i", "sdxl_pose_transfer", "image_enhance"):
-        by_key = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
-        assert by_key["checkpoint"].options == filtered, name
+def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
+    # The standing rule, checked across the whole registry rather than a list of
+    # workflow names — a workflow added later is covered the day it is added.
+    # Every mixed category is stocked with one model of every architecture, so a
+    # picker that offers all of them did not filter at all.
+    for category in _MIXED_CATEGORIES:
+        for family in _FAMILIES:
+            installed_models.add(
+                category, f"fam_{family}.safetensors",
+                arch=family, lora=(category == "loras"),
+            )
+    installed_models.add("upscale_models", "an_upscaler.pt", body=b"not a safetensors")
+
+    planted = {f"fam_{family}.safetensors" for family in _FAMILIES}
+    checked = 0
+    for name, wf in WORKFLOW_REGISTRY.items():
+        for pd in wf.param_definitions():
+            if pd.type != "combo" or not pd.options:
+                continue
+            offered = planted.intersection(pd.options)
+            if not offered:
+                continue   # not a picker over a mixed category
+            checked += 1
+            assert offered < planted, f"{name}.{pd.key} offers every architecture"
+    assert checked, "no model pickers were exercised — the fixture stopped matching"
+
+
+def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
+    # The pair that started this: a slot labelled High must not offer a file
+    # whose name says low, and vice versa. Both halves are installed, so a slot
+    # that stopped filtering would show both.
+    for category in ("diffusion_models", "loras"):
+        for half in ("high", "low"):
+            installed_models.add(
+                category, f"wan_{half}_noise.safetensors",
+                arch="wan", lora=(category == "loras"),
+            )
+
+    checked = 0
+    for name, wf in WORKFLOW_REGISTRY.items():
+        for pd in wf.param_definitions():
+            if pd.type != "combo" or not pd.options:
+                continue
+            for half, other in (("high", "low"), ("low", "high")):
+                if not pd.key.endswith(f"_{half}"):
+                    continue
+                assert f"wan_{half}_noise.safetensors" in pd.options, f"{name}.{pd.key}"
+                assert f"wan_{other}_noise.safetensors" not in pd.options, f"{name}.{pd.key}"
+                checked += 1
+    assert checked, "no high/low slots were exercised"
 
 
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
@@ -1267,7 +1303,7 @@ def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
     from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     options = [NO_LORA, "hand_high.safetensors", "hand_low.safetensors"]
-    monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback: options)
+    monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback, **terms: options)
 
     wf = Wan21AtiI2vWorkflow()
     assert wf.lora_keys == ("lora_high", "lora_low")
@@ -1844,7 +1880,7 @@ def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
     import origenerator.workflows.flux_t2i_upscaled as flux
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
-    monkeypatch.setattr(flux, "list_model_files", lambda category, fallback: installed)
+    monkeypatch.setattr(flux, "list_model_files", lambda category, fallback, **terms: installed)
 
     wf = FluxT2iUpscaledWorkflow()
     by_key = {pd.key: pd for pd in wf.param_definitions()}

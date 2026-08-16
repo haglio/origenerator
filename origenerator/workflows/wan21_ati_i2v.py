@@ -6,6 +6,7 @@ from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import (
     measure_derived_size, override_size, resolve_input_image_path,
 )
+from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 from origenerator.workflows.stroke_aim import detect_grip_aim
 
@@ -101,7 +102,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        models = list_model_files("diffusion_models", [defaults["unet"]])
+        models = list_model_files("diffusion_models", [defaults["unet"]], accepts=(WAN,))
+        loras_high = list_lora_files([], accepts=(WAN,), expert="high")
+        loras_low = list_lora_files([], accepts=(WAN,), expert="low")
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
@@ -124,9 +127,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet", "Model", "combo", defaults["unet"], options=models),
-            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=list_lora_files([])),
+            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras_high),
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=list_lora_files([])),
+            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
             ParamDef("filename_prefix", "Output Prefix", "str", "video/wan21_ati_i2v"),

@@ -1,8 +1,7 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
-from origenerator.workflows.model_files import (
-    list_checkpoint_files, list_detector_files, list_model_files,
-)
+from origenerator.workflows.model_arch import SD15, SDXL
+from origenerator.workflows.model_files import ANY, list_detector_files, list_model_files
 
 _DEFAULT_CHECKPOINT = "reapony_v80.safetensors"
 _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
@@ -77,8 +76,12 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        checkpoints = list_checkpoint_files([_DEFAULT_CHECKPOINT])
-        upscalers = list_model_files("upscale_models", [_DEFAULT_UPSCALE_MODEL])
+        checkpoints = list_model_files(
+            "checkpoints", [_DEFAULT_CHECKPOINT], accepts=(SDXL, SD15),
+        )
+        upscalers = list_model_files(
+            "upscale_models", [_DEFAULT_UPSCALE_MODEL], accepts=ANY,
+        )
         detectors = list_detector_files()
         return [
             ParamDef("input_image", "Image", "image", ""),

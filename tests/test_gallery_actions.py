@@ -1,8 +1,8 @@
 import json
 
+from origenerator.branch_session import ENV_FLAG, session_trash
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.trash import Trash
 
 
 def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=None):
@@ -32,7 +32,9 @@ def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=Non
 def _actions(tmp_path, limit=50, release_files=None):
     db = Database(tmp_path / "test.db")
     output_dir = tmp_path / "output"
-    trash = Trash(tmp_path / "trash")
+    # Composed the way the gallery composes it, so which trash a session may use
+    # is part of what these tests exercise.
+    trash = session_trash(tmp_path / "trash")
     return GalleryActions(db, output_dir, trash, limit=limit,
                           release_files=release_files), db, output_dir
 
@@ -225,6 +227,24 @@ def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
     actions.reject_experiment(row)
 
     assert seen == [output_dir / "video" / "exp.mp4"]
+
+
+def test_a_branch_session_deletes_no_files(tmp_path, monkeypatch):
+    # A preview's database is a copy of the live install's, so its rows point at
+    # the live library; and what a preview generates itself the live app adopts
+    # at its next launch. Either way the file is not the preview's to destroy —
+    # deleting there forgets the row in the copy and leaves the file alone.
+    # Moving it is how the live app ended up showing rows with nothing behind
+    # them, and how a rejected experiment kept coming back for review.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png", thumb_dir=tmp_path / "thumbs")
+
+    actions.delete_rows([row])
+
+    assert db.get_generation("p1") is None            # off the preview's own shelf
+    assert (output_dir / "a.png").exists()            # the live install's file stays
+    assert (tmp_path / "thumbs" / "p1.jpg").exists()  # and the thumbnail it shows
 
 
 def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):

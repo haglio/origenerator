@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
 
 from origenerator import gallery, recipe_match, timing
 from origenerator.gui import icons
-from origenerator.branch_session import is_branch_session
+from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
     AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
@@ -62,7 +62,6 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.navigation import NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 ensure_shared_ui_on_path()
@@ -180,7 +179,7 @@ class GalleryView(QWidget):
         # only when the number actually moves.
         self._shown_wait_note: str | None = None
         self._actions = actions or GalleryActions(
-            db, COMFYUI_OUTPUT_DIR, Trash(STATE_DIR / "trash"),
+            db, COMFYUI_OUTPUT_DIR, session_trash(STATE_DIR / "trash"),
             release_files=self._release_held_media,
         )
         # Derives the background experiments this gallery hands ComfyUI as the

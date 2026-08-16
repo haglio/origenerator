@@ -2178,6 +2178,31 @@ def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     assert [r["prompt_id"] for r in actions.deleted[0]] == ["i1"]
 
 
+def test_a_branch_session_deletes_nothing_out_of_the_library(qtbot, monkeypatch, tmp_path):
+    # The composition, not just the rule: a preview's gallery builds its actions
+    # around a trash that takes nothing, so deleting a tile forgets the row in
+    # its own copied database and leaves the file for the live app, whose own
+    # row still points at it.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    file_path = output_dir / "sdxl_t2i_i1.png"
+    file_path.write_bytes(b"data")
+    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)  # builds its own actions, the way the app does
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+
+    assert db.get_generation("i1") is None
+    assert file_path.exists()
+
+
 def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),

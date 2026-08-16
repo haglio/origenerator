@@ -223,17 +223,31 @@ def test_rebuilding_for_another_image_drops_the_old_tiles(qtbot):
 # --- the "+ Enhance" card ---------------------------------------------------
 
 
-def test_the_add_card_closes_the_strip_and_reports_its_press(qtbot):
+def test_the_add_card_leads_the_strip_and_reports_its_press(qtbot):
+    # Leftmost, because that is where a new version arrives: the strip runs
+    # newest first.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
     tiles = versions._host.findChildren((_LevelTile, _AddTile))
-    assert isinstance(tiles[-1], _AddTile)   # it closes the strip
+    assert isinstance(tiles[0], _AddTile)
 
     pressed = []
     versions.enhance_requested.connect(lambda: pressed.append(True))
-    qtbot.mouseRelease(tiles[-1], Qt.MouseButton.LeftButton)
+    qtbot.mouseRelease(tiles[0], Qt.MouseButton.LeftButton)
     assert pressed == [True]
+
+
+def test_a_running_enhance_takes_the_add_cards_slot_rather_than_sitting_beside_it(qtbot):
+    # The card becomes the thing it asked for, which is what the press looks
+    # like from the other side.
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), pending=("running", None, "2x"),
+                         add=("2x", None))
+    tiles = versions._host.findChildren((_PendingTile, _AddTile, _LevelTile))
+    assert isinstance(tiles[0], _PendingTile)
+    assert not versions._host.findChildren(_AddTile)
 
 
 def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):

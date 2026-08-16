@@ -404,3 +404,89 @@ def test_paging_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_pat
     _shift(win, Qt.Key.Key_Right)          # its own versions, from the top
 
     assert win._preview._media[0] == second_base
+
+
+def test_the_corner_says_which_version_is_on_screen(qtbot, tmp_path):
+    # Two versions of one picture differ by texture, which is exactly what you
+    # cannot tell apart from memory — so the view has to say which one this is.
+    enhanced, original = tmp_path / "e1.png", tmp_path / "src.png"
+    for path in (enhanced, original):
+        _make_png(path)
+    win = FullscreenPreview((enhanced, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_levels({str(enhanced): [(enhanced, "image", "Enhance 1"),
+                                    (original, "image", "Original")]})
+
+    assert win._note.text() == "Enhance 1 — 1 of 2"
+    _shift(win, Qt.Key.Key_Right)
+    assert win._note.text() == "Original — 2 of 2"
+
+
+def test_an_image_with_one_version_says_nothing(qtbot, tmp_path):
+    lone = _make_png(tmp_path / "only.png")
+    win = FullscreenPreview((lone, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_levels({})
+    assert win._note.isHidden()
+
+
+def test_down_asks_for_the_image_on_screen_to_be_enhanced(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    asked = []
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: asked.append(pid) or True, {str(shown): "id-a"})
+
+    _plain(win, Qt.Key.Key_Down)
+
+    assert asked == ["id-a"]
+    assert win._note.text() == "Enhancing…"
+
+
+def test_the_gallery_can_refuse_and_the_corner_stays_quiet(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: False, {str(shown): "id-a"})
+
+    _plain(win, Qt.Key.Key_Down)
+
+    assert win._note.isHidden()
+
+
+def test_e_turns_the_enhance_gesture_off(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    asked = []
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: asked.append(pid) or True, {str(shown): "id-a"})
+
+    _plain(win, Qt.Key.Key_E)
+    _plain(win, Qt.Key.Key_Down)
+    assert asked == []
+    assert "off" in win._note.text()
+
+
+def test_the_enhanced_version_replaces_what_is_on_screen(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    better = _make_png(tmp_path / "a_enhanced.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: True, {str(shown): "id-a"})
+    _plain(win, Qt.Key.Key_Down)
+
+    win.note_enhanced("id-a", better)
+
+    assert win._preview._media[0] == better
+    assert win._note.isHidden()
+
+
+def test_an_enhancement_for_something_else_leaves_the_screen_alone(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: True, {str(shown): "id-a"})
+
+    win.note_enhanced("id-b", _make_png(tmp_path / "b_enhanced.png"))
+
+    assert win._preview._media[0] == shown

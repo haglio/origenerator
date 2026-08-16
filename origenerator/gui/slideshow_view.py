@@ -4,9 +4,16 @@
 Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
 rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
 and pacing. Images advance on a dwell timer; videos play once and advance when
-they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down holds,
-Enter leaves for the shown item's own folder (``open_requested``), and Escape
-closes. The items either side of the one on screen ride along as small stills
+they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down locks
+the slide on screen against the advance (a locked clip replays, and the hold asks
+for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves for
+the shown item's own folder (``open_requested``), and Escape closes.
+
+Anything that moves off a locked slide — a step either way, a cull — releases the
+lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
+it was set on, not wherever the user wanders to.
+
+The items either side of the one on screen ride along as small stills
 (see :mod:`origenerator.gui.neighbor_previews`). The shared OSR2 stroke keys ride
 along too (Space and friends — see :mod:`origenerator.gui.stroke_hud`) with
 genau's drive panel floated up top, so the device can run over a slideshow of
@@ -133,6 +140,7 @@ class SlideshowView(QWidget):
 
     def _delete_current(self):
         """Delete the current item (if a deleter is wired) and advance to the next."""
+        self._playlist.unlock()  # the held slide is the one being culled
         item = self._playlist.current()
         if item is None:
             return
@@ -144,8 +152,15 @@ class SlideshowView(QWidget):
         else:
             self._show_current()
 
-    def _back(self):
-        self._playlist.back()
+    def _step(self, delta: int):
+        """Manual stepping — an arrow, or the console's transport: moving off a
+        slide releases its lock, so the way out of a hold is the same key that
+        got you anywhere else, not a second press of the one that set it."""
+        self._playlist.unlock()
+        if delta > 0:
+            self._playlist.advance()
+        else:
+            self._playlist.back()
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
@@ -160,10 +175,10 @@ class SlideshowView(QWidget):
     @property
     def locked(self) -> bool:
         """Whether what is on screen is being held — the console's padlock."""
-        return self._playlist.paused
+        return self._playlist.locked
 
     def stroke_step(self, delta: int) -> None:
-        self._advance() if delta > 0 else self._back()
+        self._step(delta)
 
     def stroke_toggle_hold(self) -> None:
         self._hold_current()
@@ -178,12 +193,15 @@ class SlideshowView(QWidget):
         """The pace moved — here or in another window — so the slide on screen
         takes the new one rather than waiting out the old."""
         self._playlist.image_dwell_ms = seconds * 1000
-        if not self._playlist.paused:
+        if not self._playlist.locked:
             self._show_current()
 
     def _on_video_ended(self):
-        """A clip finished: move on, unless the user paused while it played."""
-        if not self._playlist.paused:
+        """A clip finished: replay it while locked, else move on. A lock is
+        repeat-one here, as it is on a Fun Time satellite."""
+        if self._playlist.locked:
+            self._show_current()
+        else:
             self._advance()
 
     def _hold_current(self):
@@ -194,7 +212,7 @@ class SlideshowView(QWidget):
         and the run happens while you keep looking at it. Releasing the hold
         asks for nothing; only stopping does.
         """
-        held = self._toggle_pause()
+        held = self._toggle_lock()
         if held:
             self._enhance_current()
 
@@ -266,13 +284,13 @@ class SlideshowView(QWidget):
         self._note.move(x, max(0, y))
         self._note.raise_()
 
-    def _toggle_pause(self) -> bool:
-        """Flip the hold; returns whether the slide is now held."""
-        if self._playlist.toggle_pause():
+    def _toggle_lock(self) -> bool:
+        """Flip the lock; returns whether the slide is now held."""
+        if self._playlist.toggle_lock():
             self._timer.stop()  # hold on the current item
             self._update_counter()
             return True
-        self._show_current()  # resume, re-arming the dwell timer
+        self._show_current()  # released, re-arming the dwell timer
         return False
 
     def _open_current(self):
@@ -313,8 +331,8 @@ class SlideshowView(QWidget):
         # Show the item's number within the set (its shuffled position), not the
         # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
         text = f"{self._playlist.order[self._playlist.index] + 1} / {len(self._playlist)}"
-        if self._playlist.paused:
-            text += "  ·  paused"
+        if self._playlist.locked:
+            text += "  ·  locked"
         self._counter.setText(text)
         self._reposition_counter()
 
@@ -331,9 +349,9 @@ class SlideshowView(QWidget):
         if key == Qt.Key.Key_Escape:
             self.close()
         elif key == Qt.Key.Key_Left:
-            self._back()
+            self._step(-1)
         elif key == Qt.Key.Key_Right:
-            self._advance()
+            self._step(1)
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
@@ -343,7 +361,7 @@ class SlideshowView(QWidget):
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_stroke_key(self._stroke, key):
-            # Space belongs to the stroke cluster now, everywhere — holding the
+            # Space belongs to the stroke cluster now, everywhere — locking the
             # slideshow is Down, matching the auto-generate view's lock.
             self._stroke_panel.refresh()
         else:

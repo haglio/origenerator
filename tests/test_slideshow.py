@@ -77,15 +77,15 @@ def test_index_tracks_the_current_position():
     assert playlist.index == 2  # wrapped to the last
 
 
-def test_pause_resume_and_toggle():
+def test_lock_toggles_and_releases():
     playlist = _playlist()
-    assert not playlist.paused
-    playlist.pause()
-    assert playlist.paused
-    playlist.resume()
-    assert not playlist.paused
-    assert playlist.toggle_pause() is True
-    assert playlist.toggle_pause() is False
+    assert not playlist.locked
+    assert playlist.toggle_lock() is True
+    assert playlist.locked
+    assert playlist.toggle_lock() is False
+    playlist.toggle_lock()
+    playlist.unlock()
+    assert not playlist.locked
 
 
 def test_images_dwell_on_a_timer_but_videos_do_not():
@@ -95,9 +95,9 @@ def test_images_dwell_on_a_timer_but_videos_do_not():
     assert playlist.dwell_ms() is None  # a video advances when it ends, not on a timer
 
 
-def test_a_paused_or_empty_playlist_has_no_dwell():
+def test_a_locked_or_empty_playlist_has_no_dwell():
     playlist = _playlist()
-    playlist.pause()
+    playlist.toggle_lock()
     assert playlist.dwell_ms() is None
     assert SlideshowPlaylist([]).dwell_ms() is None
 

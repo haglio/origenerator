@@ -6,11 +6,12 @@ long to dwell on an image before advancing. Two policies live here.
 random order, reshuffled each pass, with the shuffle injectable so the order is
 deterministic under test. :class:`AutoGeneratePlaylist` backs the auto-generate
 slideshow: a chronological rotation that grows as the loop lands each item, with
-a trailing "live" slot for the generation in flight and a lock that holds one
-item against the advance. In both, videos aren't dwell-timed: they play once and
-the view advances when they end, so ``dwell_ms`` returns ``None`` for them.
-Keeping these plain, Qt-free objects lets the policies be unit-tested without a
-window or a clock.
+a trailing "live" slot for the generation in flight. Both carry the same lock —
+a hold on the item on screen that stops the advance — so the two slideshows
+answer Fun Time's padlock the same way. In both, videos aren't dwell-timed: they
+play once and the view advances when they end, so ``dwell_ms`` returns ``None``
+for them. Keeping these plain, Qt-free objects lets the policies be unit-tested
+without a window or a clock.
 """
 
 import random
@@ -29,7 +30,7 @@ class SlideshowPlaylist:
         self._order = list(range(len(self._items)))
         self._shuffle(self._order)  # play in a random order
         self._pos = 0
-        self._paused = False
+        self._locked = False
         self._image_dwell_ms = image_dwell_ms
 
     def is_empty(self) -> bool:
@@ -109,19 +110,18 @@ class SlideshowPlaylist:
     def image_dwell_ms(self, value: int) -> None:
         self._image_dwell_ms = max(0, int(value))
 
+    # --- lock: hold this one against the advance ---------------------------
+
     @property
-    def paused(self) -> bool:
-        return self._paused
+    def locked(self) -> bool:
+        return self._locked
 
-    def pause(self) -> None:
-        self._paused = True
+    def toggle_lock(self) -> bool:
+        self._locked = not self._locked
+        return self._locked
 
-    def resume(self) -> None:
-        self._paused = False
-
-    def toggle_pause(self) -> bool:
-        self._paused = not self._paused
-        return self._paused
+    def unlock(self) -> None:
+        self._locked = False
 
     def current_is_video(self) -> bool:
         item = self.current()
@@ -129,9 +129,9 @@ class SlideshowPlaylist:
 
     def dwell_ms(self):
         """Milliseconds to wait before auto-advancing the current item, or ``None``
-        when it shouldn't be timer-advanced: an empty or paused playlist, or a
+        when it shouldn't be timer-advanced: an empty or locked playlist, or a
         video — which advances when it ends, not on a clock."""
-        if self._paused or self.current() is None or self.current_is_video():
+        if self._locked or self.current() is None or self.current_is_video():
             return None
         return self._image_dwell_ms
 

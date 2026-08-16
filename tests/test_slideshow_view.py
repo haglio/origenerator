@@ -1,4 +1,4 @@
-"""SlideshowView — the fullscreen player: show, advance, pause, neighbors, keys."""
+"""SlideshowView — the fullscreen player: show, advance, lock, neighbors, keys."""
 
 from unittest.mock import MagicMock
 
@@ -50,23 +50,58 @@ def test_a_finished_video_advances_to_the_next(qtbot):
     assert view._playlist.current() == ("c.png", "image")
 
 
-def test_pausing_stops_a_finished_video_from_advancing(qtbot):
+def test_a_locked_video_replays_instead_of_advancing(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Right)          # -> the video
-    _press(view, Qt.Key.Key_Down)           # hold
+    _press(view, Qt.Key.Key_Down)           # lock it: repeat-one, as Fun Time's is
     view._preview.video_ended.emit()
     assert view._playlist.current() == ("b.mp4", "video")  # stayed put
-    assert view._playlist.paused
+    assert view._playlist.locked
 
 
-def test_down_toggles_pause_and_the_caption_reflects_it(qtbot):
+def test_down_toggles_the_lock_and_the_caption_reflects_it(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    assert view._playlist.paused
-    assert "paused" in view._counter.text()
+    assert view._playlist.locked
+    assert "locked" in view._counter.text()
     _press(view, Qt.Key.Key_Down)
-    assert not view._playlist.paused
-    assert "paused" not in view._counter.text()
+    assert not view._playlist.locked
+    assert "locked" not in view._counter.text()
+
+
+def test_stepping_away_releases_the_lock(qtbot):
+    # Right off a held slide is the way out of the hold — no second Down needed,
+    # matching the auto-generate slideshow and Fun Time's next/prev.
+    view = _view(qtbot)
+    _press(view, Qt.Key.Key_Down)
+    _press(view, Qt.Key.Key_Right)
+    assert not view._playlist.locked
+    assert view._playlist.current() == ("b.mp4", "video")
+    assert "locked" not in view._counter.text()
+
+    _press(view, Qt.Key.Key_Down)
+    _press(view, Qt.Key.Key_Left)           # and back the other way
+    assert not view._playlist.locked
+    assert view._playlist.current() == ("a.png", "image")
+
+
+def test_the_consoles_transport_releases_the_lock_too(qtbot):
+    view = _view(qtbot)
+    _press(view, Qt.Key.Key_Down)
+    view.stroke_step(1)                     # the console's transport, not the key
+    assert not view.locked
+    assert view._playlist.current() == ("b.mp4", "video")
+
+
+def test_culling_releases_the_lock(qtbot):
+    items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None,
+                         on_delete=lambda prompt_id: None)
+    qtbot.addWidget(view)
+    _press(view, Qt.Key.Key_Down)
+    _press(view, Qt.Key.Key_Up)             # the held slide is the one condemned
+    assert not view._playlist.locked
+    assert view._timer.isActive()           # so the rest keeps rotating
 
 
 class _FakeStroke:
@@ -89,8 +124,8 @@ class _FakeStroke:
         return "OSR2 stub"
 
 
-def test_space_drives_the_shared_stroke_not_the_pause(qtbot):
-    # Space belongs to the app-global OSR2 stroke everywhere; holding the
+def test_space_drives_the_shared_stroke_not_the_lock(qtbot):
+    # Space belongs to the app-global OSR2 stroke everywhere; locking the
     # slideshow is Down. The standing caption comes with the wired stroke.
     stroke = _FakeStroke()
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
@@ -99,7 +134,7 @@ def test_space_drives_the_shared_stroke_not_the_pause(qtbot):
     assert view._stroke_panel is not None  # the drive panel rides along
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in stroke.calls
-    assert not view._playlist.paused
+    assert not view._playlist.locked
 
 
 def test_escape_closes_the_view(qtbot):
@@ -128,7 +163,7 @@ def test_up_deletes_the_current_item_and_advances(qtbot):
 def test_down_holds_the_slideshow(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    assert view._playlist.paused
+    assert view._playlist.locked
 
 
 def test_the_caption_shows_the_item_number(qtbot):
@@ -201,7 +236,7 @@ def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
     _press(view, Qt.Key.Key_Down)
 
     assert asked == ["id-a"]
-    assert view._playlist.paused
+    assert view._playlist.locked
     assert not view._note.isHidden() and "Enhancing" in view._note.text()
 
 
@@ -262,7 +297,7 @@ def test_an_enhancement_that_lands_after_paging_on_is_dropped(qtbot, tmp_path):
 def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
     view = _view(qtbot, _KEYED)     # no on_enhance wired
     _press(view, Qt.Key.Key_Down)
-    assert view._playlist.paused
+    assert view._playlist.locked
     assert view._note.isHidden()
 
 

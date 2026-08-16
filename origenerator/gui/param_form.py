@@ -285,10 +285,10 @@ class ParamForm(QWidget):
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
 
-        It floats to the left of the two labels, midway between their rows, so it
-        reads as linking the pair rather than trailing either field. As a free
-        child of the Dimensions section's content (not a form cell) it folds away
-        with the section and needs manual placement — see
+        It floats in a gutter opened to the left of the two labels, midway between
+        their rows, so it reads as linking the pair rather than trailing either
+        field. As a free child of the Dimensions section's content (not a form
+        cell) it folds away with the section and needs manual placement — see
         :meth:`_position_swap_button`. Absent for a workflow that derives its size
         in-graph (i2v) and so has no dimensions to swap.
         """
@@ -308,27 +308,33 @@ class ParamForm(QWidget):
         content.installEventFilter(self)
 
     def _position_swap_button(self):
-        """Center the swap button between the width and height rows, just left of
-        their labels — in the Dimensions content's coordinates, its parent. Called
-        on every resize/show/toggle since a free child gets no help from the
-        layout; a no-op while the section is folded (the button hides with it)."""
+        """Center the swap button between the width and height rows, inside a left
+        gutter reserved for it so it sits clear of the "Width"/"Height" labels.
+
+        The gutter is the section's left margin, sized to the button here (its
+        final width isn't known until its font and stylesheet apply, after
+        construction) — the same lane the unlock toggle opens on a derived-size
+        form. Squeezing the button into whatever space the labels happened to
+        leave is what put it on top of the words. In the Dimensions content's
+        coordinates, its parent; called on every resize/show/toggle since a free
+        child gets no help from the layout, and a no-op while the section is
+        folded (the button hides with it).
+        """
         btn = self._swap_dimensions_btn
         if btn is None or self._sections["Dimensions"].is_collapsed():
             return
         btn.adjustSize()
+        gutter = btn.width() + 10  # room for the button plus a gap to the labels
+        form = self._sections["Dimensions"].content_form()
+        if form.contentsMargins().left() != gutter:
+            # Push the labels over to open the gutter; the relayout re-invokes us
+            # with the rows in their new positions.
+            form.setContentsMargins(gutter, 2, 0, 4)
+            return
         top = self._widgets["width"].geometry()
         bottom = self._widgets["height"].geometry()
         y = (top.center().y() + bottom.center().y()) // 2 - btn.height() // 2
-        # Labels are right-aligned in a shared column, so the wider word starts
-        # leftmost; sit a small gap to the left of it, clamped to the form edge.
-        label = self._width_label.geometry()
-        fm = self._width_label.fontMetrics()
-        text_left = label.right() - max(
-            fm.horizontalAdvance(self._width_label.text()),
-            fm.horizontalAdvance(self._height_label.text()),
-        )
-        x = max(0, text_left - btn.width() - 6)
-        btn.move(x, y)
+        btn.move(max(0, (gutter - btn.width()) // 2), y)
         btn.raise_()
 
     def eventFilter(self, obj, event):

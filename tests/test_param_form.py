@@ -235,10 +235,11 @@ def test_swapping_dimensions_emits_changed(qtbot):
     assert fired
 
 
-def test_swap_button_sits_between_the_rows_and_left_of_the_fields(qtbot):
+def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # The button reads as linking the pair: vertically midway between the width
-    # and height rows, and off to the left of the labels rather than trailing a
-    # field. A wide label ("Positive Prompt") gives the left column real room.
+    # and height rows, and in a gutter of its own to the left of the labels —
+    # squeezing it into whatever space the labels left over put it on top of the
+    # words. A wide label ("Positive Prompt") gives the left column real room.
     form = ParamForm([
         ParamDef("prompt", "Positive Prompt", "str", "", multiline=True),
         *_dimension_defs(),
@@ -258,6 +259,9 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_fields(qtbot):
     assert width.center().y() < btn.center().y() < height.center().y()
     # On the left — entirely clear of the input column.
     assert btn.right() <= width.left()
+    # And clear of the words themselves: the labels start after its lane.
+    assert btn.right() <= form._width_label.geometry().left()
+    assert btn.right() <= form._height_label.geometry().left()
 
 
 # --- derived dimensions: the input-image size, shown locked & unlockable ----

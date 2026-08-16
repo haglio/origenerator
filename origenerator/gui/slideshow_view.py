@@ -14,6 +14,11 @@ Anything that moves off a locked slide — a step either way, a cull — release
 lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
 it was set on, not wherever the user wanders to.
 
+The set is not frozen at the opening. It holds only generations there is
+something to look at — one still being made is not a slide — and the gallery
+hands each one over as it lands (:meth:`SlideshowView.note_added`), so a show of
+a folder that is auto-generating keeps up with it.
+
 The items either side of the one on screen ride along as small stills
 (see :mod:`origenerator.gui.neighbor_previews`). The shared OSR2 stroke keys ride
 along too (Space and friends — see :mod:`origenerator.gui.stroke_hud`) with
@@ -32,8 +37,6 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import SlideshowPlaylist
-
-_BEING_MADE = "Generating…"  # an item with no file yet, before its first frame
 
 
 class SlideshowView(QWidget):
@@ -56,7 +59,6 @@ class SlideshowView(QWidget):
         self._enhance_on_hold = on_enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         self._on_star = on_star
-        self._frames: dict[str, bytes] = {}  # latest streamed frame, by generation
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
@@ -122,26 +124,12 @@ class SlideshowView(QWidget):
     # --- playback ----------------------------------------------------------
 
     def _show_current(self):
-        """Render the current item and arm the dwell timer if it's an image.
-
-        An item with no file yet is one still being made: it shows the frames its
-        generation has streamed so far, or says so until the first arrives, and
-        dwells like an image. A folder whose only item is cooking is still a
-        folder worth watching.
-        """
+        """Render the current item and arm the dwell timer if it's an image."""
         self._timer.stop()
         item = self._playlist.current()
         if item is None:
             return
-        path, media_type = item[0], item[1]
-        if path is None:
-            frame = self._frames.get(item[2] if len(item) > 2 else None)
-            if frame is not None:
-                self._preview.show_frame(frame)
-            else:
-                self._preview.show_message(_BEING_MADE)
-        else:
-            self._preview.show_media(path, media_type)
+        self._preview.show_media(item[0], item[1])
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the corner belongs to whatever is on screen now
@@ -149,13 +137,19 @@ class SlideshowView(QWidget):
         if dwell is not None:
             self._timer.start(dwell)
 
-    def show_live_frame(self, prompt_id: str, frame: bytes) -> None:
-        """One more streamed frame of a generation in the playlist. Redraws only
-        when that generation is the one on screen."""
-        self._frames[prompt_id] = frame
-        item = self._playlist.current()
-        if item is not None and item[0] is None and len(item) > 2 and item[2] == prompt_id:
-            self._preview.show_frame(frame)
+    def note_added(self, path, media_type: str, prompt_id: str, still=None) -> None:
+        """A generation that belongs to what this show is playing has landed: it
+        joins the set, queued to come up next.
+
+        A folder that is auto-generating is the case this is for. Without it the
+        show plays the fixed set it opened with, so the very items being made
+        while it runs — the ones being watched for — are the ones it never gets
+        to. The slide on screen is left alone; only the counter and the stills
+        either side move, since the set they describe just grew.
+        """
+        if self._playlist.add((path, media_type, prompt_id, still)):
+            self._update_counter()
+            self._update_neighbors()
 
     def _advance(self):
         self._playlist.advance()

@@ -3524,7 +3524,20 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view._slideshow.close()
 
 
-def test_slideshow_button_follows_what_is_on_screen(qtbot):
+def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
+    # A folder gets its node the moment a generation starts, so this one has a
+    # row and no picture. A button offering a show that opens nothing is worse
+    # than no button: it reappears once the first item lands.
+    view = GalleryView(FakeDB([_running_row("cooking", prompt="a cat")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert view._slideshow_btn.isHidden()
+
+
+def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.set_generation_starred("i1", True)
     view = GalleryView(db)
@@ -3683,6 +3696,49 @@ def test_starred_slideshow_plays_a_starred_item_in_a_starred_folder_once(qtbot, 
     qtbot.addWidget(view._slideshow)
     assert [item[2] for item in view._slideshow._playlist._items] == ["i1"]  # not twice
     view._slideshow.close()
+
+
+# --- a slideshow of a folder that is still filling ---------------------------
+
+def _slideshow_of_first_leaf(qtbot, view):
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    return view._slideshow
+
+
+def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
+    # Turning the slideshow on in a folder that is auto-generating and watching it
+    # replay only what was there at the start is what sent people to double-click
+    # the in-flight image instead.
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+
+    db.add(_image("i2", "a cat", 50, 2))              # the loop landed the next one
+    view._on_reroll_finished("some-key", "i2")
+
+    assert {item[2] for item in slideshow._playlist._items} == {"i1", "i2"}
+    slideshow.close()
+
+
+def test_a_generation_from_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch):
+    # Every completion is offered to the open show; only the ones it would have
+    # played had it opened now belong to it.
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+
+    db.add(_i2v_video("v1", "styleA"))                # another folder entirely
+    view._on_reroll_finished("some-key", "v1")
+
+    assert [item[2] for item in slideshow._playlist._items] == ["i1"]
+    slideshow.close()
 
 
 def _insert_running_reroll(db, prompt_id="rr", seed=99):
@@ -7319,19 +7375,15 @@ def test_watching_a_generation_fullscreen_still_pages_its_folder(qtbot, monkeypa
     assert fs.playlist_index == 0
 
 
-def test_a_slideshow_opens_on_a_folder_whose_only_item_is_still_cooking(qtbot):
-    # It used to refuse: the one row had no file, so the playlist came back empty
-    # and the button did nothing. A folder being filled is still worth watching.
+def test_a_generation_still_cooking_stays_out_of_a_slideshow(qtbot):
+    # It used to be seeded with no file, and drew "Generating…" as its slide —
+    # a blank between pictures. It joins the show when it has something to show.
     db = FakeDB([_running_row("cooking", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    rows = view._db.list_generations()
 
-    items = view._slideshow_items(rows)
-
-    assert [item[2] for item in items] == ["cooking"]
-    assert items[0][0] is None  # no file behind it yet
+    assert view._slideshow_items(view._db.list_generations()) == []
 
 
 def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):

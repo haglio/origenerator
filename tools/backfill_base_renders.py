@@ -21,6 +21,12 @@ as generating the images did.
     python tools/backfill_base_renders.py --apply        # do it
     python tools/backfill_base_renders.py --apply --limit 5
 
+``--db`` points it at another checkout's database, because the rows that need
+this are the live install's and a worktree's copy is a throwaway. Run it from
+the primary checkout once this has landed rather than pointing branch code at
+the live library — a branch is unfinished code, and writing back into the
+library is the one thing a preview must never do.
+
 A row is skipped when its workflow isn't registered (an import the app can't
 rebuild), when it already kept an original, or when it produced no file. Runs
 are submitted one at a time and waited on, so this never competes with itself
@@ -121,9 +127,11 @@ def main(argv=None) -> int:
                         help="actually run them; without this, only report")
     parser.add_argument("--limit", type=int, default=0,
                         help="stop after this many rows (0 = all)")
+    parser.add_argument("--db", type=Path, default=DB_PATH,
+                        help="the database to repair (default: this checkout's)")
     args = parser.parse_args(argv)
 
-    db = Database(DB_PATH)
+    db = Database(args.db)
     rows = rows_missing_their_base(db)
     if args.limit:
         rows = rows[:args.limit]

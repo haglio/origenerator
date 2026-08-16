@@ -2,7 +2,8 @@
 
 Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering and a fat progress bar beside it,
-nothing else, and no wider than a bar needs to be. On the right, taking the rest
+nothing else, and no wider than a bar needs to be — or, with nothing of ours in
+flight, what the shared server is busy with instead, and a Clear for it. On the right, taking the rest
 of the strip, *what is queued*: every in-flight job as a row of its own — the one
 being made at the top — each led by a Cancel, each opening its folder on a click,
 and each draggable to a new place in the line. Only the top row is fixed: nothing
@@ -26,7 +27,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QMimeData, pyqtSignal
 
-from origenerator.gui.inflight import InFlightItem, queue_wait_text
+from origenerator.gui.inflight import (
+    InFlightItem, foreign_queue_text, queue_wait_text,
+)
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -60,8 +63,18 @@ class RunningPreview(QWidget):
         self._progress.setFixedHeight(16)  # the fat, important one
         self._progress.setFixedWidth(_BAR_WIDTH)
         layout.addWidget(self._progress)
+        # With nothing of ours being made, this half is free to say what the
+        # shared server is busy with instead.
+        self._caption = QLabel()
+        self._caption.setObjectName("estimateLabel")  # muted secondary text
+        self._caption.setWordWrap(True)
+        layout.addWidget(self._caption, 1)
 
         self.show_item(None)
+
+    def show_foreign(self, text: str):
+        """Say what another app has on ComfyUI — only while this half is free."""
+        self._caption.setText(text)
 
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
@@ -70,6 +83,7 @@ class RunningPreview(QWidget):
             self._frame.clear()
             self._progress.hide()
             return
+        self._caption.clear()  # a job of ours takes the half back
         self._progress.show()
         self._render_frame(item.frame)
         if item.status == "running" and item.progress and item.progress[1] > 0:
@@ -184,6 +198,7 @@ class GenerationQueue(QWidget):
     """The live preview and its bar on the left, the whole line on the right."""
 
     reorder_requested = pyqtSignal(list)  # prompt ids, in the order they were dropped into
+    clear_queue_requested = pyqtSignal()  # wipe another app's work off ComfyUI
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -203,6 +218,13 @@ class GenerationQueue(QWidget):
         layout.setSpacing(8)
         self._running = RunningPreview()
         layout.addWidget(self._running)
+        # Only ever offered for another app's work — the user's own queue is what
+        # he asked for, and every row of it carries its own Cancel already.
+        self._clear = QPushButton("Clear")
+        self._clear.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._clear.clicked.connect(self.clear_queue_requested)
+        self._clear.hide()
+        layout.addWidget(self._clear)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -234,15 +256,27 @@ class GenerationQueue(QWidget):
     def keys(self) -> list[str]:
         return [row.key for row in self.rows()]
 
-    def set_items(self, items: list):
+    def set_items(self, items: list, foreign_queued: int = 0):
         """Show ``items`` — every in-flight generation, the one being made first.
 
         The first also drives the live half. Rows already listed are refreshed in
         place; only a change to the *set* of jobs (or their order) rebuilds the
         list, so a poll landing mid-drag doesn't yank the row out from under the
         gesture.
+
+        ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
+        It puts Clear up whenever there is any, and with nothing of ours in flight
+        it is what the free half says — the point being to see that backlog before
+        a Generate goes in behind it.
         """
         self._running.show_item(items[0] if items else None)
+        self._clear.setVisible(bool(foreign_queued))
+        self._clear.setToolTip(
+            f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"
+            " another app has queued on ComfyUI"
+        )
+        if not items:
+            self._running.show_foreign(foreign_queue_text(foreign_queued) or "")
         if self.keys() != [item.key for item in items]:
             self._rebuild(items)
             return

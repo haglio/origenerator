@@ -38,6 +38,11 @@ class InFlightItem:
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for the bottom bar
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
+    # The two halves of the bottom bar's countdown: when ComfyUI began executing
+    # this job (None while it's still queued), and what this workflow's recent
+    # runs say a whole one takes.
+    started_at: float | None = None
+    typical_seconds: float | None = None
 
 
 def queue_wait_text(foreign_ahead: int | None) -> str | None:

@@ -10,6 +10,7 @@ to persist and how to display it.
 
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -95,6 +96,10 @@ class GenerationJob(QObject):
         self._progress_tracker = ProgressTracker.for_payload(self.payload)
         self._last_progress = (0, 0)
         self._last_preview: bytes | None = None
+        # When ComfyUI actually began executing this job — not when it was
+        # submitted, which on a busy queue can be many minutes earlier. What the
+        # running bar's elapsed count and its estimate of the time left run from.
+        self._started_at: float | None = None
         # Jobs another app has in front of this one in ComfyUI, as of the last
         # refresh_backlog; None while nothing foreign is ahead.
         self._foreign_ahead: int | None = None
@@ -112,6 +117,12 @@ class GenerationJob(QObject):
     @property
     def last_preview(self) -> bytes | None:
         return self._last_preview
+
+    @property
+    def started_at(self) -> float | None:
+        """Epoch seconds at this job's first sign of life from ComfyUI, or
+        ``None`` while it's still waiting in the queue."""
+        return self._started_at
 
     @property
     def foreign_ahead(self) -> int | None:
@@ -143,21 +154,27 @@ class GenerationJob(QObject):
         Restored on :meth:`reconnect` so a restart mid-run resumes the bar at its
         last position. Carries the displayed ``(cumulative, total)`` and the tracker's
         internal ramp, so even a job with no recognized sampler (raw per-node numbers,
-        no ramp) still restores its last shown value.
+        no ramp) still restores its last shown value — plus the moment the run
+        began, so the elapsed count carries on from where it really started rather
+        than restarting at zero with the app.
         """
         return {
             "last_progress": list(self._last_progress),
             "tracker": self._progress_tracker.snapshot(),
+            "started_at": self._started_at,
         }
 
     def _restore_progress(self, state: dict) -> None:
-        """Seed ``_last_progress`` and the tracker from a persisted snapshot."""
+        """Seed ``_last_progress``, the tracker and the start time from a snapshot."""
         tracker = state.get("tracker")
         if isinstance(tracker, dict):
             self._progress_tracker.restore(tracker)
         last = state.get("last_progress")
         if isinstance(last, (list, tuple)) and len(last) == 2:
             self._last_progress = (int(last[0]), int(last[1]))
+        started = state.get("started_at")
+        if isinstance(started, (int, float)):
+            self._started_at = float(started)
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -257,6 +274,11 @@ class GenerationJob(QObject):
         return prompt_id == self.prompt_id
 
     def _mark_running(self):
+        # Stamped outside the queued->running guard on purpose: a job reconnected
+        # from a row persisted before this was recorded arrives already "running"
+        # with no start time, and would otherwise never get one.
+        if self._started_at is None:
+            self._started_at = time.time()
         if self._state == "queued":
             self._state = "running"
             self._foreign_ahead = None  # it's ours now: nothing left in front of it

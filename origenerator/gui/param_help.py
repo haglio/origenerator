@@ -116,6 +116,20 @@ PARAM_HELP: dict[str, str] = {
         "How strictly the model obeys the prompt. Too low drifts off it; too high "
         "burns contrast and flattens detail."
     ),
+    "cfg_high": (
+        "Prompt adherence for the high-noise stage on its own, where the motion "
+        "is settled. 0 means use the shared CFG; LoRA authors often publish a "
+        "different number for each stage."
+    ),
+    "cfg_low": (
+        "Prompt adherence for the low-noise stage on its own, where the texture "
+        "is settled. 0 means use the shared CFG."
+    ),
+    "split_step": (
+        "Which step the high-noise stage hands over to the low-noise one — "
+        "earlier leaves more of the work to the refining pass. 0 splits at half "
+        "the steps."
+    ),
     "guidance": (
         "Flux's own prompt-adherence dial. It behaves like CFG but wants much "
         "smaller numbers — this model's usable range sits low."

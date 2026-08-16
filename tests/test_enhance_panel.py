@@ -423,3 +423,29 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
     # The drop says what to enhance at, not whether to keep enhancing.
     assert settings.auto is True
     assert edits and edits[-1] == settings
+
+
+def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
+    # The pane is one column of collapsible groups; a heading that cannot fold
+    # reads as the one thing you are not allowed to put away.
+    from origenerator.gui.collapsible_section import CollapsibleSection
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x", None))
+
+    (section,) = versions.findChildren(CollapsibleSection)
+    assert "Enhancement levels" in section._header.text()
+    assert not versions.is_collapsed()
+
+    versions.set_collapsed(True)
+    assert versions.is_collapsed()
+    assert section.content().isHidden()   # the tiles fold away with it
+
+
+def test_folding_survives_a_rebuild_for_another_image(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.set_collapsed(True)
+    versions.show_levels(_items(_levels(2)), add=("2x", None))
+    assert versions.is_collapsed()

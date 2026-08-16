@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtCore import QByteArray, QMimeData, Qt, pyqtSignal
 
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 
 # A dragged enhancement level carries the params that produced it under this
@@ -281,16 +282,23 @@ class EnhanceVersions(QWidget):
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(4)
-        self._heading = QLabel("Enhancement levels")
-        self._heading.setStyleSheet("font-weight: 600;")
-        box.addWidget(self._heading)
+        # A foldable section like the form's above it: this pane is one column
+        # of collapsible groups, and a heading that cannot fold reads as the one
+        # thing you are not allowed to put away.
+        self._section = CollapsibleSection("Enhancement levels")
+        box.addWidget(self._section)
         self._host = QWidget()
         FlowLayout(self._host, spacing=6)
-        box.addWidget(self._host)
-        self._box = box
+        self._section.content_form().addRow(self._host)
         self._pending: _PendingTile | None = None
         self._tiles: list[_LevelTile] = []
         self.hide()
+
+    def is_collapsed(self) -> bool:
+        return self._section.is_collapsed()
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        self._section.set_collapsed(collapsed)
 
     def show_levels(self, items: list[tuple], pending: tuple | None = None,
                     add: tuple | None = None):
@@ -311,8 +319,8 @@ class EnhanceVersions(QWidget):
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
         # related-media strips use, so no tile outlives the row it described.
-        self._box.removeWidget(self._host)
-        self._host.deleteLater()
+        form = self._section.content_form()
+        form.removeRow(self._host)
         self._host = QWidget()
         flow = FlowLayout(self._host, spacing=6)
         self._pending = None
@@ -335,7 +343,7 @@ class EnhanceVersions(QWidget):
             tile.clicked.connect(self.level_selected)
             self._tiles.append(tile)
             flow.addWidget(tile)
-        self._box.addWidget(self._host)
+        form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 
     def _highlight_level(self, position: int | None, on: bool) -> None:

@@ -5,6 +5,7 @@ edits what a folder enhances at, and the version list shows what an image has
 already received.
 """
 
+import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
 
@@ -18,11 +19,29 @@ from origenerator.gui.enhance_versions import (
     params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-def _panel(qtbot):
+def _wanted_detectors() -> tuple[str, str]:
+    """The face and hand models the detail pass looks for, read off the workflow
+    rather than retyped — the panel offers the pass only when one is installed,
+    so a test that named its own files would be measuring the wrong thing."""
+    defaults = WORKFLOW_REGISTRY["image_enhance"].default_params()
+    return (defaults["enhance_face_detector"], defaults["enhance_hand_detector"])
+
+
+def _panel(qtbot, detectors=None):
+    """A panel built against a stated set of installed face/hand detectors —
+    the one thing on it that can be missing, and so the one thing a test must
+    not read off whatever this machine happens to have in its ComfyUI."""
+    import origenerator.workflows.image_enhance as enhancer
+
+    if detectors is None:
+        detectors = _wanted_detectors()
     edits = []
-    panel = EnhancePanel(edits.append)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(enhancer, "list_detector_files", lambda: list(detectors))
+        panel = EnhancePanel(edits.append)
     qtbot.addWidget(panel)
     return panel, edits
 
@@ -121,6 +140,52 @@ def test_every_knob_reports_its_edit(qtbot):
     assert latest.params["enhance_scale"] == 3.0
     assert latest.params["enhance_steps"] == 35
     assert latest.params["enhance_denoise"] == 0.4
+
+
+def test_the_detail_pass_is_a_check_and_a_denoise_of_its_own(qtbot):
+    # The pass is bolder than the enhance around it precisely because it only
+    # touches the regions it found, so it carries its own denoise rather than
+    # sharing the one above it.
+    panel, edits = _panel(qtbot)
+    assert panel._detail.isEnabled()
+    assert panel.settings().params["enhance_detail_fix"] is False
+
+    panel._detail.setChecked(True)
+    panel._detail_denoise.setValue(0.5)
+
+    assert edits[-1].params["enhance_detail_fix"] is True
+    assert edits[-1].params["enhance_detail_denoise"] == 0.5
+    assert panel._detail.toolTip() and panel._detail_denoise.toolTip()
+
+
+def test_the_detail_pass_dims_itself_when_no_detector_is_installed(qtbot):
+    # The one setting here that can be unavailable: the models that find the
+    # faces and hands are a separate install, and a run without one is rejected
+    # on submit. Better a control that says why than a tick that quietly fails.
+    panel, _ = _panel(qtbot, detectors=())
+    assert not panel._detail.isEnabled()
+    assert not panel._detail_denoise.isEnabled()
+    # The whole setup, in the one place someone reads carefully: the node pack
+    # that runs the detectors as well as the folder the models go in.
+    assert "models/ultralytics/bbox" in panel._detail.toolTip()
+    assert "Impact Subpack" in panel._detail.toolTip()
+
+
+def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
+    # The pass names the two models it looks for, so some other detector sitting
+    # in that folder would leave the box tickable and the pass finding nothing.
+    # Dimmed names the file to add; enabled-but-inert says nothing at all.
+    panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
+    assert not panel._detail.isEnabled()
+    assert all(name in panel._detail.toolTip() for name in _wanted_detectors())
+
+
+def test_one_of_the_two_detectors_is_enough_to_offer_the_pass(qtbot):
+    # Faces and hands are found by different models, and having only one is an
+    # ordinary install — the half that can run still should.
+    panel, _ = _panel(qtbot, detectors=_wanted_detectors()[:1])
+    assert panel._detail.isEnabled()
+    assert panel._detail_denoise.isEnabled()
 
 
 def test_a_model_no_longer_installed_is_still_shown(qtbot):

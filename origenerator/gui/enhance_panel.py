@@ -17,6 +17,10 @@ is the panel's power, not one of its dials.
 An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
+
+One knob here can be unavailable rather than merely unset: the detail pass needs
+a face/hand detector installed in ComfyUI, so with none it is greyed with the
+reason on it — the alternative being a tick that fails on submit.
 """
 
 from PyQt6.QtWidgets import (
@@ -33,12 +37,48 @@ from origenerator.gui.no_wheel import (
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows import WORKFLOW_REGISTRY
+from shared_ui.check_box import CheckBox
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
     "below. The original is kept, so an enhancement can always be compared "
     "against it or redone."
 )
+_NO_DETECTOR_TOOLTIP = (
+    "Unavailable: ComfyUI hasn't got what this needs. Install the Impact "
+    "Subpack node pack, put {} and {} in its models/ultralytics/bbox folder, "
+    "and restart it."
+)
+
+
+def _read(widget):
+    """What one field reads as, in the type its param is stored as."""
+    if isinstance(widget, NoWheelComboBox):
+        return widget.currentText()
+    if isinstance(widget, CheckBox):
+        return widget.isChecked()
+    return widget.value()
+
+
+def _fill(widget, value) -> None:
+    """Put a stored value into one field, coercing what JSON handed back.
+
+    A picker offered a name it no longer has an option for keeps it anyway: a
+    folder configured against a since-removed model must come back reading as
+    that model rather than silently snapping to whatever sorts first.
+    """
+    if isinstance(widget, NoWheelComboBox):
+        index = widget.findText(str(value))
+        if index < 0:
+            widget.addItem(str(value))
+            index = widget.findText(str(value))
+        widget.setCurrentIndex(index)
+    elif isinstance(widget, CheckBox):
+        widget.setChecked(bool(value))
+    elif isinstance(widget, NoWheelSpinBox):
+        widget.setValue(int(value))
+    else:
+        widget.setValue(float(value))
 
 
 def _enhancer_param_defs() -> dict:
@@ -129,8 +169,47 @@ class EnhancePanel(QWidget):
             numbers.addWidget(self._labeled(label, widget))
             numbers.addWidget(widget, 1)
         form.addRow(numbers)
+
+        # The detail pass and the denoise it runs at, on one line, reading as
+        # the sentence it is: fix faces & hands at 0.45. Its denoise is separate
+        # from the one above because it can afford to be far bolder — nothing
+        # outside the regions it finds is touched.
+        detail = QHBoxLayout()
+        detail.setContentsMargins(0, 0, 0, 0)
+        detail.setSpacing(4)
+        self._detail = CheckBox("Fix faces & hands")
+        self._detail.setToolTip(param_help("enhance_detail_fix"))
+        self._detail.toggled.connect(self._emit)
+        self._widgets["enhance_detail_fix"] = self._detail
+        self._detail_denoise = self._number("enhance_detail_denoise",
+                                            NoWheelDoubleSpinBox())
+        detail.addWidget(self._detail)
+        detail.addStretch(1)
+        detail.addWidget(self._labeled("at", self._detail_denoise))
+        detail.addWidget(self._detail_denoise)
+        form.addRow(detail)
+        self._show_detectors_installed()
+
         box.addLayout(form)
         box.addStretch(1)
+
+    def _show_detectors_installed(self) -> None:
+        """Dim the detail pass when ComfyUI hasn't got a detector it runs.
+
+        The pass is the only setting here that can be unavailable rather than
+        merely unset: the models that find the faces and hands are a separate
+        install. It looks for two by name, so what matters is whether one of
+        THOSE is there — some other detector in that folder would leave the box
+        tickable and the pass finding nothing, which says less than a greyed box
+        naming the file to add.
+        """
+        keys = ("enhance_face_detector", "enhance_hand_detector")
+        found = [k for k in keys if self._defs[k].default in self._options(k)]
+        for widget in (self._detail, self._detail_denoise):
+            widget.setEnabled(bool(found))
+            if not found:
+                widget.setToolTip(_NO_DETECTOR_TOOLTIP.format(
+                    *(self._defs[k].default for k in keys)))
 
     @staticmethod
     def _labeled(text: str, widget) -> QLabel:
@@ -171,18 +250,8 @@ class EnhancePanel(QWidget):
             self._auto.setChecked(settings.auto)
             for key, widget in self._widgets.items():
                 value = settings.params.get(key)
-                if value is None:
-                    continue
-                if widget is self._model or widget is self._upscaler:
-                    index = widget.findText(str(value))
-                    if index < 0:
-                        widget.addItem(str(value))  # a model no longer installed
-                        index = widget.findText(str(value))
-                    widget.setCurrentIndex(index)
-                elif isinstance(widget, NoWheelSpinBox):
-                    widget.setValue(int(value))
-                else:
-                    widget.setValue(float(value))
+                if value is not None:
+                    _fill(widget, value)
         finally:
             self._loading = False
 
@@ -191,12 +260,8 @@ class EnhancePanel(QWidget):
         params = {}
         for key in ENHANCE_SETTING_KEYS:
             widget = self._widgets.get(key)
-            if widget is None:
-                continue
-            params[key] = (
-                widget.currentText() if isinstance(widget, NoWheelComboBox)
-                else widget.value()
-            )
+            if widget is not None:
+                params[key] = _read(widget)
         return EnhanceSettings(auto=self._auto.isChecked(), params=params)
 
     def _emit(self, *_args):

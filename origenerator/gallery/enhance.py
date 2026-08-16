@@ -24,7 +24,10 @@ a particular row. The thumbnail badge, the folder's Enhance All button, and the
 selection's Enhance action all decide off the helpers here, so "enhanced" means
 one thing everywhere: the row went through the upscale + low-denoise re-sample
 tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
-run.
+run. ``enhance_detail_fix`` adds a second stage past that tail, re-sampling the
+faces and hands alone at a denoise the whole-frame pass could never survive; it
+is one of the knobs a level records, so an image can carry both a plain
+enhancement and a detail-fixed one and show which is which.
 """
 
 import json
@@ -62,7 +65,7 @@ _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
 # being enhanced, and the seed is re-rolled per launch like any variation.
 ENHANCE_SETTING_KEYS = (
     "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-    "enhance_denoise",
+    "enhance_denoise", "enhance_detail_fix", "enhance_detail_denoise",
 )
 
 # What a folder's settings leave to the source image rather than pinning: the
@@ -121,8 +124,10 @@ def describe_enhance_params(params: dict) -> str:
     """A one-line summary of an enhancement's knobs, for the levels list.
 
     Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
-    distinguish one experiment from another. A pinned model is named after them;
-    the default (source-matched) one says nothing, since it is not a choice.
+    distinguish one experiment from another, then the detail pass at its own
+    denoise when it ran. A pinned model is named after them; the default
+    (source-matched) one says nothing, since it is not a choice — and neither
+    does a detail pass left off, for the same reason.
     """
     bits = []
     scale = params.get("enhance_scale")
@@ -134,6 +139,10 @@ def describe_enhance_params(params: dict) -> str:
     denoise = params.get("enhance_denoise")
     if denoise is not None:
         bits.append(f"{float(denoise):g} denoise")
+    if params.get("enhance_detail_fix"):
+        detail = params.get("enhance_detail_denoise")
+        bits.append("faces & hands"
+                    + (f" {float(detail):g}" if detail is not None else ""))
     checkpoint = params.get("checkpoint")
     if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
         bits.append(str(checkpoint))
@@ -287,6 +296,12 @@ def enhanced_source_names(rows) -> set[str]:
     return names
 
 
+def _knobs(params: dict) -> dict:
+    """One enhancement's settings as every knob, defaults filling the gaps."""
+    return {**default_enhance_params(),
+            **{k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}}
+
+
 def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int | None:
     """The position in :func:`enhance_levels` of the version this row already
     holds at ``settings``, or ``None`` when it holds none.
@@ -297,14 +312,20 @@ def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int 
     comparison — otherwise "the same settings" would read as different for every
     image the default is left on.
 
+    Both sides are read as the FULL set of knobs, a level's missing ones filled
+    from the workflow defaults: :data:`ENHANCE_SETTING_KEYS` grows over time, and
+    a level recorded before a knob existed was made with that knob at its
+    default — so it still matches settings that leave it there, and turning the
+    new knob on correctly reads as a different enhancement.
+
     What tells the ``+ Enhance`` card it would only be making a duplicate.
     """
     wanted = enhance_params_for(row, settings)
     if wanted is None:
         return None
-    knobs = {k: wanted[k] for k in ENHANCE_SETTING_KEYS if k in wanted}
+    knobs = _knobs(wanted)
     for position, level in enumerate(enhance_levels(row)):
-        if level.params and level.params == knobs:
+        if level.params and _knobs(level.params) == knobs:
             return position
     return None
 

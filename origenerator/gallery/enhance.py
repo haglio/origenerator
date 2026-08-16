@@ -46,6 +46,12 @@ logger = logging.getLogger(__name__)
 
 ENHANCE_WORKFLOW = "image_enhance"
 
+# The ``source`` a re-derived base render carries (see
+# :mod:`origenerator.base_backfill`). Lives here rather than there because the
+# tree filters on it and importing the backfill from the gallery would make a
+# cycle — the backfill reads the gallery to decide what needs repairing.
+BASE_RENDER_SOURCE = "base_render"
+
 # The workflows that ran the enhance tail unconditionally, before it became a
 # toggle: their rows carry the tail's params but no ``enhance`` flag.
 _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")

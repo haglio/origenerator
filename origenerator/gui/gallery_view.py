@@ -34,7 +34,6 @@ from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
-from origenerator.gui.auto_generate_view import AutoGenerateView
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.voice.steering import VoiceSteering
@@ -600,10 +599,6 @@ class GalleryView(QWidget):
         # don't belong to the folder they happen to be sitting under.
         browser_box.addWidget(_bottom_divider())
         browser_box.addLayout(bottom)
-        # The live auto-generate slideshow (double-click the preview while a folder
-        # loops), and the folder key it follows — None while none is open.
-        self._auto_montage = None
-        self._auto_montage_key_open: str | None = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -687,10 +682,6 @@ class GalleryView(QWidget):
         panel.levels_delete_requested.connect(self.delete_enhance_levels)
         panel.set_enhance_settings(self._enhance_settings)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
-        panel.preview_double_clicked.connect(self._on_preview_double_clicked)
-        # While the open folder is auto-generating, a preview double-click opens the
-        # live montage instead of the plain fullscreen view (which this gate vetoes).
-        panel.set_fullscreen_gate(self._plain_fullscreen_allowed)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
         # Dragging the tab's preview out lights the combine slot it fits, like a
         # browser thumbnail (see :meth:`_on_generation_drag_started`).
@@ -883,86 +874,6 @@ class GalleryView(QWidget):
         if self._stroke_btn.isChecked() != active:
             self._stroke_btn.setChecked(active)
 
-
-    # --- the live auto-generate montage (double-click the preview while looping) ---
-
-    def _plain_fullscreen_allowed(self) -> bool:
-        """Whether a preview double-click opens the plain fullscreen view — it does
-        unless the open folder is auto-generating, when the montage opens instead."""
-        return self._auto_montage_key() is None
-
-    def _auto_montage_key(self) -> str | None:
-        """The auto-generate loop a montage should follow: the open folder's loop
-        when one is running, else ``None``."""
-        key = self._selected_folder_key()
-        return key if key is not None and self._auto.is_active(key) else None
-
-    def _make_auto_montage(self) -> AutoGenerateView:
-        """Build the slideshow window on the shared stroke driver (a seam so
-        tests can stub the player and the stroke)."""
-        return AutoGenerateView(stroke=self._osr2_stroke)
-
-    def _on_preview_double_clicked(self):
-        """A preview double-click that opened no plain fullscreen: open the live
-        montage when the folder is looping, otherwise do nothing."""
-        key = self._auto_montage_key()
-        if key is not None:
-            self._open_auto_montage(key)
-
-    def _open_auto_montage(self, key: str):
-        """Open the fullscreen slideshow following folder ``key``'s loop: seed its
-        rotation with the items generated so far (oldest first, ending at the live
-        slot) and the current live frame, then wire its curation keys and its
-        stroke engine's hold on the OSR2."""
-        montage = self._make_auto_montage()
-        self._auto_montage = montage
-        self._auto_montage_key_open = key
-        montage.closed.connect(self._on_auto_montage_closed)
-        montage.cancel_requested.connect(lambda: self._skip_auto_current(key))
-        montage.weird_requested.connect(self._trash_generation)
-        group = self._group_for_key(key)
-        if isinstance(group, gallery.SettingsGroup):
-            for row in reversed(group.rows):
-                preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-                if preview is not None:
-                    montage.add_finished(preview[0], preview[1], row["prompt_id"],
-                                         row.get("thumbnail_path"))
-        job = self._reroll.job_for(key)
-        if job is not None and job.last_preview is not None:
-            montage.show_live_frame(job.last_preview)
-        montage.showFullScreen()
-
-    def _on_auto_montage_closed(self):
-        """The slideshow was dismissed (Esc/close): forget it — the loop keeps
-        running, and so does a running stroke (it's app-global, not the view's)."""
-        self._auto_montage = None
-        self._auto_montage_key_open = None
-
-    def _feed_montage_preview(self, key: str, data: bytes):
-        """Mirror a loop's live frame into the slideshow's live slot while it's open."""
-        if self._auto_montage is not None and key == self._auto_montage_key_open:
-            self._auto_montage.show_live_frame(data)
-
-    def _feed_montage_finished(self, key: str):
-        """A loop item finished: it joins the slideshow's rotation — taking over on
-        screen from its own live frames when the rotation is showing the live slot."""
-        if self._auto_montage is None or key != self._auto_montage_key_open:
-            return
-        group = self._group_for_key(key)
-        if not (isinstance(group, gallery.SettingsGroup) and group.rows):
-            return
-        row = group.rows[0]  # the just-finished item is the folder's newest
-        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-        if preview is not None:
-            self._auto_montage.note_finished(preview[0], preview[1], row["prompt_id"],
-                                             row.get("thumbnail_path"))
-
-    def _skip_auto_current(self, key: str):
-        """Slideshow Up on the live slot: abandon the generation on screen but keep
-        looping — cancel the in-flight job, then launch the next as if this one had
-        finished."""
-        self._drop_reroll(key)
-        self._auto.note_finished(key)  # still looping → launch the next
 
     def _group_for_key(self, key: str):
         item = self._item_by_key.get(key)
@@ -1819,10 +1730,7 @@ class GalleryView(QWidget):
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, cancelled, or failed): drop its
-        working params and, if it was the voice target, stop listening. An open
-        slideshow of the loop loses its live slot but keeps rotating."""
-        if self._auto_montage is not None and key == self._auto_montage_key_open:
-            self._auto_montage.set_generating(False)
+        working params and, if it was the voice target, stop listening."""
         self._auto_working.pop(key, None)
         if key == self._voice_target_key:
             self._voice.stop()
@@ -2081,23 +1989,23 @@ class GalleryView(QWidget):
     def _feed_slideshow_enhanced(self, row: dict | None):
         """Hand a landed enhancement to every full-screen surface, so the item
         becomes the better version there rather than the version it was made
-        from. All three are told; each ignores an id it isn't holding.
+        from. Both are told; each ignores an id it isn't holding.
 
         Not only the surface that asked for it, and not only while that item is
-        the one on screen: a running slideshow plays a set fixed when it opened,
-        so an upgrade it doesn't take here it never takes at all. The two
-        rotations also draw each item small as a neighbor, so they take the new
-        thumbnail with the file; the fullscreen view shows only the file.
+        the one on screen: an enhancement asked for from a slideshow lands minutes
+        later, by which time the show has long paged on, so an upgrade it doesn't
+        take here it never takes at all. The slideshow also draws each item small
+        as a neighbor, so it takes the new thumbnail with the file; the fullscreen
+        view shows only the file.
         """
         if row is None:
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
-        for rotation in (self._slideshow, self._auto_montage):
-            if rotation is not None:
-                rotation.note_enhanced(row["prompt_id"], preview[0], preview[1],
-                                       still=row.get("thumbnail_path"))
+        if self._slideshow is not None:
+            self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1],
+                                          still=row.get("thumbnail_path"))
         if self._fullscreen_preview is not None:
             self._fullscreen_preview.note_enhanced(row["prompt_id"], preview[0],
                                                    preview[1])
@@ -2682,12 +2590,10 @@ class GalleryView(QWidget):
 
     def _on_reroll_preview(self, key: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
-        remembering it so it survives the rebuild each stage completion triggers.
-        A live montage of this folder's loop mirrors the same frame."""
+        remembering it so it survives the rebuild each stage completion triggers."""
         if key == self._selected_reroll_key:
             self._last_reroll_frame = data
             self._info_tabs.show_reroll_frame(data)
-        self._feed_montage_preview(key, data)
         # An enhance's frames go to the version strip of whichever tab shows the
         # image being enhanced, not to the pane — an enhancement isn't a
         # generation taking the preview over.
@@ -2715,9 +2621,7 @@ class GalleryView(QWidget):
         self._drop_reroll(key)
 
     def _drop_reroll(self, key: str):
-        """Cancel the re-roll leading a folder and redraw without it — shared by the
-        tile's Cancel and the montage's skip, which differ only in whether the loop
-        stops or launches the next around this."""
+        """Cancel the re-roll leading a folder and redraw without it."""
         self._reroll.cancel(key)
         self._after_a_job_left(key)
 
@@ -2764,7 +2668,7 @@ class GalleryView(QWidget):
         if finished_row is not None and finished_row.get("source") == "experiment":
             # A background experiment landed: it waits on the Experiments shelf
             # for review rather than moving the user's view — no front-tab load,
-            # no montage feed, no auto-loop or combine bookkeeping.
+            # no slideshow feed, no auto-loop or combine bookkeeping.
             self.refresh()
             return
         if finished_row is not None \
@@ -2781,8 +2685,7 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
-        self._feed_montage_finished(key)  # a live montage gains this item's thumbnail
-        self._feed_slideshow_finished(finished_row)  # so does a show of its folder
+        self._feed_slideshow_finished(finished_row)  # a show of its folder gains it
         self._show_reroll_result_in_tab(finished_row)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.

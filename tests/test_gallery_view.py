@@ -18,7 +18,6 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui.auto_generate_view import AutoGenerateView
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.media_badge import MediaBadge
@@ -6535,7 +6534,7 @@ def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
     assert driver.started[-1] == ("pB", "aB")
 
 
-# --- the live auto-generate slideshow ----------------------------------------
+# --- watching a folder that is auto-generating, and the app-global stroke -----
 
 class _SignalStroke(QObject):
     """Stands in for the app-global Osr2StrokeDriver: records the calls, flips
@@ -6584,16 +6583,12 @@ class _SignalStroke(QObject):
         return "OSR2 stub"
 
 
-def _auto_montage_view(qtbot, monkeypatch, rows):
-    """A gallery on a settings leaf whose loop reports active, with the slideshow
-    built on stubbed player and stroke so no media or device backend spins up."""
+def _looping_view(qtbot, monkeypatch, rows):
+    """A gallery on a settings leaf whose loop reports active, built on a stubbed
+    stroke so no device backend spins up."""
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
                        osr2_stroke=_SignalStroke())
     qtbot.addWidget(view)
-    monkeypatch.setattr(
-        view, "_make_auto_montage",
-        lambda: AutoGenerateView(player=MagicMock(), stroke=view._osr2_stroke),
-    )
     view.refresh()
     _open_leaf(view)
     key = view._selected_folder_key()
@@ -6601,94 +6596,24 @@ def _auto_montage_view(qtbot, monkeypatch, rows):
     return view, key
 
 
-def test_auto_montage_key_follows_the_open_folders_loop(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_leaf(view)
-    key = view._selected_folder_key()
-    assert view._auto_montage_key() is None           # not looping → no montage
-    monkeypatch.setattr(view._auto, "is_active", lambda k: k == key)
-    assert view._auto_montage_key() == key
-    assert view._plain_fullscreen_allowed() is False  # montage pre-empts fullscreen
-
-
-def test_the_preview_double_click_is_gated_while_looping(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeypatch):
+    # A folder that is looping used to answer this gesture with the auto-generate
+    # montage — a second slideshow, for a double-click that means "this one,
+    # bigger". Watching the frames come in is what fullscreen is for.
+    from origenerator.gui import fullscreen_preview as fs_module
+    monkeypatch.setattr(fs_module, "FullscreenPreview", _FakeLiveFullscreen)
+    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     panel = view._info_tabs.current_config_panel()
-    # The gate is wired to the gallery, and vetoes the plain fullscreen while looping.
-    assert panel._preview._fullscreen_gate == view._plain_fullscreen_allowed
-    assert panel._preview._fullscreen_gate() is False
+    panel._preview.show_frame(_png_bytes())  # the loop's generation, streaming
 
+    win = panel._preview.open_fullscreen()
 
-def test_double_clicking_the_preview_while_looping_opens_the_montage(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    assert view._auto_montage is None
-    view._on_preview_double_clicked()
-    assert isinstance(view._auto_montage, AutoGenerateView)
-    view._auto_montage.close()
-
-
-def test_the_montage_seeds_the_rotation_and_opens_on_the_live_slot(qtbot, monkeypatch):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view, key = _auto_montage_view(qtbot, monkeypatch, rows)
-    _resolve_by_id(monkeypatch)
-    view._open_auto_montage(key)
-    montage = view._auto_montage
-    assert montage._playlist.count == 3  # both finished items, plus the live slot
-    assert montage._playlist.on_live()
-    montage.close()
-
-
-def test_a_live_frame_feeds_the_open_montage(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
-    montage = view._auto_montage
-    seen = []
-    monkeypatch.setattr(montage, "show_live_frame", lambda d: seen.append(d))
-    view._on_reroll_preview(key, b"frame-bytes")
-    assert seen == [b"frame-bytes"]
-    montage.close()
-
-
-def test_a_finished_item_joins_the_montage_rotation(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
-    montage = view._auto_montage
-    before = montage._playlist.count
-    _resolve_by_id(monkeypatch)
-    view._feed_montage_finished(key)
-    assert montage._playlist.count == before + 1
-    montage.close()
-
-
-def test_closing_the_montage_forgets_it(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
-    view._auto_montage.close()
-    assert view._auto_montage is None
-
-
-def test_up_in_the_montage_skips_the_current_and_keeps_looping(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    cancelled, relaunched = [], []
-    monkeypatch.setattr(view._reroll, "cancel", lambda k: cancelled.append(k))
-    monkeypatch.setattr(view._auto, "note_finished", lambda k: relaunched.append(k))
-    view._skip_auto_current(key)
-    assert cancelled == [key]   # the in-flight job is abandoned...
-    assert relaunched == [key]  # ...but the loop launches the next
-
-
-def test_marking_weird_in_the_montage_trashes_the_item(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
-    view._auto_montage.weird_requested.emit("i1")
-    assert [r["prompt_id"] for r in view._actions.deleted[0]] == ["i1"]
-    view._auto_montage.close()
+    qtbot.addWidget(win)
+    assert win is not None and win.is_live()
 
 
 def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     stopped = []
     monkeypatch.setattr(view._osr2_driver, "stop", lambda: stopped.append(True))
     view._osr2_driving = ("clip.mp4", "player")  # as if a funscript drive were on
@@ -6697,17 +6622,23 @@ def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypat
     assert view._osr2_drive_source() is None     # and nothing may retake the device
 
 
-def test_closing_the_montage_leaves_the_stroke_running(qtbot, monkeypatch):
+def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     # The stroke is app-global: dismissing a view must not park the device.
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
+    _resolve_by_id(monkeypatch)
+    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
     view._osr2_stroke.toggle()
-    view._auto_montage.close()
+    view._slideshow.close()
     assert view._osr2_stroke.active
 
 
 def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    # Esc is the gallery's here — no dialog and no fullscreen view up. Said
+    # outright, because which window Qt calls active is ambient in a test process
+    # (a fullscreen view another test opened and closed can still hold it).
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     view._osr2_stroke.toggle()
     assert view._handle_escape() is True
     assert not view._osr2_stroke.active
@@ -6716,19 +6647,11 @@ def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
 def test_the_stroke_keys_work_in_the_main_window_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_L, _NO_MOD)
     assert view.eventFilter(view, event) is True
     assert ("speed", 5) in view._osr2_stroke.calls
-
-
-def test_the_loop_ending_drops_the_montage_live_slot(qtbot, monkeypatch):
-    view, key = _auto_montage_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._open_auto_montage(key)
-    view._on_auto_stopped(key)
-    assert view._auto_montage._playlist.live is False
-    view._auto_montage.close()
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
@@ -7299,10 +7222,6 @@ def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(
     _select_first_leaf(view)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
-    montage = AutoGenerateView(player=MagicMock())
-    qtbot.addWidget(montage)
-    montage.add_finished("g0.png", "image", "g0")
-    view._auto_montage = montage
     view._fullscreen_preview = _FakeFullscreen(None)
 
     # The fold has happened: the row now leads with the enhanced file and wears
@@ -7313,7 +7232,6 @@ def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(
 
     upgraded = ("g0_enhanced.png", "image", "g0", "g0_enhanced_thumb.png")
     assert upgraded in view._slideshow._playlist._items
-    assert upgraded in montage._playlist._items
     assert view._fullscreen_preview.enhanced == ("g0", "g0_enhanced.png", "image")
     view._slideshow.close()
 

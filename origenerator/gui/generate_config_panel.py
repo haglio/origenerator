@@ -76,7 +76,6 @@ class GenerateConfigPanel(QWidget):
     fullscreen_opened = pyqtSignal(object)  # the preview popped a video open fullscreen
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
     preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
-    preview_double_clicked = pyqtSignal()   # the preview was double-clicked with no fullscreen to open
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
@@ -121,8 +120,7 @@ class GenerateConfigPanel(QWidget):
         # The preview leads the column: it mirrors a running re-roll's frames (driven
         # from outside), shows the browsed generation's output when one is loaded, and
         # the newest matching result otherwise.
-        self._preview = PreviewWidget(show_funscript_strip=True,
-                                      on_double_click=self.preview_double_clicked.emit)
+        self._preview = PreviewWidget(show_funscript_strip=True)
         self._preview.fullscreen_opened.connect(self.fullscreen_opened)  # → view drives it
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
@@ -850,12 +848,6 @@ class GenerateConfigPanel(QWidget):
         if preview is None or preview[1] != "video":
             return None
         return preview[0]
-
-    def set_fullscreen_gate(self, gate) -> None:
-        """Route the preview's double-click: while ``gate`` returns False the plain
-        fullscreen view is suppressed and the double-click surfaces as
-        ``preview_double_clicked`` instead (the gallery opens its montage there)."""
-        self._preview.set_fullscreen_gate(gate)
 
     # --- Drive OSR2: what the (global) driver should stream for this tab -------
 

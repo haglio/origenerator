@@ -1,6 +1,6 @@
-"""The slideshow playlists — ordering, wrap navigation, holds, and advance policy."""
+"""The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
 
-from origenerator.slideshow import LIVE, AutoGeneratePlaylist, SlideshowPlaylist
+from origenerator.slideshow import SlideshowPlaylist
 
 
 def _playlist(**kw):
@@ -155,9 +155,8 @@ def _keyed(**kw):
 
 
 def test_an_enhanced_item_is_replaced_wherever_it_sits():
-    # The show paged on long before the enhancement landed. The playlist is the
-    # fixed set the show opened with, so an arrival dropped for being late would
-    # play the pre-enhance file every pass from here on.
+    # The show paged on long before the enhancement landed, so an arrival dropped
+    # for being late would play the pre-enhance file every pass from here on.
     playlist = _keyed()
     playlist.advance()  # on b now; the enhancement of a arrives
 
@@ -186,132 +185,3 @@ def test_an_upgraded_item_takes_the_new_thumbnail_when_one_comes_with_it():
     playlist.replace_item("id-a", "a_better.png", "image", "a_better_thumb.png")
     assert playlist.current()[3] == "a_better_thumb.png"
 
-
-# --- AutoGeneratePlaylist: the growing rotation behind the auto-generate view
-
-
-def _grown(n=2):
-    """A rotation seeded with *n* finished items, sitting on the live slot."""
-    playlist = AutoGeneratePlaylist()
-    for i in range(n):
-        playlist.add_finished(f"item{i}.png", "image", f"id-{i}", stay_live=True)
-    return playlist
-
-
-def test_opens_on_the_live_slot():
-    playlist = AutoGeneratePlaylist()
-    assert playlist.count == 1
-    assert playlist.current() is LIVE
-    assert playlist.on_live()
-
-
-def test_seeding_grows_the_rotation_but_stays_on_the_live_slot():
-    playlist = _grown(3)
-    assert playlist.count == 4
-    assert playlist.current() is LIVE
-    assert playlist.index == 3  # the live slot trails the finished items
-
-
-def test_peek_names_the_slots_either_side_wrapping_across_the_live_one():
-    playlist = _grown(2)          # two finished items, then the live slot (current)
-    assert playlist.peek(-1)[2] == "id-1"  # the newest finished item, behind it
-    assert playlist.peek(1)[2] == "id-0"   # and wrapping round to the oldest
-    playlist.back()                        # onto the newest finished item
-    assert playlist.peek(1) is LIVE        # the live slot is what's next
-
-
-def test_a_completion_hands_the_live_slot_over_to_the_finished_item():
-    playlist = _grown(1)
-    playlist.add_finished("done.png", "image", "id-done")  # no stay_live: it landed
-    assert playlist.current() == ("done.png", "image", "id-done", None)
-    assert playlist.on_live() is False
-    assert playlist.count == 3  # both finished items, plus the next one's live slot
-
-
-def test_a_completion_elsewhere_leaves_the_shown_item_alone():
-    playlist = _grown(2)
-    playlist.back()  # step off the live slot onto the newest finished item
-    shown = playlist.current()
-    playlist.add_finished("done.png", "image", "id-done")
-    assert playlist.current() == shown
-
-
-def test_advance_and_back_wrap_across_items_and_live_slot():
-    playlist = _grown(2)                      # on the live slot (index 2)
-    assert playlist.advance()[2] == "id-0"    # wraps to the oldest
-    assert playlist.advance()[2] == "id-1"
-    assert playlist.advance() is LIVE
-    assert playlist.back()[2] == "id-1"
-
-
-def test_the_loop_ending_drops_the_live_slot_onto_the_newest_item():
-    playlist = _grown(2)
-    playlist.set_live(False)
-    assert playlist.count == 2
-    assert playlist.current()[2] == "id-1"
-
-
-def test_the_loop_ending_with_nothing_finished_empties_the_rotation():
-    playlist = AutoGeneratePlaylist()
-    playlist.set_live(False)
-    assert playlist.count == 0
-    assert playlist.current() is None
-
-
-def test_remove_current_drops_a_finished_item_and_moves_to_the_next():
-    playlist = _grown(3)
-    playlist.advance()  # wrap onto id-0
-    playlist.remove_current()
-    assert playlist.current()[2] == "id-1"
-    assert playlist.count == 3
-
-
-def test_removing_the_newest_item_lands_on_the_live_slot():
-    playlist = _grown(1)
-    playlist.back()  # onto id-0, the only finished item
-    playlist.remove_current()
-    assert playlist.current() is LIVE
-
-
-def test_remove_current_is_a_no_op_on_the_live_slot():
-    playlist = _grown(1)
-    playlist.remove_current()  # sitting on the live slot
-    assert playlist.count == 2
-
-
-def test_lock_holds_the_dwell_and_toggles_off():
-    playlist = _grown(1)
-    assert playlist.dwell_ms() == 4000  # the live slot dwells like an image
-    assert playlist.toggle_lock() is True
-    assert playlist.dwell_ms() is None
-    playlist.unlock()
-    assert not playlist.locked
-    assert playlist.dwell_ms() == 4000
-
-
-def test_finished_videos_advance_on_their_end_not_a_timer():
-    playlist = AutoGeneratePlaylist()
-    playlist.add_finished("clip.mp4", "video", "id-v", stay_live=True)
-    playlist.back()  # onto the video
-    assert playlist.dwell_ms() is None
-
-
-def test_an_enhanced_item_is_replaced_in_the_rotation():
-    # With the Auto box on, every item the loop lands is enhanced a few minutes
-    # later — so the rotation has to take the upgrade or replay base renders.
-    playlist = _grown(2)  # id-0 and id-1, sitting on the live slot
-
-    assert playlist.replace_item("id-0", "item0_better.png",
-                                 still="item0_better_thumb.png") is True
-
-    playlist.advance()  # wraps onto the oldest item
-    assert playlist.current() == ("item0_better.png", "image", "id-0",
-                                  "item0_better_thumb.png")
-
-
-def test_replacing_an_item_the_rotation_does_not_hold_reports_nothing():
-    # Including the live slot, which stands for a generation with no file yet.
-    playlist = _grown(1)
-    assert playlist.on_live()
-    assert playlist.replace_item("id-elsewhere", "x.png") is False
-    assert playlist.current() is LIVE

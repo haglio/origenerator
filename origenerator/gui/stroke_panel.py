@@ -119,8 +119,8 @@ class StrokePanel(QWidget):
 
     It shows exactly while the stroke is running. A readout of a stroke nobody
     is making is not information, and every surface that floats one — the main
-    window, a slideshow, the auto-generate montage, the fullscreen viewer — was
-    hosting it on the assumption that some other code would hide it. So the rule
+    window, the slideshow, the fullscreen viewer — was hosting it on the
+    assumption that some other code would hide it. So the rule
     lives here, where the driver is: the panel follows its own subject.
     """
 

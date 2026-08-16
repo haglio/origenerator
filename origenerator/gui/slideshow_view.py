@@ -81,9 +81,12 @@ class SlideshowView(QWidget):
             " padding: 4px 10px; border-radius: 4px;"
         )
         self._counter.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        # A corner note while an enhancement of the slide on screen is being
-        # made, and again for a beat when the switch is flipped — the only way
-        # to tell, in a view with no panels, that a press did anything.
+        # A note while an enhancement of the slide on screen is being made, and
+        # again for a beat when the switch is flipped — the only way to tell, in
+        # a view with no panels, that a press did anything. It sits just above
+        # the position counter at the bottom, with the rest of what this view
+        # says about the item on screen; the top-left corner belongs to genau's
+        # console, which would be underneath it.
         self._note = QLabel(self)
         self._note.setStyleSheet(
             "color: white; background: rgba(0, 0, 0, 160);"
@@ -254,8 +257,13 @@ class SlideshowView(QWidget):
         self._note_timer.start(ms)
 
     def _reposition_note(self):
+        """Centered just above the position counter, so everything this view
+        says about the item on screen reads as one group."""
         self._note.adjustSize()
-        self._note.move(24, 24)
+        self._counter.adjustSize()
+        x = (self.width() - self._note.width()) // 2
+        y = self.height() - self._counter.height() - self._note.height() - 30
+        self._note.move(x, max(0, y))
         self._note.raise_()
 
     def _toggle_pause(self) -> bool:

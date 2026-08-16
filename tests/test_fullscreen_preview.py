@@ -490,3 +490,21 @@ def test_an_enhancement_for_something_else_leaves_the_screen_alone(qtbot, tmp_pa
     win.note_enhanced("id-b", _make_png(tmp_path / "b_enhanced.png"))
 
     assert win._preview._media[0] == shown
+
+
+def test_the_caption_keeps_clear_of_the_drive_console(qtbot, tmp_path):
+    # The top-left corner is genau's console's — a caption there lands on top
+    # of it — so this view's word about what it is showing goes along the
+    # bottom, where the slideshow keeps its counter.
+    enhanced, original = tmp_path / "e1.png", tmp_path / "src.png"
+    for path in (enhanced, original):
+        _make_png(path)
+    win = FullscreenPreview((enhanced, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.resize(800, 600)
+    win.set_levels({str(enhanced): [(enhanced, "image", "Enhance 1"),
+                                    (original, "image", "Original")]})
+
+    note = win._note.geometry()
+    assert note.top() > win.height() // 2          # bottom half, not the top
+    assert abs(note.center().x() - win.width() // 2) <= 1   # centered

@@ -81,10 +81,13 @@ class FullscreenPreview(QWidget):
                                       show_funscript_strip=True, mute_audio=False,
                                       on_double_click=self.close)
         layout.addWidget(self._preview, 1)
-        # A corner caption: which version of this image is on screen and how
-        # many there are, and "Enhancing…" while one is being made. Stepping
-        # levels is invisible without it — two versions of one picture differ
-        # by texture, which is exactly what you cannot tell apart from memory.
+        # A caption along the bottom: which version of this image is on screen
+        # and how many there are, and "Enhancing…" while one is being made.
+        # Stepping levels is invisible without it — two versions of one picture
+        # differ by texture, which is exactly what you cannot tell apart from
+        # memory. Bottom center, where a view's word about what it is showing
+        # goes; the top-left corner is genau's console's, and a caption there
+        # lands on top of it.
         self._note = QLabel(self)
         self._note.setStyleSheet(
             "color: white; background: rgba(0, 0, 0, 160);"
@@ -214,9 +217,15 @@ class FullscreenPreview(QWidget):
 
     def _show_note(self, text: str) -> None:
         self._note.setText(text)
-        self._note.adjustSize()
-        self._note.move(24, 24)
         self._note.show()
+        self._reposition_note()
+
+    def _reposition_note(self) -> None:
+        """Bottom center — the same place the slideshow keeps its counter, so a
+        caption means the same thing wherever a picture is full screen."""
+        self._note.adjustSize()
+        self._note.move((self.width() - self._note.width()) // 2,
+                        max(0, self.height() - self._note.height() - 24))
         self._note.raise_()
 
     def _flash_note(self, text: str, ms: int = 1500) -> None:
@@ -268,7 +277,7 @@ class FullscreenPreview(QWidget):
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
         if not self._note.isHidden():
-            self._note.raise_()
+            self._reposition_note()
 
     def _step(self, delta: int) -> None:
         """Page ``delta`` items through the folder, wrapping at either end."""

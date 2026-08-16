@@ -430,6 +430,126 @@ def test_image_enhance_honors_an_unlocked_size_override():
     assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
 
 
+# ---- The detail pass (faces and hands, re-sampled where they are) ----
+
+def _nodes_of(payload: dict, class_type: str) -> list[dict]:
+    return [n for n in payload.values() if n.get("class_type") == class_type]
+
+
+def test_the_detail_pass_is_off_by_default_and_adds_nothing():
+    # The whole-frame tail is what an enhance is; the detail pass is a second
+    # opinion on two small regions, and it costs another sampling run each.
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    assert wf.default_params()["detail_fix"] is False
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png"))
+    assert _nodes_of(payload, "UltralyticsDetectorProvider") == []
+    assert _nodes_of(payload, "DetailerForEach") == []
+
+
+def test_the_detail_pass_re_samples_each_found_face_and_hand_in_place():
+    # What the whole-frame tail cannot do: 0.15 denoise over the full picture
+    # refines texture and leaves a six-fingered hand six-fingered, while the
+    # denoise that could redraw it wrecks everything else. So the regions are
+    # found, cropped, re-sampled hard, and pasted back — faces first, then hands
+    # over that result, so an image with both gets both.
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png", seed=5,
+        detail_fix=True, detail_denoise=0.45,
+        face_detector="face_finder.pt", hand_detector="hand_finder.pt",
+    ))
+
+    providers = {nid: n for nid, n in payload.items()
+                 if n["class_type"] == "UltralyticsDetectorProvider"}
+    # The provider names its model the way its own picker does, bbox/ and all.
+    assert sorted(n["inputs"]["model_name"] for n in providers.values()) == [
+        "bbox/face_finder.pt", "bbox/hand_finder.pt",
+    ]
+
+    detailers = {nid: n for nid, n in payload.items()
+                 if n["class_type"] == "DetailerForEach"}
+    assert len(detailers) == 2
+    for node in detailers.values():
+        segs = payload[node["inputs"]["segs"][0]]
+        assert segs["class_type"] == "BboxDetectorSEGS"
+        assert segs["inputs"]["bbox_detector"][0] in providers
+        # Each detector reads the very image its detailer repaints, so the boxes
+        # it found land where it found them.
+        assert segs["inputs"]["image"] == node["inputs"]["image"]
+        assert node["inputs"]["denoise"] == 0.45
+        assert node["inputs"]["seed"] == 5
+
+    # Chained, and the save takes the end of the chain rather than the tail's
+    # decode — otherwise the pass would run and be thrown away.
+    decode_id = _node_id(payload, "VAEDecode")
+    first = next(nid for nid, n in detailers.items()
+                 if n["inputs"]["image"] == [decode_id, 0])
+    second = next(nid for nid in detailers if nid != first)
+    assert detailers[second]["inputs"]["image"] == [first, 0]
+    assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0]
+
+
+def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
+    # It is the same enhancement, spent where it matters: the checkpoint
+    # refining the picture refines its faces too, steered by the same prompts,
+    # so a redrawn mouth stays in the picture's own style rather than the
+    # sampler's idea of a mouth.
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png", detail_fix=True,
+        positive_prompt="a lantern on a jetty",
+    ))
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    detailer = _nodes_of(payload, "DetailerForEach")[0]["inputs"]
+    ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
+    assert detailer["model"] == sampler["model"] == [ckpt_id, 0]
+    assert detailer["clip"] == [ckpt_id, 1]
+    assert detailer["positive"] == sampler["positive"]
+    assert detailer["negative"] == sampler["negative"]
+    assert detailer["vae"] == _find_node(payload, "VAEEncode")["inputs"]["vae"]
+    assert detailer["steps"] == sampler["steps"]
+    assert detailer["cfg"] == sampler["cfg"]
+    assert detailer["sampler_name"] == sampler["sampler_name"]
+    assert detailer["scheduler"] == sampler["scheduler"]
+
+
+def test_a_detector_left_unnamed_drops_its_half_of_the_pass():
+    # Having only one of the two detection models is an ordinary install, and
+    # naming a file ComfyUI hasn't got gets the whole submit rejected — so an
+    # empty slot builds no nodes at all, the way a bypassed LoRA does.
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), input_image="pick.png", detail_fix=True,
+        face_detector="face_finder.pt", hand_detector="",
+    ))
+    (provider,) = _nodes_of(payload, "UltralyticsDetectorProvider")
+    assert provider["inputs"]["model_name"] == "bbox/face_finder.pt"
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert detailer["inputs"]["image"] == [_node_id(payload, "VAEDecode"), 0]
+    save = payload[_node_id(payload, "SaveImage")]
+    assert save["inputs"]["images"] == [_node_id(payload, "DetailerForEach"), 0]
+
+
+def test_the_detail_passs_knobs_are_defined_and_its_detectors_are_the_installed_ones():
+    # The Enhance panel builds its fields from these, so the ranges and the
+    # option lists live with the workflow rather than being retyped beside it.
+    import origenerator.workflows.image_enhance as module
+
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+    installed = ["face_finder.pt", "hand_finder.pt"]
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(module, "list_detector_files", lambda: installed)
+        defs = {pd.key: pd for pd in wf.param_definitions()}
+
+    assert defs["detail_fix"].type == "bool"
+    assert defs["detail_fix"].default is False
+    # A pass at zero denoise repaints nothing, and the detailer node rejects it.
+    assert defs["detail_denoise"].min_val > 0
+    assert defs["detail_denoise"].max_val == 1.0
+    assert defs["face_detector"].options == installed
+    assert defs["hand_detector"].options == installed
+
+
 # ---- The SDXL upscale/enhance tail (shared by both SDXL workflows) ----
 
 def test_sdxl_workflows_end_with_an_upscale_enhance_pass():

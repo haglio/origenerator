@@ -26,6 +26,18 @@ SCHEDULER_OPTIONS = [
 # ``enhance_scale``, so the saved image lands at enhance_scale x the base render.
 _UPSCALE_MODEL_FACTOR = 4.0
 
+# The detail pass's fixed shape (see :meth:`WorkflowTemplate.detail_fix_nodes`).
+# All of these are the detector/detailer nodes' own defaults, kept here as named
+# constants rather than as knobs: the pass already costs the user a checkbox and
+# a denoise, and every one of these is a value their answer would be a guess at.
+_DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
+_DETECTOR_DILATION = 10       # pixels grown around each box, so edges are inside
+_DETECTOR_CROP_FACTOR = 3.0   # how much context around the box the sampler sees
+_DETECTOR_DROP_SIZE = 10      # boxes smaller than this are noise, not anatomy
+_DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
+_DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
+_DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
+
 
 @dataclass
 class ParamDef:
@@ -297,6 +309,93 @@ class WorkflowTemplate(ABC):
             },
         }
         return nodes, [decode_id, 0]
+
+    @staticmethod
+    def detail_fix_nodes(face_ids: tuple[str, str, str],
+                         hand_ids: tuple[str, str, str], *,
+                         image_ref, model_ref, clip_ref, vae_ref,
+                         positive_ref, negative_ref, params: dict):
+        """The face/hand detail pass appended after the enhance tail, and the
+        IMAGE ref the save node should store.
+
+        The tail refines the whole frame at once, and that is exactly why it
+        cannot fix anatomy: at ``enhance_denoise`` it only re-textures, and the
+        denoise that could redraw a hand (0.3+) applies to the sky and the
+        floorboards too — which is how creases became wounds. This pass spends
+        that denoise where it is wanted instead. A YOLO detector finds the faces
+        (then the hands), each box is cropped out and enlarged to the sampler's
+        own working size, re-sampled at ``detail_denoise``, and composited back
+        through a feathered mask — so a mouth or a finger is redrawn at real
+        resolution while every pixel outside the boxes is left untouched.
+
+        Two independent detectors, run one after the other on each other's
+        output, rather than one merged box list: they are different models, and
+        an image with a face and two hands must get all three. Each ``*_ids``
+        triple names that half's provider, detector and detailer nodes; a half
+        whose detector param is empty builds no nodes at all — the same bypass
+        :meth:`lora_model_input` does, since ComfyUI validates the model name
+        and rejects the whole submit for one it cannot find.
+
+        Returns ``(nodes, image_ref)`` — the dict to merge into the payload, and
+        the end of the chain. With ``detail_fix`` off (or no detector named)
+        that is ``image_ref`` unchanged, so the caller saves the tail's output.
+        """
+        if not params.get("detail_fix"):
+            return {}, image_ref
+        nodes: dict = {}
+        for ids, key in ((face_ids, "face_detector"), (hand_ids, "hand_detector")):
+            detector = params.get(key)
+            if not detector:
+                continue
+            provider_id, segs_id, detailer_id = ids
+            nodes[provider_id] = {
+                "class_type": "UltralyticsDetectorProvider",
+                # The provider's own picker prefixes its bounding-box models
+                # this way, and the value is matched against that list.
+                "inputs": {"model_name": f"bbox/{detector}"},
+            }
+            nodes[segs_id] = {
+                "class_type": "BboxDetectorSEGS",
+                "inputs": {
+                    "bbox_detector": [provider_id, 0],
+                    "image": image_ref,
+                    "threshold": _DETECTOR_THRESHOLD,
+                    "dilation": _DETECTOR_DILATION,
+                    "crop_factor": _DETECTOR_CROP_FACTOR,
+                    "drop_size": _DETECTOR_DROP_SIZE,
+                    "labels": "all",
+                },
+            }
+            nodes[detailer_id] = {
+                "class_type": "DetailerForEach",
+                "inputs": {
+                    "image": image_ref,
+                    "segs": [segs_id, 0],
+                    "model": model_ref,
+                    "clip": clip_ref,
+                    "vae": vae_ref,
+                    # The crop is enlarged to this before sampling, which is what
+                    # buys a thumbnail-sized hand enough pixels to be redrawn.
+                    "guide_size": _DETAIL_GUIDE_SIZE,
+                    "guide_size_for": True,
+                    "max_size": _DETAIL_MAX_SIZE,
+                    "seed": params["seed"],
+                    "steps": params["enhance_steps"],
+                    "cfg": params["cfg"],
+                    "sampler_name": params["sampler_name"],
+                    "scheduler": params["scheduler"],
+                    "positive": positive_ref,
+                    "negative": negative_ref,
+                    "denoise": params["detail_denoise"],
+                    "feather": _DETAIL_FEATHER,
+                    "noise_mask": True,
+                    "force_inpaint": True,
+                    "wildcard": "",
+                    "cycle": 1,
+                },
+            }
+            image_ref = [detailer_id, 0]
+        return nodes, image_ref
 
     @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):

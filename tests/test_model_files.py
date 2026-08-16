@@ -2,7 +2,7 @@ import os
 
 from origenerator import config
 from origenerator.workflows.model_files import (
-    NO_LORA, is_no_lora, list_lora_files, list_model_files,
+    NO_LORA, is_no_lora, list_detector_files, list_lora_files, list_model_files,
 )
 
 
@@ -69,6 +69,20 @@ def test_lora_picker_leads_with_the_none_sentinel(tmp_path, monkeypatch):
         NO_LORA, "a.safetensors", "b.safetensors",
     ]
     assert NO_LORA not in list_model_files("loras", ["fallback.safetensors"])
+
+
+def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
+    # Where the detail pass's provider node looks for them. Empty rather than a
+    # fallback name: "no detector installed" is a real state the panel has to be
+    # able to read, and a fabricated default would hide it behind a failed submit.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    assert list_detector_files() == []
+
+    bbox = tmp_path / "models" / "ultralytics" / "bbox"
+    bbox.mkdir(parents=True)
+    (bbox / "hand_finder.pt").touch()
+    (bbox / "face_finder.pt").touch()
+    assert list_detector_files() == ["face_finder.pt", "hand_finder.pt"]
 
 
 def test_is_no_lora_recognizes_the_sentinel_and_empty_values():

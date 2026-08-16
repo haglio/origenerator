@@ -1,13 +1,14 @@
 """The generation queue, as one strip along the bottom of the gallery.
 
 Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering and a fat progress bar beside it,
-nothing else, and no wider than a bar needs to be — or, with nothing of ours in
-flight, what the shared server is busy with instead, and a Clear for it. On the right, taking the rest
-of the strip, *what is queued*: every in-flight job as a row of its own — the one
-being made at the top — each led by a Cancel, each opening its folder on a click,
-and each draggable to a new place in the line. Only the top row is fixed: nothing
-can be moved in front of what is already rendering.
+live frame of the job ComfyUI is rendering, a fat progress bar beside it, and its
+clock — "1:30 elapsed · ~10:34 left", so the bar has something to be measured
+against — no wider than a bar needs to be. With nothing of ours in flight the same
+half says what the shared server is busy with instead, and offers a Clear for it.
+On the right, taking the rest of the strip, *what is queued*: every in-flight job
+as a row of its own — the one being made at the top — each led by a Cancel, each
+opening its folder on a click, and each draggable to a new place in the line. Only
+the top row is fixed: nothing can be moved in front of what is already rendering.
 
 The whole strip is one progress bar tall whatever the queue's length, so the panes
 above it never move; about two rows show at a time and the rest are a scroll away.
@@ -20,17 +21,20 @@ done here: :attr:`reorder_requested` carries the order the rows were dropped int
 and whoever owns the jobs makes ComfyUI agree.
 """
 
+import time
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QProgressBar, QPushButton,
     QScrollArea, QApplication, QFrame,
 )
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
-from PyQt6.QtCore import Qt, QMimeData, pyqtSignal
+from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
     InFlightItem, foreign_queue_text, queue_wait_text,
 )
 from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.timing import progress_time_label
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
@@ -39,17 +43,21 @@ _PREVIEW = 80   # the live thumbnail; the full-size preview is one click away
 # The bar needs only enough width to read as a bar; the queue's names are long,
 # so the rest of the strip goes to the line.
 _BAR_WIDTH = 150
+# How often the running half re-reads the clock. Its own timer rather than the
+# gallery's 1.5s poll, which would make a seconds count skip every other tick.
+_TICK_MS = 1000
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
 class RunningPreview(QWidget):
-    """What is being made: its live frame, and a fat bar under it."""
+    """What is being made: its live frame, a fat bar beside it, and its clock."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.key = None
+        self._item = None
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
@@ -63,12 +71,20 @@ class RunningPreview(QWidget):
         self._progress.setFixedHeight(16)  # the fat, important one
         self._progress.setFixedWidth(_BAR_WIDTH)
         layout.addWidget(self._progress)
-        # With nothing of ours being made, this half is free to say what the
-        # shared server is busy with instead.
+        # Beside the bar: how long this run has been going and how much longer it
+        # has, so a bar creeping along has something to be measured against. With
+        # nothing of ours being made the same slot is free to say what the shared
+        # server is busy with instead.
         self._caption = QLabel()
         self._caption.setObjectName("estimateLabel")  # muted secondary text
         self._caption.setWordWrap(True)
         layout.addWidget(self._caption, 1)
+
+        # Its own clock rather than the gallery's poll, so the count advances a
+        # second at a time whether or not a refresh has landed.
+        self._tick = QTimer(self)
+        self._tick.setInterval(_TICK_MS)
+        self._tick.timeout.connect(self._render_timing)
 
         self.show_item(None)
 
@@ -79,19 +95,39 @@ class RunningPreview(QWidget):
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
         self.key = item.key if item is not None else None
+        self._item = item
         if item is None:
             self._frame.clear()
             self._progress.hide()
+            self._tick.stop()
             return
-        self._caption.clear()  # a job of ours takes the half back
         self._progress.show()
         self._render_frame(item.frame)
+        self._render_timing()  # a job of ours takes the caption back for its clock
+        self._tick.start()
         if item.status == "running" and item.progress and item.progress[1] > 0:
             cumulative, total = item.progress
             self._progress.setRange(0, total)
             self._progress.setValue(cumulative)
         else:
             self._progress.setRange(0, 0)  # queued, or no step counts yet: indeterminate
+
+    def _render_timing(self):
+        """How long the running job has been going, and how much longer it has.
+
+        Read off the clock rather than off the feed. A job ComfyUI hasn't started
+        has no elapsed time to report and the line stays empty — its wait is the
+        queue beside it to explain, not a zero counting up under a bar that has
+        not moved.
+        """
+        if self._item is None:
+            self._caption.clear()
+            return
+        started = self._item.started_at
+        elapsed = None if started is None else max(0.0, time.time() - started)
+        self._caption.setText(progress_time_label(
+            elapsed, self._item.progress, self._item.typical_seconds
+        ))
 
     def _render_frame(self, frame):
         pixmap = QPixmap()

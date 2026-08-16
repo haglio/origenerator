@@ -4581,9 +4581,9 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
     view._select_reroll.assert_called_once()
 
 
-def test_running_bar_times_the_job_against_the_workflows_recent_runs(qtbot):
-    # What the bottom bar counts down from: the live job's own start time and the
-    # median of what this workflow's finished runs actually took.
+def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
+    # What the running half counts down from: the live job's own start time and
+    # the median of what this workflow's finished runs actually took.
     db = FakeDB([
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
@@ -4595,21 +4595,21 @@ def test_running_bar_times_the_job_against_the_workflows_recent_runs(qtbot):
     view.refresh()
     folder_key = _running_folder_key(view)
     began = time.time() - 90.5
-    view._reroll_jobs[folder_key] = _FakeRerollJob(
+    view._reroll._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "wan22_i2v", {}, state="running", progress=(10, 20), started_at=began
-    )
+    )]
 
     item = view._inflight_items()[0]
     assert item.started_at == began
     assert item.typical_seconds == 724.0   # the median of the three timed runs
 
-    view._update_running_bar()
-    assert view._running_bar._timing.text() == "1:30 elapsed · ~10:33 left"
+    view._update_queue()
+    assert view._queue.running_preview()._caption.text() == "1:30 elapsed · ~10:33 left"
 
 
-def test_running_bar_has_no_clock_for_a_job_still_queued(qtbot):
+def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     # Nothing has begun, so there is no elapsed time to report — the wait behind
-    # ComfyUI is the queued slot's to explain.
+    # ComfyUI is the queue beside it to explain.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
                 status="pending", output_files="[]"))
@@ -4618,7 +4618,7 @@ def test_running_bar_has_no_clock_for_a_job_still_queued(qtbot):
     view.refresh()
 
     assert view._inflight_items()[0].started_at is None
-    assert view._running_bar._timing.text() == ""
+    assert view._queue.running_preview()._caption.text() == ""
 
 
 def _running_folder_key(view):

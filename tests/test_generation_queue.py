@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
@@ -14,10 +16,12 @@ def queue(qtbot):
 
 
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None):
+          progress=None, reveal=None, cancel=None, foreign_ahead=None,
+          started_at=None, typical_seconds=None):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
-                        foreign_ahead=foreign_ahead)
+                        foreign_ahead=foreign_ahead, started_at=started_at,
+                        typical_seconds=typical_seconds)
 
 
 def _four(queue):
@@ -157,6 +161,77 @@ def test_the_users_own_queue_needs_no_explaining(queue):
     queue.set_items([_item(key="a", caption="one", foreign_ahead=0),
                      _item(key="b", caption="two", status="queued", foreign_ahead=0)])
     assert [row.caption() for row in queue.rows()] == ["one", "two"]
+
+
+# --- how long it's been, and how long is left ---------------------------------
+
+def _timing(queue) -> str:
+    return queue.running_preview()._caption.text()
+
+
+def test_shows_the_elapsed_time_and_what_is_left(queue):
+    # A 12-minute video job 90 seconds in: the bar now has both numbers beside it
+    # instead of creeping along with nothing to measure it against. The
+    # half-seconds keep both readings a clear half-second off a rollover, so the
+    # time the test itself takes can't tip either one.
+    queue.set_items([_item(status="running", progress=(10, 20),
+                           started_at=time.time() - 90.5, typical_seconds=725.0)])
+    assert _timing(queue) == "1:30 elapsed · ~10:34 left"
+
+
+def test_shows_the_elapsed_time_alone_with_no_estimate(queue):
+    # The first run of a workflow has no history behind it, and one step in it's
+    # too early to pace off — the elapsed count still stands on its own.
+    queue.set_items([_item(status="running", progress=(1, 20),
+                           started_at=time.time() - 45.5)])
+    assert _timing(queue) == "0:45 elapsed"
+
+
+def test_no_clock_on_a_job_comfyui_has_not_started(queue):
+    queue.set_items([_item(status="queued", started_at=None, typical_seconds=724.0)])
+    assert _timing(queue) == ""
+
+
+def test_the_clock_advances_between_polls(queue):
+    # The gallery re-feeds the strip every 1.5s, which would make a seconds count
+    # skip; the running half re-reads the clock itself so it moves a second at a
+    # time.
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert _timing(queue) == "0:05 elapsed"
+    queue.running_preview()._item.started_at -= 3  # as if three seconds had gone by
+    queue.running_preview()._tick.timeout.emit()
+    assert _timing(queue) == "0:08 elapsed"
+
+
+def test_the_clock_stops_when_the_queue_empties(queue):
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert queue.running_preview()._tick.isActive()
+
+    queue.set_items([])
+
+    assert not queue.running_preview()._tick.isActive()
+    assert _timing(queue) == ""
+
+
+def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
+    # The clock and the foreign-queue line share the space beside the bar: ours
+    # while we have a job, theirs when we don't.
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert "elapsed" in _timing(queue)
+
+    queue.set_items([], foreign_queued=2)
+
+    assert _timing(queue) == "2 jobs from another app are queued on ComfyUI"
+
+
+def test_the_clock_keeps_the_strip_the_same_height(queue):
+    # Same reason the idle strip holds its slot: the clock rides beside the bar
+    # rather than adding a line that would shove the panes above it.
+    queue.set_items([])
+    idle = queue.sizeHint().height()
+    queue.set_items([_item(status="running", progress=(10, 20),
+                           started_at=time.time() - 90.5, typical_seconds=725.0)])
+    assert queue.sizeHint().height() == idle
 
 
 # --- dragging a row up or down the line ---------------------------------------

@@ -119,6 +119,21 @@ def match_fix_command(text: str) -> DetailPart | None:
     return None
 
 
+def fix_command_bias() -> str:
+    """The command vocabulary as whisper's initial prompt.
+
+    Off a quiet mic the base/small models mangle a short imperative — a
+    captured "fix <part>" transcribed as "thick stick" — and the matcher can
+    only stretch so far. Handing the expected phrases to whisper up front is
+    what actually fixed that capture, so the transcriber is biased with every
+    word a command may use, overlay parts included.
+    """
+    words = ["fix", "fixed"]
+    for part in DETAIL_PARTS:
+        words += [w for w in part.spoken if w not in words]
+    return "Voice commands: " + ", ".join(words) + "."
+
+
 def _basename(filename: str) -> str:
     """The bare lowercase filename of a detector entry, which may be listed
     under a subfolder with either separator."""

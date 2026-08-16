@@ -1,3 +1,4 @@
+import builtins
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -6,6 +7,7 @@ import pytest
 from origenerator.app import (
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
+    _warm_voice_runtimes,
     main,
     resolve_comfyui_client_id,
 )
@@ -13,6 +15,24 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+
+
+def test_warming_the_voice_runtimes_survives_any_install(monkeypatch):
+    # The warm runs before Qt so ctranslate2/onnxruntime get a clean DLL init
+    # (imported after Qt, the first model load is an access violation that
+    # takes the app with it). The extra is optional and a broken install
+    # raises OSError, not ImportError — neither may cost the boot.
+    _warm_voice_runtimes()  # whatever this machine actually has
+
+    real_import = builtins.__import__
+
+    def broken(name, *args, **kwargs):
+        if name in ("onnxruntime", "ctranslate2"):
+            raise OSError("DLL initialization routine failed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", broken)
+    _warm_voice_runtimes()  # and a machine where both are broken
 
 
 def test_resolve_client_id_mints_and_persists_when_absent(tmp_path):

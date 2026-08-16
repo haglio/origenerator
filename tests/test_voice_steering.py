@@ -155,6 +155,13 @@ def test_the_mic_stays_open_while_either_use_still_wants_it(qtbot):
     assert listener.stopped
 
 
+def test_the_transcribe_bias_reaches_the_transcriber(qtbot):
+    # The vocabulary bias only helps if the real worker's transcriber holds it.
+    steering = VoiceSteering(listener=FakeListener(),
+                             transcribe_bias="Voice commands: fix.")
+    assert steering._transcriber._prompt_bias == "Voice commands: fix."
+
+
 def test_stopping_commands_ends_their_execution(qtbot):
     steering, listener = _command_steering()
     ran = []

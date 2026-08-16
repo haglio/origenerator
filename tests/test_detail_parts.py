@@ -131,3 +131,14 @@ def test_malformed_overlay_entries_are_skipped_not_fatal(monkeypatch):
     # A bad line in the overlay must not take voice commands down with it.
     _with_overlay(monkeypatch, ["zeta", {"spoken": ["zeta"]}, {"name": ""}])
     assert detail_parts.DETAIL_PARTS == detail_parts._BUILTIN_PARTS
+
+
+def test_the_whisper_bias_names_every_spoken_word_once(monkeypatch):
+    # What the transcriber is taught to expect: fix itself and every part
+    # word, the overlay's private vocabulary included — whisper can only
+    # come back with "fix <part>" if it has heard of the part.
+    _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
+    bias = detail_parts.fix_command_bias()
+    for word in ("fix", "fixed", "teeth", "hands", "eyes", "zeta", "zetas"):
+        assert word in bias
+    assert bias.count("fix,") == 1  # each word once, not once per part

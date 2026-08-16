@@ -93,7 +93,27 @@ def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump
         logger.warning("Failed to start ComfyUI server: %s", e)
 
 
+def _warm_voice_runtimes() -> None:
+    """Load the voice stack's native DLLs before Qt can spoil their welcome.
+
+    Imported after PyQt6 is up, ctranslate2 — whisper's engine — dies with a
+    plain access violation the moment the model loads, which took the whole
+    app down the instant a spoken command triggered the first transcription;
+    onnxruntime (whisper's VAD) fails its DLL init the same way. Both import
+    clean the other way round — reproduced in both orders, offscreen, in this
+    interpreter. Guarded per-module and per-failure: the voice extra is
+    optional and a broken install surfaces as OSError rather than
+    ImportError, and neither may cost the app its boot.
+    """
+    for module in ("onnxruntime", "ctranslate2"):
+        try:
+            __import__(module)
+        except Exception:
+            pass  # no voice extra (or a broken one): the app still boots
+
+
 def main():
+    _warm_voice_runtimes()  # must precede the first PyQt6 import below
     _init_windows_taskbar_identity()
 
     import logging

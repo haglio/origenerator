@@ -36,6 +36,22 @@ def test_peak_normalizes_faint_audio_before_transcribing():
     assert abs(float(np.max(np.abs(sent))) - 0.95) < 1e-3  # boosted to a usable level
 
 
+def test_the_prompt_bias_rides_along_as_whispers_initial_prompt():
+    # Off a quiet mic whisper mangles a short imperative ("fix <part>" came
+    # back as other words entirely); the caller's vocabulary bias is what
+    # steers the decode, so it must actually reach the model.
+    model = FakeModel([_Segment("fix teeth")])
+    Transcriber(model=model, prompt_bias="Voice commands: fix.").transcribe(
+        np.array([0.2, -0.2], dtype=np.float32))
+    assert model.calls[0][1]["initial_prompt"] == "Voice commands: fix."
+
+
+def test_no_bias_means_none_reaches_the_model():
+    model = FakeModel([_Segment("go")])
+    Transcriber(model=model).transcribe(np.array([0.2], dtype=np.float32))
+    assert model.calls[0][1]["initial_prompt"] is None
+
+
 def test_loading_refuses_the_optional_torch_import(monkeypatch):
     # faster-whisper needs no torch but imports any it finds — and a torch
     # that loads fine on its own can die initializing its DLLs once Qt is in

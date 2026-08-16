@@ -54,7 +54,7 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
-from origenerator.gallery.detail_parts import match_fix_command
+from origenerator.gallery.detail_parts import fix_command_bias, match_fix_command
 from origenerator.gallery.enhance import (
     ENHANCE_LEVEL_KEYS,
     ENHANCE_SETTING_KEYS,

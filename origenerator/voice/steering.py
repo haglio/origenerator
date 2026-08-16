@@ -35,12 +35,14 @@ class VoiceSteering(QObject):
     error = pyqtSignal(str)    # a mic/transcribe/rewrite failure, for the caller to surface
     heard = pyqtSignal(str)    # the raw transcription (re-emitted from the worker)
 
-    def __init__(self, *, listener=None, worker=None, command_matcher=None, parent=None):
+    def __init__(self, *, listener=None, worker=None, command_matcher=None,
+                 transcribe_bias=None, parent=None):
         super().__init__(parent)
         self._listener = listener if listener is not None else Listener(
             floor=config.VOICE_VAD_THRESHOLD
         )
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
+        self._transcribe_bias = transcribe_bias  # before _build_worker, which hands it on
         self._transcriber = None  # set when building the real worker, for preloading
         self._worker = worker if worker is not None else self._build_worker()
         self._get_prompts = None
@@ -54,7 +56,7 @@ class VoiceSteering(QObject):
         self._worker.command.connect(self._on_command)
 
     def _build_worker(self) -> VoiceWorker:
-        self._transcriber = Transcriber()
+        self._transcriber = Transcriber(prompt_bias=self._transcribe_bias)
         return VoiceWorker(
             self._transcriber.transcribe,
             partial(

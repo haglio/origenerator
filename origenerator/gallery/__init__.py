@@ -54,7 +54,9 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
+from origenerator.gallery.detail_parts import match_fix_command
 from origenerator.gallery.enhance import (
+    ENHANCE_LEVEL_KEYS,
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
     MATCH_SOURCE_MODEL,
@@ -66,6 +68,8 @@ from origenerator.gallery.enhance import (
     enhance_levels,
     enhance_params_for,
     enhance_targets_row,
+    fix_part_params,
+    level_matching_params,
     level_matching_settings,
     original_files_of,
     fold_completed_enhancements,

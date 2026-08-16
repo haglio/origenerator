@@ -166,7 +166,9 @@ class GalleryView(QWidget):
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
-        self._voice = VoiceSteering()
+        # The matcher rides along so a spoken "fix teeth" during a slideshow or
+        # fullscreen view is executed as a command rather than steering a prompt.
+        self._voice = VoiceSteering(command_matcher=gallery.match_fix_command)
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
         self._voice.edited.connect(self._on_voice_edited)
@@ -756,6 +758,7 @@ class GalleryView(QWidget):
         fullscreen.star_requested.connect(self._star_generation)
         self._arm_fullscreen_navigation(fullscreen)
         self._reconcile_osr2()
+        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
 
     def _arm_fullscreen_navigation(self, fullscreen):
         """Give the fullscreen view the visible folder's media so Left/Right page
@@ -857,6 +860,7 @@ class GalleryView(QWidget):
         if self._fullscreen_preview is fullscreen:
             self._fullscreen_preview = None
             self._reconcile_osr2()
+            self._sync_voice_commands()
 
     # --- the app-global OSR2 stroke: reconcile hold and main-window feedback --
 
@@ -1959,7 +1963,6 @@ class GalleryView(QWidget):
         controller took only one job per folder; it takes them all now, so the
         buffer had nothing left to do but hide the work.)
         """
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
         index = gallery.build_image_config_index(self._image_rows)
         for row in rows:
             params = gallery.enhance_params_for(row, self._enhance_settings)
@@ -1967,22 +1970,34 @@ class GalleryView(QWidget):
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
                 continue
-            key = gallery.settings_folder_key(
-                {"workflow_name": workflow.name, "workflow_version": workflow.version,
-                 "params_json": json.dumps(params)},
-                index,
-            )
-            prepared = randomize_seeds(params, workflow.seed_keys())
-            if self._reroll.start_prepared(key, workflow, prepared):
-                logger.info("Enhance launched for %s on %s at %s, under %s",
-                            row.get("prompt_id"), params.get("input_image"),
-                            gallery.describe_enhance_params(params), key)
-                continue
-            # Unlaunchable (no client, or the submit was refused). Logged rather
-            # than dropped in silence: a request the user made and never saw run
-            # is the one failure they cannot diagnose from the screen.
-            logger.warning("Enhance of %s dropped: could not launch under %s",
-                           params.get("input_image"), key)
+            self._launch_enhance(row, params, index)
+
+    def _launch_enhance(self, row: dict, params: dict, index=None) -> bool:
+        """Hand one standalone enhance to the controller, under the folder its
+        settings shape — a batch shares ``index`` so it isn't rebuilt per row.
+
+        Returns whether the run started. Unlaunchable (no client, or the
+        submit was refused) is logged rather than dropped in silence: a
+        request the user made and never saw run is the one failure they
+        cannot diagnose from the screen.
+        """
+        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+        if index is None:
+            index = gallery.build_image_config_index(self._image_rows)
+        key = gallery.settings_folder_key(
+            {"workflow_name": workflow.name, "workflow_version": workflow.version,
+             "params_json": json.dumps(params)},
+            index,
+        )
+        prepared = randomize_seeds(params, workflow.seed_keys())
+        if self._reroll.start_prepared(key, workflow, prepared):
+            logger.info("Enhance launched for %s on %s at %s, under %s",
+                        row.get("prompt_id"), params.get("input_image"),
+                        gallery.describe_enhance_params(params), key)
+            return True
+        logger.warning("Enhance of %s dropped: could not launch under %s",
+                       params.get("input_image"), key)
+        return False
 
     def _enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Holding a slide asked for it to be enhanced. Returns whether a run
@@ -2001,6 +2016,58 @@ class GalleryView(QWidget):
             return False
         self._enqueue_enhancements([row])
         return True
+
+    # --- spoken targeted fixes: "fix teeth" over a fullscreen surface ---------
+
+    def _sync_voice_commands(self):
+        """Keep command listening tied to a fullscreen surface being up: "fix
+        teeth" means something only while a picture fills the screen, and the
+        mic should not stay open for a view that has closed (unless a steered
+        auto loop is holding it anyway)."""
+        if self._slideshow is not None or self._fullscreen_preview is not None:
+            self._voice.start_commands(self._on_voice_fix)
+        else:
+            self._voice.stop_commands()
+
+    def _on_voice_fix(self, part):
+        """A spoken "fix <part>": aim a targeted detail pass at what's on screen.
+
+        Routed to whichever fullscreen surface is up (the active window when
+        both are), and answered out of its corner note — the speaker is looking
+        at it, not at this pane."""
+        surfaces = [s for s in (self._slideshow, self._fullscreen_preview)
+                    if s is not None]
+        surface = next((s for s in surfaces if s.isActiveWindow()),
+                       surfaces[0] if surfaces else None)
+        if surface is None:
+            return
+        prompt_id, message = self._fix_part(surface.voice_fix_target(), part)
+        surface.note_voice_fix(prompt_id, message)
+
+    def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
+        """Launch a targeted fix if the image wants one: the id it launched on
+        (``None`` when it didn't) and the line the surface should say about it.
+
+        The run is the image's latest enhancement done again with the detail
+        pass aimed at the named part (:func:`~origenerator.gallery.enhance.
+        fix_part_params`) — so the answer to a bad hand on an already-enhanced
+        image is the same image, same settings, hand redrawn."""
+        row = self._db.get_generation(prompt_id) if prompt_id else None
+        if row is None or not gallery.is_enhanceable_row(row):
+            return None, f"🎤 only a finished image can get a {part.name} fix"
+        params = gallery.fix_part_params(row, part, self._enhance_settings)
+        if params is None:
+            return None, (f"🎤 no {part.name} detector installed "
+                          "(ComfyUI models/ultralytics/bbox)")
+        if gallery.level_matching_params(row, params) is not None:
+            return None, f"🎤 already has this {part.name} fix"
+        if self.is_enhancing(row):
+            return None, "🎤 an enhance of this image is already running"
+        logger.info("Voice fix: %s on %s at %s", part.name, row.get("prompt_id"),
+                    gallery.describe_enhance_params(params))
+        if not self._launch_enhance(row, params):
+            return None, f"🎤 couldn't launch the {part.name} fix — see the log"
+        return row["prompt_id"], f"🎤 fixing {part.name}…"
 
     def _feed_slideshow_enhanced(self, row: dict | None):
         """Hand a landed enhancement to every full-screen surface, so the item
@@ -2173,10 +2240,18 @@ class GalleryView(QWidget):
                                         pace=self._pace,
                                         stroke=self._osr2_stroke)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
+        self._slideshow.closed.connect(self._on_slideshow_closed)
         logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
                     self._slideshow_subject(), len(items),
                     self._slideshow._playlist.order[:10])
         self._slideshow.showFullScreen()
+        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
+
+    def _on_slideshow_closed(self):
+        """The show was dismissed (however): let it go, and with it the
+        command listening it justified."""
+        self._slideshow = None
+        self._sync_voice_commands()
 
     def _slideshow_items(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the

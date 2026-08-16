@@ -235,6 +235,18 @@ class FullscreenPreview(QWidget):
             base = str(self._items[self._index][0])
         return self._ids_by_path.get(base or "")
 
+    def voice_fix_target(self) -> str | None:
+        """The generation a spoken "fix …" lands on: the image on screen."""
+        return self._current_prompt_id()
+
+    def note_voice_fix(self, prompt_id, message: str) -> None:
+        """Say what a spoken fix did and, when it launched a run
+        (``prompt_id``), keep the caption reading Enhancing… once the flash
+        fades — the same note Down's enhance earns."""
+        if prompt_id is not None:
+            self._enhancing.add(prompt_id)
+        self._flash_note(message, ms=2500)
+
     def _enhance_current(self) -> None:
         if self._on_enhance is None or not self._enhance_enabled:
             return

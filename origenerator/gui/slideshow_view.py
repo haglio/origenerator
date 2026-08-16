@@ -39,6 +39,9 @@ _BEING_MADE = "Generating…"  # an item with no file yet, before its first fram
 class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
+    # The show was dismissed (Escape, Enter out, or culled empty) — the gallery
+    # keeps voice-command listening tied to a fullscreen surface being up.
+    closed = pyqtSignal()
 
     def __init__(self, items, *, image_dwell_ms=None, shuffle=None, on_delete=None,
                  on_enhance=None, on_star=None, player=None, stroke=None, pace=None,
@@ -292,6 +295,18 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         return item[2] if item is not None and len(item) > 2 else None
 
+    def voice_fix_target(self):
+        """The generation a spoken "fix …" lands on: the slide on screen."""
+        return self._current_prompt_id()
+
+    def note_voice_fix(self, prompt_id, message: str) -> None:
+        """Say what a spoken fix did and, when it launched a run
+        (``prompt_id``), keep the corner reading Enhancing… once the flash
+        fades — the same note a hold's enhance earns."""
+        if prompt_id is not None:
+            self._enhancing.add(prompt_id)
+        self._flash_note(message, ms=2500)
+
     def _refresh_note(self):
         """Show "Enhancing…" while the slide on screen has a run in flight."""
         prompt_id = self._current_prompt_id()
@@ -418,4 +433,5 @@ class SlideshowView(QWidget):
     def closeEvent(self, event):
         self._timer.stop()
         self._preview.clear()  # release any held video file so it can be deleted
+        self.closed.emit()
         super().closeEvent(event)

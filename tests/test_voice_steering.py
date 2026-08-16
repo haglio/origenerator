@@ -88,3 +88,80 @@ def test_a_listener_failure_surfaces(qtbot):
     steering.start(lambda: {"positive": "a woman", "negative": ""}, lambda new: None)
 
     assert errors and "no mic" in errors[0]
+
+
+# --- spoken commands: the same mic, a second use ----------------------------
+
+
+def _command_steering(transcribe="fix teeth"):
+    listener = FakeListener()
+    worker = VoiceWorker(lambda audio: transcribe,
+                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+    steering = VoiceSteering(
+        listener=listener, worker=worker,
+        command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
+    )
+    return steering, listener
+
+
+def test_commands_alone_open_the_mic_and_execute_what_they_match(qtbot):
+    steering, listener = _command_steering()
+    ran = []
+    steering.start_commands(ran.append)
+
+    assert listener.started
+    listener.utterance.emit(object())
+
+    assert ran == ["teeth"]
+
+
+def test_a_matched_command_is_consumed_not_steered(qtbot):
+    # With a loop steering AND a surface listening, "fix teeth" is a command —
+    # it must not also (or instead) rewrite the prompt.
+    steering, listener = _command_steering()
+    prompts = {"positive": "a woman", "negative": ""}
+    ran = []
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
+    steering.start_commands(ran.append)
+
+    listener.utterance.emit(object())
+
+    assert ran == ["teeth"]
+    assert prompts["positive"] == "a woman"
+
+
+def test_an_unmatched_utterance_still_steers_the_prompt(qtbot):
+    steering, listener = _command_steering(transcribe="no hat")
+    prompts = {"positive": "a woman", "negative": ""}
+    ran = []
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
+    steering.start_commands(ran.append)
+
+    listener.utterance.emit(object())
+
+    assert ran == []
+    assert prompts["positive"] == "a woman, no hat"
+
+
+def test_the_mic_stays_open_while_either_use_still_wants_it(qtbot):
+    steering, listener = _command_steering()
+    steering.start(lambda: {"positive": "", "negative": ""}, lambda new: None)
+    steering.start_commands(lambda part: None)
+
+    steering.stop()  # the loop ended; a slideshow is still up
+    assert not listener.stopped
+
+    steering.stop_commands()  # now nothing wants the mic
+    assert listener.stopped
+
+
+def test_stopping_commands_ends_their_execution(qtbot):
+    steering, listener = _command_steering()
+    ran = []
+    steering.start_commands(ran.append)
+    steering.stop_commands()
+
+    listener.utterance.emit(object())  # a late utterance after the surface closed
+
+    assert ran == []
+    assert listener.stopped

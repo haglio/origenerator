@@ -13,6 +13,7 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
+from origenerator.gallery import detail_parts
 from origenerator.gallery.enhance import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
@@ -21,7 +22,9 @@ from origenerator.gallery.enhance import (
     displayed_levels,
     enhance_levels,
     enhance_params_for,
+    fix_part_params,
     fold_enhancement,
+    level_matching_params,
     level_matching_settings,
     remove_enhance_levels,
 )
@@ -393,3 +396,107 @@ def test_removing_every_version_changes_nothing(tmp_path):
 
 def test_removing_a_name_the_row_never_held_changes_nothing(tmp_path):
     assert remove_enhance_levels(_folded(tmp_path), ["someone_elses.png"]) == {}
+
+
+def test_describe_names_a_targeted_fix_by_its_part():
+    # A teeth-fixed version and a faces-&-hands one differ only in what their
+    # passes found; the caption must say which is which.
+    assert describe_enhance_params({
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
+        "enhance_face_detector": "teeth_yolov8n.pt", "enhance_hand_detector": "",
+    }) == "2x · 20 steps · 0.15 denoise · teeth 0.45"
+    # The generic pair still reads as it always has.
+    assert describe_enhance_params({
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
+        "enhance_face_detector": "face_yolov8m.pt",
+        "enhance_hand_detector": "hand_yolov8s.pt",
+    }) == "faces & hands 0.45"
+
+
+# --- a spoken "fix <part>": the latest enhancement plus a targeted pass -----
+
+
+def _spoken(text):
+    part = gallery.match_fix_command(text)
+    assert part is not None
+    return part
+
+
+def _install_detectors(monkeypatch, *files):
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: list(files))
+
+
+def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
+        tmp_path, monkeypatch):
+    _install_detectors(monkeypatch, "teeth_yolov8n.pt", "face_yolov8m.pt")
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  enhance_scale=3.0, enhance_steps=40, enhance_denoise=0.35,
+                  checkpoint="driftwood_v1.safetensors")
+    row = db.get_generation("src")
+
+    params = fix_part_params(row, _spoken("fix teeth"),
+                             EnhanceSettings(params={"enhance_scale": 1.5}))
+
+    # Equivalent to the LATEST enhancement — not to whatever the panel says now.
+    assert params["enhance_scale"] == 3.0
+    assert params["enhance_steps"] == 40
+    assert params["checkpoint"] == "driftwood_v1.safetensors"
+    # Re-derived from the original, like any re-enhance, with the one pass on.
+    assert params["input_image"] == "image/sdxl_t2i_src.png [output]"
+    assert params["enhance_detail_fix"] is True
+    assert params["enhance_face_detector"] == "teeth_yolov8n.pt"
+    assert params["enhance_hand_detector"] == ""
+
+
+def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkeypatch):
+    _install_detectors(monkeypatch, "hand_yolov8s.pt")
+    params = fix_part_params(_source_row(), _spoken("fix hands"),
+                             EnhanceSettings(params={"enhance_steps": 33}))
+    assert params["enhance_steps"] == 33
+    assert params["enhance_detail_fix"] is True
+    assert params["enhance_face_detector"] == "hand_yolov8s.pt"
+    assert params["enhance_hand_detector"] == ""
+
+
+def test_a_spoken_fix_with_no_detector_for_the_part_declines(monkeypatch):
+    # The caller answers "install one" out loud; a pass that finds nothing is
+    # not a fix.
+    _install_detectors(monkeypatch, "face_yolov8m.pt", "hand_yolov8s.pt")
+    assert fix_part_params(_source_row(), _spoken("fix teeth")) is None
+
+
+def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
+        tmp_path, monkeypatch):
+    # Every enhance re-derives from the original, so a "fix eyes" that dropped
+    # the teeth pass would undo the mended teeth on screen. The latest level's
+    # passes ride along instead.
+    _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  enhance_detail_fix=True, enhance_detail_denoise=0.45,
+                  enhance_face_detector="teeth_yolov8n.pt",
+                  enhance_hand_detector="")
+
+    params = fix_part_params(db.get_generation("src"), _spoken("fix eyes"))
+
+    assert params["enhance_face_detector"] == "teeth_yolov8n.pt"
+    assert params["enhance_hand_detector"] == "eyes_yolov8n.pt"
+
+
+def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatch):
+    _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    first = fix_part_params(db.get_generation("src"), _spoken("fix teeth"))
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  **{k: first[k] for k in gallery.ENHANCE_LEVEL_KEYS})
+    row = db.get_generation("src")
+
+    # Asking again would remake the level it already has; a different part is a
+    # different enhancement and runs.
+    assert level_matching_params(row, fix_part_params(row, _spoken("fix teeth"))) == 0
+    assert level_matching_params(row, fix_part_params(row, _spoken("fix eyes"))) is None

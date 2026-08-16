@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 
 from origenerator import gallery
 from origenerator.branch_session import ENV_FLAG
+from origenerator.gallery import detail_parts
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
@@ -101,16 +102,20 @@ def _stub_preview_resolution(monkeypatch):
 
 class _FakeVoiceSteering(QObject):
     """Stands in for VoiceSteering so gallery tests never open a real microphone;
-    ``say`` simulates a heard-and-rewritten utterance steering the loop's prompt."""
+    ``say`` simulates a heard-and-rewritten utterance steering the loop's prompt,
+    ``speak_command`` one the matcher recognizes while a surface is listening."""
 
     error = pyqtSignal(str)
     heard = pyqtSignal(str)
     edited = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, *, command_matcher=None):
         super().__init__()
         self.started = False
         self.stopped = False
+        self.commands_on = False
+        self._matcher = command_matcher
+        self._execute = None
         self._set = None
 
     def start(self, get_prompt, set_prompt):
@@ -120,8 +125,23 @@ class _FakeVoiceSteering(QObject):
     def stop(self):
         self.stopped = True
 
+    def start_commands(self, execute):
+        self.commands_on = True
+        self._execute = execute
+
+    def stop_commands(self):
+        self.commands_on = False
+        self._execute = None
+
     def say(self, new_prompt):
         self._set(new_prompt)
+
+    def speak_command(self, text):
+        """One spoken utterance while commands are armed: matched → executed."""
+        matched = self._matcher(text) if self.commands_on and self._matcher else None
+        if matched is not None:
+            self._execute(matched)
+        return matched
 
 
 @pytest.fixture(autouse=True)
@@ -7343,3 +7363,80 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
 
     assert fs.playlist == [("v1.mp4", "video", "v1", None)]
     assert fs.playlist_index == 0
+
+
+def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    assert view._voice.commands_on
+
+    view._slideshow.close()
+    assert view._slideshow is None
+    assert not view._voice.commands_on
+
+
+def test_a_fullscreen_view_arms_spoken_fixes_for_its_lifetime(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    fs = _FakeFullscreen(None)
+
+    view._on_fullscreen_opened(fs)
+    assert view._voice.commands_on
+
+    fs.closed.emit()
+    assert not view._voice.commands_on
+
+
+def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["teeth_yolov8n.pt"])
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    assert view._voice.speak_command("Fix her teeth.") is not None
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_detail_fix"] is True
+    assert job.params["enhance_face_detector"] == "teeth_yolov8n.pt"
+    assert job.params["enhance_hand_detector"] == ""
+    # The show answers where the speaker is looking, then reads Enhancing….
+    assert "fixing teeth" in view._slideshow._note.text()
+
+
+def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: [])
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    view._voice.speak_command("fix teeth")
+
+    assert view._reroll_jobs == {}
+    assert "no teeth detector" in view._slideshow._note.text()

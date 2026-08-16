@@ -74,3 +74,55 @@ def test_busy_toggles_around_the_work(qtbot):
     worker.process(object(), _PROMPTS)
 
     assert states == [True, False]
+
+
+def _teeth_matcher(text):
+    return "teeth" if "teeth" in text.lower() else None
+
+
+def test_a_recognized_command_is_executed_not_rewritten(qtbot):
+    # "Fix teeth" while a slideshow is up must not become a prompt edit.
+    worker = VoiceWorker(lambda audio: "Fix teeth.", lambda pos, neg, instr: ("x", "y"))
+    commands, rewrites = [], []
+    worker.command.connect(commands.append)
+    worker.rewritten.connect(rewrites.append)
+
+    worker.process(object(), _PROMPTS, _teeth_matcher)
+
+    assert commands == ["teeth"] and rewrites == []
+
+
+def test_an_unmatched_utterance_still_rewrites(qtbot):
+    worker = VoiceWorker(lambda audio: "make it a dog",
+                         lambda pos, neg, instr: (f"{pos} -> {instr}", neg))
+    out = []
+    worker.rewritten.connect(out.append)
+
+    worker.process(object(), _PROMPTS, _teeth_matcher)
+
+    assert out == [{"positive": "a cat -> make it a dog", "negative": ""}]
+
+
+def test_command_listening_alone_never_invents_a_rewrite(qtbot):
+    # prompts is None while nothing is steering: an unmatched utterance simply
+    # ends there — no rewrite, and nothing to report as a failure either.
+    worker = VoiceWorker(lambda audio: "just chatting",
+                         lambda pos, neg, instr: ("x", "y"))
+    fails, rewrites, commands = [], [], []
+    worker.failed.connect(fails.append)
+    worker.rewritten.connect(rewrites.append)
+    worker.command.connect(commands.append)
+
+    worker.process(object(), None, _teeth_matcher)
+
+    assert fails == [] and rewrites == [] and commands == []
+
+
+def test_a_command_needs_no_prompts_at_all(qtbot):
+    worker = VoiceWorker(lambda audio: "fix teeth", lambda pos, neg, instr: ("x", "y"))
+    commands = []
+    worker.command.connect(commands.append)
+
+    worker.process(object(), None, _teeth_matcher)
+
+    assert commands == ["teeth"]

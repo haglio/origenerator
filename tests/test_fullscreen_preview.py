@@ -658,3 +658,33 @@ def test_a_folder_of_videos_shows_its_neighbours_from_their_thumbnails(qtbot):
     assert still_for(view._items[0]) == "a-thumb.png"
     assert view._neighbors._sources == ("a-thumb.png", "c-thumb.png")
     assert view._counter.text() == "2 / 3"
+
+
+def test_a_spoken_fix_targets_the_image_on_screen(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: True, {str(shown): "id-a"})
+    assert win.voice_fix_target() == "id-a"
+
+
+def test_a_spoken_fix_answers_in_the_caption_then_reads_enhancing(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.set_enhance(lambda pid: True, {str(shown): "id-a"})
+
+    win.note_voice_fix("id-a", "🎤 fixing teeth…")
+    assert "fixing teeth" in win._note.text()
+    win._refresh_note()  # the flash fades into the run's own note
+    assert win._note.text() == "Enhancing…"
+
+
+def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot, tmp_path):
+    shown = _make_png(tmp_path / "a.png")
+    win = FullscreenPreview((shown, "image"), player=MagicMock())
+    qtbot.addWidget(win)
+    win.note_voice_fix(None, "🎤 no teeth detector installed")
+    assert "no teeth detector" in win._note.text()
+    win._refresh_note()
+    assert win._note.isHidden()

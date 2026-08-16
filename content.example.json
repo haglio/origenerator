@@ -1,5 +1,5 @@
 {
-  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the third-party apps such as ComfyUI. project_roots is optional: the folders holding the suite's own app checkouts, searched in order, for when they do not live under suite_root/projects; omit it and that is exactly where they are looked for. ambient_audio_dir is optional too: the library folder the toolbar's audio switch shuffles clips out of, sound only, relative to suite_root unless it is absolute; omit it and that switch simply stays silent. combine_recipes is optional as well: an act named here pins the gallery's Combine to this hand-tuned workflow+params (any param unnamed falls to the workflow's defaults, seeds are re-rolled per launch) instead of mining a recipe from past videos — the way out when an act's past videos all share a weakness.",
+  "_comment": "Placeholder content overlay. The real values live in content.local.json (git-ignored). recipe_categories maps each act a prompt can depict to the distinctive substrings that mark it; detector_labels are the aim model's class names, anchor_classes being the subset the aim point tracks; suite_root is the folder holding the media library and the third-party apps such as ComfyUI. project_roots is optional: the folders holding the suite's own app checkouts, searched in order, for when they do not live under suite_root/projects; omit it and that is exactly where they are looked for. ambient_audio_dir is optional too: the library folder the toolbar's audio switch shuffles clips out of, sound only, relative to suite_root unless it is absolute; omit it and that switch simply stays silent. combine_recipes is optional as well: an act named here pins the gallery's Combine to this hand-tuned workflow+params (any param unnamed falls to the workflow's defaults, seeds are re-rolled per launch) instead of mining a recipe from past videos — the way out when an act's past videos all share a weakness. detail_fix_parts is optional: extra parts the spoken \"fix <part>\" command can aim the enhance's detail pass at, beyond the built-in faces/hands/teeth/eyes — name is the word captions use, spoken the words the command may say, matches the filename substrings that recognize an installed detector (under ComfyUI's models/ultralytics/bbox) as finding it.",
   "suite_root": "C:/path/to/suite-root",
   "ambient_audio_dir": "videos/example-folder/ambient-clips",
   "recipe_categories": {
@@ -49,6 +49,18 @@
       }
     }
   },
+  "detail_fix_parts": [
+    {
+      "name": "zeta",
+      "spoken": [
+        "zeta",
+        "zetas"
+      ],
+      "matches": [
+        "zeta"
+      ]
+    }
+  ],
   "detector_labels": {
     "model_labels": [
       "label_a",

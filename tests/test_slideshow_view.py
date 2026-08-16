@@ -377,10 +377,11 @@ def test_double_clicking_leaves_the_slideshow(qtbot):
     # The way out of every other fullscreen view here, and the way it used to work.
     view = _view(qtbot)
     view.show()
-    closed = []
-    view.closed = closed  # a marker; the real signal is the window closing
+    closes = []
+    view.closed.connect(lambda: closes.append(True))
     view._preview._on_double_click()
     assert not view.isVisible()
+    assert closes == [True]  # the dismissal reaches the gallery, like Escape's
 
 
 # --- an item still being made ------------------------------------------------
@@ -413,3 +414,38 @@ def test_a_frame_for_something_else_is_kept_but_not_shown(qtbot):
     view.show_live_frame("gen-live", b"not-a-real-png")
 
     assert view._frames["gen-live"] == b"not-a-real-png"
+
+
+def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):
+    view = _view(qtbot, _KEYED)
+    assert view.voice_fix_target() == "id-a"
+    _press(view, Qt.Key.Key_Right)
+    assert view.voice_fix_target() == "id-b"
+
+
+def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view.note_voice_fix("id-a", "🎤 fixing teeth…")
+    assert "fixing teeth" in view._note.text()
+    # The flash fades into the same note a hold's enhance earns, until the
+    # upgraded version lands.
+    view._refresh_note()
+    assert view._note.text() == "Enhancing…"
+
+
+def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
+    view = _view(qtbot, _KEYED)
+    view.note_voice_fix(None, "🎤 no teeth detector installed")
+    assert "no teeth detector" in view._note.text()
+    view._refresh_note()
+    assert view._note.isHidden()
+
+
+def test_closing_announces_itself(qtbot):
+    # The gallery keeps voice-command listening tied to a surface being up, so
+    # a dismissal it didn't initiate (Escape) must still reach it.
+    view = _view(qtbot)
+    closes = []
+    view.closed.connect(lambda: closes.append(True))
+    view.close()
+    assert closes == [True]

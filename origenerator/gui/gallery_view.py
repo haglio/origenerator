@@ -167,8 +167,11 @@ class GalleryView(QWidget):
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
         # The matcher rides along so a spoken "fix teeth" during a slideshow or
-        # fullscreen view is executed as a command rather than steering a prompt.
-        self._voice = VoiceSteering(command_matcher=gallery.match_fix_command)
+        # fullscreen view is executed as a command rather than steering a
+        # prompt; the bias teaches whisper the command vocabulary, without
+        # which a quiet mic's "fix <part>" transcribes as other words entirely.
+        self._voice = VoiceSteering(command_matcher=gallery.match_fix_command,
+                                    transcribe_bias=gallery.fix_command_bias())
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
         self._voice.edited.connect(self._on_voice_edited)

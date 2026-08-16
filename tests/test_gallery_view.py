@@ -109,7 +109,7 @@ class _FakeVoiceSteering(QObject):
     heard = pyqtSignal(str)
     edited = pyqtSignal(str)
 
-    def __init__(self, *, command_matcher=None):
+    def __init__(self, *, command_matcher=None, transcribe_bias=None):
         super().__init__()
         self.started = False
         self.stopped = False

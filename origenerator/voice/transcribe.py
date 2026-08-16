@@ -15,9 +15,16 @@ from origenerator.config import WHISPER_MODEL
 
 
 class Transcriber:
-    def __init__(self, *, model_size: str = WHISPER_MODEL, model=None):
+    def __init__(self, *, model_size: str = WHISPER_MODEL, model=None,
+                 prompt_bias: str | None = None):
         self._model_size = model_size
         self._model = model  # injected in tests; lazily loaded in the app
+        # Domain vocabulary fed to whisper as its initial prompt. Off a quiet
+        # mic the model takes real liberties with short imperatives — a
+        # captured "fix <part>" replayed as "thick stick", and hotwords didn't
+        # move it, while this exact bias flipped the same audio to the words
+        # said — so the caller hands in the phrases it expects to hear.
+        self._prompt_bias = prompt_bias
 
     def _load(self):
         if self._model is None:
@@ -45,7 +52,8 @@ class Transcriber:
             audio = audio / peak * 0.95  # boost a faint mic so whisper can read it
         # vad_filter uses the bundled Silero VAD to isolate speech within the clip,
         # which helps whisper find words in a noisy capture.
-        segments, _info = self._load().transcribe(audio, language="en", vad_filter=True)
+        segments, _info = self._load().transcribe(
+            audio, language="en", vad_filter=True, initial_prompt=self._prompt_bias)
         # Whisper segments carry their own leading/trailing spaces; normalise to a
         # single space between non-empty pieces.
         parts = (segment.text.strip() for segment in segments)

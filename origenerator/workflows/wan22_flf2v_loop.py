@@ -92,8 +92,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
-            ParamDef("crf", "Video Quality (CRF)", "int", 19, min_val=0, max_val=51),
-            ParamDef("filename_prefix", "Output Prefix", "str", "video/flf2v_loop"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:

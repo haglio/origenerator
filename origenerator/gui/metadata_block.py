@@ -18,6 +18,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics
 
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
@@ -71,21 +72,20 @@ class MetadataBlock(QWidget):
 
 
 def _build_section(section: MetaSection) -> QWidget:
-    box = QWidget()
-    layout = QVBoxLayout(box)
+    """One titled block, folding like every other section in the pane.
+
+    It sits among the form's own sections, so it folds by the same header rather
+    than being the one heading in the column that doesn't.
+    """
+    box = CollapsibleSection(section.title)
+    rows = QWidget()
+    layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
-
-    title = QLabel(section.title)
-    title.setStyleSheet(
-        f"color: {_h(TEXT_PRIMARY)}; font-weight: 600;"
-        f" border-bottom: 1px solid {_h(BORDER_SUBTLE)}; padding-bottom: 3px;"
-    )
-    layout.addWidget(title)
-
     label_width = _label_column_width(section)
     for item in section.items:
         layout.addWidget(_build_item(item, label_width))
+    box.content_form().addRow(rows)
     return box
 
 

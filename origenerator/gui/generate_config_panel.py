@@ -150,7 +150,7 @@ class GenerateConfigPanel(QWidget):
         # form (swapped into _form_host whenever the workflow changes).
         self._form_workflow_key = None  # which workflow the installed form belongs to
         header = QHBoxLayout()
-        header.addWidget(QLabel("Workflow:"))
+        header.addWidget(QLabel("Workflow"))
         self._workflow_combo = NoWheelComboBox()
         # Machinery workflows (the standalone image enhancer) stay out of the
         # picker: they're launched by gallery buttons, and their results fold

@@ -281,6 +281,16 @@ class GalleryView(QWidget):
             # Esc has to reach the device (and any auto loop) from there too.
             if event.key() == Qt.Key.Key_Escape and self._handle_escape():
                 return True
+            # Ctrl+F reaches the find box from wherever focus happens to be —
+            # including a config tab's prompt field and the tree's own rename
+            # editor, which the gallery otherwise hands its keys to. Searching is
+            # what the chord means everywhere else, and nothing in this window
+            # competes for it, so it is answered before that yielding happens.
+            if (event.key() == Qt.Key.Key_F
+                    and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+                    and self.isVisible() and not self._other_window_owns_keys()):
+                self._focus_find()
+                return True
             if self._gallery_owns_keys():
                 # Delete removes the selection. Insert does too: some keyboards send
                 # Insert where Delete is expected, and the gallery has no other use
@@ -390,11 +400,17 @@ class GalleryView(QWidget):
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
         toc_box.addWidget(self._voice_status)
-        # A filter over the tree: type a folder name (prompt / model / LoRA /
-        # workflow) to narrow it to matching branches, or a seed to jump straight
-        # to that one generation. Sits above the tree so it reads as its search box.
+        # The gallery's find, and what Ctrl+F lands in: type any of a folder's
+        # name (prompt / model / LoRA / workflow) to narrow the tree to matching
+        # branches, a word from anywhere in a generation's positive or negative
+        # prompt — past the headline the folder label truncates to — or a seed to
+        # jump straight to that one generation. Sits above the tree it searches.
         self._filter_edit = QLineEdit()
-        self._filter_edit.setPlaceholderText("Filter…")
+        self._filter_edit.setPlaceholderText("Find…  (Ctrl+F)")
+        self._filter_edit.setToolTip(
+            "Find folders by name, generations by anything in their prompt, or "
+            "one generation by its seed"
+        )
         self._filter_edit.setClearButtonEnabled(True)
         self._filter_edit.textChanged.connect(self._on_filter_changed)
         toc_box.addWidget(self._filter_edit)
@@ -1374,6 +1390,14 @@ class GalleryView(QWidget):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
         if prompt_id and prompt_id in self._browser.visible_prompt_ids():
             self._on_thumbnail_clicked(prompt_id)
+
+    def _focus_find(self):
+        """Put the cursor in the find box with whatever is there selected, so
+        Ctrl+F starts a fresh search — the old query stays on screen and in force
+        until the first keystroke replaces it, and Ctrl+F on an already-focused box
+        re-selects rather than doing nothing."""
+        self._filter_edit.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._filter_edit.selectAll()
 
     def _on_filter_changed(self, text: str):
         self._tree_view.apply_filter(text)

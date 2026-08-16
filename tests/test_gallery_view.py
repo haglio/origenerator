@@ -538,6 +538,93 @@ def test_a_unique_seed_filter_jumps_to_that_generation(qtbot):
     assert view.selected_generation() == "i1"
 
 
+def test_find_matches_a_prompt_word_the_folder_label_truncates_away(qtbot):
+    # Two prompts alike for their first 60 characters, so the label each leaf gets
+    # is the very same headline; only the tail tells them apart, and only the rows
+    # carry it. Searching the label alone could never reach this.
+    shared = "a cat asleep on a windowsill in the late afternoon sun, watching "
+    rows = [_image("i1", shared + "sparrows", 50, 1),
+            _image("i2", shared + "beetles", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    leaves = [lora.child(i) for i in range(lora.childCount())]
+    assert len({leaf.text(0) for leaf in leaves}) == 1  # one label for both folders
+
+    view._filter_edit.setText("beetles")
+
+    hidden = {leaf.data(0, _GROUP_ROLE).rows[0]["prompt_id"]: leaf.isHidden()
+              for leaf in leaves}
+    assert hidden == {"i1": True, "i2": False}
+
+
+def test_find_matches_a_generation_by_its_negative_prompt(qtbot):
+    # The negative prompt reaches no folder label at all, so the rows are the only
+    # place it can be found.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    rows[1]["negative_prompt"] = "blurry, watermark"
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    leaves = _children_by_label(lora)
+
+    view._filter_edit.setText("watermark")
+
+    assert not leaves["a dog"].isHidden()  # the folder whose row carries it stays
+    assert leaves["a cat"].isHidden()
+
+
+def test_a_prompt_match_narrows_the_tree_without_navigating(qtbot):
+    # Unlike a seed — which names one item and so jumps to it — a prompt belongs to
+    # a whole folder the user can see and click, so the find leaves the view alone
+    # rather than yanking it around mid-word.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    before = view._tree.currentItem()
+
+    view._filter_edit.setText("cat")
+
+    assert view._tree.currentItem() is before
+    assert view.selected_generation() is None
+
+
+def test_ctrl_f_puts_the_cursor_in_the_find_box(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    # A widget another test left behind can still read as the active window here,
+    # which the find yields to exactly as Esc does; that guard has its own tests.
+    # This one is about the chord reaching the box at all, app-wide.
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    view._tree.setFocus()
+
+    qtbot.keyClick(view, Qt.Key.Key_F, Qt.KeyboardModifier.ControlModifier)
+
+    assert view.focusWidget() is view._filter_edit
+
+
+def test_ctrl_f_selects_the_old_query_and_works_where_the_gallery_yields_keys(
+        qtbot, tmp_path, monkeypatch):
+    # Focus in a prompt field or a rename editor hands Delete and Undo back to the
+    # widget; Ctrl+F still has to arrive, and it selects what's already there so
+    # the next keystroke starts a fresh search instead of appending to the last.
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    view._filter_edit.setText("cat")
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: False)
+
+    handled = view.eventFilter(
+        view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, _CTRL))
+
+    assert handled is True
+    assert view.focusWidget() is view._filter_edit
+    assert view._filter_edit.selectedText() == "cat"
+
+
 def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)

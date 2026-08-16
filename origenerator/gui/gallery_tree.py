@@ -32,6 +32,20 @@ TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recover
 TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
 
 
+def _prompt_texts(row: dict, params: dict) -> tuple[str, str]:
+    """A generation's positive and negative prompt, lowercased for matching.
+
+    Read from the row's own columns first, falling back to the params it ran
+    with: the two are written together for a generation this app made, but an
+    imported file recovers its prompt from the graph in the file's metadata and
+    may end up carrying it in only one of them.
+    """
+    return tuple(
+        str(row.get(key) or params.get(key) or "").lower()
+        for key in ("positive_prompt", "negative_prompt")
+    )
+
+
 class GalleryTree:
     """The folder tree: builds it from the gallery model and answers the lookups
     (key→item, prompt→item, breadcrumb, the selected folder's key) the view
@@ -189,9 +203,9 @@ class GalleryTree:
 
     def apply_filter(self, query: str) -> None:
         """Narrow the tree to rows matching ``query`` (case-insensitive substring
-        over the row label, or a settings leaf's generation seed), keeping each
-        match's ancestors so its path shows and expanding down to it; a matched
-        folder keeps its whole subtree. Seed hits are recorded in
+        over the row label, or a settings leaf's generation seed or prompt text),
+        keeping each match's ancestors so its path shows and expanding down to it;
+        a matched folder keeps its whole subtree. Seed hits are recorded in
         :attr:`seed_matches` for the view to jump to. An empty query restores
         every row and the expansion the user had before filtering."""
         query = (query or "").strip().lower()
@@ -220,15 +234,15 @@ class GalleryTree:
 
     def _filter_item(self, item, query, *, ancestor_match: bool) -> bool:
         """Hide ``item`` unless it, an ancestor, a descendant, or (for a settings
-        leaf) one of its generations' seeds matches; expand the path down to any
-        descendant match. Returns whether it stays visible."""
+        leaf) one of its generations' seeds or prompt text matches; expand the path
+        down to any descendant match. Returns whether it stays visible."""
         match = ancestor_match or query in item.text(0).lower()
-        seed_ids = self._seed_hits(item, query)
+        seed_ids, prompt_match = self._generation_hits(item, query)
         descendant_match = False
         for i in range(item.childCount()):
             if self._filter_item(item.child(i), query, ancestor_match=match):
                 descendant_match = True
-        visible = match or descendant_match or bool(seed_ids)
+        visible = match or descendant_match or bool(seed_ids) or prompt_match
         item.setHidden(not visible)
         if descendant_match:
             item.setExpanded(True)
@@ -236,20 +250,34 @@ class GalleryTree:
             self.seed_matches[item.data(0, GROUP_ROLE).key] = seed_ids
         return visible
 
-    def _seed_hits(self, item, query) -> list[str]:
-        """The prompt_ids in a settings leaf whose seed contains ``query``. Seeds
-        ride on the generations, not on any folder label, so this is the only way
-        the filter can pin down one specific item by its seed."""
+    def _generation_hits(self, item, query) -> tuple[list[str], bool]:
+        """What a settings leaf's own generations match on: the prompt_ids whose
+        seed contains ``query``, and whether any of their prompt text does.
+
+        Neither rides on a folder label, so this is the only way the filter can
+        reach them. A seed names one specific item, so its hits are collected for
+        the view to jump to; the prompt belongs to the whole leaf — it is part of
+        the settings every row there shares — so it only decides whether the folder
+        stays on screen. The label does lead with the positive prompt, but as a
+        60-character headline: the words past it, and the negative prompt entirely,
+        are findable here or nowhere.
+
+        One parse of a row's params serves both checks, since scanning every
+        generation in the tree happens on each keystroke.
+        """
         group = item.data(0, GROUP_ROLE)
         if not isinstance(group, gallery.SettingsGroup):
-            return []
+            return [], False
         hits = []
+        prompt_match = False
         for row in group.rows:
             params = gallery.parse_params(row.get("params_json"))
             seeds = (params.get("seed"), params.get("noise_seed"))
             if any(s is not None and query in str(s).lower() for s in seeds):
                 hits.append(row["prompt_id"])
-        return hits
+            if not prompt_match:
+                prompt_match = any(query in text for text in _prompt_texts(row, params))
+        return hits, prompt_match
 
     def _restore_from_filter(self) -> None:
         keys = self._pre_filter_expanded or set()

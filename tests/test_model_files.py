@@ -1,31 +1,14 @@
-import json
+import inspect
 import os
 import struct
 
+import pytest
+
 from origenerator import config
+from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN
 from origenerator.workflows.model_files import (
-    NO_LORA, is_no_lora, list_checkpoint_files, list_detector_files, list_lora_files,
-    list_model_files,
+    ANY, NO_LORA, is_no_lora, list_detector_files, list_lora_files, list_model_files,
 )
-
-# Stand-in tensor names for the three shapes the checkpoints folder holds: SDXL
-# (two CLIPs under ``conditioner.``), SD1.5 (one under ``cond_stage_model.``),
-# and a diffusion-only file like WAN 2.2's high/low experts, which ships weights
-# and a VAE but no text encoder at all.
-_SDXL_KEYS = ["conditioner.embedders.0.transformer.text_model.x", "model.diffusion_model.y"]
-_SD15_KEYS = ["cond_stage_model.transformer.text_model.x", "model.diffusion_model.y"]
-_DIFFUSION_ONLY_KEYS = ["model.diffusion_model.blocks.0.x", "vae.decoder.y"]
-
-
-def _write_safetensors(path, keys):
-    """A real-enough safetensors file: the little-endian u64 header length, then
-    the JSON header naming *keys*. No tensor data — the picker reads the header
-    and stops, so that is the whole file the test needs.
-    """
-    header = json.dumps(
-        {key: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for key in keys}
-    ).encode()
-    path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
 
 
 def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
@@ -35,7 +18,7 @@ def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
     (loras / "b.safetensors").touch()
     (loras / "a.safetensors").touch()
     (loras / "notes.txt").touch()   # not a model file — skipped
-    assert list_model_files("loras", ["fallback.safetensors"]) == [
+    assert list_model_files("loras", ["fallback.safetensors"], accepts=ANY) == [
         "a.safetensors", "b.safetensors",
     ]
 
@@ -48,7 +31,7 @@ def test_lists_gguf_models(tmp_path, monkeypatch):
     diffusion.mkdir(parents=True)
     (diffusion / "flux.gguf").touch()
     (diffusion / "wan.safetensors").touch()
-    assert list_model_files("diffusion_models", ["fb.safetensors"]) == [
+    assert list_model_files("diffusion_models", ["fb.safetensors"], accepts=ANY) == [
         "flux.gguf", "wan.safetensors",
     ]
 
@@ -62,35 +45,36 @@ def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
     (diffusion / "split_files").mkdir(parents=True)
     (diffusion / "top.safetensors").touch()
     (diffusion / "split_files" / "deep.safetensors").touch()
-    assert list_model_files("diffusion_models", ["fb.safetensors"]) == [
+    assert list_model_files("diffusion_models", ["fb.safetensors"], accepts=ANY) == [
         os.path.join("split_files", "deep.safetensors"), "top.safetensors",
     ]
 
 
 def test_falls_back_when_the_category_dir_is_absent(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)  # no models/loras at all
-    assert list_model_files("loras", ["default.safetensors"]) == ["default.safetensors"]
+    assert list_model_files("loras", ["default.safetensors"], accepts=ANY) == [
+        "default.safetensors",
+    ]
 
 
 def test_falls_back_when_the_category_dir_is_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     (tmp_path / "models" / "loras").mkdir(parents=True)
-    assert list_model_files("loras", ["default.safetensors"]) == ["default.safetensors"]
+    assert list_model_files("loras", ["default.safetensors"], accepts=ANY) == [
+        "default.safetensors",
+    ]
 
 
-def test_lora_picker_leads_with_the_none_sentinel(tmp_path, monkeypatch):
+def test_lora_picker_leads_with_the_none_sentinel(installed_models):
     # A LoRA is optional: the picker offers "None" first (which the workflow
     # builds with no LoraLoader, running the base model unmodified), then the
     # installed files from the same scan as any model picker.
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    loras = tmp_path / "models" / "loras"
-    loras.mkdir(parents=True)
-    (loras / "b.safetensors").touch()
-    (loras / "a.safetensors").touch()
-    assert list_lora_files(["fallback.safetensors"]) == [
+    installed_models.add("loras", "b.safetensors", arch=WAN, lora=True)
+    installed_models.add("loras", "a.safetensors", arch=WAN, lora=True)
+    assert list_lora_files(["fallback.safetensors"], accepts=(WAN,)) == [
         NO_LORA, "a.safetensors", "b.safetensors",
     ]
-    assert NO_LORA not in list_model_files("loras", ["fallback.safetensors"])
+    assert NO_LORA not in list_model_files("loras", ["fallback.safetensors"], accepts=ANY)
 
 
 def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
@@ -107,59 +91,99 @@ def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path,
     assert list_detector_files() == ["face_finder.pt", "hand_finder.pt"]
 
 
-def test_checkpoint_picker_drops_the_files_carrying_no_text_encoder(tmp_path, monkeypatch):
-    # The checkpoints folder is mixed: WAN 2.2's high/low pair lands there beside
-    # the SD1.5/SDXL checkpoints, carrying no text encoder for the SDXL graphs'
-    # CLIPTextEncode to read. Offering either half asks the user to choose
-    # between two runs that can only error.
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    checkpoints = tmp_path / "models" / "checkpoints"
-    checkpoints.mkdir(parents=True)
-    _write_safetensors(checkpoints / "an_xl_model.safetensors", _SDXL_KEYS)
-    _write_safetensors(checkpoints / "a_15_model.safetensors", _SD15_KEYS)
-    _write_safetensors(checkpoints / "vid_high.safetensors", _DIFFUSION_ONLY_KEYS)
-    _write_safetensors(checkpoints / "vid_low.safetensors", _DIFFUSION_ONLY_KEYS)
-    assert list_checkpoint_files(["fallback.safetensors"]) == [
+def test_a_picker_offers_only_the_architectures_its_graph_runs(installed_models):
+    # models/checkpoints is a folder, not a catalogue: WAN's high/low expert
+    # pairs and LTX land there beside the SDXL checkpoints, carrying no text
+    # encoder for an SDXL graph's CLIPTextEncode to read. Offering the pair asks
+    # the user to choose between two runs that can only error.
+    installed_models.add("checkpoints", "an_xl_model.safetensors", arch=SDXL)
+    installed_models.add("checkpoints", "a_15_model.safetensors", arch=SD15)
+    installed_models.add("checkpoints", "vid_high.safetensors", arch=WAN)
+    installed_models.add("checkpoints", "vid_low.safetensors", arch=WAN)
+    installed_models.add("checkpoints", "some_flux.safetensors", arch=FLUX)
+    assert list_model_files("checkpoints", ["fb.safetensors"], accepts=(SDXL, SD15)) == [
         "a_15_model.safetensors", "an_xl_model.safetensors",
     ]
 
 
-def test_checkpoint_picker_keeps_what_it_cannot_read_a_header_from(tmp_path, monkeypatch):
-    # Dropping a checkpoint that works is the costly mistake; keeping one that
-    # doesn't is not. So a file with no readable safetensors header — a .ckpt, or
-    # one truncated mid-header — stays listed rather than being judged.
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    checkpoints = tmp_path / "models" / "checkpoints"
-    checkpoints.mkdir(parents=True)
-    (checkpoints / "old.ckpt").write_bytes(b"pickled weights, no header")
-    (checkpoints / "truncated.safetensors").write_bytes(struct.pack("<Q", 4096) + b"{}")
-    (checkpoints / "empty.safetensors").write_bytes(b"")
-    assert list_checkpoint_files(["fallback.safetensors"]) == [
-        "empty.safetensors", "old.ckpt", "truncated.safetensors",
+def test_a_picker_keeps_what_it_could_not_classify(installed_models):
+    # Dropping a model that works is the costly mistake; keeping one that
+    # doesn't is not. A file with no readable index — a .ckpt, one truncated
+    # mid-header, an architecture postdating these signatures — stays listed.
+    installed_models.add("checkpoints", "old.ckpt", body=b"pickled weights, no header")
+    installed_models.add("checkpoints", "cut.safetensors", body=struct.pack("<Q", 4096) + b"{}")
+    installed_models.add("checkpoints", "future.safetensors", arch=None)
+    installed_models.add("checkpoints", "vid.safetensors", arch=WAN)
+    assert list_model_files("checkpoints", ["fb.safetensors"], accepts=(SDXL,)) == [
+        "cut.safetensors", "future.safetensors", "old.ckpt",
     ]
 
 
-def test_checkpoint_picker_falls_back_when_nothing_qualifies(tmp_path, monkeypatch):
-    # Filtering must not empty the dropdown: a folder of nothing but
-    # diffusion-only files still offers the workflow's own default.
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    checkpoints = tmp_path / "models" / "checkpoints"
-    checkpoints.mkdir(parents=True)
-    _write_safetensors(checkpoints / "vid_high.safetensors", _DIFFUSION_ONLY_KEYS)
-    assert list_checkpoint_files(["default.safetensors"]) == ["default.safetensors"]
+def test_a_picker_drops_the_other_half_of_the_expert_pair(installed_models):
+    # WAN 2.2 splits into a high-noise and a low-noise expert, and the workflow
+    # has a slot for each. A file naming the other half is the one pick that is
+    # certainly wrong; a file naming neither stays in both, because nothing
+    # inside a WAN 2.2 file tells the two experts apart.
+    for name in ("wan_high_noise.safetensors", "wan_low_noise.safetensors",
+                 "wan_unmarked.safetensors"):
+        installed_models.add("diffusion_models", name, arch=WAN)
+    assert list_model_files("diffusion_models", ["fb"], accepts=(WAN,), expert="high") == [
+        "wan_high_noise.safetensors", "wan_unmarked.safetensors",
+    ]
+    assert list_model_files("diffusion_models", ["fb"], accepts=(WAN,), expert="low") == [
+        "wan_low_noise.safetensors", "wan_unmarked.safetensors",
+    ]
 
 
-def test_checkpoint_picker_matches_text_encoder_keys_only_at_a_name_start(tmp_path, monkeypatch):
-    # The header is matched as raw bytes, so the prefixes carry their opening
-    # quote: a diffusion-only file whose tensor names merely contain the word
-    # must not read as shipping a text encoder.
-    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    checkpoints = tmp_path / "models" / "checkpoints"
-    checkpoints.mkdir(parents=True)
-    _write_safetensors(
-        checkpoints / "vid.safetensors", ["model.diffusion_model.conditioner.proj"],
-    )
-    assert list_checkpoint_files(["default.safetensors"]) == ["default.safetensors"]
+def test_a_model_picker_and_a_lora_picker_do_not_offer_each_other(installed_models):
+    # Both folders hold the wrong kind — a WAN LoRA filed under
+    # diffusion_models, a full checkpoint filed under loras — and neither loads
+    # in the other's slot, whatever architecture it was trained for.
+    installed_models.add("diffusion_models", "real_model.safetensors", arch=WAN)
+    installed_models.add("diffusion_models", "stray_lora.safetensors", arch=WAN, lora=True)
+    installed_models.add("loras", "real_lora.safetensors", arch=WAN, lora=True)
+    installed_models.add("loras", "stray_model.safetensors", arch=WAN)
+    assert list_model_files("diffusion_models", ["fb"], accepts=(WAN,)) == [
+        "real_model.safetensors",
+    ]
+    assert list_lora_files(["fb"], accepts=(WAN,)) == [NO_LORA, "real_lora.safetensors"]
+
+
+def test_a_picker_drops_the_parts_of_a_sharded_download(installed_models):
+    installed_models.add("diffusion_models", "whole.safetensors", arch=WAN)
+    for part in (1, 2, 3):
+        installed_models.add(
+            "diffusion_models", f"model-0000{part}-of-00003.safetensors", arch=WAN,
+        )
+    assert list_model_files("diffusion_models", ["fb"], accepts=(WAN,)) == [
+        "whole.safetensors",
+    ]
+
+
+def test_filtering_never_empties_a_dropdown(installed_models):
+    # A folder holding nothing this graph can run still offers the workflow's
+    # own default, so the form always has something selected.
+    installed_models.add("checkpoints", "vid_high.safetensors", arch=WAN)
+    assert list_model_files("checkpoints", ["default.safetensors"], accepts=(SDXL,)) == [
+        "default.safetensors",
+    ]
+
+
+def test_listing_a_folder_requires_saying_what_the_graph_runs():
+    # The enforcement, and the reason `accepts` is keyword-only with no default:
+    # a workflow added later cannot list a category without answering the
+    # question. Forgetting is a TypeError at the call, not a dropdown that
+    # quietly went back to offering everything. ANY is how a genuinely
+    # architecture-neutral category (the ESRGAN upscalers) says so out loud.
+    for picker in (list_model_files, list_lora_files):
+        accepts = inspect.signature(picker).parameters["accepts"]
+        assert accepts.kind is inspect.Parameter.KEYWORD_ONLY, picker.__name__
+        assert accepts.default is inspect.Parameter.empty, picker.__name__
+
+    with pytest.raises(TypeError):
+        list_model_files("checkpoints", ["fb.safetensors"])
+    with pytest.raises(TypeError):
+        list_lora_files(["fb.safetensors"])
 
 
 def test_is_no_lora_recognizes_the_sentinel_and_empty_values():

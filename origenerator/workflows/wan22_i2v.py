@@ -1,4 +1,5 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
 
@@ -68,8 +69,18 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        models = list_model_files("diffusion_models", [defaults["unet_high"], defaults["unet_low"]])
-        loras = list_lora_files([defaults["lora_high"], defaults["lora_low"]])
+        # Each slot offers only WAN, and only the expert it fills: a file whose
+        # name claims the other half is the one pick that is certainly wrong
+        # here. Names claiming neither stay in both, since nothing inside a
+        # WAN 2.2 file distinguishes the two experts.
+        high = list_model_files(
+            "diffusion_models", [defaults["unet_high"]], accepts=(WAN,), expert="high",
+        )
+        low = list_model_files(
+            "diffusion_models", [defaults["unet_low"]], accepts=(WAN,), expert="low",
+        )
+        loras_high = list_lora_files([defaults["lora_high"]], accepts=(WAN,), expert="high")
+        loras_low = list_lora_files([defaults["lora_low"]], accepts=(WAN,), expert="low")
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
@@ -87,11 +98,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "CFG (Low) (0 = CFG Scale)", "float", 0.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=models),
-            ParamDef("unet_low", "Model (Low)", "combo", defaults["unet_low"], options=models),
-            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras),
+            ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=high),
+            ParamDef("unet_low", "Model (Low)", "combo", defaults["unet_low"], options=low),
+            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras_high),
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras),
+            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=60.0, step=1.0),
             ParamDef("filename_prefix", "Output Prefix", "str", "video/wan22_i2v"),

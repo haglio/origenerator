@@ -3,12 +3,23 @@
 A workflow's checkpoint/LoRA/etc. picker offers whatever is actually installed
 under ``ComfyUI/models/<category>``, so the user chooses from real files rather
 than typing a filename. Shared by every workflow that exposes such a dropdown.
+
+A category directory is a folder, not a catalogue — ``checkpoints`` holds WAN and
+LTX video models beside the SDXL ones, ``loras`` holds a LoRA for every
+architecture at once — so a picker also says what its graph can *run*, and only
+those are offered. See :mod:`origenerator.workflows.model_arch` for how a file's
+architecture is read.
+
+``accepts`` is keyword-only and has no default on purpose. A workflow added later
+cannot list a folder without answering the question — the call fails outright
+rather than quietly offering everything, which is the failure this exists to
+prevent. :data:`ANY` is the way to say a category genuinely takes anything.
 """
 
-import struct
 from pathlib import Path
 
 from origenerator import config
+from origenerator.workflows import model_arch
 
 # The suffixes ComfyUI loads as models — LoRAs and checkpoints alike live under
 # these, so one set serves every category. ``.gguf`` covers the quantized Flux
@@ -26,17 +37,11 @@ _DETECTOR_CATEGORY = "ultralytics/bbox"
 # carries its extension — so it is safe as a sentinel.
 NO_LORA = "None"
 
-# The tensor-name prefixes a checkpoint's own text encoder sits under: SDXL keeps
-# its two CLIPs beneath ``conditioner.``, SD1.5 its single one beneath
-# ``cond_stage_model.``, and some repackaged checkpoints use ``text_encoders.``.
-# Matched against the raw JSON header, where every tensor name is a quoted key —
-# hence the leading quote, so a prefix can't match mid-name.
-_TEXT_ENCODER_KEYS = (b'"conditioner.', b'"cond_stage_model.', b'"text_encoders.')
-
-# No real header comes near this (the largest installed here is under 500 KB). A
-# length past it means a corrupt or non-safetensors file, and honoring it would
-# pull the whole model into memory to answer a question about its index.
-_MAX_HEADER_BYTES = 32 * 1024 * 1024
+# ``accepts=ANY``: this category is architecture-neutral, so list all of it. The
+# ESRGAN upscalers are the real case — they resample pixels and neither know nor
+# care which model made them. Spelled out at the call site so an unfiltered
+# picker is a decision on the record, not an omission.
+ANY = "any"
 
 
 def _model_paths(directory: Path) -> list[Path]:
@@ -53,79 +58,66 @@ def _model_paths(directory: Path) -> list[Path]:
     )
 
 
-def list_model_files(category: str, fallback: list[str]) -> list[str]:
-    """Sorted model files in ``ComfyUI/models/<category>``, subfolders included.
+def _offer(path: Path, accepts, expert: str | None, want_lora: bool) -> bool:
+    """Whether *path* belongs in a picker with these terms.
+
+    Each test drops a file only on a positive finding — an architecture that is
+    recognized and wrong, a name that names the other expert. A file we could not
+    read stays offered: a listed option that errors on submit costs one run,
+    where a working model silently missing from the dropdown has no symptom the
+    user can act on at all.
+    """
+    described = model_arch.describe(path)
+    if described.is_shard:
+        return False
+    if described.is_lora != want_lora:
+        return False
+    if accepts != ANY and described.arch is not None and described.arch not in accepts:
+        return False
+    return not (expert and described.expert and described.expert != expert)
+
+
+def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
+    directory = config.COMFYUI_DIR / "models" / category
+    found = [
+        str(path.relative_to(directory)) for path in _model_paths(directory)
+        if _offer(path, accepts, expert, want_lora)
+    ]
+    return found or list(fallback)
+
+
+def list_model_files(
+    category: str, fallback: list[str], *, accepts, expert: str | None = None,
+) -> list[str]:
+    """The model files in ``ComfyUI/models/<category>`` this picker can run.
+
+    *accepts* is an architecture from :mod:`~origenerator.workflows.model_arch`,
+    a tuple of them, or :data:`ANY`. *expert* is ``"high"`` or ``"low"`` for a
+    picker that fills one half of WAN 2.2's expert pair, which drops the files
+    whose names claim the other half.
 
     Names are given relative to the category directory (e.g.
     ``split_files\\diffusion_models\\wan.safetensors``), matching how ComfyUI's
     own loaders reference models in subfolders — so a nested model is selectable
     and the value a run stored round-trips. Falls back to ``fallback`` when the
-    directory is missing or holds no model files, so the dropdown always offers
-    at least the workflow's default.
+    directory is missing or nothing in it qualifies, so the dropdown always
+    offers at least the workflow's default.
     """
-    directory = config.COMFYUI_DIR / "models" / category
-    found = [str(path.relative_to(directory)) for path in _model_paths(directory)]
-    return found or list(fallback)
+    return _listing(category, fallback, accepts, expert, want_lora=False)
 
 
-def _has_text_encoder(path: Path) -> bool:
-    """Whether *path* ships its own text encoder, read from its header alone.
-
-    A safetensors file opens with a little-endian u64 giving the byte length of a
-    JSON header of tensor names, so the question is settled by a few hundred KB
-    off the front of each file — no weights loaded, a couple of milliseconds for
-    a whole folder, which is why the picker can afford to ask on every form
-    build rather than caching a scan that would then go stale.
-
-    Anything the header can't be read from — a ``.ckpt``, a truncated or
-    malformed file — counts as a yes. Leaving an option in that turns out not to
-    work is the harmless direction to be wrong in; dropping a checkpoint that
-    works is not.
-    """
-    if path.suffix != ".safetensors":
-        return True
-    try:
-        with path.open("rb") as handle:
-            (length,) = struct.unpack("<Q", handle.read(8))
-            if length > _MAX_HEADER_BYTES:
-                return True
-            header = handle.read(length)
-    except (OSError, struct.error):
-        return True
-    if len(header) < length:
-        return True  # truncated: we never saw the index we would be judging
-    return any(key in header for key in _TEXT_ENCODER_KEYS)
-
-
-def list_checkpoint_files(fallback: list[str]) -> list[str]:
-    """The checkpoint picker's options, minus the files that cannot work.
-
-    ``models/checkpoints`` is a mixed folder: alongside the SD1.5/SDXL
-    checkpoints it collects diffusion-only files — WAN 2.2's high/low expert
-    pairs, LTX — that carry no text encoder of their own. Every graph reading
-    this picker wires ``CLIPTextEncode`` to the checkpoint loader's CLIP output,
-    which such a file leaves empty, so listing them offers runs that can only
-    error. The WAN pairs are the worse half of it: they read as a choice the
-    user is being asked to make (High or Low?) when neither half belongs in an
-    SDXL form at all.
-
-    Falls back like :func:`list_model_files`, so a folder of nothing but
-    diffusion-only files still offers the workflow's default.
-    """
-    directory = config.COMFYUI_DIR / "models" / "checkpoints"
-    found = [
-        str(path.relative_to(directory)) for path in _model_paths(directory)
-        if _has_text_encoder(path)
-    ]
-    return found or list(fallback)
-
-
-def list_lora_files(fallback: list[str]) -> list[str]:
+def list_lora_files(
+    fallback: list[str], *, accepts, expert: str | None = None,
+) -> list[str]:
     """The LoRA picker's options: the "None" sentinel first, then the installed
-    LoRAs from the ``loras`` scan. "None" bypasses the LoRA (see
-    :data:`NO_LORA`), so every LoRA picker can opt out of applying one.
+    LoRAs this picker can run. "None" bypasses the LoRA (see :data:`NO_LORA`), so
+    every LoRA picker can opt out of applying one.
+
+    Takes the same *accepts*/*expert* terms as :func:`list_model_files`, against
+    the architecture each LoRA was *trained for* — and drops the occasional full
+    checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
     """
-    return [NO_LORA, *list_model_files("loras", fallback)]
+    return [NO_LORA, *_listing("loras", fallback, accepts, expert, want_lora=True)]
 
 
 def list_detector_files() -> list[str]:
@@ -136,8 +128,12 @@ def list_detector_files() -> list[str]:
     is the ordinary starting state — and the Enhance panel has to be able to see
     it, so it can dim the detail pass rather than offer a run that would be
     rejected on submit.
+
+    ``ANY``, and not as a shrug: these are YOLO region detectors, which have no
+    diffusion architecture to match against and work the same whatever made the
+    image they scan.
     """
-    return list_model_files(_DETECTOR_CATEGORY, [])
+    return list_model_files(_DETECTOR_CATEGORY, [], accepts=ANY)
 
 
 def is_no_lora(value) -> bool:

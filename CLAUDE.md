@@ -24,6 +24,38 @@ already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that clip, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
+## A model picker offers only what its graph can run
+
+`ComfyUI/models/<category>` is a folder, not a catalogue. `checkpoints` holds WAN
+and LTX video models beside the SDXL ones; `diffusion_models` holds WAN, Flux,
+Qwen and bare SDXL UNets together; `loras` holds a LoRA for every one of those,
+plus the occasional full checkpoint filed there by mistake. So a dropdown built
+from a plain folder listing offers runs that can only error — and worse, presents
+them as choices the user is being asked to make. That is exactly how the SDXL
+Text-to-Image form came to show WAN 2.2's high/low expert pairs, with nothing to
+say which one to pick or that neither belonged.
+
+So every picker states what its graph runs: `list_model_files(category, fallback,
+accepts=…)` and `list_lora_files(fallback, accepts=…)`, with `accepts` a family
+from `workflows/model_arch.py`, a tuple of them, or `ANY` for a category that
+genuinely takes anything (the ESRGAN upscalers). Add `expert="high"` / `"low"` on
+a slot that fills one half of WAN 2.2's expert pair. `accepts` is keyword-only
+with no default, so a new workflow cannot list a folder without answering the
+question — forgetting is a `TypeError`, not a dropdown that quietly went back to
+offering everything. Two registry-wide tests in `tests/test_workflows.py` cover
+every workflow, present and future, so nothing here needs a name added to a list.
+
+The families are read from each file's own header, never its name — installed
+here is a checkpoint whose name says Flux and whose tensors say SDXL, and the
+tensors are right. **Unrecognized is not unwanted:**
+`describe()` returns `arch=None` for a file it cannot read or match, and every
+filter keeps those. Be wrong in that direction. A listed option that errors on
+submit costs one run and says why; a working model missing from the dropdown has
+no symptom at all, and the user cannot even tell there is something to look for.
+The near miss that still counts: tightening a signature so an unfamiliar file
+lands in a family rather than in `None` — a confident wrong answer hides the
+model, where the honest shrug only leaves it listed.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it

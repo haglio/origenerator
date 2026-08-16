@@ -2,7 +2,7 @@
 
 The suite can be entirely green while the icon does nothing, and this is the
 gap. ``main()`` imports almost the whole app *inside the function* -- the
-database, the trash sweep, the ComfyUI client, the importer, the main window --
+database, the recovery bin, the ComfyUI client, the importer, the main window --
 so nothing about a break in one of them reaches a test that imports
 ``origenerator.app`` and stops there. And every other test here runs under
 ``tests/conftest.py``, which pins the content overlay and puts ``shared_ui`` on

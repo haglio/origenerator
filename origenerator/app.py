@@ -170,16 +170,21 @@ def main():
     from origenerator.db import Database
     db = Database(DB_PATH)
 
-    # Reclaim any trash left by deletes from a previous session: the in-memory
-    # undo stack is empty now, so those held files are unreachable and safe to
-    # clear (see GalleryActions / Trash). A branch session sweeps nothing — it
-    # takes no files in the first place, and the batches previews took before
-    # they stopped are the only copies left (see branch_session.session_trash).
-    from origenerator.branch_session import session_trash
-    try:
-        session_trash(STATE_DIR / "trash").sweep()
-    except Exception as e:
-        logger.warning("Trash sweep failed: %s", e)
+    # Age out the recovery bin: deletions past their window are ended for good
+    # and any trash folder no surviving record names is reclaimed (see
+    # origenerator.recovery). A branch session sweeps nothing at all — its
+    # database is a copy, so the deletions it inherited point at the *live*
+    # install's held files, and both purging and restoring them from here would
+    # reach into the library the live app is still showing.
+    if not branch_session:
+        from origenerator.branch_session import session_trash
+        from origenerator import recovery
+        try:
+            expired = recovery.sweep(db, session_trash(STATE_DIR / "trash"))
+            if expired:
+                logger.info("Recovery bin: ended %d expired deletion(s)", expired)
+        except Exception as e:
+            logger.warning("Recovery-bin sweep failed: %s", e)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the

@@ -3,16 +3,22 @@
 A Qt-free controller the gallery view drives. Every mutation records how to
 reverse it on one undo stack, so a single Undo (button or Ctrl+Z) walks back the
 most recent delete or rename. Deletes move the underlying files to the trash and
-drop their rows; undo puts both back. The stack is session-scoped — anything
-still on it when the app closes is committed (the trash is swept next launch).
-When the stack overflows its limit, the oldest entry is committed for good,
-purging its trashed files.
+drop their rows; undo puts both back. The stack is session-scoped, and the oldest
+entry is dropped once it overflows.
+
+Falling off that stack no longer ends anything, though: a delete also files the
+row and its trashed files in the recovery bin, which holds them for weeks (see
+:mod:`origenerator.recovery`). So the stack is the quick "that was a mistake",
+and the bin — restored or ended from the gallery's Trash shelf, through
+:meth:`GalleryActions.restore_deleted` and :meth:`GalleryActions.purge_deleted` —
+is the slow one.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from origenerator import recovery
 from origenerator.gallery import custom_folder_id, output_disk_files
 
 
@@ -38,27 +44,38 @@ class GalleryActions:
     # --- deletion ----------------------------------------------------------
 
     def delete_rows(self, rows: list[dict]) -> None:
-        """Trash each row's files and drop its DB record, as one undoable step."""
+        """Trash each row's files and drop its DB record, as one undoable step.
+
+        Each row's files go into a batch of their own, filed in the recovery bin
+        beside the row it dropped — so an item stays restorable from the Trash
+        shelf long after this session's undo stack has forgotten the delete, and
+        one item of a deleted folder can be brought back without the rest.
+        """
         if not rows:
             return
         # Move files out before touching the DB: if a move fails, nothing is lost.
-        batch = self._trash_files(rows)
-        for row in rows:
+        batches = self._trash_files(rows)
+        for row, batch in batches:
             self._db.delete_generation(row["prompt_id"])
-
-        captured = list(rows)
+            self._db.record_deletion(row["prompt_id"], row, batch.record())
 
         def undo() -> str | None:
-            batch.restore()
-            for row in captured:
+            for row, batch in batches:
+                batch.restore()
                 self._db.restore_generation(row)
-            return captured[0]["prompt_id"]  # a restored item to navigate back to
+                self._db.forget_deletion(row["prompt_id"])
+            return batches[0][0]["prompt_id"]  # a restored item to navigate back to
 
-        self._push(_UndoEntry(_delete_label(len(rows)), undo, batch.purge))
+        # No commit hook: an entry falling off the stack ends nothing now — the
+        # bin goes on holding the files until they expire or the user says so.
+        self._push(_UndoEntry(_delete_label(len(rows)), undo))
 
     def _trash_files(self, rows: list[dict]):
-        """Move every file ``rows`` own into the trash, after telling the app to
-        let go of them.
+        """Move the files ``rows`` own into the trash — a batch per row — after
+        telling the app to let go of them. Returns ``(row, batch)`` pairs.
+
+        A batch per row is what lets the bin restore or end one item on its own;
+        deleting a whole folder is still one undo step, made of them.
 
         The release comes first because a file the app itself still holds open
         can't be moved on Windows at all: a preview keeps its video's file open
@@ -67,25 +84,59 @@ class GalleryActions:
         Every path in and out of the trash runs through here so no caller can
         forget it.
         """
-        files = self._files_for_rows(rows)
+        by_row = self._files_by_row(rows)
         if self._release_files is not None:
-            self._release_files(files)
-        return self._trash.store(files)
+            self._release_files([path for files in by_row for path in files])
+        return [(row, self._trash.store(files)) for row, files in zip(rows, by_row)]
 
-    def _files_for_rows(self, rows: list[dict]) -> list[Path]:
-        """Every on-disk file the rows own — outputs, sidecars, thumbnails."""
-        files: list[Path] = []
+    def _files_by_row(self, rows: list[dict]) -> list[list[Path]]:
+        """Each row's on-disk files — outputs, sidecars, thumbnail — in row order.
+
+        A path two rows both claim (a shared sidecar) goes to the first of them:
+        it can only be moved once, and the batch that took it is the one that has
+        to put it back.
+        """
         seen: set[str] = set()
+        by_row: list[list[Path]] = []
         for row in rows:
             candidates = list(output_disk_files(row, self._output_dir))
             thumb = row.get("thumbnail_path")
             if thumb:
                 candidates.append(Path(thumb))
+            files = []
             for path in candidates:
                 if path.exists() and str(path) not in seen:
                     seen.add(str(path))
                     files.append(path)
-        return files
+            by_row.append(files)
+        return by_row
+
+    # --- the recovery bin: putting a delete back, or ending it ---------------
+
+    def restore_deleted(self, prompt_ids) -> str | None:
+        """Bring deleted items back out of the bin — files to where they were,
+        rows to the gallery — and return one to navigate to.
+
+        Not pushed onto the undo stack: undoing a restore is just deleting the
+        item again, which the user can do directly and which would only file it
+        back in the bin. Unknown ids (already restored, already ended) are
+        skipped rather than treated as an error.
+        """
+        restored = None
+        for prompt_id in prompt_ids:
+            record = self._db.get_deletion(prompt_id)
+            if record is not None:
+                restored = recovery.restore(self._db, record)
+        return restored
+
+    def purge_deleted(self, prompt_ids) -> None:
+        """End held deletions now rather than waiting out their window: the files
+        are removed and the bin forgets them. Irreversible, and deliberately not
+        undoable — the caller confirms with the user first."""
+        for prompt_id in prompt_ids:
+            record = self._db.get_deletion(prompt_id)
+            if record is not None:
+                recovery.purge(self._db, record)
 
     def reject_experiment(self, row: dict) -> None:
         """Reject a background experiment: trash its files and clear their
@@ -95,9 +146,13 @@ class GalleryActions:
 
         The verdict is recorded here, with the file cleanup, so the whole
         rejection is one reversible unit rather than half in the view.
+
+        Nothing is filed in the recovery bin: the bin holds *deleted rows*, and
+        this row is kept — it stays in the gallery's own hands, verdict and all,
+        so there is no orphan for a Trash shelf to offer back.
         """
         prompt_id = row["prompt_id"]
-        batch = self._trash_files([row])
+        ((_row, batch),) = self._trash_files([row])
         self._db.set_experiment_verdict(prompt_id, "down")
         self._db.update_generation(
             prompt_id, output_files=None, thumbnail_path=None

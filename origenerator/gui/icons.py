@@ -95,8 +95,15 @@ def audio_icon() -> QIcon:
     return _two_mode(_draw_audio)
 
 
-def delete_icon() -> QIcon:
+def trash_icon() -> QIcon:
+    """A trash can — the Trash shelf's caret marker, and the Delete button that
+    fills it. One glyph for both ends of a deletion, so the shelf reads as where
+    that button's items go."""
     return _two_mode(lambda p, _color: _draw_trash(p))
+
+
+def delete_icon() -> QIcon:
+    return trash_icon()
 
 
 def star_icon(*, filled: bool) -> QIcon:
@@ -128,6 +135,16 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
     what to avoid). White line art on the buttons' own translucent chip, like the
     per-seed re-roll controls."""
     return QIcon(_render(lambda p, _c: _draw_verdict(p, verdict), _REROLL_GLYPH))
+
+
+@lru_cache(maxsize=None)
+def recovery_action_icon(action: str) -> QIcon:
+    """A Trash-shelf tile's review hover-buttons: a circular arrow back
+    ("restore" — the item and its files return to where they were) or a trash can
+    ("purge" — end it now instead of waiting out its window). White line art on
+    the buttons' own translucent chip, like the experiment verdict controls."""
+    draw = _draw_undo if action == "restore" else (lambda p, _c: _draw_trash(p))
+    return QIcon(_render(draw, _REROLL_GLYPH))
 
 
 @lru_cache(maxsize=None)

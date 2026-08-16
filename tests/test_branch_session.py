@@ -30,7 +30,7 @@ def test_the_flag_marks_a_branch_session():
     assert is_branch_session({}) is False
 
 
-def test_a_branch_sessions_trash_neither_takes_files_nor_sweeps(tmp_path, monkeypatch):
+def test_a_branch_sessions_trash_neither_takes_files_nor_reclaims_them(tmp_path, monkeypatch):
     # A preview has no standing to destroy library files, and none to purge what
     # an earlier preview took either: those batches hold the only copies left of
     # files the live app's own rows still point at.
@@ -44,7 +44,7 @@ def test_a_branch_sessions_trash_neither_takes_files_nor_sweeps(tmp_path, monkey
 
     trash = session_trash(tmp_path / "trash")
     batch = trash.store([library_file])
-    trash.sweep()
+    assert trash.purge_orphans([]) == 0  # even told nothing is held, it takes nothing
 
     assert library_file.exists() and batch.moves == []
     assert held.exists()

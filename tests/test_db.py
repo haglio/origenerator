@@ -466,3 +466,55 @@ def test_restore_generation_preserves_newest_first_order(tmp_path):
 
     # Restored by its original id, the row lands back in the middle, not on top.
     assert [r["prompt_id"] for r in db.list_generations()] == ["o-2", "o-1", "o-0"]
+
+
+# --- the recovery bin (held deletions) -------------------------------------
+
+
+def test_a_recorded_deletion_comes_back_as_data(tmp_path):
+    db = Database(tmp_path / "test.db")
+    row = {"prompt_id": "d-1", "seed": 7}
+    batch = {"moves": [["out/a.png", "trash/abc/0_a.png"]], "subdir": "trash/abc"}
+
+    db.record_deletion("d-1", row, batch)
+
+    held = db.get_deletion("d-1")
+    assert held["prompt_id"] == "d-1"
+    assert held["row"] == row       # JSON columns arrive parsed, not as strings
+    assert held["batch"] == batch
+    assert held["deleted_at"]       # stamped, so the sweep can age it out
+
+
+def test_held_deletions_list_newest_first(tmp_path):
+    db = Database(tmp_path / "test.db")
+    for prompt_id in ("d-1", "d-2", "d-3"):
+        db.record_deletion(prompt_id, {"prompt_id": prompt_id}, {})
+
+    # Same-second stamps tie, so the insertion order is what breaks it.
+    assert [r["prompt_id"] for r in db.list_deletions()] == ["d-3", "d-2", "d-1"]
+
+
+def test_re_deleting_an_item_restarts_its_window(tmp_path):
+    # Deleted, restored, deleted again: one record, held from the latest delete.
+    db = Database(tmp_path / "test.db")
+    db.record_deletion("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "first"})
+    db.record_deletion("d-1", {"prompt_id": "d-1"}, {"moves": [], "subdir": "second"})
+
+    (held,) = db.list_deletions()
+    assert held["batch"]["subdir"] == "second"
+
+
+def test_forgetting_a_deletion_drops_it_from_the_bin(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.record_deletion("d-1", {"prompt_id": "d-1"}, {})
+
+    db.forget_deletion("d-1")
+
+    assert db.get_deletion("d-1") is None
+    assert db.list_deletions() == []
+
+
+def test_an_unheld_deletion_is_simply_absent(tmp_path):
+    db = Database(tmp_path / "test.db")
+    assert db.get_deletion("never") is None
+    db.forget_deletion("never")  # must not raise

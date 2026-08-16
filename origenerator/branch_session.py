@@ -7,8 +7,8 @@ looking crashed) to rebuild a database the primary checkout already has. The
 same problem fun_time's branch sessions solved, and the same answer: the
 library-derived state is *seeded* from the live install rather than rebuilt,
 and the maintenance passes that keep it healthy — the import scan, the
-backfills, the reconciles, the trash sweep — are the live app's job alone, so a
-branch session skips them (``origenerator.app.main`` gates on
+backfills, the reconciles, the recovery-bin sweep — are the live app's job
+alone, so a branch session skips them (``origenerator.app.main`` gates on
 :func:`is_branch_session`).
 
 The same line divides what a preview may do to the *shared ComfyUI*: it
@@ -52,9 +52,10 @@ def session_trash(root: Path):
     survived. That row then had nothing to show, and an experiment's stayed on
     the review shelf as a dead tile the user could only remove again.
 
-    Its ``sweep`` does nothing for the same reason, which also spares the trash
-    previews filled before they stopped taking files: those batches hold the
-    only copies left of what they took.
+    Its ``purge_orphans`` does nothing for the same reason, which also spares
+    the trash previews filled before they stopped taking files: those batches
+    hold the only copies left of what they took. The recovery bin is out of a
+    preview's reach on the same grounds — see ``GalleryView._bin_records``.
     """
     from origenerator.trash import NoTrash, Trash
     return NoTrash() if is_branch_session() else Trash(root)

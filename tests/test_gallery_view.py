@@ -25,6 +25,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.recovery import RETENTION_DAYS
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -50,12 +51,22 @@ class FakeActions:
         self.deleted = []   # each entry is one delete batch (list of rows)
         self.renamed = []   # (key, name) pairs
         self.rejected = []  # experiment rows handed to reject_experiment
+        self.restored = []  # each entry is one restore_deleted call's ids
+        self.purged = []    # each entry is one purge_deleted call's ids
         self.undo_count = 0
         self._label = None
 
     def delete_rows(self, rows):
         self.deleted.append(list(rows))
         self._label = f"Delete {len(rows)} items"
+
+    def restore_deleted(self, prompt_ids):
+        ids = list(prompt_ids)
+        self.restored.append(ids)
+        return ids[0] if ids else None
+
+    def purge_deleted(self, prompt_ids):
+        self.purged.append(list(prompt_ids))
 
     def reject_experiment(self, row):
         self.rejected.append(row)
@@ -129,6 +140,7 @@ class FakeDB:
         self._meta = {}
         self._custom = {}       # folder id -> {"name", "members": {key: (level, ref)}}
         self._next_custom = 1
+        self._deletions = {}    # prompt_id -> the held-deletion record, newest last
 
     def list_generations(self):
         return list(self._rows)
@@ -180,6 +192,24 @@ class FakeDB:
     def restore_generation(self, row):
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
+
+    # --- the recovery bin (deletions held for the Trash shelf) -------------
+
+    def record_deletion(self, prompt_id, row, batch):
+        self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
+        self._deletions[prompt_id] = {
+            "prompt_id": prompt_id, "row": row, "batch": batch,
+            "deleted_at": "2026-08-15 03:00:00",
+        }
+
+    def list_deletions(self):
+        return list(reversed(self._deletions.values()))  # newest first
+
+    def get_deletion(self, prompt_id):
+        return self._deletions.get(prompt_id)
+
+    def forget_deletion(self, prompt_id):
+        self._deletions.pop(prompt_id, None)
 
     # --- custom folders (the groupings the user composes) ------------------
 
@@ -274,7 +304,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"Recents", "Starred", "Experiments", "Images", "Videos"}
+    assert set(top) == {"Recents", "Starred", "Experiments", "Trash", "Images", "Videos"}
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
@@ -765,6 +795,242 @@ def test_a_branch_session_says_why_its_experiments_shelf_is_empty(qtbot, monkeyp
     view._tree.setCurrentItem(view._experiments_item)
 
     assert "live app" in view._browser._experiments_empty_hint()
+
+
+# --- the Trash shelf: deleted items, still recoverable ----------------------
+
+
+def _bin_db(rows=(), held=()):
+    """A gallery whose bin already holds ``held`` — ``(prompt_id, row)`` pairs,
+    oldest first — the way a previous session's deletes would have left it."""
+    db = FakeDB(list(rows))
+    for prompt_id, row in held:
+        db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+    return db
+
+
+def test_the_trash_shelf_is_always_reachable(qtbot):
+    # A bin you can only find once you have something to recover is no use: the
+    # point is knowing, before you delete, that deleting is not the end.
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    shelf = _top_level(view._tree)["Trash"]
+    assert shelf.text(0) == "Trash"
+    assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
+
+
+def test_the_trash_shelf_label_counts_what_it_holds(qtbot):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+                                     ("d2", _image("d2", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert _top_level(view._tree)["Trash (2)"] is not None
+
+
+def test_the_trash_shelf_lists_deleted_items_newest_first(qtbot):
+    view = GalleryView(_bin_db(held=[("old", _image("old", "a cat", 50, 1)),
+                                     ("new", _image("new", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert view.visible_prompt_ids() == ["new", "old"]
+
+
+def test_a_deleted_item_reaches_the_shelf_the_moment_it_is_deleted(qtbot, tmp_path):
+    # End to end through the real GalleryActions: delete a tile, and the item is
+    # standing on the Trash shelf rather than gone.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.update_generation("p1", status="completed",
+                         output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
+    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+                                                  Trash(tmp_path / "trash")))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._delete_rows([db.get_generation("p1")])
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert view.visible_prompt_ids() == ["p1"]
+
+
+def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    tooltips = [b.toolTip() for b in view._thumb_widgets["d1"]._corner_buttons]
+    assert any("Restore" in t for t in tooltips)
+    assert any("permanently" in t for t in tooltips)
+
+
+def test_a_trash_tile_says_how_long_it_has_left(qtbot):
+    # The one fact a gallery caption can't carry and this shelf can't do without.
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    caption = view._thumb_widgets["d1"]._text_label.text()
+    assert "seed 1" in caption   # still says which item it is...
+    assert "d left" in caption   # ...and, only here, how long it stays one
+
+
+def test_the_shelf_states_the_retention_promise_while_it_holds_anything(qtbot):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert str(RETENTION_DAYS) in view._avg_label.text()
+
+
+def test_an_empty_trash_shelf_explains_what_it_is_for(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert str(RETENTION_DAYS) in view._browser._trash_empty_hint()
+    assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
+
+
+def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
+    actions = FakeActions()
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+                       actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+
+    view._thumb_widgets["d1"].corner_action_triggered.emit("d1", "restore")
+
+    assert actions.restored == [["d1"]]
+
+
+def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1",
+                         params_json=json.dumps({"steps": 20}), workflow_json="{}")
+    db.update_generation("p1", status="completed",
+                         output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
+    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+                                                  Trash(tmp_path / "trash")))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._delete_rows([db.get_generation("p1")])
+    assert "Images" not in _top_level(view._tree)  # the folder emptied out with it
+
+    view.restore_from_trash(["p1"])
+
+    assert "Images" in _top_level(view._tree)      # back in the tree...
+    assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left on the shelf
+    assert view._db.list_deletions() == []
+
+
+def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
+    # The one gallery action with no undo and no second copy behind it.
+    actions = FakeActions()
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+                       actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+    asked = []
+    monkeypatch.setattr(view, "_confirm", lambda text: asked.append(text) or False)
+
+    view._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+
+    assert actions.purged == []                      # declined: nothing ended
+    assert "cannot be undone" in asked[0]
+
+    monkeypatch.setattr(view, "_confirm", lambda text: True)
+    view._thumb_widgets["d1"].corner_action_triggered.emit("d1", "purge")
+    assert actions.purged == [["d1"]]
+
+
+def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
+    # The picked items are already deleted, so the button's one remaining
+    # meaning is "for good" — rather than a live-looking control doing nothing.
+    actions = FakeActions()
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+                       actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+    view._apply_selection("d1", _NO_MOD)
+    monkeypatch.setattr(view, "_confirm", lambda text: True)
+
+    assert "Permanently delete 1 item" in view._delete_btn.toolTip()
+    view._delete_selection()
+
+    assert actions.purged == [["d1"]]
+    assert actions.deleted == []  # and never the ordinary delete path
+
+
+def test_the_delete_button_is_dark_on_an_unpicked_trash_shelf(qtbot):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+
+    assert not view._delete_btn.isEnabled()
+
+
+def test_a_purge_clears_the_item_off_the_shelf(qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.update_generation("p1", status="completed",
+                         output_files=json.dumps([{"filename": "a.png", "subfolder": ""}]))
+    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+                                                  Trash(tmp_path / "trash")))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._delete_rows([db.get_generation("p1")])
+    monkeypatch.setattr(view, "_confirm", lambda text: True)
+
+    view.purge_from_trash(["p1"])
+
+    view._tree.setCurrentItem(view._trash_item)
+    assert view.visible_prompt_ids() == []
+    assert db.list_deletions() == []
+
+
+def test_the_trash_shelf_is_a_place_back_returns_to(qtbot):
+    view = GalleryView(_bin_db([_image("i1", "a cat", 50, 1)],
+                               held=[("d1", _image("d1", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    view._tree.setCurrentItem(view._recents_item)
+    view._go_back()
+
+    assert view._tree.currentItem() is view._trash_item
+
+
+def test_a_branch_session_offers_no_recovery_at_all(qtbot, monkeypatch):
+    # A preview's database is a copy, so the deletions it inherits point into the
+    # LIVE install's trash: restoring would move the live app's files out from
+    # under rows it is still showing, and purging would destroy its only copies.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+
+    assert view.visible_prompt_ids() == []
+    assert "live" in view._browser._trash_empty_hint()
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
@@ -1260,14 +1526,14 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments", "Images"}
+    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments", "Trash", "Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
     assert set(_top_level(view._tree)) == {
-        "Recents", "Starred", "Experiments", "Images", "Videos"}
+        "Recents", "Starred", "Experiments", "Trash", "Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):
@@ -5506,7 +5772,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     assert not view._enhance_panel.isHidden()
 
     for item in (_top_level(view._tree)["Images"], view._recents_item,
-                 view._starred_item, view._experiments_item):
+                 view._starred_item, view._experiments_item, view._trash_item):
         view._tree.setCurrentItem(item)
         assert not view._enhance_panel.isHidden()
 

@@ -178,8 +178,9 @@ def test_main_reconciles_in_flight_before_importing(qapp):
     assert calls[:2] == ["reconcile", "import"]
 
 
-def test_main_sweeps_stale_trash_on_startup(qapp):
-    """Leftover trash from a prior session is reclaimed before the window opens."""
+def test_main_ages_out_the_recovery_bin_on_startup(qapp):
+    """Deletions past their window are ended, and the trash they no longer hold
+    is reclaimed, before the window opens."""
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.gui.loading_screen.LoadingScreen"), \
@@ -188,6 +189,7 @@ def test_main_sweeps_stale_trash_on_startup(qapp):
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
+         patch("origenerator.recovery.sweep", return_value=0) as sweep, \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
@@ -197,7 +199,8 @@ def test_main_sweeps_stale_trash_on_startup(qapp):
         with pytest.raises(SystemExit):
             main()
 
-    trash.sweep.assert_called_once()
+    sweep.assert_called_once()
+    assert sweep.call_args.args[1] is trash
 
 
 def test_main_connects_the_client_under_the_persisted_id(qapp):

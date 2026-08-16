@@ -82,18 +82,35 @@ DETAIL_PARTS = _BUILTIN_PARTS + _overlay_parts()
 _MAX_COMMAND_WORDS = 6
 
 
+def _lead_is_fix(word: str) -> bool:
+    """Whether the utterance's first word is "fix" — as whisper renders it.
+
+    Off a quiet mic the base model takes real liberties with a one-syllable
+    imperative: "fixed" for it, and one-letter misses like "six" ("fix teeth"
+    arrives as "six-teeth."). One substitution against the two real forms is
+    accepted; the part-word requirement is what keeps this loose lead from
+    firing on prose.
+    """
+    if word in ("fix", "fixed"):
+        return True
+    return any(
+        len(word) == len(target)
+        and sum(a != b for a, b in zip(word, target)) == 1
+        for target in ("fix", "fixed")
+    )
+
+
 def match_fix_command(text: str) -> DetailPart | None:
     """The part a spoken utterance asks to fix, or ``None`` when it isn't asking.
 
-    Deliberately strict about the shape — it must lead with "fix" and name a
-    known part within a few words — because while prompt steering is also
-    listening, everything unmatched here falls through to a prompt rewrite, and
-    "fix the lighting" is one of those. Punctuation and case are whisper's,
-    so both are ignored; "fixed" is accepted for it, being what an imperative
-    "fix" is often heard as.
+    Deliberately strict about the shape — it must lead with "fix" (as heard,
+    :func:`_lead_is_fix`) and name a known part within a few words — because
+    while prompt steering is also listening, everything unmatched here falls
+    through to a prompt rewrite, and "fix the lighting" is one of those.
+    Punctuation and case are whisper's, so both are ignored.
     """
     words = re.findall(r"[a-z]+", (text or "").lower())
-    if not words or words[0] not in ("fix", "fixed") or len(words) > _MAX_COMMAND_WORDS:
+    if not words or not _lead_is_fix(words[0]) or len(words) > _MAX_COMMAND_WORDS:
         return None
     named = set(words[1:])
     for part in DETAIL_PARTS:

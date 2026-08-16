@@ -27,6 +27,8 @@ from origenerator.gallery.detail_parts import (
     ("Fixed the eyes.", "eyes"),   # what an imperative "fix" is often heard as
     ("Fix face", "faces"),
     ("Fix her mouth", "teeth"),
+    ("six-teeth.", "teeth"),       # whisper, quiet mic: "fix teeth" verbatim
+    ("Mix her hands.", "hands"),   # one letter off "fix" still reads as it
 ])
 def test_a_short_fix_utterance_names_its_part(text, part):
     assert match_fix_command(text).name == part
@@ -37,6 +39,8 @@ def test_a_short_fix_utterance_names_its_part(text, part):
     "the teeth need fixing",         # doesn't lead with fix
     "make her teeth whiter",         # no fix at all
     "fix the way she is holding the wine glass in her left hand",  # sentence-shaped
+    "six of them",                   # a fix-alike lead with no part named
+    "vic shows teeth",               # two letters from "fix" is another word
     "",
     ". . . .",
 ])

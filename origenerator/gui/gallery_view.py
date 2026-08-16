@@ -187,7 +187,7 @@ class GalleryView(QWidget):
         self._shown_wait_note: str | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, session_trash(STATE_DIR / "trash"),
-            release_files=self._release_held_media,
+            release_files=self._release_held_media, thumb_dir=THUMB_DIR,
         )
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's
@@ -208,12 +208,18 @@ class GalleryView(QWidget):
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
         # The latest streamed frame of each running enhance, keyed by the folder
-        # its job runs under, so the info pane's version strip can show the level
-        # being made. One slot per folder is enough because ComfyUI renders one
-        # prompt at a time: a folder's other enhances are queued behind, and a
-        # queued one is shown as queued rather than lent this frame (see
+        # its job runs under, so the info pane's version list, the tab preview
+        # and the image's own tile can all show the level being made. One slot
+        # per folder is enough because ComfyUI renders one prompt at a time: a
+        # folder's other enhances are queued behind, and a queued one is shown as
+        # queued rather than lent this frame (see
         # :meth:`_pending_enhancement_for`).
         self._enhance_frames: dict[str, bytes] = {}
+        # Which image each running enhance is improving, and the set of runs that
+        # answer was worked out from — recomputed only when that set changes, not
+        # on every frame they stream.
+        self._enhancing_by_prompt: dict[str, tuple] = {}
+        self._enhancing_signature: tuple = ()
         # What every enhance runs at, app-wide — the Enhance subpanel's value.
         # Restored from the session by set_enhance_settings; built before
         # _build_ui, whose panel opens on it.
@@ -650,9 +656,11 @@ class GalleryView(QWidget):
         # Pointing a tab at another generation drops its claim on the run it
         # launched, so its Generate button has to be re-read straight away.
         panel.displayed_changed.connect(self._reconcile_generating)
-        # Its version strip's "+ Enhance" card runs through the same queue the
-        # folder button and the context menu use.
+        # Its version list's "+ Enhance" row runs through the same queue the
+        # folder button and the context menu use, and its Delete goes through
+        # the same undo stack as every other delete in the gallery.
         panel.enhance_requested.connect(lambda pid: self.enhance_items([pid]))
+        panel.levels_delete_requested.connect(self.delete_enhance_levels)
         panel.set_enhance_settings(self._enhance_settings)
         panel.fullscreen_opened.connect(self._on_fullscreen_opened)
         panel.preview_double_clicked.connect(self._on_preview_double_clicked)
@@ -2016,14 +2024,40 @@ class GalleryView(QWidget):
             for job in self._reroll.all_jobs
         )
 
-    def _reconcile_pending_enhancements(self):
-        """Show each tab the enhancement being made for the image it displays.
+    def delete_enhance_levels(self, prompt_id: str, filenames: list):
+        """Bin some of one image's versions, from the info pane's version list.
 
-        The info pane's version strip leads with a live tile while one is
-        cooking — the same in-flight treatment work gets everywhere else — and
-        the jobs are the gallery's, so the match is made here: every running
-        standalone enhance against every tab's displayed row. Cheap enough to
-        re-run on each frame; the panel updates its tile in place.
+        Undoable like every other delete here, and only ever a delete of files:
+        the generation keeps its row, its folder, its star and its other
+        versions. The rebuild after is what redraws the tile — a binned top
+        version means a new picture and, once the last enhancement goes, no more
+        green badge."""
+        row = self._db.get_generation(prompt_id)
+        if row is None or not self._actions.delete_enhance_levels(row, filenames):
+            return
+        self._sync_undo_button()
+        self.refresh()
+        updated = self._db.get_generation(prompt_id)
+        if updated is not None:
+            # Every tab showing this image, not just the front one — the delete
+            # can come from a tab that isn't in front, and a stale list would
+            # still be offering a version that is gone.
+            for panel in self._info_tabs._config_panels():
+                shown = panel.displayed_row()
+                if shown is not None and shown.get("prompt_id") == prompt_id:
+                    panel.show_completed_result(updated, self._image_rows)
+        self._sync_enhance_all_button()  # an image with no enhancement left awaits one
+
+    def _reconcile_pending_enhancements(self):
+        """Show the enhancement being made wherever the image it improves is.
+
+        The info pane's version list leads with a live row while one is cooking,
+        the tab's own preview streams the same frames, and the image's tile in
+        the middle column streams them under its "Enhancing…" scrim — the same
+        in-flight treatment work gets everywhere else in the app. The jobs are
+        the gallery's, so the match is made here: every running standalone
+        enhance against every tab's displayed row. Cheap enough to re-run on
+        each frame; the panel updates its row in place.
 
         Every job of every folder, for the same reason :meth:`is_enhancing` reads
         them all: a batch of enhances shares one settings key, and a tab showing
@@ -2040,6 +2074,36 @@ class GalleryView(QWidget):
             panel.set_pending_enhancement(
                 self._pending_enhancement_for(row, running) if row else None
             )
+        self._reconcile_enhancing_tiles(running)
+
+    def _reconcile_enhancing_tiles(self, running):
+        """Stream each running enhance onto the tile of the image it is enhancing.
+
+        Which image a job targets is worked out only when the set of running
+        enhances changes, not on every streamed frame: the match walks every
+        image row, and the frames arrive several times a second.
+
+        A frame goes only to a job actually rendering, for the reason
+        :meth:`_pending_enhancement_for` spells out — a batch shares one folder
+        and so one frame slot, and lending it to the ones queued behind would
+        show each of those tiles a picture of a different image.
+        """
+        signature = tuple(sorted(
+            (key, job.params.get("input_image") or "") for key, job in running
+        ))
+        if signature != self._enhancing_signature:
+            self._enhancing_signature = signature
+            self._enhancing_by_prompt = {
+                row["prompt_id"]: (key, job)
+                for key, job in running
+                for row in self._image_rows
+                if gallery.enhance_targets_row(job.params.get("input_image"), row)
+            }
+        self._browser.show_enhancing({
+            prompt_id: (self._enhance_frames.get(key)
+                        if job.state == "running" else None)
+            for prompt_id, (key, job) in self._enhancing_by_prompt.items()
+        })
 
     def _pending_enhancement_for(self, row: dict, running) -> tuple | None:
         """``(status, frame, settings)`` of a standalone enhance running on

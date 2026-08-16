@@ -50,8 +50,16 @@ class MetadataBlock(QWidget):
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
 
-    def show_row(self, row: dict):
-        self._render(build_sections(row))
+    def show_row(self, row: dict) -> bool:
+        """Render this row's sections, reporting whether it had any.
+
+        An image usually has none — every file it holds is a version, listed
+        with the enhancement level that made it — and a caller shows this block
+        only when there is something in it, rather than leaving a bare gap above
+        the form."""
+        sections = build_sections(row)
+        self._render(sections)
+        return bool(sections)
 
     def _render(self, sections: list[MetaSection]):
         if self._container is not None:
@@ -82,28 +90,32 @@ def _build_section(section: MetaSection) -> QWidget:
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
-    label_width = _label_column_width(section)
+    label_width = label_column_width(section.items)
     for item in section.items:
-        layout.addWidget(_build_item(item, label_width))
+        layout.addWidget(meta_row(item, label_width))
     box.content_form().addRow(rows)
     return box
 
 
-def _label_column_width(section: MetaSection) -> int:
-    """Pixels wide enough for this section's longest key, so a Parameters block
+def label_column_width(items: list[MetaItem]) -> int:
+    """Pixels wide enough for this group's longest key, so a Parameters block
     (``lora_strength_high``) gets the room a short Details block never wastes.
     Applied as a minimum, not a cap, so an under-measured label grows to fit
     rather than clipping."""
-    labels = [item.label for item in section.items if item.label]
+    labels = [item.label for item in items if item.label]
     if not labels:
         return 0
     metrics = QFontMetrics(QApplication.font())
     return max(metrics.horizontalAdvance(text) for text in labels) + 12
 
 
-def _build_item(item: MetaItem, label_width: int) -> QWidget:
+def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     """A ``label: value`` row, gaining a copy-to-clipboard button when the item
-    declares copyable text. ``label_width`` aligns keys within the section."""
+    declares copyable text. ``label_width`` aligns keys within the section.
+
+    Public because a file's row belongs wherever that file is listed: the
+    version strip builds its own rows from this, so a level's File line carries
+    the same copy and Show-in-Explorer buttons as one in a metadata block."""
     row = QWidget()
     layout = QHBoxLayout(row)
     layout.setContentsMargins(0, 0, 0, 0)

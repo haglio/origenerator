@@ -576,26 +576,35 @@ def _enhanced_image_row(db, prompt_id="img1"):
     return db.get_generation(prompt_id)
 
 
+def _level_rows(panel):
+    from origenerator.gui.enhance_versions import _LevelRow
+    return panel._versions._host.findChildren(_LevelRow)
+
+
+def _row_texts(row):
+    """Every label on one level's row, minus the wrapping zero-widths."""
+    from PyQt6.QtWidgets import QLabel
+    return [lbl.text().replace("​", "") for lbl in row.findChildren(QLabel)]
+
+
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
     # This is where an image's versions live, so it has to be somewhere you can
     # already see before the first enhancement makes a second one — not least
-    # because the enhance you just launched replaces the strip's only other
+    # because the enhance you just launched replaces the list's only other
     # content while it runs.
-    from PyQt6.QtWidgets import QLabel
-
-    from origenerator.gui.enhance_versions import _AddTile, _LevelTile
+    from origenerator.gui.enhance_versions import _AddRow
 
     panel, db = saved_panel
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
     assert not panel._versions.isHidden()
-    (tile,) = panel._versions._host.findChildren(_LevelTile)
-    assert "Original" in [lbl.text() for lbl in tile.findChildren(QLabel)]
-    assert panel._versions._host.findChildren(_AddTile)
+    (row,) = _level_rows(panel)
+    assert "Original" in _row_texts(row)
+    assert panel._versions._host.findChildren(_AddRow)
 
 
 def test_a_video_has_no_version_strip(saved_panel):
-    # The enhancer takes images; a video has no versions and no card to press.
+    # The enhancer takes images; a video has no versions and no row to press.
     panel, db = saved_panel
     video = _video_row(db, "vid1")
     panel.show_saved_generation(video, [])
@@ -603,45 +612,99 @@ def test_a_video_has_no_version_strip(saved_panel):
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
-    from PyQt6.QtWidgets import QLabel
-
-    from origenerator.gui.enhance_versions import _LevelTile
-
     panel, db = saved_panel
     image = _enhanced_image_row(db)
     panel.show_saved_generation(image, [image])
 
     assert not panel._versions.isHidden()
-    tiles = panel._versions._host.findChildren(_LevelTile)
-    captions = [
-        " / ".join(lbl.text() for lbl in tile.findChildren(QLabel)
-                   if lbl.text() and lbl.text() != "—")
-        for tile in tiles
-    ]
-    assert captions[0].startswith("Enhance 1")
-    assert "2x" in captions[0] and "20 steps" in captions[0] and "0.15 denoise" in captions[0]
-    assert captions[1] == "Original"
+    rows = _level_rows(panel)
+    first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
+    assert first.startswith("Enhance 1")
+    assert "2x" in first and "20 steps" in first and "0.15 denoise" in first
+    assert "Original" in _row_texts(rows[1])
+
+
+def test_each_level_carries_its_own_file_row(saved_panel):
+    # The file information is per enhancement, so it sits with the level that
+    # made it — the same File row a metadata block renders, copy button and all,
+    # rather than a pooled block at the top labeled with a level's name.
+    from PyQt6.QtWidgets import QPushButton
+
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+
+    rows = _level_rows(panel)
+    assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
+    assert "image/sdxl_img1.png" in _row_texts(rows[1])
+    for row in rows:
+        names = {b.objectName() for b in row.findChildren(QPushButton)}
+        assert "copyButton" in names and "revealButton" in names
+        assert "Created" in _row_texts(row)
+    # ...and the block at the top has nothing left to repeat.
+    assert panel._metadata_block.isHidden()
 
 
 def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
-    from origenerator.gui.enhance_versions import _PendingTile
+    from origenerator.gui.enhance_versions import _PendingRow
 
     panel, db = saved_panel
     image = _image_row(db, "img1")      # never enhanced: no levels of its own
     panel.show_saved_generation(image, [image])
-    assert not panel._versions._host.findChildren(_PendingTile)
+    assert not panel._versions._host.findChildren(_PendingRow)
 
     panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 denoise"))
 
     assert not panel._versions.isHidden()
-    assert panel._versions._host.findChildren(_PendingTile)
+    assert panel._versions._host.findChildren(_PendingRow)
     # The original stays beside it — the base render is out and worth looking at
     # while its enhancement is made, which is the point of generating it first.
-    from origenerator.gui.enhance_versions import _LevelTile
-    assert panel._versions._host.findChildren(_LevelTile)
+    assert _level_rows(panel)
 
     panel.set_pending_enhancement(None)
-    assert not panel._versions._host.findChildren(_PendingTile)
+    assert not panel._versions._host.findChildren(_PendingRow)
+
+
+def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
+                                                        monkeypatch):
+    # The pane at the top of the tab is where this app shows what is being made,
+    # and an enhancement of the image on display is being made — it used to be
+    # the one surface that sat on the old picture while the little row streamed.
+    from origenerator.gui import generate_config_panel as module
+
+    panel, db = saved_panel
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    (output_dir / "image" / "sdxl_img1.png").write_bytes(b"x")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output_dir)
+
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+    panel._preview.show_frame = MagicMock()
+    panel._preview.show_media.reset_mock()
+
+    panel.set_pending_enhancement(("running", b"\x89PNG-ish", "2x"))
+    panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish")
+
+    # ...and when the run ends the pane goes back to the image itself.
+    panel.set_pending_enhancement(None)
+    panel._preview.show_media.assert_called_once_with(
+        output_dir / "image" / "sdxl_img1.png", "image"
+    )
+
+
+def test_picked_levels_are_deleted_by_filename(saved_panel):
+    # Positions belong to the widget that produced them; the gallery does the
+    # deleting and has to be told which files.
+    panel, db = saved_panel
+    image = _enhanced_image_row(db)
+    panel.show_saved_generation(image, [image])
+    asked = []
+    panel.levels_delete_requested.connect(lambda pid, names: asked.append((pid, names)))
+
+    panel._versions.delete_requested.emit([0])
+
+    assert asked == [("img1", ["image_enhance_00001_.png"])]
 
 
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,
@@ -767,13 +830,13 @@ def test_reasserting_generating_retargets_the_tracked_prompt(panel):
 
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
     panel, db = saved_panel
-    image = _image_row(db, "img1", filename="sdxl_img1.png")
+    video = _video_row(db, "vid1")
 
-    panel.show_saved_generation(image, [image])
+    panel.show_saved_generation(video, [])
 
     assert not panel._metadata_block.isHidden()
     texts = _metadata_texts(panel)
-    assert "image/sdxl_img1.png" in texts   # the filename — the reported regression
+    assert "video/vid1.mp4" in texts         # the filename — the reported regression
     assert "completed" not in texts         # Details (status/source) dropped as not useful
     assert "generated" not in texts
 
@@ -784,12 +847,13 @@ def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monk
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     panel.show_saved_generation(image, [image])
-    assert not panel._metadata_block.isHidden()
+    assert not panel._versions.isHidden()   # where an image's file facts live
 
     monkeypatch.setattr(panel, "_recent_matching_row", lambda: None)
     panel.show_recent_preview()
 
     assert panel._metadata_block.isHidden()
+    assert panel._versions.isHidden()
     assert panel._source_tile.isHidden()
     assert panel._evolver_btn.isHidden()
 
@@ -972,8 +1036,8 @@ def test_completed_result_shows_output_and_footer_without_touching_the_form(save
     panel.show_completed_result(image, [image])
 
     assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
-    assert panel._displayed_row is image          # the finished output is on display
-    assert not panel._metadata_block.isHidden()   # with its footer
+    assert panel._displayed_row is image     # the finished output is on display
+    assert not panel._versions.isHidden()    # with its footer
 
 
 def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, monkeypatch):

@@ -1,53 +1,77 @@
-"""Every version of one image, as a strip of thumbnails that swap the preview.
+"""Every version of one image, a row each: its picture, and the facts about it.
 
 An enhancement is a layer, not a replacement: the enhanced file leads the row's
 ``output_files`` and each earlier one stays listed, so an image can carry several
 levels at once — usually one, more when the same image is enhanced again at
 different settings to compare them. The preview opens on the most-enhanced
 version; this is where the rest are, sitting at the bottom of the info pane
-beside the other cross-links (a video's source image, an image's animations),
-each tile captioned with the settings that made it.
+beside the other cross-links (a video's source image, an image's animations).
 
-A tile can also be dragged onto the Enhance subpanel, which absorbs the settings
+One level per row, because each is a file with a file's worth to say about it:
+the enhancement that made it, where it is on disk (with the copy and
+Show-in-Explorer buttons a file row carries anywhere in this app), and when it
+was written. That information used to sit in one ``Basic`` block at the top,
+pooled under labels naming levels you then had to go and find; it is per
+enhancement, so it lives with the enhancement.
+
+A row can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-An enhancement still cooking takes the ``+ Enhance`` card's own slot at the head
-of the strip, mirroring the run's streamed frames the way the in-flight cards do
-everywhere else — the card becomes the thing it asked for, and the level being
+Levels can be deleted from here: pick rows and press Delete or Backspace, or
+right-click for the menu. A binned version is a file, not a generation — the
+image keeps its folder, its star and its other versions — and the delete is
+undoable like every other. What is refused is emptying the row: an image with no
+file left is a deleted generation, and that is the gallery's own delete.
+
+An enhancement still cooking takes the ``+ Enhance`` row's own slot at the head
+of the list, mirroring the run's streamed frames the way the in-flight cards do
+everywhere else — the row becomes the thing it asked for, and the level being
 made appears where the level will be.
 
-The strip is up for every image, even one with nothing but its original: it is
+The list is up for every image, even one with nothing but its original: it is
 where an image's versions live, and a place that appears only once you already
 have versions is a place you never find. It also closes with a ``+ Enhance``
-card that makes another at the current settings — dimmed when the image already
-holds one made at exactly those, and hovering the dimmed card lights the level
+row that makes another at the current settings — dimmed when the image already
+holds one made at exactly those, and hovering the dimmed row lights the level
 it would have duplicated.
 """
 
 import json
 
 from PyQt6.QtWidgets import (
-    QApplication, QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget,
+    QApplication, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu,
+    QVBoxLayout, QWidget,
 )
 from PyQt6.QtGui import QDrag, QPixmap
-from PyQt6.QtCore import QByteArray, QMimeData, Qt, pyqtSignal
+from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
 
+from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.metadata_block import label_column_width, meta_row
 
 # A dragged enhancement level carries the params that produced it under this
 # type; the Enhance subpanel reads it to absorb those settings.
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
-_TILE = 108  # the thumbnail box; a caption of settings sits under it
+_TILE = 96  # the thumbnail box; the level's facts sit beside it
 # The in-flight edge the Recents shelf's cards wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = "2px solid #3080e0"
 # The dashed box of an empty slot waiting to be filled, and the lit edge a level
-# wears while the card that would duplicate it is hovered.
+# wears while the row that would duplicate it is hovered.
 _ADD_BORDER = "1px dashed #808080"
 _MATCH_BORDER = "2px solid #30a030"
+# A picked row lightens, the way a picked thumbnail does — same fill, so "this
+# one is selected" reads the same in both places. The children have to be made
+# transparent for it to show at all: the app's global ``QWidget`` background
+# paints every label and container opaque over whatever the row fills with, and
+# the fill would otherwise appear only in the gaps between them.
+_ROW_CSS = ("#levelRow QLabel, #levelRow #levelFactRow"
+            " { background-color: transparent; }")
+_SELECTED_ROW_CSS = (
+    "#levelRow { background-color: #3a3a3a; border-radius: 4px; }" + _ROW_CSS
+)
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -69,56 +93,122 @@ def params_from_mime(mime) -> dict | None:
     return params if isinstance(params, dict) else None
 
 
-class _LevelTile(QWidget):
-    """One version: its picture, its label, and the settings that made it.
+class _Row(QWidget):
+    """The shape every entry in the list shares: a picture, then a bold title
+    over a column of ``label: value`` facts.
 
-    Clicking puts it in the preview; dragging it carries those settings for the
-    Enhance subpanel to absorb.
+    One shape for the finished levels, the one being made, and the card that
+    would make another — so a run in flight sits in the list reading like the
+    level it is about to become rather than like a different kind of thing."""
+
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setObjectName("levelRow")
+        # Without this a stylesheet background on a plain QWidget paints nothing
+        # at all, so the selection fill would never show.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(_ROW_CSS)
+        box = QHBoxLayout(self)
+        box.setContentsMargins(2, 2, 2, 2)
+        box.setSpacing(8)
+        self._picture = QLabel()
+        self._picture.setFixedSize(_TILE, _TILE)
+        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._picture.setWordWrap(True)
+        box.addWidget(self._picture, 0, Qt.AlignmentFlag.AlignTop)
+        facts = QVBoxLayout()
+        facts.setContentsMargins(0, 0, 0, 0)
+        facts.setSpacing(3)
+        facts.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._title = QLabel(title)
+        self._title.setStyleSheet("font-weight: 600; background: transparent;")
+        facts.addWidget(self._title)
+        self._facts = facts
+        self._fact_rows: list[QWidget] = []
+        box.addLayout(facts, 1)
+
+    def _show_facts(self, items: list[MetaItem]) -> None:
+        """Lay this row's facts out as the same ``label: value`` rows a metadata
+        block uses — so the enhancement that made a version, the file it wrote
+        and when it was written all read alike, and the file line keeps its copy
+        and Show-in-Explorer buttons. Replaces whatever was there."""
+        for widget in self._fact_rows:
+            self._facts.removeWidget(widget)
+            widget.setParent(None)
+            widget.deleteLater()
+        width = label_column_width(items)
+        self._fact_rows = [meta_row(item, width) for item in items]
+        for widget in self._fact_rows:
+            widget.setObjectName("levelFactRow")  # so a selected row shows through it
+            self._facts.addWidget(widget)
+
+    def _show_picture(self, pixmap: QPixmap) -> None:
+        self._picture.setPixmap(pixmap.scaled(
+            _TILE, _TILE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        ))
+
+
+class _LevelRow(_Row):
+    """One version: its picture, the enhancement that made it, its file and when
+    that file was written.
+
+    Clicking puts it in the preview and picks it; dragging it carries those
+    settings for the Enhance subpanel to absorb.
     """
 
-    clicked = pyqtSignal(int)
+    clicked = pyqtSignal(int, Qt.KeyboardModifier)
+    context_requested = pyqtSignal(int, QPoint)
 
-    def __init__(self, level, position: int, image_path, parent=None):
-        super().__init__(parent)
+    def __init__(self, level, position: int, image_path, created_fallback: str = "",
+                 parent=None):
+        super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
         self._press_pos = None
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(2)
-        picture = QLabel()
-        self._picture = picture  # the image the drag carries under the cursor
-        picture.setFixedSize(_TILE, _TILE)
-        picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
         if not pixmap.isNull():
-            picture.setPixmap(pixmap.scaled(
-                _TILE, _TILE,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            ))
+            self._show_picture(pixmap)
         else:
             # The file is gone (trashed, or moved out from under us). The level
-            # still lists — its caption says which one it was — so the box shows
+            # still lists — its facts say which one it was — so the box shows
             # the em dash the rest of the app uses for "nothing to show here".
-            picture.setText("—")
-            picture.setToolTip("This version's file is no longer on disk")
-        box.addWidget(picture)
-        caption = QLabel(level.label)
-        caption.setStyleSheet("font-weight: 600;")
-        box.addWidget(caption)
+            self._picture.setText("—")
+            self._picture.setToolTip("This version's file is no longer on disk")
+        items = []
         if level.settings:
-            detail = QLabel(level.settings.replace(" · ", "\n"))
-            detail.setObjectName("estimateLabel")
-            box.addWidget(detail)
+            items.append(MetaItem("Enhancement", level.settings))
+        items.append(file_item(level.file))
+        items.append(created_item(level.file, created_fallback))
+        self._show_facts(items)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(
+            lambda pos: self.context_requested.emit(
+                self._position, self.mapToGlobal(pos))
+        )
         self.setToolTip(
             f"{level.settings}\nDrag onto Enhance to reuse these settings"
             if level.params else level.label
         )
 
+    def position(self) -> int:
+        return self._position
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool) -> None:
+        if selected == self._selected:
+            return
+        self._selected = selected
+        self.setStyleSheet(_SELECTED_ROW_CSS if selected else _ROW_CSS)
+
     def set_highlighted(self, on: bool) -> None:
-        """Light this level's picture — what the ``+ Enhance`` card points at
+        """Light this level's picture — what the ``+ Enhance`` row points at
         when it is dimmed because this is the version it would duplicate."""
         self._picture.setStyleSheet(
             f"border: {_MATCH_BORDER}; border-radius: 3px;" if on else ""
@@ -147,10 +237,10 @@ class _LevelTile(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._press_pos is not None:
             self._press_pos = None
-            self.clicked.emit(self._position)
+            self.clicked.emit(self._position, event.modifiers())
 
 
-class _PendingTile(QWidget):
+class _PendingRow(_Row):
     """The enhancement being made right now: its live frame, or the stage it's at.
 
     Wears the same blue "in progress" edge as the Recents shelf's in-flight
@@ -159,86 +249,61 @@ class _PendingTile(QWidget):
     """
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(2)
-        self._picture = QLabel()
-        self._picture.setFixedSize(_TILE, _TILE)
-        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._picture.setWordWrap(True)
+        super().__init__("Enhancing", parent)
         self._picture.setStyleSheet(
             f"background-color: transparent; border: {_PENDING_BORDER};"
             " border-radius: 3px;"
         )
-        box.addWidget(self._picture)
-        self._caption = QLabel("Enhancing")
-        self._caption.setStyleSheet("font-weight: 600;")
-        box.addWidget(self._caption)
-        # The settings under the caption, exactly where a finished level carries
-        # its own: what is being made is as much a question of "at what" as the
-        # levels already there, and it is the only place to read it back before
-        # the run lands.
-        self._detail = QLabel()
-        self._detail.setObjectName("estimateLabel")
-        box.addWidget(self._detail)
+        # The settings row a finished level carries, in the same place: what is
+        # being made is as much a question of "at what" as the levels already
+        # there, and it is the only place to read it back before the run lands.
+        # No file and no timestamp yet — that is exactly what is still cooking.
+        self._settings = ""
         self.setToolTip("An enhancement of this image is being generated")
 
     def update_pending(self, status: str, frame: bytes | None, settings: str = ""):
         pixmap = QPixmap()
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
-            self._picture.setPixmap(pixmap.scaled(
-                _TILE, _TILE,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            ))
+            self._show_picture(pixmap)
         else:
             self._picture.setText(
                 "Generating…" if status == "running" else "Queued…"
             )
-        self._detail.setText(settings.replace(" · ", "\n"))
-        self._detail.setVisible(bool(settings))
+        # Only when the text actually moves: a run streams several frames a
+        # second and each would otherwise rebuild the row under the cursor.
+        if settings != self._settings:
+            self._settings = settings
+            self._show_facts([MetaItem("Enhancement", settings)] if settings else [])
         self.setToolTip(
             f"An enhancement of this image is being generated at {settings}"
             if settings else "An enhancement of this image is being generated"
         )
 
 
-class _AddTile(QWidget):
-    """The ``+ Enhance`` slot that closes the strip.
+class _AddRow(_Row):
+    """The ``+ Enhance`` slot that leads the list.
 
     Live, it makes another version at whatever the Enhance panel currently says.
     Dimmed, the image already holds one made at exactly those settings, and
     hovering it lights that level rather than leaving you to compare numbers —
-    the answer to "why can't I press this" is the tile it points at.
+    the answer to "why can't I press this" is the row it points at.
     """
 
     clicked = pyqtSignal()
     hovered = pyqtSignal(bool)
 
     def __init__(self, settings: str, duplicate_of: int | None, parent=None):
-        super().__init__(parent)
+        super().__init__("Enhance", parent)
         self._enabled = duplicate_of is None
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(2)
-        self._picture = QLabel("+")
-        self._picture.setFixedSize(_TILE, _TILE)
-        self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._picture.setText("+")
         self._picture.setStyleSheet(
             f"border: {_ADD_BORDER}; border-radius: 3px; font-size: 28px;"
         )
-        box.addWidget(self._picture)
-        caption = QLabel("Enhance")
-        caption.setStyleSheet("font-weight: 600;")
-        box.addWidget(caption)
         if settings:
-            detail = QLabel(settings.replace(" · ", "\n"))
-            detail.setObjectName("estimateLabel")
-            box.addWidget(detail)
+            self._show_facts([MetaItem("Enhancement", settings)])
         # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
         # events to a disabled widget, and the hover is exactly what the dimmed
-        # state is for — it is how the card explains why it cannot be pressed.
+        # state is for — it is how the row explains why it cannot be pressed.
         if not self._enabled:
             effect = QGraphicsOpacityEffect(self)
             effect.setOpacity(0.4)
@@ -264,18 +329,20 @@ class _AddTile(QWidget):
 
 
 class EnhanceVersions(QWidget):
-    """The levels of one image, newest first, as a strip of thumbnails.
+    """The levels of one image, newest first, one per row.
 
     ``show_levels`` takes :class:`~origenerator.gallery.enhance.EnhanceLevel`
-    objects (as :func:`~origenerator.gallery.enhance.enhance_levels` produces
+    objects (as :func:`~origenerator.gallery.enhance.displayed_levels` produces
     them) paired with the on-disk file to draw, plus the ``(status, frame)`` of
-    an enhancement still running on this image. Clicking a level's tile emits
+    an enhancement still running on this image. Clicking a level's row emits
     ``level_selected`` with its position in that list, for the panel to put in
-    the preview.
+    the preview; picking rows and pressing Delete (or the right-click menu's
+    Delete) emits ``delete_requested`` with those positions.
     """
 
     level_selected = pyqtSignal(int)
-    enhance_requested = pyqtSignal()   # the "+ Enhance" card was pressed
+    enhance_requested = pyqtSignal()   # the "+ Enhance" row was pressed
+    delete_requested = pyqtSignal(list)  # positions of the levels to bin
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -288,10 +355,10 @@ class EnhanceVersions(QWidget):
         self._section = CollapsibleSection("Enhancement levels")
         box.addWidget(self._section)
         self._host = QWidget()
-        FlowLayout(self._host, spacing=6)
+        QVBoxLayout(self._host)
         self._section.content_form().addRow(self._host)
-        self._pending: _PendingTile | None = None
-        self._tiles: list[_LevelTile] = []
+        self._pending: _PendingRow | None = None
+        self._rows: list[_LevelRow] = []
         self.hide()
 
     def is_collapsed(self) -> bool:
@@ -301,63 +368,133 @@ class EnhanceVersions(QWidget):
         self._section.set_collapsed(collapsed)
 
     def show_levels(self, items: list[tuple], pending: tuple | None = None,
-                    add: tuple | None = None):
-        """Rebuild the strip from ``(level, image_path)`` pairs.
+                    add: tuple | None = None, created_fallback: str = ""):
+        """Rebuild the list from ``(level, image_path)`` pairs.
 
-        ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` card, which
-        leads the strip: that is where a new version arrives, since the strip
-        runs newest first. ``duplicate_of`` names the level those settings would
+        ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` row, which
+        leads the list: that is where a new version arrives, since the list runs
+        newest first. ``duplicate_of`` names the level those settings would
         duplicate, or ``None`` when they would make something new.
 
         ``pending`` is the ``(status, frame, settings)`` of an enhancement still
-        running, and it takes that same leading slot — the card *becomes* the
+        running, and it takes that same leading slot — the row *becomes* the
         thing it asked for rather than sitting beside it, which is what the press
         looks like from the other side.
 
+        ``created_fallback`` stands in on a level whose file is no longer on disk
+        to be asked when it was written — the row's own timestamp, which is the
+        closest true answer left.
+
         Hidden only when there is nothing at all to show — no versions, nothing
-        running, and no card to press, which is what a video looks like.
+        running, and no row to press, which is what a video looks like.
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
-        # related-media strips use, so no tile outlives the row it described.
+        # related-media strips use, so no row outlives the levels it described.
         form = self._section.content_form()
         form.removeRow(self._host)
         self._host = QWidget()
-        flow = FlowLayout(self._host, spacing=6)
+        column = QVBoxLayout(self._host)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(6)
         self._pending = None
-        self._tiles = []
+        self._rows = []
         # One leading slot, held by whichever of the two applies: the run in
-        # flight if there is one, else the card that would start it.
+        # flight if there is one, else the row that would start it.
         if pending is not None:
-            self._pending = _PendingTile()
+            self._pending = _PendingRow()
             self._pending.update_pending(*pending)
-            flow.addWidget(self._pending)
+            column.addWidget(self._pending)
         elif add is not None:
             settings, duplicate_of = add
-            card = _AddTile(settings, duplicate_of)
+            card = _AddRow(settings, duplicate_of)
             card.clicked.connect(self.enhance_requested)
             card.hovered.connect(
                 lambda on, at=duplicate_of: self._highlight_level(at, on))
-            flow.addWidget(card)
+            column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
-            tile = _LevelTile(level, position, image_path)
-            tile.clicked.connect(self.level_selected)
-            self._tiles.append(tile)
-            flow.addWidget(tile)
+            row = _LevelRow(level, position, image_path, created_fallback)
+            row.clicked.connect(self._on_row_clicked)
+            row.context_requested.connect(self._on_row_menu)
+            self._rows.append(row)
+            column.addWidget(row)
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 
-    def _highlight_level(self, position: int | None, on: bool) -> None:
-        """Light the level the dimmed ``+ Enhance`` card would have duplicated."""
-        if position is None or not 0 <= position < len(self._tiles):
+    # --- picking levels, and binning the picked ones ------------------------
+
+    def selected_positions(self) -> list[int]:
+        """The levels currently picked, in list order."""
+        return [row.position() for row in self._rows if row.is_selected()]
+
+    def _on_row_clicked(self, position: int, modifiers):
+        """Pick a level and put it in the preview.
+
+        Ctrl adds to the picking without moving the preview — the gesture is
+        "these ones", aimed at the Delete that follows, and swapping the picture
+        under each ctrl-click would fight it."""
+        if modifiers & Qt.KeyboardModifier.ControlModifier:
+            for row in self._rows:
+                if row.position() == position:
+                    row.set_selected(not row.is_selected())
             return
-        self._tiles[position].set_highlighted(on)
+        for row in self._rows:
+            row.set_selected(row.position() == position)
+        self.level_selected.emit(position)
+
+    def _on_row_menu(self, position: int, global_pos: QPoint):
+        """The right-click menu: Delete, over whatever is picked.
+
+        A right-click on an unpicked row picks it first, so the menu always acts
+        on what it appeared over — the same rule the thumbnail menu follows."""
+        if position not in self.selected_positions():
+            for row in self._rows:
+                row.set_selected(row.position() == position)
+        picked = self.selected_positions()
+        if not picked:
+            return
+        menu = QMenu(self)
+        action = menu.addAction(
+            f"Delete {len(picked)} version{'s' if len(picked) != 1 else ''}"
+        )
+        if not self._may_delete(picked):
+            # Grayed with the reason on it rather than absent: the answer to
+            # "why can't I delete this" is the only thing the menu can offer.
+            action.setEnabled(False)
+            action.setText("Delete (this is the image's only version)")
+        if menu.exec(global_pos) is action and self._may_delete(picked):
+            self.delete_requested.emit(picked)
+
+    def _may_delete(self, positions: list[int]) -> bool:
+        """Whether binning ``positions`` would leave the image a version.
+
+        An image with no file left is a deleted generation, and deleting a
+        generation is the gallery's own action, reached from its thumbnail — a
+        version list quietly doing it would be a much bigger delete than the one
+        that was asked for."""
+        return bool(positions) and len(positions) < len(self._rows)
+
+    def keyPressEvent(self, event):
+        """Delete or Backspace bins the picked levels — the keys that delete a
+        picked thumbnail, over the picked versions instead."""
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            picked = self.selected_positions()
+            if self._may_delete(picked):
+                self.delete_requested.emit(picked)
+                return
+        super().keyPressEvent(event)
+
+    def _highlight_level(self, position: int | None, on: bool) -> None:
+        """Light the level the dimmed ``+ Enhance`` row would have duplicated."""
+        if position is None or not 0 <= position < len(self._rows):
+            return
+        self._rows[position].set_highlighted(on)
 
     def update_pending(self, pending: tuple | None) -> bool:
-        """Feed a new frame to the tile already standing, without rebuilding.
+        """Feed a new frame to the row already standing, without rebuilding.
 
-        A run streams frames several times a second, and rebuilding the strip on
+        A run streams frames several times a second, and rebuilding the list on
         each would thrash the layout under the cursor mid-drag. Returns whether
-        the update landed; ``False`` means the strip's shape has to change (a run
+        the update landed; ``False`` means the list's shape has to change (a run
         started or ended) and the caller should rebuild.
         """
         if (self._pending is None) != (pending is None):

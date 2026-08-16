@@ -18,10 +18,12 @@ from origenerator.gallery.enhance import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    displayed_levels,
     enhance_levels,
     enhance_params_for,
     fold_enhancement,
     level_matching_settings,
+    remove_enhance_levels,
 )
 
 
@@ -303,3 +305,91 @@ def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
         "enhance_scale": 2.0, "checkpoint": "driftwood_v1.safetensors",
     }) == "2x · driftwood_v1.safetensors"
     assert describe_enhance_params({}) == ""
+
+
+# --- what the info pane lists, and what deleting a level leaves behind ------
+
+
+def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
+    # This is where an image's versions live, so it has to be somewhere you can
+    # already see before the first enhancement makes a second one.
+    (level,) = displayed_levels(_source_row())
+    assert level.is_original
+    assert level.file["filename"] == "sdxl_t2i_src.png"
+
+
+def test_a_video_lists_no_versions():
+    # The enhancer takes images, so a video's file stays in the block at the top.
+    video = dict(_source_row(), output_files=json.dumps(
+        [{"filename": "wan_00001.mp4", "subfolder": "video", "type": "output"}]))
+    assert displayed_levels(video) == []
+
+
+def _folded(tmp_path, count=1):
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    for i in range(1, count + 1):
+        _add_and_fold(db, f"e{i}", f"image_enhance_0000{i}_.png",
+                      enhance_scale=float(i + 1))
+    return db.get_generation("src")
+
+
+def test_removing_an_enhancement_leaves_the_others(tmp_path):
+    row = _folded(tmp_path, count=2)
+    updates = remove_enhance_levels(row, ["image_enhance_00002_.png"])
+    after = dict(row, **updates)
+    assert [lvl.label for lvl in enhance_levels(after)] == ["Enhance 1", "Original"]
+    assert json.loads(after["enhance_history"]) == [
+        {"filename": "image_enhance_00001_.png", "params": {"enhance_scale": 2.0}}
+    ]
+
+
+def test_removing_the_last_enhancement_leaves_a_plain_image(tmp_path):
+    # An original still marked as one would read as an enhancement of itself.
+    row = _folded(tmp_path, count=1)
+    after = dict(row, **remove_enhance_levels(row, ["image_enhance_00001_.png"]))
+    assert after["original_files"] is None
+    assert after["enhance_history"] is None
+    assert not gallery.is_enhanced_row(after)
+    assert enhance_levels(after) == []
+
+
+def test_removing_the_original_keeps_every_enhancement_named(tmp_path):
+    # Binning the pre-enhance file is a fair thing to want; what is left is
+    # still two enhancements, and each still says what made it.
+    row = _folded(tmp_path, count=2)
+    after = dict(row, **remove_enhance_levels(row, ["sdxl_t2i_src.png"]))
+    levels = enhance_levels(after)
+    assert [lvl.label for lvl in levels] == ["Enhance 2", "Enhance 1"]
+    assert levels[0].params == {"enhance_scale": 3.0}
+    assert gallery.is_enhanced_row(after)   # still an enhanced image, badge and all
+
+
+def test_removing_an_inline_tails_enhancement_untags_its_base_render():
+    # An inline run tags the base render it kept; left tagged with nothing ahead
+    # of it, that one file would read as an enhancement of itself.
+    row = dict(
+        _source_row(),
+        params_json=json.dumps({"enhance": False}),
+        output_files=json.dumps([
+            {"filename": "enhanced.png", "subfolder": "image"},
+            {"filename": "base.png", "subfolder": "image", "role": "original"},
+        ]),
+    )
+    after = dict(row, **remove_enhance_levels(row, ["enhanced.png"]))
+    assert json.loads(after["output_files"]) == [
+        {"filename": "base.png", "subfolder": "image"}
+    ]
+    assert not gallery.is_enhanced_row(after)
+
+
+def test_removing_every_version_changes_nothing(tmp_path):
+    # A generation with no file is a generation deleted, which is a bigger
+    # delete than a version list should make.
+    row = _folded(tmp_path, count=1)
+    assert remove_enhance_levels(
+        row, ["image_enhance_00001_.png", "sdxl_t2i_src.png"]) == {}
+
+
+def test_removing_a_name_the_row_never_held_changes_nothing(tmp_path):
+    assert remove_enhance_levels(_folded(tmp_path), ["someone_elses.png"]) == {}

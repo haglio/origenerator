@@ -14,12 +14,21 @@ and the bin — restored or ended from the gallery's Trash shelf, through
 is the slow one.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator import recovery
-from origenerator.gallery import custom_folder_id, output_disk_files
+from origenerator.gallery import (
+    custom_folder_id,
+    output_disk_files,
+    remove_enhance_levels,
+    resolve_preview,
+)
+from origenerator.thumbnail import generate_thumbnail
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,12 +42,17 @@ class _UndoEntry:
 
 class GalleryActions:
     def __init__(self, db, output_dir: Path, trash, limit: int = 50,
-                 release_files: Callable[[list[Path]], None] | None = None):
+                 release_files: Callable[[list[Path]], None] | None = None,
+                 thumb_dir: Path | None = None):
         self._db = db
         self._output_dir = Path(output_dir)
         self._trash = trash
         self._limit = limit
         self._release_files = release_files
+        # Where a row's tile picture lives, so deleting the version it was made
+        # from can redraw it from whichever version now leads. Optional: without
+        # it the row keeps a picture of a file that is no longer there.
+        self._thumb_dir = Path(thumb_dir) if thumb_dir else None
         self._stack: list[_UndoEntry] = []
 
     # --- deletion ----------------------------------------------------------
@@ -70,12 +84,81 @@ class GalleryActions:
         # bin goes on holding the files until they expire or the user says so.
         self._push(_UndoEntry(_delete_label(len(rows)), undo))
 
-    def _trash_files(self, rows: list[dict]):
+    def delete_enhance_levels(self, row: dict, filenames: list[str]) -> bool:
+        """Trash some of one image's versions, keeping the generation itself.
+
+        A level is a file, not a generation: binning the 0.3-denoise experiment
+        leaves the image where it is, in its folder, with its star and its other
+        versions. So this trashes those files and rewrites only the row's version
+        bookkeeping (:func:`~origenerator.gallery.enhance.remove_enhance_levels`),
+        as one undoable step.
+
+        Returns whether anything was deleted — ``False`` when the names match no
+        file, or when they would take every version the row has: an image with no
+        file left is a deleted generation, and that is the gallery's own delete,
+        reached from the thumbnail rather than from this list.
+
+        Nothing is filed in the recovery bin: the bin holds a row and the files
+        it was deleted with, and this row was not deleted. So these files keep
+        the old arrangement — the trash holds them, and the undo entry falling
+        off the stack is what ends them.
+        """
+        prompt_id = row["prompt_id"]
+        updates = remove_enhance_levels(row, filenames)
+        if not updates:
+            return False
+        before = {
+            "output_files": row.get("output_files"),
+            "original_files": row.get("original_files"),
+            "enhance_history": row.get("enhance_history"),
+            "thumbnail_path": row.get("thumbnail_path"),
+        }
+        # Files out first, as everywhere: a move that fails loses nothing.
+        ((_row, batch),) = self._trash_files([row], names=set(filenames))
+        self._db.update_generation(prompt_id, **updates)
+        self._redraw_thumbnail(prompt_id)
+
+        def undo() -> str | None:
+            batch.restore()
+            self._db.update_generation(prompt_id, **before)
+            self._redraw_thumbnail(prompt_id)
+            return prompt_id
+
+        self._push(_UndoEntry(_level_label(len(filenames)), undo, batch.purge))
+        return True
+
+    def _redraw_thumbnail(self, prompt_id: str) -> None:
+        """Rebuild a row's tile picture from whichever version now leads it.
+
+        The thumbnail is a separate JPEG keyed by prompt_id, so deleting the
+        version it was rendered from leaves it showing a file that is gone —
+        the gallery would still be advertising the enhancement you just binned.
+        Rendering is best-effort: a row that can't be redrawn keeps the picture
+        it has rather than losing its tile.
+        """
+        if self._thumb_dir is None:
+            return
+        row = self._db.get_generation(prompt_id)
+        preview = resolve_preview(row, self._output_dir) if row else None
+        if preview is None:
+            return
+        try:
+            path = generate_thumbnail(preview[0], preview[1], self._thumb_dir,
+                                      name=prompt_id)
+        except Exception:
+            logger.exception("Could not redraw the thumbnail for %s", prompt_id)
+            return
+        self._db.update_generation(prompt_id, thumbnail_path=str(path))
+
+    def _trash_files(self, rows: list[dict], names: set[str] | None = None):
         """Move the files ``rows`` own into the trash — a batch per row — after
         telling the app to let go of them. Returns ``(row, batch)`` pairs.
 
         A batch per row is what lets the bin restore or end one item on its own;
         deleting a whole folder is still one undo step, made of them.
+
+        ``names`` narrows each row to those output files, for a delete that takes
+        some of a row's files rather than the row.
 
         The release comes first because a file the app itself still holds open
         can't be moved on Windows at all: a preview keeps its video's file open
@@ -84,24 +167,29 @@ class GalleryActions:
         Every path in and out of the trash runs through here so no caller can
         forget it.
         """
-        by_row = self._files_by_row(rows)
+        by_row = self._files_by_row(rows, names)
         if self._release_files is not None:
             self._release_files([path for files in by_row for path in files])
         return [(row, self._trash.store(files)) for row, files in zip(rows, by_row)]
 
-    def _files_by_row(self, rows: list[dict]) -> list[list[Path]]:
+    def _files_by_row(self, rows: list[dict],
+                      names: set[str] | None = None) -> list[list[Path]]:
         """Each row's on-disk files — outputs, sidecars, thumbnail — in row order.
 
         A path two rows both claim (a shared sidecar) goes to the first of them:
         it can only be moved once, and the batch that took it is the one that has
         to put it back.
+
+        ``names`` narrows each row to those output files, and leaves the
+        thumbnail where it is: a delete of some of a row's versions is not a
+        delete of the row, and its tile still has a picture to show.
         """
         seen: set[str] = set()
         by_row: list[list[Path]] = []
         for row in rows:
-            candidates = list(output_disk_files(row, self._output_dir))
+            candidates = list(output_disk_files(row, self._output_dir, names))
             thumb = row.get("thumbnail_path")
-            if thumb:
+            if thumb and names is None:
                 candidates.append(Path(thumb))
             files = []
             for path in candidates:
@@ -299,6 +387,10 @@ class GalleryActions:
 
 def _delete_label(count: int) -> str:
     return f"Delete {count} item{'s' if count != 1 else ''}"
+
+
+def _level_label(count: int) -> str:
+    return f"Delete {count} version{'s' if count != 1 else ''}"
 
 
 def _add_label(count: int, name: str) -> str:

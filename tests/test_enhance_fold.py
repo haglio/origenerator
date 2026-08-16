@@ -164,14 +164,20 @@ def test_original_files_survives_capture_and_restore(tmp_path):
     assert db.get_generation("src")["original_files"] == row["original_files"]
 
 
-def test_metadata_labels_the_pre_enhance_file_original(tmp_path):
-    from origenerator.generation_metadata import build_sections
+def test_each_version_carries_its_own_file_row(tmp_path):
+    # The file information is per enhancement, so it belongs to the level that
+    # made the file rather than to one block at the top of the pane. The top
+    # block is then left with nothing to say about an image at all.
+    from origenerator.generation_metadata import build_sections, file_item
 
     db = Database(tmp_path / "t.db")
     _add_source(db)
     fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
                                       "image_enhance_00001_.png"))
-    (basic,) = build_sections(db.get_generation("src"))
-    labels = [(item.label, item.value) for item in basic.items]
-    assert ("Enhance 1", "image/image_enhance_00001_.png") == labels[0]
-    assert ("Original", "image/sdxl_t2i_src.png") == labels[1]
+    row = db.get_generation("src")
+    levels = gallery.displayed_levels(row)
+    assert [(lvl.label, file_item(lvl.file).value) for lvl in levels] == [
+        ("Enhance 1", "image/image_enhance_00001_.png"),
+        ("Original", "image/sdxl_t2i_src.png"),
+    ]
+    assert build_sections(row) == []

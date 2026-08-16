@@ -3,9 +3,10 @@
 ComfyUI runs a single job at a time, so at most one generation is ever executing
 (plus any queued behind it). This bar sits at the bottom of the gallery and shows
 that job from anywhere in the app — a small live preview, its caption, a progress
-bar, a "+N queued" count, and a cancel — so you can watch or stop it without
-leaving whatever folder or config tab you're on. Clicking the bar reveals the job
-(its config tab or re-roll folder); the ✕ cancels it.
+bar, how long it has been running and how much longer it has to go, a "+N queued"
+count, and a cancel — so you can watch or stop it without leaving whatever folder
+or config tab you're on. Clicking the bar reveals the job (its config tab or
+re-roll folder); the ✕ cancels it.
 
 It also speaks for the *shared* ComfyUI, which is what makes it worth watching
 when none of the work is ours. The server outlives whatever queued on it, so its
@@ -20,19 +21,26 @@ It's fed the same in-flight view-models the Recents shelf uses
 progress stay live.
 """
 
+import time
+
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QProgressBar, QToolButton,
 )
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.inflight_card import foreign_queue_text, queue_wait_text
 from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.timing import progress_time_label
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
 
 _PREVIEW = 40  # a small live thumbnail; the full-size preview is one click away
+# The gallery's poll — which is what re-feeds this bar — runs every 1.5s, so a
+# seconds count driven by it would skip one every other tick. The bar re-reads
+# the clock itself on this interval, and the count advances a second at a time.
+_TICK_MS = 1000
 
 
 class RunningJobBar(QWidget):
@@ -63,8 +71,17 @@ class RunningJobBar(QWidget):
         middle = QVBoxLayout()
         middle.setContentsMargins(0, 0, 0, 0)
         middle.setSpacing(2)
+        # The caption and the clock share a row above the bar, so the timing rides
+        # along without adding a third line (and a taller bar) to the layout.
+        caption_row = QHBoxLayout()
+        caption_row.setContentsMargins(0, 0, 0, 0)
+        caption_row.setSpacing(8)
         self._caption = QLabel()
-        middle.addWidget(self._caption)
+        caption_row.addWidget(self._caption, 1)
+        self._timing = QLabel()
+        self._timing.setObjectName("estimateLabel")  # muted secondary text
+        caption_row.addWidget(self._timing)
+        middle.addLayout(caption_row)
         self._progress = QProgressBar()
         self._progress.setTextVisible(False)
         self._progress.setFixedHeight(8)
@@ -92,8 +109,13 @@ class RunningJobBar(QWidget):
 
         # Let clicks on the labels/preview/progress fall through to the bar (which
         # reveals the job); only the cancel button handles its own click.
-        for child in (self._preview, self._caption, self._progress, self._queued):
+        for child in (self._preview, self._caption, self._timing,
+                      self._progress, self._queued):
             child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+        self._tick = QTimer(self)
+        self._tick.setInterval(_TICK_MS)
+        self._tick.timeout.connect(self._render_timing)
 
         self._show_idle()  # nothing in flight yet — hold the slot, but blank
 
@@ -122,6 +144,8 @@ class RunningJobBar(QWidget):
         self._caption.clear()
         self._preview.clear()
         self._queued.clear()
+        self._timing.clear()
+        self._tick.stop()
         self._progress.hide()
         self._cancel.hide()
         self._clear.hide()
@@ -134,6 +158,8 @@ class RunningJobBar(QWidget):
         self._caption.setText(foreign_queue_text(total) or "")
         self._preview.clear()
         self._queued.clear()
+        self._timing.clear()  # their run, their clock — we don't time it
+        self._tick.stop()
         self._progress.hide()
         self._cancel.hide()
         self._sync_clear()
@@ -144,6 +170,8 @@ class RunningJobBar(QWidget):
         self._render_preview(item.frame)
         self._progress.show()
         self._render_progress(item)
+        self._render_timing()
+        self._tick.start()  # keep the clock moving between the gallery's polls
         self._queued.setText(self._waiting_text(item, queued))
         self._cancel.setVisible(item.cancel is not None)
         self._sync_clear()
@@ -177,6 +205,23 @@ class RunningJobBar(QWidget):
             ))
         else:
             self._preview.clear()  # no frame yet — a blank square, not a stale one
+
+    def _render_timing(self):
+        """How long the shown job has been running, and how much longer it has.
+
+        Read off the clock rather than off the feed, so the count advances evenly
+        whether or not a poll has landed. A job still queued has no elapsed time
+        to report and the line stays empty — its wait is the ``_queued`` slot's
+        to explain, not a zero counting up beside a bar that hasn't moved.
+        """
+        if self._item is None:
+            self._timing.clear()
+            return
+        started = self._item.started_at
+        elapsed = None if started is None else max(0.0, time.time() - started)
+        self._timing.setText(progress_time_label(
+            elapsed, self._item.progress, self._item.typical_seconds
+        ))
 
     def _render_progress(self, item):
         if item.status == "running" and item.progress and item.progress[1] > 0:

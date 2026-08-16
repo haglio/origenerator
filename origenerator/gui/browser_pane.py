@@ -16,7 +16,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
 from PyQt6.QtCore import Qt, QTimer
 
-from origenerator import gallery
+from origenerator import gallery, timing
 from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
@@ -340,12 +340,13 @@ class BrowserPane:
         flight — every generation is a gallery re-roll (a tab's Generate launches
         one too) — so a card shows even when no live job object is tracking a row
         (after a restart that hasn't re-adopted it, say). A re-roll tracked this
-        session grafts on its live frame, progress and cancel from its
+        session grafts on its live frame, progress, cancel and start time from its
         :class:`GenerationJob`; an untracked running row shows a plain card.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, job in self._v._reroll.jobs.items()}
         image_index = None  # built lazily, only to place an untracked row's folder
+        typical: dict[str, float | None] = {}  # workflow -> its usual run time
         items = []
         for row in self._v._db.list_generations():
             if row.get("status") not in ("running", "pending"):
@@ -356,16 +357,18 @@ class BrowserPane:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
+                started = job.started_at  # None until ComfyUI actually starts it
                 cancel = lambda k=folder_key: self._v._cancel_reroll(k)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
                 folder_key = gallery.settings_folder_key(row, image_index)
-                frame, progress, cancel, foreign = None, None, None, None
+                frame, progress, cancel, foreign, started = None, None, None, None, None
+            workflow_name = row.get("workflow_name") or ""
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(
-                    row.get("workflow_name") or "", gallery.parse_params(row.get("params_json"))
+                    workflow_name, gallery.parse_params(row.get("params_json"))
                 ),
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
@@ -374,9 +377,21 @@ class BrowserPane:
                 progress=progress,
                 cancel=cancel,
                 foreign_ahead=foreign,
+                started_at=started,
+                typical_seconds=self._typical_seconds(workflow_name, typical),
             ))
         items.sort(key=lambda it: it.status != "running")  # stable: running first
         return items
+
+    def _typical_seconds(self, workflow_name: str, cache: dict):
+        """What a whole run of ``workflow_name`` usually takes, for the running
+        bar's countdown — memoized into ``cache`` for the length of one pass,
+        since this list is rebuilt on every poll."""
+        if workflow_name not in cache:
+            cache[workflow_name] = timing.estimate_seconds(
+                self._v._db.recent_durations(workflow_name)
+            )
+        return cache[workflow_name]
 
     def _reveal_reroll(self, key: str):
         """Open the folder a re-roll runs in and select its live tile."""

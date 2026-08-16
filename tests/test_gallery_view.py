@@ -1,4 +1,5 @@
 import json
+import time
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -4182,12 +4183,13 @@ class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
-                 progress=(0, 0), foreign_ahead=None):
+                 progress=(0, 0), foreign_ahead=None, started_at=None):
         self.prompt_id = prompt_id
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
         self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
+        self.started_at = started_at        # when ComfyUI began it; None while queued
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
 
@@ -4385,6 +4387,54 @@ def test_running_bar_shows_the_active_job_then_blanks_when_idle(qtbot):
     view._poll()
     assert view._running_bar.isVisible()      # still holding its slot
     assert view._running_bar._item is None    # but blank
+
+
+def test_running_bar_times_the_job_against_the_workflows_recent_runs(qtbot):
+    # What the bottom bar counts down from: the live job's own start time and the
+    # median of what this workflow's finished runs actually took.
+    db = FakeDB([
+        _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
+        _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
+        _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
+    ])
+    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    folder_key = _running_folder_key(view)
+    began = time.time() - 90.5
+    view._reroll_jobs[folder_key] = _FakeRerollJob(
+        "rr1", "wan22_i2v", {}, state="running", progress=(10, 20), started_at=began
+    )
+
+    item = view._inflight_items()[0]
+    assert item.started_at == began
+    assert item.typical_seconds == 724.0   # the median of the three timed runs
+
+    view._update_running_bar()
+    assert view._running_bar._timing.text() == "1:30 elapsed · ~10:33 left"
+
+
+def test_running_bar_has_no_clock_for_a_job_still_queued(qtbot):
+    # Nothing has begun, so there is no elapsed time to report — the wait behind
+    # ComfyUI is the queued slot's to explain.
+    db = FakeDB([_image("done", "a cat", 50, 1)])
+    db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
+                status="pending", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._inflight_items()[0].started_at is None
+    assert view._running_bar._timing.text() == ""
+
+
+def _running_folder_key(view):
+    """The settings-folder key the running wan22_i2v row above lands in."""
+    return gallery.settings_folder_key(
+        view._db.get_generation("rr1"),
+        gallery.build_image_config_index(view._image_rows),
+    )
 
 
 def _finished_row_db(tmp_path):

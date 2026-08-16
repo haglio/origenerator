@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -281,6 +282,56 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
 
     state = job.progress_state()
     assert state["last_progress"] == [13, 20]
+
+
+def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
+    # Submitted isn't started: on a busy queue the wait can be many minutes, and
+    # counting it as run time would make the estimate of what's left nonsense.
+    job, _client_ = _started_job(tmp_path)
+    assert job.started_at is None
+
+
+def test_the_start_time_is_stamped_at_the_first_sign_of_life(qtbot, tmp_path):
+    job, client = _started_job(tmp_path)
+    before = time.time()
+    client.progress.emit("comfy-A", 5, 50)
+    assert before <= job.started_at <= time.time()
+
+    stamped = job.started_at
+    client.progress.emit("comfy-A", 6, 50)
+    assert job.started_at == stamped  # the run began once, not on every tick
+
+
+def test_progress_state_carries_the_start_time(qtbot, tmp_path):
+    job, client = _started_job(tmp_path)
+    client.progress.emit("comfy-A", 5, 50)
+    assert job.progress_state()["started_at"] == job.started_at
+
+
+def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path):
+    # The payoff for persisting it: an app restarted mid-run picks the count back
+    # up where the run really began, rather than restarting the clock at zero and
+    # claiming a job ten minutes in has only just started.
+    began = time.time() - 600
+    job = GenerationJob.reconnect(
+        _client(), SDXL, _params(), "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+        progress_state={"last_progress": [30, 70], "started_at": began},
+    )
+    assert job.started_at == began
+
+
+def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):
+    # A row persisted before the start time was recorded arrives already running,
+    # so the queued->running flip that normally stamps it never happens. It gets
+    # one anyway — an undercount beats a job that never shows a clock at all.
+    job = GenerationJob.reconnect(
+        _client(), SDXL, _params(), "pid",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    assert job.started_at is None
+    job._on_progress("pid", 5, 50)
+    assert job.started_at is not None
 
 
 def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):

@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from PyQt6.QtCore import Qt
 
@@ -15,10 +17,12 @@ def bar(qtbot):
 
 
 def _item(key="j1", caption="SDXL › x", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None):
+          progress=None, reveal=None, cancel=None, foreign_ahead=None,
+          started_at=None, typical_seconds=None):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
-                        foreign_ahead=foreign_ahead)
+                        foreign_ahead=foreign_ahead, started_at=started_at,
+                        typical_seconds=typical_seconds)
 
 
 def test_keeps_its_slot_when_idle(bar):
@@ -62,6 +66,59 @@ def test_progress_is_indeterminate_without_step_counts(bar):
     # (indeterminate) bar rather than a stuck 0%.
     bar.set_items([_item(status="queued", progress=None)])
     assert bar._progress.maximum() == 0
+
+
+# --- how long it's been, and how long is left --------------------------------
+
+def test_shows_the_elapsed_time_and_what_is_left(bar):
+    # A 12-minute video job 90 seconds in: the wait now has both numbers on it
+    # instead of a bar creeping along with nothing to measure it against. The
+    # half-seconds keep both readings a clear half-second off a rollover, so the
+    # time the test itself takes can't tip either one.
+    bar.set_items([_item(status="running", progress=(10, 20),
+                         started_at=time.time() - 90.5, typical_seconds=725.0)])
+    assert bar._timing.text() == "1:30 elapsed · ~10:34 left"
+
+
+def test_shows_the_elapsed_time_alone_with_no_estimate(bar):
+    # The first run of a workflow has no history behind it, and one step in it's
+    # too early to pace off — the elapsed count still stands on its own.
+    bar.set_items([_item(status="running", progress=(1, 20),
+                         started_at=time.time() - 45.5)])
+    assert bar._timing.text() == "0:45 elapsed"
+
+
+def test_no_clock_on_a_job_that_has_not_started(bar):
+    bar.set_items([_item(status="queued", started_at=None, typical_seconds=724.0)])
+    assert bar._timing.text() == ""
+
+
+def test_the_clock_advances_between_polls(bar):
+    # The gallery re-feeds the bar every 1.5s, which would make a seconds count
+    # skip; the bar re-reads the clock itself so it moves a second at a time.
+    bar.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert bar._timing.text() == "0:05 elapsed"
+    bar._item.started_at -= 3   # as if three more seconds had gone by
+    bar._tick.timeout.emit()
+    assert bar._timing.text() == "0:08 elapsed"
+
+
+def test_the_clock_stops_when_the_job_does(bar):
+    bar.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert bar._tick.isActive()
+    bar.set_items([])
+    assert not bar._tick.isActive()
+    assert bar._timing.text() == ""
+
+
+def test_the_clock_keeps_the_same_footprint(bar):
+    # Same reason the idle bar holds its slot: the timing rides in the caption's
+    # row rather than adding a line that would shove the panes above it.
+    bar.set_items([])
+    idle = bar.sizeHint().height()
+    bar.set_items([_item(status="running", progress=(10, 20),
+                         started_at=time.time() - 90.5, typical_seconds=725.0)])
+    assert bar.sizeHint().height() == idle
 
 
 def test_clicking_the_bar_reveals_the_job(bar, qtbot):

@@ -1,9 +1,12 @@
-"""Generation-time tracking: read execution times and estimate future ones.
+"""Generation-time tracking: read execution times, estimate future ones, and
+count a running one down.
 
 Pure functions with no Qt or DB dependency so the timing logic can be unit
 tested directly. ComfyUI stamps every prompt's history with ``execution_start``
 and ``execution_success`` events carrying millisecond timestamps; the gap
-between them is the real generation time, free of queue-wait noise.
+between them is the real generation time, free of queue-wait noise. Those
+measured times are both what a resting estimate is drawn from and what tells a
+job in flight how much of its run is left (:func:`progress_time_label`).
 """
 
 import statistics
@@ -45,6 +48,85 @@ def average_seconds(durations: list[float]) -> float | None:
     if not durations:
         return None
     return statistics.fmean(durations)
+
+
+def clock_duration(seconds: float) -> str:
+    """A ``m:ss`` (or ``h:mm:ss``) reading of a count the user is watching move.
+
+    The opposite call from :func:`_coarse_duration`, and for the opposite job: a
+    resting estimate rounds to one unit so it claims no precision it hasn't got,
+    while a live count has to visibly advance, so the seconds stay on screen.
+    """
+    total = max(0, int(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+# How much of a run's sampling has to be behind it before its own pace is worth
+# extrapolating from. The opening steps carry the model load — a 14B checkpoint
+# coming off disk — so a rate measured across one or two of them predicts a run
+# several times longer than the real one.
+_PACE_MIN_FRACTION = 0.25
+_PACE_MIN_STEPS = 2
+
+
+def _pace_remaining(elapsed: float, progress: tuple[int, int] | None) -> float | None:
+    """Seconds left at the pace this run has been sampling at.
+
+    ``None`` while it's too early for that pace to mean anything, and once the
+    last step is done — past there the step count has nothing left to say.
+    """
+    if not progress or elapsed <= 0:
+        return None
+    done, total = progress
+    if total <= 0 or done <= 0 or done >= total:
+        return None
+    if done < max(_PACE_MIN_STEPS, total * _PACE_MIN_FRACTION):
+        return None
+    return elapsed * (total - done) / done
+
+
+def remaining_seconds(elapsed: float, progress: tuple[int, int] | None,
+                      typical: float | None) -> float | None:
+    """How much longer a running generation has to go, from two readings.
+
+    Whichever says more is left wins. The run's own sampling pace is what catches
+    a run going slower than usual, but it only measures sampling — a video job
+    still has a VAE decode and an audio pass after its last step, and the step
+    count knows nothing about those. The workflow's typical time covers that
+    tail, so taking the larger keeps the number from sitting at zero through it.
+
+    ``0.0`` once both readings are spent — the run is over its time, which is
+    worth saying — against ``None`` when there was never anything to go on.
+    """
+    readings = [r for r in (
+        None if typical is None else typical - elapsed,
+        _pace_remaining(elapsed, progress),
+    ) if r is not None]
+    if not readings:
+        return None
+    return max(max(readings), 0.0)
+
+
+def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,
+                        typical: float | None) -> str:
+    """The running bar's live line: ``"1:23 elapsed · ~4:10 left"``.
+
+    ``""`` for a job that hasn't started (``elapsed`` of ``None``), so a queued
+    one shows nothing rather than a zero that reads as stuck.
+    """
+    if elapsed is None:
+        return ""
+    label = f"{clock_duration(elapsed)} elapsed"
+    remaining = remaining_seconds(elapsed, progress, typical)
+    if remaining is None:
+        return label
+    if remaining < 1:
+        return f"{label} · finishing"
+    return f"{label} · ~{clock_duration(remaining)} left"
 
 
 def _coarse_duration(seconds: float) -> str:

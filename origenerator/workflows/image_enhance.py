@@ -27,7 +27,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
 
     That tail's gentleness is also its ceiling: it cannot mend a mouth fused
     into its teeth or a hand with a finger too many, because the denoise that
-    would redraw them redraws everything else too. ``detail_fix`` adds a second
+    would redraw them redraws everything else too. ``enhance_detail_fix`` adds a second
     stage past it (:meth:`WorkflowTemplate.detail_fix_nodes`) that finds the
     faces and hands and re-samples each one alone, at its own much higher
     denoise, leaving every pixel outside those regions exactly as the tail left
@@ -67,10 +67,10 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
-            "detail_fix": False,
-            "detail_denoise": 0.45,
-            "face_detector": _DEFAULT_FACE_DETECTOR,
-            "hand_detector": _DEFAULT_HAND_DETECTOR,
+            "enhance_detail_fix": False,
+            "enhance_detail_denoise": 0.45,
+            "enhance_face_detector": _DEFAULT_FACE_DETECTOR,
+            "enhance_hand_detector": _DEFAULT_HAND_DETECTOR,
             "filename_prefix": "image/image_enhance",
         }
 
@@ -92,14 +92,14 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
-            ParamDef("detail_fix", "Fix Faces & Hands", "bool", False),
+            ParamDef("enhance_detail_fix", "Fix Faces & Hands", "bool", False),
             # Floored above zero: the detailer node rejects 0, and a pass that
             # repaints nothing is a slower way of not running one.
-            ParamDef("detail_denoise", "Detail Denoise", "float", 0.45,
+            ParamDef("enhance_detail_denoise", "Detail Denoise", "float", 0.45,
                      min_val=0.05, max_val=1.0, step=0.05),
-            ParamDef("face_detector", "Face Detector", "combo",
+            ParamDef("enhance_face_detector", "Face Detector", "combo",
                      _DEFAULT_FACE_DETECTOR, options=detectors),
-            ParamDef("hand_detector", "Hand Detector", "combo",
+            ParamDef("enhance_hand_detector", "Hand Detector", "combo",
                      _DEFAULT_HAND_DETECTOR, options=detectors),
             ParamDef("filename_prefix", "Output Prefix", "str", "image/image_enhance"),
         ]
@@ -114,6 +114,26 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             return None
         scale = params.get("enhance_scale", 1.0)
         return round(size[0] * scale), round(size[1] * scale)
+
+    @staticmethod
+    def _with_installed_detectors(params: dict) -> dict:
+        """``params`` with any detail-pass detector ComfyUI hasn't got blanked.
+
+        Faces and hands are found by two different models, and having only one
+        of them installed is an ordinary state — but ComfyUI validates the name
+        and rejects the whole prompt over the missing one, which would take the
+        half that could have run down with it. Blanked, that half simply builds
+        no nodes (see :meth:`WorkflowTemplate.detail_fix_nodes`). With neither
+        installed the pass builds nothing at all, which is the state the Enhance
+        panel dims its checkbox for.
+        """
+        if not params.get("enhance_detail_fix"):
+            return params
+        installed = set(list_detector_files())
+        return dict(params, **{
+            key: (params.get(key) if params.get(key) in installed else "")
+            for key in ("enhance_face_detector", "enhance_hand_detector")
+        })
 
     def build_api_payload(self, params: dict) -> dict:
         tail, enhanced_ref = self.enhance_image_nodes(
@@ -141,7 +161,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ("13", "14", "15"), ("16", "17", "18"),
             image_ref=enhanced_ref, model_ref=["2", 0], clip_ref=["2", 1],
             vae_ref=["5", 0], positive_ref=["3", 0], negative_ref=["4", 0],
-            params=params,
+            params=self._with_installed_detectors(params),
         )
         return {
             "1": {

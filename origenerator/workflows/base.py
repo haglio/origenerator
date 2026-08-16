@@ -324,7 +324,7 @@ class WorkflowTemplate(ABC):
         floorboards too — which is how creases became wounds. This pass spends
         that denoise where it is wanted instead. A YOLO detector finds the faces
         (then the hands), each box is cropped out and enlarged to the sampler's
-        own working size, re-sampled at ``detail_denoise``, and composited back
+        own working size, re-sampled at ``enhance_detail_denoise``, and composited back
         through a feathered mask — so a mouth or a finger is redrawn at real
         resolution while every pixel outside the boxes is left untouched.
 
@@ -337,13 +337,14 @@ class WorkflowTemplate(ABC):
         and rejects the whole submit for one it cannot find.
 
         Returns ``(nodes, image_ref)`` — the dict to merge into the payload, and
-        the end of the chain. With ``detail_fix`` off (or no detector named)
+        the end of the chain. With ``enhance_detail_fix`` off (or no detector named)
         that is ``image_ref`` unchanged, so the caller saves the tail's output.
         """
-        if not params.get("detail_fix"):
+        if not params.get("enhance_detail_fix"):
             return {}, image_ref
         nodes: dict = {}
-        for ids, key in ((face_ids, "face_detector"), (hand_ids, "hand_detector")):
+        for ids, key in ((face_ids, "enhance_face_detector"),
+                         (hand_ids, "enhance_hand_detector")):
             detector = params.get(key)
             if not detector:
                 continue
@@ -386,7 +387,7 @@ class WorkflowTemplate(ABC):
                     "scheduler": params["scheduler"],
                     "positive": positive_ref,
                     "negative": negative_ref,
-                    "denoise": params["detail_denoise"],
+                    "denoise": params["enhance_detail_denoise"],
                     "feather": _DETAIL_FEATHER,
                     "noise_mask": True,
                     "force_inpaint": True,

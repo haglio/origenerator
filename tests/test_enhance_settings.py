@@ -21,6 +21,7 @@ from origenerator.gallery.enhance import (
     enhance_levels,
     enhance_params_for,
     fold_enhancement,
+    level_matching_settings,
 )
 
 
@@ -96,6 +97,19 @@ def test_enhance_params_take_the_folders_settings_over_the_workflow_defaults():
     assert params["input_image"] == "image/sdxl_t2i_src.png [output]"
     assert params["positive_prompt"] == "a lantern on a jetty"
     assert params["negative_prompt"] == "blurry"
+
+
+def test_the_detail_pass_is_one_of_the_knobs_the_panel_sets():
+    # It is part of what an enhancement IS, not a property of one image, so it
+    # is set once on the panel and every enhance launched from there carries it.
+    settings = EnhanceSettings(params={"enhance_detail_fix": True,
+                                       "enhance_detail_denoise": 0.5})
+    params = enhance_params_for(_source_row(), settings)
+    assert params["enhance_detail_fix"] is True
+    assert params["enhance_detail_denoise"] == 0.5
+    # Left alone it stays off, so nothing starts paying for it by accident.
+    unset = enhance_params_for(_source_row(), EnhanceSettings())
+    assert unset["enhance_detail_fix"] is False
 
 
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
@@ -243,6 +257,41 @@ def test_enhance_history_survives_capture_and_restore(tmp_path):
     db.delete_generation("src")
     db.restore_generation(row)
     assert db.get_generation("src")["enhance_history"] == row["enhance_history"]
+
+
+def test_a_level_recorded_before_a_knob_existed_still_reads_as_a_duplicate(tmp_path):
+    # The knob list grows, and a level recorded before one existed was made with
+    # it at its default — so it still matches settings that leave it there, and
+    # the + Enhance card still knows it would only be making the same thing
+    # twice. Turning the new knob on is a different enhancement, and does not.
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  enhance_scale=2.0, enhance_steps=20, enhance_denoise=0.15,
+                  checkpoint="anemone_v3.safetensors")
+    row = db.get_generation("src")
+    settings = EnhanceSettings(params={
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
+        "checkpoint": "anemone_v3.safetensors",
+    })
+    assert level_matching_settings(row, settings) == 0
+    assert level_matching_settings(
+        row, EnhanceSettings(params=dict(settings.params, enhance_detail_fix=True))
+    ) is None
+
+
+def test_describe_names_the_detail_pass_only_when_it_ran():
+    # Two versions of one image can differ by nothing but this, and the strip's
+    # captions are the only place that difference is visible.
+    assert describe_enhance_params({
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
+    }) == "2x · 20 steps · 0.15 denoise · faces & hands 0.45"
+    # Off says nothing: it is the default rather than a choice, the same reason
+    # a source-matched model goes unnamed.
+    assert describe_enhance_params({"enhance_scale": 2.0,
+                                    "enhance_detail_fix": False,
+                                    "enhance_detail_denoise": 0.45}) == "2x"
 
 
 def test_describe_names_a_pinned_model_but_not_the_source_matching_default():

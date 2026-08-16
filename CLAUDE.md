@@ -61,19 +61,24 @@ what happened on #33, 2026-08-13). Three delivery lessons from the session that
 forced this flow into existence (2026-08-12):
 
 - **NEVER launch the preview yourself. Hand the link and stop.** Running the vbs
-  puts an app window over whatever he is doing and takes his focus — something
+  — `cscript`, `wscript`, `Start-Process`, or a bare `python -m origenerator` —
+  puts an app window over whatever he is doing and takes his focus: something
   popping up unannounced, which he closes in irritation, and his live app goes
   with it (both instances I launched and his running app were gone inside two
   minutes, 2026-08-15; he asked for this law by name). Launching is HIS act, on
-  his schedule: the green suite is the pre-handoff check, and a launcher that
-  fails he will tell you about in one line. This overrides the older "launch it
-  once yourself to confirm it comes up clean" rule, which is what produced the
-  failure. Same reason his live app must never be closed by you — every
-  Origenerator window is a `python` process titled "Origenerator", so a
-  title-matched close shuts his app too (2026-08-13). The near miss that still
-  counts: launching it "just for a few seconds" to read
-  `state\origenerator_launcher.log` — those seconds are the window on his screen,
-  and that is the whole failure.
+  his schedule. This overrides the older "launch it once yourself to confirm it
+  comes up clean" rule, which is what produced the failure. The pre-handoff
+  check is windowless instead: `python -m pytest tests/test_launch_smoke.py`
+  replays the launch's whole import phase in a fresh interpreter under the
+  launcher's own cwd and `PYTHONPATH`, which is precisely what a dead icon fails
+  at — and a launcher that breaks past that, he tells you about in one line.
+  `~/.claude/hooks/block-visible-origenerator.py` blocks the visible launch
+  mechanically, so this one does not rest on prose. Same reason his live app
+  must never be closed by you — every Origenerator window is a `python` process
+  titled "Origenerator", so a title-matched close shuts his app too
+  (2026-08-13). The near miss that still counts: launching it "just for a few
+  seconds" to read `state\origenerator_launcher.log` — those seconds are the
+  window on his screen, and that is the whole failure.
 - Hand a launcher link to the vbs FILE itself — never its folder,
   never a shell command, and never any launcher sharing a filename with the
   live app's. The user was once handed the worktree's `launch_origenerator.vbs`

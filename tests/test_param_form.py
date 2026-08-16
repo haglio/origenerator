@@ -704,7 +704,7 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
     assert form._sections["Model & LoRA"].is_collapsed() is True
     assert form._sections["Sampling"].is_collapsed() is True
     assert form._sections["Frames"].is_collapsed() is True
-    assert form._sections["Output"].is_collapsed() is True
+    assert form._sections["Audio"].is_collapsed() is True
 
 
 def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
@@ -830,3 +830,20 @@ def test_a_passthrough_only_section_appears_when_a_config_supplies_it(qtbot):
     form.set_values({"unet_high": "hi.safetensors", "unet_low": "lo.safetensors"})
     assert form._sections["Model & LoRA"].isHidden() is False
     assert form._present_keys["Model & LoRA"] == ["unet_high", "unet_low"]
+
+
+def test_the_plumbing_params_get_no_row_at_all(qtbot):
+    # Removing their fields alone only demoted them to read-only rows, which is
+    # still an Output section on the form. They round-trip unseen instead.
+    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
+    qtbot.addWidget(form)
+
+    form.set_values({"steps": 30, "batch_size": 4, "filename_prefix": "image/x",
+                     "crf": 19})
+
+    shown = {key for _title, key, _label in form._readonly_rows}
+    assert shown == set()
+    assert "Output" not in form._sections
+    # …and they are still handed back, so a payload built from this form works.
+    values = form.get_values_static()
+    assert values["batch_size"] == 4 and values["filename_prefix"] == "image/x"

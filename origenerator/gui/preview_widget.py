@@ -403,8 +403,9 @@ class PreviewWidget(QWidget):
         from origenerator.gui.fullscreen_preview import FullscreenPreview
         self._fullscreen = FullscreenPreview(self._media, frame=self._live_frame)
         self._fullscreen.showFullScreen()
-        # The view listens for this to drive the OSR2 off the fullscreen video for as
-        # long as it's up — independently of the global Drive-OSR2 toggle.
+        # The view listens for this to re-aim the OSR2 drive at the fullscreen video
+        # for as long as it's up — under the same global Drive-OSR2 toggle that gates
+        # driving from this pane.
         self.fullscreen_opened.emit(self._fullscreen)
         return self._fullscreen
 

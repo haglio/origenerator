@@ -16,8 +16,9 @@ alive, mirroring how the gallery holds its slideshow window.
 
 Being the deliberate foreground view, it plays sound (the inline preview stays
 muted) and exposes its :meth:`osr2_drive_target`, so the gallery can drive the OSR2
-off the video on screen for as long as it's up — regardless of the global toggle.
-It signals :attr:`closed` on dismissal so the device is handed back.
+off the video on screen for as long as it's up — whenever the global Drive-OSR2
+toggle is on, which gates this surface exactly as it gates the inline preview. It
+signals :attr:`closed` on dismissal so the device is handed back.
 """
 
 from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout

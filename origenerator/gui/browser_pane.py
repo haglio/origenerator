@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
 from PyQt6.QtCore import Qt, QTimer
 
 from origenerator import gallery
+from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
@@ -429,6 +430,11 @@ class BrowserPane:
                          else self._empty_state(self._experiments_empty_hint()))
 
     def _experiments_empty_hint(self) -> str:
+        if is_branch_session():
+            return ("Reviewing experiments is the live app's.\n\nA preview's "
+                    "database is a copy, so a verdict recorded here would never "
+                    "reach the live app — and rejecting would delete files its "
+                    "own gallery still shows. The results are waiting there.")
         if self._v.experiments_enabled():
             return ("Nothing to review yet.\n\nEach time you close the app, "
                     "variations of your own generations are queued up and run "

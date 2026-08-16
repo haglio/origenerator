@@ -999,13 +999,26 @@ class GalleryView(QWidget):
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()
 
+    def _review_queue(self, rows) -> list[dict]:
+        """The experiments waiting on the user's verdict — the Experiments shelf.
+
+        Empty in a branch session, whatever its database holds. A preview's
+        database is a copy of the live one, so it inherits the live app's
+        unreviewed experiments; but a verdict recorded here stays in the copy
+        while the live app goes on offering the same items, and a rejection here
+        deletes the files the live app's own rows still point at — which is how
+        a shelf of dead "No preview" tiles was built, and rebuilt, in the live
+        install. Reviewing is the live app's, as scheduling is.
+        """
+        return [] if is_branch_session() else gallery.unreviewed_experiments(rows)
+
     def present_pending_experiments(self):
         """Open on the Experiments shelf when reviews are waiting — the launch-time
         "here's what I came up with while you were away". A no-op with nothing to
         review, leaving the saved folder restore in charge. Called once at startup,
         before the first refresh builds the tree, so it steers the pending-folder
         target the same way a saved session does."""
-        if gallery.unreviewed_experiments(self._db.list_generations()):
+        if self._review_queue(self._db.list_generations()):
             self.select_folder(_EXPERIMENTS_KEY)
 
     def _sync_experiments_bar(self):
@@ -1206,7 +1219,7 @@ class GalleryView(QWidget):
             recipe_match.available_categories(self._rebuildable_videos(rows))
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
-        unreviewed = gallery.unreviewed_experiments(rows)
+        unreviewed = self._review_queue(rows)
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
         )

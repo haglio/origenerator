@@ -7,6 +7,8 @@ faster-whisper or downloads weights. Captured audio is peak-normalized first:
 a quiet mic (RMS ~0.03) otherwise transcribes as empty.
 """
 
+import sys
+
 import numpy as np
 
 from origenerator.config import WHISPER_MODEL
@@ -19,6 +21,14 @@ class Transcriber:
 
     def _load(self):
         if self._model is None:
+            # faster-whisper runs on ctranslate2 and needs no torch — but it
+            # imports any torch it finds, and a torch that loads fine on its
+            # own can die initializing c10.dll once Qt's DLLs are in the
+            # process (WinError 1114 — the same import-after-Qt failure
+            # onnxruntime had), taking every transcription with it. Refusing
+            # the optional import keeps whisper on its own torch-free path.
+            # setdefault: a torch something else already imported stays.
+            sys.modules.setdefault("torch", None)
             from faster_whisper import WhisperModel
             self._model = WhisperModel(self._model_size, device="cpu", compute_type="int8")
         return self._model

@@ -3,7 +3,7 @@ from origenerator.workflows.base import (
     SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
 )
 from origenerator.workflows.derived_size import measure_derived_size
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import list_checkpoint_files, list_model_files
 
 # The pixel budget the output is scaled to. SDXL is trained at ~1 megapixel, so
 # the pose image's aspect ratio is kept at that budget — unlike the video
@@ -94,7 +94,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        checkpoints = list_model_files("checkpoints", [defaults["checkpoint"]])
+        checkpoints = list_checkpoint_files([defaults["checkpoint"]])
         controlnets = list_model_files("controlnet", [defaults["controlnet"]])
         upscalers = list_model_files("upscale_models", [defaults["upscale_model"]])
         return [

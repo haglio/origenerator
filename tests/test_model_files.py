@@ -1,9 +1,31 @@
+import json
 import os
+import struct
 
 from origenerator import config
 from origenerator.workflows.model_files import (
-    NO_LORA, is_no_lora, list_detector_files, list_lora_files, list_model_files,
+    NO_LORA, is_no_lora, list_checkpoint_files, list_detector_files, list_lora_files,
+    list_model_files,
 )
+
+# Stand-in tensor names for the three shapes the checkpoints folder holds: SDXL
+# (two CLIPs under ``conditioner.``), SD1.5 (one under ``cond_stage_model.``),
+# and a diffusion-only file like WAN 2.2's high/low experts, which ships weights
+# and a VAE but no text encoder at all.
+_SDXL_KEYS = ["conditioner.embedders.0.transformer.text_model.x", "model.diffusion_model.y"]
+_SD15_KEYS = ["cond_stage_model.transformer.text_model.x", "model.diffusion_model.y"]
+_DIFFUSION_ONLY_KEYS = ["model.diffusion_model.blocks.0.x", "vae.decoder.y"]
+
+
+def _write_safetensors(path, keys):
+    """A real-enough safetensors file: the little-endian u64 header length, then
+    the JSON header naming *keys*. No tensor data — the picker reads the header
+    and stops, so that is the whole file the test needs.
+    """
+    header = json.dumps(
+        {key: {"dtype": "F16", "shape": [1], "data_offsets": [0, 2]} for key in keys}
+    ).encode()
+    path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
 
 
 def test_lists_sorted_model_files_from_the_category_dir(tmp_path, monkeypatch):
@@ -83,6 +105,61 @@ def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path,
     (bbox / "hand_finder.pt").touch()
     (bbox / "face_finder.pt").touch()
     assert list_detector_files() == ["face_finder.pt", "hand_finder.pt"]
+
+
+def test_checkpoint_picker_drops_the_files_carrying_no_text_encoder(tmp_path, monkeypatch):
+    # The checkpoints folder is mixed: WAN 2.2's high/low pair lands there beside
+    # the SD1.5/SDXL checkpoints, carrying no text encoder for the SDXL graphs'
+    # CLIPTextEncode to read. Offering either half asks the user to choose
+    # between two runs that can only error.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    checkpoints = tmp_path / "models" / "checkpoints"
+    checkpoints.mkdir(parents=True)
+    _write_safetensors(checkpoints / "an_xl_model.safetensors", _SDXL_KEYS)
+    _write_safetensors(checkpoints / "a_15_model.safetensors", _SD15_KEYS)
+    _write_safetensors(checkpoints / "vid_high.safetensors", _DIFFUSION_ONLY_KEYS)
+    _write_safetensors(checkpoints / "vid_low.safetensors", _DIFFUSION_ONLY_KEYS)
+    assert list_checkpoint_files(["fallback.safetensors"]) == [
+        "a_15_model.safetensors", "an_xl_model.safetensors",
+    ]
+
+
+def test_checkpoint_picker_keeps_what_it_cannot_read_a_header_from(tmp_path, monkeypatch):
+    # Dropping a checkpoint that works is the costly mistake; keeping one that
+    # doesn't is not. So a file with no readable safetensors header — a .ckpt, or
+    # one truncated mid-header — stays listed rather than being judged.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    checkpoints = tmp_path / "models" / "checkpoints"
+    checkpoints.mkdir(parents=True)
+    (checkpoints / "old.ckpt").write_bytes(b"pickled weights, no header")
+    (checkpoints / "truncated.safetensors").write_bytes(struct.pack("<Q", 4096) + b"{}")
+    (checkpoints / "empty.safetensors").write_bytes(b"")
+    assert list_checkpoint_files(["fallback.safetensors"]) == [
+        "empty.safetensors", "old.ckpt", "truncated.safetensors",
+    ]
+
+
+def test_checkpoint_picker_falls_back_when_nothing_qualifies(tmp_path, monkeypatch):
+    # Filtering must not empty the dropdown: a folder of nothing but
+    # diffusion-only files still offers the workflow's own default.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    checkpoints = tmp_path / "models" / "checkpoints"
+    checkpoints.mkdir(parents=True)
+    _write_safetensors(checkpoints / "vid_high.safetensors", _DIFFUSION_ONLY_KEYS)
+    assert list_checkpoint_files(["default.safetensors"]) == ["default.safetensors"]
+
+
+def test_checkpoint_picker_matches_text_encoder_keys_only_at_a_name_start(tmp_path, monkeypatch):
+    # The header is matched as raw bytes, so the prefixes carry their opening
+    # quote: a diffusion-only file whose tensor names merely contain the word
+    # must not read as shipping a text encoder.
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    checkpoints = tmp_path / "models" / "checkpoints"
+    checkpoints.mkdir(parents=True)
+    _write_safetensors(
+        checkpoints / "vid.safetensors", ["model.diffusion_model.conditioner.proj"],
+    )
+    assert list_checkpoint_files(["default.safetensors"]) == ["default.safetensors"]
 
 
 def test_is_no_lora_recognizes_the_sentinel_and_empty_values():

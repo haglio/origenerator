@@ -665,6 +665,29 @@ def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
         assert denoise.default == 0.15
 
 
+def test_checkpoint_pickers_route_through_the_filtered_listing(monkeypatch):
+    # Every graph here takes its CLIP from the checkpoint loader, so the Model
+    # dropdown must come from the listing that drops the diffusion-only files
+    # (WAN 2.2's high/low pairs, LTX) rather than from the raw folder scan — those
+    # cannot supply a text encoder, and a run picking one only errors.
+    import origenerator.workflows.image_enhance as enhance
+    import origenerator.workflows.sdxl_pose_transfer as pose
+    import origenerator.workflows.sdxl_t2i as t2i
+
+    filtered = ["with_clip.safetensors"]
+    for module in (t2i, pose, enhance):
+        monkeypatch.setattr(module, "list_checkpoint_files", lambda fallback: filtered)
+        monkeypatch.setattr(
+            module, "list_model_files",
+            lambda category, fallback: pytest.fail(f"checkpoints read raw in {category}")
+            if category == "checkpoints" else list(fallback),
+        )
+
+    for name in ("sdxl_t2i", "sdxl_pose_transfer", "image_enhance"):
+        by_key = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+        assert by_key["checkpoint"].options == filtered, name
+
+
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
     # The gallery drops these from a row's identity, so an enhanced render shares
     # its unenhanced twin's folder. A tail param left off the list would silently

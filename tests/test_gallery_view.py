@@ -720,6 +720,52 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
+def test_a_branch_session_holds_no_experiment_review_queue(qtbot, monkeypatch):
+    # A preview's database is a copy of the live one, so it inherits the live
+    # app's unreviewed experiments — but a verdict recorded here is written to
+    # that throwaway copy and never reaches the live app, which goes on offering
+    # the same items for review. Reviewing is the live install's; a preview's
+    # shelf offers none of it, and its count doesn't nag from the tree.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    top = _top_level(view._tree)
+    assert "Experiments" in top          # the shelf itself stays, unnumbered
+    view._tree.setCurrentItem(view._experiments_item)
+    assert view.visible_prompt_ids() == []
+
+
+def test_a_branch_session_does_not_open_on_the_experiments_shelf(qtbot, monkeypatch):
+    # The live app opens on the shelf when verdicts are waiting. A preview
+    # inherits those same rows in its seeded copy, so it would greet every launch
+    # with a review queue it cannot answer — and did, which is where the reviewing
+    # that destroyed the live app's files happened.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    view = GalleryView(FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+
+    view.present_pending_experiments()
+    view.refresh()
+
+    assert view._tree.currentItem() is not view._experiments_item
+
+
+def test_a_branch_session_says_why_its_experiments_shelf_is_empty(qtbot, monkeypatch):
+    # Empty with no explanation would read as "nothing came up while you were
+    # away" — when in fact the results are on the live app's shelf, where the
+    # verdicts count. The switch above it says the same about scheduling.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    view = GalleryView(FakeDB([_experiment_row("e1")]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._experiments_item)
+
+    assert "live app" in view._browser._experiments_empty_hint()
+
+
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)

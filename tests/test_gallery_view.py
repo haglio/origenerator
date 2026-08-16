@@ -5783,6 +5783,22 @@ def test_the_hud_holds_the_left_of_the_bottom_row_and_enhance_the_right(qtbot, t
     assert row.stretch(0) == 0 and row.stretch(1) == 1
 
 
+def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp_path):
+    # Without it the Enhance knobs read as the bottom of whatever folder is on
+    # screen, rather than as the app-wide settings they are.
+    from PyQt6.QtWidgets import QFrame
+
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    column = view._stroke_panel.parentWidget().layout()
+    above = column.itemAt(_row_index(view, view._stroke_panel) - 1).widget()
+
+    assert isinstance(above, QFrame)
+    assert above.height() == 1
+    # Painted, not a native sunken line: the app's flat background swallows those.
+    assert "background-color" in above.styleSheet()
+
+
 def _row_index(view, widget):
     """Which slot of the browser pane's column holds the row ``widget`` sits in."""
     column = widget.parentWidget().layout()

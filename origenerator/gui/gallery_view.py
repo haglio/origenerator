@@ -3,7 +3,7 @@ import logging
 import random
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel,
+    QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel,
     QScrollArea, QToolButton, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
@@ -68,6 +68,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
+from shared_ui.colors import BORDER_SUBTLE
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,19 @@ def _is_reusable_workflow(workflow_name) -> bool:
     random seed).
     """
     return (workflow_name or "") in WORKFLOW_REGISTRY
+
+
+def _bottom_divider() -> QFrame:
+    """The hairline closing the browser pane off from the panels beneath it.
+
+    Drawn with an explicit background rather than a ``QFrame`` sunken line: the
+    app's stylesheet paints every plain widget one flat color, and a frame's
+    native shadow line is invisible against it.
+    """
+    line = QFrame()
+    line.setFixedHeight(1)
+    line.setStyleSheet(f"background-color: {BORDER_SUBTLE.name()};")
+    return line
 
 
 def _is_deletable_folder(group) -> bool:
@@ -575,6 +589,11 @@ class GalleryView(QWidget):
         self._enhance_panel = EnhancePanel(self._on_enhance_settings_changed)
         self._enhance_panel.show_settings(self._enhance_settings)
         bottom.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
+        # A hairline where the browsing stops and these two panels start. Without
+        # it the Enhance knobs read as the bottom of whatever folder is on screen
+        # rather than as their own thing — which they are: app-wide settings that
+        # don't belong to the folder they happen to be sitting under.
+        browser_box.addWidget(_bottom_divider())
         browser_box.addLayout(bottom)
         # The live auto-generate slideshow (double-click the preview while a folder
         # loops), and the folder key it follows — None while none is open.

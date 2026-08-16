@@ -172,15 +172,14 @@ def main():
 
     # Reclaim any trash left by deletes from a previous session: the in-memory
     # undo stack is empty now, so those held files are unreachable and safe to
-    # clear (see GalleryActions / Trash). Not in a branch session — what its
-    # deletes hold are real library files, and purging them is the one way a
-    # preview could destroy something for good.
-    if not branch_session:
-        from origenerator.trash import Trash
-        try:
-            Trash(STATE_DIR / "trash").sweep()
-        except Exception as e:
-            logger.warning("Trash sweep failed: %s", e)
+    # clear (see GalleryActions / Trash). A branch session sweeps nothing — it
+    # takes no files in the first place, and the batches previews took before
+    # they stopped are the only copies left (see branch_session.session_trash).
+    from origenerator.branch_session import session_trash
+    try:
+        session_trash(STATE_DIR / "trash").sweep()
+    except Exception as e:
+        logger.warning("Trash sweep failed: %s", e)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the

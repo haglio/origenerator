@@ -65,6 +65,22 @@ class Trash:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+class NoTrash:
+    """A trash that takes nothing: every delete leaves its files where they are.
+
+    What a session with no standing to destroy library files gets instead of a
+    real one — see :func:`origenerator.branch_session.session_trash`. Deleting
+    still drops the row; the empty batch returned here restores and purges
+    nothing, and sweeping never reaches what an earlier session parked.
+    """
+
+    def store(self, paths) -> TrashedBatch:
+        return TrashedBatch(moves=[], subdir=None)
+
+    def sweep(self) -> None:
+        pass
+
+
 def _move(src: Path, dest: Path) -> None:
     """Move a file into the trash, retrying briefly past a transient lock.
 

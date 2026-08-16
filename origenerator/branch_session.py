@@ -36,6 +36,30 @@ def is_branch_session(environ=os.environ) -> bool:
     return environ.get(ENV_FLAG) == "1"
 
 
+def session_trash(root: Path):
+    """The trash this session may put files in: the real one, or nothing.
+
+    A branch session deletes no files at all. Every file it can see is the live
+    install's — its database is a copy, so its rows point at the live library,
+    and what it generates itself the live app adopts at its next launch (see
+    :func:`adopt_branch_rows`). So a delete in a preview drops the row from its
+    own throwaway database and leaves the file alone; the live app's rows keep
+    pointing at something real.
+
+    What that used to cost: a delete in a preview moved the shared ComfyUI
+    output file — and the live install's thumbnail, which the row names by
+    absolute path — into the worktree's trash, while the live app's own row
+    survived. That row then had nothing to show, and an experiment's stayed on
+    the review shelf as a dead tile the user could only remove again.
+
+    Its ``sweep`` does nothing for the same reason, which also spares the trash
+    previews filled before they stopped taking files: those batches hold the
+    only copies left of what they took.
+    """
+    from origenerator.trash import NoTrash, Trash
+    return NoTrash() if is_branch_session() else Trash(root)
+
+
 def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
                       thumb_dir: Path) -> int:
     """Adopt generations made in branch sessions into the live database.

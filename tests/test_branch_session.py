@@ -4,7 +4,9 @@ import json
 import sqlite3
 from pathlib import Path
 
-from origenerator.branch_session import ENV_FLAG, is_branch_session, seed_branch_db
+from origenerator.branch_session import (
+    ENV_FLAG, is_branch_session, seed_branch_db, session_trash,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +28,38 @@ def test_the_flag_marks_a_branch_session():
     assert is_branch_session({ENV_FLAG: "1"}) is True
     assert is_branch_session({ENV_FLAG: "0"}) is False
     assert is_branch_session({}) is False
+
+
+def test_a_branch_sessions_trash_neither_takes_files_nor_sweeps(tmp_path, monkeypatch):
+    # A preview has no standing to destroy library files, and none to purge what
+    # an earlier preview took either: those batches hold the only copies left of
+    # files the live app's own rows still point at.
+    monkeypatch.setenv(ENV_FLAG, "1")
+    held = tmp_path / "trash" / "batch" / "0_clip.mp4"
+    held.parent.mkdir(parents=True)
+    held.write_bytes(b"the only copy")
+    library_file = tmp_path / "output" / "clip.mp4"
+    library_file.parent.mkdir()
+    library_file.write_bytes(b"data")
+
+    trash = session_trash(tmp_path / "trash")
+    batch = trash.store([library_file])
+    trash.sweep()
+
+    assert library_file.exists() and batch.moves == []
+    assert held.exists()
+    batch.restore()   # and an undo of a delete that moved nothing moves nothing
+    assert library_file.exists()
+
+
+def test_a_live_session_gets_a_working_trash(tmp_path):
+    library_file = tmp_path / "output" / "clip.mp4"
+    library_file.parent.mkdir(parents=True)
+    library_file.write_bytes(b"data")
+
+    session_trash(tmp_path / "trash").store([library_file])
+
+    assert not library_file.exists()
 
 
 def test_seeding_copies_the_primary_db_once(tmp_path):

@@ -3473,10 +3473,18 @@ class _FakeLiveFullscreen(QWidget):
         self.frames = [frame] if frame is not None else []
         self.landed = None
         self.levels = None
+        self.enhance_hook = None
+        self.enhanced = None
         self._live = media is None
 
     def set_levels(self, levels_by_path):
         self.levels = levels_by_path
+
+    def set_enhance(self, on_enhance, ids_by_path):
+        self.enhance_hook = (on_enhance, ids_by_path)
+
+    def note_enhanced(self, prompt_id, path, media_type="image"):
+        self.enhanced = (prompt_id, path, media_type)
 
     def is_live(self):
         return self._live
@@ -5364,11 +5372,19 @@ class _FakeFullscreen(QObject):
         self.playlist = None       # the items set_playlist was armed with, if any
         self.playlist_index = None
         self.levels = None         # the per-image version playlists (Shift+arrows)
+        self.enhance_hook = None   # (callback, ids) Down asks through
+        self.enhanced = None       # a landed enhancement handed back to it
         self.stroke = None         # the shared stroke driver the gallery wires in
         self.closes = 0
 
     def set_levels(self, levels_by_path):
         self.levels = levels_by_path
+
+    def set_enhance(self, on_enhance, ids_by_path):
+        self.enhance_hook = (on_enhance, ids_by_path)
+
+    def note_enhanced(self, prompt_id, path, media_type="image"):
+        self.enhanced = (prompt_id, path, media_type)
 
     def osr2_drive_target(self):
         return self._target
@@ -6272,5 +6288,11 @@ def test_the_fullscreen_view_is_armed_with_each_images_versions(qtbot, tmp_path)
     view._on_fullscreen_opened(fs)
 
     (levels,) = fs.levels.values()
-    assert [p.name for p, _kind in levels] == \
+    assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
+    # Each carries its label, so the corner can say which version is on screen.
+    assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
+    # And Down is armed with the ids, so it can name what it is looking at.
+    hook, ids = fs.enhance_hook
+    assert hook == view._enhance_from_slideshow
+    assert set(ids.values()) == {"g0"}

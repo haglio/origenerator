@@ -13,6 +13,35 @@ def _h(color) -> str:
     return color.name()
 
 
+def _spin_arrow_rules() -> str:
+    """The step-button arrows, as ``image:`` rules over generated triangles.
+
+    Qt takes an arrow only as a picture — the CSS zero-box-with-borders triangle
+    draws a filled rectangle here, which is what appeared over the buttons — so
+    :mod:`origenerator.gui.spin_arrows` renders one. If it can't, this contributes
+    nothing and Qt draws its own arrow: uncertain color, but an arrow.
+    """
+    from origenerator.gui.spin_arrows import arrow_paths
+
+    normal = arrow_paths(TEXT_PRIMARY)
+    if normal is None:
+        return ""
+    muted = arrow_paths(TEXT_MUTED) or normal
+    return f"""\
+    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+        image: url("{normal[0]}");
+    }}
+    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+        image: url("{normal[1]}");
+    }}
+    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
+        image: url("{muted[0]}");
+    }}
+    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        image: url("{muted[1]}");
+    }}"""
+
+
 def build_stylesheet() -> str:
     return f"""
     QMainWindow, QWidget {{
@@ -79,26 +108,7 @@ def build_stylesheet() -> str:
     QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
         background-color: {_h(BLUE)};
     }}
-    /* Triangles drawn out of borders — the app ships no arrow images, and an
-       unstyled arrow under a styled button is invisible. */
-    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-        width: 0; height: 0;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-bottom: 5px solid {_h(TEXT_PRIMARY)};
-    }}
-    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-        width: 0; height: 0;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 5px solid {_h(TEXT_PRIMARY)};
-    }}
-    QSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:disabled {{
-        border-bottom-color: {_h(TEXT_MUTED)};
-    }}
-    QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
-        border-top-color: {_h(TEXT_MUTED)};
-    }}
+{_spin_arrow_rules()}
     QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
         border: 1px solid {_h(BLUE)};
     }}

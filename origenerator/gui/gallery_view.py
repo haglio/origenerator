@@ -714,10 +714,16 @@ class GalleryView(QWidget):
         if len(items) > 1:
             fullscreen.set_playlist(items, index)
         fullscreen.set_levels(self._folder_level_playlists())
+        # And Down asks for an enhancement of whatever is on screen, exactly as
+        # it does in the slideshow — this is the other place you stop on a
+        # picture because you want it.
+        fullscreen.set_enhance(self._enhance_from_slideshow,
+                               self._folder_ids_by_path())
 
     def _folder_level_playlists(self) -> dict:
         """Each visible image's versions, keyed by the file the folder shows it
-        under — newest first, matching the strip in the info pane."""
+        under — newest first, matching the strip in the info pane. Each carries
+        its label, so the fullscreen view can say which one is on screen."""
         playlists = {}
         for pid in self._browser.visible_prompt_ids():
             row = self._db.get_generation(pid)
@@ -726,13 +732,29 @@ class GalleryView(QWidget):
             levels = gallery.enhance_levels(row)
             if len(levels) < 2:
                 continue  # one version is nothing to step between
-            paths = [
-                COMFYUI_OUTPUT_DIR / (lvl.file.get("subfolder") or "")
-                / (lvl.file.get("filename") or "")
+            entries = [
+                (COMFYUI_OUTPUT_DIR / (lvl.file.get("subfolder") or "")
+                 / (lvl.file.get("filename") or ""), "image", lvl.label)
                 for lvl in levels
             ]
-            playlists[str(paths[0])] = [(p, "image") for p in paths]
+            playlists[str(entries[0][0])] = entries
         return playlists
+
+    def _folder_ids_by_path(self) -> dict:
+        """Which generation each visible file belongs to, so the fullscreen view
+        can name what it is looking at when it asks for an enhancement.
+
+        Keyed off the row's leading output file, the same key the level
+        playlists use, so the two maps agree on what "this image" means."""
+        ids = {}
+        for pid in self._browser.visible_prompt_ids():
+            row = self._db.get_generation(pid)
+            files = gallery.row_output_files(row) if row else []
+            if files:
+                path = (COMFYUI_OUTPUT_DIR / (files[0].get("subfolder") or "")
+                        / (files[0].get("filename") or ""))
+                ids[str(path)] = pid
+        return ids
 
     def _folder_media_playlist(self):
         """The visible folder's resolvable media in shown order, and the index of
@@ -1807,13 +1829,17 @@ class GalleryView(QWidget):
         return True
 
     def _feed_slideshow_enhanced(self, row: dict | None):
-        """Hand an enhancement the slideshow asked for back to it, so the slide
-        on screen becomes the better version without waiting for a new pass."""
-        if self._slideshow is None or row is None:
+        """Hand a landed enhancement back to whichever full-screen surface asked
+        for it, so what is on screen becomes the better version without waiting
+        for a new pass. Both are told; each ignores an id it isn't showing."""
+        if row is None:
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-        if preview is not None:
-            self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1])
+        if preview is None:
+            return
+        for surface in (self._slideshow, self._fullscreen_preview):
+            if surface is not None:
+                surface.note_enhanced(row["prompt_id"], preview[0], preview[1])
 
     def is_enhancing(self, row: dict) -> bool:
         """Whether a standalone enhance of this image is running right now.

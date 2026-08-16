@@ -12,10 +12,10 @@ A tile can also be dragged onto the Enhance subpanel, which absorbs the settings
 it carries — the way to say "do that again" about a version you liked without
 reading its numbers off and typing them back in.
 
-An enhancement still cooking leads the strip as a live tile, mirroring the run's
-streamed frames the way the in-flight cards do everywhere else — so the level
-being made appears where the levels are, rather than the strip sitting unchanged
-until the fold lands.
+An enhancement still cooking takes the ``+ Enhance`` card's own slot at the head
+of the strip, mirroring the run's streamed frames the way the in-flight cards do
+everywhere else — the card becomes the thing it asked for, and the level being
+made appears where the level will be.
 
 The strip is up for every image, even one with nothing but its original: it is
 where an image's versions live, and a place that appears only once you already
@@ -296,11 +296,15 @@ class EnhanceVersions(QWidget):
                     add: tuple | None = None):
         """Rebuild the strip from ``(level, image_path)`` pairs.
 
+        ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` card, which
+        leads the strip: that is where a new version arrives, since the strip
+        runs newest first. ``duplicate_of`` names the level those settings would
+        duplicate, or ``None`` when they would make something new.
+
         ``pending`` is the ``(status, frame, settings)`` of an enhancement still
-        running, which leads the strip — it is becoming the newest level, and the
-        strip runs newest first. ``add`` is ``(settings, duplicate_of)`` for the
-        ``+ Enhance`` card that closes it: ``duplicate_of`` names the level those
-        settings would duplicate, or ``None`` when they would make something new.
+        running, and it takes that same leading slot — the card *becomes* the
+        thing it asked for rather than sitting beside it, which is what the press
+        looks like from the other side.
 
         Hidden only when there is nothing at all to show — no versions, nothing
         running, and no card to press, which is what a video looks like.
@@ -313,22 +317,24 @@ class EnhanceVersions(QWidget):
         flow = FlowLayout(self._host, spacing=6)
         self._pending = None
         self._tiles = []
+        # One leading slot, held by whichever of the two applies: the run in
+        # flight if there is one, else the card that would start it.
         if pending is not None:
             self._pending = _PendingTile()
             self._pending.update_pending(*pending)
             flow.addWidget(self._pending)
-        for position, (level, image_path) in enumerate(items):
-            tile = _LevelTile(level, position, image_path)
-            tile.clicked.connect(self.level_selected)
-            self._tiles.append(tile)
-            flow.addWidget(tile)
-        if add is not None:
+        elif add is not None:
             settings, duplicate_of = add
             card = _AddTile(settings, duplicate_of)
             card.clicked.connect(self.enhance_requested)
             card.hovered.connect(
                 lambda on, at=duplicate_of: self._highlight_level(at, on))
             flow.addWidget(card)
+        for position, (level, image_path) in enumerate(items):
+            tile = _LevelTile(level, position, image_path)
+            tile.clicked.connect(self.level_selected)
+            self._tiles.append(tile)
+            flow.addWidget(tile)
         self._box.addWidget(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
 

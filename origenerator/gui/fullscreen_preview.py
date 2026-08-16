@@ -20,9 +20,9 @@ off the video on screen for as long as it's up — regardless of the global togg
 It signals :attr:`closed` on dismissal so the device is handed back.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.preview_widget import PreviewWidget
@@ -52,6 +52,13 @@ class FullscreenPreview(QWidget):
         self._levels_by_path: dict[str, list[tuple]] = {}
         self._level_base: str | None = None
         self._level_index = 0
+        # Asking for an enhancement from here, as the slideshow does: the
+        # prompt id of each item the folder shows, the callback that decides
+        # whether a run is wanted, and which images have one in flight.
+        self._ids_by_path: dict[str, str] = {}
+        self._on_enhance = None
+        self._enhance_enabled = False
+        self._enhancing: set[str] = set()
         # Following a generation still in flight: no media of its own, so the pane
         # that opened it feeds the frames and hands over the file that lands.
         self._live = media is None
@@ -74,6 +81,20 @@ class FullscreenPreview(QWidget):
                                       show_funscript_strip=True, mute_audio=False,
                                       on_double_click=self.close)
         layout.addWidget(self._preview, 1)
+        # A corner caption: which version of this image is on screen and how
+        # many there are, and "Enhancing…" while one is being made. Stepping
+        # levels is invisible without it — two versions of one picture differ
+        # by texture, which is exactly what you cannot tell apart from memory.
+        self._note = QLabel(self)
+        self._note.setStyleSheet(
+            "color: white; background: rgba(0, 0, 0, 160);"
+            " padding: 6px 12px; border-radius: 4px;"
+        )
+        self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._note.hide()
+        self._note_timer = QTimer(self)
+        self._note_timer.setSingleShot(True)
+        self._note_timer.timeout.connect(self._refresh_note)
         if media is not None:
             self._preview.show_media(media[0], media[1])
         elif frame is not None:
@@ -118,11 +139,89 @@ class FullscreenPreview(QWidget):
         """Arm Shift+Left/Right to step an image's enhancement levels.
 
         ``levels_by_path`` maps the file the folder shows an image under to that
-        image's versions, newest first, as ``(path, media_type)``. Plain
+        image's versions, newest first, as ``(path, media_type, label)``. Plain
         Left/Right still pages the folder; the shifted pair moves within the one
         image — its own axis, because a version is not a neighbor.
         """
         self._levels_by_path = {str(k): list(v) for k, v in levels_by_path.items()}
+        self._refresh_note()
+
+    def set_enhance(self, on_enhance, ids_by_path: dict) -> None:
+        """Wire Down to ask for the image on screen to be enhanced.
+
+        The same gesture the slideshow uses, for the same reason — stopping on a
+        picture is what says you want it, and here you have already stopped. The
+        gallery decides whether a run is wanted (it holds the settings and the
+        levels); ``True`` back means one started. ``E`` turns it off.
+        """
+        self._on_enhance = on_enhance
+        self._ids_by_path = {str(k): v for k, v in ids_by_path.items()}
+        self._enhance_enabled = on_enhance is not None
+
+    def note_enhanced(self, prompt_id: str, path, media_type: str = "image") -> None:
+        """An enhancement asked for from here landed: show it in place, if this
+        view is still on the image that asked."""
+        self._enhancing.discard(prompt_id)
+        if self._current_prompt_id() == prompt_id:
+            self._level_base = None  # its versions are a level deeper now
+            self._level_index = 0
+            self._preview.show_media(path, media_type)
+            self.media_changed.emit()
+        self._refresh_note()
+
+    def _current_prompt_id(self) -> str | None:
+        base = self._level_base
+        if base is None and self._items:
+            base = str(self._items[self._index][0])
+        return self._ids_by_path.get(base or "")
+
+    def _enhance_current(self) -> None:
+        if self._on_enhance is None or not self._enhance_enabled:
+            return
+        prompt_id = self._current_prompt_id()
+        if prompt_id is None or prompt_id in self._enhancing:
+            return
+        if self._on_enhance(prompt_id):
+            self._enhancing.add(prompt_id)
+            self._refresh_note()
+
+    def _toggle_enhance(self) -> None:
+        if self._on_enhance is None:
+            return
+        self._enhance_enabled = not self._enhance_enabled
+        self._flash_note(
+            "Enhance on Down: on" if self._enhance_enabled else "Enhance on Down: off"
+        )
+
+    # --- the corner caption -------------------------------------------------
+
+    def _refresh_note(self) -> None:
+        """Say which version is on screen, of how many — or that one is cooking."""
+        prompt_id = self._current_prompt_id()
+        if prompt_id is not None and prompt_id in self._enhancing:
+            self._show_note("Enhancing…")
+            return
+        levels = self._levels_by_path.get(self._level_base or self._current_base()) or []
+        if len(levels) <= 1:
+            self._note.hide()
+            return
+        level = levels[self._level_index]
+        label = level[2] if len(level) > 2 else f"Version {self._level_index + 1}"
+        self._show_note(f"{label} — {self._level_index + 1} of {len(levels)}")
+
+    def _current_base(self) -> str:
+        return str(self._items[self._index][0]) if self._items else ""
+
+    def _show_note(self, text: str) -> None:
+        self._note.setText(text)
+        self._note.adjustSize()
+        self._note.move(24, 24)
+        self._note.show()
+        self._note.raise_()
+
+    def _flash_note(self, text: str, ms: int = 1500) -> None:
+        self._show_note(text)
+        self._note_timer.start(ms)
 
     def set_stroke(self, stroke) -> None:
         """Wire the shared OSR2 stroke keys and genau's drive panel in — so the
@@ -155,6 +254,10 @@ class FullscreenPreview(QWidget):
             self._step_level(-1) if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
             self._step_level(1) if shifted else self._step(1)
+        elif key == Qt.Key.Key_Down:
+            self._enhance_current()
+        elif key == Qt.Key.Key_E:
+            self._toggle_enhance()
         elif apply_stroke_key(self._stroke, key):
             self._stroke_panel.refresh()
         else:
@@ -164,6 +267,8 @@ class FullscreenPreview(QWidget):
         super().resizeEvent(event)
         if self._stroke_panel is not None:
             self._stroke_panel.reposition()
+        if not self._note.isHidden():
+            self._note.raise_()
 
     def _step(self, delta: int) -> None:
         """Page ``delta`` items through the folder, wrapping at either end."""
@@ -173,7 +278,8 @@ class FullscreenPreview(QWidget):
         self._index = (self._index + delta) % len(self._items)
         self._level_base = None  # a new image, so its own versions from the top
         self._level_index = 0
-        self._preview.show_media(*self._items[self._index])
+        self._preview.show_media(*self._items[self._index][:2])
+        self._refresh_note()
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     def _step_level(self, delta: int) -> None:
@@ -194,7 +300,8 @@ class FullscreenPreview(QWidget):
         self._live = False
         self._level_base = base
         self._level_index = (self._level_index + delta) % len(levels)
-        self._preview.show_media(*levels[self._level_index])
+        self._preview.show_media(*levels[self._level_index][:2])
+        self._refresh_note()
 
     def mouseDoubleClickEvent(self, event):
         self.close()  # a second double-click dismisses the fullscreen view

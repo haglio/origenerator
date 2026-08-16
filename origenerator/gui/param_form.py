@@ -509,20 +509,26 @@ class ParamForm(QWidget):
         bare name against its input folder but takes an absolute path outside
         it unchanged, so a full path lets the user draw an input from anywhere.
         """
+        pd = next((p for p in self._param_defs if p.key == key), None)
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Input Image",
-            self._initial_browse_path(self._widgets[key].text().strip()),
+            self._initial_browse_path(
+                self._widgets[key].text().strip(), pd.browse_dir if pd else None
+            ),
             "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)",
         )
         if path:
             self._widgets[key].setText(path)
 
     @staticmethod
-    def _initial_browse_path(current: str) -> str:
+    def _initial_browse_path(current: str, home: Path | None = None) -> str:
         """Where the file dialog opens: the current value's own location when it
         points at a real file (a full path, or a bare name from ComfyUI's input
-        folder), else the input folder as a sensible home."""
+        folder), else the field's home folder — the one its ParamDef names, or
+        ComfyUI's input folder for a field naming none. A named folder that isn't
+        on this machine (a checkout without the library) falls back the same way,
+        since a dialog pointed at a missing path opens wherever it likes."""
         if current:
             full = Path(current)
             if full.is_file():
@@ -530,6 +536,8 @@ class ParamForm(QWidget):
             in_input = COMFYUI_INPUT_DIR / current
             if in_input.is_file():
                 return str(in_input)
+        if home is not None and home.is_dir():
+            return str(home)
         return str(COMFYUI_INPUT_DIR)
 
     def _wire_changed(self, widget: QWidget):

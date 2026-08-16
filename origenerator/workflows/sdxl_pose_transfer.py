@@ -1,3 +1,4 @@
+from origenerator.config import CUSTOM_POSES_DIR
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
 )
@@ -99,7 +100,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("input_image", "Structure Image", "image", ""),
+            ParamDef("input_image", "Structure Image", "image", "",
+                     browse_dir=CUSTOM_POSES_DIR),
             ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
                      options=checkpoints),
             ParamDef("control_mode", "Structure From", "combo", "depth",

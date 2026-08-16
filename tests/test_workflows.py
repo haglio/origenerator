@@ -1324,6 +1324,19 @@ def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
     assert wf.derives_size_from_input is True
 
 
+def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
+    # The pose references this workflow is steered by are a curated folder of the
+    # library, not ComfyUI's input dump, so its Structure Image picker opens
+    # there. The path is built from the (private) library root, never spelled out
+    # in source.
+    from origenerator import config
+
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    pd = next(pd for pd in wf.param_definitions() if pd.key == "input_image")
+    assert pd.browse_dir == config.CUSTOM_POSES_DIR
+    assert config.CUSTOM_POSES_DIR == config.SUITE_ROOT / "images" / "custom_poses"
+
+
 def test_sdxl_pose_transfer_build_api_payload_structure():
     # The re-skin pipeline: the input image is scaled to the SDXL pixel budget
     # (keeping its aspect ratio), its structure is extracted — a DepthAnythingV2

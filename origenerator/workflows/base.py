@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from origenerator.workflows.derived_size import measure_derived_size, override_size
@@ -37,6 +38,12 @@ class ParamDef:
     max_val: float | None = None
     step: float | None = None
     multiline: bool = False
+    # Where an "image" field's Browse dialog opens when the field is empty (a
+    # field already holding an image still opens at that image). ``None`` leaves
+    # it at ComfyUI's input folder — the right home for workflows fed by
+    # generated frames; a workflow whose sources live in a folder of the library
+    # names that folder instead.
+    browse_dir: Path | None = None
 
 
 class WorkflowTemplate(ABC):

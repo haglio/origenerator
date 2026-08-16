@@ -1,7 +1,7 @@
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
 )
-from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.model_files import list_checkpoint_files, list_model_files
 
 _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
 
@@ -61,7 +61,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
-        checkpoints = list_model_files("checkpoints", ["reapony_v80.safetensors"])
+        checkpoints = list_checkpoint_files(["reapony_v80.safetensors"])
         upscalers = list_model_files("upscale_models", [_DEFAULT_UPSCALE_MODEL])
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),

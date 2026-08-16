@@ -21,6 +21,18 @@ End Sub
 Function FindPythonCommand()
   Dim venvPython, candidates, i
 
+  ' The copy a previous run left named for this app, then the plain venv
+  ' interpreter.  Windows identifies a process by the file it was started from,
+  ' so a plain python.exe arrives as one more anonymous "Python" among every
+  ' other Python app on the machine; app_support.process_identity makes a copy
+  ' that says Origenerator instead.  The run makes it for the run after, so a
+  ' checkout that has never started launches exactly as it used to.
+  namedPython = projectRoot & "\.venv\Scripts\Origenerator-Origenerator.exe"
+  If fso.FileExists(namedPython) Then
+    FindPythonCommand = Quote(namedPython)
+    Exit Function
+  End If
+
   venvPython = projectRoot & "\.venv\Scripts\python.exe"
   If fso.FileExists(venvPython) Then
     FindPythonCommand = Quote(venvPython)

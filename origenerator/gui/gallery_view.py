@@ -727,10 +727,14 @@ class GalleryView(QWidget):
 
     def _arm_fullscreen_navigation(self, fullscreen):
         """Give the fullscreen view the visible folder's media so Left/Right page
-        through it, starting on the item already on screen. Skipped for a lone
-        item. Shift+Left/Right gets its own axis: the versions of whichever
-        image is on screen, so a level can be compared against the one below it
-        at full size rather than in a thumbnail.
+        through it, starting on the item already on screen. Shift+Left/Right gets
+        its own axis: the versions of whichever image is on screen, so a level can
+        be compared against the one below it at full size rather than in a
+        thumbnail.
+
+        A folder of one is armed too: it has nothing to page to, but the view
+        still says where you are, and that shouldn't depend on how many others
+        happen to share the folder — most video folders here hold exactly one.
 
         A view opened over a generation still being made has no place among that
         media — it has no file yet — so it is armed with the folder anyway, from
@@ -740,7 +744,7 @@ class GalleryView(QWidget):
         items, index = self._folder_media_playlist()
         if not items and fullscreen.is_live():
             items, index = self._folder_media(), 0
-        if len(items) > 1:
+        if items:
             fullscreen.set_playlist(items, index)
         fullscreen.set_levels(self._folder_level_playlists())
         # And Down asks for an enhancement of whatever is on screen, exactly as

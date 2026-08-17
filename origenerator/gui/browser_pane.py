@@ -527,33 +527,38 @@ class BrowserPane:
                          else self._empty_state(self._trash_empty_hint()))
 
     def _add_trash_thumbnail(self, flow, row, corner_actions):
-        """One deleted item's tile — tracked for selection like any other, but
-        wired to almost nothing.
+        """One deleted item's tile — a shelf tile like any other, wired to
+        everything a deleted item can still do.
 
-        There is no database row behind it and no folder to open, so the gestures
-        every other shelf tile carries (preview in the info pane, double-click to
-        its folder, star / enhance / delete, drag to a combine slot) have nothing
-        to act on. What is left is picking it and the two things the corners and
-        the right-click menu offer: restore, or end it.
+        Its files are all in the trash rather than gone, and the bin kept its row
+        whole, so it previews on a click, loops if it's a video, opens full size,
+        plays in the shelf's slideshow and fills a config tab with the settings
+        that made it — the whole point of a bin being that you can look before you
+        decide. Double-clicking opens it as a Generate tab (the gesture a folder's
+        tiles carry) rather than jumping to its folder, which is the one thing a
+        deleted item hasn't got.
+
+        What it doesn't get is the ordinary tile's right-click menu — star,
+        enhance, delete all want a row in the gallery — and no drag to a combine
+        slot, whose graphs read files out of ComfyUI's output folder, not ours. In
+        their place the corners and the menu offer the two actions that do apply:
+        restore, or end it now.
         """
         tile = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
+            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
+            enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
             corner_actions=corner_actions,
         )
-        tile.clicked.connect(self._trash_thumbnail_clicked)
+        tile.clicked.connect(self._thumbnail_clicked)          # preview it here
+        tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
         tile.context_requested.connect(self._trash_context_menu)
         flow.addWidget(tile)
         self._visible_ids.append(row["prompt_id"])
         self._thumb_widgets[row["prompt_id"]] = tile
         return tile
-
-    def _trash_thumbnail_clicked(self, prompt_id: str):
-        """Pick a deleted tile — the multi-selection the restore and purge actions
-        work over. It only selects: with the row gone there is nothing for the
-        info pane to show."""
-        self.apply_selection(prompt_id, QApplication.keyboardModifiers())
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
         """Right-click a deleted tile: restore or permanently delete the picked
@@ -667,9 +672,11 @@ class BrowserPane:
         The slideshow plays these, so they have to match the tiles: Recents is its
         listed items (the media-type filter already applied), Starred is its
         starred items plus everything under each bookmarked folder, since a folder
-        tile there stands for its whole folder, and Experiments is its unreviewed
-        queue. A starred item inside a starred folder is one item, so repeats drop
-        out.
+        tile there stands for its whole folder, Experiments is its unreviewed
+        queue, and Trash is what the bin is holding — deleted is not unwatchable,
+        and a shelf of items you are deciding whether to keep is exactly one you
+        want to sit and look through. A starred item inside a starred folder is
+        one item, so repeats drop out.
         """
         if self.showing_recents():
             return list(self._recent_rows)
@@ -679,6 +686,8 @@ class BrowserPane:
             ])
         if self.showing_experiments():
             return list(self._experiment_rows)
+        if self.showing_trash():
+            return list(self._trash_rows)
         return None
 
     # --- the thumbnail grid: a settings leaf's generations ------------------

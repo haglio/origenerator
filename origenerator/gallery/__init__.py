@@ -48,6 +48,7 @@ from origenerator.gallery.output import (
     animated_preview_path,
     media_type_of_row,
     output_disk_files,
+    output_file_path,
     output_file_reference,
     parse_file_list,
     produced_output,

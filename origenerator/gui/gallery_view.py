@@ -62,6 +62,7 @@ from origenerator.gui.gallery_tree import (
     STARRED_KEY as _STARRED_KEY,
     STARRED_LABEL as _STARRED_LABEL,
     TRASH_KEY as _TRASH_KEY,
+    TRASH_LABEL as _TRASH_LABEL,
 )
 from origenerator.navigation import NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
@@ -216,6 +217,10 @@ class GalleryView(QWidget):
             registry=WORKFLOW_REGISTRY, rng=random.Random()
         )
         self._image_rows: list[dict] = []
+        # The held deletions the Trash shelf lists, as gallery rows re-pointed at
+        # their files in the trash — the rows behind everything a deleted item can
+        # still do (see :meth:`_row_for`).
+        self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards.
@@ -835,15 +840,14 @@ class GalleryView(QWidget):
         its label, so the fullscreen view can say which one is on screen."""
         playlists = {}
         for pid in self._browser.visible_prompt_ids():
-            row = self._db.get_generation(pid)
+            row = self._row_for(pid)
             if row is None:
                 continue
             levels = gallery.enhance_levels(row)
             if len(levels) < 2:
                 continue  # one version is nothing to step between
             entries = [
-                (COMFYUI_OUTPUT_DIR / (lvl.file.get("subfolder") or "")
-                 / (lvl.file.get("filename") or ""), "image", lvl.label)
+                (gallery.output_file_path(lvl.file, COMFYUI_OUTPUT_DIR), "image", lvl.label)
                 for lvl in levels
             ]
             playlists[str(entries[0][0])] = entries
@@ -857,12 +861,10 @@ class GalleryView(QWidget):
         playlists use, so the two maps agree on what "this image" means."""
         ids = {}
         for pid in self._browser.visible_prompt_ids():
-            row = self._db.get_generation(pid)
+            row = self._row_for(pid)
             files = gallery.row_output_files(row) if row else []
             if files:
-                path = (COMFYUI_OUTPUT_DIR / (files[0].get("subfolder") or "")
-                        / (files[0].get("filename") or ""))
-                ids[str(path)] = pid
+                ids[str(gallery.output_file_path(files[0], COMFYUI_OUTPUT_DIR))] = pid
         return ids
 
     def _folder_media_playlist(self):
@@ -889,7 +891,7 @@ class GalleryView(QWidget):
         rows have nothing to show fullscreen, so they are left out."""
         media = []
         for pid in self._browser.visible_prompt_ids():
-            row = self._db.get_generation(pid)
+            row = self._row_for(pid)
             preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
             if preview is not None:
                 media.append((preview[0], preview[1], pid, row.get("thumbnail_path")))
@@ -1279,7 +1281,7 @@ class GalleryView(QWidget):
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = self._review_queue(rows)
-        held = recovery.bin_items(self._bin_records())
+        held = self._held_rows = recovery.bin_items(self._bin_records())
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
         )
@@ -1914,7 +1916,8 @@ class GalleryView(QWidget):
     def _slideshow_subject(self) -> str:
         """What the slideshow button would play, named for its tooltip."""
         return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
-                _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL}.get(
+                _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL,
+                _TRASH_KEY: _TRASH_LABEL}.get(
             self._current_shelf_key(), "this folder"
         )
 
@@ -2337,6 +2340,11 @@ class GalleryView(QWidget):
         An unreviewed experiment is rejected instead of deleted: the Experiments
         shelf plays as a slideshow, so Up there is the shelf's own Reject, and
         that keeps the row whose params the policy learns to steer away from.
+
+        An item already in the bin has no row to delete, so Up does nothing over
+        the Trash shelf's slideshow. Deliberate: the only delete left there is the
+        permanent one, and that is not a thing to do on a keystroke — it is asked
+        for from the tile, and confirmed.
         """
         row = self._db.get_generation(prompt_id)
         if row is None:
@@ -3404,8 +3412,25 @@ class GalleryView(QWidget):
 
     # --- the selected generation drives a config tab -----------------------
 
-    def _on_thumbnail_clicked(self, prompt_id: str):
+    def _row_for(self, prompt_id: str) -> dict | None:
+        """The generation behind a tile: the gallery's own row, else a held
+        deletion's.
+
+        A deleted item's row is out of the ``generations`` table — that is what
+        deleting is — but the recovery bin kept it whole, and its files are all
+        still there in the trash. So a Trash tile is a generation like any other
+        to look at: it previews, it plays, it opens full size, it fills a config
+        tab with the settings that made it. Only the actions that would change it
+        are gone (it has no folder, no star, no enhance), and those already ask
+        the database directly rather than coming through here.
+        """
         row = self._db.get_generation(prompt_id)
+        if row:
+            return row
+        return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
+
+    def _on_thumbnail_clicked(self, prompt_id: str):
+        row = self._row_for(prompt_id)
         if not row:
             return
         self._clear_reroll_selection()  # a saved generation takes over the info pane

@@ -63,6 +63,24 @@ def test_an_undateable_record_is_never_aged_out():
     assert recovery.days_left(broken, _NOW) == recovery.RETENTION_DAYS
 
 
+# --- how long it has been sitting there ------------------------------------
+
+
+def test_a_fresh_delete_has_been_in_the_trash_no_days_at_all():
+    # Rounded down, the opposite way from days_left: "I binned this an hour ago"
+    # is not a day in the trash.
+    assert recovery.days_held(_record(deleted_at=_NOW - timedelta(hours=5)), _NOW) == 0
+
+
+def test_time_in_the_trash_counts_up_by_the_day():
+    aged = _record(deleted_at=_NOW - timedelta(days=3, hours=2))
+    assert recovery.days_held(aged, _NOW) == 3
+
+
+def test_an_undateable_record_reads_as_freshly_deleted():
+    assert recovery.days_held(_record(deleted_at="not a date"), _NOW) == 0
+
+
 # --- what the shelf draws --------------------------------------------------
 
 
@@ -94,6 +112,40 @@ def test_a_bin_item_keeps_its_path_when_the_delete_moved_nothing():
     record = _record(row={"prompt_id": "p1", "thumbnail_path": r"C:\thumbs\p1.jpg"})
     (item,) = recovery.bin_items([record], _NOW)
     assert item["thumbnail_path"] == r"C:\thumbs\p1.jpg"
+
+
+def test_a_bin_items_output_files_point_at_where_they_actually_are():
+    # What makes a deleted item as watchable as any other: its video is in the
+    # trash, so the row that plays it has to say so.
+    trashed = r"C:\state\trash\abc\0_clip.mp4"
+    record = _record(
+        row={"prompt_id": "p1",
+             "output_files": json.dumps([{"filename": "clip.mp4", "subfolder": "video"}])},
+        batch={"moves": [[r"C:\out\video\clip.mp4", trashed]], "subdir": r"C:\state\trash\abc"},
+    )
+    (item,) = recovery.bin_items([record], _NOW)
+    (f,) = json.loads(item["output_files"])
+
+    assert f["path"] == trashed
+    # And it still says what the generation produced — the name the info pane
+    # shows and the copy button hands over is the file's own, not the trash's.
+    assert (f["filename"], f["subfolder"]) == ("clip.mp4", "video")
+
+
+def test_a_bin_items_output_files_stay_put_when_the_delete_moved_nothing():
+    record = _record(row={
+        "prompt_id": "p1",
+        "output_files": json.dumps([{"filename": "a.png", "subfolder": ""}]),
+    })
+    (item,) = recovery.bin_items([record], _NOW)
+    (f,) = json.loads(item["output_files"])
+    assert "path" not in f
+
+
+def test_a_bin_item_says_how_long_it_has_been_in_the_trash():
+    record = _record(deleted_at=_NOW - timedelta(days=4))
+    (item,) = recovery.bin_items([record], _NOW)
+    assert item["days_in_trash"] == 4
 
 
 def test_bin_items_keeps_the_order_it_was_given():

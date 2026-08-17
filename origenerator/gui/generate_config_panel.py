@@ -15,8 +15,8 @@ from origenerator.gallery import (
     EnhanceSettings, animated_preview_path,
     build_image_config_index, config_tab_title, describe_enhance_params,
     displayed_levels, enhance_params_for, find_source_image_id,
-    level_matching_settings, media_type_of_row, resolve_preview,
-    row_output_files, rows_in_settings, settings_signature,
+    level_matching_settings, media_type_of_row, output_file_path,
+    resolve_preview, row_output_files, rows_in_settings, settings_signature,
     videos_from_source_image,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
@@ -655,7 +655,10 @@ class GenerateConfigPanel(QWidget):
         # rather than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
         self._refresh_versions()
-        self._folder_btn.show()  # any saved generation has a containing folder to open
+        # Any saved generation has a containing folder to open — except a deleted
+        # one, whose folder it left when its row did. Everything else about it is
+        # still here to look at; there is just nowhere to go.
+        self._folder_btn.setVisible(row.get("deleted_at") is None)
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows)
         self._update_evolver_button(preview)
@@ -754,6 +757,7 @@ class GenerateConfigPanel(QWidget):
         self._versions.show_levels(
             self._version_items(row), self._pending_enhancement,
             self._add_card_for(row), str(row.get("created_at", "")),
+            row.get("days_in_trash"),
         )
 
     def _add_card_for(self, row: dict) -> tuple:
@@ -764,9 +768,9 @@ class GenerateConfigPanel(QWidget):
 
     @staticmethod
     def _level_path(level) -> Path:
-        """Where one version's file lives under ComfyUI's output folder."""
-        return (COMFYUI_OUTPUT_DIR / (level.file.get("subfolder") or "")
-                / (level.file.get("filename") or ""))
+        """Where one version's file lives — under ComfyUI's output folder, or in
+        the trash once the generation has been deleted."""
+        return output_file_path(level.file, COMFYUI_OUTPUT_DIR)
 
     def _version_items(self, row: dict) -> list[tuple]:
         """``(level, image path)`` for each version this image holds — the list

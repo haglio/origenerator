@@ -75,6 +75,22 @@ def media_type_of_row(row: dict) -> str:
     return workflow_output_type(row.get("workflow_name")) or "image"
 
 
+def output_file_path(file: dict, output_dir: Path) -> Path:
+    """Where one recorded output file actually sits on disk.
+
+    Normally under ``output_dir``, at the subfolder and name ComfyUI wrote it
+    to. A file the recovery bin has re-pointed carries an absolute ``path`` of
+    its own — its place inside the trash — so a deleted item's row resolves to
+    the files it still has rather than to where they used to be, and every
+    surface that shows a generation follows it there without having to know the
+    bin exists (see :func:`origenerator.recovery.bin_items`).
+    """
+    moved = file.get("path")
+    if moved:
+        return Path(moved)
+    return output_dir / (file.get("subfolder") or "") / (file.get("filename") or "")
+
+
 def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
     """Locate the file to preview for ``row`` and how to render it.
 
@@ -87,7 +103,7 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
         filename = f.get("filename")
         if not filename:
             continue
-        full = output_dir / f.get("subfolder", "") / filename
+        full = output_file_path(f, output_dir)
         rendered_as = media_type_from_filename(filename)
         if rendered_as is not None and full.exists():
             return full, rendered_as
@@ -138,7 +154,7 @@ def output_disk_files(row: dict, output_dir: Path,
         filename = f.get("filename")
         if not filename or (names is not None and filename not in names):
             continue
-        full = output_dir / f.get("subfolder", "") / filename
+        full = output_file_path(f, output_dir)
         if not full.exists():
             continue
         paths.append(full)

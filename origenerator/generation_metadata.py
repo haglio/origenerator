@@ -54,16 +54,38 @@ def _output_path(file: dict) -> str:
     return f"{subfolder}/{filename}" if subfolder else filename
 
 
-def file_item(file: dict, label: str = "File") -> MetaItem:
+def _held_prefix(held_days: int | None) -> str:
+    """How long this file's generation has been in the trash, for the front of
+    its File line — nothing at all for an item that hasn't been deleted.
+
+    It leads the line because the line is where you go to find out what a file
+    *is*, and for a deleted one "how long until it's gone" is part of that. The
+    Trash shelf's tiles carry the other half of the arithmetic (how many days it
+    has left); this says how long it has been sitting there.
+    """
+    if held_days is None:
+        return ""
+    if held_days <= 0:
+        return "(deleted today) "
+    return f"({held_days} day{'s' if held_days != 1 else ''} in trash) "
+
+
+def file_item(file: dict, label: str = "File", *,
+              held_days: int | None = None) -> MetaItem:
     """One output file as a row: its path, a copy of just its filename (dropping
     the image/ or video/ subfolder the displayed path carries), and a reveal of
-    its absolute location under ComfyUI's output folder.
+    its absolute location — under ComfyUI's output folder, or wherever the
+    recovery bin has since moved it.
+
+    ``held_days`` is set only for a deleted item, and puts how long it has been
+    in the trash in front of the path.
 
     Shared with the version strip, which puts this exact row beside the level it
     belongs to — the same file information, wherever the file is listed."""
     filename = file.get("filename") or ""
-    full = COMFYUI_OUTPUT_DIR / (file.get("subfolder") or "") / filename
-    return MetaItem(label, _output_path(file), copy=filename, reveal=str(full))
+    full = gallery.output_file_path(file, COMFYUI_OUTPUT_DIR)
+    return MetaItem(label, _held_prefix(held_days) + _output_path(file),
+                    copy=filename, reveal=str(full))
 
 
 def created_item(file: dict, fallback: str = "") -> MetaItem:
@@ -74,8 +96,7 @@ def created_item(file: dict, fallback: str = "") -> MetaItem:
     render from last week, and one ``created_at`` on the row can only be honest
     about one of them. Falls back to the row's own timestamp when the file is
     gone from disk."""
-    filename = file.get("filename") or ""
-    full = COMFYUI_OUTPUT_DIR / (file.get("subfolder") or "") / filename
+    full = gallery.output_file_path(file, COMFYUI_OUTPUT_DIR)
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime)
     except OSError:
@@ -95,7 +116,8 @@ def _basic(row: dict) -> MetaSection | None:
              if f.get("filename") and f.get("filename") not in listed]
     if not files:
         return None
-    items = [file_item(f) for f in files]
+    held = row.get("days_in_trash")
+    items = [file_item(f, held_days=held) for f in files]
     items.append(MetaItem("Created", str(row.get("created_at", ""))))
     return MetaSection("Basic", items)
 

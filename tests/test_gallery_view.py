@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
 from origenerator import gallery
 from origenerator.branch_session import ENV_FLAG
 from origenerator.gallery import detail_parts
+from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
@@ -1253,6 +1254,105 @@ def test_a_preview_still_recovers_what_it_deleted_itself(qtbot, monkeypatch):
     assert db.get_generation("mine") is not None
     assert db.get_deletion("mine") is None
     assert db.get_deletion("live") is not None  # the live app's is left where it is
+
+
+# --- a deleted item is still a generation you can look at -------------------
+
+
+def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
+    # Its row left the gallery, but the bin kept it whole and its files are all
+    # in the trash — so it fills a config tab with the settings that made it,
+    # which is the whole point of being able to look before you decide.
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+
+    view._thumbnail_clicked("d1")
+
+    assert view._selected_row["prompt_id"] == "d1"
+    shown = view._info_tabs.current_config_panel().displayed_row()
+    assert shown["prompt_id"] == "d1"
+
+
+def test_double_clicking_a_deleted_tile_reuses_its_settings(qtbot):
+    # The gesture a folder's tiles carry, since the one a shelf's carry — jump to
+    # its folder — is the single thing a deleted item hasn't got.
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+
+    with qtbot.waitSignal(view.reuse_requested) as blocker:
+        view._thumbnail_double_clicked("d1")
+
+    workflow_name, params = blocker.args
+    assert workflow_name == "sdxl_t2i"
+    assert params["seed"] == 1
+
+
+def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
+    # Deciding what to keep out of a bin of sixty days' deletions is exactly what
+    # a slideshow is for — one at a time, full size, rather than a grid of stamps.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+                                     ("d2", _image("d2", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+
+    assert not view._slideshow_btn.isHidden()
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert {item[2] for item in view._slideshow._playlist._items} == {"d1", "d2"}
+    view._slideshow.close()
+
+
+def test_fullscreen_over_a_deleted_item_pages_through_the_shelf(qtbot, monkeypatch):
+    # Left/Right work here for the same reason they work in a folder: the shelf's
+    # items resolve to real files, so there is a playlist to page.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+                                     ("d2", _image("d2", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._trash_item)
+    view._on_thumbnail_clicked("d1")
+
+    fs = _FakeFullscreen(None)
+    view._on_fullscreen_opened(fs)
+
+    assert [entry[2] for entry in fs.playlist] == view.visible_prompt_ids()
+    assert fs.playlist[fs.playlist_index][2] == "d1"  # opened on the shown item
+
+
+def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
+    # End to end through the real delete: what the shelf hands the preview is the
+    # clip where it now sits, not the folder it was taken out of.
+    db = Database(tmp_path / "test.db")
+    out = tmp_path / "out" / "video"
+    out.mkdir(parents=True)
+    (out / "clip.mp4").write_bytes(b"x")
+    db.insert_generation(prompt_id="v1", workflow_name="wan22_i2v",
+                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    db.update_generation("v1", status="completed", output_files=json.dumps(
+        [{"filename": "clip.mp4", "subfolder": "video"}]))
+    view = GalleryView(db, actions=GalleryActions(db, tmp_path / "out",
+                                                  Trash(tmp_path / "trash")))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._delete_rows([db.get_generation("v1")])
+
+    view._tree.setCurrentItem(view._trash_item)
+    (held,) = view._held_rows
+    # The real resolver, not this module's autouse "nothing to show" stub.
+    resolved = real_resolve_preview(held, tmp_path / "out")
+
+    assert resolved is not None
+    path, media_type = resolved
+    assert media_type == "video"
+    assert Path(path).exists() and Path(path).is_relative_to(tmp_path / "trash")
 
 
 def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):

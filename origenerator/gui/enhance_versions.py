@@ -207,7 +207,7 @@ class _LevelRow(_Row):
     context_requested = pyqtSignal(int, QPoint)
 
     def __init__(self, level, position: int, image_path, created_fallback: str = "",
-                 parent=None):
+                 held_days: int | None = None, parent=None):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
@@ -225,7 +225,7 @@ class _LevelRow(_Row):
         items = []
         if level.settings:
             items.append(MetaItem("Enhancement", level.settings))
-        items.append(file_item(level.file))
+        items.append(file_item(level.file, held_days=held_days))
         items.append(created_item(level.file, created_fallback))
         self._show_facts(items)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -413,7 +413,8 @@ class EnhanceVersions(QWidget):
         self._section.set_collapsed(collapsed)
 
     def show_levels(self, items: list[tuple], pending: tuple | None = None,
-                    add: tuple | None = None, created_fallback: str = ""):
+                    add: tuple | None = None, created_fallback: str = "",
+                    held_days: int | None = None):
         """Rebuild the list from ``(level, image_path)`` pairs.
 
         ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` row, which
@@ -429,6 +430,9 @@ class EnhanceVersions(QWidget):
         ``created_fallback`` stands in on a level whose file is no longer on disk
         to be asked when it was written — the row's own timestamp, which is the
         closest true answer left.
+
+        ``held_days`` is set only for a deleted image, and each level's File line
+        leads with how long it has been in the trash.
 
         Hidden only when there is nothing at all to show — no versions, nothing
         running, and no row to press, which is what a video looks like.
@@ -457,7 +461,7 @@ class EnhanceVersions(QWidget):
                 lambda on, at=duplicate_of: self._highlight_level(at, on))
             column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
-            row = _LevelRow(level, position, image_path, created_fallback)
+            row = _LevelRow(level, position, image_path, created_fallback, held_days)
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             self._rows.append(row)

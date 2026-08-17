@@ -33,6 +33,15 @@ class AutoGenerateController(QObject):
     def is_active(self, key: str) -> bool:
         return key in self._active
 
+    def active_key(self) -> str | None:
+        """The folder looping right now, or ``None`` — there is only ever one.
+
+        What a surface asks when it has to say a loop is running *somewhere*: the
+        switch lives on the folder in front, and a loop the user has walked away
+        from is exactly the one they need to be told about.
+        """
+        return next(iter(self._active), None)
+
     def start(self, key: str) -> None:
         """Loop ``key``, ending whatever other folder was looping.
 

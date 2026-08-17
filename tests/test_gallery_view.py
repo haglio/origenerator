@@ -4054,15 +4054,51 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
     assert panel._generating is False
 
 
-def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
+def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
+    # Never hidden: a loop runs until it is stopped, and a switch that went away
+    # with its folder would leave one running with nothing on screen to say so.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._auto_btn.isHidden()             # offered on a re-rollable leaf
+    assert not view._auto_btn.isHidden() and view._auto_btn.isEnabled()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # a media root, not a leaf
-    assert view._auto_btn.isHidden()
+
+    assert not view._auto_btn.isHidden()   # still there
+    assert not view._auto_btn.isEnabled()  # with nothing to do from here
+    assert "open a settings folder" in view._auto_btn.toolTip()
+
+
+def test_the_auto_switch_stays_lit_away_from_the_folder_looping(qtbot, tmp_path):
+    # The nightmare this ends: a loop running in a folder the user can't find,
+    # with nothing on screen to say one is running at all.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # walk away from it
+
+    assert view._auto_btn.isChecked()   # lit: a loop is running
+    assert view._auto_btn.isEnabled()   # and stoppable from here
+    assert "running in" in view._auto_btn.toolTip()  # naming the folder it runs in
+    assert view._auto.is_active(key)
+
+
+def test_switching_the_lit_auto_off_stops_the_loop_wherever_it_runs(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+
+    view._toggle_auto(False)  # clicked from a folder that isn't the one looping
+
+    assert not view._auto.is_active(key)
+    assert not view._auto_btn.isChecked()
 
 
 # --- a tab's Generate is a re-roll of its folder, navigated to at once ---------

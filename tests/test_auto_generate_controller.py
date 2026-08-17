@@ -155,18 +155,17 @@ def test_starting_an_already_looping_folder_does_not_double_launch(qtbot):
     assert launcher.calls == ["k"]  # the second start is a no-op
 
 
-def test_stop_all_ends_every_active_loop(qtbot):
+def test_stop_all_ends_the_loop_that_is_running(qtbot):
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)
     stopped = []
     auto.stopped.connect(stopped.append)
     auto.start("a")
-    auto.start("b")
 
     auto.stop_all()
 
-    assert not auto.is_active("a") and not auto.is_active("b")
-    assert sorted(stopped) == ["a", "b"]
+    assert not auto.is_active("a")
+    assert stopped == ["a"]
     assert not auto.any_active()
 
 
@@ -180,13 +179,43 @@ def test_rekey_moves_an_active_loop_to_a_new_key(qtbot):
     assert not auto.is_active("old") and auto.is_active("new")
 
 
-def test_folders_loop_independently(qtbot):
+def test_looping_a_new_folder_ends_the_one_that_was_looping(qtbot):
+    # One folder at a time: two loops would only take turns on the machine, each
+    # waiting out the other's render, and the voice steering that follows the loop
+    # would have two prompts to answer to.
+    launcher = FakeLauncher()
+    auto = AutoGenerateController(launcher)
+    stopped = []
+    auto.stopped.connect(stopped.append)
+    auto.start("a")
+
+    auto.start("b")
+
+    assert auto.is_active("b") and not auto.is_active("a")
+    assert stopped == ["a"]  # reported, so its switch and voice steering clean up
+
+
+def test_the_displaced_folder_launches_nothing_more(qtbot):
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)
     auto.start("a")
     auto.start("b")
 
-    auto.note_finished("a")
+    auto.note_finished("a")  # a's in-flight variation still lands
 
-    assert launcher.calls == ["a", "b", "a"]  # only a relaunched
-    assert auto.is_active("a") and auto.is_active("b")
+    assert launcher.calls == ["a", "b"]  # but nothing further goes into it
+
+
+def test_a_new_folder_that_cannot_start_leaves_the_loop_where_it_was(qtbot):
+    # Otherwise a refused launch would stop one loop and start none, leaving the
+    # machine idle and both switches off.
+    launcher = FakeLauncher(results=[True, False])
+    auto = AutoGenerateController(launcher)
+    stopped = []
+    auto.stopped.connect(stopped.append)
+    auto.start("a")
+
+    auto.start("b")
+
+    assert auto.is_active("a") and not auto.is_active("b")
+    assert stopped == []

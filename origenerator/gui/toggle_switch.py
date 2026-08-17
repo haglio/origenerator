@@ -28,6 +28,7 @@ from shared_ui.colors import (  # noqa: E402
 _TRACK = QSize(38, 20)   # the pill
 _KNOB_INSET = 3          # gap between the knob and the track's edge
 _GAP = 8                 # between the pill and its label
+_DISABLED_OPACITY = 0.4  # how far a switch fades when it can't be thrown
 
 
 class ToggleSwitch(QAbstractButton):
@@ -55,6 +56,11 @@ class ToggleSwitch(QAbstractButton):
     def paintEvent(self, _event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            # Painted rather than styled, so nothing else would have dimmed it:
+            # a disabled switch drawn at full strength reads as a live one, and
+            # the panel it powers goes dark around a switch that still looks on.
+            painter.setOpacity(_DISABLED_OPACITY)
         top = (self.height() - _TRACK.height()) / 2
         track = QRectF(0, top, _TRACK.width(), _TRACK.height())
         painter.setPen(Qt.PenStyle.NoPen)

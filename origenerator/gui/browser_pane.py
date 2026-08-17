@@ -210,7 +210,7 @@ class BrowserPane:
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_recents()
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
         self._v._record_location(RECENTS_KEY)  # so Back can return to the shelf
 
     def _render_recents(self):
@@ -468,7 +468,7 @@ class BrowserPane:
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_experiments()
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
         self._v._record_location(EXPERIMENTS_KEY)  # so Back can return to the shelf
 
     def _render_experiments(self):
@@ -518,7 +518,7 @@ class BrowserPane:
         self._v._avg_label.setText(self._trash_note())
         self._v._clear_metadata()
         self._render_trash()
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
         self._v._record_location(TRASH_KEY)  # so Back can return to the shelf
 
     def _render_trash(self):
@@ -633,7 +633,7 @@ class BrowserPane:
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._show_starred(self._starred_groups, self._starred_rows)
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
         self._v._record_location(STARRED_KEY)  # so Back can return to the shelf
 
     def _show_starred(self, groups, rows):
@@ -841,13 +841,13 @@ class BrowserPane:
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():
             widget.set_selected(pid in self._selected_ids)
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
 
     def clear_selection(self):
         self._selected_ids = set()
         self._selection_anchor = None
         self._thumb_widgets = {}
-        self._v._sync_delete_button()
+        self._v._sync_action_buttons()
 
     def clear_thumbnail_selection(self):
         """Drop the thumbnail multi-selection and its highlights while keeping the

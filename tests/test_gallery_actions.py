@@ -168,6 +168,107 @@ def test_undo_label_describes_the_most_recent_action(tmp_path):
     assert "2" in actions.undo_label()
 
 
+# --- redo: the undo stack walked the other way -----------------------------
+
+def test_redo_re_applies_an_undone_delete(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    file_path = output_dir / "a.png"
+    actions.delete_rows([row])
+    actions.undo()
+    assert actions.can_redo() and not actions.can_undo()
+
+    actions.redo()
+
+    assert db.get_generation("p1") is None and not file_path.exists()
+    # And it lands back on the undo stack, so the pair keeps working.
+    assert actions.can_undo() and not actions.can_redo()
+
+
+def test_a_delete_can_be_undone_and_redone_over_and_over(tmp_path):
+    # The redo re-runs the delete rather than replaying the undo backwards, which
+    # is what makes the second round work: each pass files its own trash batch.
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    file_path = output_dir / "a.png"
+    actions.delete_rows([row])
+
+    for _ in range(3):
+        actions.undo()
+        assert db.get_generation("p1") == row and file_path.exists()
+        actions.redo()
+        assert db.get_generation("p1") is None and not file_path.exists()
+
+
+def test_redo_walks_back_up_several_undos_in_order(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    first = _completed_row(db, output_dir, "p1", "a.png")
+    second = _completed_row(db, output_dir, "p2", "b.png")
+    actions.delete_rows([first])
+    actions.delete_rows([second])
+    actions.undo()  # p2 back
+    actions.undo()  # p1 back
+
+    actions.redo()  # the most recently undone step goes first
+    assert db.get_generation("p1") is None and db.get_generation("p2") is not None
+    actions.redo()
+    assert db.get_generation("p2") is None
+
+
+def test_a_new_action_forks_history_and_drops_the_redo(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    actions.delete_rows([row])
+    actions.undo()
+    assert actions.can_redo()
+
+    actions.rename_folder("image/sdxl_t2i", "Name")
+
+    assert not actions.can_redo()  # the branch that redo led to is gone
+
+
+def test_redo_label_names_the_step_it_would_re_apply(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    assert actions.redo_label() is None and not actions.can_redo()
+    actions.rename_folder("image/sdxl_t2i", "Name")
+    actions.undo()
+    assert "rename" in actions.redo_label().lower()
+
+
+def test_redo_of_a_rename_puts_the_new_name_back(tmp_path):
+    actions, db, _ = _actions(tmp_path)
+    db.rename_folder("image/sdxl_t2i", "First Name")
+    actions.rename_folder("image/sdxl_t2i", "Second Name")
+    actions.undo()
+
+    actions.redo()
+
+    assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "Second Name"
+
+
+def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
+    # A saved session points at a custom folder by id, so a create that is undone
+    # and redone has to resolve to the same key rather than a fresh one.
+    actions, db, _ = _actions(tmp_path)
+    folder_id = actions.create_custom_folder("Mine", [("image/sdxl_t2i", "model", None)])
+    actions.undo()
+    assert db.list_custom_folders() == []
+
+    actions.redo()
+
+    ((record,),) = (db.list_custom_folders(),)
+    assert record["id"] == folder_id
+    assert record["name"] == "Mine" and record["members"] == ["image/sdxl_t2i"]
+
+
+def test_redo_with_nothing_undone_is_a_noop(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+    actions.delete_rows([row])
+    actions.redo()  # never undone — nothing to re-apply
+    assert db.get_generation("p1") is None and actions.can_undo()
+
+
 def test_eviction_past_the_limit_leaves_the_oldest_in_the_bin(tmp_path):
     actions, db, output_dir = _actions(tmp_path, limit=1)
     first = _completed_row(db, output_dir, "p1", "a.png")

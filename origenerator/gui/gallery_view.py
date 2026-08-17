@@ -79,6 +79,14 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_MS = 1500
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
+_TOOL_ICON_PX = 24  # the button bank's icons — see GalleryView._tool_button
+_TOOLBAR_RULE_INSET = 5  # the gap each side of a between-groups rule, and its inset
+# Said the same way by the button and by the settings panel it would run, because
+# both go dark together the moment what's in front of you is a video.
+_NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
+_ALREADY_AT_THESE_SETTINGS = (
+    "Already enhanced at these settings — change one below to make another"
+)
 # The synthetic shelves, as back/forward history locations: each is a place the
 # user can be standing, so a visit to one is recorded and restored by key rather
 # than by the generation that happened to be picked there.
@@ -92,6 +100,25 @@ def _is_reusable_workflow(workflow_name) -> bool:
     with a fresh seed, which needs a template to build the graph from.
     """
     return (workflow_name or "") in WORKFLOW_REGISTRY
+
+
+def _toolbar_divider() -> QFrame:
+    """The hairline between two groups of the button bank.
+
+    Drawn with an explicit background for the same reason the pane divider is
+    (see :func:`_bottom_divider`), and inset a little on each side so it reads
+    as a gap with a rule in it rather than as another button.
+    """
+    line = QFrame()
+    # Wide enough for the margin the rule is inset by and still leave a pixel to
+    # paint: a 1px-wide frame with a 4px margin has nothing left to draw, and the
+    # bank shows a gap where the rule should be.
+    line.setFixedWidth(_TOOLBAR_RULE_INSET * 2 + 1)
+    line.setStyleSheet(
+        f"background-color: {BORDER_SUBTLE.name()};"
+        f" margin: {_TOOLBAR_RULE_INSET}px {_TOOLBAR_RULE_INSET}px;"
+    )
+    return line
 
 
 def _bottom_divider() -> QFrame:
@@ -161,7 +188,9 @@ class GalleryView(QWidget):
         # is on — including this one, with nothing playing, where it is what
         # the next slideshow opens at.
         self._pace = SlideshowPace(parent=self)
-        self._osr2_stroke.active_changed.connect(self._on_stroke_active_changed)
+        # Guards the one reconcile that owns both drive sources: starting or
+        # stopping the stroke is something it does, not something it reacts to.
+        self._reconciling_osr2 = False
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
@@ -282,9 +311,9 @@ class GalleryView(QWidget):
         # bottom bar can say the server is busy before a Generate goes in behind it.
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
-        self._sync_undo_button()
+        self._sync_history_buttons()
         self._sync_nav_buttons()
-        self._sync_delete_button()
+        self._sync_action_buttons()
         # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
         # Neither keyPressEvent nor a shortcut delivered the key in the running
         # app — a clicked thumbnail's key press never reached the view through
@@ -331,13 +360,18 @@ class GalleryView(QWidget):
                     return True
                 if (event.key() == Qt.Key.Key_Z
                         and event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                    self._undo()
+                    # Ctrl+Shift+Z is the other direction, as everywhere else.
+                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                        self._redo()
+                    else:
+                        self._undo()
                     return True
                 # The OSR2 stroke keys work right here in the main window too —
                 # not only in the fullscreen show — under the same guards that
                 # keep them out of text fields and other windows.
                 if (not event.modifiers()
-                        and apply_stroke_key(self._osr2_stroke, event.key())):
+                        and apply_stroke_key(self._osr2_stroke, event.key(),
+                                             on_drive_toggle=self._toggle_osr2_drive)):
                     self._stroke_panel.refresh()
                     return True
         return super().eventFilter(obj, event)
@@ -352,10 +386,12 @@ class GalleryView(QWidget):
             return False
         handled = False
         if self._osr2_enabled:
-            self._osr2_btn.setChecked(False)  # untoggling stops the driver
+            # One switch, so one thing to turn off: untoggling stops whichever
+            # source is on the device — a funscript drive or the stroke.
+            self._osr2_btn.setChecked(False)
             handled = True
-        if self._osr2_stroke.active:
-            self._osr2_stroke.stop()  # the stroke is part of the same panic-stop
+        elif self._osr2_stroke.active:
+            self._osr2_stroke.stop()  # nothing else should own it, but say so anyway
             handled = True
         if self._auto.any_active():
             self._auto.stop_all()
@@ -471,10 +507,15 @@ class GalleryView(QWidget):
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
         header.addWidget(self._title, 1)
-        # A compact, grouped toolbar: browse back/forward, undo, delete — icon-only.
+        # The button bank, in four groups a hairline apart (see the assembly at
+        # the end of this block): where you are, what you did, what to do with
+        # what's in front of you, and what the app is doing on its own. Grouping
+        # is what makes an icon-only bank readable — a button's neighbors say as
+        # much about it as its glyph does.
         self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
         self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
         self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
+        self._redo_btn = self._tool_button(icons.redo_icon(), "Redo", self._redo)
         self._slideshow_btn = self._tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow", self._start_slideshow
         )
@@ -491,13 +532,16 @@ class GalleryView(QWidget):
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
         self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
-        self._enhance_all_btn = self._tool_button(
-            icons.enhance_icon(),
-            "Enhance every not-yet-enhanced image in this folder "
-            "(upscale + low-denoise re-sample)",
-            self._enhance_all,
+        # Star, enhance, delete: the three things you can do to what is in front
+        # of you, each aimed the same way — the picked thumbnails, else the
+        # folder on screen. Colored, and grouped, because they are one set: gold
+        # for keep, green for make-better, red for take-away.
+        self._star_btn = self._tool_button(
+            icons.star_icon(filled=True), "Star", self._star_selection
         )
-        self._enhance_all_btn.hide()  # shown only on a folder with images awaiting it
+        self._enhance_btn = self._tool_button(
+            icons.enhance_icon(), "Enhance", self._enhance_selection
+        )
         # Turn the folders picked in the tree into a folder of their own. Shown
         # only while several are picked — that selection IS the folder, unsaved.
         self._group_btn = self._tool_button(
@@ -506,18 +550,7 @@ class GalleryView(QWidget):
             self._group_selection,
         )
         self._group_btn.hide()
-        # A single global switch: while it's on, whatever scripted video is in front
-        # drives the OSR2 — in the generate tab, or one opened fullscreen over it.
-        # Always visible (it's app-wide), lit when on.
-        self._osr2_btn = self._tool_button(
-            icons.osr2_icon(),
-            "Drive the OSR2 from the video in front — the generate tab's, or one "
-            "opened fullscreen (Esc to stop)",
-            self._on_osr2_toggle, checkable=True,
-        )
-        self._osr2_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
+        self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         # The other app-global switch, beside the OSR2's: while it's on, a few
         # library clips play at once with only their sound — something to work
         # over, tied to nothing on screen.
@@ -544,27 +577,40 @@ class GalleryView(QWidget):
         self._mic_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
-        # The stroke's own switch, beside the OSR2's. Genau toggles its engine
-        # from Fun Time's console; there is no console here, so the toolbar
-        # carries it — and the drive readout appears with it rather than sitting
-        # there dark while nothing is being sent.
-        self._stroke_btn = self._tool_button(
+        # One switch for the device, wearing the waveform: on means Origenerator
+        # is driving the OSR2, and the app picks the source — the funscript of
+        # whatever scripted video is in front (the generate tab's, or one playing
+        # in a slideshow), and a self-generated genau stroke whenever there is no
+        # script to follow. It used to be two buttons, which asked the user to
+        # answer a question the app can answer for itself, and let both sources
+        # be armed at once. Always visible (it's app-wide), lit when on.
+        self._osr2_btn = self._tool_button(
             icons.stroke_icon(),
-            "Drive the OSR2 from a self-generated stroke — no video needed "
-            f"({STROKE_KEY_LEGEND})",
-            self._on_stroke_toggle, checkable=True,
+            "Drive the OSR2 — the funscript of the video in front, or a "
+            f"self-generated stroke when there is none ({STROKE_KEY_LEGEND}; "
+            "Esc to stop)",
+            self._on_osr2_toggle, checkable=True,
         )
-        self._stroke_btn.setStyleSheet(
+        self._osr2_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
-        self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(2)
-        for button in (self._back_btn, self._forward_btn, self._undo_btn,
-                       self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
-                       self._group_btn, self._mic_btn, self._audio_btn,
-                       self._osr2_btn, self._stroke_btn, self._delete_btn):
-            toolbar.addWidget(button)
+        self._toolbar_groups = []
+        for buttons in (
+            (self._back_btn, self._forward_btn),                    # where you are
+            (self._undo_btn, self._redo_btn),                       # what you did
+            (self._group_btn,),                                     # …to the picked folders
+            (self._star_btn, self._enhance_btn, self._delete_btn),  # …to what's in front
+            (self._slideshow_btn, self._auto_btn,                   # what the app is doing
+             self._mic_btn, self._audio_btn, self._osr2_btn),
+        ):
+            divider = _toolbar_divider()
+            toolbar.addWidget(divider)
+            for button in buttons:
+                toolbar.addWidget(button)
+            self._toolbar_groups.append((divider, buttons))
+        self._sync_toolbar_dividers()
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
         browser_box.addLayout(header)
@@ -718,16 +764,32 @@ class GalleryView(QWidget):
         layout.addWidget(self._queue)
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
-        """A compact, icon-only toolbar button for the browser-pane header. A
-        ``checkable`` one is a toggle whose ``handler`` receives its on/off state."""
+        """An icon-only button for the browser-pane header's bank. A
+        ``checkable`` one is a toggle whose ``handler`` receives its on/off state.
+
+        The icon is drawn near the button's full height on purpose. At 16px it
+        sat in a 24px button carrying a glyph that used a third of its own
+        canvas — a mark covering about a ninth of the button, which reads as a
+        smudge rather than as a symbol.
+        """
         btn = QToolButton()
         btn.setObjectName("iconButton")
         btn.setIcon(icon)
-        btn.setIconSize(QSize(16, 16))
+        btn.setIconSize(QSize(_TOOL_ICON_PX, _TOOL_ICON_PX))
         btn.setToolTip(tooltip)
         btn.setCheckable(checkable)
         (btn.toggled if checkable else btn.clicked).connect(handler)
         return btn
+
+    def _sync_toolbar_dividers(self):
+        """Show the rule in front of each group that has something to show, and
+        hide the leading one — so a bank whose optional buttons (Group, Auto,
+        Slideshow) are away never wears a stray or doubled line."""
+        leading = True
+        for divider, buttons in self._toolbar_groups:
+            showing = any(not button.isHidden() for button in buttons)
+            divider.setVisible(showing and not leading)
+            leading = leading and not showing
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
@@ -767,42 +829,68 @@ class GalleryView(QWidget):
         # under it — re-run rather than leave highlights on words that shifted.
         panel.title_changed.connect(self._refresh_find)
 
-    # --- Drive OSR2: a single global toggle following the front video ----------
+    # --- Drive OSR2: one switch, the app picking funscript or stroke ----------
 
     def _on_osr2_toggle(self, on: bool):
         self._osr2_enabled = on
         self._reconcile_osr2()
 
-    def _reconcile_osr2(self):
-        """Point the one driver at whichever video is foreground.
+    def _toggle_osr2_drive(self):
+        """Flip the one switch — what Space does, from any surface. The stroke's
+        own toggle is deliberately not reachable from a key any more: with two
+        sources for one device, whichever one a key started would have been
+        streaming alongside whatever the switch already had going."""
+        self._osr2_btn.setChecked(not self._osr2_btn.isChecked())
 
-        Idempotent: it (re)starts only when the driven ``(video, player)`` actually
-        changes and stops when nothing should drive — so tab switches, browsing,
-        completions, and opening or closing a slideshow all resolve to the
-        right video without churning the device."""
-        target = self._osr2_drive_source()
-        if target is None:
-            if self._osr2_driving is not None:
-                self._osr2_driver.stop()
-                self._osr2_driving = None
+    def _reconcile_osr2(self):
+        """Put the right thing on the device, or nothing.
+
+        With the switch off, neither source drives. With it on, a funscript wins
+        wherever there is one — a slideshow showing a scripted video, else the
+        front tab's — and the self-generated stroke fills every other moment,
+        which is most of them: a folder of images, a clip with no script, an
+        empty tab. That is the whole of "genau mode when no funscript is going".
+
+        Idempotent, so tab switches, browsing, completions and opening or closing
+        a show all resolve without churning the device. The guard makes it
+        re-entrant-safe too: starting or stopping the stroke emits
+        ``active_changed``, and a listener that reconciles must not land back
+        here mid-flight.
+        """
+        if self._reconciling_osr2:
             return
-        video_path, player, actions = target
-        driving = (video_path, player)  # same clip, new player (fullscreen) still re-aims
-        if self._osr2_driving != driving:
-            self._osr2_driver.start(player, actions)
-            self._osr2_driving = driving
+        self._reconciling_osr2 = True
+        try:
+            target = self._osr2_drive_source() if self._osr2_enabled else None
+            if target is None:
+                if self._osr2_driving is not None:
+                    self._osr2_driver.stop()
+                    self._osr2_driving = None
+            else:
+                video_path, player, actions = target
+                # Same clip, new player (a show opened over it) still re-aims.
+                driving = (video_path, player)
+                if self._osr2_driving != driving:
+                    self._osr2_driver.start(player, actions)
+                    self._osr2_driving = driving
+            wants_stroke = self._osr2_enabled and target is None
+            if wants_stroke and not self._osr2_stroke.active:
+                self._osr2_stroke.start()
+            elif not wants_stroke and self._osr2_stroke.active:
+                self._osr2_stroke.stop()
+        finally:
+            self._reconciling_osr2 = False
 
     def _osr2_drive_source(self):
-        """The drive target the device should follow, or ``None``. The auto-generate
-        slideshow's stroke engine owns the device outright while it runs; else, while
-        the toggle is on, an open slideshow wins when it's showing a scripted video,
-        otherwise the front tab's video.
+        """The funscript target to follow, or ``None`` when there is none to
+        follow — in which case the stroke is what drives (see
+        :meth:`_reconcile_osr2`). An open slideshow wins when it's showing a
+        scripted video, otherwise the front tab's video.
 
-        The toggle governs both surfaces alike: double-clicking a clip open fullscreen
-        used to take the device on its own, so a clip watched with the switch off drove
-        anyway — the switch is what decides now, whichever surface the video is on."""
-        if self._osr2_stroke.active or not self._osr2_enabled:
-            return None
+        The switch governs both surfaces alike: double-clicking a clip open used
+        to take the device on its own, so a clip watched with the switch off
+        drove anyway — the switch is what decides now, whichever surface the
+        video is on."""
         if self._slideshow is not None:
             target = self._slideshow.osr2_drive_target()
             if target is not None:
@@ -849,7 +937,9 @@ class GalleryView(QWidget):
             items, on_delete=self._trash_generation,
             on_enhance=self._enhance_from_slideshow,
             on_star=self._star_generation,
-            pace=self._pace, stroke=self._osr2_stroke, **kwargs)
+            pace=self._pace, stroke=self._osr2_stroke,
+            # Its Space reaches the one OSR2 switch, like every other surface's.
+            on_drive_toggle=self._toggle_osr2_drive, **kwargs)
         if folder_items and self._slideshow.is_live():
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
@@ -913,24 +1003,6 @@ class GalleryView(QWidget):
             if preview is not None:
                 media.append((preview[0], preview[1], pid, row.get("thumbnail_path")))
         return media
-
-    # --- the app-global OSR2 stroke: reconcile hold and main-window feedback --
-
-    def _on_stroke_toggle(self, checked: bool):
-        """The toolbar switch: take the device, or park it. The stroke is
-        app-global, so this only asks — every surface hears back through
-        ``active_changed``, including this window's own button."""
-        if checked != self._osr2_stroke.active:
-            self._osr2_stroke.toggle()
-
-    def _on_stroke_active_changed(self, active: bool):
-        """The stroke took or released the device (from whichever surface — a
-        key in a slideshow, or the toolbar switch here): the funscript reconcile
-        stands down while it holds it, and the switch follows. The drive readout
-        shows and hides itself (:class:`StrokePanel` follows the same signal)."""
-        self._reconcile_osr2()
-        if self._stroke_btn.isChecked() != active:
-            self._stroke_btn.setChecked(active)
 
 
     def _group_for_key(self, key: str):
@@ -1089,7 +1161,7 @@ class GalleryView(QWidget):
             row = self._db.get_generation(prompt_id)
             if row is not None:
                 self._actions.reject_experiment(row)
-            self._sync_undo_button()
+            self._sync_history_buttons()
         self.refresh()
 
     def _folder_key_for(self, workflow_name: str, params: dict) -> str:
@@ -1421,7 +1493,7 @@ class GalleryView(QWidget):
             return  # a multi-selection owns the panes; the current row is one of many
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
-        self._sync_enhance_all_button()  # enhance-all fits a folder with plain images
+        self._sync_enhance_button()  # enhance-all fits a folder with plain images
         self._sync_group_button()      # grouping fits only a multi-selection
         # The image/video filter belongs to the Recents shelf alone; the
         # experimenter's switch to the Experiments shelf alone.
@@ -1431,7 +1503,7 @@ class GalleryView(QWidget):
             self._title.set_display("")
             self._avg_label.setText("")
             self._browser.show_empty()
-            self._sync_delete_button()
+            self._sync_action_buttons()
             return
         if current is self._recents_item:
             self._browser.show_recents_overview()
@@ -1455,7 +1527,7 @@ class GalleryView(QWidget):
         self._title.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         self._show_group_contents(group)
-        self._sync_delete_button()
+        self._sync_action_buttons()
 
     def _show_group_contents(self, group):
         """Fill the browser pane with what a folder holds: its generations
@@ -1506,10 +1578,9 @@ class GalleryView(QWidget):
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._auto_btn.hide()
-        self._enhance_all_btn.hide()
         self._sync_slideshow_button()
         self._sync_group_button()
-        self._sync_delete_button()
+        self._sync_action_buttons()
 
     def _restore_multi_selection(self, keys: list[str]):
         """Re-pick the folders a rebuild dropped, and re-show them together.
@@ -1533,6 +1604,7 @@ class GalleryView(QWidget):
         """Offer "group these" only while several folders are picked — one folder
         is not a grouping, and the button would only ask what it meant."""
         self._group_btn.setVisible(self._selection_group is not None)
+        self._sync_toolbar_dividers()
 
     def _group_selection(self):
         """Save the picked folders as a folder of the user's own, under a name they
@@ -1565,7 +1637,7 @@ class GalleryView(QWidget):
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
-        self._sync_undo_button()
+        self._sync_history_buttons()
         item = self._item_by_key.get(gallery.custom_folder_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
@@ -1609,7 +1681,7 @@ class GalleryView(QWidget):
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
-        self._sync_undo_button()
+        self._sync_history_buttons()
 
     def _remove_from_custom_folder(self, group, member_key: str):
         """Drop one gathered folder out of the custom folder on screen."""
@@ -1619,7 +1691,7 @@ class GalleryView(QWidget):
             group.folder_id, member_key, level=identity[1], ref_prompt_id=identity[2]
         )
         self.refresh()
-        self._sync_undo_button()
+        self._sync_history_buttons()
 
     def _note_folder_visit(self, key: str | None):
         """Record a folder the user opened, so a delete can return to the most
@@ -1880,6 +1952,7 @@ class GalleryView(QWidget):
         self._auto_btn.blockSignals(True)
         self._auto_btn.setChecked(available and key is not None and self._auto.is_active(key))
         self._auto_btn.blockSignals(False)
+        self._sync_toolbar_dividers()
 
     def _sync_slideshow_button(self):
         """Offer the slideshow on anything that holds media: a folder, or the
@@ -1894,6 +1967,7 @@ class GalleryView(QWidget):
             bool(self._slideshow_items(self._slideshow_rows()))
         )
         self._slideshow_btn.setToolTip(f"Play {self._slideshow_subject()} as a slideshow")
+        self._sync_toolbar_dividers()
 
     def _slideshow_rows(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
@@ -1912,17 +1986,165 @@ class GalleryView(QWidget):
             self._current_shelf_key(), "this folder"
         )
 
-    # --- standalone enhance: the folder button, the selection action, the queue ---
+    # --- standalone enhance: the bank button, the selection action, the queue ---
 
-    def _sync_enhance_all_button(self):
-        """Offer Enhance All only on a settings folder holding finished images
-        that haven't been enhanced yet — neither inline (their workflow's
-        ``enhance`` toggle) nor by a standalone enhance of their output."""
+    def _sync_enhance_button(self):
+        """Aim Enhance the way Delete is aimed: the picked thumbnails if any are
+        picked, else every image in this folder still waiting for one. It stays
+        in the bank either way, disabled when there is nothing to enhance —
+        a button that comes and goes is one the user has to go looking for.
+
+        Picked items are enhanced whether or not they already have been (that is
+        what picking them says); a whole folder is only its not-yet-enhanced
+        images, so the button doesn't quietly re-run the ones that are done.
+        """
+        if self._browser.selected_ids:
+            ids = self._enhanceable_selection()
+            self._enhance_btn.setEnabled(bool(ids))
+            if ids:
+                self._enhance_btn.setToolTip(
+                    f"Enhance {len(ids)} item{'s' if len(ids) != 1 else ''} "
+                    "(upscale + low-denoise re-sample)"
+                )
+            else:
+                self._enhance_btn.setToolTip(
+                    _NO_VIDEO_ENHANCER if self._selection_is_all_video()
+                    else _ALREADY_AT_THESE_SETTINGS
+                )
+            return
         group = self._current_group()
-        available = isinstance(group, gallery.SettingsGroup) and bool(
+        awaiting = (
             gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
+            if isinstance(group, gallery.SettingsGroup) else []
         )
-        self._enhance_all_btn.setVisible(available)
+        self._enhance_btn.setEnabled(bool(awaiting))
+        self._enhance_btn.setToolTip(
+            f"Enhance {len(awaiting)} not-yet-enhanced image"
+            f"{'s' if len(awaiting) != 1 else ''} in this folder "
+            "(upscale + low-denoise re-sample)"
+            if awaiting else "Nothing here to enhance"
+        )
+
+    def _enhanceable_selection(self) -> list[str]:
+        """The picked thumbnails this button would actually run on.
+
+        Two things are dropped. Videos, because there is no video enhancer — the
+        workflow behind all of this refines a still — and they are picked from
+        the same flow and look no different picked, so a picked clip is nothing
+        to run rather than a run that fails.
+
+        And an image that already holds a version made at exactly the settings
+        on the panel: running it again would spend a generation arriving at the
+        picture that is already there. Judged against what the run would *use*
+        (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
+        source-matched model resolves to this image's own checkpoint before the
+        comparison rather than the panel's raw value. Change any knob and the
+        button comes back, which is what makes it read as "you have this one"
+        rather than as "no".
+        """
+        ids = []
+        for prompt_id in self.selected_prompt_ids():
+            row = self._db.get_generation(prompt_id)
+            if row is None or not gallery.is_enhanceable_row(row):
+                continue
+            if gallery.level_matching_settings(row, self._enhance_settings) is None:
+                ids.append(prompt_id)
+        return ids
+
+    def _selection_is_all_video(self) -> bool:
+        """Whether every picked thumbnail is a video — which is why Enhance is
+        dark, as opposed to its images being enhanced at these settings already."""
+        rows = [row for pid in self.selected_prompt_ids()
+                if (row := self._db.get_generation(pid)) is not None]
+        return bool(rows) and all(
+            gallery.media_type_of_row(row) == "video" for row in rows
+        )
+
+    def _enhance_selection(self):
+        """The bank button's action: enhance the picked thumbnails, or every
+        member image of this folder that isn't enhanced yet."""
+        if self._browser.selected_ids:
+            ids = self._enhanceable_selection()
+            if ids:
+                self.enhance_items(ids)
+                self._sync_enhance_button()
+            return
+        self._enhance_all()
+
+    def _sync_enhance_panel(self):
+        """Gray the Enhance settings out where nothing they say could ever run.
+
+        The panel is app-wide and follows you rather than the folder, which is
+        why it shows on the shelves as readily as on a settings folder — but a
+        video is the one place with no enhancement to configure at all, and live
+        knobs there advertise an action that isn't on offer. A mixed folder
+        keeps them: the images in it are still enhanceable.
+        """
+        self._enhance_panel.set_applicable(
+            not self._showing_only_videos(), _NO_VIDEO_ENHANCER
+        )
+
+    def _showing_only_videos(self) -> bool:
+        """Whether everything in front of us is video — the picked thumbnails if
+        any are picked, else the folder on screen. Nothing in front (a shelf with
+        no pick) is not "only videos": there is simply nothing to say."""
+        rows = [row for pid in self.selected_prompt_ids()
+                if (row := self._row_for(pid)) is not None]
+        if not rows and not self._browser.selected_ids:
+            group = self._current_group()
+            rows = gallery.rows_under(group) if group is not None else []
+        return bool(rows) and all(
+            gallery.media_type_of_row(row) == "video" for row in rows
+        )
+
+    def _sync_star_button(self):
+        """Aim Star like Delete and Enhance: the picked thumbnails, else the
+        folder on screen. It toggles, so the tooltip says which way it will go —
+        a set already starred all over unstars.
+
+        Disabled where a star means nothing: a shelf, or a deleted item in the
+        bin, which has no folder to be bookmarked in."""
+        pids = self.selected_prompt_ids() if self._browser.selected_ids else []
+        if pids and not self._browser.showing_trash():
+            starring = not self._all_starred(pids)
+            self._star_btn.setEnabled(True)
+            self._star_btn.setToolTip(
+                f"{'Star' if starring else 'Unstar'} {len(pids)} "
+                f"item{'s' if len(pids) != 1 else ''}"
+            )
+            return
+        group = None if pids else self._starrable_folder()
+        self._star_btn.setEnabled(group is not None)
+        self._star_btn.setToolTip(
+            f"{'Unstar' if group.starred else 'Star'} folder “{group.label}”"
+            if group is not None else "Nothing here to star"
+        )
+
+    def _starrable_folder(self):
+        """The folder on screen if a star can be set on it, else ``None``.
+
+        A shelf has no group at all, and a multi-selection's folder isn't one
+        yet — it has no row to hang a star on until it's saved, which is what
+        the Group button beside this one is for."""
+        if self._selection_group is not None:
+            return None
+        return self._current_group()
+
+    def _all_starred(self, prompt_ids) -> bool:
+        rows = [self._db.get_generation(pid) for pid in prompt_ids]
+        return all(row and row.get("starred") for row in rows)
+
+    def _star_selection(self):
+        """The bank button's action: bookmark the picked thumbnails, or the
+        folder on screen — and un-bookmark them when they already are, so the one
+        button is the whole of the toggle."""
+        if self._browser.selected_ids and not self._browser.showing_trash():
+            pids = self.selected_prompt_ids()
+            self.set_items_starred(pids, not self._all_starred(pids))
+            return
+        group = self._starrable_folder()
+        if group is not None:
+            self._toggle_star(group.key)
 
     def enhance_settings(self) -> str:
         """The app-wide enhancement settings, for the session to persist."""
@@ -1953,6 +2175,9 @@ class GalleryView(QWidget):
         launched a moment later uses what is on screen."""
         self._enhance_settings = settings
         self._push_enhance_settings()
+        # Whether a picked image already holds this exact version is what the
+        # button is answering, so turning a knob is what brings it back.
+        self._sync_enhance_button()
 
     def _enhance_all(self):
         """The folder button's action: queue a standalone enhance for every
@@ -1964,7 +2189,7 @@ class GalleryView(QWidget):
         self._enqueue_enhancements(
             gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
         )
-        self._sync_enhance_all_button()
+        self._sync_enhance_button()
 
     def enhance_items(self, prompt_ids: list[str]):
         """Queue a standalone enhance for each picked generation (the thumbnail
@@ -2209,7 +2434,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None or not self._actions.delete_enhance_levels(row, filenames):
             return
-        self._sync_undo_button()
+        self._sync_history_buttons()
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
@@ -2220,7 +2445,7 @@ class GalleryView(QWidget):
                 shown = panel.displayed_row()
                 if shown is not None and shown.get("prompt_id") == prompt_id:
                     panel.show_completed_result(updated, self._image_rows)
-        self._sync_enhance_all_button()  # an image with no enhancement left awaits one
+        self._sync_enhance_button()  # an image with no enhancement left awaits one
 
     def _reconcile_pending_enhancements(self):
         """Show the enhancement being made wherever the image it improves is.
@@ -2402,7 +2627,7 @@ class GalleryView(QWidget):
             return
         if gallery.unreviewed_experiments([row]):
             self._actions.reject_experiment(row)
-            self._sync_undo_button()
+            self._sync_history_buttons()
         else:
             self._actions.delete_rows([row])
 
@@ -2875,7 +3100,7 @@ class GalleryView(QWidget):
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
         self._auto_enhance_if_wanted(finished_row)  # while the Auto switch is on
-        self._sync_enhance_all_button()  # a landed enhance may retire the button
+        self._sync_enhance_button()  # a landed enhance may retire the button
         self._reconcile_pending_enhancements()  # the live tile gives way to the level
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None):
@@ -3295,7 +3520,7 @@ class GalleryView(QWidget):
             return
         self._browser.clear_selection()
         self.refresh()
-        self._sync_undo_button()
+        self._sync_history_buttons()
 
     def _undo(self):
         if not self._actions.can_undo():
@@ -3308,12 +3533,32 @@ class GalleryView(QWidget):
         # rather than leaving the user on the parent we'd navigated to.
         if focus and focus in self._leaf_by_id:
             self._show_generation(focus)
-        self._sync_undo_button()
+        self._sync_history_buttons()
 
-    def _sync_undo_button(self):
-        label = self._actions.undo_label()
+    def _redo(self):
+        """Re-apply what Undo took back. There is nothing to navigate to — a redo
+        takes something away rather than restoring it — so this only rebuilds."""
+        if not self._actions.can_redo():
+            return
+        self._info_tabs.clear_current_preview()
+        self._actions.redo()
+        self._browser.clear_selection()
+        self.refresh()
+        self._sync_history_buttons()
+
+    def _sync_history_buttons(self):
+        """Undo and Redo: enabled when there's a step that way, each saying in
+        its tooltip which step that is."""
+        undo_label = self._actions.undo_label()
         self._undo_btn.setEnabled(self._actions.can_undo())
-        self._undo_btn.setToolTip(f"Undo: {label}" if label else "Nothing to undo")
+        self._undo_btn.setToolTip(
+            f"Undo: {undo_label}" if undo_label else "Nothing to undo"
+        )
+        redo_label = self._actions.redo_label()
+        self._redo_btn.setEnabled(self._actions.can_redo())
+        self._redo_btn.setToolTip(
+            f"Redo: {redo_label}" if redo_label else "Nothing to redo"
+        )
 
     def _confirm(self, text: str) -> bool:
         reply = QMessageBox.question(
@@ -3435,7 +3680,7 @@ class GalleryView(QWidget):
     def _apply_rename(self, key: str, name: str):
         self._actions.rename_folder(key, name.strip() or None)
         self.refresh()
-        self._sync_undo_button()
+        self._sync_history_buttons()
 
     def _begin_inline_rename(self, item, _column):
         """Double-clicking a tree folder edits its name in place."""
@@ -3452,7 +3697,7 @@ class GalleryView(QWidget):
         self._editing_key = None
         name = item.text(0)  # no ★ prefix to strip — the star is a row icon now
         self._actions.rename_folder(key, name.strip() or None)
-        self._sync_undo_button()
+        self._sync_history_buttons()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
         QTimer.singleShot(0, self.refresh)
 
@@ -3472,7 +3717,7 @@ class GalleryView(QWidget):
         if key is not None:
             self._actions.rename_folder(key, name.strip() or None)
             self.refresh()
-            self._sync_undo_button()
+            self._sync_history_buttons()
 
     def _toggle_star(self, key: str):
         item = self._item_by_key.get(key)
@@ -3646,6 +3891,18 @@ class GalleryView(QWidget):
     def _sync_nav_buttons(self):
         self._back_btn.setEnabled(self._history.can_go_back())
         self._forward_btn.setEnabled(self._history.can_go_forward())
+
+    def _sync_action_buttons(self):
+        """Re-aim the act-on-this trio together.
+
+        Star, Enhance and Delete all follow the same target — the picked
+        thumbnails, else the folder on screen — so the events that move that
+        target re-read all three at once rather than each on its own."""
+        self._sync_star_button()
+        self._sync_enhance_button()
+        self._sync_enhance_panel()
+        self._sync_delete_button()
+        self._sync_toolbar_dividers()
 
     def _sync_delete_button(self):
         """Enable Delete when there's a target — picked thumbnails, else the

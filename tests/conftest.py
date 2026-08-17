@@ -82,6 +82,38 @@ def installed_models(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _never_take_the_real_device(monkeypatch):
+    """Keep the suite off the OSR2 and off genau's state file.
+
+    A test that builds a gallery gets real drive controllers, and the one OSR2
+    switch now *drives* the moment it goes on — a stroke when there's no
+    funscript to follow — where it used to arm and wait. So turning it on in a
+    test would open a socket at the broker's port, spin the 40 Hz clock, and
+    write "0" into the sibling app's ``genau_enabled.txt``, which is a live file
+    on this machine. Both drivers take an injectable broker, and every test that
+    exercises one for its own sake injects its own; this only replaces the
+    default, so nothing is left reaching the hardware by accident.
+    """
+    from origenerator.gui import osr2_driver, osr2_stroke_driver
+
+    class _NoDevice:
+        def pause_genau(self): pass
+        def restore_genau(self): pass
+        def park(self): pass
+        def send_position(self, pos, interval_ms): pass
+        def close(self): pass
+
+    class _NoTicker:
+        def __init__(self, tick, interval_s, **_kw): pass
+        def start(self): pass
+        def stop(self): pass
+
+    monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
+    monkeypatch.setattr(osr2_stroke_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
+    monkeypatch.setattr(osr2_stroke_driver, "_TickThread", _NoTicker)
+
+
+@pytest.fixture(autouse=True)
 def _collect_widgets_between_tests():
     """Reap each test's widgets before the next one builds its own.
 

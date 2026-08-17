@@ -22,14 +22,20 @@ CAPTION_CSS = (
 )
 
 
-def apply_stroke_key(stroke, key) -> bool:
+def apply_stroke_key(stroke, key, *, on_drive_toggle=None) -> bool:
     """Route one of genau's stroke keys to ``stroke``; ``False`` for any other
     key (or with no driver wired), so the caller falls through to its own
-    handling."""
+    handling.
+
+    ``on_drive_toggle`` takes Space instead of the stroke's own switch. Driving
+    the OSR2 is one switch now — the gallery's — which picks the funscript or
+    the stroke by what is playing, so Space has to reach *that* rather than
+    start a second source alongside a script already streaming.
+    """
     if stroke is None:
         return False
     if key == Qt.Key.Key_Space:
-        stroke.toggle()
+        (on_drive_toggle or stroke.toggle)()
     elif key == Qt.Key.Key_J:
         stroke.adjust_speed(-5)
     elif key == Qt.Key.Key_L:

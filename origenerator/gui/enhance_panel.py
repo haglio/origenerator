@@ -38,6 +38,7 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows import WORKFLOW_REGISTRY
 from shared_ui.check_box import CheckBox
+from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "
@@ -49,6 +50,25 @@ _NO_DETECTOR_TOOLTIP = (
     "Subpack node pack, put {} and {} in its models/ultralytics/bbox folder, "
     "and restart it."
 )
+# Disabling a widget is not the same as it looking disabled: the app's sheet
+# colors every label, picker and spin box outright and names no disabled state,
+# so a panel switched off went on reading exactly as live as before. These mute
+# this panel's own fields — set on the panel, so nothing outside it is touched.
+# (The switch paints itself and dims itself; the check boxes already did.)
+_DISABLED_CSS = f"""
+    #enhancePanel QLabel:disabled,
+    #enhancePanel QComboBox:disabled,
+    #enhancePanel QSpinBox:disabled,
+    #enhancePanel QDoubleSpinBox:disabled {{
+        color: {TEXT_MUTED.name()};
+    }}
+    #enhancePanel QComboBox:disabled,
+    #enhancePanel QSpinBox:disabled,
+    #enhancePanel QDoubleSpinBox:disabled {{
+        background-color: {BG_PRIMARY.name()};
+        border: 1px solid {BORDER_SUBTLE.name()};
+    }}
+"""
 
 
 def _read(widget):
@@ -111,6 +131,8 @@ class EnhancePanel(QWidget):
         self._widgets: dict = {}
         self._defs = _enhancer_param_defs()
         self.setAcceptDrops(True)  # a version tile dropped here hands its settings over
+        self.setObjectName("enhancePanel")
+        self.setStyleSheet(_DISABLED_CSS)
 
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
@@ -192,6 +214,18 @@ class EnhancePanel(QWidget):
 
         box.addLayout(form)
         box.addStretch(1)
+
+    def set_applicable(self, applicable: bool, reason: str = "") -> None:
+        """Switch the whole panel on or off, and look it.
+
+        Off, every field is disabled *and* muted, so the panel reads as what it
+        is where it can't apply — settings for an action that isn't on offer —
+        rather than as live knobs that quietly do nothing. Back on, each field
+        returns to whatever it was in its own right: the detail pass stays
+        grayed if ComfyUI still hasn't got a detector.
+        """
+        self.setEnabled(applicable)
+        self.setToolTip("" if applicable else reason)
 
     def _show_detectors_installed(self) -> None:
         """Dim the detail pass when ComfyUI hasn't got a detector it runs.

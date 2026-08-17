@@ -52,6 +52,45 @@ def test_stopping_prevents_further_relaunches(qtbot):
     assert not auto.is_active("k")
 
 
+def test_cancelling_a_variation_keeps_the_loop_and_tries_another_seed(qtbot):
+    launcher = FakeLauncher()
+    auto = AutoGenerateController(launcher)
+    stopped = []
+    auto.stopped.connect(stopped.append)
+    auto.start("k")
+
+    auto.note_canceled("k")  # the user threw away the seed being made
+
+    assert launcher.calls == ["k", "k"]  # another seed, at once
+    assert auto.is_active("k")           # and the loop is still on
+    assert stopped == []
+
+
+def test_a_cancel_after_the_user_stopped_does_not_relaunch(qtbot):
+    launcher = FakeLauncher()
+    auto = AutoGenerateController(launcher)
+    auto.start("k")
+
+    auto.stop("k")
+    auto.note_canceled("k")  # the stopped loop's in-flight job is cancelled after
+
+    assert launcher.calls == ["k"]
+    assert not auto.is_active("k")
+
+
+def test_a_cancel_whose_relaunch_cannot_run_ends_the_loop(qtbot):
+    launcher = FakeLauncher(results=[True, False])  # starts, then next won't run
+    auto = AutoGenerateController(launcher)
+    stopped = []
+    auto.stopped.connect(stopped.append)
+    auto.start("k")
+
+    auto.note_canceled("k")  # nothing running and nothing launchable: a dead loop
+
+    assert not auto.is_active("k")
+    assert stopped == ["k"]
+
+
 def test_a_failed_variation_ends_the_loop_and_signals_stopped(qtbot):
     launcher = FakeLauncher()
     auto = AutoGenerateController(launcher)

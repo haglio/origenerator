@@ -8,7 +8,9 @@ They are handed :class:`InFlightItem` instead: a plain view-model the gallery
 builds per job, carrying what to draw, how to stop it, and how to go to it.
 
 :func:`queue_wait_text` is here for the same reason: what a wait on another app
-reads like is one wording, shared by every surface that has to say it.
+reads like is one wording, shared by every surface that has to say it — as is
+:func:`discard_run_text`, the label on the button that throws the run in flight
+away, which three panes each draw.
 """
 
 from dataclasses import dataclass
@@ -27,12 +29,32 @@ class InFlightItem:
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for a progress bar
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
+    auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
     # The two halves of the countdown on the job being rendered: when ComfyUI
     # began executing it (None while it's still queued), and what this workflow's
     # recent runs say a whole one takes.
     started_at: float | None = None
     typical_seconds: float | None = None
+
+
+def discard_run_text(auto_generating: bool) -> str:
+    """The label on the button that throws away the run being made — one wording
+    for the folder's live tile, the bottom strip's rows, and the config pane.
+
+    While the folder is auto-generating, that press ends nothing: the loop takes
+    it as a discarded seed and launches another at once (see
+    :meth:`AutoGenerateController.note_canceled`). "Cancel" would be a promise of
+    a stop that doesn't come — only the Auto toggle stops — so there it reads
+    "Next seed", which is what the press actually gets you.
+    """
+    return "Next seed" if auto_generating else "Cancel"
+
+
+def discard_run_tooltip(auto_generating: bool) -> str:
+    """The hover line for :func:`discard_run_text`'s button."""
+    return ("Throw away this seed and start the next" if auto_generating
+            else "Cancel this generation")
 
 
 def queue_wait_text(foreign_ahead: int | None) -> str | None:

@@ -1108,16 +1108,20 @@ class GalleryView(QWidget):
         return self._folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every config tab's Cancel and progress fill at the run *it* launched.
+        """Point every config tab's discard button and progress fill at the run *it*
+        launched.
 
         A tab tracks its own Generates, not its settings folder: a folder can have
         several runs queued at once (two pictures of one recipe, both wanted), and
         a tab showing one of them must not claim the others. Of its own it follows
         the *oldest still alive* — the one nearest to being made, and so the one
-        whose progress the bar shows and whose run its Cancel stops. A press that
-        stopped the job queued behind the one on screen was the reported dead
+        whose progress the bar shows and whose run its button discards. A press
+        that stopped the job queued behind the one on screen was the reported dead
         click. A chained i2v is two prompts but one run, so a tab follows its
         origin across the hand-off, and runs that have ended are let go here.
+        Launches from outside a tab — the folder tile's "+", the auto loop — are
+        claimed by the tab looking at that same folder (:meth:`_claim_launch`), so
+        they light it up too.
 
         Idempotent — driven by every re-roll lifecycle change and by switching the
         front tab. Every tab is reconciled, not just the front one, so a run
@@ -1130,12 +1134,46 @@ class GalleryView(QWidget):
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
-                                 job.prompt_id if job is not None else None)
+                                 job.prompt_id if job is not None else None,
+                                 auto_generating=self._auto_generating(job))
+
+    def _auto_generating(self, job) -> bool:
+        """Whether ``job``'s own folder is auto-looping — so the button that throws
+        the run away reads "Next seed" instead of "Cancel". Its folder, not the
+        front tab's: the label has to match what pressing it actually does."""
+        key = self._job_folder_key(job)
+        return key is not None and self._auto.is_active(key)
+
+    def _job_folder_key(self, job) -> str | None:
+        """The settings folder a live job runs in, or ``None`` for one no longer
+        tracked. Read from the controller's grouping rather than recomputed from the
+        job's params, so it is the key the job was actually filed under."""
+        if job is None:
+            return None
+        return next((k for k, jobs in self._reroll.jobs_by_folder.items()
+                     if job in jobs), None)
+
+    def _claim_launch(self, key: str):
+        """Give a run launched outside any tab — the folder tile's "+", the auto
+        loop — to the front config tab when that tab is showing the same folder.
+
+        Unclaimed, such a run belonged to no tab at all, so the tab looking
+        straight at it showed neither the discard button nor a filling Generate
+        while the pane beside it streamed the very frames it was making. Only a
+        matching folder claims it, so a tab parked on other settings is untouched.
+        """
+        panel = self._info_tabs.current_config_panel()
+        job = self._reroll.newest_job_for(key)
+        if panel is None or job is None or panel.settings_key() is None:
+            return
+        if self._panel_reroll_key(panel) == key:
+            panel.note_launched(job.origin)
+            self._reconcile_generating()  # the launch's own reconcile ran before this
 
     def _cancel_panel_reroll(self, panel):
-        """Cancel the run this tab's bar is showing — its Cancel button.
+        """Discard the run this tab's bar is showing — its Cancel/Next seed button.
 
-        The oldest of the tab's own still alive, so the press stops the thing on
+        The oldest of the tab's own still alive, so the press acts on the thing on
         screen rather than something queued behind it.
         """
         for origin in panel.launched_runs():
@@ -1734,7 +1772,8 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item else None
 
     def _add_reroll_tile(self, flow, group):
-        tile = RerollTile(self._reroll.job_for(group.key))
+        tile = RerollTile(self._reroll.job_for(group.key),
+                          auto_generating=self._auto.is_active(group.key))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
@@ -1747,6 +1786,11 @@ class GalleryView(QWidget):
         its live preview fills the info pane at once. Returns whether a variation
         is now running for the folder — the auto-generate loop's cue that a launch
         took hold, and its cue to stop when one can't.
+
+        The tile's "+" and the auto loop both come through here, and neither
+        pressed a tab's Generate, so the run is offered to the tab showing that
+        folder (:meth:`_claim_launch`) — otherwise it would run with no tab
+        showing its progress or offering to discard it.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
@@ -1774,6 +1818,7 @@ class GalleryView(QWidget):
             item = self._item_by_key.get(key)
             group = item.data(0, _GROUP_ROLE) if item else None
             self._reroll.start(key, group, self._image_rows)
+        self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         self._select_reroll(key)  # a no-op if the launch above failed to register
         return self._reroll.has(key)
 
@@ -1791,6 +1836,7 @@ class GalleryView(QWidget):
             else:
                 self._auto.stop(key)  # cleanup + voice-off run in _on_auto_stopped
         self._sync_auto_button()  # reflect the real state — a start may not take
+        self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
     def _begin_auto(self, key: str):
         """Capture the folder's settings as the loop's working params and start
@@ -1844,6 +1890,20 @@ class GalleryView(QWidget):
             self._pending_auto_key = None
             self._sync_voice()
         self._sync_auto_button()
+        self._sync_discard_buttons()  # the in-flight run's button is a Cancel again
+
+    def _sync_discard_buttons(self):
+        """Re-label every button that throws a run away — the folder's live tile, the
+        bottom strip's rows, each config tab's — after a loop started or ended.
+
+        Nothing else repaints them at that moment: switching Auto on over a folder
+        that is already generating launches nothing, so there is no re-roll change
+        to ride, and the label would keep promising a stop that the press no longer
+        performs (or offering a next seed after the loop is off).
+        """
+        self._rerender_current_leaf()
+        self._update_queue()
+        self._reconcile_generating()
 
     # --- voice feedback: a floating caption of what voice heard and did --------
 
@@ -2788,7 +2848,7 @@ class GalleryView(QWidget):
         self._reroll.reconnect_running()
 
     def _cancel_reroll(self, key: str):
-        """The live tile's Cancel: drop the variation it leads with.
+        """The live tile's button: drop the variation it leads with.
 
         An auto loop survives it and launches the next seed at once — cancel
         discards the run, only the Auto toggle stops the loop. Told *after* the
@@ -2803,17 +2863,15 @@ class GalleryView(QWidget):
         self._after_a_job_left(key)
 
     def _cancel_job(self, prompt_id: str):
-        """Stop one named run — a queue row's Cancel, and a config tab's.
+        """Throw away one named run — a queue row's button, and a config tab's.
 
-        A folder can hold several runs at once, so the one to stop is named rather
+        A folder can hold several runs at once, so the one to drop is named rather
         than inferred from its folder; the redraw afterwards is the same. An auto
         loop in that folder takes it as a discarded seed and launches the next —
         after the drop, and a no-op while another of the folder's runs is still
         alive (:meth:`_start_reroll`), so the loop never doubles up.
         """
-        job = self._reroll.job_for_prompt(prompt_id)
-        key = next((k for k, jobs in self._reroll.jobs_by_folder.items()
-                    if job in jobs), None)
+        key = self._job_folder_key(self._reroll.job_for_prompt(prompt_id))
         self._reroll.cancel_job(prompt_id)
         if key is not None:
             self._after_a_job_left(key)

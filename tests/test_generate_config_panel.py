@@ -230,6 +230,16 @@ def test_set_generating_offers_cancel_beside_a_still_pressable_generate(panel):
     assert panel._generate_btn.isEnabled() is True
 
 
+def test_the_discard_button_says_next_seed_while_the_folder_auto_generates(panel):
+    # Same button, honest label: with the folder looping, the press discards this
+    # seed and the loop starts another — nothing stops.
+    panel.set_generating(True, "p1", auto_generating=True)
+    assert panel._cancel_btn.text() == "Next seed"
+
+    panel.set_generating(True, "p1")  # Auto switched off mid-run: a plain cancel
+    assert panel._cancel_btn.text() == "Cancel"
+
+
 def test_set_generating_false_keeps_generate_disabled_without_a_client(qtbot, tmp_path):
     # A read-only tab (no client) can never launch, so clearing the generating flag
     # must not re-enable Generate.

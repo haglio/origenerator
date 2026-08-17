@@ -3700,6 +3700,112 @@ def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_p
     assert not view._auto.is_active(key)
 
 
+def _folder_tab(view, db):
+    """Put the front config tab on the seeded folder's settings, as clicking that
+    folder's thumbnail does — where the user is when they press the tile or Auto."""
+    row = db.get_generation("orig")
+    view._info_tabs.load_selection(row, [row])
+    return view._info_tabs.current_config_panel()
+
+
+def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
+    # Center (the folder's live tile), bottom (the queue row) and right (the config
+    # tab) each draw a button for the run in flight. While the folder loops, the
+    # press throws away a seed and the loop starts another, so all three say so.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _folder_tab(view, db)
+
+    view._toggle_auto(True)
+
+    assert _reroll_tile(view)._cancel.text() == "Next seed"
+    assert [row._cancel.text() for row in view._queue.rows()] == ["Next seed"]
+    assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Next seed"
+
+
+def test_turning_auto_off_says_cancel_again_with_the_run_still_cooking(qtbot, tmp_path):
+    # Auto off leaves the variation in flight (it still lands), and from then on
+    # that button really does stop it — so it must stop claiming to be a next seed.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _folder_tab(view, db)
+    view._toggle_auto(True)
+
+    view._toggle_auto(False)
+
+    assert key in view._reroll_jobs  # the in-flight variation was left alone
+    assert _reroll_tile(view)._cancel.text() == "Cancel"
+    assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
+    assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Cancel"
+
+
+def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
+    # Reported: pressing the tile's "New (random seed)" left the tab looking at that
+    # very folder with no button to discard the run and an unfilled Generate, while
+    # the pane beside it streamed the frames of the run it had just started. Nothing
+    # had claimed a launch that came from outside a tab.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _folder_tab(view, db)
+
+    _reroll_tile(view).add_requested.emit()
+
+    panel = view._info_tabs.current_config_panel()
+    job = next(iter(view._reroll_jobs.values()))
+    assert panel._cancel_btn.isHidden() is False
+    assert panel._generating_prompt_id == job.prompt_id
+    assert panel._generate_btn._fraction == 0.0  # in progress mode, filling from 0
+
+
+def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
+    # Same gap for the Auto toggle's own launches, and it recurs on every relaunch:
+    # each new variation is claimed by the tab on that folder.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _folder_tab(view, db)
+
+    view._toggle_auto(True)
+    first = view._reroll_jobs[key]
+    assert view._info_tabs.current_config_panel()._generating_prompt_id == first.prompt_id
+
+    client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # the loop moves on
+
+    panel = view._info_tabs.current_config_panel()
+    assert panel._cancel_btn.isHidden() is False
+    assert panel._generating_prompt_id == view._reroll_jobs[key].prompt_id
+
+
+def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):
+    # The claim is by folder, so a tab parked on a different recipe stays idle
+    # rather than showing progress for a run that has nothing to do with it.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    panel = _folder_tab(view, db)
+    panel._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert view._reroll_jobs                       # the run started
+    assert panel._cancel_btn.isHidden() is True    # but this tab isn't its home
+    assert panel._generating is False
+
+
 def test_auto_toggle_hidden_off_a_settings_leaf(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

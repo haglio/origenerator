@@ -406,6 +406,9 @@ class BrowserPane:
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 progress=progress,
                 cancel=cancel,
+                # Its folder auto-looping makes that button "Next seed": the press
+                # discards this run and the loop launches another.
+                auto_generating=self._v._auto.is_active(folder_key),
                 foreign_ahead=foreign,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),

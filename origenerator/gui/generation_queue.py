@@ -32,7 +32,8 @@ from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
-    InFlightItem, foreign_queue_text, queue_wait_text,
+    InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
+    queue_wait_text,
 )
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import progress_time_label
@@ -171,7 +172,11 @@ class RunningPreview(QWidget):
 
 
 class QueueRow(QWidget):
-    """One job in the line: its caption and a Cancel.
+    """One job in the line: its caption and the button that throws it away.
+
+    That button reads "Cancel", or "Next seed" for a job whose folder is
+    auto-generating — where the press discards the seed and the loop starts
+    another (:func:`inflight.discard_run_text`).
 
     A press-and-release opens the job's folder; a press that travels starts a
     drag, which the strip turns into a reorder. The row being made is the head of
@@ -194,12 +199,11 @@ class QueueRow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 1, 6, 1)
         layout.setSpacing(6)
-        # Cancel leads the row: the names run long and elide, and a button behind
-        # one of those was pushed out of sight at the right-hand end.
-        self._cancel = QPushButton("Cancel")
+        # It leads the row: the names run long and elide, and a button behind one
+        # of those was pushed out of sight at the right-hand end.
+        self._cancel = QPushButton()
         self._cancel.setObjectName("queueCancelBtn")
         self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._cancel.setToolTip("Cancel this generation")
         self._cancel.setFixedHeight(self.HEIGHT - 6)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
@@ -213,12 +217,15 @@ class QueueRow(QWidget):
         return self._caption.text()
 
     def update_item(self, item):
-        """Re-render this row in place — a queued→running flip, a fresh caption."""
+        """Re-render this row in place — a queued→running flip, a fresh caption,
+        or an Auto toggle that changed what the button gets you."""
         self._item = item
         # Another app's hold is the one wait worth naming; the user's own place in
         # the line is the line itself.
         self._caption.setText(queue_wait_text(item.foreign_ahead) or item.caption)
         self._caption.setToolTip(item.caption)
+        self._cancel.setText(discard_run_text(item.auto_generating))
+        self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
         self._cancel.setVisible(item.cancel is not None)
 
     def set_dragging(self, dragging: bool):

@@ -17,10 +17,12 @@ the retention arithmetic can be unit-tested directly.
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from origenerator.gallery.output import parse_file_list
 from origenerator.trash import TrashedBatch
 
 RETENTION_DAYS = 60
@@ -58,6 +60,21 @@ def days_left(record: dict, now: datetime | None = None,
     return max(0, math.ceil(remaining.total_seconds() / _SECONDS_PER_DAY))
 
 
+def days_held(record: dict, now: datetime | None = None) -> int:
+    """Whole days ``record`` has been sitting in the trash, rounded down.
+
+    The other half of :func:`days_left`, and rounded the other way for the same
+    reason: this one is read as "how long ago did I bin this", where an item
+    deleted an hour ago has been there no days rather than a whole one. A record
+    whose stamp won't parse reads as freshly deleted.
+    """
+    when = _deleted_at(record)
+    if when is None:
+        return 0
+    elapsed = ((now or _now()) - when).total_seconds()
+    return max(0, int(elapsed // _SECONDS_PER_DAY))
+
+
 def is_expired(record: dict, now: datetime | None = None,
                retention_days: int = RETENTION_DAYS) -> bool:
     """True once ``record`` has outlived its window and is due to be purged."""
@@ -69,9 +86,19 @@ def bin_items(records, now: datetime | None = None,
     """The held deletions as gallery rows the Trash shelf can draw, newest first.
 
     Each is the row exactly as it was deleted — so its media type, its star and
-    its caption read the way they did in the gallery — with two additions: the
-    thumbnail is re-pointed at where that file actually sits now, inside the
-    trash, and ``days_left`` says how long the item has before it is taken.
+    its caption read the way they did in the gallery — with its files re-pointed
+    at where they actually sit now, inside the trash, and two facts about the
+    deletion itself: ``days_left`` before the item is taken, and
+    ``days_in_trash`` since it was binned.
+
+    Re-pointing the *output* files, not only the thumbnail, is what makes a
+    deleted item as watchable as any other. A bin row is fed to the same preview,
+    slideshow and fullscreen machinery every live row goes through, and all of
+    that resolves files through
+    :func:`~origenerator.gallery.output.output_file_path` — which follows the
+    re-pointed path. Left alone, those rows resolve to the folder the files were
+    taken out of, so the shelf could offer a stored thumbnail and nothing else:
+    no video to play, nothing to open full size.
     """
     now = now or _now()
     return [_bin_item(record, now, retention_days) for record in records]
@@ -83,9 +110,29 @@ def _bin_item(record: dict, now: datetime, retention_days: int) -> dict:
     thumbnail = row.get("thumbnail_path")
     if thumbnail:
         row["thumbnail_path"] = _trashed_path(record, thumbnail)
+    row["output_files"] = _trashed_output_files(record, row)
     row["deleted_at"] = record.get("deleted_at")
     row["days_left"] = days_left(record, now, retention_days)
+    row["days_in_trash"] = days_held(record, now)
     return row
+
+
+def _trashed_output_files(record: dict, row: dict) -> str:
+    """``row``'s output files with each one's current location stamped on it.
+
+    The recorded ``filename``/``subfolder`` stay as they were — they say what the
+    generation produced and where it lived, which is what the info pane shows —
+    and a ``path`` alongside says where that file is right now. A file the batch
+    never moved (a branch session's delete takes none) gets no ``path`` and is
+    read from its own folder, as before.
+    """
+    moved = {Path(moved_from).name: moved_to
+             for moved_from, moved_to in (record.get("batch") or {}).get("moves") or []}
+    files = []
+    for f in parse_file_list(row.get("output_files")):
+        trashed = moved.get(f.get("filename") or "")
+        files.append({**f, "path": trashed} if trashed else f)
+    return json.dumps(files)
 
 
 def _trashed_path(record: dict, original: str) -> str:

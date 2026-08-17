@@ -1347,6 +1347,20 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
     assert resolve_preview(row, out) == (thumb, "image")
 
 
+def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
+    # A deleted generation's files sit in the trash, and its row says so — which
+    # is what lets the Trash shelf play a deleted video rather than offer a still.
+    out = tmp_path / "output"
+    out.mkdir()
+    trashed = tmp_path / "trash" / "abc" / "0_wan22_i2v_1_.mp4"
+    trashed.parent.mkdir(parents=True)
+    trashed.write_bytes(b"x")
+    row = _row(output_files=json.dumps([{"filename": "wan22_i2v_1_.mp4",
+                                         "subfolder": "video",
+                                         "path": str(trashed)}]))
+    assert resolve_preview(row, out) == (trashed, "video")
+
+
 def test_resolve_preview_returns_none_when_nothing_exists(tmp_path):
     out = tmp_path / "output"
     out.mkdir()

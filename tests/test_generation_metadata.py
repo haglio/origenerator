@@ -74,6 +74,38 @@ def test_file_item_reveals_the_absolute_output_path():
     assert file_item.reveal == str(COMFYUI_OUTPUT_DIR / "video" / "clip.mp4")
 
 
+def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
+    # The bin re-points a deleted row's files at the trash; Show in Explorer has
+    # to follow them there, or it points at a folder the file left.
+    row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video",
+                                         "path": r"C:\state\trash\abc\0_clip.mp4"}]))
+    file_item = _section(build_sections(row), "Basic").items[0]
+    assert file_item.reveal == r"C:\state\trash\abc\0_clip.mp4"
+
+
+# --- a deleted item's file line says how long it has been in the trash -------
+
+def test_a_deleted_items_file_line_leads_with_its_days_in_the_trash():
+    file_item = _section(build_sections(_row(days_in_trash=3)), "Basic").items[0]
+    assert file_item.value == "(3 days in trash) video/clip.mp4"
+    assert file_item.copy == "clip.mp4"  # the copy button still hands over the name
+
+
+def test_one_day_in_the_trash_reads_as_one_day():
+    file_item = _section(build_sections(_row(days_in_trash=1)), "Basic").items[0]
+    assert file_item.value.startswith("(1 day in trash)")
+
+
+def test_an_item_binned_today_says_so_rather_than_counting_zero():
+    file_item = _section(build_sections(_row(days_in_trash=0)), "Basic").items[0]
+    assert file_item.value == "(deleted today) video/clip.mp4"
+
+
+def test_a_live_items_file_line_says_nothing_about_the_trash():
+    file_item = _section(build_sections(_row()), "Basic").items[0]
+    assert file_item.value == "video/clip.mp4"
+
+
 def test_created_row_carries_no_reveal_path():
     # Only the output file is a real thing on disk; the date has nothing to reveal.
     created = _section(build_sections(_row()), "Basic").items[1]

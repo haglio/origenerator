@@ -746,6 +746,34 @@ def test_go_to_folder_shows_for_a_saved_generation_and_emits_its_id(saved_panel)
     assert got == ["img1"]
 
 
+def test_go_to_folder_stays_hidden_for_a_deleted_generation(saved_panel):
+    # A Trash tile opens here like any other generation, but its folder is the one
+    # thing it hasn't got — its row left the gallery when it was deleted.
+    panel, db = saved_panel
+    image = dict(_image_row(db, "img1"), deleted_at="2026-08-10 03:00:00")
+
+    panel.show_saved_generation(image, [image])
+
+    assert panel._folder_btn.isHidden()
+
+
+def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_panel):
+    panel, db = saved_panel
+    image = dict(_image_row(db, "img1"), days_in_trash=2)
+
+    panel.show_saved_generation(image, [image])
+
+    files = [text for text in _version_texts(panel) if "sdxl_img1.png" in text]
+    assert files and all(text.startswith("(2 days in trash)") for text in files)
+
+
+def _version_texts(panel):
+    """Every label in the panel's version list, minus the wrapping zero-widths."""
+    from PyQt6.QtWidgets import QLabel
+    return [lbl.text().replace("​", "")
+            for lbl in panel._versions.findChildren(QLabel)]
+
+
 def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypatch):
     panel, db = saved_panel
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("img1.png", "image"))

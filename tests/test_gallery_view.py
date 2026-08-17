@@ -4083,8 +4083,42 @@ def test_the_auto_switch_stays_lit_away_from_the_folder_looping(qtbot, tmp_path)
 
     assert view._auto_btn.isChecked()   # lit: a loop is running
     assert view._auto_btn.isEnabled()   # and stoppable from here
-    assert "running in" in view._auto_btn.toolTip()  # naming the folder it runs in
     assert view._auto.is_active(key)
+    # And the tip that says so is the clickable one, so the plain tooltip stands
+    # down rather than both appearing.
+    assert "another folder" in view._auto_tip._html
+    assert view._auto_btn.toolTip() == ""
+
+
+def test_the_lit_auto_tip_links_to_the_folder_looping(qtbot, tmp_path):
+    # Naming the folder is no use — every folder is named for its prompt, and
+    # those run long and read alike — so the tip offers to take the user there.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+    assert "<a href=" in view._auto_tip._html
+
+    view._auto_tip.link_activated.emit("auto")  # the link, followed
+
+    assert view._selected_folder_key() == key
+
+
+def test_the_auto_tip_goes_when_the_loop_does(qtbot, tmp_path):
+    # A tip offering to take you to a loop that has ended is worse than none.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+    assert view._auto_tip._html
+
+    view._toggle_auto(False)
+
+    assert view._auto_tip._html == ""
 
 
 def test_switching_the_lit_auto_off_stops_the_loop_wherever_it_runs(qtbot, tmp_path):

@@ -10,6 +10,10 @@ the case that asks for it. Videos aren't dwell-timed: they play once and the
 view advances when they end, so ``dwell_ms`` returns ``None`` for them. Keeping
 this a plain, Qt-free object lets the policy be unit-tested without a window or
 a clock.
+
+A dwell of zero means never: the show holds whatever is on screen until an arrow
+moves it. That is the shape a double-clicked picture opens in — one show, opened
+at a pace of nought, rather than a second full-screen viewer with its own keys.
 """
 
 import random
@@ -18,6 +22,15 @@ import random
 # Genau's console shows this as its clip-seconds pace and sets it from
 # there, so the number it opens at has to be the one the slideshow uses.
 DEFAULT_IMAGE_DWELL_MS = 4000
+
+
+def in_order(order: list) -> None:
+    """A shuffle that doesn't: play the set in the order it was handed over.
+
+    What a double-clicked picture opens in — its folder as the browser lists it,
+    starting where the double-click landed — against the random pass a folder
+    played from the toolbar gets.
+    """
 
 
 def _upgraded(item: tuple, path, media_type=None, still=None) -> tuple:
@@ -41,12 +54,16 @@ def _upgraded(item: tuple, path, media_type=None, still=None) -> tuple:
 
 class SlideshowPlaylist:
     def __init__(self, items, *, image_dwell_ms=DEFAULT_IMAGE_DWELL_MS,
-                 shuffle=random.shuffle):
+                 shuffle=random.shuffle, start=None):
         self._items = list(items)  # each an (path, media_type) pair
         self._shuffle = shuffle
         self._order = list(range(len(self._items)))
         self._shuffle(self._order)  # play in a random order
-        self._pos = 0
+        # The pass begins at its own front unless a particular item was asked for:
+        # a double-clicked picture opens on *that* picture, which sits wherever
+        # this pass's order happens to have put it.
+        self._pos = (self._order.index(start)
+                     if start is not None and 0 <= start < len(self._items) else 0)
         self._locked = False
         self._image_dwell_ms = image_dwell_ms
 
@@ -138,9 +155,10 @@ class SlideshowPlaylist:
 
     @property
     def image_dwell_ms(self) -> int:
-        """How long an image holds the screen. Settable, because Genau's console
-        carries the pair that sets it — the same clip-seconds pace Genau leaves
-        its own clips up for."""
+        """How long an image holds the screen, zero meaning never move on.
+        Settable, because Genau's console carries the pair that sets it — the same
+        clip-seconds pace Genau leaves its own clips up for, so turning a
+        double-clicked picture's nought up is what sets it going."""
         return self._image_dwell_ms
 
     @image_dwell_ms.setter
@@ -171,9 +189,10 @@ class SlideshowPlaylist:
 
     def dwell_ms(self):
         """Milliseconds to wait before auto-advancing the current item, or ``None``
-        when it shouldn't be timer-advanced: an empty or locked playlist, or a
-        video — which advances when it ends, not on a clock."""
+        when it shouldn't be timer-advanced: an empty or locked playlist, a pace of
+        nought (hold this one until an arrow moves it), or a video — which advances
+        when it ends, not on a clock."""
         if self._locked or self.current() is None or self.current_is_video():
             return None
-        return self._image_dwell_ms
+        return self._image_dwell_ms or None
 

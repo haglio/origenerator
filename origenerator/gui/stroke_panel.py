@@ -119,7 +119,7 @@ class StrokePanel(QWidget):
 
     It shows exactly while the stroke is running. A readout of a stroke nobody
     is making is not information, and every surface that floats one — the main
-    window, the slideshow, the fullscreen viewer — was hosting it on the
+    window, the fullscreen show — was hosting it on the
     assumption that some other code would hide it. So the rule
     lives here, where the driver is: the panel follows its own subject.
     """

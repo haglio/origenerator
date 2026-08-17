@@ -30,7 +30,7 @@ def drive_target_for(video_path, player):
     no video, or a video with no funscript beside it.
 
     The one driver can follow either of two foreground surfaces — the front config
-    tab's preview or an open fullscreen view — so both describe their target through
+    tab's preview or an open fullscreen show — so both describe their target through
     this, keeping the ``(path, player, actions)`` contract in a single place.
     """
     if video_path is None:

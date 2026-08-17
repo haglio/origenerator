@@ -4,7 +4,7 @@ The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
 static images are scaled to fit (and rescaled on resize), animated images
 (animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
 default, so selecting one gives an immediate moving preview without stealing audio,
-while the fullscreen view opts in to sound.
+while the fullscreen slideshow opts in to sound.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ def _path_key(path) -> str:
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
-    fullscreen_opened = pyqtSignal(object)  # popped a FullscreenPreview open (drive cue)
     drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
 
@@ -58,11 +57,15 @@ class PreviewWidget(QWidget):
         # generation had to wait for it to land.
         self._live = False
         self._live_frame: bytes | None = None
-        self._allow_fullscreen = allow_fullscreen  # a slideshow / the fullscreen view opts out
+        self._allow_fullscreen = allow_fullscreen  # a slideshow's own preview opts out
         self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
+        # What builds that window. The gallery sets it, because what a double-click
+        # opens is a slideshow of the folder behind this pane — which this pane
+        # knows nothing about. Unset, a double-click opens nothing.
+        self._open_fullscreen_view = None
         # A double-click that doesn't open fullscreen (this preview opted out, or has
-        # nothing to open) runs this instead — the fullscreen view and the slideshow
-        # use it so a second double-click dismisses them.
+        # nothing to open) runs this instead — the slideshow uses it so a second
+        # double-click dismisses it.
         self._on_double_click = on_double_click
         # The shown generation's prompt_id when the owner has armed the preview to be
         # dragged out onto a combine slot (like a gallery thumbnail), else None; a
@@ -211,7 +214,7 @@ class PreviewWidget(QWidget):
 
     def _end_live(self, media: tuple | None) -> None:
         """Stop mirroring a running generation, handing ``media`` — the file it
-        landed as, if any — to a fullscreen view opened over its live frames, so
+        landed as, if any — to a fullscreen show opened over its live frames, so
         watching a generation fullscreen ends on the finished image rather than the
         last low-res frame.
 
@@ -227,9 +230,9 @@ class PreviewWidget(QWidget):
             win.show_landed(media)
 
     def _following_fullscreen(self):
-        """The fullscreen view this pane opened over a running generation and is
+        """The fullscreen show this pane opened over a running generation and is
         still feeding, or ``None``. One that's been dismissed — or that already
-        landed on a file, and so is an ordinary fullscreen view now — follows
+        landed on a file, and so is an ordinary show of it now — follows
         nothing."""
         win = self._fullscreen
         if win is None or not win.isVisible() or not win.is_live():
@@ -253,7 +256,7 @@ class PreviewWidget(QWidget):
         source, and Windows refuses to move a file anything holds open, so a
         pane still showing a condemned item is what makes its own deletion
         fail. Panes showing anything else are left exactly as they are: only
-        what's about to go is dropped, along with a fullscreen view of it.
+        what's about to go is dropped, along with a fullscreen show of it.
         """
         if self._fullscreen is not None:
             self._fullscreen.release_media(paths)
@@ -368,32 +371,39 @@ class PreviewWidget(QWidget):
         finally:
             self.drag_ended.emit()
 
+    def set_fullscreen_factory(self, make) -> None:
+        """Wire what a double-click here opens: ``make(media, frame)`` returns a
+        shown fullscreen window, or ``None``.
+
+        The gallery supplies it, because the window is a slideshow of the folder
+        this pane's generation sits in and the pane has no idea what that folder
+        holds. Left unset — a bare preview in a test — a double-click opens
+        nothing.
+        """
+        self._open_fullscreen_view = make
+
     def mouseDoubleClickEvent(self, event) -> None:
         # Open fullscreen, or — when this preview can't (it opted out, e.g. the
-        # fullscreen view's own inner preview) — run the double-click callback, so a
-        # second double-click that lands here closes the fullscreen view.
+        # slideshow's own inner preview) — run the double-click callback, so a
+        # second double-click that lands here closes the slideshow.
         if self.open_fullscreen() is None and self._on_double_click is not None:
             self._on_double_click()
 
     def open_fullscreen(self):
-        """Pop what's on screen open fullscreen (Escape or a double-click closes it).
+        """Pop what's on screen open fullscreen (Escape or a double-click closes it):
+        a slideshow of this generation's folder, held on this one.
 
         That's the current file, or — while a generation is running behind this pane —
         its live frames, in a view that goes on following the run from here and swaps
         to the finished file when it lands. A no-op when this preview opted out (a
-        slideshow, or the fullscreen view itself), or there's nothing to watch at
-        all: the idle placeholder or a plain message."""
+        slideshow's own inner preview), when nothing has wired
+        :meth:`set_fullscreen_factory`, or when there's nothing to watch at all:
+        the idle placeholder or a plain message."""
         if not self._allow_fullscreen or (self._media is None and not self._live):
             return None
-        # Imported here, not at module scope: fullscreen_preview builds a
-        # PreviewWidget, so a top-level import would be circular.
-        from origenerator.gui.fullscreen_preview import FullscreenPreview
-        self._fullscreen = FullscreenPreview(self._media, frame=self._live_frame)
-        self._fullscreen.showFullScreen()
-        # The view listens for this to re-aim the OSR2 drive at the fullscreen video
-        # for as long as it's up — under the same global Drive-OSR2 toggle that gates
-        # driving from this pane.
-        self.fullscreen_opened.emit(self._fullscreen)
+        if self._open_fullscreen_view is None:
+            return None
+        self._fullscreen = self._open_fullscreen_view(self._media, self._live_frame)
         return self._fullscreen
 
     def _on_media_status(self, status) -> None:

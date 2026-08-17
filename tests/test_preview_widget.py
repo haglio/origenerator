@@ -8,7 +8,6 @@ from PyQt6.QtGui import QResizeEvent, QMouseEvent
 from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtMultimedia import QMediaPlayer
 
-import origenerator.gui.fullscreen_preview as fullscreen_preview
 import origenerator.gui.preview_widget as preview_widget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.generation_drag import GENERATION_MIME
@@ -191,7 +190,7 @@ def test_release_media_matches_the_same_file_spelled_differently(make_preview, t
 
 
 def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_path):
-    # A fullscreen view built over this pane holds the file open too.
+    # A fullscreen show built over this pane holds the file open too.
     w = make_preview()
     clip = tmp_path / "clip.mp4"
     w.show_video(clip)
@@ -311,67 +310,67 @@ def test_other_media_status_does_not_emit_video_ended(make_preview):
 
 # --- double-click to open the current media fullscreen ----------------------
 
-def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path, monkeypatch):
-    opened = {}
+def _arm(preview, cls=None):
+    """Wire what a double-click here opens, as the gallery does — the pane itself
+    has no idea what folder its generation sits in, so the window is built for it.
+    Returns a list the built windows land in."""
+    built = []
 
-    class Fake(QWidget):
-        def __init__(self, media, **kwargs):
-            super().__init__()
-            opened["media"] = media
+    def make(media, frame):
+        win = (cls or _FakeFullscreen)(media, frame=frame)
+        built.append(win)
+        win.showFullScreen()
+        return win
 
-        def showFullScreen(self):
-            opened["shown"] = True
+    preview.set_fullscreen_factory(make)
+    return built
 
-    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", Fake)
+
+def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path):
     w = make_preview()
+    built = _arm(w)
     png = _make_png(tmp_path / "p.png")
     w.show_image(png)
-    win = w.mouseDoubleClickEvent(None) or w._fullscreen
-    assert opened["media"] == (png, "image")
-    assert opened.get("shown") is True
-    assert w._fullscreen is win
+
+    w.mouseDoubleClickEvent(None)
+
+    assert built[0].media == (png, "image")
+    assert built[0].isVisible()
+    assert w._fullscreen is built[0]  # kept alive here, and fed from here
 
 
-def test_opening_fullscreen_announces_it(make_preview, tmp_path, monkeypatch):
-    # The gallery listens for this to drive the OSR2 off the fullscreen video.
-    class Fake(QWidget):
-        def __init__(self, media, **kwargs):
-            super().__init__()
-
-        def showFullScreen(self):
-            pass
-
-    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", Fake)
+def test_a_pane_with_nothing_wired_opens_nothing(make_preview, tmp_path):
+    # Without the gallery behind it there is no folder to make a show of.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    announced = []
-    w.fullscreen_opened.connect(announced.append)
-    win = w.open_fullscreen()
-    assert announced == [win]
+    assert w.open_fullscreen() is None
 
 
 def test_open_fullscreen_is_a_no_op_without_media(make_preview):
     w = make_preview()  # just the placeholder
+    _arm(w)
     assert w.open_fullscreen() is None
 
 
 def test_a_plain_message_opens_nothing(make_preview):
     w = make_preview()
+    _arm(w)
     w.show_message("Nothing to show")  # not a running generation: nothing to watch
     assert w.open_fullscreen() is None
 
 
 def test_a_preview_that_opted_out_never_opens_fullscreen(qtbot, tmp_path):
-    # The slideshow / the fullscreen view itself pass allow_fullscreen=False.
+    # A slideshow's own inner preview passes allow_fullscreen=False.
     w = PreviewWidget(player=MagicMock(), allow_fullscreen=False)
     qtbot.addWidget(w)
+    _arm(w)
     w.show_image(_make_png(tmp_path / "p.png"))
     assert w.open_fullscreen() is None
 
 
 def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
-    # The fullscreen view's inner preview opts out of opening another, so a
-    # double-click there runs the callback (which closes the view) instead.
+    # A slideshow's inner preview opts out of opening another, so a double-click
+    # there runs the callback (which closes the show) instead.
     called = []
     w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
                       on_double_click=lambda: called.append(True))
@@ -383,8 +382,9 @@ def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
 # --- watching a generation fullscreen while it's still being made -----------
 
 class _FakeFullscreen(QWidget):
-    """Stands in for FullscreenPreview so a test can see what the pane feeds a
-    view opened over a running generation, without a real media backend."""
+    """Stands in for the slideshow a double-click opens, so a test can see what
+    the pane feeds a show opened over a running generation, without a real media
+    backend."""
 
     def __init__(self, media, *, frame=None, **kwargs):
         super().__init__()
@@ -408,11 +408,11 @@ class _FakeFullscreen(QWidget):
 
 
 @pytest.fixture
-def live_preview(make_preview, monkeypatch):
-    """A preview mirroring a running generation, with the fullscreen view it opens
-    faked out."""
-    monkeypatch.setattr(fullscreen_preview, "FullscreenPreview", _FakeFullscreen)
-    return make_preview()
+def live_preview(make_preview):
+    """A preview mirroring a running generation, with the show it opens faked out."""
+    preview = make_preview()
+    _arm(preview)
+    return preview
 
 
 def test_a_live_frame_opens_fullscreen_over_the_generation(live_preview):

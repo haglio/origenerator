@@ -1,8 +1,8 @@
-"""The "3 / 17" plate a fullscreen view floats over the bottom of its media.
+"""The "3 / 17" plate the fullscreen show floats over the bottom of its media.
 
-Both fullscreen views page a set, so both say where in it they are, in the same
-place and the same plate. A suffix carries whatever else that view has to add —
-the slideshow's lock.
+A show always plays a set — a folder's, a shelf's, or the folder a double-clicked
+picture came from — so it always has somewhere in it to be. A suffix carries
+whatever else it has to add: the lock.
 """
 
 from PyQt6.QtWidgets import QLabel, QWidget

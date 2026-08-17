@@ -1294,9 +1294,9 @@ def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
     view._slideshow.close()
 
 
-def test_fullscreen_over_a_deleted_item_pages_through_the_shelf(qtbot, monkeypatch):
+def test_a_deleted_item_double_clicked_open_steps_through_the_shelf(qtbot, monkeypatch):
     # Left/Right work here for the same reason they work in a folder: the shelf's
-    # items resolve to real files, so there is a playlist to page.
+    # items resolve to real files, so there is a set to step through.
     _resolve_by_id(monkeypatch)
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
@@ -1305,11 +1305,11 @@ def test_fullscreen_over_a_deleted_item_pages_through_the_shelf(qtbot, monkeypat
     view._tree.setCurrentItem(view._trash_item)
     view._on_thumbnail_clicked("d1")
 
-    fs = _FakeFullscreen(None)
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot)
 
-    assert [entry[2] for entry in fs.playlist] == view.visible_prompt_ids()
-    assert fs.playlist[fs.playlist_index][2] == "d1"  # opened on the shown item
+    assert [item[2] for item in show._playlist._items] == view.visible_prompt_ids()
+    assert show._playlist.current()[2] == "d1"  # opened on the shown item
+    show.close()
 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
@@ -4289,81 +4289,29 @@ def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
     assert view._selected_reroll_key is None
 
 
-class _FakeLiveFullscreen(QWidget):
-    """Stands in for the FullscreenPreview a double-click pops open, recording what
-    the running generation feeds it — without a real media backend."""
-
-    closed = pyqtSignal()
-    media_changed = pyqtSignal()
-    delete_requested = pyqtSignal(str)
-    star_requested = pyqtSignal(str)
-
-    def __init__(self, media, *, frame=None, **kwargs):
-        super().__init__()
-        self.media = media
-        self.frames = [frame] if frame is not None else []
-        self.landed = None
-        self.levels = None
-        self.enhance_hook = None
-        self.enhanced = None
-        self._live = media is None
-
-    def set_levels(self, levels_by_path):
-        self.levels = levels_by_path
-
-    def set_enhance(self, on_enhance, ids_by_path):
-        self.enhance_hook = (on_enhance, ids_by_path)
-
-    def note_enhanced(self, prompt_id, path, media_type="image"):
-        self.enhanced = (prompt_id, path, media_type)
-
-    def is_live(self):
-        return self._live
-
-    def show_frame(self, data):
-        self.frames.append(data)
-
-    def show_landed(self, media):
-        self.landed = media
-        self._live = False
-
-    def showFullScreen(self):
-        self.show()
-
-    def set_stroke(self, stroke):
-        pass
-
-    def osr2_drive_target(self):
-        return None
-
-
 def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
         qtbot, tmp_path, monkeypatch):
     # The reported gap, end to end: double-clicking the preview mid-generation did
     # nothing. Now it opens over the live frames, keeps streaming them, and lands on
     # the finished image when the run completes.
-    from origenerator.gui import fullscreen_preview as fs_module
     from origenerator.gui import generate_config_panel as gcp_module
-    monkeypatch.setattr(fs_module, "FullscreenPreview", _FakeLiveFullscreen)
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
     _reroll_tile(view).selected.emit()
-    frame = _png_bytes()
-    client.preview_image.emit(job.prompt_id, frame)
+    client.preview_image.emit(job.prompt_id, _png_bytes())
 
     win = view._preview.open_fullscreen()  # the double-click, mid-generation
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
-    assert win.frames == [frame]  # seeded with what was on screen
+    assert not win._preview._image_label.pixmap().isNull()  # seeded with the frame
 
     buf = BytesIO()
     Image.new("RGB", (8, 8), (200, 30, 30)).save(buf, format="PNG")  # a later, redder frame
-    later = buf.getvalue()
-    client.preview_image.emit(job.prompt_id, later)
-    assert win.frames == [frame, later]  # the run goes on streaming into it
+    client.preview_image.emit(job.prompt_id, buf.getvalue())
+    assert win.is_live()  # the run goes on streaming into it
 
     done = tmp_path / "done.png"
     Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
@@ -4372,26 +4320,29 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert win.landed == (done, "image")  # ends on the result, not the last frame
+    # Ends on the result, not the last frame.
+    assert win._preview._media == (done, "image")
+    assert not win.is_live()
+    win.close()
 
 
-def test_a_cancelled_generation_closes_the_view_watching_it(qtbot, tmp_path):
-    # Nothing will ever land, so the view would sit on a stale partial frame.
+def test_a_cancelled_generation_closes_the_show_watching_it(qtbot, tmp_path):
+    # Nothing will ever land, so the show would sit on a stale partial frame.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
     _reroll_tile(view).selected.emit()
-    fs = _FakeFullscreen(None, live=True)
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, media=None, frame=_png_bytes())
+    show.show()
 
     view._cancel_reroll(key)
 
-    assert fs.closes == 1
+    assert not show.isVisible()
 
 
-def test_a_cancelled_generation_leaves_a_plain_fullscreen_alone(qtbot, tmp_path):
+def test_a_cancelled_generation_leaves_a_show_of_a_saved_file_alone(qtbot, tmp_path):
     # One opened over a saved file has its own thing on screen: it stays up.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
@@ -4399,12 +4350,13 @@ def test_a_cancelled_generation_leaves_a_plain_fullscreen_alone(qtbot, tmp_path)
     view.refresh()
     key, _job = _running_reroll(view)
     _reroll_tile(view).selected.emit()
-    fs = _FakeFullscreen(None)
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot)
+    show.show()
 
     view._cancel_reroll(key)
 
-    assert fs.closes == 0
+    assert show.isVisible()
+    show.close()
 
 
 def test_clicking_add_selects_the_reroll_so_its_preview_shows_at_once(qtbot, tmp_path):
@@ -6688,53 +6640,28 @@ class _FakeDriver:
         self.stopped += 1
 
 
-class _FakeFullscreen(QObject):
-    """Stand-in for a FullscreenPreview: a settable drive target, a closed signal,
-    a media_changed signal (paging), the curation signals its Up/Down keys emit,
-    and a recorded playlist arming. ``live`` makes it one opened over a generation
-    still in flight."""
-    closed = pyqtSignal()
-    media_changed = pyqtSignal()
-    delete_requested = pyqtSignal(str)
-    star_requested = pyqtSignal(str)
+def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
+                       target=None):
+    """The double-click path end to end: the gallery opens the folder behind the
+    pane as a real show, held at a pace of nought.
 
-    def __init__(self, target, *, live=False):
-        super().__init__()
-        self._target = target
-        self._live = live
-        self.playlist = None       # the items set_playlist was armed with, if any
-        self.playlist_index = None
-        self.levels = None         # the per-image version playlists (Shift+arrows)
-        self.enhance_hook = None   # (callback, ids) Down asks through
-        self.enhanced = None       # a landed enhancement handed back to it
-        self.stroke = None         # the shared stroke driver the gallery wires in
-        self.closes = 0
+    ``media`` is what the pane was showing — ``None`` for a generation still
+    running behind it, which opens the show over ``frame``. ``target`` stands in
+    for the OSR2 drive target the clip on screen would offer, since these tests
+    carry no real scripted video.
+    """
+    show = view._open_slideshow_on_preview(media, frame)
+    qtbot.addWidget(show)
+    if target is not None:
+        _aim_show(view, show, target)
+    return show
 
-    def set_levels(self, levels_by_path):
-        self.levels = levels_by_path
 
-    def set_enhance(self, on_enhance, ids_by_path):
-        self.enhance_hook = (on_enhance, ids_by_path)
-
-    def note_enhanced(self, prompt_id, path, media_type="image"):
-        self.enhanced = (prompt_id, path, media_type)
-
-    def osr2_drive_target(self):
-        return self._target
-
-    def is_live(self):
-        return self._live
-
-    def close(self):
-        self.closes += 1
-        self.closed.emit()
-
-    def set_stroke(self, stroke):
-        self.stroke = stroke
-
-    def set_playlist(self, items, index):
-        self.playlist = list(items)
-        self.playlist_index = index
+def _aim_show(view, show, target):
+    """Say what the clip on screen offers the device, and reconcile as a step
+    onto it would."""
+    show.osr2_drive_target = lambda: target
+    view._reconcile_osr2()
 
 
 def _osr2_view(qtbot):
@@ -6834,9 +6761,10 @@ def test_audio_enabled_state_round_trips_for_persistence(qtbot):
     assert bed.starts == 1  # restoring the switch actually starts it playing
 
 
-def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeypatch):
-    # Left/Right in fullscreen page through the folder: the view is armed with the
-    # visible items' media, starting on the one already shown.
+def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
+    # Left/Right step through the folder: the show is built from the visible
+    # items' media, in the browser's order, starting on the one already shown —
+    # and held at nought, so nothing moves until an arrow does.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -6849,28 +6777,30 @@ def test_opening_fullscreen_arms_the_visible_folder_as_a_playlist(qtbot, monkeyp
     _open_leaf(view)
     view._on_thumbnail_clicked("i2")  # i2 is the shown/selected item
 
-    fs = _FakeFullscreen(None)
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot)
 
     order = view._browser.visible_prompt_ids()
-    # Each entry carries its generation's id, so the view's Up and Down can name
+    # Each entry carries its generation's id, so the show's Up and Down can name
     # what to trash and what to bookmark, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
-    assert fs.playlist == [(f"{pid}.png", "image", pid, None) for pid in order]
-    assert fs.playlist_index == order.index("i2")  # opened on the shown item
+    assert show._playlist._items == [(f"{pid}.png", "image", pid, None)
+                                     for pid in order]
+    assert show._playlist.order == list(range(len(order)))  # the browser's order
+    assert show._playlist.current()[2] == "i2"  # opened on the shown item
+    assert show.dwell_s == 0                    # and holding it
+    show.close()
 
 
-def test_paging_the_fullscreen_re_aims_the_osr2(qtbot):
-    # Paging to another clip re-aims the one device at the newly shown video.
+def test_stepping_a_double_clicked_show_re_aims_the_osr2(qtbot):
+    # Stepping to another clip re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
     view._osr2_btn.setChecked(True)
-    fs = _FakeFullscreen(("A.mp4", "pA", "aA"))
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
-    fs._target = ("B.mp4", "pB", "aB")
-    fs.media_changed.emit()  # Left/Right landed on another clip
+    _aim_show(view, show, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
     assert driver.started[-1] == ("pB", "aB")
+    show.close()
 
 
 # --- watching a folder that is auto-generating, and the app-global stroke -----
@@ -6939,8 +6869,6 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     # A folder that is looping used to answer this gesture with the auto-generate
     # montage — a second slideshow, for a double-click that means "this one,
     # bigger". Watching the frames come in is what fullscreen is for.
-    from origenerator.gui import fullscreen_preview as fs_module
-    monkeypatch.setattr(fs_module, "FullscreenPreview", _FakeLiveFullscreen)
     view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     panel = view._info_tabs.current_config_panel()
     panel._preview.show_frame(_png_bytes())  # the loop's generation, streaming
@@ -6949,6 +6877,7 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
 
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
+    win.close()
 
 
 def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypatch):
@@ -6994,76 +6923,78 @@ def test_the_stroke_keys_work_in_the_main_window_too(qtbot, monkeypatch):
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
-    # The toggle governs the fullscreen view as much as the tab preview: double-
-    # clicking a clip to watch it doesn't take the device on its own.
+    # The toggle governs a show as much as the tab preview: double-clicking a clip
+    # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view._osr2_btn.isChecked()
 
-    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
 
     assert driver.started == []
+    show.close()
 
 
-def test_turning_the_toggle_on_over_an_open_fullscreen_drives_its_video(qtbot):
+def test_turning_the_toggle_on_over_an_open_show_drives_its_video(qtbot):
     # …and turning it on while one is up drives what's on screen, without closing it.
     view, driver, _panel = _osr2_view(qtbot)
-    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
 
     view._osr2_btn.setChecked(True)
 
     assert driver.started[-1] == ("pF", "aF")
+    show.close()
 
 
-def test_untoggling_while_a_fullscreen_video_drives_stops_the_device(qtbot):
+def test_untoggling_while_a_shows_video_drives_stops_the_device(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     view._osr2_btn.setChecked(True)
-    view._on_fullscreen_opened(_FakeFullscreen(("F.mp4", "pF", "aF")))
+    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
     view._osr2_btn.setChecked(False)
 
     assert driver.stopped >= 1
+    show.close()
 
 
-def test_closing_the_fullscreen_stops_driving_with_no_tab_video_behind_it(qtbot):
+def test_closing_the_show_stops_driving_with_no_tab_video_behind_it(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     view._osr2_btn.setChecked(True)
-    fs = _FakeFullscreen(("F.mp4", "pF", "aF"))
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
-    fs.closed.emit()
+    show.close()
 
     assert driver.stopped >= 1
 
 
-def test_the_fullscreen_video_overrides_the_toggle_target_then_hands_back(qtbot):
-    # With the toggle already driving the front-tab video, opening a fullscreen clip
-    # re-aims the one device at the fullscreen player; closing hands it back.
+def test_the_shows_video_overrides_the_toggle_target_then_hands_back(qtbot):
+    # With the toggle already driving the front-tab video, opening a clip fullscreen
+    # re-aims the one device at the show's player; closing hands it back.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view._osr2_btn.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
-    fs = _FakeFullscreen(("F.mp4", "pF", "aF"))
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started[-1] == ("pF", "aF")
 
-    fs.closed.emit()
+    show.close()
     assert driver.started[-1] == ("pA", "aA")  # back to the toggle's video
 
 
-def test_a_fullscreen_image_leaves_the_toggle_driving(qtbot):
-    # A fullscreen with no scripted video (an image) has no target, so the toggle's
+def test_a_show_of_an_image_leaves_the_toggle_driving(qtbot):
+    # A show with no scripted video (an image) has no target, so the toggle's
     # front-tab video keeps driving uninterrupted — no restart, no stop.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view._osr2_btn.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
-    view._on_fullscreen_opened(_FakeFullscreen(None))
+    show = _double_click_show(view, qtbot)
 
     assert driver.started == [("pA", "aA")] and driver.stopped == 0
+    show.close()
 
 
 def _press_escape(view):
@@ -7072,8 +7003,16 @@ def _press_escape(view):
     )
 
 
+def _keys_are_the_gallerys(view):
+    """Say outright that no other window owns the keystroke — which window Qt
+    calls active is ambient in a test process, so a fullscreen show another test
+    opened and closed can still hold it."""
+    view._other_window_owns_keys = lambda: False
+
+
 def test_esc_stops_osr2_driving(qtbot):
     view, driver, panel = _osr2_view(qtbot)
+    _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view._osr2_btn.setChecked(True)  # driving the device
     assert driver.started
@@ -7089,6 +7028,7 @@ def test_esc_stops_osr2_even_without_gallery_key_focus(qtbot):
     # The driven video usually lives in the focused info-pane tab, where the gallery
     # doesn't own Delete/Undo — Esc must still reach the device from there.
     view, driver, panel = _osr2_view(qtbot)
+    _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view._osr2_btn.setChecked(True)
     view._gallery_owns_keys = lambda: False  # focus is inside a config tab
@@ -7102,6 +7042,7 @@ def test_esc_passes_through_when_nothing_is_running(qtbot):
     # OSR2 off and no auto loop: Esc isn't swallowed, so it can still close a
     # dropdown or cancel an edit elsewhere.
     view, _driver, _panel = _osr2_view(qtbot)
+    _keys_are_the_gallerys(view)
 
     assert _press_escape(view) is False
 
@@ -7566,11 +7507,11 @@ def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path)
     assert view._reroll_jobs == {}
 
 
-def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(
+def test_a_landed_enhancement_upgrades_that_item_in_the_open_show(
         qtbot, tmp_path, monkeypatch):
     # The whole point of enhancing from a show: what plays becomes the better
-    # version. It lands minutes after the ask, so no surface is still on the
-    # item that asked — each takes the upgrade wherever that item sits.
+    # version. It lands minutes after the ask, by which time the show is no longer
+    # on the item that asked — it takes the upgrade wherever that item sits.
     paths = {"g0": "g0.png", "g1": "g1.png"}
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: (paths[row["prompt_id"]], "image"))
@@ -7581,17 +7522,15 @@ def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(
     _select_first_leaf(view)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
-    view._fullscreen_preview = _FakeFullscreen(None)
 
     # The fold has happened: the row now leads with the enhanced file and wears
-    # its thumbnail. That upgraded row is what reaches the shows.
+    # its thumbnail. That upgraded row is what reaches the show.
     paths["g0"] = "g0_enhanced.png"
     db.update_generation("g0", thumbnail_path="g0_enhanced_thumb.png")
     view._feed_slideshow_enhanced(db.get_generation("g0"))
 
     upgraded = ("g0_enhanced.png", "image", "g0", "g0_enhanced_thumb.png")
     assert upgraded in view._slideshow._playlist._items
-    assert view._fullscreen_preview.enhanced == ("g0", "g0_enhanced.png", "image")
     view._slideshow.close()
 
 
@@ -7605,7 +7544,7 @@ def test_a_slideshow_hold_on_a_video_asks_for_nothing(qtbot, tmp_path):
     assert view._enhance_from_slideshow("g0") is False
 
 
-def test_the_fullscreen_view_is_armed_with_each_images_versions(qtbot, tmp_path):
+def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -7616,25 +7555,23 @@ def test_the_fullscreen_view_is_armed_with_each_images_versions(qtbot, tmp_path)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    fs = _FakeFullscreen(None)
 
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot)
 
-    (levels,) = fs.levels.values()
+    (levels,) = show._levels_by_path.values()
     assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
-    # Each carries its label, so the corner can say which version is on screen.
+    # Each carries its label, so the note can say which version is on screen.
     assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
-    # And Down is armed with the ids, so it can name what it is looking at.
-    hook, ids = fs.enhance_hook
-    assert hook == view._enhance_from_slideshow
-    assert set(ids.values()) == {"g0"}
+    # And Down asks through the gallery, which holds the settings.
+    assert show._on_enhance == view._enhance_from_slideshow
+    show.close()
 
 
-def test_watching_a_generation_fullscreen_still_pages_its_folder(qtbot, monkeypatch):
-    # A view opened over something still being made has no place among the
+def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypatch):
+    # A show opened over something still being made has no place among the
     # folder's files — but the folder is still what it was opened from, so its
-    # arrows page it rather than doing nothing at all.
+    # arrows step it rather than doing nothing at all.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -7644,12 +7581,14 @@ def test_watching_a_generation_fullscreen_still_pages_its_folder(qtbot, monkeypa
     )
     view.refresh()
     _open_leaf(view)
-    fs = _FakeFullscreen(None, live=True)
 
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, media=None, frame=_png_bytes())
 
-    assert [entry[2] for entry in fs.playlist] == view._browser.visible_prompt_ids()
-    assert fs.playlist_index == 0
+    assert show.is_live()
+    assert [item[2] for item in show._playlist._items] == \
+        view._browser.visible_prompt_ids()
+    assert show._playlist.index == 0
+    show.close()
 
 
 def test_a_generation_still_cooking_stays_out_of_a_slideshow(qtbot):
@@ -7687,11 +7626,11 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     view._tree.setCurrentItem(view._leaf_by_id["v1"])
     view._on_thumbnail_clicked("v1")
 
-    fs = _FakeFullscreen(None)
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot, media=("v1.mp4", "video"))
 
-    assert fs.playlist == [("v1.mp4", "video", "v1", None)]
-    assert fs.playlist_index == 0
+    assert show._playlist._items == [("v1.mp4", "video", "v1", None)]
+    assert show._playlist.index == 0
+    show.close()
 
 
 def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
@@ -7713,17 +7652,16 @@ def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
     assert not view._voice.commands_on
 
 
-def test_a_fullscreen_view_arms_spoken_fixes_for_its_lifetime(qtbot, tmp_path):
+def test_a_double_clicked_show_arms_spoken_fixes_for_its_lifetime(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    fs = _FakeFullscreen(None)
 
-    view._on_fullscreen_opened(fs)
+    show = _double_click_show(view, qtbot)
     assert view._voice.commands_on
 
-    fs.closed.emit()
+    show.close()
     assert not view._voice.commands_on
 
 

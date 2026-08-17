@@ -2,10 +2,16 @@
 
 Genau's console carries a clip-seconds pair, and here the clips are the slides,
 so that pair sets this. It is app-wide rather than per-slideshow because the
-console is: the same one is on the main window, the fullscreen viewer and both
-slideshows, and a pace that meant something different on each would read as four
-paces. Set it in the main window with nothing playing and the next slideshow
-opens at it; set it while one is running and that one changes pace under you.
+console is: the same one is on the main window and on whatever show is playing,
+and a pace that meant something different on each would read as several paces.
+Set it in the main window with nothing playing and the next slideshow opens at
+it; set it while one is running and that one changes pace under you.
+
+Nought is a pace like any other here, and it means never: the slide holds the
+screen until an arrow moves it. Genau's own floor is one second because a
+Genau clip is a fraction of one, but a picture is happy to sit there — and a
+picture sitting there is the whole of what double-clicking one now opens, so
+nought has to be a number the console can reach.
 """
 
 from __future__ import annotations
@@ -16,7 +22,7 @@ from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 
 # The console's pair steps by this, and will not walk past these ends.
 STEP_S = 1
-MIN_S, MAX_S = 1, 60
+MIN_S, MAX_S = 0, 60
 
 
 class SlideshowPace(QObject):
@@ -53,10 +59,9 @@ class SlideshowPace(QObject):
 class PaceOnlyHost:
     """What the console acts on where there is no slideshow behind it.
 
-    The main window and the plain fullscreen viewer show the console with
-    nothing to step, so its transport does nothing there — but the pace is
-    app-wide and setting it is worth doing anywhere, because it is what the next
-    slideshow will open at.
+    The main window shows the console with nothing to step, so its transport does
+    nothing there — but the pace is app-wide and setting it is worth doing
+    anywhere, because it is what the next slideshow will open at.
     """
 
     locked = True

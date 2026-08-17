@@ -371,8 +371,10 @@ def is_enhanceable_row(row: dict) -> bool:
     """Whether the standalone enhancer can take this row: a finished image.
 
     An already-enhanced image still qualifies — selecting one and choosing
-    Enhance is a deliberate re-enhance; only the folder-wide button filters to
-    the not-yet-enhanced (:func:`rows_awaiting_enhancement`)."""
+    Enhance is a deliberate re-enhance. The gestures made without the settings
+    in view filter to the not-yet-enhanced instead
+    (:func:`rows_awaiting_enhancement`, and :func:`is_enhanced_row` for a
+    fullscreen hold's Down)."""
     return media_type_of_row(row) == "image" and produced_output(row)
 
 

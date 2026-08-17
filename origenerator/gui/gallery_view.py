@@ -2034,14 +2034,21 @@ class GalleryView(QWidget):
         """Holding a slide asked for it to be enhanced. Returns whether a run
         started — the slideshow shows its corner note only if one did.
 
+        Only an image that has received NO enhancement gets one, the same gate
+        Enhance All and the Auto switch use. A hold is a glance-speed gesture
+        made with no view of the Enhance panel, so an image already carrying an
+        enhancement someone chose must not be re-derived at whatever the knobs
+        happen to say now: that spends a run and hangs a level nobody asked for
+        beside the one they did. Re-enhancing stays a deliberate act — the
+        thumbnail menu's Enhance, or the info pane's ``+ Enhance`` card, both of
+        which are pressed while looking at the settings they will use.
+
         The decision is here rather than in the slideshow because it is this
-        side that holds the settings and the levels: an image that already
-        carries a version made at exactly the current settings wants nothing,
-        and neither does a video."""
+        side that holds the levels — and a video has none to receive."""
         row = self._db.get_generation(prompt_id)
         if row is None or not gallery.is_enhanceable_row(row):
             return False
-        if gallery.level_matching_settings(row, self._enhance_settings) is not None:
+        if gallery.is_enhanced_row(row):
             return False
         if self.is_enhancing(row):
             return False

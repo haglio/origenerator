@@ -6,7 +6,8 @@ at least one: closing the last tab opens a fresh blank one in its place, so the
 resting state is a whole generate form waiting on a workflow rather than an empty
 black rectangle. That is why there is no "+" — a tab is always there — and no
 close-all; a tab's right-click menu closes the others, or everything to its
-right, and tabs drag along the row to reorder.
+right, listing only what that tab can actually do, and tabs drag along the row
+to reorder.
 
 Tabs open the way an IDE opens files, so browsing doesn't leave a row of them
 behind. A single-clicked generation lands in the *preview* tab, drawn in italic:
@@ -201,24 +202,33 @@ class InfoPaneTabs(QTabWidget):
     def _tab_menu(self, index: int) -> QMenu:
         """The right-click menu for the tab at ``index``.
 
-        Both entries always show, greyed when they would close nothing, so the
-        menu reads the same wherever it opens instead of changing shape under the
-        cursor.
+        Only what this tab can actually do: on the last tab there is nothing to
+        its right, and on the only tab there are no others — an entry that would
+        close nothing is left out rather than listed dead.
         """
         menu = QMenu(self)
-        others = menu.addAction("Close others")
-        others.setEnabled(self.count() > 1)
-        others.triggered.connect(lambda: self._close_other_subtabs(index))
-        to_right = menu.addAction("Close to the right")
-        to_right.setEnabled(index < self.count() - 1)
-        to_right.triggered.connect(lambda: self._close_subtabs_to_the_right(index))
+        if self.count() > 1:
+            menu.addAction("Close others").triggered.connect(
+                lambda: self._close_other_subtabs(index)
+            )
+        if index < self.count() - 1:
+            menu.addAction("Close to the right").triggered.connect(
+                lambda: self._close_subtabs_to_the_right(index)
+            )
         return menu
 
     def _open_tab_menu(self, pos):
-        """Pop the tab menu where a tab was right-clicked; nowhere else."""
+        """Pop the tab menu where a tab was right-clicked; nowhere else.
+
+        A menu with nothing in it — the pane's single resting tab — doesn't open
+        at all, rather than flashing an empty box at the cursor.
+        """
         index = self.tabBar().tabAt(pos)
-        if index >= 0:
-            self._tab_menu(index).exec(self.tabBar().mapToGlobal(pos))
+        if index < 0:
+            return
+        menu = self._tab_menu(index)
+        if menu.actions():
+            menu.exec(self.tabBar().mapToGlobal(pos))
 
     # --- the preview tab ---------------------------------------------------
 

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QMenu
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -197,21 +198,26 @@ def test_the_tab_menu_closes_everything_to_the_right(tabs):
 
 def test_the_tab_menu_offers_exactly_those_two_closes(tabs):
     tabs._add_subtab()
+    tabs._add_subtab()  # three open, so the first tab can do both
     menu = tabs._tab_menu(0)
     assert [a.text() for a in menu.actions()] == ["Close others", "Close to the right"]
 
 
-def test_the_tab_menu_greys_out_what_would_close_nothing(tabs):
-    # Both entries always show, greyed when there is nothing for them to close, so
-    # the menu reads the same wherever it opens.
-    only = tabs._tab_menu(0)
-    assert [a.isEnabled() for a in only.actions()] == [False, False]
-
+def test_the_tab_menu_leaves_out_what_would_close_nothing(tabs):
+    # An entry that can't do anything isn't listed dead — it isn't listed.
     tabs._add_subtab()
-    last = tabs._tab_menu(1)
-    assert [a.isEnabled() for a in last.actions()] == [True, False]
-    first = tabs._tab_menu(0)
-    assert [a.isEnabled() for a in first.actions()] == [True, True]
+    assert [a.text() for a in tabs._tab_menu(1).actions()] == ["Close others"]
+
+
+def test_the_only_tab_has_no_menu_at_all(tabs):
+    # Nothing to close beside it and nothing to its right; an empty box flashed
+    # at the cursor would be worse than no menu.
+    from PyQt6.QtCore import QPoint
+
+    assert tabs._tab_menu(0).actions() == []
+    with patch.object(QMenu, "exec") as spy:
+        tabs._open_tab_menu(QPoint(5, 5))
+    spy.assert_not_called()
 
 
 def test_a_right_click_off_the_tabs_opens_no_menu(tabs):

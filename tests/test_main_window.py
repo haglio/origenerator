@@ -144,10 +144,14 @@ def test_restores_the_dragged_prompt_heights_from_app_state(
     qtbot, tmp_path, forget_prompt_heights
 ):
     # A prompt box dragged tall stays tall across launches — and the restore has
-    # to land before the first form is built, or the tab that opens with the
-    # window comes up at the default size.
+    # to land before the first form is built, or the session's own tab comes up
+    # at the default size. (The resting tab lays out no form until a workflow is
+    # picked, so a restored tab is what makes a form at launch.)
     state = AppState(tmp_path / "ui.json")
     state.set("prompt_heights", {"positive_prompt": 260})
+    state.set("generate_tabs", {"tabs": [
+        {"config": {"workflow_name": "sdxl_t2i", "params": {}, "seed_is_random": True}},
+    ], "current": 0})
     win = _window(qtbot, tmp_path, state)
 
     assert forget_prompt_heights.height("positive_prompt") == 260

@@ -129,6 +129,40 @@ def build_stylesheet() -> str:
            unpickable entry would look exactly as pickable as the rest. Mute it. */
         color: {_h(TEXT_MUTED)};
     }}
+    /* Every right-click menu in the app. The app-wide QWidget rule above paints a
+       menu's items on the same flat background as the menu itself, which leaves
+       the row under the cursor looking exactly like the rows either side of it —
+       so a menu gives no sign of what a click would land on. These put the
+       highlight back, in the same blue a dropdown marks its rows with. */
+    QMenu {{
+        background-color: {_h(BG_TERTIARY)};
+        color: {_h(TEXT_PRIMARY)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        padding: 4px 0;
+    }}
+    QMenu::item {{
+        /* Room for the highlight to read as a band across the row rather than a
+           rectangle crowding the text. */
+        padding: 6px 20px;
+        background-color: transparent;
+    }}
+    QMenu::item:selected {{
+        background-color: {_h(BLUE)};
+        color: {_h(TEXT_PRIMARY)};
+    }}
+    QMenu::item:disabled {{
+        color: {_h(TEXT_MUTED)};
+    }}
+    QMenu::item:disabled:selected {{
+        /* Hovering something unclickable must not promise a click. */
+        background-color: transparent;
+        color: {_h(TEXT_MUTED)};
+    }}
+    QMenu::separator {{
+        height: 1px;
+        background-color: {_h(BORDER_SUBTLE)};
+        margin: 4px 0;
+    }}
     QPushButton {{
         background-color: {_h(BG_BUTTON)};
         color: {_h(TEXT_PRIMARY)};

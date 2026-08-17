@@ -58,3 +58,47 @@ def test_stylesheet_styles_collapsible_section_headers():
     qss = build_stylesheet()
     assert "QPushButton#sectionHeader" in qss
     assert "QPushButton#sectionHeader:pressed" in qss
+
+
+def _menu_row_colors(qtbot):
+    """(hovered row, unhovered row) as rendered under the app stylesheet.
+
+    Rendered rather than read off the sheet: a stylesheet rule that never reaches
+    a QMenu — they are top-level popups — looks identical in the string and shows
+    nothing on screen, which is how the app's tooltips once went missing.
+    """
+    from PyQt6.QtWidgets import QApplication, QMenu
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        menu = QMenu()
+        qtbot.addWidget(menu)
+        hovered = menu.addAction("Close others")
+        other = menu.addAction("Close to the right")
+        menu.show()
+        menu.setActiveAction(hovered)
+        image = menu.grab().toImage()
+        return (image.pixelColor(menu.actionGeometry(hovered).center()),
+                image.pixelColor(menu.actionGeometry(other).center()))
+    finally:
+        app.setStyleSheet(prior)
+
+
+def test_a_menu_lights_the_row_under_the_cursor(qtbot):
+    # The app-wide QWidget rule paints a menu's items on the menu's own flat
+    # background, so without this the row under the cursor looked exactly like the
+    # rows either side of it and the menu said nothing about what a click hits.
+    from shared_ui.colors import BLUE
+
+    hovered, other = _menu_row_colors(qtbot)
+    assert hovered == BLUE
+    assert other != hovered
+
+
+def test_a_menus_disabled_row_does_not_light_up():
+    # Hovering something unclickable must not promise a click.
+    qss = build_stylesheet()
+    rule = qss.split("QMenu::item:disabled:selected {", 1)[1].split("}", 1)[0]
+    assert "background-color: transparent" in rule

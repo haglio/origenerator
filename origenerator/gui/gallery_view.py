@@ -534,6 +534,20 @@ class GalleryView(QWidget):
         self._audio_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
+        # The microphone, beside the other app-global switches: on is listening,
+        # off is not, and that is the whole of it. Nothing opens or closes the mic
+        # on its own any more — it used to come on with the Auto loop and with a
+        # fullscreen show, which meant the answer to "is it listening?" was a
+        # thing to work out rather than a thing to look at.
+        self._mic_btn = self._tool_button(
+            icons.mic_icon(),
+            "Listen: spoken slideshow commands, targeted fixes over a show, and "
+            "prompt steering while a folder is auto-generating",
+            self._on_mic_toggle, checkable=True,
+        )
+        self._mic_btn.setStyleSheet(
+            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+        )
         # The stroke's own switch, beside the OSR2's. Genau toggles its engine
         # from Fun Time's console; there is no console here, so the toolbar
         # carries it — and the drive readout appears with it rather than sitting
@@ -552,8 +566,8 @@ class GalleryView(QWidget):
         toolbar.setSpacing(2)
         for button in (self._back_btn, self._forward_btn, self._undo_btn,
                        self._slideshow_btn, self._auto_btn, self._enhance_all_btn,
-                       self._group_btn, self._audio_btn, self._osr2_btn,
-                       self._stroke_btn, self._delete_btn):
+                       self._group_btn, self._mic_btn, self._audio_btn,
+                       self._osr2_btn, self._stroke_btn, self._delete_btn):
             toolbar.addWidget(button)
         header.addLayout(toolbar)
         header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
@@ -857,7 +871,6 @@ class GalleryView(QWidget):
         self._slideshow.media_changed.connect(self._reconcile_osr2)
         self._slideshow.showFullScreen()
         self._reconcile_osr2()
-        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
         return self._slideshow
 
     def _folder_level_playlists(self) -> dict:
@@ -1781,8 +1794,12 @@ class GalleryView(QWidget):
         return self._reroll.has(key)
 
     def _toggle_auto(self, checked: bool):
-        """Start or stop auto-generating fresh variations of the open folder. Auto
-        is also voice's on/off: starting a loop begins always-listening steering."""
+        """Start or stop auto-generating fresh variations of the open folder.
+
+        It no longer touches the microphone. A running loop is what gives voice a
+        prompt to steer, so an open mic starts steering when one begins — but the
+        mic itself is the button's, and only the button's.
+        """
         key = self._selected_folder_key()
         if key is not None:
             if checked:
@@ -1792,21 +1809,13 @@ class GalleryView(QWidget):
         self._sync_auto_button()  # reflect the real state — a start may not take
 
     def _begin_auto(self, key: str):
-        """Capture the folder's settings as the loop's working params, start the
-        loop, and begin voice steering of its prompt."""
+        """Capture the folder's settings as the loop's working params and start
+        the loop, giving an open mic a prompt to steer."""
         self._capture_working(key)
         self._auto.start(key)
         if self._auto.is_active(key):
             self._voice_target_key = key
-            self._voice.start(
-                lambda: self._working_prompts(self._voice_target_key),
-                lambda new: self._steer_prompts(self._voice_target_key, new),
-            )
-            # The mic is open now, so the spoken commands are listened for too —
-            # "start slideshow" among them, which is only any use before there
-            # is a show.
-            self._sync_voice_commands()
-            self._show_voice_status("🎤 Listening…", transient=False)
+            self._sync_voice()  # steers this folder's prompt, if the mic is on
         else:
             self._auto_working.pop(key, None)  # the launch didn't take
 
@@ -1842,15 +1851,13 @@ class GalleryView(QWidget):
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, cancelled, or failed): drop its
-        working params and, if it was the voice target, stop listening."""
+        working params and, if it was the one being steered, leave voice with
+        nothing to steer. The mic stays as the button has it."""
         self._auto_working.pop(key, None)
         if key == self._voice_target_key:
-            self._voice.stop()
             self._voice_target_key = None
             self._pending_auto_key = None
-            self._voice_status_timer.stop()
-            self._voice_status.hide()
-            self._sync_voice_commands()  # the mic closes unless a show holds it
+            self._sync_voice()
         self._sync_auto_button()
 
     # --- voice feedback: a floating caption of what voice heard and did --------
@@ -1864,7 +1871,7 @@ class GalleryView(QWidget):
             self._voice_status_timer.stop()
 
     def _voice_status_revert(self):
-        if self._voice_target_key is not None:  # still listening
+        if self._mic_btn.isChecked():  # still listening
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._voice_status.hide()
@@ -2057,20 +2064,37 @@ class GalleryView(QWidget):
 
     # --- spoken commands: "fix teeth" over a show, "start slideshow" for one ---
 
-    def _sync_voice_commands(self):
-        """Listen for commands whenever the mic is open at all — while a show is
-        up, and while a steered auto loop is running.
+    def _on_mic_toggle(self, _on: bool):
+        """The microphone switch: the one thing that opens or closes the mic."""
+        self._sync_voice()
 
-        Not only while a show is up, which is where this started: "start
-        slideshow" has to be heard when there is no show, or it can never be the
-        thing that opens one. The mic itself is still only ever open for a reason
-        (the Auto switch, or a show), so this widens what is listened *for*, not
-        when something is listening.
+    def _sync_voice(self):
+        """Listen, or don't, exactly as the mic button says.
+
+        Nothing else decides. The mic used to come on with the Auto loop and
+        again with a fullscreen show, which made "is it listening?" a question
+        with a derivation rather than an answer — and left "start slideshow"
+        unhearable in the one state it is for, with no show up.
+
+        What is listened *for* still depends on what is running: the spoken
+        commands always, and the prompt steering only while a loop has a folder
+        to steer. That is not a second switch, just nothing to steer.
         """
-        if self._slideshow is not None or self._voice_target_key is not None:
-            self._voice.start_commands(self._on_voice_command)
-        else:
+        if not self._mic_btn.isChecked():
+            self._voice.stop()           # both halves, so the listener closes
             self._voice.stop_commands()
+            self._voice_status_timer.stop()
+            self._voice_status.hide()
+            return
+        self._voice.start_commands(self._on_voice_command)
+        if self._voice_target_key is not None:
+            self._voice.start(
+                lambda: self._working_prompts(self._voice_target_key),
+                lambda new: self._steer_prompts(self._voice_target_key, new),
+            )
+        else:
+            self._voice.stop()  # no loop to steer; the commands hold the mic open
+        self._show_voice_status("🎤 Listening…", transient=False)
 
     def _on_voice_command(self, matched):
         """One recognized utterance: a show command, or a targeted fix."""
@@ -2320,12 +2344,12 @@ class GalleryView(QWidget):
                     show._playlist.order[:10])
 
     def _on_slideshow_closed(self):
-        """The show was dismissed (however): let it go, hand the OSR2 back to
-        whatever the toggle was driving, and drop the command listening it
-        justified."""
+        """The show was dismissed (however): let it go and hand the OSR2 back to
+        whatever the toggle was driving. The mic is untouched — it answers to its
+        own button, and "start slideshow" has to still be heard now there is no
+        show to hear it over."""
         self._slideshow = None
         self._reconcile_osr2()
-        self._sync_voice_commands()
 
     def _slideshow_items(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the

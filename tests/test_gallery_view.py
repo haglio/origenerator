@@ -3665,12 +3665,13 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
 
 # --- voice steering: Auto is voice's "on"; utterances steer the loop's prompt --
 
-def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
+def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    view._mic_btn.setChecked(True)  # the mic is the switch; the loop is what it steers
 
     view._toggle_auto(True)
     assert view._voice.started
@@ -3691,16 +3692,49 @@ def test_turning_auto_on_starts_voice_and_steers_the_prompt(qtbot, tmp_path):
     assert view._selected_folder_key() == new_key
 
 
-def test_turning_auto_off_stops_voice(qtbot, tmp_path):
+def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
+
+    view._toggle_auto(True)
+    view._toggle_auto(False)
+
+    assert view._voice.stopped        # steering stood down with the loop
+    assert view._voice.commands_on    # but the mic is still the button's, still open
+
+
+def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
+    # It used to come on with the Auto loop and again with a fullscreen show,
+    # which made "is it listening?" a thing to work out rather than to look at.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
 
     view._toggle_auto(True)
+    assert not view._voice.commands_on and not view._voice.started
     view._toggle_auto(False)
 
-    assert view._voice.stopped
+    view._mic_btn.setChecked(True)
+    assert view._voice.commands_on
+
+    view._mic_btn.setChecked(False)
+    assert not view._voice.commands_on
+
+
+def test_arming_the_mic_mid_loop_picks_up_the_steering(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._toggle_auto(True)  # running, unheard
+
+    view._mic_btn.setChecked(True)
+
+    assert view._voice.started  # it steers the loop already in flight
 
 
 def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path):
@@ -3709,14 +3743,14 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     view.refresh()
     _select_first_leaf(view)
 
-    view._toggle_auto(True)
+    view._mic_btn.setChecked(True)
     assert not view._voice_status.isHidden()
     assert "Listening" in view._voice_status.text()
 
     view._voice.heard.emit("no hat")
     assert "no hat" in view._voice_status.text()
 
-    view._toggle_auto(False)
+    view._mic_btn.setChecked(False)
     assert view._voice_status.isHidden()
 
 
@@ -3732,7 +3766,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
     view.refresh()
     _select_first_leaf(view)
 
-    view._toggle_auto(True)
+    view._mic_btn.setChecked(True)
     view._voice.heard.emit("give her a much longer caption than the idle one")
     qtbot.wait(1)  # let the layout settle around the grown caption
 
@@ -7634,8 +7668,10 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     show.close()
 
 
-def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
+def test_a_show_opening_and_closing_leaves_the_mic_as_it_found_it(
         qtbot, tmp_path, monkeypatch):
+    # It used to arm the mic and disarm it again, which is what left "start
+    # slideshow" unhearable in the one state it is for.
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -7643,6 +7679,7 @@ def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
 
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
@@ -7650,20 +7687,19 @@ def test_a_slideshow_arms_spoken_fixes_and_its_close_disarms_them(
 
     view._slideshow.close()
     assert view._slideshow is None
-    assert not view._voice.commands_on
+    assert view._voice.commands_on  # still on, because the button still is
 
 
-def test_a_double_clicked_show_arms_spoken_fixes_for_its_lifetime(qtbot, tmp_path):
+def test_a_show_with_the_mic_off_hears_nothing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
     show = _double_click_show(view, qtbot)
-    assert view._voice.commands_on
 
-    show.close()
     assert not view._voice.commands_on
+    show.close()
 
 
 def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
@@ -7677,6 +7713,7 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
 
@@ -7701,6 +7738,7 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
 
@@ -7713,7 +7751,7 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
 # --- spoken show control: start it, pause it, close it ----------------------
 
 def _voiceable(qtbot, tmp_path, monkeypatch):
-    """A gallery on a playable folder with the mic armed for commands."""
+    """A gallery on a playable folder with the microphone switched on."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -7721,7 +7759,7 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._voice.start_commands(view._on_voice_command)  # as an open mic would
+    view._mic_btn.setChecked(True)
     return view
 
 
@@ -7817,30 +7855,22 @@ def test_a_spoken_fix_with_no_show_up_says_so_rather_than_vanishing(
     assert "picture on screen" in view._voice_status.text()
 
 
-def test_the_mic_listens_for_commands_while_a_loop_is_steered(qtbot, tmp_path):
-    # "start slideshow" is only any use before there is a show, so it has to be
-    # heard whenever the mic is open — which the Auto switch is what opens.
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    assert not view._voice.commands_on
-
-    view._toggle_auto(True)
-    assert view._voice.commands_on
-
-    view._toggle_auto(False)
-    assert not view._voice.commands_on
-    assert not view._auto.is_active(key)
-
-
-def test_a_show_holds_command_listening_open_after_a_loop_ends(qtbot, tmp_path,
-                                                               monkeypatch):
+def test_start_slideshow_is_heard_with_no_show_and_no_loop(qtbot, tmp_path,
+                                                          monkeypatch):
+    # The state the command is for: nothing playing, nothing generating, mic on.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
+    assert view._slideshow is None and view._voice_target_key is None
+
     view._voice.speak_command("start slideshow")
+
+    assert view._slideshow is not None
     qtbot.addWidget(view._slideshow)
+    view._slideshow.close()
+
+
+def test_a_loop_ending_leaves_the_commands_listening(qtbot, tmp_path, monkeypatch):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
 
     view._on_auto_stopped("some-other-folder")  # a loop elsewhere ended
 
-    assert view._voice.commands_on  # the show is still up and still listening
-    view._slideshow.close()
+    assert view._voice.commands_on  # the button says listen, so it listens

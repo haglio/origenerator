@@ -6,7 +6,7 @@ source, advancing a :class:`~origenerator.stroke_engine.Stroke` on a clock
 of its own and streaming each sampled position as T-code. Same broker etiquette,
 too: it pauses genau while it drives, and parks the device + restores genau when
 it stops. The gallery owns the one instance, app-global — every surface (the main
-window, the fullscreen viewer, both slideshows) drives it through the shared
+window, the fullscreen show) drives it through the shared
 key cluster in :mod:`origenerator.gui.stroke_hud`, and the stroke outlives any
 of them: closing a view leaves the device running until Space (or Esc in the
 gallery) stops it.

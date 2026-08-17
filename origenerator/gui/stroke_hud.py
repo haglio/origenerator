@@ -1,8 +1,8 @@
 """The OSR2 stroke's shared key cluster.
 
 The stroke driver is app-global — the device shouldn't care which window is in
-front — so every surface that can drive it (the gallery window, the plain
-fullscreen viewer, the slideshow) answers the same keys through this helper,
+front — so every surface that can drive it (the gallery window, the fullscreen
+show) answers the same keys through this helper,
 and floats the same drive panel
 (:mod:`origenerator.gui.stroke_panel`). The keys are genau's own, so the muscle
 memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,

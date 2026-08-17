@@ -196,7 +196,7 @@ class GalleryActions:
         The release comes first because a file the app itself still holds open
         can't be moved on Windows at all: a preview keeps its video's file open
         for as long as it's showing it, so deleting what's on screen — in any
-        tab, a slideshow, or a fullscreen view — would otherwise fail outright.
+        tab or a slideshow — would otherwise fail outright.
         Every path in and out of the trash runs through here so no caller can
         forget it.
         """

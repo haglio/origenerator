@@ -80,7 +80,6 @@ class GenerateConfigPanel(QWidget):
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
-    fullscreen_opened = pyqtSignal(object)  # the preview popped a video open fullscreen
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
     preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
@@ -128,7 +127,6 @@ class GenerateConfigPanel(QWidget):
         # from outside), shows the browsed generation's output when one is loaded, and
         # the newest matching result otherwise.
         self._preview = PreviewWidget(show_funscript_strip=True)
-        self._preview.fullscreen_opened.connect(self.fullscreen_opened)  # → view drives it
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
         self._preview.drag_started.connect(self.preview_drag_started)
@@ -767,6 +765,14 @@ class GenerateConfigPanel(QWidget):
             return
         self._preview.show_media(*preview)
         self._preview.set_draggable_id(row["prompt_id"])
+
+    def set_fullscreen_factory(self, make):
+        """Wire what a double-click on this tab's preview opens — a slideshow of
+        the folder behind it, which only the gallery can assemble. Passed straight
+        through to the preview (see
+        :meth:`~origenerator.gui.preview_widget.PreviewWidget.set_fullscreen_factory`).
+        """
+        self._preview.set_fullscreen_factory(make)
 
     def set_enhance_settings(self, settings: EnhanceSettings):
         """The app-wide enhance settings the ``+ Enhance`` card would run at.

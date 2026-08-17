@@ -1,14 +1,23 @@
-"""A fullscreen slideshow of a set of generations — a folder's, or a shelf's
-(Recents, Starred).
+"""The fullscreen player — the one way this app fills the screen with a picture.
 
-Reuses :class:`PreviewWidget` (in play-once mode) for the actual image/video
-rendering and a :class:`~origenerator.slideshow.SlideshowPlaylist` for the order
-and pacing. Images advance on a dwell timer; videos play once and advance when
-they end (``PreviewWidget.video_ended``). The arrows step, Up culls, Down locks
-the slide on screen against the advance (a locked clip replays, and the hold both
-stars the slide and asks for an enhancement — see
-:meth:`SlideshowView._hold_current`), Enter leaves for the shown item's own folder
-(``open_requested``), and Escape closes.
+It plays a set of generations: a folder's, a shelf's (Recents, Starred), or the
+one folder a double-clicked picture came from. Reuses :class:`PreviewWidget` (in
+play-once mode) for the actual image/video rendering and a
+:class:`~origenerator.slideshow.SlideshowPlaylist` for the order and pacing.
+Images advance on a dwell timer; videos play once and advance when they end
+(``PreviewWidget.video_ended``). The arrows step, Shift+arrows step the
+enhancement levels of the picture on screen, Up culls, Down locks the slide
+against the advance (a locked clip replays, and the hold both stars the slide and
+asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
+for the shown item's own folder (``open_requested``), and Escape closes.
+
+**Double-clicking a picture opens this same view at a pace of nought** — its
+folder in the browser's own order, starting on the picture that was clicked,
+holding it until an arrow moves it. There used to be a second full-screen
+viewer for that, with its own keys to learn and its own copy of the counter, the
+neighbor stills, the level stepping and the culling; a show that simply never
+moves on is the same thing with nothing to keep in sync. Turning the console's
+clip-seconds pace up off nought is what sets such a show going.
 
 Anything that moves off a locked slide — a step either way, a cull — releases the
 lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
@@ -19,11 +28,19 @@ something to look at — one still being made is not a slide — and the gallery
 hands each one over as it lands (:meth:`SlideshowView.note_added`), so a show of
 a folder that is auto-generating keeps up with it.
 
+It also opens over a generation that's still running: built with no items, it
+shows that generation's streamed low-res frames (:meth:`show_frame`) until the
+pane that opened it hands over the finished file (:meth:`show_landed`), at which
+point it is an ordinary show of that file. So a generation can be watched
+full-screen while it's made, not only once it lands.
+
 The items either side of the one on screen ride along as small stills
 (see :mod:`origenerator.gui.neighbor_previews`). The shared OSR2 stroke keys ride
 along too (Space and friends — see :mod:`origenerator.gui.stroke_hud`) with
-genau's drive panel floated up top, so the device can run over a slideshow of
-stills.
+genau's drive panel floated up top, so the device can run over a show of stills;
+a clip that carries a funscript instead offers itself as an
+:meth:`osr2_drive_target`. Being the deliberate foreground view, it plays sound —
+the inline preview stays muted.
 """
 
 from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
@@ -31,12 +48,15 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
+from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
-from origenerator.slideshow import SlideshowPlaylist
+from origenerator.slideshow import SlideshowPlaylist, in_order
+
+_GENERATING = "Generating…"
 
 
 class SlideshowView(QWidget):
@@ -45,10 +65,12 @@ class SlideshowView(QWidget):
     # The show was dismissed (Escape, Enter out, or culled empty) — the gallery
     # keeps voice-command listening tied to a fullscreen surface being up.
     closed = pyqtSignal()
+    # A different item (or version) is on screen — re-aim the OSR2 drive.
+    media_changed = pyqtSignal()
 
-    def __init__(self, items, *, image_dwell_ms=None, shuffle=None, on_delete=None,
-                 on_enhance=None, on_star=None, player=None, stroke=None, pace=None,
-                 parent=None):
+    def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
+                 shuffle=None, on_delete=None, on_enhance=None, on_star=None,
+                 player=None, stroke=None, pace=None, parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
         # Holding a slide is also how you ask for it: Down enhances what is on
@@ -61,14 +83,27 @@ class SlideshowView(QWidget):
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         self._on_star = on_star
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
+        # Following a generation still in flight: no items of its own, so the pane
+        # that opened this feeds the frames and hands over the file that lands.
+        self._live = not items
+        self._frame = frame  # the frame the double-click landed on, if any
+        # The enhancement levels of each item that has any, keyed by the file the
+        # set lists it under, so Shift+Left/Right steps the versions of whatever
+        # is on screen. The base path is remembered separately: once you have
+        # stepped onto a level, the file showing is no longer the key.
+        self._levels_by_path: dict[str, list[tuple]] = {}
+        self._level_base: str | None = None
+        self._level_index = 0
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
-        # same number. An explicit dwell (a test's) still wins.
+        # same number. An explicit dwell (a double-clicked picture's nought,
+        # or a test's) wins until the console next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         if image_dwell_ms is None:
             image_dwell_ms = self._pace.dwell_ms
+        self._dwell_s = image_dwell_ms // 1000
         self._pace.changed.connect(self._on_pace_changed)
-        playlist_kwargs = {"image_dwell_ms": image_dwell_ms}
+        playlist_kwargs = {"image_dwell_ms": image_dwell_ms, "start": start}
         if shuffle is not None:  # else the playlist uses its own random shuffle
             playlist_kwargs["shuffle"] = shuffle
         self._playlist = SlideshowPlaylist(items, **playlist_kwargs)
@@ -81,10 +116,13 @@ class SlideshowView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # Already a fullscreen view, so a double-click leaves it rather than
-        # spawning a nested one — the way out of every other fullscreen view here.
+        # Already the fullscreen view, so a double-click leaves it rather than
+        # spawning a nested one. It plays sound (mute_audio=False), unlike the
+        # muted inline preview, and wears the funscript strip a scripted clip's
+        # stroke motion shows in.
         self._preview = PreviewWidget(player=player, loop_videos=False,
                                       allow_fullscreen=False,
+                                      show_funscript_strip=True, mute_audio=False,
                                       on_double_click=self.close)
         self._preview.video_ended.connect(self._on_video_ended)
         # The media is refitted a beat after the window resizes (and again when a
@@ -95,15 +133,15 @@ class SlideshowView(QWidget):
         # The items either side of this one, floated over the black surround.
         self._neighbors = NeighborPreviews(self)
 
-        # Where in the set this one is, floated over the bottom of the media —
-        # the same plate the plain fullscreen view wears.
+        # Where in the set this one is, floated over the bottom of the media.
         self._counter = PositionCaption(self)
-        # A note while an enhancement of the slide on screen is being made, and
-        # again for a beat when the switch is flipped — the only way to tell, in
-        # a view with no panels, that a press did anything. It sits just above
-        # the position counter at the bottom, with the rest of what this view
-        # says about the item on screen; the top-left corner belongs to genau's
-        # console, which would be underneath it.
+        # A note about the item on screen: which of its versions this is, that an
+        # enhancement of it is being made, and for a beat whatever a switch or a
+        # spoken fix just did — the only way to tell, in a view with no panels,
+        # that a press did anything. It sits just above the position counter at
+        # the bottom, with the rest of what this view says about the item on
+        # screen; the top-left corner belongs to genau's console, which would be
+        # underneath it.
         self._note = QLabel(self)
         self._note.setStyleSheet(
             "color: white; background: rgba(0, 0, 0, 160);"
@@ -127,16 +165,58 @@ class SlideshowView(QWidget):
     def _show_current(self):
         """Render the current item and arm the dwell timer if it's an image."""
         self._timer.stop()
+        if self._live:
+            # Nothing on disk yet: the run's own frames stand in for a slide.
+            if self._frame is not None:
+                self._preview.show_frame(self._frame)
+            else:
+                self._preview.show_message(_GENERATING)  # opened before the first one
+            self._update_counter()
+            self._update_neighbors()
+            return
         item = self._playlist.current()
         if item is None:
             return
+        self._level_base = None  # a new item, so its own versions from the top
+        self._level_index = 0
         self._preview.show_media(item[0], item[1])
         self._update_counter()
         self._update_neighbors()
-        self._refresh_note()  # the corner belongs to whatever is on screen now
+        self._refresh_note()  # the note belongs to whatever is on screen now
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
+        self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
+
+    def set_playlist(self, items, index: int) -> None:
+        """Re-seed the set this show plays, on ``index``.
+
+        What a double-clicked picture's show is armed with once the gallery has
+        worked out the folder behind it: the view comes up on the one item the
+        pane had, and this hands it the rest in the browser's own order. A view
+        still following a generation keeps its frames — it has no place among
+        those files until an arrow leaves them for one.
+        """
+        self._playlist = SlideshowPlaylist(
+            items, image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
+            start=index,
+        )
+        if self._live:
+            self._update_counter()
+            self._update_neighbors()
+        else:
+            self._show_current()
+
+    def set_levels(self, levels_by_path: dict) -> None:
+        """Arm Shift+Left/Right to step an image's enhancement levels.
+
+        ``levels_by_path`` maps the file the set shows an image under to that
+        image's versions, newest first, as ``(path, media_type, label)``. Plain
+        Left/Right still steps the set; the shifted pair moves within the one
+        image — its own axis, because a version is not a neighbor.
+        """
+        self._levels_by_path = {str(k): list(v) for k, v in levels_by_path.items()}
+        self._refresh_note()
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None) -> None:
         """A generation that belongs to what this show is playing has landed: it
@@ -179,11 +259,57 @@ class SlideshowView(QWidget):
         """Manual stepping — an arrow, or the console's transport: moving off a
         slide releases its lock, so the way out of a hold is the same key that
         got you anywhere else, not a second press of the one that set it."""
+        if self._live and self._playlist.is_empty():
+            return  # a run with no folder armed behind it: nowhere to step to
         self._playlist.unlock()
+        self._live = False  # stepped off a live generation: its frames stop landing
         if delta > 0:
             self._playlist.advance()
         else:
             self._playlist.back()
+        self._show_current()
+
+    def _step_level(self, delta: int) -> None:
+        """Step ``delta`` enhancement levels within the image on screen.
+
+        A no-op for an image with one version, and for a video — there is
+        nothing to compare it against, and silently doing nothing is better
+        than stepping the set when the shift was the whole point.
+        """
+        base = self._level_base or self._current_base()
+        levels = self._levels_by_path.get(base) or []
+        if len(levels) <= 1:
+            return
+        self._live = False
+        self._level_base = base
+        self._level_index = (self._level_index + delta) % len(levels)
+        self._preview.show_media(*levels[self._level_index][:2])
+        self._refresh_note()
+        self.media_changed.emit()
+
+    # --- opened over a generation still being made --------------------------
+
+    def is_live(self) -> bool:
+        """Whether this show is still following a generation in flight — the pane
+        that opened it checks before feeding it another frame or its result."""
+        return self._live
+
+    def show_frame(self, data: bytes) -> None:
+        """One more streamed frame of the generation being followed. Ignored once
+        it has landed (or the show has stepped away), which is no longer this run."""
+        if self._live:
+            self._frame = data
+            self._preview.show_frame(data)
+
+    def show_landed(self, media: tuple) -> None:
+        """The followed generation finished: show the saved file in place of its
+        frames, and become an ordinary show of it."""
+        if not self._live:
+            return
+        self._live = False
+        self._playlist = SlideshowPlaylist(
+            [media], image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
+        )
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
@@ -193,7 +319,9 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        return self._pace.seconds
+        """The seconds this show leaves an unheld slide up — nought while it is
+        holding one picture, which is how a double-clicked one opens."""
+        return self._dwell_s
 
     @property
     def locked(self) -> bool:
@@ -210,19 +338,36 @@ class SlideshowView(QWidget):
         self._delete_current()
 
     def set_dwell_s(self, seconds: int) -> None:
-        self._pace.set_seconds(seconds)
+        """Take a new pace, and hand it on: the number is app-wide, so a show
+        opened at nought that is turned up sets the pace for the next one too.
+
+        Applied here as well as posted to the pace, rather than only waiting for
+        the signal back — a show sitting at nought while the app-wide pace already
+        reads one gets no signal from a step up to one, and would stay frozen.
+        """
+        self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
+        self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
 
     def _on_pace_changed(self, seconds: int) -> None:
         """The pace moved — here or in another window — so the slide on screen
         takes the new one rather than waiting out the old."""
+        self._apply_dwell(seconds)
+
+    def _apply_dwell(self, seconds: int) -> None:
+        seconds = max(0, int(seconds))
+        if seconds == self._dwell_s:
+            return
+        self._dwell_s = seconds
         self._playlist.image_dwell_ms = seconds * 1000
-        if not self._playlist.locked:
+        if not self._playlist.locked and not self._live:
             self._show_current()
 
     def _on_video_ended(self):
-        """A clip finished: replay it while locked, else move on. A lock is
-        repeat-one here, as it is on a Fun Time satellite."""
-        if self._playlist.locked:
+        """A clip finished: replay it while held, else move on. A lock is
+        repeat-one here, as it is on a Fun Time satellite — and a pace of nought
+        holds the clip the same way, since nought means nothing moves on its own.
+        """
+        if self._playlist.locked or not self._dwell_s:
             self._show_current()
         else:
             self._advance()
@@ -254,7 +399,7 @@ class SlideshowView(QWidget):
 
         The gallery decides whether it does — it is the one that knows whether
         this image has already been enhanced, and an enhanced one wants nothing.
-        ``True`` back means a run started, and the corner says so until the
+        ``True`` back means a run started, and the note says so until the
         finished version arrives.
         """
         if self._on_enhance is None or not self._enhance_on_hold:
@@ -272,8 +417,8 @@ class SlideshowView(QWidget):
         from here on, wherever that item sits in the running order.
 
         Not only while it is the one on screen. It was asked for minutes ago and
-        the show has paged on since; and the playlist is the fixed set the show
-        opened with — nothing re-reads the folder — so a swap confined to the
+        the show may have paged on since; and the playlist is the fixed set the
+        show opened with — nothing re-reads the folder — so a swap confined to the
         current slide would leave every later pass replaying the version this
         one replaced. What is on screen changes only when the upgraded item is
         what's on it.
@@ -281,15 +426,29 @@ class SlideshowView(QWidget):
         self._enhancing.discard(prompt_id)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
+                self._level_base = None  # its versions are a level deeper now
+                self._level_index = 0
                 self._preview.show_media(path, media_type)
+                self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
         self._refresh_note()
 
     def _current_prompt_id(self):
         """The id of the item on screen, or ``None`` — a playlist assembled
-        without ids (a test's) names nothing."""
+        without ids (a test's) names nothing.
+
+        Read off the playlist item rather than off the file showing, so it is
+        still the right answer while Shift+Left/Right has stepped onto one of
+        that item's other versions.
+        """
         item = self._playlist.current()
         return item[2] if item is not None and len(item) > 2 else None
+
+    def _current_base(self) -> str:
+        """The file the set lists the item on screen under — what its versions
+        are keyed by."""
+        item = self._playlist.current()
+        return str(item[0]) if item is not None else ""
 
     def voice_fix_target(self):
         """The generation a spoken "fix …" lands on: the slide on screen."""
@@ -297,28 +456,41 @@ class SlideshowView(QWidget):
 
     def note_voice_fix(self, prompt_id, message: str) -> None:
         """Say what a spoken fix did and, when it launched a run
-        (``prompt_id``), keep the corner reading Enhancing… once the flash
+        (``prompt_id``), keep the note reading Enhancing… once the flash
         fades — the same note a hold's enhance earns."""
         if prompt_id is not None:
             self._enhancing.add(prompt_id)
         self._flash_note(message, ms=2500)
 
     def _refresh_note(self):
-        """Show "Enhancing…" while the slide on screen has a run in flight."""
+        """Say what there is to say about the item on screen: that a version of
+        it is cooking, or — failing that — which of its versions this one is.
+
+        Stepping levels is invisible without the second line: two versions of one
+        picture differ by texture, which is exactly what you cannot tell apart
+        from memory.
+        """
         prompt_id = self._current_prompt_id()
         if prompt_id is not None and prompt_id in self._enhancing:
-            self._note.setText("Enhancing…")
-            self._note.show()
-            self._reposition_note()
-        else:
+            self._show_note("Enhancing…")
+            return
+        levels = self._levels_by_path.get(self._level_base or self._current_base()) or []
+        if len(levels) <= 1:
             self._note.hide()
+            return
+        level = levels[self._level_index]
+        label = level[2] if len(level) > 2 else f"Version {self._level_index + 1}"
+        self._show_note(f"{label} — {self._level_index + 1} of {len(levels)}")
 
-    def _flash_note(self, text: str, ms: int = 1500):
-        """Say something in the corner for a moment, then fall back to whatever
-        the corner would otherwise be saying."""
+    def _show_note(self, text: str) -> None:
         self._note.setText(text)
         self._note.show()
         self._reposition_note()
+
+    def _flash_note(self, text: str, ms: int = 1500):
+        """Say something for a moment, then fall back to whatever the note would
+        otherwise be saying."""
+        self._show_note(text)
         self._note_timer.start(ms)
 
     def _reposition_note(self):
@@ -326,9 +498,10 @@ class SlideshowView(QWidget):
         says about the item on screen reads as one group."""
         self._note.adjustSize()
         self._counter.adjustSize()
+        floor = self._counter.height() if not self._counter.isHidden() else 0
         x = (self.width() - self._note.width()) // 2
-        y = self.height() - self._counter.height() - self._note.height() - 30
-        self._note.move(x, max(0, y))
+        y = self.height() - floor - self._note.height() - 30
+        self._note.move(max(0, x), max(0, y))
         self._note.raise_()
 
     def _toggle_lock(self) -> bool:
@@ -361,12 +534,20 @@ class SlideshowView(QWidget):
         if prompt_id is not None:
             self.open_requested.emit(prompt_id)
 
+    def osr2_drive_target(self):
+        """``(video_path, player, actions)`` for the video on screen, or ``None`` for
+        an image or a video with no funscript — mirrors the config panel's target so
+        the gallery can point its one driver at whichever surface is foreground."""
+        return drive_target_for(self._preview.current_video_path(), self._preview.player())
+
     # --- the neighboring items ---------------------------------------------
 
     def _update_neighbors(self):
-        """Draw the items either side of this one — nothing on a playlist too
-        short for a neighbor to be anything but the item already on screen."""
-        if len(self._playlist) < 2:
+        """Draw the items either side of this one — nothing on a set too short
+        for a neighbor to be anything but the item already on screen, and nothing
+        at all while this is following a generation, which has no place among
+        them yet."""
+        if self._live or len(self._playlist) < 2:
             self._neighbors.set_neighbors(None, None)
             return
         self._neighbors.set_neighbors(
@@ -386,6 +567,12 @@ class SlideshowView(QWidget):
     # --- caption -----------------------------------------------------------
 
     def _update_counter(self):
+        """Say where in the set this is — nothing at all while following a
+        generation still being made, which is nowhere in it yet."""
+        if self._live or self._playlist.is_empty():
+            self._counter.hide()
+            return
+        self._counter.show()
         # Show the item's number within the set (its shuffled position), not the
         # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
         self._counter.show_position(
@@ -397,12 +584,13 @@ class SlideshowView(QWidget):
 
     def keyPressEvent(self, event):
         key = event.key()
+        shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
         if key == Qt.Key.Key_Escape:
             self.close()
         elif key == Qt.Key.Key_Left:
-            self._step(-1)
+            self._step_level(-1) if shifted else self._step(-1)
         elif key == Qt.Key.Key_Right:
-            self._step(1)
+            self._step_level(1) if shifted else self._step(1)
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:

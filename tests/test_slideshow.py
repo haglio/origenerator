@@ -1,6 +1,6 @@
 """The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
 
-from origenerator.slideshow import SlideshowPlaylist
+from origenerator.slideshow import SlideshowPlaylist, in_order
 
 
 def _playlist(**kw):
@@ -100,6 +100,59 @@ def test_a_locked_or_empty_playlist_has_no_dwell():
     playlist.toggle_lock()
     assert playlist.dwell_ms() is None
     assert SlideshowPlaylist([]).dwell_ms() is None
+
+
+def test_a_pace_of_nought_means_never_move_on():
+    # What a double-clicked picture opens at: the slide holds the screen until an
+    # arrow moves it, rather than advancing the instant the timer is armed with 0.
+    playlist = _playlist(image_dwell_ms=0)
+    assert playlist.dwell_ms() is None
+
+
+def test_turning_the_pace_up_off_nought_starts_it_moving():
+    playlist = _playlist(image_dwell_ms=0)
+    playlist.image_dwell_ms = 3000
+    assert playlist.dwell_ms() == 3000
+
+
+# --- opening on a chosen item -----------------------------------------------
+
+def test_a_pass_can_start_on_a_named_item():
+    # A double-clicked picture opens on *that* picture, not on whatever the set
+    # happens to lead with.
+    playlist = _playlist(start=2)
+    assert playlist.current() == ("c.png", "image")
+    assert playlist.index == 2
+
+
+def test_the_start_item_is_found_wherever_the_shuffle_put_it():
+    playlist = SlideshowPlaylist(
+        [("a.png", "image"), ("b.png", "image"), ("c.png", "image")],
+        shuffle=lambda order: order.reverse(),  # order == [2, 1, 0]
+        start=2,
+    )
+    assert playlist.current() == ("c.png", "image")
+    assert playlist.index == 0  # which is where the reversed pass begins
+
+
+def test_no_start_leads_with_whatever_the_pass_leads_with():
+    # A shuffled show opens on the front of its pass, not on the set's first item.
+    playlist = SlideshowPlaylist(
+        [("a.png", "image"), ("b.png", "image"), ("c.png", "image")],
+        shuffle=lambda order: order.reverse(),
+    )
+    assert playlist.current() == ("c.png", "image")
+
+
+def test_an_out_of_range_start_falls_back_to_the_front():
+    assert _playlist(start=99).index == 0
+    assert SlideshowPlaylist([], start=3).current() is None
+
+
+def test_in_order_leaves_the_set_exactly_as_handed_over():
+    # A folder played from a double-click is the browser's own listing, not a pass.
+    playlist = _playlist(shuffle=in_order)
+    assert playlist.order == [0, 1, 2]
 
 
 def test_remove_current_drops_the_item_and_advances():

@@ -37,6 +37,7 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.slideshow import in_order
 from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
@@ -135,7 +136,7 @@ class GalleryView(QWidget):
             ambient_audio if ambient_audio is not None else AmbientAudio(parent=self)
         )
         # The one app-global stroke driver (genau's engine, no funscript needed):
-        # every surface — this window, the fullscreen viewer, both slideshows —
+        # every surface — this window and whatever slideshow is up —
         # drives it through the shared stroke keys, and while it holds the device
         # the funscript reconcile stands down. Injectable so tests never touch
         # the broker. Built before _build_ui, which wires its window feedback.
@@ -164,8 +165,8 @@ class GalleryView(QWidget):
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
-        # The matcher rides along so a spoken "fix teeth" during a slideshow or
-        # fullscreen view is executed as a command rather than steering a
+        # The matcher rides along so a spoken "fix teeth" during a slideshow is
+        # executed as a command rather than steering a
         # prompt; the bias teaches whisper the command vocabulary, without
         # which a quiet mic's "fix <part>" transcribes as other words entirely.
         self._voice = VoiceSteering(command_matcher=gallery.match_fix_command,
@@ -190,7 +191,11 @@ class GalleryView(QWidget):
         self._voice_status_timer = QTimer(self)
         self._voice_status_timer.setSingleShot(True)
         self._voice_status_timer.timeout.connect(self._voice_status_revert)
-        self._slideshow = None  # the fullscreen slideshow window while one is open
+        # The fullscreen slideshow window while one is open — whether it was
+        # started from the toolbar (a whole folder, shuffled) or by
+        # double-clicking a picture (that folder in order, held at a pace of
+        # nought). One slot, because it is one view.
+        self._slideshow = None
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -312,7 +317,7 @@ class GalleryView(QWidget):
                     self._undo()
                     return True
                 # The OSR2 stroke keys work right here in the main window too —
-                # not only in the fullscreen views — under the same guards that
+                # not only in the fullscreen show — under the same guards that
                 # keep them out of text fields and other windows.
                 if (not event.modifiers()
                         and apply_stroke_key(self._osr2_stroke, event.key())):
@@ -324,7 +329,7 @@ class GalleryView(QWidget):
         """Esc stops the physical device and any running loop, wherever focus is: it
         turns off OSR2 driving and ends auto-generate. It yields, though, when
         another window owns the keystroke — an open dialog/popup, so Esc still closes
-        a combo dropdown, or an active fullscreen preview/slideshow, which close on
+        a combo dropdown, or an active fullscreen slideshow, which closes on
         Esc themselves. Returns whether it acted."""
         if self._other_window_owns_keys():
             return False
@@ -343,7 +348,7 @@ class GalleryView(QWidget):
     def _other_window_owns_keys(self) -> bool:
         """True when a keystroke belongs to something other than the gallery: an open
         modal dialog or popup, or a separate top-level window that's active — a
-        fullscreen preview or the slideshow, both of which close on Esc. The
+        fullscreen slideshow, which closes on Esc itself. The
         gallery's filter is installed on the application, so it sees those windows'
         keys first and has to hand them back."""
         if QApplication.activeModalWidget() or QApplication.activePopupWidget():
@@ -591,17 +596,15 @@ class GalleryView(QWidget):
         self._info_tabs = InfoPaneTabs(self._client, self._db)
         # One OSR2 driver for the whole view, under the one global toggle
         # (self._osr2_btn): while that's on it follows whichever video is foreground —
-        # an open fullscreen view, else whatever scripted video is in the front tab —
+        # an open slideshow, else whatever scripted video is in the front tab —
         # and with it off nothing drives on either surface.
-        # Switching tabs/videos or opening/closing the fullscreen view re-aims it; with
+        # Switching tabs/videos or opening/closing a slideshow re-aims it; with
         # nothing to drive it stops. self._osr2_driving is the (video, player) currently
         # driven, so a redundant reconcile doesn't churn the device. Built before the
-        # panels are wired, since wiring connects their displayed_changed and
-        # fullscreen_opened here.
+        # panels are wired, since wiring connects their displayed_changed here.
         self._osr2_driver = Osr2Driver(parent=self)
         self._osr2_enabled = False
         self._osr2_driving = None
-        self._fullscreen_preview = None  # the open fullscreen view, top drive priority
         # The bottom of the center (browser) pane, shared by two panels that each
         # take their own room rather than floating over anyone's buttons: genau's
         # readout, copied, held to the left at its fixed size, and the open
@@ -699,8 +702,8 @@ class GalleryView(QWidget):
         """Route a config tab's footer links to the gallery: its "from source
         image" link and an animation-tile click both navigate like any source link.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
-        and re-reads whether the tab still owns a run in flight,
-        its ``fullscreen_opened`` hands the drive to a video popped open fullscreen,
+        and re-reads whether the tab still owns a run in flight, a double-click on
+        its preview opens the folder behind it as a held slideshow,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
@@ -719,7 +722,7 @@ class GalleryView(QWidget):
         panel.enhance_requested.connect(lambda pid: self.enhance_items([pid]))
         panel.levels_delete_requested.connect(self.delete_enhance_levels)
         panel.set_enhance_settings(self._enhance_settings)
-        panel.fullscreen_opened.connect(self._on_fullscreen_opened)
+        panel.set_fullscreen_factory(self._open_slideshow_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
         # Dragging the tab's preview out lights the combine slot it fits, like a
         # browser thumbnail (see :meth:`_on_generation_drag_started`).
@@ -744,7 +747,7 @@ class GalleryView(QWidget):
 
         Idempotent: it (re)starts only when the driven ``(video, player)`` actually
         changes and stops when nothing should drive — so tab switches, browsing,
-        completions, and opening or closing the fullscreen view all resolve to the
+        completions, and opening or closing a slideshow all resolve to the
         right video without churning the device."""
         target = self._osr2_drive_source()
         if target is None:
@@ -761,7 +764,7 @@ class GalleryView(QWidget):
     def _osr2_drive_source(self):
         """The drive target the device should follow, or ``None``. The auto-generate
         slideshow's stroke engine owns the device outright while it runs; else, while
-        the toggle is on, a fullscreen view wins when it's showing a scripted video,
+        the toggle is on, an open slideshow wins when it's showing a scripted video,
         otherwise the front tab's video.
 
         The toggle governs both surfaces alike: double-clicking a clip open fullscreen
@@ -769,9 +772,8 @@ class GalleryView(QWidget):
         anyway — the switch is what decides now, whichever surface the video is on."""
         if self._osr2_stroke.active or not self._osr2_enabled:
             return None
-        fullscreen = self._fullscreen_preview
-        if fullscreen is not None:
-            target = fullscreen.osr2_drive_target()
+        if self._slideshow is not None:
+            target = self._slideshow.osr2_drive_target()
             if target is not None:
                 return target
         panel = self._info_tabs.current_config_panel()
@@ -779,58 +781,64 @@ class GalleryView(QWidget):
             return panel.osr2_drive_target()
         return None
 
-    def _on_fullscreen_opened(self, fullscreen):
-        """A double-click popped a video open fullscreen. While the global toggle is on
-        it takes over the drive for its lifetime, then hands the device back when it
-        closes; with the toggle off it drives nothing, exactly like the tab preview it
-        was opened from. (An image or unscripted video simply has no target, so nothing
-        drives and the toggle's video, if any, keeps going.)
+    def _open_slideshow_on_preview(self, media, frame):
+        """A double-click on a tab's preview: open its folder as a slideshow held
+        on the very picture that was clicked.
 
-        It's also armed to page Left/Right through the folder it was opened from, and
-        each such page re-aims the device at whatever clip it lands on."""
-        self._fullscreen_preview = fullscreen
-        fullscreen.closed.connect(lambda: self._on_fullscreen_closed(fullscreen))
-        fullscreen.media_changed.connect(self._reconcile_osr2)
-        fullscreen.set_stroke(self._osr2_stroke)  # the shared stroke keys work here too
-        # Up and Down curate from up there, exactly as they do in the slideshow.
-        fullscreen.delete_requested.connect(self._trash_generation)
-        fullscreen.star_requested.connect(self._star_generation)
-        self._arm_fullscreen_navigation(fullscreen)
-        self._reconcile_osr2()
-        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
+        The pace is nought — nothing moves until an arrow does, or until the
+        console's clip-seconds pair is turned up — and the order is the browser's
+        rather than a shuffle, because this is the folder you were already looking
+        at rather than a set to be played. That is the whole of what used to be a
+        second fullscreen viewer: the arrows, the counter, the neighbor stills,
+        Up and Down, are the show's own.
 
-    def _arm_fullscreen_navigation(self, fullscreen):
-        """Give the fullscreen view the visible folder's media so Left/Right page
-        through it, starting on the item already on screen. Shift+Left/Right gets
-        its own axis: the versions of whichever image is on screen, so a level can
-        be compared against the one below it at full size rather than in a
-        thumbnail.
-
-        A folder of one is armed too: it has nothing to page to, but the view
-        still says where you are, and that shouldn't depend on how many others
-        happen to share the folder — most video folders here hold exactly one.
-
-        A view opened over a generation still being made has no place among that
-        media — it has no file yet — so it is armed with the folder anyway, from
-        the top: watching something render is no reason to lose the folder it is
-        being made in, and the first arrow leaves the live frames for it.
+        ``media`` is the file the pane is showing, or ``None`` while a generation
+        is still running behind it — in which case the show opens over ``frame``,
+        that run's latest, and goes on following it until the pane hands over the
+        file it lands as.
         """
         items, index = self._folder_media_playlist()
-        if not items and fullscreen.is_live():
-            items, index = self._folder_media(), 0
-        if items:
-            fullscreen.set_playlist(items, index)
-        fullscreen.set_levels(self._folder_level_playlists())
-        # And Down asks for an enhancement of whatever is on screen, exactly as
-        # it does in the slideshow — this is the other place you stop on a
-        # picture because you want it.
-        fullscreen.set_enhance(self._enhance_from_slideshow,
-                               self._folder_ids_by_path())
+        if media is None:  # following a run: it has no place among the files yet
+            items, index = [], 0
+        elif not items:  # the shown item isn't in the folder listing: play it alone
+            items, index = [(media[0], media[1], None, None)], 0
+        return self._open_slideshow(items, start=index, frame=frame,
+                                    image_dwell_ms=0, shuffle=in_order,
+                                    folder_items=self._folder_media())
+
+    def _open_slideshow(self, items, *, folder_items=None, **kwargs):
+        """Build, wire and show a fullscreen slideshow of ``items``.
+
+        The one place a show is made, however it was asked for, so the toolbar's
+        and a double-click's differ only in the order and the pace they pass.
+        ``folder_items`` is what to arm a show that opened over a running
+        generation with, since that one has no items of its own yet.
+        """
+        self._slideshow = SlideshowView(
+            items, on_delete=self._trash_generation,
+            on_enhance=self._enhance_from_slideshow,
+            on_star=self._star_generation,
+            pace=self._pace, stroke=self._osr2_stroke, **kwargs)
+        if folder_items and self._slideshow.is_live():
+            # Watching something render is no reason to lose the folder it is
+            # being made in: the first arrow leaves the live frames for it.
+            self._slideshow.set_playlist(folder_items, 0)
+        # Shift+Left/Right gets its own axis: the versions of whichever image is
+        # on screen, so a level can be compared against the one below it at full
+        # size rather than in a thumbnail.
+        self._slideshow.set_levels(self._folder_level_playlists())
+        self._slideshow.open_requested.connect(self._open_from_slideshow)
+        self._slideshow.closed.connect(self._on_slideshow_closed)
+        self._slideshow.media_changed.connect(self._reconcile_osr2)
+        self._slideshow.showFullScreen()
+        self._reconcile_osr2()
+        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
+        return self._slideshow
 
     def _folder_level_playlists(self) -> dict:
         """Each visible image's versions, keyed by the file the folder shows it
         under — newest first, matching the strip in the info pane. Each carries
-        its label, so the fullscreen view can say which one is on screen."""
+        its label, so a slideshow can say which one is on screen."""
         playlists = {}
         for pid in self._browser.visible_prompt_ids():
             row = self._row_for(pid)
@@ -846,30 +854,16 @@ class GalleryView(QWidget):
             playlists[str(entries[0][0])] = entries
         return playlists
 
-    def _folder_ids_by_path(self) -> dict:
-        """Which generation each visible file belongs to, so the fullscreen view
-        can name what it is looking at when it asks for an enhancement.
-
-        Keyed off the row's leading output file, the same key the level
-        playlists use, so the two maps agree on what "this image" means."""
-        ids = {}
-        for pid in self._browser.visible_prompt_ids():
-            row = self._row_for(pid)
-            files = gallery.row_output_files(row) if row else []
-            if files:
-                ids[str(gallery.output_file_path(files[0], COMFYUI_OUTPUT_DIR))] = pid
-        return ids
-
     def _folder_media_playlist(self):
         """The visible folder's resolvable media in shown order, and the index of
-        the currently-shown item — the playlist a fullscreen view pages through.
+        the currently-shown item — what a double-clicked picture's show plays.
 
-        Each entry carries its generation's id alongside the media, so the view's
+        Each entry carries its generation's id alongside the media, so the show's
         Up and Down can name what to trash and what to bookmark, and its stored
         thumbnail, which is the only still a video has for the neighbor previews.
 
-        Returns an empty list when the shown item isn't among them, so an armed
-        playlist's starting item always matches what's already on screen."""
+        Returns an empty list when the shown item isn't among them, so the show
+        always opens on what's already on screen."""
         selected_pid = self._selected["prompt_id"] if self._selected else None
         items, index, found = [], 0, False
         for entry in self._folder_media():
@@ -889,14 +883,6 @@ class GalleryView(QWidget):
             if preview is not None:
                 media.append((preview[0], preview[1], pid, row.get("thumbnail_path")))
         return media
-
-    def _on_fullscreen_closed(self, fullscreen):
-        """The fullscreen view closed: drop it and re-aim at the toggle's video, or
-        stop. Guarded so a superseded view's late close can't clear a newer one."""
-        if self._fullscreen_preview is fullscreen:
-            self._fullscreen_preview = None
-            self._reconcile_osr2()
-            self._sync_voice_commands()
 
     # --- the app-global OSR2 stroke: reconcile hold and main-window feedback --
 
@@ -2031,14 +2017,14 @@ class GalleryView(QWidget):
         self._enqueue_enhancements([row])
         return True
 
-    # --- spoken targeted fixes: "fix teeth" over a fullscreen surface ---------
+    # --- spoken targeted fixes: "fix teeth" over a fullscreen show ------------
 
     def _sync_voice_commands(self):
-        """Keep command listening tied to a fullscreen surface being up: "fix
+        """Keep command listening tied to a fullscreen show being up: "fix
         teeth" means something only while a picture fills the screen, and the
         mic should not stay open for a view that has closed (unless a steered
         auto loop is holding it anyway)."""
-        if self._slideshow is not None or self._fullscreen_preview is not None:
+        if self._slideshow is not None:
             self._voice.start_commands(self._on_voice_fix)
         else:
             self._voice.stop_commands()
@@ -2046,17 +2032,13 @@ class GalleryView(QWidget):
     def _on_voice_fix(self, part):
         """A spoken "fix <part>": aim a targeted detail pass at what's on screen.
 
-        Routed to whichever fullscreen surface is up (the active window when
-        both are), and answered out of its corner note — the speaker is looking
-        at it, not at this pane."""
-        surfaces = [s for s in (self._slideshow, self._fullscreen_preview)
-                    if s is not None]
-        surface = next((s for s in surfaces if s.isActiveWindow()),
-                       surfaces[0] if surfaces else None)
-        if surface is None:
+        Answered out of the show's own note — the speaker is looking at it, not
+        at this pane."""
+        show = self._slideshow
+        if show is None:
             return
-        prompt_id, message = self._fix_part(surface.voice_fix_target(), part)
-        surface.note_voice_fix(prompt_id, message)
+        prompt_id, message = self._fix_part(show.voice_fix_target(), part)
+        show.note_voice_fix(prompt_id, message)
 
     def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
@@ -2084,28 +2066,22 @@ class GalleryView(QWidget):
         return row["prompt_id"], f"🎤 fixing {part.name}…"
 
     def _feed_slideshow_enhanced(self, row: dict | None):
-        """Hand a landed enhancement to every full-screen surface, so the item
-        becomes the better version there rather than the version it was made
-        from. Both are told; each ignores an id it isn't holding.
+        """Hand a landed enhancement to an open show, so the item becomes the
+        better version there rather than the version it was made from. A show
+        ignores an id it isn't holding.
 
-        Not only the surface that asked for it, and not only while that item is
-        the one on screen: an enhancement asked for from a slideshow lands minutes
-        later, by which time the show has long paged on, so an upgrade it doesn't
-        take here it never takes at all. The slideshow also draws each item small
-        as a neighbor, so it takes the new thumbnail with the file; the fullscreen
-        view shows only the file.
+        Not only while that item is the one on screen: an enhancement asked for
+        from a show lands minutes later, by which time it has long paged on, so an
+        upgrade it doesn't take here it never takes at all. The show also draws
+        each item small as a neighbor, so it takes the new thumbnail with the file.
         """
-        if row is None:
+        if row is None or self._slideshow is None:
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
-        if self._slideshow is not None:
-            self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1],
-                                          still=row.get("thumbnail_path"))
-        if self._fullscreen_preview is not None:
-            self._fullscreen_preview.note_enhanced(row["prompt_id"], preview[0],
-                                                   preview[1])
+        self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1],
+                                      still=row.get("thumbnail_path"))
 
     def is_enhancing(self, row: dict) -> bool:
         """Whether a standalone enhance of this image is running right now.
@@ -2244,27 +2220,21 @@ class GalleryView(QWidget):
 
     def _start_slideshow(self):
         """Open what's on screen — a folder, or the Recents/Starred shelf — as a
-        fullscreen slideshow."""
+        fullscreen slideshow, shuffled and running at the app-wide pace."""
         items = self._slideshow_items(self._slideshow_rows())
         if not items:
             return
-        self._slideshow = SlideshowView(items, on_delete=self._trash_generation,
-                                        on_enhance=self._enhance_from_slideshow,
-                                        on_star=self._star_generation,
-                                        pace=self._pace,
-                                        stroke=self._osr2_stroke)
-        self._slideshow.open_requested.connect(self._open_from_slideshow)
-        self._slideshow.closed.connect(self._on_slideshow_closed)
+        show = self._open_slideshow(items)
         logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
                     self._slideshow_subject(), len(items),
-                    self._slideshow._playlist.order[:10])
-        self._slideshow.showFullScreen()
-        self._sync_voice_commands()  # "fix teeth" works for as long as it's up
+                    show._playlist.order[:10])
 
     def _on_slideshow_closed(self):
-        """The show was dismissed (however): let it go, and with it the
-        command listening it justified."""
+        """The show was dismissed (however): let it go, hand the OSR2 back to
+        whatever the toggle was driving, and drop the command listening it
+        justified."""
         self._slideshow = None
+        self._reconcile_osr2()
         self._sync_voice_commands()
 
     def _slideshow_items(self, rows) -> list:
@@ -2312,7 +2282,7 @@ class GalleryView(QWidget):
         self._browser.open_in_containing_folder(prompt_id)
 
     def _star_generation(self, prompt_id: str):
-        """Bookmark a generation from a fullscreen view (its Down key) — the same
+        """Bookmark a generation from a fullscreen show (its Down key) — the same
         star the gallery's own control sets."""
         self.set_items_starred([prompt_id], True)
 
@@ -2756,11 +2726,11 @@ class GalleryView(QWidget):
             self._clear_metadata()
 
     def _close_live_fullscreen(self):
-        """Dismiss a fullscreen view that was watching a generation which ended with
+        """Dismiss a show that was watching a generation which ended with
         nothing to show — left up, it would sit on a stale partial frame forever."""
-        fullscreen = self._fullscreen_preview
-        if fullscreen is not None and fullscreen.is_live():
-            fullscreen.close()
+        show = self._slideshow
+        if show is not None and show.is_live():
+            show.close()
 
     def _on_reroll_finished(self, key: str, prompt_id: str):
         """A re-roll saved its result (finalized by the controller): drop it as the

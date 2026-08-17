@@ -6394,6 +6394,86 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
 
 
+def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypatch,
+                                                                tmp_path):
+    # An enhancement is a version of the image it improves, so deleting the image
+    # leaves its run nowhere to fold: it comes off the queue rather than spending
+    # minutes producing an enhanced file with no original to belong to.
+    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())  # its own actions, as the app builds them
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0", "g1"])
+    doomed, kept = view._reroll.all_jobs
+
+    view._delete_rows([db.get_generation("g0")])
+
+    assert doomed.state == "canceled"                   # off ComfyUI's queue
+    assert db.get_generation(doomed.prompt_id) is None  # no transient row left behind
+    assert view._reroll.all_jobs == [kept]              # the other image's run goes on
+
+
+def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
+                                                             tmp_path):
+    # A re-enhance runs on the pre-enhance original still listed behind the
+    # enhanced file, so the run to stop is found by the image's whole file list
+    # rather than by whichever version leads it.
+    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation(
+        "g0",
+        output_files=json.dumps([
+            {"filename": "image_enhance_e0.png", "subfolder": "image", "type": "output"},
+            {"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"},
+        ]),
+        original_files=json.dumps([{"filename": "sdxl_t2i_g0.png",
+                                    "subfolder": "image", "type": "output"}]),
+    )
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+    assert "sdxl_t2i_g0.png" in job.params["input_image"]  # re-enhanced from the original
+
+    view._delete_rows([db.get_generation("g0")])
+
+    assert job.state == "canceled"
+    assert view._reroll.all_jobs == []
+
+
+def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, monkeypatch,
+                                                                      tmp_path):
+    # A rejection keeps the row but takes its files, so nothing is left for a
+    # landing enhance to fold onto — and one that did land would bring a rejected
+    # experiment back as an enhanced image.
+    monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="g0", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a cat", seed=0, workflow_json="{}", source="experiment",
+        params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": 0}),
+    )
+    db.update_generation("g0", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_t2i_g0.png",
+                                                   "subfolder": "image",
+                                                   "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+
+    view._trash_generation("g0")  # the Experiments shelf's Reject, from a slideshow
+
+    assert job.state == "canceled"
+    assert view._reroll.all_jobs == []
+
+
 def _png_bytes() -> bytes:
     import io
 

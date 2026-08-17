@@ -209,6 +209,7 @@ class GalleryView(QWidget):
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, session_trash(STATE_DIR / "trash"),
             release_files=self._release_held_media, thumb_dir=THUMB_DIR,
+            cancel_enhancements=self._cancel_enhancements_of,
         )
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's
@@ -3208,6 +3209,32 @@ class GalleryView(QWidget):
         self._info_tabs.release_media(paths)
         if self._slideshow is not None:
             self._slideshow.release_media(paths)
+
+    def _cancel_enhancements_of(self, rows):
+        """Stop every standalone enhance still being made of ``rows`` — the items
+        a delete is about to take.
+
+        Wired into :class:`GalleryActions` beside the media release, so it runs
+        for every delete there is: a picked tile, a whole folder, a rejected
+        experiment, a slideshow's Up key. The jobs are the gallery's, so the
+        match is made here — the same "is this run an enhance of this image?"
+        question :meth:`is_enhancing` asks, over every live job of every folder
+        (a batch of enhances shares one settings key, so all but its leader
+        would be missed by the folder-facing view).
+
+        Cancelling frees the queue — a video-length wait can sit behind an
+        enhance nobody wants any more — and takes the run's transient row with
+        it, so no enhanced file lands with no original to be a version of.
+        """
+        doomed = [row for row in rows if row]
+        for job in list(self._reroll.all_jobs):
+            if job.workflow.name != gallery.ENHANCE_WORKFLOW:
+                continue
+            source = job.params.get("input_image")
+            if any(gallery.enhance_targets_row(source, row) for row in doomed):
+                logger.info("Cancelling the enhance of %s: its image is being deleted",
+                            source)
+                self._reroll.cancel_job(job.prompt_id)
 
     def _delete_rows(self, rows):
         if not rows:

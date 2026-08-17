@@ -30,14 +30,15 @@ def _completed_row(db, output_dir, pid, filename, *, subfolder="", thumb_dir=Non
     return db.get_generation(pid)
 
 
-def _actions(tmp_path, limit=50, release_files=None):
+def _actions(tmp_path, limit=50, release_files=None, cancel_enhancements=None):
     db = Database(tmp_path / "test.db")
     output_dir = tmp_path / "output"
     # Composed the way the gallery composes it, so which trash a session may use
     # is part of what these tests exercise.
     trash = session_trash(tmp_path / "trash")
     return GalleryActions(db, output_dir, trash, limit=limit,
-                          release_files=release_files), db, output_dir
+                          release_files=release_files,
+                          cancel_enhancements=cancel_enhancements), db, output_dir
 
 
 def test_delete_removes_the_row_and_its_file(tmp_path):
@@ -302,6 +303,50 @@ def test_delete_has_the_app_let_go_of_the_files_before_moving_them(tmp_path):
 
     assert seen == [[(output_dir / "video" / "clip.mp4", True),
                      (tmp_path / "thumbs" / "v1.jpg", True)]]
+
+
+def test_delete_stops_an_enhancement_being_made_of_what_it_takes(tmp_path):
+    # An enhancement is a version of the image it improves, so a run whose image
+    # is being deleted has nowhere left to fold: left going it holds the queue
+    # for minutes and then lands an enhanced file with no original to belong to.
+    seen = []
+    actions, db, output_dir = _actions(
+        tmp_path,
+        # Recorded with the file's existence, since the run is only stoppable
+        # while its input is still where ComfyUI would read it.
+        cancel_enhancements=lambda rows: seen.append(
+            [(r["prompt_id"], (output_dir / "a.png").exists()) for r in rows]),
+    )
+    row = _completed_row(db, output_dir, "p1", "a.png")
+
+    actions.delete_rows([row])
+
+    assert seen == [[("p1", True)]]
+
+
+def test_rejecting_an_experiment_stops_its_enhancement_too(tmp_path):
+    # The row survives a rejection but its files don't, so it is no longer a
+    # source anything can fold onto — and a run that did land would resurrect
+    # the rejection as an enhanced image.
+    seen = []
+    actions, db, output_dir = _actions(tmp_path, cancel_enhancements=seen.extend)
+    row = _completed_row(db, output_dir, "e1", "exp.png")
+
+    actions.reject_experiment(row)
+
+    assert [r["prompt_id"] for r in seen] == ["e1"]
+
+
+def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
+    # A versions delete takes files off a row that stays, and an enhance
+    # re-derives from the original either way — its run still has an image to
+    # fold onto, so stopping it would only throw away work the user wants.
+    seen = []
+    actions, db, output_dir = _actions(tmp_path, cancel_enhancements=seen.extend)
+
+    actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["enhanced.png"])
+
+    assert seen == []
 
 
 def test_rejecting_an_experiment_releases_its_files_too(tmp_path):

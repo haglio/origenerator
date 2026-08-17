@@ -337,7 +337,7 @@ class InfoPaneTabs(QTabWidget):
 
     # --- loading the browser selection into a tab --------------------------
 
-    def load_selection(self, row: dict, image_rows: list[dict]):
+    def load_selection(self, row: dict, image_rows: list[dict], request=None):
         """Show a single-clicked generation in a tab, without leaving a trail of
         them behind.
 
@@ -349,6 +349,9 @@ class InfoPaneTabs(QTabWidget):
         So a browse through a folder's items reuses one italic tab however many
         are clicked, while a tab that was pinned (double-clicked) or edited into a
         different folder is left where it is.
+
+        ``request`` is the spoken request that made this row, when one did, so the
+        tab can mark what it changed and link back to what it was asked about.
         """
         key = self._row_settings_key(row)
         cur = self.current_config_panel()
@@ -361,7 +364,7 @@ class InfoPaneTabs(QTabWidget):
             target = self._preview_panel  # replace the italic tab, don't fork
         else:
             target = self._add_subtab(preview=True)
-        target.show_saved_generation(row, image_rows)
+        target.show_saved_generation(row, image_rows, request)
         self.setCurrentWidget(target)
 
     def show_result_in_current_tab(self, row: dict, image_rows: list[dict]):

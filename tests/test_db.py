@@ -518,3 +518,52 @@ def test_an_unheld_deletion_is_simply_absent(tmp_path):
     db = Database(tmp_path / "test.db")
     assert db.get_deletion("never") is None
     db.forget_deletion("never")  # must not raise
+
+
+# --- spoken requests (what the Requests shelf lists) -------------------------
+
+
+def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):
+    db.record_request(
+        prompt_id=prompt_id, source_prompt_id=source, heard=heard,
+        term="hat", polarity="remove", action="dropped",
+        old_positive="a woman, a hat", old_negative="blurry",
+        new_positive="a woman", new_negative="blurry",
+    )
+
+
+def test_a_recorded_request_comes_back_whole(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1")
+
+    record = db.get_request("gen-1")
+
+    assert record["source_prompt_id"] == "src-1"
+    assert record["heard"] == "Request, no hat, over."
+    assert record["term"] == "hat"
+    assert record["old_positive"] == "a woman, a hat"
+    assert record["new_positive"] == "a woman"
+
+
+def test_requests_list_newest_first(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1")
+    _record(db, "gen-2")
+
+    assert [r["prompt_id"] for r in db.list_requests()] == ["gen-2", "gen-1"]
+
+
+def test_a_generation_nothing_asked_for_has_no_request(tmp_path):
+    db = Database(tmp_path / "test.db")
+    assert db.get_request("gen-unasked") is None
+
+
+def test_a_request_outlives_the_generation_it_queued(tmp_path):
+    # A delete here is undoable, so the record has to be waiting if the item
+    # comes back; the shelf skips what it can't resolve instead.
+    db = Database(tmp_path / "test.db")
+    _record(db, "gen-1")
+
+    db.delete_generation("gen-1")
+
+    assert db.get_request("gen-1") is not None

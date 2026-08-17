@@ -91,6 +91,7 @@ def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
     primary_by_file = _rows_by_rel_path(db.list_generations())
     adopted = 0
     for branch_db in sorted(worktrees_root.glob("*/state/origenerator.db")):
+        requests = _request_records(branch_db)
         for row in _completed_rows(branch_db):
             if db.get_generation(row["prompt_id"]) is not None:
                 continue  # already adopted (or a row the branch merely seeded)
@@ -112,6 +113,12 @@ def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
             except Exception:
                 pass  # a tile can live without its thumbnail; the row cannot wait
             db.restore_generation(row)
+            # A generation asked for out loud comes over with the request that
+            # asked for it, or it would land in the live gallery as an ordinary
+            # re-roll — the one thing it isn't.
+            record = requests.get(row["prompt_id"])
+            if record is not None:
+                db.record_request(**record)
             for path in rel_paths:
                 primary_by_file[path] = row
             adopted += 1
@@ -135,6 +142,27 @@ def _completed_rows(branch_db: Path) -> list[dict]:
                 " AND (source IS NULL OR source = 'generated') ORDER BY id")]
     except sqlite3.Error:
         return []
+
+
+def _request_records(branch_db: Path) -> dict:
+    """The spoken requests a branch session recorded, by the generation each
+    queued — so an adopted row keeps its place on the Requests shelf.
+
+    ``created_at`` is dropped: the live record is written now, and a stamp from
+    a database that was never the live one is not a time this app can vouch for.
+    A branch database predating the table (or unreadable) yields nothing rather
+    than failing the launch, exactly as :func:`_completed_rows` does.
+    """
+    try:
+        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
+        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = [dict(r) for r in conn.execute("SELECT * FROM requests")]
+    except sqlite3.Error:
+        return {}
+    for row in rows:
+        row.pop("created_at", None)
+    return {row["prompt_id"]: row for row in rows}
 
 
 def _rel_paths(row: dict) -> list[str]:

@@ -15,6 +15,7 @@ import os
 import struct
 
 import pytest
+from PyQt6.QtCore import QObject, pyqtSignal
 
 # Render Qt offscreen for the whole suite. Agents run these GUI tests on every
 # commit; without this, each test that shows a widget throws a real window onto
@@ -79,6 +80,77 @@ def installed_models(tmp_path, monkeypatch):
 
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     return ModelTree(tmp_path)
+
+
+class FakeVoiceSteering(QObject):
+    """Stands in for VoiceSteering so no test ever opens a real microphone.
+
+    Suite-wide rather than per-module, so a module that builds a gallery for
+    some other reason can never inherit a device grab and a speech-model
+    download from the one that does.
+
+    ``say`` simulates a heard-and-rewritten utterance steering a loop's prompt,
+    ``speak_command`` one the matcher recognizes, and ``speak`` one fed through
+    the real request dictation.
+    """
+
+    error = pyqtSignal(str)
+    heard = pyqtSignal(str)
+    edited = pyqtSignal(str)
+    request = pyqtSignal(object)
+
+    def __init__(self, *, command_matcher=None, dictation=None, transcribe_bias=None):
+        super().__init__()
+        self.started = False
+        self.stopped = False
+        self.commands_on = False
+        self._matcher = command_matcher
+        self._dictation = dictation
+        self._execute = None
+        self._set = None
+
+    def start(self, get_prompt, set_prompt):
+        self.started = True
+        self._set = set_prompt
+
+    def stop(self):
+        self.stopped = True
+
+    def start_commands(self, execute):
+        self.commands_on = True
+        self._execute = execute
+
+    def stop_commands(self):
+        self.commands_on = False
+        self._execute = None
+
+    def say(self, new_prompt):
+        self._set(new_prompt)
+
+    def speak_command(self, text):
+        """One spoken utterance while commands are armed: matched → executed."""
+        matched = self._matcher(text) if self.commands_on and self._matcher else None
+        if matched is not None:
+            self._execute(matched)
+        return matched
+
+    def speak(self, text):
+        """One utterance through the real dictation, as the mic would feed it:
+        part of a request is re-emitted, anything else falls through to the
+        command matcher exactly as the live steering routes it."""
+        spoken = self._dictation.push(text) if self._dictation is not None else None
+        if spoken is not None:
+            self.request.emit(spoken)
+            return spoken
+        return self.speak_command(text)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_mic(monkeypatch):
+    """Point every gallery's voice steering at the inert stand-in above."""
+    from origenerator.gui import gallery_view
+
+    monkeypatch.setattr(gallery_view, "VoiceSteering", FakeVoiceSteering)
 
 
 @pytest.fixture(autouse=True)

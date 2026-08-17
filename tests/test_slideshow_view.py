@@ -837,3 +837,62 @@ def test_stepping_re_aims_the_device(qtbot):
     view.media_changed.connect(lambda: changed.append(True))
     _press(view, Qt.Key.Key_Right)
     assert changed == [True]
+
+# --- the hold a spoken request puts on the show -----------------------------
+
+
+def test_a_request_holds_the_advance_and_says_so(qtbot):
+    view = _view(qtbot, _KEYED)
+    assert view._timer.isActive()  # an image, dwelling
+
+    view.hold_for_request(True, "🎤 Request: no hat…")
+
+    assert not view._timer.isActive()
+    assert view._playlist.paused
+    assert "Request" in view._note.text()
+
+
+def test_releasing_the_hold_resumes_the_dwell(qtbot):
+    view = _view(qtbot, _KEYED)
+    view.hold_for_request(True, "🎤 Request…")
+
+    view.hold_for_request(False)
+
+    assert view._timer.isActive()
+    assert not view._playlist.paused
+    assert view._note.isHidden()
+
+
+def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
+    # The point of the hold: the request is about this slide, so the show must
+    # not page on while the sentence is still being spoken.
+    view = _view(qtbot, _KEYED)
+    view.hold_for_request(True, "🎤 Request…")
+
+    view._on_video_ended()  # the clip on screen ran out mid-sentence
+
+    assert view.voice_request_target() == "id-a"
+
+
+def test_releasing_the_hold_leaves_a_locked_slide_locked(qtbot):
+    view = _view(qtbot, _KEYED)
+    view._hold_current()  # the user locked this one
+    view.hold_for_request(True, "🎤 Request…")
+
+    view.hold_for_request(False)
+
+    assert view._playlist.locked
+    assert not view._timer.isActive()  # still held — by the lock, now
+
+
+def test_a_request_targets_the_slide_on_screen(qtbot):
+    view = _view(qtbot, _KEYED)
+    assert view.voice_request_target() == "id-a"
+    _press(view, Qt.Key.Key_Right)
+    assert view.voice_request_target() == "id-b"
+
+
+def test_a_finished_request_answers_in_the_corner(qtbot):
+    view = _view(qtbot, _KEYED)
+    view.note_request("🎤 dropped “a hat” — generating")
+    assert "dropped" in view._note.text()

@@ -197,6 +197,10 @@ class GenerateConfigPanel(QWidget):
         # what the fold saved, so the closer the form got the further away they
         # went. Every gap in this column is the layout's spacing now, the same as
         # between the form's own sections.
+        # One tile, one place: the start frame for a video, and for something a
+        # spoken request made, the item it was asked about — the same kind of
+        # link (this came from that) in the same spot, rather than a second tile
+        # teaching the reader a second place to look.
         self._source_tile = SourceImageTile()
         self._source_tile.activated.connect(self.source_activated)
         body.addWidget(self._source_tile)
@@ -640,10 +644,12 @@ class GenerateConfigPanel(QWidget):
 
     # --- displaying a saved generation (the browsed selection) ----------------
 
-    def show_saved_generation(self, row: dict, image_rows: list[dict]):
+    def show_saved_generation(self, row: dict, image_rows: list[dict], request=None):
         """Display a browsed generation in this tab: seed the editable form with
         its settings, show its output in the preview, and reveal the info for its
-        media type (an image's animations, a video's source-image tile + Evolver).
+        media type (an image's animations, a video's source-image tile + Evolver)
+        and, when ``request`` says a spoken request made it, a link back to the
+        item it was asked about.
 
         The form is seeded first so its recent-preview autoshow doesn't override
         the selection's own output. A workflow the app can't rebuild leaves the
@@ -660,7 +666,7 @@ class GenerateConfigPanel(QWidget):
         # Prefill's autoshow just set _displayed_row to this tab's recent result; the
         # browsed selection is what's actually on display, so _display_result (below)
         # overrides it.
-        self._display_result(row, image_rows)
+        self._display_result(row, image_rows, request)
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         """Show a generation this tab's own Generate just produced: swap the live
@@ -674,7 +680,7 @@ class GenerateConfigPanel(QWidget):
         """
         self._display_result(row, image_rows)
 
-    def _display_result(self, row: dict, image_rows: list[dict]):
+    def _display_result(self, row: dict, image_rows: list[dict], request=None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
         generation, whether freshly browsed or just completed. The form is left
         untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
@@ -685,7 +691,7 @@ class GenerateConfigPanel(QWidget):
             self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
         else:
             self._preview.clear()
-        self._show_footer(row, image_rows, preview)
+        self._show_footer(row, image_rows, preview, request)
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
     def _hide_footer(self):
@@ -700,12 +706,16 @@ class GenerateConfigPanel(QWidget):
         self._folder_btn.hide()
         self._evolver_btn.hide()
 
-    def _show_footer(self, row: dict, image_rows: list[dict], preview):
+    def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the read-only
-        metadata block for every selection, the source-image tile + Evolver for a
-        video, and the animations strip for an image. ``preview`` is the already-
-        resolved ``(path, media_type)`` (or ``None``), so Evolver keys off the same
-        on-disk lookup."""
+        metadata block for every selection, the source tile + Evolver for a video,
+        and the animations strip for an image. ``preview`` is the already-resolved
+        ``(path, media_type)`` (or ``None``), so Evolver keys off the same on-disk
+        lookup.
+
+        ``request`` is the spoken request that made this row, when one did: it
+        marks the prompt fields with what it changed and points the source tile
+        at the item it was asked about."""
         # Only files no version claims are left for this block, which for an
         # image is usually none of them — so it shows only when it has content
         # rather than opening a bare gap above the form.
@@ -716,7 +726,8 @@ class GenerateConfigPanel(QWidget):
         # still here to look at; there is just nowhere to go.
         self._folder_btn.setVisible(row.get("deleted_at") is None)
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
-        self._show_source_tile(row, image_rows)
+        self._show_source_tile(row, image_rows, request)
+        self._show_request_diff(request)
         self._update_evolver_button(preview)
 
     def displayed_row(self) -> dict | None:
@@ -860,20 +871,52 @@ class GenerateConfigPanel(QWidget):
         if path.exists():
             self._preview.show_media(path, "image")
 
-    def _show_source_tile(self, row: dict, image_rows: list[dict]):
-        """Reveal the source-image tile when this row is a video built on a known
-        image generation, else hide it. The tile shows that image's thumbnail and
-        filename and navigates to it on click."""
+    def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
+        """Reveal the source tile for whatever this row was built from, else hide
+        it. The tile shows that item's thumbnail and filename and navigates to it
+        on click.
+
+        For a video that is its start frame. For something a spoken request made
+        it is the item the request was asked about — the same relation in the
+        same place, since a requested image has no start frame and a requested
+        video's start frame is the one it already had.
+        """
         source_id = find_source_image_id(row, image_rows)
         source_row = next(
             (r for r in image_rows if r.get("prompt_id") == source_id), None
         ) if source_id else None
-        if source_row is None:
+        heading = None
+        if source_row is None and request is not None:
+            source_row = request.get("source_row")
+            heading = "Requested from"
+        if not source_row:
             self._source_tile.clear()
             return
         files = row_output_files(source_row)
-        filename = files[0]["filename"] if files else ""
-        self._source_tile.show_source(source_id, source_row.get("thumbnail_path"), filename)
+        self._source_tile.show_source(
+            source_row["prompt_id"], source_row.get("thumbnail_path"),
+            files[0]["filename"] if files else "", heading=heading,
+        )
+
+    def _show_request_diff(self, request):
+        """Mark the prompt fields with what a spoken request changed — struck
+        through where words went, lit where they arrived.
+
+        In the fields themselves, because that is where the prompt is: a change
+        described anywhere else has to be carried back to the words it is about.
+        Nothing marked when this row wasn't asked for, so the fields clear as
+        the tab moves on to an ordinary generation.
+        """
+        if self._param_form is None:
+            return
+        self._param_form.clear_prompt_diffs()
+        if not request:
+            return
+        for key, before, after in (
+            ("positive_prompt", request.get("old_positive"), request.get("new_positive")),
+            ("negative_prompt", request.get("old_negative"), request.get("new_negative")),
+        ):
+            self._param_form.show_prompt_diff(key, before or "", after or "")
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image

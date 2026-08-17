@@ -1,9 +1,14 @@
-"""The image an image-to-video was built from, shown as a clickable thumbnail tile.
+"""The item a generation was built from, shown as a clickable thumbnail tile.
 
 In the info pane of a video generation: the source image's thumbnail with its
 filename centered beneath, styled like the gallery's other thumbnail tiles — a
 thin border and a media-type badge in the corner. Clicking anywhere emits
 ``activated`` with the source image's prompt_id, so the gallery navigates to it.
+
+Something a spoken request made borrows the same tile for the item it was
+revised from, which is why the heading and the badge's media type are settable:
+what a request came from may itself be a video, and it is "requested from"
+rather than a start frame.
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
@@ -30,17 +35,19 @@ class SourceImageTile(QWidget):
 
     activated = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, heading: str = "From source image",
+                 media_type: str = "image"):
         super().__init__(parent)
         self._prompt_id: str | None = None
+        self._default_heading = heading
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(4)
-        heading = QLabel("From source image")
-        heading.setStyleSheet("font-weight: 600;")
-        box.addWidget(heading)
+        self._heading = QLabel(heading)
+        self._heading.setStyleSheet("font-weight: 600;")
+        box.addWidget(self._heading)
 
         self._thumb = QLabel()
         self._thumb.setFixedSize(_THUMB, _THUMB)
@@ -49,8 +56,9 @@ class SourceImageTile(QWidget):
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: 3px;"
         )
         box.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
-        # A photo badge in the thumbnail's top-left corner, like the gallery tiles.
-        MediaBadge("image", self._thumb)
+        # A photo (or play) badge in the thumbnail's top-left corner, like the
+        # gallery tiles.
+        MediaBadge(media_type, self._thumb)
 
         self._filename = QLabel()
         self._filename.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
@@ -59,8 +67,13 @@ class SourceImageTile(QWidget):
 
         self.hide()
 
-    def show_source(self, prompt_id: str, thumbnail_path, filename: str):
+    def show_source(self, prompt_id: str, thumbnail_path, filename: str,
+                    heading: str | None = None):
+        """Point the tile at an item. ``heading`` names the relation when it
+        isn't the usual one — the same slot says "from source image" for a
+        video's start frame and "requested from" for what a request revised."""
         self._prompt_id = prompt_id
+        self._heading.setText(heading or self._default_heading)
         # A spaceless filename can't wrap, so middle-elide it to the tile width and
         # keep the full name in the tooltip.
         elided = self._filename.fontMetrics().elidedText(

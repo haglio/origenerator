@@ -154,6 +154,32 @@ def test_in_order_leaves_the_set_exactly_as_handed_over():
     playlist = _playlist(shuffle=in_order)
     assert playlist.order == [0, 1, 2]
 
+def test_a_paused_playlist_has_no_dwell_either():
+    # What a spoken request puts on the show while the sentence is being said.
+    playlist = _playlist()
+    playlist.set_paused(True)
+    assert playlist.dwell_ms() is None
+    assert playlist.holding()
+
+    playlist.set_paused(False)
+    assert playlist.dwell_ms() == playlist.image_dwell_ms
+
+
+def test_the_pause_and_the_lock_are_independent_holds():
+    # Releasing one must not release the other: a slide the user locked stays
+    # locked when a request ends, and stepping (which drops the lock) must not
+    # quietly resume a show that is still listening.
+    playlist = _playlist()
+    playlist.toggle_lock()
+    playlist.set_paused(True)
+
+    playlist.set_paused(False)
+    assert playlist.locked and playlist.holding()
+
+    playlist.set_paused(True)
+    playlist.unlock()
+    assert playlist.paused and playlist.holding()
+
 
 def test_remove_current_drops_the_item_and_advances():
     playlist = SlideshowPlaylist(

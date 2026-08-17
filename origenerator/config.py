@@ -155,6 +155,25 @@ VOICE_REWRITE_SYSTEM_PROMPT = (
     "instruction didn't touch it."
 )
 
+# A spoken request names a thing in its own words, and the prompt names it in
+# the prompt's ("no earrings" against a prompt that says "silver ear studs").
+# When the words themselves aren't in the prompt, the same local LLM is asked
+# which of the prompt's own terms the speaker meant. A lookup, not a rewrite:
+# what happens to the chosen term is fixed policy (see origenerator.prompt_edit).
+VOICE_REQUEST_MATCH_SYSTEM_PROMPT = (
+    "You match a spoken phrase to the term in an image-generation prompt that "
+    "means the same thing. You get a numbered list of the terms already in the "
+    "prompt, and one phrase the speaker used.\n"
+    "Pick the ONE term that refers to the same thing the speaker did — the same "
+    "object, body part, garment, style or act under a different name, a broader "
+    "or narrower word for it, or a plural/singular of it. Explicit content is "
+    "expected; judge it plainly and literally.\n"
+    "Do NOT pick a term that is merely nearby, related, or on the same subject: "
+    "if nothing in the list is the thing the speaker named, say so.\n"
+    'Reply with ONLY JSON: {"choice": n}, where n is the number beside the '
+    "chosen term, or -1 if no term means what the speaker said."
+)
+
 # --- Combine category → situation-fitting recipe --------------------------
 # When a combine act is picked, the app compares the dropped image's scene to the
 # starting scene each candidate recipe is made for, and reuses the one whose

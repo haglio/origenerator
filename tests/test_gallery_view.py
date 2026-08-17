@@ -479,7 +479,7 @@ def test_toc_filter_stays_applied_across_a_rebuild(qtbot):
 def test_toc_pane_holds_a_filter_field_above_the_tree(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    toc = view._panes.widget(0)
+    toc = view._folder_panes.widget(0)
     assert isinstance(view._filter_edit, QLineEdit)
     assert toc.isAncestorOf(view._filter_edit)
     # it leads the pane, above the folder tree it filters.
@@ -2568,15 +2568,25 @@ def test_gallery_creates_a_preview_widget(qtbot):
 def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    splitter = view._panes
 
-    # The three panes share one horizontal splitter, so the dividers drag-resize.
-    assert isinstance(splitter, QSplitter)
-    assert splitter.count() == 3                            # TOC, browser, info pane
-    assert not splitter.childrenCollapsible()               # none can be dragged shut
-    assert splitter.widget(0).isAncestorOf(view._tree)      # TOC pane holds the folder tree
-    assert splitter.widget(1).isAncestorOf(view._scroll)    # browser holds the contents
-    assert splitter.widget(2).isAncestorOf(view._preview)   # info pane holds the preview
+    # Every divider drag-resizes, and none of the panes can be dragged shut.
+    for splitter in (view._panes, view._folder_panes, view._left_column):
+        assert isinstance(splitter, QSplitter)
+        assert not splitter.childrenCollapsible()
+    # The TOC and browser panes sit side by side...
+    assert view._folder_panes.count() == 2
+    assert view._folder_panes.widget(0).isAncestorOf(view._tree)
+    assert view._folder_panes.widget(1).isAncestorOf(view._scroll)
+    # ...with the queue strip under both of them, and the info pane beside the
+    # whole column at full height — the strip is the folders' foot, not the
+    # window's.
+    assert view._left_column.count() == 2
+    assert view._left_column.widget(0) is view._folder_panes
+    assert view._left_column.widget(1) is view._queue
+    assert view._panes.count() == 2
+    assert view._panes.widget(0) is view._left_column
+    assert view._panes.widget(1).isAncestorOf(view._preview)
+    assert not view._panes.widget(1).isAncestorOf(view._queue)
 
 
 def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
@@ -2586,7 +2596,7 @@ def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     # the info pane readable without a sideways scrollbar. It's lower than it once
     # was so the whole window can still tile into a narrow monitor slot, but it
     # must never collapse to a cramped strip.
-    assert view._panes.widget(2).minimumWidth() >= 280
+    assert view._panes.widget(1).minimumWidth() >= 280
 
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
@@ -2600,7 +2610,7 @@ def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     assert isinstance(view._info_tabs, QTabWidget)
     # The pane is the tabs plus the find strip that searches them, so the splitter
     # holds a wrapper rather than the tab widget itself.
-    assert view._panes.widget(2).isAncestorOf(view._info_tabs)
+    assert view._panes.widget(1).isAncestorOf(view._info_tabs)
     assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
     assert view._info_tabs.widget(0).isAncestorOf(view._preview)
 
@@ -3821,6 +3831,38 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     assert client.submit_job.call_count == 2   # the next one was launched
     assert view._auto.is_active(key)
     assert key in view._reroll_jobs            # a fresh variation is running
+
+
+def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_path):
+    # One folder at a time: two loops would take turns on the machine, each
+    # waiting out the other's render, and the voice steering that follows the loop
+    # would have two prompts to answer to.
+    client = _reroll_client()
+    db = _seeded_db(tmp_path)
+    db.insert_generation(
+        prompt_id="other", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a dog", negative_prompt="", seed=9,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=9,
+                                    positive_prompt="a dog")),
+        workflow_json="{}",
+    )
+    db.update_generation("other", status="completed",
+                         output_files=json.dumps([{"filename": "b.png", "subfolder": ""}]))
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    settings = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    first = settings.child(0).data(0, _GROUP_ROLE).key
+    view._tree.setCurrentItem(settings.child(0))
+    view._toggle_auto(True)
+
+    view._tree.setCurrentItem(settings.child(1))
+    view._toggle_auto(True)
+    second = view._selected_folder_key()
+
+    assert view._auto.is_active(second)
+    assert not view._auto.is_active(first)
+    assert view._auto_btn.isChecked()  # the switch follows the folder in front
 
 
 def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):

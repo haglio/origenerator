@@ -77,7 +77,8 @@ def test_the_clock_reads_above_the_bar_it_measures(queue):
 
 def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
     # The live frame is what the left half is for, so it takes the biggest square
-    # the strip has room for — the strip's own height — right into its corner.
+    # the strip has room for — its height under the top rule — right into its
+    # corner.
     from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running")])
@@ -85,8 +86,41 @@ def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
     frame = queue.running_preview()._frame
     corner = frame.mapTo(queue, frame.rect().bottomLeft())
 
-    assert frame.width() == frame.height() == queue.height()
+    assert frame.width() == frame.height() == queue.height() - 1
     assert (corner.x(), corner.y()) == (0, queue.height() - 1)
+
+
+def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
+    # It is opened to read the queue, not to be shown one enormous frame: the
+    # thumbnail stops at the strip's own opening height and the rows take the rest.
+    from PyQt6.QtWidgets import QApplication
+
+    from origenerator.gui.generation_queue import _STRIP_HEIGHT
+
+    queue.set_items([_item(status="running")])
+    queue.resize(800, 400)
+    QApplication.processEvents()
+
+    assert queue.running_preview()._frame.height() == _STRIP_HEIGHT
+    assert queue._scroll.height() > _STRIP_HEIGHT
+
+
+def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
+    from origenerator.gui.generation_queue import _STRIP_HEIGHT
+
+    assert queue.minimumHeight() == _STRIP_HEIGHT
+    assert queue.maximumHeight() > _STRIP_HEIGHT  # not pinned to its opening height
+
+
+def test_the_strip_carries_its_own_top_rule(queue):
+    # A stylesheet border under a child's own background disappears into the flat
+    # color the app paints everything; this one is a widget of its own.
+    from PyQt6.QtWidgets import QFrame
+
+    rules = [w for w in queue.findChildren(QFrame)
+             if w.height() == 1 and w.parent() is queue]
+    assert len(rules) == 1
+    assert rules[0].y() == 0
 
 
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):

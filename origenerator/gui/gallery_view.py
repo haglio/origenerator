@@ -461,12 +461,26 @@ class GalleryView(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
 
-        # The three panes live in a splitter, so the divider between each doubles
+        # The three panes live in splitters, so the divider between each doubles
         # as a drag handle: the TOC pane (folder tree), the browser pane (a
         # folder's contents), and the info pane (preview + metadata).
+        #
+        # Nested rather than flat, because the queue strip belongs to the first
+        # two and not to the third: the tree and the browser sit side by side in
+        # _folder_panes, the strip goes under both of them in _left_column, and
+        # the info pane stands beside that whole column at full height. Its tabs
+        # are where the user reads and edits a generation, and a strip cutting
+        # across their foot would take that height for a queue they can already
+        # see next to it.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
+        self._folder_panes = QSplitter(Qt.Orientation.Horizontal)
+        self._folder_panes.setChildrenCollapsible(False)
+        self._folder_panes.setHandleWidth(6)
+        self._left_column = QSplitter(Qt.Orientation.Vertical)
+        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
+        self._left_column.setHandleWidth(6)
 
         # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
         # -> settings; a LoRA-less workflow collapses the LoRA level to one
@@ -524,7 +538,7 @@ class GalleryView(QWidget):
         self._combine.open_category_requested.connect(self._open_category)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
-        self._panes.addWidget(toc)
+        self._folder_panes.addWidget(toc)
 
         # Browser pane: a header (folder title, then a back/forward/undo toolbar)
         # over the flowing contents. Double-clicking the title renames the folder.
@@ -690,7 +704,20 @@ class GalleryView(QWidget):
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
         browser_box.addWidget(self._scroll, 1)
-        self._panes.addWidget(browser)
+        self._folder_panes.addWidget(browser)
+
+        # A strip under those two lists every generation in flight — the app hands
+        # ComfyUI one at a time, so a batch of Generates is a queue — reachable
+        # from any folder or config tab. Fed on every rebuild and poll; a row
+        # dragged to a new place asks the controller to re-line the queue. Its top
+        # edge is this column's splitter handle, so a long queue can be dragged
+        # open at the cost of the folder listing above it.
+        self._queue = GenerationQueue()
+        self._queue.reorder_requested.connect(self._reroll.reorder)
+        self._queue.clear_queue_requested.connect(self._clear_foreign_queue)
+        self._left_column.addWidget(self._folder_panes)
+        self._left_column.addWidget(self._queue)
+        self._panes.addWidget(self._left_column)
 
         # Info pane: a tabbed workspace of identical editable generate panels
         # (form + Generate). No special or permanent tab — the first opens on
@@ -777,20 +804,20 @@ class GalleryView(QWidget):
         browser.setMinimumWidth(210)
         self._info_tabs.setMinimumWidth(300)
         info_pane.setMinimumWidth(300)  # the pane in the splitter is the wrapper now
-        self._panes.setStretchFactor(0, 0)
-        self._panes.setStretchFactor(1, 3)
-        self._panes.setStretchFactor(2, 2)
-        self._panes.setSizes([220, 560, 440])
+        self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
+        self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
+        self._folder_panes.setSizes([220, 560])
+        # The strip opens at its own height and stays there: all the growth goes
+        # to the folders above it, so a taller window is more gallery rather than
+        # more queue.
+        self._left_column.setStretchFactor(0, 1)
+        self._left_column.setStretchFactor(1, 0)
+        self._left_column.setSizes([600, self._queue.minimumHeight()])
+        self._panes.setStretchFactor(0, 3)
+        self._panes.setStretchFactor(1, 2)
+        self._panes.setSizes([780, 440])
 
         layout.addWidget(self._panes, 1)
-        # A strip under the panes lists every generation in flight — ComfyUI runs
-        # them one at a time, so a batch of Generates is a queue — reachable from
-        # any folder or config tab. Fed on every rebuild and poll; a row dragged to
-        # a new place asks the controller to make ComfyUI run them in that order.
-        self._queue = GenerationQueue()
-        self._queue.reorder_requested.connect(self._reroll.reorder)
-        self._queue.clear_queue_requested.connect(self._clear_foreign_queue)
-        layout.addWidget(self._queue)
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
         """An icon-only button for the browser-pane header's bank. A

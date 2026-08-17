@@ -259,9 +259,12 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     assert db.get_generation("exp-1") is not None
 
 
-def test_opening_with_unreviewed_experiments_presents_the_shelf(qtbot, tmp_path):
-    # "What did it come up with while I was away?" — a launch with experiments
-    # waiting opens on the review shelf instead of the last-visited folder.
+def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp_path):
+    # Where the user left off is where the app reopens. Experiments waiting for
+    # review used to hijack the launch onto their shelf; the count on the shelf's
+    # row already says they're there, and it can be visited when the user wants it.
+    state = AppState(tmp_path / "ui.json")
+    state.set("gallery_folder", "__recents__")
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -271,28 +274,6 @@ def test_opening_with_unreviewed_experiments_presents_the_shelf(qtbot, tmp_path)
     db.update_generation(
         "exp-1", status="completed",
         output_files=json.dumps([{"filename": "exp.png", "subfolder": ""}]),
-    )
-    win = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
-    qtbot.addWidget(win)
-
-    view = win._gallery_view
-    view.refresh()
-    assert view._tree.currentItem() is view._experiments_item
-    assert view.visible_prompt_ids() == ["exp-1"]
-
-
-def test_opening_without_pending_experiments_keeps_the_saved_folder(qtbot, tmp_path):
-    state = AppState(tmp_path / "ui.json")
-    state.set("gallery_folder", "__recents__")
-    db = Database(tmp_path / "t.db")
-    db.insert_generation(
-        prompt_id="g-1", workflow_name="sdxl_t2i", workflow_version="v002",
-        params_json=json.dumps({"positive_prompt": "x", "seed": 1}),
-        workflow_json="{}",
-    )
-    db.update_generation(
-        "g-1", status="completed",
-        output_files=json.dumps([{"filename": "g.png", "subfolder": ""}]),
     )
     win = OrigeneratorWindow(ComfyUIClient(), db, state)
     qtbot.addWidget(win)

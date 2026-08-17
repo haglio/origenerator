@@ -1046,15 +1046,6 @@ class GalleryView(QWidget):
         """
         return [] if is_branch_session() else gallery.unreviewed_experiments(rows)
 
-    def present_pending_experiments(self):
-        """Open on the Experiments shelf when reviews are waiting — the launch-time
-        "here's what I came up with while you were away". A no-op with nothing to
-        review, leaving the saved folder restore in charge. Called once at startup,
-        before the first refresh builds the tree, so it steers the pending-folder
-        target the same way a saved session does."""
-        if self._review_queue(self._db.list_generations()):
-            self.select_folder(_EXPERIMENTS_KEY)
-
     def _sync_experiments_bar(self):
         """Say what the switch's current position means, under the switch."""
         if is_branch_session():

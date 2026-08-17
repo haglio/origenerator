@@ -70,7 +70,8 @@ class SlideshowView(QWidget):
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
-                 player=None, stroke=None, pace=None, parent=None):
+                 player=None, stroke=None, pace=None, on_drive_toggle=None,
+                 parent=None):
         super().__init__(parent)
         self._on_delete = on_delete
         # Holding a slide is also how you ask for it: Down enhances what is on
@@ -83,6 +84,9 @@ class SlideshowView(QWidget):
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         self._on_star = on_star
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
+        # Space goes to the gallery's one OSR2 switch rather than straight to
+        # the stroke: which source drives is that switch's call, not a key's.
+        self._on_drive_toggle = on_drive_toggle
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -605,7 +609,8 @@ class SlideshowView(QWidget):
             self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
-        elif apply_stroke_key(self._stroke, key):
+        elif apply_stroke_key(self._stroke, key,
+                              on_drive_toggle=self._on_drive_toggle):
             # Space belongs to the stroke cluster now, everywhere — locking the
             # slideshow is Down, matching the auto-generate view's lock.
             self._stroke_panel.refresh()

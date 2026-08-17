@@ -103,8 +103,10 @@ def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon
 
-    makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.delete_icon,
-              icons.clock_icon, icons.audio_icon, icons.osr2_icon,
+    makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
+              icons.delete_icon, icons.clock_icon, icons.audio_icon, icons.stroke_icon,
+              icons.autoloop_icon, icons.slideshow_icon, icons.enhance_icon,
+              icons.custom_folder_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
     for make in makers:
         icon = make()
@@ -113,6 +115,91 @@ def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
         size = QSize(24, 24)
         assert not icon.pixmap(size, QIcon.Mode.Normal).isNull()
         assert not icon.pixmap(size, QIcon.Mode.Disabled).isNull()
+
+
+def test_the_bank_glyphs_are_all_different_marks(qtbot):
+    from PyQt6.QtCore import QSize
+
+    # Icon-only buttons are only as good as the glyphs telling each other apart,
+    # and two of these were near-identical before: undo against auto-generate
+    # (both a circular arrow), and undo against the redo it now sits beside.
+    size = QSize(24, 24)
+    drawn = {
+        name: make().pixmap(size).toImage()
+        for name, make in (
+            ("back", icons.back_icon), ("forward", icons.forward_icon),
+            ("undo", icons.undo_icon), ("redo", icons.redo_icon),
+            ("auto", icons.autoloop_icon), ("slideshow", icons.slideshow_icon),
+            ("enhance", icons.enhance_icon), ("delete", icons.delete_icon),
+            ("audio", icons.audio_icon), ("osr2", icons.stroke_icon),
+            ("group", icons.custom_folder_icon),
+            ("star", lambda: icons.star_icon(filled=True)),
+        )
+    }
+    names = sorted(drawn)
+    for i, first in enumerate(names):
+        for second in names[i + 1:]:
+            assert drawn[first] != drawn[second], f"{first} and {second} draw alike"
+
+
+def test_undo_and_redo_carry_their_heads_on_opposite_sides(qtbot):
+    from PyQt6.QtCore import QSize
+
+    # The pair is one drawing mirrored, and the arrowhead is what the mirror
+    # moves: undo's fills the top-left, redo's the top-right. That difference has
+    # to be big — the small head this replaced left the two all but identical at
+    # button size — so each side carries at least half again the other's ink.
+    size = QSize(48, 48)
+    undo_left, undo_right = _top_corner_ink(icons.undo_icon().pixmap(size))
+    redo_left, redo_right = _top_corner_ink(icons.redo_icon().pixmap(size))
+    assert undo_left > undo_right * 1.5
+    assert redo_right > redo_left * 1.5
+
+
+def _top_corner_ink(pixmap) -> tuple[int, int]:
+    """How much is drawn in the glyph's top-left and top-right corners."""
+    image = pixmap.toImage()
+    half, third = image.width() // 2, image.height() // 3
+    left = right = 0
+    for y in range(third):
+        for x in range(image.width()):
+            if image.pixelColor(x, y).alpha() > 128:
+                if x < half:
+                    left += 1
+                else:
+                    right += 1
+    return left, right
+
+
+def test_the_bank_colors_its_act_on_this_trio(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+    from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED
+
+    # Star green, enhance yellow, delete red — the colors the corner badges wear,
+    # so a button and the mark it leaves on a tile are one symbol. And every one
+    # of them still dims to the same muted gray when it has nothing to act on, so
+    # a dead button never reads as a dimmer shade of its color.
+    size = QSize(48, 48)
+    for icon, color in ((icons.star_icon(filled=True), GREEN),
+                        (icons.enhance_icon(), AMBER),
+                        (icons.delete_icon(), RED)):
+        assert _dominant_color(icon.pixmap(size, QIcon.Mode.Normal)) == color.rgb()
+        muted = _dominant_color(icon.pixmap(size, QIcon.Mode.Disabled))
+        assert muted == TEXT_MUTED.rgb()
+
+
+def _dominant_color(pixmap) -> int:
+    """The most common fully-opaque pixel in a rendered glyph — its ink."""
+    from collections import Counter
+
+    image = pixmap.toImage()
+    counts = Counter(
+        image.pixel(x, y)
+        for y in range(image.height()) for x in range(image.width())
+        if image.pixelColor(x, y).alpha() == 255
+    )
+    return counts.most_common(1)[0][0]
 
 
 def test_experiment_icons_render_and_verdicts_differ(qtbot):

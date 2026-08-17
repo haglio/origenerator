@@ -56,7 +56,9 @@ class FakeActions:
         self.restored = []  # each entry is one restore_deleted call's ids
         self.purged = []    # each entry is one purge_deleted call's ids
         self.undo_count = 0
+        self.redo_count = 0
         self._label = None
+        self._redo_label = None
 
     def delete_rows(self, rows):
         self.deleted.append(list(rows))
@@ -80,13 +82,23 @@ class FakeActions:
 
     def undo(self):
         self.undo_count += 1
-        self._label = None
+        self._label, self._redo_label = None, self._label
 
     def can_undo(self):
         return self._label is not None
 
     def undo_label(self):
         return self._label
+
+    def redo(self):
+        self.redo_count += 1
+        self._label, self._redo_label = self._redo_label, None
+
+    def can_redo(self):
+        return self._redo_label is not None
+
+    def redo_label(self):
+        return self._redo_label
 
 
 @pytest.fixture(autouse=True)
@@ -2064,6 +2076,187 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     assert actions.deleted and {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
+# --- the bank's act-on-this trio: star and enhance aim where delete aims ------
+
+def test_star_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._thumbnail_clicked("i1")
+
+    assert view._star_btn.isEnabled()
+    assert view._star_btn.toolTip() == "Star 1 item"
+    view._star_btn.click()
+    assert db.get_generation("i1")["starred"]
+
+    # A second press is the other half of the one toggle.
+    view._thumbnail_clicked("i1")
+    assert view._star_btn.toolTip() == "Unstar 1 item"
+    view._star_btn.click()
+    assert not db.get_generation("i1")["starred"]
+
+
+def test_star_button_falls_back_to_the_folder_on_screen(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)                       # nothing picked inside it
+    assert view._star_btn.isEnabled()
+    assert "folder" in view._star_btn.toolTip()
+
+    view._star_btn.click()
+
+    key = view._selected_folder_key()
+    assert view._db.folder_meta_map()[key]["starred"]
+
+
+def test_star_button_is_dark_where_a_star_means_nothing(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)   # a shelf is nobody's folder
+    assert not view._star_btn.isEnabled()
+    assert view._star_btn.toolTip() == "Nothing here to star"
+
+
+def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    queued = []
+    view.enhance_items = queued.append
+
+    view._thumbnail_clicked("g0")
+    assert view._enhance_btn.toolTip().startswith("Enhance 1 item")
+    view._enhance_btn.click()
+
+    assert queued == [["g0"]]  # just the picked one, not the whole folder
+
+
+def _video_leaf(view):
+    """Open the settings folder under Videos, the deepest branch's only leaf."""
+    item = _top_level(view._tree)["Videos"]
+    while item.childCount():
+        item.setExpanded(True)
+        item = item.child(0)
+    view._tree.setCurrentItem(item)
+
+
+def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
+    # There is no video enhancer — the workflow behind all of this refines a
+    # still — so a picked video is nothing to run, not a run that fails.
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _video_leaf(view)
+    assert not view._enhance_btn.isEnabled()   # the folder holds only videos
+
+    view._thumbnail_clicked("v1")
+    assert not view._enhance_btn.isEnabled()
+    assert "no video enhancer" in view._enhance_btn.toolTip()
+
+
+def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _video_leaf(view)
+    assert not view._enhance_panel.isEnabled()
+    assert "no video enhancer" in view._enhance_panel.toolTip()
+
+    _select_first_leaf(view)   # back on images, and the knobs come back
+    assert view._enhance_panel.isEnabled()
+    assert view._enhance_panel.toolTip() == ""
+
+
+def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
+    # Pressing it would spend a generation arriving at the picture already
+    # sitting in the version list. Turning any knob makes it a different
+    # enhancement, and the button comes back — which is what tells the two
+    # reasons apart: "you have this one" rather than "not this image".
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    settings = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 2.0})
+    view.set_enhance_settings(settings.to_json())
+    _enhanced_in_place(db)
+    # The level records what the run actually used, as a landed enhance does —
+    # the source-matched model resolved to this image's own checkpoint.
+    db.update_generation("g0", enhance_history=json.dumps([
+        {"filename": "image_enhance_00001_.png",
+         "params": gallery.enhance_params_for(db.get_generation("g0"), settings)},
+    ]))
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._thumbnail_clicked("g0")
+    assert not view._enhance_btn.isEnabled()
+    assert "these settings" in view._enhance_btn.toolTip()
+
+    # The panel edited to something else: that enhancement doesn't exist yet.
+    view._on_enhance_settings_changed(
+        gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
+    assert view._enhance_btn.isEnabled()
+
+
+def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
+    # A folder can hold both; picking across them enhances what can be enhanced
+    # rather than going dark because one video is in the set.
+    db = FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._thumbnail_clicked("i1")
+    view._browser.selected_ids.add("v1")   # as a Ctrl-click across the two
+    view._sync_action_buttons()
+    queued = []
+    view.enhance_items = queued.append
+
+    assert view._enhance_btn.isEnabled()
+    assert view._enhance_panel.isEnabled()
+    view._enhance_btn.click()
+
+    assert queued == [["i1"]]
+
+
+def test_the_bank_groups_its_buttons_with_a_rule_between(qtbot):
+    # Icon-only buttons lean on their neighbors to be read, so the bank is laid
+    # out in groups: where you are, what you did, what you picked, what to do
+    # with what's in front of you, and what the app is doing on its own.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    groups = [buttons for _divider, buttons in view._toolbar_groups]
+    assert groups[0] == (view._back_btn, view._forward_btn)
+    assert groups[1] == (view._undo_btn, view._redo_btn)
+    assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
+    assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
+
+
+def test_a_group_with_nothing_showing_takes_no_rule(qtbot):
+    # Group, Auto and Slideshow come and go; the rules in front of them must go
+    # with them, or the bank wears a stray line (or two in a row) where a hidden
+    # group used to be.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view.show()
+    _select_first_leaf(view)
+
+    dividers = {id(divider): divider for divider, _ in view._toolbar_groups}
+    leading, group_rule = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
+    assert not leading.isVisible()          # nothing to divide from, at the front
+    assert view._group_btn.isHidden() and not group_rule.isVisible()
+    assert view._toolbar_groups[3][0].isVisible()  # the trio is always there
+    assert len(dividers) == len(view._toolbar_groups)
+
+
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     for pid, prompt, steps in (("a", "alpha", 10), ("b", "beta", 20)):  # two settings folders
@@ -3309,6 +3502,45 @@ def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
     view._undo_btn.click()
     assert actions.undo_count == 1
     assert not view._undo_btn.isEnabled()
+
+
+def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    assert not view._redo_btn.isEnabled()  # nothing undone, so nothing to redo
+    assert view._redo_btn.toolTip() == "Nothing to redo"
+
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+    view._undo_btn.click()
+
+    assert view._redo_btn.isEnabled()
+    assert "Delete" in view._redo_btn.toolTip()
+    view._redo_btn.click()
+    assert actions.redo_count == 1
+    assert not view._redo_btn.isEnabled() and view._undo_btn.isEnabled()
+
+
+def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    view._delete_selection()
+
+    ctrl = Qt.KeyboardModifier.ControlModifier
+    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z, ctrl))
+    assert (actions.undo_count, actions.redo_count) == (1, 0)
+
+    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z,
+                                     ctrl | Qt.KeyboardModifier.ShiftModifier))
+    assert (actions.undo_count, actions.redo_count) == (1, 1)
 
 
 def test_renaming_goes_through_the_undoable_actions(qtbot):
@@ -6073,16 +6305,21 @@ def _enhanceable_db(tmp_path, count=2):
     return db
 
 
-def test_enhance_all_button_shows_only_on_a_folder_awaiting_enhancement(qtbot, tmp_path):
+def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
+    # It keeps its place in the bank beside Star and Delete rather than coming
+    # and going — a button that vanishes is one you have to go looking for — and
+    # says in its tooltip what it would do here.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._enhance_all_btn.isHidden()   # a plain image awaits
+    assert not view._enhance_btn.isHidden()
+    assert view._enhance_btn.isEnabled()          # a plain image awaits
+    assert "1 not-yet-enhanced image" in view._enhance_btn.toolTip()
 
-    # Once a standalone enhance of that image exists, nothing awaits: the
-    # button retires from this folder.
+    # Once a standalone enhance of that image exists, nothing awaits: the button
+    # stays put and goes dark.
     db.insert_generation(
         prompt_id="e0", workflow_name="image_enhance", workflow_version="v001",
         params_json=json.dumps({"input_image": "image/sdxl_t2i_g0.png [output]"}),
@@ -6093,7 +6330,9 @@ def test_enhance_all_button_shows_only_on_a_folder_awaiting_enhancement(qtbot, t
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view._item_by_key[key])
-    assert view._enhance_all_btn.isHidden()
+    assert not view._enhance_btn.isHidden()
+    assert not view._enhance_btn.isEnabled()
+    assert view._enhance_btn.toolTip() == "Nothing here to enhance"
 
 
 def test_enhance_all_queues_every_member_image(qtbot, tmp_path):
@@ -6761,7 +7000,10 @@ def _aim_show(view, show, target):
 
 
 def _osr2_view(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    """A gallery with both drive sources stubbed: the funscript driver, and the
+    stroke the one switch falls back to when there is no script to follow."""
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(),
+                       osr2_stroke=_SignalStroke())
     qtbot.addWidget(view)
     driver = _FakeDriver()
     view._osr2_driver = driver
@@ -6779,12 +7021,44 @@ def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
     assert driver.stopped == 1
 
 
-def test_toggle_on_with_no_video_shown_drives_nothing(qtbot):
+def test_toggle_on_with_no_video_shown_strokes_instead(qtbot):
+    # "Genau mode when no funscript is going": with nothing scripted in front,
+    # the one switch drives the device from the app's own stroke rather than
+    # sitting armed and doing nothing.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
     view._osr2_btn.setChecked(True)
-    assert driver.started == []
+    assert driver.started == [] and view._osr2_stroke.active
+
+    view._osr2_btn.setChecked(False)
+    assert not view._osr2_stroke.active
+
+
+def test_space_flips_the_one_switch_rather_than_the_stroke_alone(qtbot, monkeypatch):
+    # Space is genau's "drives" key and the switch is the same control, so it has
+    # to reach the switch: routed to the stroke directly it would start a second
+    # source alongside a funscript the switch already had streaming.
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
+    view._osr2_btn.setChecked(True)
+    assert driver.started == [("pA", "aA")] and not view._osr2_stroke.active
+
+    space = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, _NO_MOD)
+    assert view.eventFilter(view, space) is True
+
+    assert not view._osr2_btn.isChecked()      # the switch went off, not the stroke
+    assert driver.stopped >= 1 and not view._osr2_stroke.active
+
+
+def test_a_show_gets_space_wired_to_the_switch(qtbot):
+    # Every surface that answers the stroke keys has to send Space to the one
+    # switch rather than to the stroke it was handed — the show as much as the
+    # main window, since a slideshow is where the device is usually driven from.
+    view, _driver, _panel = _osr2_view(qtbot)
+    show = _double_click_show(view, qtbot)
+    assert show._on_drive_toggle == view._toggle_osr2_drive
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
@@ -6919,6 +7193,13 @@ class _SignalStroke(QObject):
         self.active_changed.emit(self.active)
         return self.active
 
+    def start(self):
+        was_active = self.active
+        self.active = True
+        self.calls.append(("start",))
+        if not was_active:
+            self.active_changed.emit(True)
+
     def stop(self):
         was_active = self.active
         self.active = False
@@ -6976,14 +7257,24 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     win.close()
 
 
-def test_the_stroke_taking_the_device_stops_the_funscript_drive(qtbot, monkeypatch):
+def test_a_funscript_coming_into_view_takes_the_device_off_the_stroke(qtbot, monkeypatch):
+    # The one switch picks the source, and a script beats the stroke: turning it
+    # on over an image strokes, and browsing to a scripted video hands the device
+    # to the funscript rather than leaving both streaming at it.
     view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    stopped = []
-    monkeypatch.setattr(view._osr2_driver, "stop", lambda: stopped.append(True))
-    view._osr2_driving = ("clip.mp4", "player")  # as if a funscript drive were on
-    view._osr2_stroke.toggle()                   # the stroke takes the device
-    assert stopped == [True]                     # the funscript drive stood down
-    assert view._osr2_drive_source() is None     # and nothing may retake the device
+    driver = _FakeDriver()
+    view._osr2_driver = driver
+    panel = view._info_tabs.current_config_panel()
+    panel.osr2_drive_target = lambda: None
+
+    view._osr2_btn.setChecked(True)
+    assert view._osr2_stroke.active and driver.started == []
+
+    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
+    panel.displayed_changed.emit()
+
+    assert driver.started == [("pA", "aA")]
+    assert not view._osr2_stroke.active  # the stroke stood down for the script
 
 
 def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
@@ -6992,7 +7283,9 @@ def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
-    view._osr2_stroke.toggle()
+    # And its Space reaches the one switch, like every other surface's.
+    assert view._slideshow._on_drive_toggle == view._toggle_osr2_drive
+    view._osr2_btn.setChecked(True)
     view._slideshow.close()
     assert view._osr2_stroke.active
 
@@ -7003,7 +7296,8 @@ def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
     # outright, because which window Qt calls active is ambient in a test process
     # (a fullscreen view another test opened and closed can still hold it).
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    view._osr2_stroke.toggle()
+    view._osr2_btn.setChecked(True)
+    assert view._osr2_stroke.active
     assert view._handle_escape() is True
     assert not view._osr2_stroke.active
 

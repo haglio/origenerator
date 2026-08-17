@@ -188,6 +188,78 @@ def test_one_of_the_two_detectors_is_enough_to_offer_the_pass(qtbot):
     assert panel._detail_denoise.isEnabled()
 
 
+def _mean_ink(widget) -> float:
+    """How bright the widget draws over the app's own background, averaged over
+    every pixel — the one thing a "does it actually look disabled?" test can
+    measure without fonts.
+
+    Rendered onto a filled pixmap rather than grabbed: a bare ``grab`` leaves
+    whatever the widget doesn't paint uninitialized, and a switch that dims by
+    going translucent then measures as whatever happened to be behind it.
+    """
+    from PyQt6.QtGui import QPixmap
+    from PyQt6.QtWidgets import QWidget
+    from shared_ui.colors import BG_PRIMARY
+
+    pixmap = QPixmap(widget.size())
+    pixmap.fill(BG_PRIMARY)
+    widget.render(pixmap, QPoint(), flags=QWidget.RenderFlag.DrawChildren)
+    image = pixmap.toImage()
+    total = 0
+    for y in range(image.height()):
+        for x in range(image.width()):
+            color = image.pixelColor(x, y)
+            total += color.red() + color.green() + color.blue()
+    return total / max(1, image.width() * image.height() * 3)
+
+
+def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
+    # setEnabled alone changed nothing here: the app's sheet colors every label,
+    # picker and spin box outright and names no disabled state, so a panel that
+    # could not apply went on reading exactly as live as one that could.
+    panel, _ = _panel(qtbot)
+    panel.show_settings(EnhanceSettings(auto=True, params={}))
+    panel.resize(360, 150)
+    panel.show()
+    qtbot.waitExposed(panel)
+    live = _mean_ink(panel)
+
+    panel.set_applicable(False, "no video enhancer")
+
+    assert not panel.isEnabled()
+    assert panel.toolTip() == "no video enhancer"
+    assert _mean_ink(panel) < live      # visibly dimmer, not merely inert
+
+    panel.set_applicable(True)
+    assert panel.isEnabled() and panel.toolTip() == ""
+
+
+def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
+    # Switching the panel off and on again must not hand back a knob that was
+    # grayed in its own right: the pass still has no model to run.
+    panel, _ = _panel(qtbot, detectors=())
+    panel.set_applicable(False, "nope")
+    panel.set_applicable(True)
+    assert panel.isEnabled() and not panel._detail.isEnabled()
+
+
+def test_a_disabled_toggle_switch_dims(qtbot):
+    # It paints itself, so nothing else would have dimmed it — and a switch that
+    # still looks on inside a panel gone dark is the one thing that says the
+    # panel is still live.
+    on = ToggleSwitch()
+    qtbot.addWidget(on)
+    on.setChecked(True)
+    on.resize(40, 22)
+    off = ToggleSwitch()
+    qtbot.addWidget(off)
+    off.setChecked(True)
+    off.resize(40, 22)
+    off.setEnabled(False)
+
+    assert _mean_ink(off) < _mean_ink(on)
+
+
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
     # A folder configured against a checkpoint since removed must come back
     # reading as that checkpoint, not silently snap to whatever sorts first.

@@ -352,39 +352,6 @@ def test_queue_reads_on_the_poll_path_use_the_short_timeout():
         assert m.call_args.kwargs.get("timeout") == _POLL_TIMEOUT_S
 
 
-def test_queue_order_runs_what_is_executing_first_then_pending_by_number():
-    # A queue the user can read has to be in the order ComfyUI will actually work
-    # through it: what it's executing, then the pending ones by queue number —
-    # /queue hands those back heap-ordered, so list position says nothing.
-    client, urlopen = _queue_client({
-        "queue_running": [_entry(0, "executing", "ours-client")],
-        "queue_pending": [_entry(9, "third", "ours-client"),
-                          _entry(4, "second", "some-other-app")],
-    })
-    with urlopen:
-        assert client.queue_order() == ["executing", "second", "third"]
-
-
-def test_queue_order_is_empty_when_nothing_is_queued():
-    client, urlopen = _queue_client({"queue_running": [], "queue_pending": []})
-    with urlopen:
-        assert client.queue_order() == []
-
-
-def test_queue_order_keeps_unnumbered_entries_at_the_back():
-    # A malformed entry must not sort ahead of real ones or drop out of the list,
-    # however many of them arrive together.
-    client, urlopen = _queue_client({
-        "queue_running": [],
-        "queue_pending": [_entry("?", "unnumbered", "ours-client"),
-                          _entry(2, "numbered", "ours-client"),
-                          _entry(None, "also-unnumbered", "ours-client")],
-    })
-    with urlopen:
-        assert client.queue_order()[0] == "numbered"
-        assert set(client.queue_order()[1:]) == {"unnumbered", "also-unnumbered"}
-
-
 def test_parse_ws_executing_none_signals_completion():
     client = ComfyUIClient.__new__(ComfyUIClient)
     messages = []

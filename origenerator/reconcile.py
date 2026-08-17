@@ -1,8 +1,8 @@
 """Resolve generations left in flight by a previous session against ComfyUI.
 
-A job Origenerator launches keeps running inside ComfyUI after the app closes,
-so on the next launch each still-``running`` (or ``pending``) DB row is checked
-against the server it was submitted to — matched by the shared prompt_id — and:
+A job Origenerator hands ComfyUI keeps running there after the app closes, so on
+the next launch each still-``running`` DB row is checked against the server it
+was submitted to — matched by the shared prompt_id — and:
 
   - **finished while we were away** → finalized from ``/history`` (its outputs,
     thumbnail and duration), so it shows as a real result instead of a job stuck
@@ -35,17 +35,20 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-# Statuses a row can carry while its ComfyUI job is unfinished. ``pending`` is the
-# insert-time default that a crash can freeze a row at before it reaches ``running``.
-_IN_FLIGHT = ("running", "pending")
+# The status of a row whose prompt ComfyUI was given. A ``pending`` row is the
+# other kind of in-flight: one the queue was still holding when the app closed,
+# which the server has never heard of and cannot be asked about — the app takes
+# those back itself (see :meth:`RerollController.reconnect_running`), so checking
+# them here would only delete a queue the user is still waiting on.
+_SENT = ("running",)
 
 
 def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
-    """Reconcile every in-flight DB row against ``client`` (ComfyUI).
+    """Reconcile every submitted-and-unfinished DB row against ``client`` (ComfyUI).
 
     Returns a summary ``{"finalized": n, "running": n, "cleared": n}``.
     """
-    rows = [r for r in db.list_generations() if r.get("status") in _IN_FLIGHT]
+    rows = [r for r in db.list_generations() if r.get("status") in _SENT]
     summary = {"finalized": 0, "running": 0, "cleared": 0}
     if not rows:
         return summary

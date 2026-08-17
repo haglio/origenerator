@@ -117,11 +117,15 @@ class OrigeneratorWindow(QMainWindow):
             pass  # corrupt/hand-edited state — fall back to the default size
 
     def closeEvent(self, event):
-        """Hand ComfyUI the background experiments for the coming absence, then
-        persist the session (open config tabs, gallery folder/selection) and the
-        window geometry so the next launch reopens as it was."""
+        """Hand ComfyUI the background experiments for the coming absence and
+        everything else the queue is still holding, then persist the session (open
+        config tabs, gallery folder/selection) and the window geometry so the next
+        launch reopens as it was."""
         self._gallery_view.queue_experiments_for_absence()
         self._gallery_view.queue_base_renders_for_absence()
+        # Last, so the batches above go with it: the queue holds work back for the
+        # sake of somebody watching, and there is about to be nobody watching.
+        self._gallery_view.flush_queue_to_server()
         self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())

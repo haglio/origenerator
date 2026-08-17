@@ -19,7 +19,12 @@ It's fed the in-flight view-models the Recents shelf uses
 every poll so the frame and progress stay live; a refresh updates rows in place,
 so a drag is never yanked out from under the user. Reordering is asked for, not
 done here: :attr:`reorder_requested` carries the order the rows were dropped into,
-and whoever owns the jobs makes ComfyUI agree.
+and whoever owns the jobs re-lines the queue.
+
+A row the queue is deliberately holding — a video, while a slideshow plays — says
+so in place of its caption, and with nothing of ours running the left half says it
+for the whole line. A queue that has stopped moving with the GPU idle is exactly
+the thing a user goes hunting for an explanation of.
 """
 
 import time
@@ -33,7 +38,7 @@ from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
-    queue_wait_text,
+    held_row_text, queue_held_text, queue_wait_text,
 )
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import progress_time_label
@@ -220,9 +225,12 @@ class QueueRow(QWidget):
         """Re-render this row in place — a queued→running flip, a fresh caption,
         or an Auto toggle that changed what the button gets you."""
         self._item = item
-        # Another app's hold is the one wait worth naming; the user's own place in
-        # the line is the line itself.
-        self._caption.setText(queue_wait_text(item.foreign_ahead) or item.caption)
+        # Two waits are worth naming over the job's own name: one this queue is
+        # imposing (a video, while a slideshow plays), and another app's hold.
+        # The user's own place in the line is the line itself.
+        self._caption.setText(
+            held_row_text(item.held) or queue_wait_text(item.foreign_ahead) or item.caption
+        )
         self._caption.setToolTip(item.caption)
         self._cancel.setText(discard_run_text(item.auto_generating))
         self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
@@ -335,24 +343,31 @@ class GenerationQueue(QWidget):
     def set_items(self, items: list, foreign_queued: int = 0):
         """Show ``items`` — every in-flight generation, the one being made first.
 
-        The first also drives the live half. Rows already listed are refreshed in
-        place; only a change to the *set* of jobs (or their order) rebuilds the
-        list, so a poll landing mid-drag doesn't yank the row out from under the
-        gesture.
+        The first drives the live half unless the queue is holding it back: a job
+        that cannot start has no frame and no clock, so the half stays free to say
+        why instead of showing an empty square over an unmoving bar. Rows already
+        listed are refreshed in place; only a change to the *set* of jobs (or
+        their order) rebuilds the list, so a poll landing mid-drag doesn't yank the
+        row out from under the gesture.
 
         ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
-        It puts Clear up whenever there is any, and with nothing of ours in flight
+        It puts Clear up whenever there is any, and with nothing of ours running
         it is what the free half says — the point being to see that backlog before
-        a Generate goes in behind it.
+        a Generate goes in behind it — after the queue's own hold, which is nearer
+        to hand and is ended by closing the show.
         """
-        self._running.show_item(items[0] if items else None)
+        leader = items[0] if items and not items[0].held else None
+        self._running.show_item(leader)
         self._clear.setVisible(bool(foreign_queued))
         self._clear.setToolTip(
             f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"
             " another app has queued on ComfyUI"
         )
-        if not items:
-            self._running.show_foreign(foreign_queue_text(foreign_queued) or "")
+        if leader is None:
+            self._running.show_foreign(
+                queue_held_text(sum(1 for item in items if item.held))
+                or foreign_queue_text(foreign_queued) or ""
+            )
         if self.keys() != [item.key for item in items]:
             self._rebuild(items)
             return
@@ -366,9 +381,12 @@ class GenerationQueue(QWidget):
             self._rows_box.removeWidget(row)
             row.deleteLater()
         for index, item in enumerate(items):
-            # The head is what ComfyUI is already rendering: it cannot be moved,
-            # and nothing can be dropped in front of it.
-            self._rows_box.insertWidget(index, QueueRow(item, movable=index > 0))
+            # What ComfyUI is already rendering cannot be moved, and nothing can
+            # be dropped in front of it. Everything else is only waiting — held
+            # or not — and its place is the user's to change.
+            self._rows_box.insertWidget(
+                index, QueueRow(item, movable=item.status != "running")
+            )
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
@@ -378,14 +396,15 @@ class GenerationQueue(QWidget):
     def move_row(self, source: int, target: int):
         """Lift the row at ``source`` out and drop it back in at ``target``.
 
-        Re-lists them there and then — ComfyUI's agreement only shows up on a later
-        poll, and a row that springs back reads as a failure — then asks for that
-        order through :attr:`reorder_requested`. Neither end may be the head: what
-        is already rendering keeps the front of the line. A move that changes
-        nothing asks for nothing.
+        Re-lists them there and then — the queue's agreement only shows up on a
+        later poll, and a row that springs back reads as a failure — then asks for
+        that order through :attr:`reorder_requested`. Neither end may be a job
+        already being rendered: those keep the front of the line. A move that
+        changes nothing asks for nothing.
         """
         order = [item.key for item in self._items]
-        if not 1 <= source < len(order) or not 1 <= target < len(order):
+        first = self._first_movable()
+        if not first <= source < len(order) or not first <= target < len(order):
             return
         moved = list(self._items)
         moved.insert(target, moved.pop(source))
@@ -437,14 +456,22 @@ class GenerationQueue(QWidget):
             self._drop_at = index
             self.update()
 
+    def _first_movable(self) -> int:
+        """The first slot a row may be moved to or from — past whatever is already
+        being rendered, which nothing can be put in front of."""
+        for index, item in enumerate(self._items):
+            if item.status != "running":
+                return index
+        return len(self._items)
+
     def _drop_index(self, point) -> int:
         """Which slot a drop at ``point`` (in this widget's coordinates) lands in:
         above the row whose top half it fell on, else at the end of the line. Never
-        in front of the head, which is already being rendered."""
+        in front of a row already being rendered."""
         for index, row in enumerate(self.rows()):
             middle = row.mapTo(self, row.rect().center())
             if point.y() < middle.y():
-                return max(1, index)
+                return max(self._first_movable(), index)
         return len(self.rows())
 
     def paintEvent(self, event):

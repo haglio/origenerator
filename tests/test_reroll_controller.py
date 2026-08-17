@@ -133,7 +133,9 @@ def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
 
     assert again is True
     assert len(controller.all_jobs) == 2
-    assert client.submit_job.call_count == 2
+    # Both are queued; only the first has been handed to ComfyUI, which holds one
+    # prompt of ours at a time.
+    client.submit_job.assert_called_once()
 
 
 def test_the_folders_live_tile_still_follows_the_job_in_front(qtbot, tmp_path):
@@ -280,7 +282,8 @@ def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
     again = controller.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
 
     assert again is True
-    assert client.submit_job.call_count == 2
+    assert len(controller.all_jobs) == 2
+    client.submit_job.assert_called_once()  # the second waits its turn in the line
 
 
 # --- user work preempts background experiments --------------------------------
@@ -435,108 +438,308 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     assert job.last_progress == (30, 50)
 
 
-# --- the order ComfyUI will work through the queue in -------------------------
+# --- the line: what runs next, and what waits --------------------------------
+
+def _image_params(**over):
+    params = dict(WORKFLOW_REGISTRY[_IMAGE_WF].default_params())
+    params.update(over)
+    return params
+
+
+def _launch_image(controller, key, **over):
+    """Launch an image job — the kind that jumps the line — and return it."""
+    controller.start_prepared(key, WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(**over))
+    return controller.newest_job_for(key)
+
+
+def _launch_video(controller, key, **over):
+    controller.start_prepared(key, _I2V, _params(**over))
+    return controller.newest_job_for(key)
+
 
 def test_queue_order_starts_out_empty(qtbot, tmp_path):
     controller = RerollController(Database(tmp_path / "test.db"), _client())
     assert controller.queue_order == []
 
 
-def test_refresh_reads_the_order_from_comfyui(qtbot, tmp_path):
+def test_comfyui_is_handed_one_job_at_a_time(qtbot, tmp_path):
+    # The line is kept on this side of the wire precisely so it can still be
+    # re-ordered and gated: a prompt already on the server can only be interrupted.
     client = _client()
-    client.queue_order = MagicMock(return_value=["b", "a"])
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+
+    first = _launch_video(controller, "k1", seed=1)
+    second = _launch_video(controller, "k2", seed=2)
+
+    client.submit_job.assert_called_once()
+    assert db.get_generation(first.prompt_id)["status"] == "running"
+    assert db.get_generation(second.prompt_id)["status"] == "pending"
+    assert controller.queue_order == [first.prompt_id, second.prompt_id]
+
+
+def test_the_next_job_goes_the_moment_the_one_before_it_lands(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    first = _launch_video(controller, "k1", seed=1)
+    second = _launch_video(controller, "k2", seed=2)
+
+    first.finished.emit([{"filename": "out.mp4"}], None, 1.0)
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [
+        first.prompt_id, second.prompt_id
+    ]
+
+
+def test_a_cancelled_job_starts_the_next_one_rather_than_stalling(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    first = _launch_video(controller, "k1", seed=1)
+    second = _launch_video(controller, "k2", seed=2)
+
+    controller.cancel_job(first.prompt_id)
+
+    assert client.submit_job.call_args_list[-1].args[1] == second.prompt_id
+
+
+def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
+    # A queue stalled on a job ComfyUI won't take would strand everything behind
+    # it; the refused job fails and the line carries on.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    client.submit_job = MagicMock(side_effect=[RuntimeError("bad prompt"), "ok"])
+
+    _launch_video(controller, "k1", seed=1)           # refused, and dropped
+    second = _launch_video(controller, "k2", seed=2)  # takes its place
+
+    statuses = {row["prompt_id"]: row["status"] for row in db.list_generations()}
+    assert statuses.pop(second.prompt_id) == "running"
+    assert list(statuses.values()) == ["error"]
+
+
+def test_an_image_jumps_ahead_of_the_videos_waiting(qtbot, tmp_path):
+    # A picture is seconds of GPU and is usually the thing being waited for; a
+    # video queued earlier is a "later", and keeps its place behind it.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    running = _launch_video(controller, "v1", seed=1)
+    waiting = _launch_video(controller, "v2", seed=2)
+    image = _launch_image(controller, "i1")
+
+    assert controller.queue_order == [
+        running.prompt_id, image.prompt_id, waiting.prompt_id
+    ]
+
+
+def test_images_stack_newest_first(qtbot, tmp_path):
+    # The last picture asked for is the next one made: it was asked for while
+    # looking at the one before it, so it is the one being waited on.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    _launch_video(controller, "v", seed=1)  # takes the server, so both images wait
+    older = _launch_image(controller, "i1", seed=1)
+    newer = _launch_image(controller, "i2", seed=2)
+
+    assert controller.queue_order[1:] == [newer.prompt_id, older.prompt_id]
+
+
+def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, tmp_path):
+    # There can be a great many of them, and putting one in front of the user's
+    # own work would be the whole cost of the feature.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    _launch_video(controller, "v1", seed=1)   # on the server
+    user_video = _launch_video(controller, "v2", seed=2)
+    controller.start_prepared("e1", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
+                              source="experiment")
+
+    assert controller.queue_order[1] == user_video.prompt_id
+
+
+# --- the slideshow's gate: no video starts while a show plays -----------------
+
+def test_a_video_does_not_start_while_the_slideshow_plays(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.hold_videos(True)
+
+    video = _launch_video(controller, "v", seed=1)
+
+    client.submit_job.assert_not_called()
+    assert controller.held_jobs() == [video]
+
+
+def test_an_image_still_goes_while_the_slideshow_plays(qtbot, tmp_path):
+    # Only the GPU-hungry work is held: the enhancement asked for from the show
+    # itself is exactly what must still run.
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.hold_videos(True)
+
+    image = _launch_image(controller, "i")
+
+    client.submit_job.assert_called_once_with(image.payload, image.prompt_id)
+    assert controller.held_jobs() == []
+
+
+def test_a_held_video_is_passed_over_rather_than_blocking_the_line(qtbot, tmp_path):
+    # "Sent to the bottom": everything that can start goes first, and the videos
+    # keep the order they were asked in for when the show ends.
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.hold_videos(True)
+    video = _launch_video(controller, "v", seed=1)
+    behind = controller.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF],
+                                       _image_params(), source="experiment")
+
+    assert behind is True
+    client.submit_job.assert_called_once()  # the image behind it, not the video
+    assert controller.queue_order[-1] == video.prompt_id
+
+
+def test_closing_the_slideshow_starts_what_it_held(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.hold_videos(True)
+    video = _launch_video(controller, "v", seed=1)
+
+    controller.hold_videos(False)
+
+    client.submit_job.assert_called_once_with(video.payload, video.prompt_id)
+    assert controller.held_jobs() == []
+
+
+def test_a_video_already_being_rendered_is_left_alone(qtbot, tmp_path):
+    # Nothing is gained by interrupting one: ComfyUI cannot set a run down and
+    # pick it back up, so the minutes already spent would simply be thrown away.
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    video = _launch_video(controller, "v", seed=1)
+
+    controller.hold_videos(True)
+
+    client.interrupt.assert_not_called()
+    assert controller.queue_order == [video.prompt_id]
+
+
+# --- handing the line over as the app closes ---------------------------------
+
+def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
+    # There is about to be nobody watching, so every reason to hold work back is
+    # gone and the server can work through the rest alone.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.hold_videos(True)
+    first = _launch_video(controller, "v1", seed=1)
+    second = _launch_video(controller, "v2", seed=2)
+
+    assert controller.flush_to_server() == 2
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [
+        first.prompt_id, second.prompt_id
+    ]
+    assert db.get_generation(second.prompt_id)["status"] == "running"
+
+
+def test_flush_with_nothing_waiting_is_harmless(qtbot, tmp_path):
+    client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)
 
-    controller.refresh_queue_order()
+    assert controller.flush_to_server() == 0
+    client.submit_job.assert_not_called()
 
-    assert controller.queue_order == ["b", "a"]
+
+# --- taking a held queue back after a restart --------------------------------
+
+def _pending_row(db, prompt_id, workflow_name="wan22_i2v", params=None):
+    """A row the queue was still holding when the app closed."""
+    workflow = WORKFLOW_REGISTRY.get(workflow_name)
+    if params is None:
+        params = dict(workflow.default_params()) if workflow is not None else {}
+    db.insert_generation(prompt_id=prompt_id, workflow_name=workflow_name,
+                         workflow_version="v", positive_prompt="x", seed=1,
+                         params_json=json.dumps(params), workflow_json="{}")
 
 
-def test_an_unreadable_queue_leaves_the_last_known_order(qtbot, tmp_path):
-    # Dropping to no order at all would reshuffle the strip on screen every time
-    # ComfyUI hiccups; the order it last gave is still the best answer there is.
+def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path):
+    # A pending row was never submitted, so there is nothing on the server to
+    # rebind to — it rejoins the line under its own prompt id and waits its turn.
     client = _client()
-    client.queue_order = MagicMock(return_value=["b", "a"])
-    controller = RerollController(Database(tmp_path / "test.db"), client)
-    controller.refresh_queue_order()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.hold_videos(True)
+    _pending_row(db, "held-1")
+    _pending_row(db, "held-2")
 
-    client.queue_order = MagicMock(side_effect=OSError("connection refused"))
-    controller.refresh_queue_order()
+    controller.reconnect_running()
 
-    assert controller.queue_order == ["b", "a"]
+    client.submit_job.assert_not_called()
+    assert controller.queue_order == ["held-1", "held-2"]  # oldest first, as asked
 
 
-def test_refresh_without_a_client_is_harmless(qtbot, tmp_path):
-    controller = RerollController(Database(tmp_path / "test.db"), None)
-    controller.refresh_queue_order()
+def test_a_re_adopted_queue_starts_moving_again_at_once(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    _pending_row(db, "held-1")
+
+    controller.reconnect_running()
+
+    client.submit_job.assert_called_once()
+    assert db.get_generation("held-1")["status"] == "running"
+
+
+def test_a_held_row_whose_workflow_is_gone_is_dropped(qtbot, tmp_path):
+    # It could never be sent, and left in flight it would sit in the queue forever.
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, _client())
+    _pending_row(db, "orphan", workflow_name="a_workflow_that_left", params={})
+
+    controller.reconnect_running()
+
+    assert db.get_generation("orphan") is None
     assert controller.queue_order == []
 
 
-# --- reordering what ComfyUI has waiting --------------------------------------
+# --- reordering the line by hand ---------------------------------------------
 
-def _three_queued(tmp_path):
-    """A controller holding three queued jobs, and their prompt ids in queue order."""
+def test_reorder_rearranges_the_waiting_jobs(qtbot, tmp_path):
+    # A waiting job has never been sent, so its place is ours to change: no
+    # dequeue, no re-submit, nothing the server has to agree to.
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)
-    for i in range(3):
-        controller.start_prepared(f"k{i}", _I2V, _params(seed=i))
-    ids = [controller.job_for(f"k{i}").prompt_id for i in range(3)]
-    client.queue_order = MagicMock(return_value=list(ids))
-    client.cancel_prompt.reset_mock()
+    head = _launch_video(controller, "k0", seed=0)
+    second = _launch_video(controller, "k1", seed=1)
+    third = _launch_video(controller, "k2", seed=2)
     client.submit_job.reset_mock()
-    return controller, client, ids
 
+    controller.reorder([head.prompt_id, third.prompt_id, second.prompt_id])
 
-def test_reorder_requeues_only_from_where_the_order_first_differs(qtbot, tmp_path):
-    # Dragging the last job above the middle one leaves the head alone: requeuing
-    # a job that hasn't moved would push it behind another app's work for nothing.
-    controller, client, (a, b, c) = _three_queued(tmp_path)
-
-    controller.reorder([a, c, b])
-
-    assert [call.args[1] for call in client.submit_job.call_args_list] == [c, b]
-    assert [call.args[0] for call in client.cancel_prompt.call_args_list] == [c, b]
-
-
-def test_reorder_that_changes_nothing_touches_the_queue(qtbot, tmp_path):
-    controller, client, ids = _three_queued(tmp_path)
-
-    controller.reorder(list(ids))
-
-    client.cancel_prompt.assert_not_called()
+    assert controller.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
     client.submit_job.assert_not_called()
+    client.cancel_prompt.assert_not_called()
 
 
-def test_reorder_never_moves_the_job_comfyui_is_running(qtbot, tmp_path):
+def test_reorder_cannot_move_the_job_already_on_the_server(qtbot, tmp_path):
     # There is no place in front of what is executing, and dropping it would throw
     # the work away rather than reorder it.
-    controller, client, (a, b, c) = _three_queued(tmp_path)
-    client.progress.emit(a, 1, 10)  # ComfyUI started the head of the queue
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(controller, "k0", seed=0)
+    waiting = _launch_video(controller, "k1", seed=1)
 
-    controller.reorder([c, a, b])
+    controller.reorder([waiting.prompt_id, head.prompt_id])
 
-    assert a not in [call.args[1] for call in client.submit_job.call_args_list]
-
-
-def test_reorder_ignores_ids_this_app_holds_no_job_for(qtbot, tmp_path):
-    # Another app's prompts share the queue; nothing here can move them.
-    controller, client, (a, b, c) = _three_queued(tmp_path)
-
-    controller.reorder(["some-other-apps-prompt", c, b, a])
-
-    assert [call.args[1] for call in client.submit_job.call_args_list] == [c, b, a]
+    assert controller.queue_order == [head.prompt_id, waiting.prompt_id]
 
 
-def test_reorder_is_a_noop_when_the_queue_cannot_be_read(qtbot, tmp_path):
-    # Without knowing the order now, "from where it first differs" is unanswerable
-    # — better to leave the queue alone than reshuffle it on a guess.
-    controller, client, (a, b, c) = _three_queued(tmp_path)
-    client.queue_order = MagicMock(side_effect=OSError("connection refused"))
+def test_reorder_ignores_ids_this_app_holds_no_waiting_job_for(qtbot, tmp_path):
+    # Another app's prompts share the server; nothing here can move them.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    head = _launch_video(controller, "k0", seed=0)
+    second = _launch_video(controller, "k1", seed=1)
+    third = _launch_video(controller, "k2", seed=2)
 
-    controller.reorder([c, b, a])
+    controller.reorder(["some-other-apps-prompt", third.prompt_id, second.prompt_id])
 
-    client.cancel_prompt.assert_not_called()
-    client.submit_job.assert_not_called()
+    assert controller.queue_order == [head.prompt_id, third.prompt_id, second.prompt_id]
 
 
 def test_reorder_without_a_client_is_harmless(qtbot, tmp_path):

@@ -359,7 +359,7 @@ class BrowserPane:
                 card.update_item(item)
 
     def _inflight_items(self) -> list:
-        """Every queued/running generation as a card model, in the order ComfyUI
+        """Every queued/running generation as a card model, in the order the queue
         will work through them.
 
         The database's running/pending rows are the source of truth for what's in
@@ -369,15 +369,18 @@ class BrowserPane:
         session grafts on its live frame, progress, cancel and start time from its
         :class:`GenerationJob`; an untracked running row shows a plain card.
 
-        ComfyUI's own queue orders them, since a drag in the bottom strip moves
-        jobs there without touching anything the rows record. A job it hasn't
-        listed yet — submitted between polls — waits at the back rather than
-        jumping the queue on screen; with no order known at all (no client, or a
-        first poll still to come) they fall back to running-first, as they were.
+        The queue's own line orders them (:attr:`RerollController.queue_order`):
+        nothing a row records says whether an image jumped ahead of a video, or
+        whether a drag moved one. A row the line holds no job for — one a restart
+        hasn't re-adopted — sorts to the back rather than jumping the queue on
+        screen.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._v._reroll.jobs_by_folder.items()
                          for job in jobs}
+        # The jobs the queue is holding back rather than waiting on the GPU for,
+        # so a row can say why the line isn't moving.
+        held = {job.prompt_id for job in self._v._reroll.held_jobs()}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         items = []
@@ -413,6 +416,7 @@ class BrowserPane:
                 # discards this run and the loop launches another.
                 auto_generating=self._v._auto.is_active(folder_key),
                 foreign_ahead=foreign,
+                held=pid in held,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),
             ))

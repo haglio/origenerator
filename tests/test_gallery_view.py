@@ -2,6 +2,7 @@ import json
 import time
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -4227,6 +4228,24 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view._slideshow.close()
 
 
+def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
+    # A video generation saturates the card the show is being drawn with, and a
+    # show is exactly the stretch when nobody is waiting on a video.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    assert view._reroll.videos_held is True
+
+    view._slideshow.close()
+    assert view._reroll.videos_held is False  # closing lets the held ones run
+
+
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     # A folder gets its node the moment a generation starts, so this one has a
     # row and no picture. A button offering a show that opens nothing is worse
@@ -5503,9 +5522,14 @@ def test_inflight_running_cards_sort_before_queued(qtbot):
     assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
 
 
-def test_inflight_items_follow_the_order_comfyui_will_run_them_in(qtbot):
-    # A drag in the bottom strip moves jobs in ComfyUI without touching anything
-    # the database records, so the queue is ordered by what ComfyUI reports —
+def _queued_job(prompt_id):
+    """A stand-in for a job waiting in the queue's line, as the display reads it."""
+    return SimpleNamespace(prompt_id=prompt_id, media_type="image", source="generated")
+
+
+def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
+    # An image jumping ahead of a video, or a drag moving a row, leaves no mark on
+    # anything the rows record — so the strip is ordered by the queue's own line,
     # here the reverse of the order the rows were made in.
     db = FakeDB([
         _row("first", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
@@ -5515,15 +5539,15 @@ def test_inflight_items_follow_the_order_comfyui_will_run_them_in(qtbot):
     ])
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view._reroll._queue_order = ["second", "first"]
+    view._reroll._waiting = [_queued_job("second"), _queued_job("first")]
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["second", "first"]
 
 
-def test_a_job_comfyui_has_not_listed_yet_sorts_to_the_back(qtbot):
-    # A prompt submitted between polls isn't in the order yet; it waits at the end
-    # rather than jumping the queue on screen.
+def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
+    # A row a restart hasn't re-adopted has no place in the line; it waits at the
+    # end rather than jumping the queue on screen.
     db = FakeDB([
         _row("known", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
              status="pending", output_files="[]"),
@@ -5532,7 +5556,7 @@ def test_a_job_comfyui_has_not_listed_yet_sorts_to_the_back(qtbot):
     ])
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view._reroll._queue_order = ["known"]
+    view._reroll._waiting = [_queued_job("known")]
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["known", "brand-new"]
@@ -5572,7 +5596,7 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
     assert view._queue.keys() == ["running-one", "waiting-one"]
 
 
-def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
+def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
     from unittest.mock import patch
 
     from origenerator.gui.reroll_controller import RerollController
@@ -5587,7 +5611,8 @@ def test_dragging_a_queue_row_asks_comfyui_for_that_order(qtbot):
     with patch.object(RerollController, "reorder") as reorder:
         view = GalleryView(db)
         qtbot.addWidget(view)
-        view._reroll._queue_order = ["running-one", "w1", "w2"]
+        view._reroll._on_server = [_queued_job("running-one")]
+        view._reroll._waiting = [_queued_job("w1"), _queued_job("w2")]
         view.refresh()
 
         view._queue.move_row(2, 1)
@@ -6780,7 +6805,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     tiles = view._browser._thumb_widgets
     assert tiles["g0"].is_enhancing() and tiles["g1"].is_enhancing()
     assert not tiles["g0"]._image_label.pixmap().isNull()
-    assert follower.state == "queued"
+    assert follower.state == "idle"  # still waiting in the line, never sent
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
 
 

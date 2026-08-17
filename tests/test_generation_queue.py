@@ -16,11 +16,11 @@ def queue(qtbot):
 
 
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None,
+          progress=None, reveal=None, cancel=None, foreign_ahead=None, held=False,
           started_at=None, typical_seconds=None, auto_generating=False):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
-                        foreign_ahead=foreign_ahead, started_at=started_at,
+                        foreign_ahead=foreign_ahead, held=held, started_at=started_at,
                         typical_seconds=typical_seconds, auto_generating=auto_generating)
 
 
@@ -234,6 +234,37 @@ def test_the_users_own_queue_needs_no_explaining(queue):
     assert [row.caption() for row in queue.rows()] == ["one", "two"]
 
 
+# --- a queue holding work back for a slideshow --------------------------------
+
+def test_a_held_row_says_what_it_is_waiting_on(queue):
+    # A line that stops moving with the GPU idle is a mystery worth ending, and
+    # this one ends by closing the show.
+    queue.set_items([_item(status="queued", held=True)])
+    assert queue.rows()[0].caption() == "Held until the slideshow closes"
+
+
+def test_the_free_half_says_the_hold_when_nothing_of_ours_runs(queue):
+    queue.set_items([_item(key="a", status="queued", held=True),
+                     _item(key="b", status="queued", held=True)])
+
+    assert queue.running_preview().key is None  # a held job has no frame to show
+    assert _timing(queue) == "2 videos held until the slideshow closes"
+
+
+def test_the_hold_is_said_before_another_apps_backlog(queue):
+    # Both are reasons the machine isn't ours, but only one of them ends by
+    # closing something in this window.
+    queue.set_items([_item(status="queued", held=True)], foreign_queued=2)
+    assert _timing(queue) == "1 video held until the slideshow closes"
+
+
+def test_a_running_job_still_takes_the_half_while_others_are_held(queue):
+    queue.set_items([_item(key="a", status="running", started_at=time.time() - 5.5),
+                     _item(key="b", status="queued", held=True)])
+    assert queue.running_preview().key == "a"
+    assert "elapsed" in _timing(queue)
+
+
 # --- how long it's been, and how long is left ---------------------------------
 
 def _timing(queue) -> str:
@@ -361,6 +392,17 @@ def test_the_job_being_made_cannot_be_picked_up(queue, monkeypatch):
     _four(queue)
     assert queue.rows()[0].movable is False
     assert _press_and_drag(queue.rows()[0], monkeypatch) == []
+
+
+def test_the_head_of_a_queue_with_nothing_running_can_be_moved(queue, monkeypatch):
+    # It is only what is being *rendered* that is fixed. A queue held for a
+    # slideshow has nothing rendering, and the user may still put it in the order
+    # they want it run in.
+    queue.set_items([_item(key="a", status="queued", held=True),
+                     _item(key="b", status="queued", held=True)])
+
+    assert queue.rows()[0].movable is True
+    assert _press_and_drag(queue.rows()[0], monkeypatch) == ["a"]
 
 
 def test_a_press_that_stays_put_is_a_click_not_a_drag(queue, monkeypatch):

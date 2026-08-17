@@ -31,6 +31,7 @@ class InFlightItem:
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
+    held: bool = False           # the queue is holding it back (a video, during a slideshow)
     # The two halves of the countdown on the job being rendered: when ComfyUI
     # began executing it (None while it's still queued), and what this workflow's
     # recent runs say a whole one takes.
@@ -71,6 +72,24 @@ def queue_wait_text(foreign_ahead: int | None) -> str | None:
     if not foreign_ahead:
         return None
     return f"Waiting behind {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
+
+
+def queue_held_text(held: int | None) -> str | None:
+    """What a queue holding videos back for a slideshow reads like.
+
+    A line that stops moving with the GPU idle is the same mystery as a wait
+    behind another app's work, and worse for being this app's own doing — so the
+    strip says it outright, and says what ends it. ``None`` when the gate is
+    holding nothing, which is every moment no slideshow is playing.
+    """
+    if not held:
+        return None
+    return (f"{held} video{'' if held == 1 else 's'} held until the slideshow closes")
+
+
+def held_row_text(held: bool) -> str | None:
+    """The same thing said in one queue row's width, or ``None`` if it can start."""
+    return "Held until the slideshow closes" if held else None
 
 
 def foreign_queue_text(total: int | None) -> str | None:

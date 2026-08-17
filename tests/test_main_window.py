@@ -483,6 +483,19 @@ def test_default_window_is_not_maximized(qtbot, tmp_path):
     assert not win.isMaximized()
 
 
+def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
+    # The queue holds work back for the sake of somebody watching, and closing the
+    # app ends every one of those reasons: ComfyUI outlives it and works through
+    # the rest alone.
+    from unittest.mock import patch
+
+    win = _window(qtbot, tmp_path)
+    with patch.object(type(win._gallery_view._reroll), "flush_to_server") as flush:
+        win.close()
+
+    flush.assert_called_once_with()
+
+
 def test_close_event_persists_window_geometry(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))

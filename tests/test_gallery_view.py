@@ -18,7 +18,11 @@ from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
+from origenerator.gui import diff_text
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.request_worker import RevisionWorker
+from origenerator.prompt_edit import apply_request
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.media_badge import MediaBadge
@@ -26,6 +30,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.voice.dictation import RequestDictation
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from origenerator.stroke_engine import Stroke
@@ -113,57 +118,6 @@ def _stub_preview_resolution(monkeypatch):
     monkeypatch.setattr(gallery, "resolve_preview", lambda row, output_dir: None)
 
 
-class _FakeVoiceSteering(QObject):
-    """Stands in for VoiceSteering so gallery tests never open a real microphone;
-    ``say`` simulates a heard-and-rewritten utterance steering the loop's prompt,
-    ``speak_command`` one the matcher recognizes while a surface is listening."""
-
-    error = pyqtSignal(str)
-    heard = pyqtSignal(str)
-    edited = pyqtSignal(str)
-
-    def __init__(self, *, command_matcher=None, transcribe_bias=None):
-        super().__init__()
-        self.started = False
-        self.stopped = False
-        self.commands_on = False
-        self._matcher = command_matcher
-        self._execute = None
-        self._set = None
-
-    def start(self, get_prompt, set_prompt):
-        self.started = True
-        self._set = set_prompt
-
-    def stop(self):
-        self.stopped = True
-
-    def start_commands(self, execute):
-        self.commands_on = True
-        self._execute = execute
-
-    def stop_commands(self):
-        self.commands_on = False
-        self._execute = None
-
-    def say(self, new_prompt):
-        self._set(new_prompt)
-
-    def speak_command(self, text):
-        """One spoken utterance while commands are armed: matched → executed."""
-        matched = self._matcher(text) if self.commands_on and self._matcher else None
-        if matched is not None:
-            self._execute(matched)
-        return matched
-
-
-@pytest.fixture(autouse=True)
-def _no_real_mic(monkeypatch):
-    """Default every GalleryView's voice steering to the inert fake above, so
-    toggling Auto in a test never opens the microphone."""
-    monkeypatch.setattr(gallery_view_module, "VoiceSteering", _FakeVoiceSteering)
-
-
 class FakeDB:
     """In-memory stand-in for Database covering the methods the view calls."""
 
@@ -174,6 +128,7 @@ class FakeDB:
         self._custom = {}       # folder id -> {"name", "members": {key: (level, ref)}}
         self._next_custom = 1
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
+        self._requests = {}     # prompt_id -> its spoken-request record, newest last
 
     def list_generations(self):
         return list(self._rows)
@@ -243,6 +198,22 @@ class FakeDB:
 
     def forget_deletion(self, prompt_id):
         self._deletions.pop(prompt_id, None)
+
+    # --- spoken requests (what the Requests shelf lists) -------------------
+
+    def record_request(self, *, prompt_id, source_prompt_id, heard, **fields):
+        self._requests[prompt_id] = {
+            "prompt_id": prompt_id, "source_prompt_id": source_prompt_id,
+            "heard": heard, "term": None, "polarity": None, "action": None,
+            "old_positive": "", "old_negative": "",
+            "new_positive": "", "new_negative": "", **fields,
+        }
+
+    def list_requests(self):
+        return list(reversed(self._requests.values()))  # newest first
+
+    def get_request(self, prompt_id):
+        return self._requests.get(prompt_id)
 
     # --- custom folders (the groupings the user composes) ------------------
 
@@ -337,7 +308,8 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"Recents", "Starred", "Experiments", "Trash", "Images", "Videos"}
+    assert set(top) == {"Recents", "Starred", "Experiments", "Requests", "Trash",
+                        "Images", "Videos"}
 
     workflow_node = top["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
@@ -1879,14 +1851,15 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments", "Trash", "Images"}
+    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments",
+                                           "Requests", "Trash", "Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
     assert set(_top_level(view._tree)) == {
-        "Recents", "Starred", "Experiments", "Trash", "Images", "Videos"}
+        "Recents", "Starred", "Experiments", "Requests", "Trash", "Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):
@@ -7143,6 +7116,17 @@ def _aim_show(view, show, target):
     show.osr2_drive_target = lambda: target
     view._reconcile_osr2()
 
+    # --- what the gallery says to whichever surface is up ------------------
+
+    def isActiveWindow(self):
+        return True
+
+    def note_request(self, message):
+        self.notes.append(message)
+
+    def hold_for_request(self, holding, note=""):
+        self.holds.append((holding, note))
+
 
 def _osr2_view(qtbot):
     """A gallery with both drive sources stubbed: the funscript driver, and the
@@ -8374,3 +8358,261 @@ def test_a_loop_ending_leaves_the_commands_listening(qtbot, tmp_path, monkeypatc
     view._on_auto_stopped("some-other-folder")  # a loop elsewhere ended
 
     assert view._voice.commands_on  # the button says listen, so it listens
+# --- spoken requests: "Request … over" over what's on screen -----------------
+
+
+def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
+    """A DB holding one finished, re-rollable SDXL image — what a spoken request
+    is made about. Fabricated prompt text, like every fixture here."""
+    db = Database(tmp_path / "test.db")
+    params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
+                  negative_prompt="blurry")
+    db.insert_generation(
+        prompt_id="orig", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt=prompt, negative_prompt="blurry", seed=7,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("orig", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_t2i_orig.png", "subfolder": "image", "type": "output"}]))
+    return db
+
+
+def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("orig.png", "image"))
+    view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
+    qtbot.addWidget(view)
+    # The words alone, with no smart matcher: these cover the policy and the
+    # plumbing, and a matcher would put a local LLM in the middle of both.
+    view._revision = RevisionWorker(apply_request, parent=view)
+    view._revision.revised.connect(view._on_request_revised)
+    view._mic_btn.setChecked(True)  # the switch, as the user flips it
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    return view
+
+
+def _speak_request(view, qtbot, *utterances):
+    """Say a request and wait for the app to have answered it — the revision is
+    worked out off the UI thread, so the answer arrives a hop later."""
+    for text in utterances:
+        view._voice.speak(text)
+    qtbot.waitUntil(
+        lambda: "working out" not in view._slideshow._note.text(), timeout=3000
+    )
+
+
+def _finish_reroll(view, job):
+    """Land a launched job, so what it made is a finished item like any other."""
+    view._client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    view.refresh()
+
+
+def test_the_tree_carries_a_requests_shelf(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert "Requests" in _top_level(view._tree)
+
+
+def test_saying_request_holds_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    view._voice.speak("Request.")
+    assert view._slideshow._playlist.paused
+    assert "Request" in view._slideshow._note.text()
+
+    view._voice.speak("no hat. Over.")
+    assert not view._slideshow._playlist.paused
+
+
+def test_a_finished_request_queues_the_revision_with_the_same_seed(
+        qtbot, tmp_path, monkeypatch):
+    # "the same picture but without X" means the picture, so the one thing not
+    # re-rolled is the seed that draws it.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["seed"] == 7
+    assert job.params["positive_prompt"] == "a woman, soft light"
+    assert job.params["negative_prompt"] == "blurry"
+
+
+def test_a_request_for_something_absent_goes_to_the_negative_prompt(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt="a woman, soft light")
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["negative_prompt"] == "blurry, hat"
+
+
+def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    (job,) = view._reroll_jobs.values()
+    record = view._db.get_request(job.prompt_id)
+    assert record["source_prompt_id"] == "orig"
+    assert record["heard"] == "Request, no hat, over."
+    assert record["old_positive"] == "a woman, a hat, soft light"
+    assert record["new_positive"] == "a woman, soft light"
+
+
+def test_the_request_lands_on_the_slide_it_was_opened_over(
+        qtbot, tmp_path, monkeypatch):
+    # The words take seconds; the show holds, but the target is taken when the
+    # request opens rather than when it runs out.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._voice.speak("Request.")
+
+    view._slideshow._playlist.add(("other.png", "image", "elsewhere", None))
+    view._slideshow._advance()  # something else is on screen now
+    _speak_request(view, qtbot, "no hat. Over.")
+
+    (job,) = view._reroll_jobs.values()
+    assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
+
+
+def test_the_requests_shelf_lists_what_was_asked_for_as_ordinary_tiles(
+        qtbot, tmp_path, monkeypatch):
+    # An item a request made is an ordinary generation that happens to have been
+    # asked for out loud, so it gets the tile every other shelf gives one.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    view._slideshow.close()
+    (job,) = view._reroll_jobs.values()
+    _finish_reroll(view, job)
+
+    view._tree.setCurrentItem(view._requests_item)
+
+    assert view.visible_prompt_ids() == [job.prompt_id]
+    assert view._scroll.widget().findChildren(ThumbnailWidget)
+
+
+def test_a_request_still_generating_shows_as_a_live_card(
+        qtbot, tmp_path, monkeypatch):
+    # What "did it queue?" is answered by: the same in-flight card the Recents
+    # shelf gives work that is still cooking.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    view._slideshow.close()
+
+    view._tree.setCurrentItem(view._requests_item)
+
+    assert view._scroll.widget().findChildren(InFlightCard)
+
+
+def test_the_shelf_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request, no hat, over.")
+
+    assert "Requests (1)" in _top_level(view._tree)
+
+
+def test_a_request_that_never_hears_over_says_so_and_resumes(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._voice._dictation = RequestDictation(max_utterances=2)
+
+    view._voice.speak("Request.")
+    view._voice.speak("no hat")
+
+    assert not view._slideshow._playlist.paused
+    assert "never heard" in view._slideshow._note.text()
+    assert view._reroll_jobs == {}
+
+
+def test_a_request_naming_nothing_is_answered_not_generated(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    _speak_request(view, qtbot, "Request. Over.")
+
+    assert view._reroll_jobs == {}
+    assert "didn't catch" in view._slideshow._note.text()
+
+
+def test_the_words_of_a_request_never_reach_the_fix_matcher(
+        qtbot, tmp_path, monkeypatch):
+    # An open request swallows what it hears; "fix teeth" said inside one is
+    # part of the sentence, not a command.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._voice.speak("Request.")
+
+    view._voice.speak("fix teeth")
+
+    assert view._reroll_jobs == {}  # no enhance launched
+
+
+def test_a_request_item_links_back_to_what_it_was_asked_about(
+        qtbot, tmp_path, monkeypatch):
+    # In the source tile, the same slot an image-to-video's start frame uses.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    view._slideshow.close()
+    (job,) = view._reroll_jobs.values()
+    _finish_reroll(view, job)
+
+    view._on_thumbnail_clicked(job.prompt_id)
+
+    panel = view._info_tabs.current_config_panel()
+    assert not panel._source_tile.isHidden()
+    assert panel._source_tile._prompt_id == "orig"
+
+
+def test_a_request_item_marks_its_change_in_the_prompt_field(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    _speak_request(view, qtbot, "Request, no hat, over.")
+    view._slideshow.close()
+    (job,) = view._reroll_jobs.values()
+    _finish_reroll(view, job)
+
+    view._on_thumbnail_clicked(job.prompt_id)
+
+    field = view._info_tabs.current_config_panel()._param_form._widgets["positive_prompt"]
+    # The field shows what went as well as what stayed…
+    assert "a hat" in field.toPlainText()
+    # …while its value is the prompt that would actually generate.
+    assert diff_text.live_text(field) == "a woman, soft light"
+
+
+def test_what_the_microphone_heard_reaches_the_slideshow(
+        qtbot, tmp_path, monkeypatch):
+    # From a slideshow this window is invisible, so a mic that heard nothing and
+    # one that heard the wrong words used to look exactly alike.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    view._voice.heard.emit("something off the mic")
+
+    assert "something off the mic" in view._slideshow._note.text()
+
+
+def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    view._voice.error.emit("mic unavailable — No module named 'sounddevice'")
+
+    assert "mic unavailable" in view._slideshow._note.text()
+
+
+def test_the_slideshow_shows_the_request_as_it_is_being_said(
+        qtbot, tmp_path, monkeypatch):
+    # What was missing when a spoken request looked like nothing happening.
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+
+    view._voice.speak("Request.")
+    assert "Request" in view._slideshow._note.text()
+
+    view._voice.speak("no hat")
+    assert "no hat" in view._slideshow._note.text()

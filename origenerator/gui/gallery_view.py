@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+from functools import partial
 
 from PyQt6.QtWidgets import (
     QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel,
@@ -8,15 +9,16 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
-from PyQt6.QtCore import Qt, QEvent, QTimer, QPoint, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize, pyqtSignal
 
-from origenerator import gallery, recipe_match, recovery, timing
+from origenerator import gallery, prompt_edit, recipe_match, recovery, timing
 from origenerator.gui import icons
 from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
     AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
+    VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
@@ -36,8 +38,11 @@ from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
+from origenerator.gui.request_worker import RevisionWorker, ReviseTask
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, in_order
+from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
 from origenerator.voice.show_commands import (
     ShowCommand, match_show_command, show_command_bias,
 )
@@ -62,6 +67,8 @@ from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
     RECENTS_KEY as _RECENTS_KEY,
     RECENTS_LABEL as _RECENTS_LABEL,
+    REQUESTS_KEY as _REQUESTS_KEY,
+    REQUESTS_LABEL as _REQUESTS_LABEL,
     STARRED_KEY as _STARRED_KEY,
     STARRED_LABEL as _STARRED_LABEL,
     TRASH_KEY as _TRASH_KEY,
@@ -90,7 +97,8 @@ _ALREADY_AT_THESE_SETTINGS = (
 # The synthetic shelves, as back/forward history locations: each is a place the
 # user can be standing, so a visit to one is recorded and restored by key rather
 # than by the generation that happened to be picked there.
-_SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _TRASH_KEY)
+_SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
+               _TRASH_KEY)
 
 
 def _is_reusable_workflow(workflow_name) -> bool:
@@ -210,18 +218,39 @@ class GalleryView(QWidget):
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
         # The matcher rides along so a spoken "fix teeth" or "start slideshow" is
-        # executed as a command rather than steering a
-        # prompt; the bias teaches whisper the command vocabulary, without
-        # which a quiet mic's "fix <part>" transcribes as other words entirely.
+        # executed as a command rather than steering a prompt; the dictation
+        # collects "Request … over" across as many utterances as it takes. The
+        # bias teaches whisper all three vocabularies, without which a quiet
+        # mic's "fix <part>" — or the marker words the whole request hangs on —
+        # transcribe as other words entirely.
         self._voice = VoiceSteering(
             command_matcher=_match_voice_command,
-            transcribe_bias=f"{gallery.fix_command_bias()} {show_command_bias()}",
+            dictation=RequestDictation(),
+            transcribe_bias=(f"{gallery.fix_command_bias()} {show_command_bias()} "
+                             f"{request_bias()}"),
         )
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
         self._voice.edited.connect(self._on_voice_edited)
         self._voice.error.connect(self._on_voice_error)
+        self._voice.request.connect(self._on_spoken_request)
+        # A finished request is worked out on the pool: the prompt may not
+        # contain the words the speaker used ("no earrings" against a prompt
+        # that says "silver ear studs"), and finding out which of its own terms
+        # they meant is a call to the local LLM.
+        self._revision = RevisionWorker(partial(
+            apply_request,
+            match=partial(prompt_edit.smart_match,
+                          base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                          system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
+        ), parent=self)
+        self._revision.revised.connect(self._on_request_revised)
         self._voice_target_key: str | None = None
+        # The generation an open request is about, captured the moment the
+        # request opens rather than when it finishes: a show holds still for the
+        # sentence, but the words take seconds and the item on screen when they
+        # end is not necessarily the one they were about.
+        self._request_target: str | None = None
         # A caption showing what voice heard and did, so it's visible without reading
         # the log. It rides at the top of the left pane, taking its own room rather
         # than floating over the header buttons it used to land on; transient
@@ -1395,17 +1424,20 @@ class GalleryView(QWidget):
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
         )
+        requested = gallery.requested_generations(self._db.list_requests(), rows)  # the Requests shelf
         self._browser.set_model(
             gallery.recent_generations(rows, self._recents_media_types()),
             gallery.starred_folders(tree_model),
             gallery.starred_generations(rows),
             unreviewed,
             held,
+            requested,
         )
         self._tree_view.populate(tree_model, expanded,
                                  show_recents=bool(tree_model or self._browser._inflight_items()),
                                  experiment_count=len(unreviewed),
                                  trash_count=len(held),
+                                 request_count=len(requested),
                                  custom_folders=self._custom_folders)
         self._tree_view.reapply_filter()  # populate rebuilds un-filtered; re-narrow it
         # The rows the old selection group pointed at are gone with the rebuild;
@@ -1552,6 +1584,9 @@ class GalleryView(QWidget):
         if current is self._experiments_item:
             self._sync_experiments_bar()
             self._browser.show_experiments_overview()
+            return
+        if current is self._requests_item:
+            self._browser.show_requests_overview()
             return
         if current is self._trash_item:
             self._browser.show_trash_overview()
@@ -1825,6 +1860,10 @@ class GalleryView(QWidget):
         return self._tree_view.experiments_item
 
     @property
+    def _requests_item(self):
+        return self._tree_view.requests_item
+
+    @property
     def _trash_item(self):
         return self._tree_view.trash_item
 
@@ -1995,13 +2034,26 @@ class GalleryView(QWidget):
 
     def _on_voice_heard(self, text: str):
         if any(char.isalpha() for char in text):
-            self._show_voice_status(f"🎤 heard: “{text}”", transient=True)
+            self._say_of_voice(f"🎤 heard: “{text}”")
 
     def _on_voice_edited(self, _new_prompt: str):
-        self._show_voice_status("🎤 ✓ prompt updated", transient=True)
+        self._say_of_voice("🎤 ✓ prompt updated")
 
     def _on_voice_error(self, message: str):
-        self._show_voice_status(f"🎤 {message}", transient=True)
+        self._say_of_voice(f"🎤 {message}")
+
+    def _say_of_voice(self, message: str):
+        """Put what voice heard or hit in front of whoever is listening.
+
+        Both places, because they are different screens: this pane's caption for
+        someone working in the window, and the show's own corner for someone
+        watching a slideshow — who can see nothing of this window at all, and
+        for whom a mic that heard nothing and one that heard the wrong words
+        look exactly alike.
+        """
+        self._show_voice_status(message, transient=True)
+        if self._slideshow is not None:
+            self._slideshow.note_request(message)
 
     def _sync_auto_button(self):
         """Offer the auto-generate toggle only on a re-rollable settings folder,
@@ -2043,6 +2095,7 @@ class GalleryView(QWidget):
         """What the slideshow button would play, named for its tooltip."""
         return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
                 _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL,
+                _REQUESTS_KEY: _REQUESTS_LABEL,
                 _TRASH_KEY: _TRASH_LABEL}.get(
             self._current_shelf_key(), "this folder"
         )
@@ -2448,6 +2501,127 @@ class GalleryView(QWidget):
         if not self._launch_enhance(row, params):
             return None, f"🎤 couldn't launch the {part.name} fix — see the log"
         return row["prompt_id"], f"🎤 fixing {part.name}…"
+
+    # --- spoken requests: "Request … over" over whatever is on screen ---------
+
+    def _on_spoken_request(self, spoken):
+        """One step of a spoken request, from the mic's dictation.
+
+        While it is still being said the show holds and the corner says so;
+        finished, it queues a revision of the item it was opened over. The
+        target is taken at the opening step and kept, because a request is about
+        the picture that prompted it, not whatever is up when the words run out.
+        """
+        show = self._slideshow
+        if self._request_target is None:
+            # Taken at the first step of the request, whichever step that is —
+            # "Request, no hat, over" is a whole one in a single breath.
+            self._request_target = self._voice_request_target(show)
+        if spoken.listening:
+            self._hold_for_request(show, spoken)
+            return
+        target = self._request_target
+        self._request_target = None
+        self._hold_for_request(show, spoken)
+        if spoken.state != COMPLETED:  # given up on — the terminator never came
+            self._answer_request(show, "🎤 request dropped — never heard “over”")
+            return
+        self._begin_request(target, spoken)
+
+    def _voice_request_target(self, show) -> str | None:
+        """What a request just opened is about: the slide filling the screen
+        when a show is up, else the generation picked in the gallery."""
+        if show is not None:
+            return show.voice_request_target()
+        return self.selected_generation()
+
+    def _hold_for_request(self, show, spoken):
+        """Hold (or release) the show while the sentence is being said, and say
+        so — in the show's own corner when one is up, since that is where the
+        speaker is looking, and in this pane's voice caption otherwise."""
+        note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
+        if show is not None:
+            show.hold_for_request(spoken.listening, note)
+        elif spoken.listening:
+            self._show_voice_status(note or "🎤 Request…", transient=False)
+
+    def _answer_request(self, show, message: str):
+        """Say what the request did, where the speaker is looking."""
+        if show is not None:
+            show.note_request(message)
+        else:
+            self._show_voice_status(message, transient=True)
+
+    def _begin_request(self, prompt_id: str | None, spoken):
+        """Start working out what a finished request changes.
+
+        The working-out goes to the pool because it may have to ask the local
+        LLM which of the prompt's own terms the speaker meant, and a second of
+        network wait on this thread is a second of frozen slideshow — at the one
+        moment the app must not stutter. Whatever can be answered without that
+        (nothing on screen, a recipe this app can't rebuild) is answered here,
+        so a request that was never going to run doesn't wait on a model.
+        """
+        row = self._db.get_generation(prompt_id) if prompt_id else None
+        show = self._slideshow
+        if row is None:
+            self._answer_request(show, "🎤 nothing on screen to request a change to")
+            return
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+        if workflow is None or self._client is None:
+            self._answer_request(
+                show, "🎤 this one can't be re-made, so there's nothing to revise")
+            return
+        params = filled_params(row, workflow)
+        self._answer_request(show, f"🎤 working out “{spoken.text}”…")
+        QThreadPool.globalInstance().start(ReviseTask(
+            self._revision, (row, workflow, params, spoken),
+            params.get("positive_prompt", ""), params.get("negative_prompt", ""),
+            spoken.text,
+        ))
+
+    def _on_request_revised(self, context, revision):
+        """The revision came back from the pool: queue it, and say what it did.
+
+        The show is looked up now rather than remembered, so an answer that took
+        a couple of seconds still lands wherever the speaker is looking.
+        """
+        row, workflow, params, spoken = context
+        show = self._slideshow
+        if revision is None:
+            self._answer_request(show, f"🎤 didn't catch what to change in “{spoken.text}”")
+            return
+        if not revision.changed:
+            self._answer_request(show, f"🎤 “{revision.term}” is already how you asked for it")
+            return
+        self._answer_request(show, self._queue_request(row, workflow, params,
+                                                          spoken, revision))
+
+    def _queue_request(self, row, workflow, params, spoken, revision) -> str:
+        """Launch the revised generation and record the request behind it;
+        return the line to say about it.
+
+        The revision is the target's own recipe with its prompt pair edited and
+        *the same seed* — "the same picture but without X" means the picture, so
+        the one thing deliberately not re-rolled is the seed that draws it.
+        """
+        params = {**params, "positive_prompt": revision.positive,
+                  "negative_prompt": revision.negative}
+        key = self._folder_key_for(row.get("workflow_name") or "", params)
+        if not self._reroll.start_prepared(key, workflow, params):
+            return "🎤 couldn't queue the request — see the log"
+        job = self._reroll.newest_job_for(key)
+        logger.info("Request %r on %s: %s", spoken.heard, row.get("prompt_id"),
+                    revision.describe())
+        self._db.record_request(
+            prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
+            heard=spoken.heard, term=revision.term, polarity=revision.polarity,
+            action=revision.action, old_positive=revision.old_positive,
+            old_negative=revision.old_negative, new_positive=revision.positive,
+            new_negative=revision.negative,
+        )
+        self.refresh()  # the shelf shows the request the moment it is spoken
+        return f"🎤 {revision.describe()} — generating"
 
     def _feed_slideshow_enhanced(self, row: dict | None):
         """Hand a landed enhancement to an open show, so the item becomes the
@@ -3819,6 +3993,22 @@ class GalleryView(QWidget):
             return row
         return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
 
+    def _request_for(self, prompt_id: str) -> dict | None:
+        """The spoken request that made this generation, with the item it was
+        asked about resolved onto it — or ``None`` when nothing asked for it.
+
+        Read off the shelf's own listing rather than the database, so the tab's
+        link and the shelf's card can never disagree about what a request was
+        about.
+        """
+        return next((item for item in self._request_items()
+                     if item["prompt_id"] == prompt_id), None)
+
+    def _request_items(self) -> list[dict]:
+        """Every spoken request paired with what it made, newest first."""
+        return gallery.requested_generations(self._db.list_requests(),
+                                             self._db.list_generations())
+
     def _on_thumbnail_clicked(self, prompt_id: str):
         row = self._row_for(prompt_id)
         if not row:
@@ -3831,7 +4021,8 @@ class GalleryView(QWidget):
         # or Back/Forward) only refreshes the current tab's preview, leaving the
         # tab set and any edited form alone.
         if not self._suppress_history:
-            self._info_tabs.load_selection(row, self._image_rows)
+            self._info_tabs.load_selection(row, self._image_rows,
+                                           self._request_for(prompt_id))
         else:
             self._info_tabs.show_selection_preview(
                 gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR), prompt_id

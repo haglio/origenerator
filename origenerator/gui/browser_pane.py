@@ -2,8 +2,8 @@
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Starred /
-Experiments / Trash shelf overviews. Owns the thumbnail multi-selection and the
-live in-flight cards.
+Experiments / Requests / Trash shelf overviews. Owns the thumbnail multi-selection
+and the live in-flight cards.
 
 It drives the surrounding pieces it doesn't own — the info pane on a click, the
 tree on a drill, the re-roll tile, the delete action — so it holds a reference to
@@ -27,7 +27,8 @@ from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
-    RECENTS_KEY, RECENTS_LABEL, STARRED_KEY, STARRED_LABEL,
+    RECENTS_KEY, RECENTS_LABEL, REQUESTS_KEY, REQUESTS_LABEL,
+    STARRED_KEY, STARRED_LABEL,
     TRASH_KEY, TRASH_LABEL,
 )
 from origenerator.recovery import RETENTION_DAYS
@@ -87,15 +88,17 @@ class BrowserPane:
         self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
+        self._request_items: list[dict] = []  # spoken requests + what they made
 
     def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
-                  trash_rows):
+                  trash_rows, request_items=()):
         """Take the newly rebuilt gallery model the shelves render from."""
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
         self._starred_rows = starred_rows
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
+        self._request_items = list(request_items)
 
     def show_enhancing(self, frames: dict):
         """Mark every visible tile whose image is being enhanced, and stream the
@@ -508,6 +511,53 @@ class BrowserPane:
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
 
+    # --- the Requests shelf: what you asked for out loud ---------------------
+
+    def show_requests_overview(self):
+        """Render the Requests shelf: what your spoken requests made, newest
+        first — ordinary tiles, since what a request produced is an ordinary
+        generation that happens to have been asked for out loud. What was heard
+        and what it changed in the prompt show where the prompt does, in the
+        config tab a click loads.
+
+        One still generating shows as the live card the Recents shelf gives
+        in-flight work, so a request you have just spoken is visibly under way
+        rather than absent until it lands."""
+        self._v._title.set_display(REQUESTS_LABEL)
+        self._v._avg_label.setText("")
+        self._v._clear_metadata()
+        self._render_requests()
+        self._v._sync_delete_button()
+        self._v._record_location(REQUESTS_KEY)  # so Back can return to the shelf
+
+    def _render_requests(self):
+        container, flow = self._new_tile_pane()
+        cooking = {item.key: item for item in self._inflight_items()}
+        for item in self._request_items:
+            row = item["row"]
+            live = cooking.get(row["prompt_id"])
+            if live is not None:
+                card = InFlightCard(live)
+                card.clicked.connect(self._on_inflight_clicked)
+                flow.addWidget(card)
+                self._inflight_cards[live.key] = card
+                self._inflight_by_key[live.key] = live
+            elif gallery.produced_output(row):
+                self._add_shelf_thumbnail(flow, row)
+        self.show_widget(container if self._request_items
+                         else self._empty_state(self._requests_empty_hint()))
+
+    def showing_requests(self) -> bool:
+        return (self._v._requests_item is not None
+                and self._v._tree.currentItem() is self._v._requests_item)
+
+    @staticmethod
+    def _requests_empty_hint() -> str:
+        return ("Nothing requested yet.\n\nWith a picture on screen, say "
+                "“Request”, then what you want changed, then “over” — "
+                "“Request… no hat… over”. The revision is queued straight away "
+                "and lands here; open one and its prompt shows what moved.")
+
     # --- the Trash shelf: deleted items, still recoverable -------------------
 
     def show_trash_overview(self):
@@ -685,10 +735,10 @@ class BrowserPane:
         listed items (the media-type filter already applied), Starred is its
         starred items plus everything under each bookmarked folder, since a folder
         tile there stands for its whole folder, Experiments is its unreviewed
-        queue, and Trash is what the bin is holding — deleted is not unwatchable,
-        and a shelf of items you are deciding whether to keep is exactly one you
-        want to sit and look through. A starred item inside a starred folder is
-        one item, so repeats drop out.
+        queue, Requests is what your spoken requests made, and Trash is what the
+        bin is holding — deleted is not unwatchable, and a shelf of items you are
+        deciding whether to keep is exactly one you want to sit and look through.
+        A starred item inside a starred folder is one item, so repeats drop out.
         """
         if self.showing_recents():
             return list(self._recent_rows)
@@ -698,6 +748,8 @@ class BrowserPane:
             ])
         if self.showing_experiments():
             return list(self._experiment_rows)
+        if self.showing_requests():
+            return [item["row"] for item in self._request_items]
         if self.showing_trash():
             return list(self._trash_rows)
         return None

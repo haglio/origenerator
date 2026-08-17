@@ -23,6 +23,11 @@ Anything that moves off a locked slide — a step either way, a cull — release
 lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
 it was set on, not wherever the user wanders to.
 
+A second hold is the show's own: :meth:`SlideshowView.hold_for_request` stops the
+advance while a spoken request is being said, since the request is about what is
+on screen and a show that pages on mid-sentence would aim it at the wrong slide.
+It is independent of the lock, so releasing it never unlocks a held slide.
+
 The set is not frozen at the opening. It holds only generations there is
 something to look at — one still being made is not a slide — and the gallery
 hands each one over as it lands (:meth:`SlideshowView.note_added`), so a show of
@@ -153,6 +158,9 @@ class SlideshowView(QWidget):
         )
         self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._note.hide()
+        # What the corner reads while a spoken request holds the show; empty
+        # whenever nothing is being dictated.
+        self._request_note = ""
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
@@ -370,11 +378,47 @@ class SlideshowView(QWidget):
         """A clip finished: replay it while held, else move on. A lock is
         repeat-one here, as it is on a Fun Time satellite — and a pace of nought
         holds the clip the same way, since nought means nothing moves on its own.
+        A request being spoken holds it too: paging on mid-sentence is exactly
+        what that pause exists to stop.
         """
-        if self._playlist.locked or not self._dwell_s:
+        if self._playlist.holding() or not self._dwell_s:
             self._show_current()
         else:
             self._advance()
+
+    # --- the hold a spoken request puts on the show ------------------------
+
+    def hold_for_request(self, holding: bool, note: str = "") -> None:
+        """Stop (or release) the advance while a request is being spoken.
+
+        Not the user's lock: a slide they had locked is still locked when the
+        request ends, and one they hadn't goes back to its dwell. ``note`` is
+        what the corner should say while it holds — the only sign, in a view
+        with no panels, that the mic is taking a sentence.
+        """
+        self._playlist.set_paused(holding)
+        if holding:
+            self._timer.stop()
+            self._note_timer.stop()  # it holds, rather than fading after a beat
+            self._request_note = note
+            self._refresh_note()
+        else:
+            self._request_note = ""
+            self._refresh_note()
+            if not self._playlist.locked:
+                self._rearm_dwell()
+
+    def note_request(self, message: str) -> None:
+        """Say what a spoken request did, where the speaker is looking."""
+        self._flash_note(message, ms=3000)
+
+    def _rearm_dwell(self) -> None:
+        """Start the dwell timer again for the slide already on screen — a
+        released pause resumes the show rather than restarting the media, which
+        for a video part-way through would send it back to its first frame."""
+        dwell = self._playlist.dwell_ms()
+        if dwell is not None:
+            self._timer.start(dwell)
 
     def _hold_current(self):
         """Down: hold the slide, star it, and ask for it to be enhanced.
@@ -458,6 +502,10 @@ class SlideshowView(QWidget):
         """The generation a spoken "fix …" lands on: the slide on screen."""
         return self._current_prompt_id()
 
+    def voice_request_target(self):
+        """The generation a spoken request is about: the slide on screen."""
+        return self._current_prompt_id()
+
     def note_voice_fix(self, prompt_id, message: str) -> None:
         """Say what a spoken fix did and, when it launched a run
         (``prompt_id``), keep the note reading Enhancing… once the flash
@@ -473,13 +521,17 @@ class SlideshowView(QWidget):
         self._flash_note(message, ms=2500)
 
     def _refresh_note(self):
-        """Say what there is to say about the item on screen: that a version of
-        it is cooking, or — failing that — which of its versions this one is.
+        """Say what there is to say about the item on screen: the request being
+        spoken (which holds the show, so it outranks the rest), that a version of
+        it is cooking, or — failing those — which of its versions this one is.
 
-        Stepping levels is invisible without the second line: two versions of one
+        Stepping levels is invisible without the last line: two versions of one
         picture differ by texture, which is exactly what you cannot tell apart
         from memory.
         """
+        if self._request_note:
+            self._show_note(self._request_note)
+            return
         prompt_id = self._current_prompt_id()
         if prompt_id is not None and prompt_id in self._enhancing:
             self._show_note("Enhancing…")

@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QEvent, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
+from origenerator.gui import diff_text
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
@@ -277,8 +278,27 @@ class ParamForm(QWidget):
         clipboard."""
         w = self._widgets[key]
         if isinstance(w, QPlainTextEdit):
-            return w.toPlainText()
+            return diff_text.live_text(w)
         return w.text()
+
+    def show_prompt_diff(self, key: str, before: str, after: str) -> None:
+        """Mark a prompt field with the change a spoken request made to it —
+        struck through where words went, lit where they arrived.
+
+        The field's *value* stays the revised prompt throughout (see
+        :mod:`origenerator.gui.diff_text`); this only adds what it replaced, so
+        the change reads where the prompt itself is rather than in a panel
+        beside it. Silently ignores a key this form has no text field for, so a
+        workflow without one of the prompts costs the caller no branch.
+        """
+        widget = self._widgets.get(key)
+        if isinstance(widget, QPlainTextEdit):
+            diff_text.show_diff(widget, before, after)
+
+    def clear_prompt_diffs(self) -> None:
+        """Collapse every marked field back to its plain prompt."""
+        for widget in self.text_fields():
+            diff_text.clear_diff(widget)
 
     def text_fields(self) -> list[QPlainTextEdit]:
         """The form's multiline text inputs — its prompts — in the order they lay
@@ -662,7 +682,9 @@ class ParamForm(QWidget):
             except ValueError:
                 return 0
         if pd.type == "str" and pd.multiline:
-            return w.toPlainText()
+            # Never the raw document: while a request's change is marked in the
+            # field, that document also holds the words the change took out.
+            return diff_text.live_text(w)
         if pd.type == "image":
             return _clean_image_ref(w.text())
         if pd.type == "str":
@@ -685,6 +707,8 @@ class ParamForm(QWidget):
             if cb:
                 cb.setChecked(False)
         elif pd.type == "str" and pd.multiline:
+            # A written value replaces whatever was there, marked change and all.
+            diff_text.forget(w)
             w.setPlainText(str(value))
         elif pd.type == "str" or pd.type == "image":
             w.setText(str(value))

@@ -172,3 +172,92 @@ def test_stopping_commands_ends_their_execution(qtbot):
 
     assert ran == []
     assert listener.stopped
+
+
+# --- spoken requests: a third use of the same mic ----------------------------
+
+
+def _request_steering(transcribe="Request, no hat, over."):
+    from origenerator.voice.dictation import RequestDictation
+
+    listener = FakeListener()
+    worker = VoiceWorker(lambda audio: transcribe,
+                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+    steering = VoiceSteering(
+        listener=listener, worker=worker, dictation=RequestDictation(),
+        command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
+    )
+    return steering, listener
+
+
+def test_a_request_is_re_emitted_rather_than_steering_the_prompt(qtbot):
+    steering, listener = _request_steering()
+    prompts = {"positive": "a woman", "negative": ""}
+    spoken = []
+    steering.request.connect(spoken.append)
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
+
+    listener.utterance.emit(object())
+
+    assert [s.text for s in spoken] == ["no hat"]
+    assert prompts["positive"] == "a woman"  # not also rewritten
+
+
+def test_an_open_request_swallows_what_would_be_a_command(qtbot):
+    # The words of a request are a sentence, not instructions: "fix teeth" said
+    # inside one belongs to the request.
+    steering, listener = _request_steering(transcribe="Request.")
+    ran = []
+    spoken = []
+    steering.request.connect(spoken.append)
+    steering.start_commands(ran.append)
+
+    listener.utterance.emit(object())          # opens the request
+    steering._worker._transcribe = lambda audio: "fix teeth"
+    listener.utterance.emit(object())
+
+    assert ran == []
+    assert len(spoken) == 2
+
+
+def test_requests_ride_along_wherever_the_mic_is_open(qtbot):
+    # Unlike "fix …", which means something only over a fullscreen surface, a
+    # request can be spoken any time the mic is listening at all.
+    steering, listener = _request_steering()
+    spoken = []
+    steering.request.connect(spoken.append)
+    steering.start(lambda: {"positive": "", "negative": ""}, lambda new: None)
+
+    listener.utterance.emit(object())
+
+    assert spoken and spoken[0].text == "no hat"
+
+
+def test_closing_the_mic_drops_a_half_said_request(qtbot):
+    steering, listener = _request_steering(transcribe="Request.")
+    steering.start_commands(lambda part: None)
+    listener.utterance.emit(object())
+    assert steering._dictation.listening
+
+    steering.stop_commands()
+
+    assert not steering._dictation.listening
+
+
+def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
+    class BrokenListener(QObject):
+        utterance = pyqtSignal(object)
+
+        def start(self):
+            raise RuntimeError("No module named 'sounddevice'")
+
+        def stop(self):
+            pass
+
+    steering, _ = _steering(listener=BrokenListener())
+    errors = []
+    steering.error.connect(errors.append)
+
+    steering.start_commands(lambda part: None)
+
+    assert errors and "mic unavailable" in errors[0]

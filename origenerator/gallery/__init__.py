@@ -104,6 +104,7 @@ from origenerator.gallery.tree import (
     legacy_preversion_settings_folder_key,
     legacy_settings_folder_key,
     recent_generations,
+    requested_generations,
     settings_folder_key,
     starred_folders,
     starred_generations,

@@ -13,6 +13,15 @@ while a fullscreen surface is up, an utterance the injected matcher recognizes �
 the one listener and run independently: commands alone keep the mic open with no
 loop steering, and with both active a matched command is consumed as a command,
 never a rewrite.
+
+A third use rides above both: an injected
+:class:`~origenerator.voice.dictation.RequestDictation` gets first refusal on
+every transcription for as long as the mic is open at all, so "Request … over"
+can be said wherever it is heard rather than only over a fullscreen surface.
+While one is open it swallows what it hears — which is exactly what keeps the
+words of a request from steering the prompt or matching a command — and each
+step of it is re-emitted as :attr:`VoiceSteering.request`.
+
 """
 
 import logging
@@ -22,6 +31,7 @@ from functools import partial
 from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 
 from origenerator import config
+from origenerator.voice.dictation import SpokenRequest
 from origenerator.voice.listener import Listener
 from origenerator.voice.rewrite import rewrite_prompt
 from origenerator.voice.transcribe import Transcriber
@@ -34,9 +44,10 @@ class VoiceSteering(QObject):
     edited = pyqtSignal(str)   # applied a revised prompt
     error = pyqtSignal(str)    # a mic/transcribe/rewrite failure, for the caller to surface
     heard = pyqtSignal(str)    # the raw transcription (re-emitted from the worker)
+    request = pyqtSignal(object)  # a SpokenRequest: one step of "Request … over"
 
     def __init__(self, *, listener=None, worker=None, command_matcher=None,
-                 transcribe_bias=None, parent=None):
+                 dictation=None, transcribe_bias=None, parent=None):
         super().__init__(parent)
         self._listener = listener if listener is not None else Listener(
             floor=config.VOICE_VAD_THRESHOLD
@@ -49,6 +60,11 @@ class VoiceSteering(QObject):
         self._set_prompts = None
         self._matcher = command_matcher  # recognizes a spoken command in a transcription
         self._execute_command = None     # runs one, while a surface is listening for them
+        self._dictation = dictation      # collects "Request … over" across utterances
+        # Utterances are transcribed on the pool, so two can finish at once; the
+        # dictation is the one piece of state here that a second one could walk
+        # into mid-update.
+        self._lock = threading.Lock()
         self._listener.utterance.connect(self._on_utterance)
         self._worker.rewritten.connect(self._on_rewritten)
         self._worker.failed.connect(self.error)
@@ -87,7 +103,8 @@ class VoiceSteering(QObject):
         try:
             self._listener.start()  # already-open mics stay as they are
         except Exception as exc:  # no mic or no audio backend
-            self.error.emit(str(exc))
+            logger.warning("Voice: the mic could not be opened: %s", exc)
+            self.error.emit(f"mic unavailable — {exc}")
 
     def _preload(self) -> None:
         try:
@@ -99,27 +116,54 @@ class VoiceSteering(QObject):
         self._get_prompts = None  # a late utterance after stop is then ignored
         self._set_prompts = None
         if self._execute_command is None:  # commands may still want the mic
-            self._listener.stop()
+            self._close_mic()
 
     def stop_commands(self) -> None:
         self._execute_command = None
         if self._get_prompts is None:  # steering may still want the mic
-            self._listener.stop()
+            self._close_mic()
+
+    def _close_mic(self) -> None:
+        """Shut the mic and drop any half-said request with it — one nobody can
+        finish saying must not be waiting the next time it opens."""
+        self._listener.stop()
+        if self._dictation is not None:
+            with self._lock:
+                self._dictation.reset()
 
     def _on_utterance(self, audio) -> None:
         if self._get_prompts is None and self._execute_command is None:
             return
         prompts = self._get_prompts() if self._get_prompts is not None else None
-        matcher = self._matcher if self._execute_command is not None else None
         logger.info("Voice: processing utterance (positive %r)",
                     (prompts or {}).get("positive"))
         if self._async:
             QThreadPool.globalInstance().start(
-                ProcessTask(self._worker, audio, prompts, matcher))
+                ProcessTask(self._worker, audio, prompts, self._interpret))
         else:
-            self._worker.process(audio, prompts, matcher)
+            self._worker.process(audio, prompts, self._interpret)
+
+    def _interpret(self, text: str):
+        """What one transcription meant, or ``None`` to let it steer the prompt.
+
+        An open request dictation has first refusal — it is collecting a
+        sentence, and half of one landing in the prompt would be worse than
+        either use alone — then the command matcher, which only answers while a
+        surface is listening for commands.
+        """
+        with self._lock:
+            spoken = self._dictation.push(text) if self._dictation is not None else None
+        if spoken is not None:
+            return spoken
+        if self._execute_command is not None and self._matcher is not None:
+            return self._matcher(text)
+        return None
 
     def _on_command(self, matched) -> None:
+        if isinstance(matched, SpokenRequest):
+            logger.info("Voice: request %s -> %r", matched.state, matched.text)
+            self.request.emit(matched)
+            return
         logger.info("Voice: command -> %r", matched)
         if self._execute_command is not None:
             self._execute_command(matched)

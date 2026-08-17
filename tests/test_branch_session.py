@@ -198,3 +198,41 @@ def test_adoption_skips_rows_whose_file_is_gone(tmp_path):
 
     assert adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs") == 0
     assert live.get_generation("b4") is None
+
+
+def test_adoption_brings_a_spoken_request_home_with_its_generation(tmp_path):
+    # Otherwise a request made while judging a preview lands in the live gallery
+    # as an ordinary re-roll — the one thing it isn't.
+    from origenerator.branch_session import adopt_branch_rows
+    from origenerator.db import Database
+    live = _live_db(tmp_path)
+    branch_path = _branch_db_with(
+        tmp_path, "wt-a", [{"prompt_id": "b5", "filename": "fox5.png"}])
+    Database(branch_path).record_request(
+        prompt_id="b5", source_prompt_id="asked-about",
+        heard="Request, no hat, over.", term="hat", polarity="remove",
+        action="dropped", old_positive="a fox, a hat", old_negative="",
+        new_positive="a fox", new_negative="",
+    )
+    out = _output_file(tmp_path, "fox5.png")
+
+    adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs")
+
+    record = live.get_request("b5")
+    assert record is not None
+    assert record["heard"] == "Request, no hat, over."
+    assert record["source_prompt_id"] == "asked-about"
+
+
+def test_adoption_survives_a_branch_database_predating_requests(tmp_path):
+    # A worktree seeded before the table existed must still hand its rows over.
+    import sqlite3
+    from origenerator.branch_session import adopt_branch_rows
+    branch_path = _branch_db_with(
+        tmp_path, "wt-a", [{"prompt_id": "b6", "filename": "fox6.png"}])
+    with sqlite3.connect(branch_path) as conn:
+        conn.execute("DROP TABLE requests")
+    live = _live_db(tmp_path)
+    out = _output_file(tmp_path, "fox6.png")
+
+    assert adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs") == 1

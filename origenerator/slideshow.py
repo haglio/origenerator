@@ -14,6 +14,10 @@ a clock.
 A dwell of zero means never: the show holds whatever is on screen until an arrow
 moves it. That is the shape a double-clicked picture opens in — one show, opened
 at a pace of nought, rather than a second full-screen viewer with its own keys.
+
+A third hold — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
+the user's or the pace's: speaking a request stops the advance for as long as
+the sentence takes, and releases it without disturbing either of the others.
 """
 
 import random
@@ -65,6 +69,7 @@ class SlideshowPlaylist:
         self._pos = (self._order.index(start)
                      if start is not None and 0 <= start < len(self._items) else 0)
         self._locked = False
+        self._paused = False
         self._image_dwell_ms = image_dwell_ms
 
     def is_empty(self) -> bool:
@@ -183,16 +188,38 @@ class SlideshowPlaylist:
     def unlock(self) -> None:
         self._locked = False
 
+    # --- pause: a hold the show puts on itself -----------------------------
+
+    @property
+    def paused(self) -> bool:
+        """Whether something other than the user's lock is holding the slide.
+
+        Speaking a request pauses the show: the request is *about* what is on
+        screen, and a set that pages on every few seconds would hand the words
+        to whatever came up next. Kept apart from the lock so releasing one
+        never releases the other — a paused slide the user had locked stays
+        locked when the request ends, and stepping off a slide (which drops its
+        lock) doesn't quietly resume a show that is still listening.
+        """
+        return self._paused
+
+    def set_paused(self, paused: bool) -> None:
+        self._paused = bool(paused)
+
+    def holding(self) -> bool:
+        """Whether anything at all is holding this slide — locked or paused."""
+        return self._locked or self._paused
+
     def current_is_video(self) -> bool:
         item = self.current()
         return item is not None and item[1] == "video"
 
     def dwell_ms(self):
         """Milliseconds to wait before auto-advancing the current item, or ``None``
-        when it shouldn't be timer-advanced: an empty or locked playlist, a pace of
-        nought (hold this one until an arrow moves it), or a video — which advances
-        when it ends, not on a clock."""
-        if self._locked or self.current() is None or self.current_is_video():
+        when it shouldn't be timer-advanced: an empty, locked or paused playlist, a
+        pace of nought (hold this one until an arrow moves it), or a video — which
+        advances when it ends, not on a clock."""
+        if self.holding() or self.current() is None or self.current_is_video():
             return None
         return self._image_dwell_ms or None
 

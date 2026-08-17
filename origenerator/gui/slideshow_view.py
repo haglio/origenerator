@@ -460,6 +460,12 @@ class SlideshowView(QWidget):
         fades — the same note a hold's enhance earns."""
         if prompt_id is not None:
             self._enhancing.add(prompt_id)
+        self.note_voice_command(message)
+
+    def note_voice_command(self, message: str) -> None:
+        """Say what a spoken command did. Here rather than in the gallery's own
+        caption because the speaker is looking at this — the window behind it is
+        covered by the very show being talked to."""
         self._flash_note(message, ms=2500)
 
     def _refresh_note(self):

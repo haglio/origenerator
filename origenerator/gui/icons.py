@@ -47,6 +47,14 @@ _BADGE_CHIP = QColor(0, 0, 0, 160)
 _BADGE_GLYPH = QColor(255, 255, 255)
 _BADGE_DISPLAY = 22  # the badge's on-screen size, in px
 
+# A starred item's star, in the green Fun Time paints its favorite ★ with: one
+# color means "bookmarked" across both apps, so a star learned in one reads in
+# the other. Worn by every star that says something IS starred — the tile's
+# corner badge and a starred folder's row alike. The plus marking an enhanced
+# tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
+# badges can sit on one tile, and blue is genau's across this family.
+_STAR_GLYPH = GREEN
+
 
 def back_icon() -> QIcon:
     return _two_mode(lambda p, _color: _chevron(p, pointing_left=True))
@@ -108,8 +116,19 @@ def delete_icon() -> QIcon:
 
 def star_icon(*, filled: bool) -> QIcon:
     """A five-pointed star — solid when the folder is starred, an outline when
-    not, so the hover control shows the state it will toggle."""
-    return _two_mode(lambda p, color: _draw_star(p, color, filled))
+    not, so the hover control shows the state it will toggle.
+
+    A starred one is green (:data:`_STAR_GLYPH`), the color the corner badge and
+    Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
+    because it is an offer to star rather than a thing that is starred."""
+    if filled:
+        icon = QIcon()
+        icon.addPixmap(_render(lambda p, c: _draw_star(p, c, True), _STAR_GLYPH),
+                       QIcon.Mode.Normal)
+        icon.addPixmap(_render(lambda p, c: _draw_star(p, c, True), TEXT_MUTED),
+                       QIcon.Mode.Disabled)
+        return icon
+    return _two_mode(lambda p, color: _draw_star(p, color, False))
 
 
 def clock_icon() -> QIcon:
@@ -171,16 +190,13 @@ def media_type_badge(media_type: str) -> QPixmap:
     )
 
 
-_STAR_GLYPH = AMBER  # a starred item's gold star, on the same translucent chip
-
-
 @lru_cache(maxsize=None)
 def star_badge() -> QPixmap:
     """A corner badge marking a starred image or video.
 
-    A filled gold star on the translucent dark chip the media-type badges use, so
-    a bookmarked item reads at a glance over a thumbnail of any color. Cached and
-    pre-scaled — the one badge decorates every starred tile."""
+    A filled green star on the translucent dark chip the media-type badges use,
+    so a bookmarked item reads at a glance over a thumbnail of any color. Cached
+    and pre-scaled — the one badge decorates every starred tile."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -198,9 +214,11 @@ def star_badge() -> QPixmap:
 
 @lru_cache(maxsize=None)
 def enhance_badge() -> QPixmap:
-    """A corner badge marking an enhanced image: a green plus on the translucent
+    """A corner badge marking an enhanced image: a yellow plus on the translucent
     chip the other badges use, so an upscaled/re-sampled result reads at a
-    glance over a thumbnail of any color. Cached and pre-scaled — the one badge
+    glance over a thumbnail of any color. Yellow because green is the star's
+    (see :data:`_STAR_GLYPH`) and the two badges share a tile, and because blue
+    belongs to genau across this family. Cached and pre-scaled — the one badge
     decorates every enhanced tile."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
@@ -209,7 +227,7 @@ def enhance_badge() -> QPixmap:
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(_BADGE_CHIP)
     painter.drawRoundedRect(QRectF(4, 4, _SIZE - 8, _SIZE - 8), 11, 11)
-    pen = QPen(QColor(GREEN))
+    pen = QPen(QColor(AMBER))
     pen.setWidthF(6.5)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     painter.setPen(pen)

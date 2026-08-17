@@ -55,6 +55,37 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     assert image_badge.toImage() != video_badge.toImage()
 
 
+def test_corner_badges_wear_the_star_green_and_the_enhance_yellow(qtbot):
+    from shared_ui.colors import AMBER, GREEN
+
+    # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
+    # the value its HUD paints), so one color means "bookmarked" in both apps —
+    # which leaves the enhanced tile's plus this palette's yellow, since the two
+    # badges can sit on one tile and blue is genau's across this family. Both
+    # marks are solid at their center, so the middle pixel is the color.
+    star = icons.star_badge().toImage()
+    plus = icons.enhance_badge().toImage()
+    assert star.pixelColor(star.width() // 2, star.height() // 2) == GREEN
+    assert plus.pixelColor(plus.width() // 2, plus.height() // 2) == AMBER
+
+
+def test_a_starred_folders_star_is_the_same_green(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+
+    from shared_ui.colors import GREEN
+
+    # The tree paints a starred leaf (and the Starred shelf) with the filled star,
+    # so it wears the badge's green: one color for "starred", tile or folder row.
+    filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
+    assert filled.toImage().pixelColor(24, 25) == GREEN
+    # The outline is the offer to star, not a thing that is starred, so it stays
+    # the chrome's gray — and it dims like every other icon when disabled.
+    outline = icons.star_icon(filled=False)
+    assert outline.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage() \
+        != filled.toImage()
+
+
 def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
     from PyQt6.QtCore import QSize
 

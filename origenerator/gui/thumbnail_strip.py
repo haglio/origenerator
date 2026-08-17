@@ -61,7 +61,7 @@ class ThumbnailStrip(QWidget):
                 movie_path=gallery.animated_preview_path(
                     row, COMFYUI_OUTPUT_DIR, THUMB_DIR
                 ),  # a video row loops its preview; an image stays a still
-                enhanced=gallery.is_enhanced_row(row),  # the green-plus corner badge
+                enhanced=gallery.is_enhanced_row(row),  # the yellow-plus corner badge
             )
             tw.clicked.connect(self.thumbnail_activated)
             tw.hovered.connect(self._highlight_matching)

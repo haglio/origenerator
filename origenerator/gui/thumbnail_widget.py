@@ -122,12 +122,12 @@ class ThumbnailWidget(QWidget):
         if media_type:
             MediaBadge(media_type, self)
 
-        # A gold star in the opposite (top-right) corner marks a bookmarked item,
+        # A green star in the opposite (top-right) corner marks a bookmarked item,
         # shown only while starred so an unstarred tile stays clean.
         self._star_badge = StarBadge(self)
         self._star_badge.setVisible(self._starred)
 
-        # A green plus in the bottom-right of the image area marks an enhanced
+        # A yellow plus in the bottom-right of the image area marks an enhanced
         # image (upscaled + re-sampled), clear of the other corners' badges.
         self._enhanced_badge = None
         if enhanced:

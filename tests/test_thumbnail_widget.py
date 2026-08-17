@@ -186,7 +186,7 @@ def test_star_badge_shows_only_when_starred(qtbot):
     qtbot.addWidget(plain)
     assert plain.is_starred() is False
     assert all(b.isHidden() for b in plain.findChildren(StarBadge))
-    # ...a starred one reveals it (a gold star in the corner).
+    # ...a starred one reveals it (a green star in the corner).
     starred = ThumbnailWidget("p2", None, "label", starred=True)
     qtbot.addWidget(starred)
     assert starred.is_starred() is True

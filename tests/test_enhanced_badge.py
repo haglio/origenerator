@@ -1,7 +1,7 @@
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
-def test_enhanced_tile_wears_the_green_plus_badge(qtbot):
+def test_enhanced_tile_wears_the_yellow_plus_badge(qtbot):
     # An enhanced image's tile carries the corner badge; a plain tile grows
     # none at all, so an unenhanced thumbnail stays clean.
     enhanced = ThumbnailWidget("p1", None, "seed 1", enhanced=True)

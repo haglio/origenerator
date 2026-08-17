@@ -80,8 +80,13 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
     the gallery folder (the prompt) its output would land in when there is one.
 
     Leads with the model so tabs stay grouped by pipeline; the prompt distinguishes
-    same-model tabs. A blank config is named by its model alone.
+    same-model tabs. A blank config is named by its model alone — and one with no
+    workflow picked yet is named for what it is, since :func:`workflow_label`'s
+    "unknown" reads as a workflow the app failed to recognize rather than a
+    question nobody has answered.
     """
+    if not workflow_name:
+        return "New generation"
     headline = _prompt_headline(settings_only(params))
     model = workflow_label(workflow_name)
     return f"{model} › {headline}" if headline else model

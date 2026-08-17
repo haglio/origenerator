@@ -63,6 +63,12 @@ class GenerateConfigPanel(QWidget):
     source-image tile for a video. Go-to-folder (any saved generation), Send-to-
     Evolver (a video), and the Drive-OSR2 toggle key off the displayed row. A blank
     tab, or one showing a bare autoshow, hides them all.
+
+    A fresh panel opens with no workflow picked — the picker sits on its
+    placeholder, and everything the workflow decides (its typical time, its param
+    form, its Generate) waits until one is chosen. That is the pane's resting
+    state: a tab is always open, so the pane is never a blank rectangle, and the
+    one question it asks first is which workflow to run.
     """
 
     title_changed = pyqtSignal(str)     # current tab title
@@ -158,6 +164,12 @@ class GenerateConfigPanel(QWidget):
         for key, wf in WORKFLOW_REGISTRY.items():
             if wf.selectable:
                 self._workflow_combo.addItem(wf.display_name, key)
+        # Open on no workflow at all, so a fresh tab asks which one to run rather
+        # than presenting whichever happens to be registered first as a choice
+        # already made. Set before the signal is connected: nothing below the
+        # picker is built yet at this point in the layout.
+        self._workflow_combo.setPlaceholderText("Select a workflow…")
+        self._workflow_combo.setCurrentIndex(-1)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
         # Elide to a short floor when the window is narrow instead of holding the
         # width of the longest workflow name, which would set the tab's whole
@@ -256,8 +268,9 @@ class GenerateConfigPanel(QWidget):
 
         layout.addWidget(self._panes)
 
-        if self._client is None:
-            self._generate_btn.setEnabled(False)  # nothing to run against
+        # Lays out the empty state on a fresh panel — no form, no estimate, and a
+        # Generate with nothing to run — and everything below the picker once a
+        # workflow is chosen.
         self._on_workflow_changed()
 
     def _connect_signals(self):
@@ -296,6 +309,12 @@ class GenerateConfigPanel(QWidget):
         if self._displayed_row:
             self.containing_folder_requested.emit(self._displayed_row["prompt_id"])
 
+    def _can_generate(self) -> bool:
+        """Is there anything to run? A run needs a server to send it to and a
+        workflow to send — a tab still on the picker's placeholder has neither a
+        graph nor params, so its Generate is greyed rather than silently inert."""
+        return self._client is not None and self._workflow_combo.currentData() is not None
+
     def _on_workflow_changed(self):
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
@@ -320,7 +339,11 @@ class GenerateConfigPanel(QWidget):
             }
             if carried:
                 self._param_form.set_values(carried)
+        else:
+            self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
+        if not self._generating:
+            self._generate_btn.setEnabled(self._can_generate())
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
 
@@ -339,18 +362,35 @@ class GenerateConfigPanel(QWidget):
             if k not in defaults or v != defaults[k]
         }
 
+    def _detach_form(self):
+        """Take the installed form off the panel, if there is one.
+
+        Detached from its parent at once (not just scheduled for deletion), so it
+        leaves the screen immediately instead of lingering under whatever comes
+        next until the event loop spins.
+        """
+        if self._param_form is None:
+            return
+        self._form_host_box.removeWidget(self._param_form)
+        self._param_form.setParent(None)
+        self._param_form.deleteLater()
+        self._param_form = None
+
+    def _clear_form(self):
+        """Leave the panel with no form at all — the state of a tab whose picker
+        is still on its placeholder. Which params exist is the workflow's answer,
+        so until one is chosen there is nothing truthful to lay out."""
+        had_form = self._param_form is not None
+        self._detach_form()
+        self._form_workflow_key = None
+        if had_form:
+            self.form_replaced.emit()  # an open find must let go of its fields
+
     def _install_form(self, form: ParamForm):
         """Swap the workflow's ParamForm into the form host inside the scroll,
         discarding the previous one. The form lives in the shared scroll so it moves
-        with the info above it, not boxed in a separate scroll of its own.
-
-        The old form is detached from its parent at once (not just scheduled for
-        deletion), so it leaves the screen immediately instead of lingering under
-        the new form until the event loop next spins."""
-        if self._param_form is not None:
-            self._form_host_box.removeWidget(self._param_form)
-            self._param_form.setParent(None)
-            self._param_form.deleteLater()
+        with the info above it, not boxed in a separate scroll of its own."""
+        self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self._emit_title)
         self._form_host_box.addWidget(self._param_form)
@@ -367,11 +407,18 @@ class GenerateConfigPanel(QWidget):
         self.title_changed.emit(self.title())
 
     def _refresh_estimate(self):
-        """Show how long this workflow typically takes, from its recent runs."""
-        key = self._workflow_combo.currentData()
-        wf = WORKFLOW_REGISTRY.get(key)
-        durations = self._db.recent_durations(wf.name) if wf else []
-        self._estimate_label.setText(f"Typical time: {estimate_label(durations)}")
+        """Show how long this workflow typically takes, from its recent runs.
+
+        Hidden entirely with no workflow picked: a typical time belongs to a
+        workflow, and "no runs yet" over an unanswered picker reads as a fact
+        about the app rather than about the question still being asked.
+        """
+        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
+        self._estimate_label.setVisible(wf is not None)
+        if wf is not None:
+            self._estimate_label.setText(
+                f"Typical time: {estimate_label(self._db.recent_durations(wf.name))}"
+            )
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
@@ -384,10 +431,10 @@ class GenerateConfigPanel(QWidget):
         the panel keeps only the form-level guard that an image workflow has its
         input picked.
         """
-        if self._client is None:
-            return  # nothing to run against
+        if not self._can_generate():
+            return  # no server to run against, or no workflow picked yet
         key = self._workflow_combo.currentData()
-        if not key or key not in WORKFLOW_REGISTRY:
+        if key not in WORKFLOW_REGISTRY:
             return
         wf = WORKFLOW_REGISTRY[key]
         params = self._param_form.get_values()
@@ -431,7 +478,8 @@ class GenerateConfigPanel(QWidget):
 
         While it is, Cancel shows and the Generate button switches to progress mode
         (filling as the run advances) so it can't be relaunched over; when it ends,
-        Generate returns — still disabled in a read-only gallery with no client.
+        Generate returns — still disabled where there is nothing to run: a
+        read-only gallery with no client, or a tab with no workflow picked.
 
         ``prompt_id`` names the run, so the button fills only with that job's
         progress (see :meth:`_on_progress`). It's tracked even on a redundant
@@ -451,7 +499,7 @@ class GenerateConfigPanel(QWidget):
         if generating:
             self._generate_btn.start()
         else:
-            self._generate_btn.finish(enabled=self._client is not None)
+            self._generate_btn.finish(enabled=self._can_generate())
 
     def use_random_seed(self):
         """Switch this config's seed(s) to Random.
@@ -531,6 +579,16 @@ class GenerateConfigPanel(QWidget):
             self._param_form.get_values_static(),
             self._param_form.seed_is_random(),
         )
+
+    def is_blank(self) -> bool:
+        """Has this tab been used for anything yet?
+
+        True only for a panel still on the picker's placeholder with nothing on
+        display — the pane's resting tab. Such a tab is what a clicked generation
+        loads into rather than opening beside; a tab whose workflow has been
+        picked holds a choice someone made, so it is left alone.
+        """
+        return self._workflow_combo.currentData() is None and self._displayed_row is None
 
     def title(self) -> str:
         """The tab title: the user's custom name, else the model + gallery folder."""

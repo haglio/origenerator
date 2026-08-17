@@ -252,38 +252,14 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
-    /* The config pane's close-all and "+" stand in the tab row, right after the
-       tabs, so they wear the tabs' own flat look rather than the raised, rounded,
-       bordered QToolButton default — which read as a separate little toolbar
-       bolted onto the strip. Same background, same muted text, same hover, and
-       the transparent bottom rule that keeps them level with an unselected tab. */
-    QToolButton#tabBarButton {{
-        background-color: {_h(BG_SECONDARY)};
-        color: {_h(TEXT_MUTED)};
-        border: none;
-        border-right: 1px solid {_h(BORDER_SUBTLE)};
-        border-bottom: 2px solid transparent;
-        border-radius: 0;
-        /* The tabs' own vertical padding, so a label and a tab's label are laid
-           out in boxes of the same height and sit on the same line. */
-        padding: 8px 14px;
-        font-weight: normal;
-    }}
-    QToolButton#tabBarButton:hover {{
-        color: {_h(TEXT_PRIMARY)};
-    }}
     /* A tab's close button. Flat and bare, because all it is is the style's own
-       ✕ sitting on the tab: the QToolButton rule above would otherwise wrap it in
-       a raised, rounded, bordered box that looks nothing like a tab's mark. */
+       ✕ sitting on the tab: the default QToolButton look would wrap it in a
+       raised, rounded, bordered box that looks nothing like a tab's mark. */
     QToolButton#tabCloseButton {{
         background-color: transparent;
         border: none;
         border-radius: 0;
         padding: 0;
-    }}
-    QToolButton#tabBarButton:disabled {{
-        background-color: {_h(BG_SECONDARY)};
-        color: {_h(BORDER_SUBTLE)};
     }}
     /* A row in the bottom strip's queue: flat, and lit while hovered or while it
        is the one being dragged, so a drag reads as something the strip meant to

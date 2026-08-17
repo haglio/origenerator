@@ -25,8 +25,7 @@ from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    ConfigSnapshot, filled_params, find_duplicate_generation, merge_denormalized,
-    randomize_seeds,
+    ConfigSnapshot, filled_params, find_duplicate_generation, randomize_seeds,
 )
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
@@ -85,9 +84,8 @@ _SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _TRASH_KEY)
 def _is_reusable_workflow(workflow_name) -> bool:
     """Whether the app can rebuild this workflow from its template.
 
-    The single gate for both Reuse Parameters and the gallery re-roll, so the
-    re-roll '+' appears exactly where Reuse works (a re-roll is just Reuse with a
-    random seed).
+    The gate on the gallery re-roll: a re-roll re-runs a folder's own settings
+    with a fresh seed, which needs a template to build the graph from.
     """
     return (workflow_name or "") in WORKFLOW_REGISTRY
 
@@ -122,8 +120,6 @@ def _is_deletable_folder(group) -> bool:
 
 
 class GalleryView(QWidget):
-    reuse_requested = pyqtSignal(str, dict)   # workflow_name, params dict
-
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
                  actions: GalleryActions | None = None,
@@ -661,10 +657,6 @@ class GalleryView(QWidget):
         info_box.addWidget(self._info_tabs, 1)
         info_box.addWidget(self._find_bar)
         self._panes.addWidget(info_pane)
-        # A thumbnail double-click reuses its parameters by forking an editable
-        # config tab in this same pane (a no-op without a client — nothing to run);
-        # the fork's footer links are wired via tab_added like every other tab.
-        self.reuse_requested.connect(self._info_tabs.open_config)
 
         # The TOC pane holds its width; the browser and info panes both grow with
         # the window (the browser faster), so the info pane stays comfortably wide
@@ -1335,9 +1327,9 @@ class GalleryView(QWidget):
         """Ctrl+F: open the find strip over the front tab's prompt fields, its
         standing query re-run against them.
 
-        With no tab open — the pane emptied by close-all — there are no prompts to
-        search, so the chord goes to the tree's own find instead: the one search
-        the window still has. It never does nothing.
+        With no prompts in front — the resting tab, whose form waits on a workflow
+        being picked — the chord goes to the tree's own find instead: the one
+        search the window still has. It never does nothing.
         """
         fields = self._prompt_fields()
         if not fields:
@@ -1653,10 +1645,10 @@ class GalleryView(QWidget):
     def _can_reroll(self, group) -> bool:
         """True when this folder's settings can be re-run as a new variation.
 
-        Mirrors the Reuse Parameters gate — any folder whose workflow the app
-        knows how to build, imported or not — since a re-roll is exactly Reuse +
-        a random seed + Generate (with missing params filled from the workflow's
-        defaults, just as the Generate tab does).
+        Any folder whose workflow the app knows how to build, imported or not: a
+        re-roll is that folder's own settings + a random seed + Generate (with
+        missing params filled from the workflow's defaults, just as the Generate
+        tab does).
         """
         if self._client is None or not group.rows:
             return False
@@ -1679,18 +1671,10 @@ class GalleryView(QWidget):
     @property
     def _preview(self):
         """The current config tab's preview — where a selection, a re-roll frame,
-        or a running generation's frames all land. ``None`` only if every tab has
-        been closed."""
+        or a running generation's frames all land. ``None`` only if the pane holds
+        something that isn't a config tab, which nothing builds."""
         panel = self._info_tabs.current_config_panel()
         return panel._preview if panel is not None else None
-
-    def current_params(self) -> dict | None:
-        """The reusable parameters of the generation on display, or ``None`` when
-        nothing reusable is shown (idle, a live re-roll, or a workflow the app
-        can't rebuild)."""
-        if not self._selected_row or not _is_reusable_workflow(self._selected_row.get("workflow_name")):
-            return None
-        return merge_denormalized(self._selected_row) or None
 
     # The folder tree's key→item / prompt→item maps and shelf rows are owned by the
     # GalleryTree renderer; surfaced here for navigation, selection, and rebuild.
@@ -3624,14 +3608,11 @@ class GalleryView(QWidget):
         self._selected_row = None
         self._info_tabs.clear_current_preview()
 
-    def _on_reuse(self):
-        """Reuse the shown generation's parameters — fork a config tab from them.
-
-        Gated on reusability (not just a button state) so the double-click path is
-        inert for a workflow the app can't rebuild."""
-        params = self.current_params()
-        if params:
-            self.reuse_requested.emit(self._selected_row.get("workflow_name", ""), params)
+    def pin_config_tab(self):
+        """Keep the front config tab — the double-click half of the pane's
+        preview-tab rule. Relayed here because the browser owns the gesture and
+        the info pane owns the tabs."""
+        self._info_tabs.pin_current_tab()
 
 
 def _group_workflow(group) -> str | None:

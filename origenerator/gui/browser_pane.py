@@ -307,7 +307,7 @@ class BrowserPane:
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
-        tw.double_clicked.connect(self.open_in_containing_folder)  # or open its folder
+        tw.double_clicked.connect(self._shelf_double_clicked)  # or open its folder
         # Every shelf gets the folder menu — an item is no less actionable for being
         # listed by when it was made or by its bookmark rather than by its settings.
         tw.context_requested.connect(self._thumbnail_context_menu)
@@ -445,6 +445,15 @@ class BrowserPane:
         folder"; a followed link (:meth:`GalleryView._on_source_link`) lands the
         same way."""
         self._v._on_source_link(prompt_id)
+
+    def _shelf_double_clicked(self, prompt_id: str):
+        """A shelf tile's double-click: go to the item's own folder, and keep the
+        tab that lands there.
+
+        Double-click means the same thing everywhere in the pane — this tab is
+        one I'm staying on — whether it opens a folder on the way or not."""
+        self.open_in_containing_folder(prompt_id)
+        self._v.pin_config_tab()
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
@@ -773,11 +782,14 @@ class BrowserPane:
         self._v._on_thumbnail_clicked(prompt_id)  # records the visit itself
 
     def _thumbnail_double_clicked(self, prompt_id: str):
-        """Open a thumbnail as a Generate tab — the same "reuse parameters"
-        gesture as picking it and clicking the button. Inert for a workflow the
-        app can't rebuild, matching the button's greyed-out state."""
+        """Open a thumbnail as a Generate tab and keep that tab.
+
+        The first click has already loaded it into the pane's preview tab; the
+        second says to stay there, so the tab stops being the one the next click
+        replaces. Browsing costs one tab however far you go; deciding to work on
+        something costs the double-click that keeps it."""
         self._v._on_thumbnail_clicked(prompt_id)  # make it the selected generation
-        self._v._on_reuse()
+        self._v.pin_config_tab()
 
     def apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.

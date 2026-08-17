@@ -603,8 +603,19 @@ def _press_ctrl_f(view, monkeypatch):
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, _CTRL))
 
 
+def _tab_with_prompts(view, key="sdxl_t2i"):
+    """Answer the front tab's workflow picker, so it has prompt fields to find in.
+
+    The resting tab lays out no form until a workflow is chosen — and a find over
+    no fields is the tree-find fallback, which has its own test below."""
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData(key))
+    return panel
+
+
 def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _tab_with_prompts(view)
     assert not view._find_bar.isVisible()
 
     assert _press_ctrl_f(view, monkeypatch) is True
@@ -618,6 +629,7 @@ def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, mon
     # still has to arrive, since the field you're typing in is exactly where you
     # reach for a find.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _tab_with_prompts(view)
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: False)
 
     assert _press_ctrl_f(view, monkeypatch) is True
@@ -627,7 +639,7 @@ def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, mon
 
 def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    positive, _negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive, _negative = _tab_with_prompts(view).prompt_fields()
     positive.setPlainText("a cat on a windowsill, watching sparrows and more sparrows")
     _press_ctrl_f(view, monkeypatch)
 
@@ -641,7 +653,7 @@ def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, mo
 
 def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    positive, negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive, negative = _tab_with_prompts(view).prompt_fields()
     positive.setPlainText("a cat")
     negative.setPlainText("no cat")
     _press_ctrl_f(view, monkeypatch)
@@ -659,7 +671,7 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
 
 def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    positive, _negative = view._info_tabs.current_config_panel().prompt_fields()
+    positive, _negative = _tab_with_prompts(view).prompt_fields()
     positive.setPlainText("a cat")
     _press_ctrl_f(view, monkeypatch)
     view._find_bar._query.setText("cat")
@@ -673,11 +685,11 @@ def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypat
     assert not positive.extraSelections()  # a closed find leaves no marks behind
 
 
-def test_ctrl_f_falls_back_to_the_tree_find_with_no_tab_open(qtbot, tmp_path, monkeypatch):
-    # Close-all empties the pane, so there are no prompts to search; the chord
-    # goes to the one search the window still has rather than doing nothing.
+def test_ctrl_f_falls_back_to_the_tree_find_with_no_prompts_in_front(qtbot, tmp_path, monkeypatch):
+    # The resting tab has no form until a workflow is picked, so there are no
+    # prompts to search; the chord goes to the one search the window still has
+    # rather than doing nothing.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    view._info_tabs.close_all_subtabs()
 
     _press_ctrl_f(view, monkeypatch)
 
@@ -687,25 +699,31 @@ def test_ctrl_f_falls_back_to_the_tree_find_with_no_tab_open(qtbot, tmp_path, mo
 
 def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    first = view._info_tabs.current_config_panel()
+    first = _tab_with_prompts(view)
     first.prompt_fields()[0].setPlainText("a cat")
+    view._info_tabs._add_subtab()          # a second tab, its prompts still empty
+    second = _tab_with_prompts(view)
+    view._info_tabs.setCurrentWidget(first)
     _press_ctrl_f(view, monkeypatch)
     view._find_bar._query.setText("cat")
     assert view._find.count() == 1
 
-    second = view._info_tabs._add_subtab()  # a fresh tab, its prompts still empty
+    view._info_tabs.setCurrentWidget(second)
 
     assert view._find.fields() == second.prompt_fields()
     assert view._find.count() == 0
     assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
 
 
-def test_closing_the_last_tab_puts_an_open_find_away(qtbot, tmp_path, monkeypatch):
+def test_closing_the_searched_tab_puts_an_open_find_away(qtbot, tmp_path, monkeypatch):
+    # The blank tab that replaces it has no prompts, so the find has nothing left
+    # to sit over.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    _tab_with_prompts(view)
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    view._info_tabs.close_all_subtabs()
+    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
 
     assert not view._find_bar.isVisible()
 
@@ -1260,7 +1278,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     assert shown["prompt_id"] == "d1"
 
 
-def test_double_clicking_a_deleted_tile_reuses_its_settings(qtbot):
+def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     # The gesture a folder's tiles carry, since the one a shelf's carry — jump to
     # its folder — is the single thing a deleted item hasn't got.
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
@@ -1268,12 +1286,11 @@ def test_double_clicking_a_deleted_tile_reuses_its_settings(qtbot):
     view.refresh()
     view._tree.setCurrentItem(view._trash_item)
 
-    with qtbot.waitSignal(view.reuse_requested) as blocker:
-        view._thumbnail_double_clicked("d1")
+    view._thumbnail_double_clicked("d1")
 
-    workflow_name, params = blocker.args
-    assert workflow_name == "sdxl_t2i"
-    assert params["seed"] == 1
+    panel = view._info_tabs.current_config_panel()
+    assert panel.displayed_row()["prompt_id"] == "d1"
+    assert view._info_tabs._preview_panel is not panel  # pinned: it stays
 
 
 def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
@@ -1499,6 +1516,22 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     # previewed — as if we'd navigated in and clicked it.
     assert view.selected_prompt_ids() == ["i2"]         # landed selected
     assert view._thumb_widgets["i2"].is_selected()
+
+
+def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
+    # Double-click means the same thing everywhere in the pane — this is a tab I'm
+    # staying on — whether it opens a folder on the way or not.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._thumb_widgets["i2"].clicked.emit("i2")  # a plain click borrows the italic tab
+    assert view._info_tabs._preview_panel is not None
+
+    view._thumb_widgets["i2"].double_clicked.emit("i2")
+
+    assert view._info_tabs._preview_panel is None
 
 
 def _right_click(view, prompt_id):
@@ -2631,46 +2664,77 @@ def _make_db(tmp_path):
     return db
 
 
-def test_reuse_emits_merged_params(qtbot, tmp_path):
+def test_clicking_a_thumbnail_seeds_the_tab_with_its_parameters(qtbot, tmp_path):
     db = _make_db(tmp_path)
     view = GalleryView(db)
     qtbot.addWidget(view)
 
     view._on_thumbnail_clicked("p1")
-    with qtbot.waitSignal(view.reuse_requested) as blocker:
-        view._on_reuse()
 
-    workflow_name, params = blocker.args
-    assert workflow_name == "sdxl_t2i"
-    assert params == {
-        "steps": 20,
-        "positive_prompt": "a cat",
-        "negative_prompt": "blurry",
-        "seed": 7,
-    }
+    panel = view._info_tabs.current_config_panel()
+    assert panel._workflow_combo.currentData() == "sdxl_t2i"
+    values = panel._param_form.get_values_static()
+    assert (values["steps"], values["positive_prompt"], values["negative_prompt"],
+            values["seed"]) == (20, "a cat", "blurry", 7)
 
 
-def test_double_clicking_a_thumbnail_reuses_its_parameters(qtbot, tmp_path):
+def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
+    # Single click borrows the italic preview tab; the double-click says to stay,
+    # so the next clicked generation opens beside it rather than over it.
     db = _make_db(tmp_path)
     view = GalleryView(db)
     qtbot.addWidget(view)
+    view._on_thumbnail_clicked("p1")
+    assert view._info_tabs._preview_panel is view._info_tabs.current_config_panel()
 
-    # Double-clicking is the same "open it as a Generate tab" gesture as picking
-    # the item and clicking Reuse Parameters.
-    with qtbot.waitSignal(view.reuse_requested) as blocker:
-        view._thumbnail_double_clicked("p1")
+    view._thumbnail_double_clicked("p1")
 
-    workflow_name, params = blocker.args
-    assert workflow_name == "sdxl_t2i"
-    assert params == {
-        "steps": 20,
-        "positive_prompt": "a cat",
-        "negative_prompt": "blurry",
-        "seed": 7,
-    }
+    panel = view._info_tabs.current_config_panel()
+    assert panel.displayed_row()["prompt_id"] == "p1"
+    assert view._info_tabs._preview_panel is None
 
 
-def test_double_clicking_an_unregistered_thumbnail_does_not_reuse(qtbot, tmp_path):
+def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
+    # The whole point of the preview tab: a walk through a folder leaves one tab
+    # behind, not one per thing looked at.
+    db = _make_db(tmp_path)
+    for i, prompt in enumerate(["a dog", "a heron", "a fox"], start=2):
+        db.insert_generation(
+            prompt_id=f"p{i}", workflow_name="sdxl_t2i", workflow_version="v002",
+            positive_prompt=prompt, seed=i, params_json=json.dumps({"steps": 20}),
+            workflow_json="{}",
+        )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    for i in range(1, 5):
+        view._on_thumbnail_clicked(f"p{i}")
+
+    assert view._info_tabs.count() == 1
+
+
+def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
+    # The kept one and a fresh preview tab beside it — the IDE bargain.
+    db = _make_db(tmp_path)
+    db.insert_generation(
+        prompt_id="p2", workflow_name="sdxl_t2i", workflow_version="v002",
+        positive_prompt="a dog", seed=8, params_json=json.dumps({"steps": 20}),
+        workflow_json="{}",
+    )
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    view._thumbnail_double_clicked("p1")
+    view._on_thumbnail_clicked("p2")
+
+    assert view._info_tabs.count() == 2
+    kept = view._info_tabs.widget(0)
+    assert kept.displayed_row()["prompt_id"] == "p1"  # untouched by the later click
+
+
+def test_double_clicking_an_unregistered_thumbnail_still_pins_its_tab(qtbot, tmp_path):
+    # No template exists to rebuild this workflow's form, but the tab still shows
+    # the generation — and a double-click still means "keep this one".
     db = Database(tmp_path / "t.db")
     db.insert_generation(
         prompt_id="unreg", workflow_name="unknown", workflow_version="imported",
@@ -2678,14 +2742,10 @@ def test_double_clicking_an_unregistered_thumbnail_does_not_reuse(qtbot, tmp_pat
     )
     view = GalleryView(db)
     qtbot.addWidget(view)
-    fired = []
-    view.reuse_requested.connect(lambda *a: fired.append(a))
 
-    # No template exists for this workflow, so the gesture is inert — the same
-    # gate that greys out the Reuse button.
     view._thumbnail_double_clicked("unreg")
 
-    assert fired == []
+    assert view._info_tabs._preview_panel is None
 
 
 def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
@@ -4268,7 +4328,7 @@ def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    panel = view._info_tabs.current_config_panel()
+    panel = _tab_with_prompts(view)
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
@@ -5282,7 +5342,8 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     gv = GalleryView(db, client=client)
     qtbot.addWidget(gv)
     gv.refresh()
-    panel = gv._info_tabs._add_subtab()
+    gv._info_tabs._add_subtab()
+    panel = _tab_with_prompts(gv)
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()                          # emits generate_requested -> a re-roll
     (pid,) = [job.prompt_id for job in gv._reroll_jobs.values()]

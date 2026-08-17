@@ -48,12 +48,12 @@ def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
     assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
 
 
-def test_reuse_requested_opens_a_config_tab(qtbot, tmp_path):
+def test_opening_a_config_adds_a_tab(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     tabs = win._gallery_view._info_tabs
-    assert tabs.count() == 1  # only the Inspect tab to start
+    assert tabs.count() == 1  # the pane's resting tab to start
 
-    win._gallery_view.reuse_requested.emit("wan22_i2v", {"positive_prompt": "hi"})
+    tabs.open_config("wan22_i2v", {"positive_prompt": "hi"})
 
     assert tabs.count() == 2
     panel = tabs.currentWidget()
@@ -449,9 +449,10 @@ def test_close_event_persists_session(qtbot, tmp_path):
 
     reloaded = AppState(path)
     tabs = reloaded.get("generate_tabs")["tabs"]
-    # Every tab is captured now (no special/permanent tab): the initial editable
-    # tab plus the one just opened.
-    assert [t["config"]["workflow_name"] for t in tabs] == ["sdxl_t2i", "wan22_i2v"]
+    # Every tab is captured (no special/permanent tab). The resting tab is here
+    # too, carrying no workflow — restoring skips it and opens a fresh one, which
+    # is the same tab in every way that matters.
+    assert [t["config"]["workflow_name"] for t in tabs] == [None, "wan22_i2v"]
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
 
 
@@ -575,6 +576,7 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
     tabs._client.fetch_history = lambda prompt_id: {}  # reconcile finds nothing done
     panel = tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()               # emits generate_requested -> a folder re-roll
     (folder_key,) = list(gv._reroll_jobs)

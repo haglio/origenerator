@@ -23,6 +23,7 @@ from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import drive_target_for
@@ -222,10 +223,12 @@ class GenerateConfigPanel(QWidget):
 
         # One button bank, fixed under the scroll so Generate is always reachable.
         # Go-to-folder and Send-to-Evolver show only while displaying a saved
-        # generation (Evolver only for a video); Cancel only while a run this tab
-        # launched is in flight (the gallery owns the job and drives set_generating),
-        # stopping it from the tab like the folder's tile. Generate itself doubles as
-        # the progress bar — it fills as the run advances — so there's no status line.
+        # generation (Evolver only for a video); the discard button only while a run
+        # this tab launched is in flight (the gallery owns the job and drives
+        # set_generating), throwing it away from the tab like the folder's tile —
+        # "Cancel", or "Next seed" while that folder is auto-generating. Generate
+        # itself doubles as the progress bar — it fills as the run advances — so
+        # there's no status line.
         btn_row = QHBoxLayout()
         self._folder_btn = QPushButton("Go to folder")
         self._folder_btn.setToolTip("Open this generation's folder in the gallery.")
@@ -237,7 +240,7 @@ class GenerateConfigPanel(QWidget):
         )
         self._evolver_btn.clicked.connect(self._on_send_to_evolver)
         self._evolver_btn.hide()  # shown only for a video the tab is displaying
-        self._cancel_btn = QPushButton("Cancel")
+        self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
@@ -471,18 +474,25 @@ class GenerateConfigPanel(QWidget):
         else:
             self._launched_runs = [r for r in self._launched_runs if r not in origins]
 
-    def set_generating(self, generating: bool, prompt_id: str | None = None):
+    def set_generating(self, generating: bool, prompt_id: str | None = None,
+                       *, auto_generating: bool = False):
         """Reflect whether a run of this config's folder is in flight.
 
-        While it is, Cancel shows and the Generate button switches to progress mode
-        (filling as the run advances) so it can't be relaunched over; when it ends,
-        Generate returns — still disabled where there is nothing to run: a
-        read-only gallery with no client, or a tab with no workflow picked.
+        While it is, the discard button shows and the Generate button switches to
+        progress mode (filling as the run advances) so it can't be relaunched over;
+        when it ends, Generate returns — still disabled where there is nothing to
+        run: a read-only gallery with no client, or a tab with no workflow picked.
 
         ``prompt_id`` names the run, so the button fills only with that job's
         progress (see :meth:`_on_progress`). It's tracked even on a redundant
         re-assert, because a chained i2v swaps to a new prompt mid-flight (image
         stage, then video stage) without ever leaving the generating state.
+
+        ``auto_generating`` says the run's folder is auto-looping, which is what
+        the discard button reads as "Next seed" rather than "Cancel" (see
+        :func:`inflight.discard_run_text`). Re-labeled ahead of the idempotence
+        guard below, because the Auto toggle flips mid-run without the generating
+        state ever changing.
 
         Idempotent: only an actual change flips the button, because ``start`` resets
         the fill to zero. The gallery re-asserts this state on every rebuild (so a
@@ -490,6 +500,8 @@ class GenerateConfigPanel(QWidget):
         on each of those would keep snapping a filling bar back to empty.
         """
         self._generating_prompt_id = prompt_id if generating else None
+        self._cancel_btn.setText(discard_run_text(auto_generating))
+        self._cancel_btn.setToolTip(discard_run_tooltip(auto_generating))
         if generating == self._generating:
             return
         self._generating = generating

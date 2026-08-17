@@ -17,11 +17,11 @@ def queue(qtbot):
 
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
           progress=None, reveal=None, cancel=None, foreign_ahead=None,
-          started_at=None, typical_seconds=None):
+          started_at=None, typical_seconds=None, auto_generating=False):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
                         foreign_ahead=foreign_ahead, started_at=started_at,
-                        typical_seconds=typical_seconds)
+                        typical_seconds=typical_seconds, auto_generating=auto_generating)
 
 
 def _png_bytes(side=200):
@@ -171,6 +171,24 @@ def test_cancel_stops_the_job_on_its_own_row(queue):
 def test_cancel_is_hidden_on_a_job_that_cannot_be_stopped_from_here(queue):
     queue.set_items([_item(key="a", cancel=None)])
     assert not queue.rows()[0]._cancel.isVisible()
+
+
+def test_a_row_from_an_auto_generating_folder_says_next_seed(queue):
+    # The press discards that seed and its folder's loop starts another, so the
+    # row says what it gets you — one folder looping doesn't re-label the others.
+    queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True),
+                     _item(key="b", status="queued", cancel=lambda: None)])
+    assert [row._cancel.text() for row in queue.rows()] == ["Next seed", "Cancel"]
+
+
+def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
+    # Auto off with the run still cooking: the same row's press is a plain cancel
+    # again, and rows are updated in place rather than rebuilt.
+    queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True)])
+
+    queue.set_items([_item(key="a", cancel=lambda: None)])
+
+    assert queue.rows()[0]._cancel.text() == "Cancel"
 
 
 # --- clicking a row goes to the job's folder ----------------------------------

@@ -61,6 +61,16 @@ def test_active_queued_tile_shows_waiting_with_cancel(qtbot):
     qtbot.addWidget(tile)
     assert tile._status.text() == "Waiting…"
     assert not tile._cancel.isHidden()
+    assert tile._cancel.text() == "Cancel"
+
+
+def test_an_auto_generating_folders_tile_says_next_seed(qtbot):
+    # Pressing it there discards the seed and the loop starts another, so "Cancel"
+    # would promise a stop that never comes.
+    tile = RerollTile(FakeJob(state="running"), auto_generating=True)
+    qtbot.addWidget(tile)
+    assert tile._cancel.text() == "Next seed"
+    assert "seed" in tile._cancel.toolTip()
 
 
 def test_active_tile_cancel_button_emits_cancel_requested(qtbot):

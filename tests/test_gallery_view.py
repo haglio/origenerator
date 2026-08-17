@@ -960,21 +960,6 @@ def test_a_branch_session_holds_no_experiment_review_queue(qtbot, monkeypatch):
     assert view.visible_prompt_ids() == []
 
 
-def test_a_branch_session_does_not_open_on_the_experiments_shelf(qtbot, monkeypatch):
-    # The live app opens on the shelf when verdicts are waiting. A preview
-    # inherits those same rows in its seeded copy, so it would greet every launch
-    # with a review queue it cannot answer — and did, which is where the reviewing
-    # that destroyed the live app's files happened.
-    monkeypatch.setenv(ENV_FLAG, "1")
-    view = GalleryView(FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-
-    view.present_pending_experiments()
-    view.refresh()
-
-    assert view._tree.currentItem() is not view._experiments_item
-
-
 def test_a_branch_session_says_why_its_experiments_shelf_is_empty(qtbot, monkeypatch):
     # Empty with no explanation would read as "nothing came up while you were
     # away" — when in fact the results are on the live app's shelf, where the

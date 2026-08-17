@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 
@@ -123,6 +124,47 @@ def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
 
     win.close()  # closeEvent persists the session
     assert state.get("experiments_enabled") is True
+
+
+@pytest.fixture
+def forget_prompt_heights():
+    """Leave the app-wide prompt-box heights as this test found them.
+
+    They live in one process-wide store (see ``prompt_box``), so a height set
+    here would otherwise be the starting size for every form the rest of the
+    suite builds.
+    """
+    from origenerator.gui.prompt_box import PROMPT_HEIGHTS
+
+    yield PROMPT_HEIGHTS
+    PROMPT_HEIGHTS.restore({})
+
+
+def test_restores_the_dragged_prompt_heights_from_app_state(
+    qtbot, tmp_path, forget_prompt_heights
+):
+    # A prompt box dragged tall stays tall across launches — and the restore has
+    # to land before the first form is built, or the tab that opens with the
+    # window comes up at the default size.
+    state = AppState(tmp_path / "ui.json")
+    state.set("prompt_heights", {"positive_prompt": 260})
+    win = _window(qtbot, tmp_path, state)
+
+    assert forget_prompt_heights.height("positive_prompt") == 260
+    panel = win._gallery_view._info_tabs.widget(0)
+    assert panel._param_form._widgets["positive_prompt"].height() == 260
+
+
+def test_persists_the_dragged_prompt_heights_on_close(
+    qtbot, tmp_path, forget_prompt_heights
+):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    forget_prompt_heights.set_height("positive_prompt", 300)
+
+    win.close()  # closeEvent persists the session
+
+    assert AppState(path).get("prompt_heights") == {"positive_prompt": 300}
 
 
 class _QueueSpyClient(ComfyUIClient):

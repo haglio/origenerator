@@ -118,6 +118,24 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
     assert QApplication.clipboard().text() == "a red fox in snow"
 
 
+def test_prompt_fields_are_draggable_boxes_filed_under_their_param(qtbot):
+    # A prompt is the one field worth more than a few lines, so it gets the box
+    # whose bottom edge drags — filed under its own key, so the height the user
+    # gave Positive Prompt is the height every Positive Prompt opens at.
+    from origenerator.gui.prompt_box import PromptBox
+
+    form = ParamForm([
+        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("name", "Name", "str", ""),      # single-line: an ordinary field
+    ])
+    qtbot.addWidget(form)
+    prompt = form._widgets["positive_prompt"]
+    assert isinstance(prompt, PromptBox)
+    assert prompt._key == "positive_prompt"
+    assert not isinstance(form._widgets["name"], PromptBox)
+    assert form.text_fields() == [prompt]
+
+
 def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
     form = ParamForm([
         ParamDef("steps", "Steps", "int", 20),

@@ -15,6 +15,7 @@ from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui import param_sections
 from origenerator.gui.param_help import param_help
+from origenerator.gui.prompt_box import PromptBox
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
@@ -577,9 +578,11 @@ class ParamForm(QWidget):
             w.setChecked(bool(pd.default))
             return w
         if pd.type == "str" and pd.multiline:
-            w = QPlainTextEdit()
+            # A prompt is the one field worth more than a few lines of the form,
+            # and how many it wants is the user's call — hence a box whose bottom
+            # edge drags, at whatever height this param was last given.
+            w = PromptBox(pd.key)
             w.setPlainText(str(pd.default))
-            w.setMaximumHeight(100)
             return w
         if pd.type == "str":
             w = QLineEdit()

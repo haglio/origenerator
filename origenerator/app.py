@@ -72,6 +72,33 @@ def _init_windows_taskbar_identity() -> None:
     stamp_pinned_shortcuts(APP_USER_MODEL_ID, include="origenerator")
 
 
+def _bring_to_front(window) -> None:
+    """Put a just-opened window in front, the way opening an app is supposed to.
+
+    A launch here is slow — starting ComfyUI's server, scanning its whole output
+    history, the backfills behind it — and nobody sits and watches that, so by
+    the time there is a window to show, the last input event went to whatever
+    the user moved on to. Windows hands the foreground to the process that got
+    that input, and refuses it to this one; ``show()`` then puts Origenerator
+    *behind* the window they are looking at, flashing the taskbar button as the
+    only sign it opened at all.
+
+    Qt's ``raise_``/``activateWindow`` ask down that same refused path, so they
+    are the polite first try and the native call is what actually lands. Losing
+    the race is cosmetic — the window is open either way — so no failure here may
+    cost the launch.
+    """
+    window.raise_()
+    window.activateWindow()
+    if sys.platform != "win32":
+        return
+    try:
+        from origenerator.win32 import force_foreground_window
+        force_foreground_window(int(window.winId()))
+    except Exception:
+        pass  # cosmetic: a window behind is still a window
+
+
 def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
     import importlib.util
     import socket
@@ -186,6 +213,7 @@ def main():
     # keeps the busy sweep animating while the main thread is blocked.
     loading = LoadingScreen()
     loading.show()
+    _bring_to_front(loading)
     app.processEvents()
 
     def status(message: str) -> None:
@@ -390,6 +418,11 @@ def main():
     window.show()
 
     loading.close()
+    # Let the splash's closing settle before asking for the foreground: Windows
+    # hands activation on from a closing window to whatever is next in the
+    # Z-order, and unpumped that lands *after* the request below and undoes it.
+    app.processEvents()
+    _bring_to_front(window)
 
     exit_code = app.exec()
     client.stop()

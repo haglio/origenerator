@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from origenerator.app import (
+    _bring_to_front,
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
     _warm_voice_runtimes,
@@ -93,6 +94,47 @@ def test_init_windows_taskbar_identity_noop_off_windows():
     mock_stamp.assert_not_called()
 
 
+class TestBringToFront:
+    """Opening the app has to put it in front of what the user is looking at.
+    The boot is slow enough that they click elsewhere while it runs, and Windows
+    then refuses this process the foreground — silently — so ``show()`` alone
+    leaves the window behind their other windows."""
+
+    def test_raises_activates_and_takes_the_foreground(self):
+        window = MagicMock()
+        window.winId.return_value = 4242
+
+        with patch("origenerator.app.sys.platform", "win32"), \
+             patch("origenerator.win32.force_foreground_window") as force:
+            _bring_to_front(window)
+
+        window.raise_.assert_called_once_with()
+        window.activateWindow.assert_called_once_with()
+        # Qt's own activation asks down the path Windows refuses, so the native
+        # call is the one that actually lands.
+        force.assert_called_once_with(4242)
+
+    def test_noop_off_windows(self):
+        window = MagicMock()
+
+        with patch("origenerator.app.sys.platform", "linux"), \
+             patch("origenerator.win32.force_foreground_window") as force:
+            _bring_to_front(window)
+
+        force.assert_not_called()
+        window.raise_.assert_called_once_with()
+
+    def test_a_refused_foreground_never_costs_the_launch(self):
+        # Being behind is cosmetic; failing to open is not.
+        window = MagicMock()
+        window.winId.return_value = 4242
+
+        with patch("origenerator.app.sys.platform", "win32"), \
+             patch("origenerator.win32.force_foreground_window",
+                   side_effect=OSError("denied")):
+            _bring_to_front(window)
+
+
 def test_ensure_server_warns_when_port_held_by_non_comfyui():
     logger = MagicMock()
     with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
@@ -170,6 +212,45 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
     # The boot phases drive the splash status text.
     statuses = " ".join(str(c.args[0]) for c in loading.set_status.call_args_list)
     assert "ComfyUI server" in statuses
+
+
+def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
+    """The window is brought forward LAST — after the splash closes. Windows
+    hands a closing window's activation on to whatever is next in the Z-order,
+    so fronting before that would be undone by the splash's own departure."""
+    events = []
+
+    loading = MagicMock()
+    loading.close.side_effect = lambda: events.append("loading.close")
+
+    window = MagicMock()
+    window.show.side_effect = lambda: events.append("window.show")
+
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
+         patch("origenerator.app._bring_to_front",
+               side_effect=lambda w: events.append(
+                   "front:window" if w is window else "front:loading")), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
+         patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main()
+
+    assert events == [
+        "front:loading",  # the splash leads the launch too, not just the window
+        "window.show",
+        "loading.close",
+        "front:window",
+    ]
 
 
 def test_main_reconciles_in_flight_before_importing(qapp):

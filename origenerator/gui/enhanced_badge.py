@@ -1,9 +1,10 @@
 """A small corner badge marking a thumbnail as an enhanced image.
 
 An enhanced generation — one that went through the upscale + low-denoise
-re-sample tail, inline or via the standalone enhancer — wears a green plus in
+re-sample tail, inline or via the standalone enhancer — wears a yellow plus in
 the bottom-right corner of its image area: clear of the media-type badge and
 re-roll controls (top-left) and the star (top-right), so all three can coexist.
+Yellow rather than green: green belongs to the star, which shares the tile.
 The badge parents to its tile and positions itself; a tile just constructs one
 when its row is enhanced.
 
@@ -20,7 +21,7 @@ _INSET = 10  # px in from the tile's right edge and up from the image's bottom
 
 
 class EnhancedBadge(QLabel):
-    """A green-plus chip overlaid on the bottom-right of an enhanced tile's
+    """A yellow-plus chip overlaid on the bottom-right of an enhanced tile's
     image area. ``image_bottom`` is the y where that area ends, in tile
     coordinates, so the badge sits over the picture rather than the caption."""
 

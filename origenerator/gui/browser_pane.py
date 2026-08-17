@@ -302,7 +302,7 @@ class BrowserPane:
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
-            enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
+            enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
             enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
             corner_actions=corner_actions,
         )
@@ -549,7 +549,7 @@ class BrowserPane:
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
-            enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
+            enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
             corner_actions=corner_actions,
         )
         tile.clicked.connect(self._thumbnail_clicked)          # preview it here
@@ -715,7 +715,7 @@ class BrowserPane:
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
-                enhanced=gallery.is_enhanced_row(row),      # the green-plus corner badge
+                enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
                 enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )

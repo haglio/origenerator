@@ -43,12 +43,17 @@ class _UndoEntry:
 class GalleryActions:
     def __init__(self, db, output_dir: Path, trash, limit: int = 50,
                  release_files: Callable[[list[Path]], None] | None = None,
-                 thumb_dir: Path | None = None):
+                 thumb_dir: Path | None = None,
+                 cancel_enhancements: Callable[[list[dict]], None] | None = None):
         self._db = db
         self._output_dir = Path(output_dir)
         self._trash = trash
         self._limit = limit
         self._release_files = release_files
+        # Told which rows are losing their files, so an enhancement still being
+        # made of one can be stopped before it outlives the image it improves.
+        # Optional: without it an in-flight enhance runs on past its source.
+        self._cancel_enhancements = cancel_enhancements
         # Where a row's tile picture lives, so deleting the version it was made
         # from can redraw it from whichever version now leads. Optional: without
         # it the row keeps a picture of a file that is no longer there.
@@ -67,6 +72,7 @@ class GalleryActions:
         """
         if not rows:
             return
+        self._stop_enhancements(rows)
         # Move files out before touching the DB: if a move fails, nothing is lost.
         batches = self._trash_files(rows)
         for row, batch in batches:
@@ -149,6 +155,33 @@ class GalleryActions:
             logger.exception("Could not redraw the thumbnail for %s", prompt_id)
             return
         self._db.update_generation(prompt_id, thumbnail_path=str(path))
+
+    def _stop_enhancements(self, rows: list[dict]) -> None:
+        """Stop any enhancement still being made of ``rows``, before their files go.
+
+        An enhancement is not a generation of its own: it is a version of the
+        image it improves, folded onto that row when it lands. So a run whose
+        image is being deleted has nowhere left to fold — left going, it holds
+        the queue for minutes and then produces an enhanced file with no
+        original to belong to, which lands in the gallery as a stray
+        ``image_enhance`` row (:func:`~origenerator.gallery.enhance
+        .fold_enhancement` declines a fold it can't find a source for). So the
+        run is cancelled here, at the same choke point the media release uses,
+        and for the same reason: every path into the trash passes through, so
+        no caller can forget it.
+
+        Not reversed by undo. Restoring the image does not put a cancelled run
+        back in ComfyUI's queue — enhancing it again is one press of the button,
+        and re-queuing minutes of GPU work on an undo nobody asked to re-launch
+        would be the worse surprise.
+
+        The versions delete (:meth:`delete_enhance_levels`) deliberately does
+        NOT come through here: it takes files off a row that stays, and an
+        enhance re-derives from the original either way, so its run is still
+        going to have somewhere to land.
+        """
+        if self._cancel_enhancements is not None:
+            self._cancel_enhancements(rows)
 
     def _trash_files(self, rows: list[dict], names: set[str] | None = None):
         """Move the files ``rows`` own into the trash — a batch per row — after
@@ -238,8 +271,15 @@ class GalleryActions:
         Nothing is filed in the recovery bin: the bin holds *deleted rows*, and
         this row is kept — it stays in the gallery's own hands, verdict and all,
         so there is no orphan for a Trash shelf to offer back.
+
+        An enhancement being made of the rejected item is stopped like any
+        delete's would be (:meth:`_stop_enhancements`): the row survives, but
+        with no files left it is no longer a source anything can fold onto, so
+        the run would leave the same stray behind — and resurrect a rejection
+        as an enhanced image if it did land.
         """
         prompt_id = row["prompt_id"]
+        self._stop_enhancements([row])
         ((_row, batch),) = self._trash_files([row])
         self._db.set_experiment_verdict(prompt_id, "down")
         self._db.update_generation(

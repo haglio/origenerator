@@ -574,7 +574,9 @@ class GalleryView(QWidget):
         self._auto_btn.setStyleSheet(  # a lit background while auto-generate is running
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
-        self._auto_btn.hide()  # shown only while a re-rollable settings folder is open
+        # Never hidden: a loop runs until it is stopped, and a switch that went
+        # away with its folder left one running with nothing on screen to say so
+        # (see _sync_auto_button). It greys instead when there is nothing to do.
         # Star, enhance, delete: the three things you can do to what is in front
         # of you, each aimed the same way — the picked thumbnails, else the
         # folder on screen. Colored, and grouped, because they are one set: gold
@@ -1690,7 +1692,7 @@ class GalleryView(QWidget):
         self._title.set_display(group.label)
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
-        self._auto_btn.hide()
+        self._sync_auto_button()  # greyed here, but still lit if a loop runs elsewhere
         self._sync_slideshow_button()
         self._sync_group_button()
         self._sync_action_buttons()
@@ -1974,18 +1976,22 @@ class GalleryView(QWidget):
         return self._reroll.has(key)
 
     def _toggle_auto(self, checked: bool):
-        """Start or stop auto-generating fresh variations of the open folder.
+        """Start or stop auto-generating fresh variations.
+
+        Switching it on runs the open folder; switching it off stops the loop
+        wherever it is running, since the lit switch means one is running rather
+        than that this folder is the one running it (see :meth:`_sync_auto_button`).
+        Cleanup runs in :meth:`_on_auto_stopped` either way.
 
         It no longer touches the microphone. A running loop is what gives voice a
         prompt to steer, so an open mic starts steering when one begins — but the
         mic itself is the button's, and only the button's.
         """
         key = self._selected_folder_key()
-        if key is not None:
-            if checked:
-                self._begin_auto(key)
-            else:
-                self._auto.stop(key)  # cleanup + voice-off run in _on_auto_stopped
+        if not checked:
+            self._auto.stop_all()
+        elif key is not None:
+            self._begin_auto(key)
         self._sync_auto_button()  # reflect the real state — a start may not take
         self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
@@ -2096,16 +2102,54 @@ class GalleryView(QWidget):
             self._slideshow.note_request(message)
 
     def _sync_auto_button(self):
-        """Offer the auto-generate toggle only on a re-rollable settings folder,
-        and keep it checked while that folder's loop runs."""
+        """Keep the auto-generate toggle on screen wherever the user is, lit
+        whenever a loop is running — in this folder or any other.
+
+        A loop is a standing instruction to spend the whole machine on one recipe,
+        so the one thing the toolbar must never do is let one run out of sight. A
+        switch that disappeared with the folder it belonged to did exactly that:
+        nothing on screen said a loop was running, and finding the folder it was
+        running in meant hunting the tree for it.
+
+        So it is always there, and lit means "a loop is running" rather than "this
+        folder's loop is running" — clicking it off stops whichever folder has it,
+        from wherever the user happens to be, and the tooltip names that folder.
+        Greyed only when there is genuinely nothing to do: this folder can't be
+        looped and none is running.
+        """
         group = self._current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
-        key = self._selected_folder_key()
-        self._auto_btn.setVisible(available)
+        looping = self._auto.active_key()
+        self._auto_btn.setEnabled(available or looping is not None)
+        self._auto_btn.setToolTip(self._auto_tooltip(available, looping))
         self._auto_btn.blockSignals(True)
-        self._auto_btn.setChecked(available and key is not None and self._auto.is_active(key))
+        self._auto_btn.setChecked(looping is not None)
         self._auto_btn.blockSignals(False)
         self._sync_toolbar_dividers()
+
+    def _auto_tooltip(self, available: bool, looping: str | None) -> str:
+        """What the toggle says it will do, given what is running and where.
+
+        A running loop names its folder, so a lit switch is also the answer to
+        "where is it?" — the whole point of leaving it on screen.
+        """
+        if looping is None:
+            return (
+                "Auto-generate: repeatedly generate variations of this folder "
+                "until toggled off (Esc stops it too)"
+                if available else
+                "Auto-generate: open a settings folder to generate variations of it"
+            )
+        if looping == self._selected_folder_key():
+            return "Auto-generate is running in this folder — click to stop it (Esc too)"
+        return (f"Auto-generate is running in {self._folder_label(looping)} — "
+                "click to stop it (Esc too)")
+
+    def _folder_label(self, key: str) -> str:
+        """A folder's name as the tree shows it, for naming one the user isn't in.
+        Falls back to a bare "another folder" for a key with no node yet."""
+        item = self._item_by_key.get(key)
+        return f"“{item.text(0)}”" if item is not None else "another folder"
 
     def _sync_slideshow_button(self):
         """Offer the slideshow on anything that holds media: a folder, or the

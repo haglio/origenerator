@@ -59,6 +59,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.generation_queue import GenerationQueue
+from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.browser_pane import BrowserPane
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -99,6 +100,13 @@ _ALREADY_AT_THESE_SETTINGS = (
 # than by the generation that happened to be picked there.
 _SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
                _TRASH_KEY)
+# What the lit Auto switch says while its loop runs in some other folder. It
+# doesn't name that folder: every folder is named for its prompt, and those run
+# long and read alike, so a name is no help in finding one. A link is.
+_AUTO_ELSEWHERE_TIP = (
+    "Auto-generate is running in another folder<br>"
+    f"{link('auto', 'Go to it')} · click the switch to stop it"
+)
 
 
 def _is_reusable_workflow(workflow_name) -> bool:
@@ -577,6 +585,11 @@ class GalleryView(QWidget):
         # Never hidden: a loop runs until it is stopped, and a switch that went
         # away with its folder left one running with nothing on screen to say so
         # (see _sync_auto_button). It greys instead when there is nothing to do.
+        # While the loop is somewhere else, its tip is one you can click into —
+        # naming that folder is no use when every name is a long prompt and they
+        # all look alike at a glance, so the tip offers to take the user there.
+        self._auto_tip = LinkTip(self._auto_btn)
+        self._auto_tip.link_activated.connect(self._go_to_looping_folder)
         # Star, enhance, delete: the three things you can do to what is in front
         # of you, each aimed the same way — the picked thumbnails, else the
         # folder on screen. Colored, and grouped, because they are one set: gold
@@ -2113,43 +2126,46 @@ class GalleryView(QWidget):
 
         So it is always there, and lit means "a loop is running" rather than "this
         folder's loop is running" — clicking it off stops whichever folder has it,
-        from wherever the user happens to be, and the tooltip names that folder.
-        Greyed only when there is genuinely nothing to do: this folder can't be
-        looped and none is running.
+        from wherever the user happens to be. Greyed only when there is genuinely
+        nothing to do: this folder can't be looped and none is running.
+
+        While the loop is running somewhere else, its tip is a clickable one that
+        offers to go there (:attr:`_auto_tip`), and the plain tooltip stands down
+        so only one of them appears.
         """
         group = self._current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
         looping = self._auto.active_key()
+        elsewhere = looping is not None and looping != self._selected_folder_key()
         self._auto_btn.setEnabled(available or looping is not None)
-        self._auto_btn.setToolTip(self._auto_tooltip(available, looping))
+        self._auto_btn.setToolTip("" if elsewhere else self._auto_tooltip(available, looping))
+        self._auto_tip.set_html(_AUTO_ELSEWHERE_TIP if elsewhere else "")
         self._auto_btn.blockSignals(True)
         self._auto_btn.setChecked(looping is not None)
         self._auto_btn.blockSignals(False)
         self._sync_toolbar_dividers()
 
     def _auto_tooltip(self, available: bool, looping: str | None) -> str:
-        """What the toggle says it will do, given what is running and where.
-
-        A running loop names its folder, so a lit switch is also the answer to
-        "where is it?" — the whole point of leaving it on screen.
-        """
-        if looping is None:
-            return (
-                "Auto-generate: repeatedly generate variations of this folder "
-                "until toggled off (Esc stops it too)"
-                if available else
-                "Auto-generate: open a settings folder to generate variations of it"
-            )
-        if looping == self._selected_folder_key():
+        """What the toggle says it will do, for every case but the loop being
+        elsewhere — that one is the clickable tip's to say."""
+        if looping is not None:
             return "Auto-generate is running in this folder — click to stop it (Esc too)"
-        return (f"Auto-generate is running in {self._folder_label(looping)} — "
-                "click to stop it (Esc too)")
+        return (
+            "Auto-generate: repeatedly generate variations of this folder "
+            "until toggled off (Esc stops it too)"
+            if available else
+            "Auto-generate: open a settings folder to generate variations of it"
+        )
 
-    def _folder_label(self, key: str) -> str:
-        """A folder's name as the tree shows it, for naming one the user isn't in.
-        Falls back to a bare "another folder" for a key with no node yet."""
-        item = self._item_by_key.get(key)
-        return f"“{item.text(0)}”" if item is not None else "another folder"
+    def _go_to_looping_folder(self, _href: str):
+        """Follow the tip's link to whichever folder is looping right now.
+
+        Read at the click rather than baked into the link, so a loop that has
+        since moved or ended takes the user to where it actually is, or nowhere.
+        """
+        key = self._auto.active_key()
+        if key is not None:
+            self._navigate_to_reroll(key)
 
     def _sync_slideshow_button(self):
         """Offer the slideshow on anything that holds media: a folder, or the

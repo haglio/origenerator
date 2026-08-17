@@ -1,9 +1,9 @@
-"""The generation queue, as one strip along the bottom of the gallery.
+"""The generation queue, as one strip along the foot of the gallery's own panes.
 
 Two halves, each answering one question. On the left, *what is being made*: the
-live frame of the job ComfyUI is rendering, filling the strip's whole height out
-of its bottom-left corner, and beside it a column no wider than a bar needs to be
-— the job's clock, "1:30 elapsed · ~10:34 left", reading directly above the fat
+live frame of the job ComfyUI is rendering, filling the strip's height out of its
+bottom-left corner, and beside it a column no wider than a bar needs to be — the
+job's clock, "1:30 elapsed · ~10:34 left", reading directly above the fat
 progress bar it measures. With nothing of ours in flight the same half says what
 the shared server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
@@ -11,8 +11,11 @@ as a row of its own — the one being made at the top — each led by a Cancel, 
 opening its folder on a click, and each draggable to a new place in the line. Only
 the top row is fixed: nothing can be moved in front of what is already rendering.
 
-The whole strip is one progress bar tall whatever the queue's length, so the panes
-above it never move; about two rows show at a time and the rest are a scroll away.
+It opens one progress bar tall — about two rows, the rest a scroll away — and its
+top edge is a splitter handle, so a long queue can be dragged open to as many rows
+as it's worth giving up. The extra height all goes to the line: the thumbnail
+never grows past the strip's opening height, so a queue dragged tall is a queue
+you can read rather than one enormous frame.
 
 It's fed the in-flight view-models the Recents shelf uses
 (:class:`origenerator.gui.inflight.InFlightItem`), leading job first, refreshed on
@@ -31,7 +34,7 @@ import time
 
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QProgressBar, QPushButton,
-    QScrollArea, QApplication, QFrame,
+    QScrollArea, QApplication, QFrame, QSizePolicy,
 )
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
@@ -46,10 +49,11 @@ from origenerator.timing import progress_time_label
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
 
-# The strip's height, and so the side of the square the live thumbnail fills: it
-# takes the bottom-left corner whole, being the one thing here worth looking at
-# (the full-size preview is still one click away). Fixed, so the panes above the
-# strip never move however long the line gets.
+# The strip's opening height, its floor, and so the widest the live thumbnail
+# ever gets: it takes the bottom-left corner whole, being the one thing here worth
+# looking at (the full-size preview is still one click away). The strip never
+# opens taller than this however long the line gets, so the panes above it don't
+# move on their own — only on a drag of the handle at its top edge.
 _STRIP_HEIGHT = 88
 # The clock and the bar beneath it share one column, wide enough to read a line
 # of the clock and for the bar to read as a bar. The queue's names are long, so
@@ -79,7 +83,9 @@ class RunningPreview(QWidget):
         self._frame = QLabel()
         self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self._frame)
+        # Pinned to the bottom, so it still sits in the strip's corner once the
+        # strip is dragged taller than the square it stops growing at.
+        layout.addWidget(self._frame, 0, Qt.AlignmentFlag.AlignBottom)
 
         column = QVBoxLayout()
         column.setContentsMargins(0, 0, 0, 0)
@@ -168,11 +174,14 @@ class RunningPreview(QWidget):
 
         Taken off the height rather than a size of its own, so the thumbnail is
         always as big as the corner it sits in: a strip laid out any other height
-        grows it to match instead of stranding it in an empty square.
+        grows it to match instead of stranding it in an empty square. Only up to
+        the strip's opening height, though — a queue dragged open is being opened
+        to read the line, and every pixel past that goes to the rows.
         """
         super().resizeEvent(event)
-        if self.height() != self._frame.width():
-            self._frame.setFixedSize(self.height(), self.height())
+        side = min(self.height(), _STRIP_HEIGHT)
+        if side != self._frame.width():
+            self._frame.setFixedSize(side, side)
             self._render_frame(None if self._item is None else self._item.frame)
 
 
@@ -284,22 +293,32 @@ class GenerationQueue(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("generationQueue")
-        # A raw QWidget paints no stylesheet border without this (see the QWidget
-        # stylesheet-border gotcha); a top rule sets the strip off from the panes.
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(
-            f"#generationQueue {{ border-top: 1px solid {BORDER_SUBTLE.name()}; }}"
-        )
         self.setAcceptDrops(True)  # a row dropped anywhere on the strip reorders it
-        self.setFixedHeight(_STRIP_HEIGHT)
+        # A floor, not a fixed height: the strip opens one bar tall and grows only
+        # when its splitter handle is dragged, so the panes above never move on
+        # their own however long the line gets.
+        self.setMinimumHeight(_STRIP_HEIGHT)
         self._items: list = []
         self._drop_at: int | None = None  # where a drag in progress would land
 
-        layout = QHBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        # An explicit hairline rather than a stylesheet border: the app paints
+        # every plain widget one flat color, and a border drawn under a child's
+        # own background disappears into it. This one is a widget of its own, so
+        # it is there whatever is laid out beneath it.
+        rule = QFrame()
+        rule.setFixedHeight(1)
+        rule.setStyleSheet(f"background-color: {BORDER_SUBTLE.name()};")
+        outer.addWidget(rule)
+
+        layout = QHBoxLayout()
         # Flush at the left and both ends, so the live frame fills the strip's
         # bottom-left corner; only the far right is held off the window edge.
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(8)
+        outer.addLayout(layout, 1)
         self._running = RunningPreview()
         layout.addWidget(self._running)
         # Only ever offered for another app's work — the user's own queue is what
@@ -314,7 +333,10 @@ class GenerationQueue(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setFixedHeight(_STRIP_HEIGHT)
+        # Takes whatever height the strip has and asks for none of its own: a
+        # twelve-job line must not make the strip open twelve rows tall, and a
+        # strip dragged open must hand every extra pixel to these rows.
+        self._scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         self._host = QWidget()
         self._rows_box = QVBoxLayout(self._host)
         self._rows_box.setContentsMargins(0, 0, 0, 0)

@@ -21,6 +21,12 @@ def tabs(qtbot, tmp_path):
     return t
 
 
+def _pick_workflow(panel, key="sdxl_t2i"):
+    """Answer a fresh tab's workflow picker, so it has a param form to poke at."""
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData(key))
+    return panel
+
+
 def _sdxl_full(**over):
     """A full sdxl param set, as a real generation would store it."""
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
@@ -96,10 +102,17 @@ def test_every_tab_including_the_first_is_closable(tabs):
     assert close_btn(1) is not None
 
 
-def test_closing_the_last_tab_is_allowed(tabs):
+def test_closing_the_last_tab_leaves_a_fresh_blank_one(tabs):
+    # The pane is never empty: closing the last tab used to strand a black
+    # rectangle with nothing in it to click, so a resting tab takes its place.
+    _pick_workflow(tabs.widget(0))
+    gone = tabs.widget(0)
+
     tabs._close_subtab(0)
-    assert tabs.count() == 0
-    assert tabs._config_panels() == []
+
+    assert tabs.count() == 1
+    assert tabs.widget(0) is not gone
+    assert tabs.widget(0).is_blank()
 
 
 def test_the_first_tab_is_renamable(tabs, monkeypatch):
@@ -126,12 +139,6 @@ def test_add_subtab_increases_count_and_focuses_new(tabs):
     assert tabs.currentIndex() == 1
 
 
-def test_the_plus_button_adds_a_config_tab(tabs):
-    tabs._add_btn.click()
-    assert tabs.count() == 2
-    assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
-
-
 def test_close_subtab_removes_and_tears_down(tabs):
     panel = tabs._add_subtab()
     with patch.object(panel, "teardown", wraps=panel.teardown) as spy:
@@ -140,165 +147,79 @@ def test_close_subtab_removes_and_tears_down(tabs):
     assert tabs._config_panels() == [tabs.widget(0)]
 
 
-# --- close all --------------------------------------------------------------
-
-def test_close_all_wears_the_tabs_own_close_mark(tabs):
-    # Two spellings of "close" in one row read as two different controls: the
-    # tabs' ✕ is the style's mark, so the corner button borrows it rather than
-    # typing a ✕ character of its own next to "All".
-    from origenerator.gui import icons
-
-    assert "✕" not in tabs._close_all_btn.text()
-    assert tabs._close_all_btn.text() == "All"
-    expected = icons.tab_close_icon().pixmap(tabs._close_all_btn.iconSize())
-    assert tabs._close_all_btn.icon().pixmap(
-        tabs._close_all_btn.iconSize()).toImage() == expected.toImage()
+def test_the_pane_carries_no_corner_controls(tabs):
+    # The "+" is gone with the empty pane it existed to refill, and close-all with
+    # it: a tab is always open, and the tab menu closes the rest.
+    assert tabs.cornerWidget(Qt.Corner.TopLeftCorner) is None
+    assert tabs.cornerWidget(Qt.Corner.TopRightCorner) is None
 
 
-def test_close_all_icon_matches_the_size_a_tab_draws_its_close_mark(tabs):
-    # Same mark at a different scale would still look like a different control.
-    from PyQt6.QtWidgets import QStyle
+# --- the tab row: reorder by drag, close by menu ----------------------------
 
-    indicator = tabs.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
-    assert tabs._close_all_btn.iconSize().width() == indicator
-
-
-def test_both_corner_buttons_stand_the_same_height(tabs):
-    # Close-all carries an icon and "+" a bare glyph, so left alone the two sit at
-    # different heights in one row — the same mismatched look this pairing is
-    # meant to end.
-    tabs.resize(900, 300)
-    tabs.show()
-    tabs._corner.layout().activate()
-    assert tabs._add_btn.height() == tabs._close_all_btn.height()
+def test_tabs_can_be_dragged_along_the_row(tabs):
+    # The order is the user's, not the order things happened to open in.
+    assert tabs.isMovable()
 
 
-def test_close_all_button_empties_the_pane_in_one_click(tabs):
-    tabs._add_subtab()
-    tabs._add_subtab()  # three open tabs
+def test_the_tab_menu_closes_the_others(tabs):
+    keep = tabs._add_subtab()
+    tabs._add_subtab()  # three open; the middle one is the keeper
 
-    tabs._close_all_btn.click()
+    tabs._close_other_subtabs(tabs.indexOf(keep))
 
-    assert tabs.count() == 0
-    assert tabs._config_panels() == []
+    assert tabs.count() == 1
+    assert tabs.widget(0) is keep
 
 
-def test_close_all_tears_down_every_panel(tabs):
-    # Each closed tab must release what it holds, exactly as its own ✕ does —
-    # closing in bulk is no excuse to leak a panel's timers/handles.
-    panels = [tabs.widget(0), tabs._add_subtab(), tabs._add_subtab()]
+def test_closing_the_others_tears_each_one_down(tabs):
+    # A tab closed in bulk must release what it holds, exactly as its own ✕ does.
+    keep = tabs.widget(0)
+    doomed = [tabs._add_subtab(), tabs._add_subtab()]
     with ExitStack() as stack:
         spies = [
             stack.enter_context(patch.object(p, "teardown", wraps=p.teardown))
-            for p in panels
+            for p in doomed
         ]
-        tabs.close_all_subtabs()
+        tabs._close_other_subtabs(tabs.indexOf(keep))
         for spy in spies:
             spy.assert_called_once()
 
 
-def test_close_all_on_an_already_empty_pane_is_harmless(tabs):
-    tabs.close_all_subtabs()
-    tabs.close_all_subtabs()  # nothing left to walk
-    assert tabs.count() == 0
-
-
-def test_close_all_is_disabled_only_while_the_pane_is_empty(tabs):
-    assert tabs._close_all_btn.isEnabled()  # one tab open
-    tabs.close_all_subtabs()
-    assert not tabs._close_all_btn.isEnabled()  # nothing left to close
-    tabs._add_btn.click()
-    assert tabs._close_all_btn.isEnabled()  # a fresh tab re-arms it
-
-
-def test_close_all_leaves_the_add_button_usable(tabs):
-    # An emptied pane is not a dead end: "+" still opens a fresh tab.
-    tabs.close_all_subtabs()
-    tabs._add_btn.click()
-    assert tabs.count() == 1
-    assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
-
-
-def test_the_add_button_is_still_on_screen_with_no_tabs_left(tabs):
-    # It isn't enough that "+" still works when clicked in a test: Qt sizes the
-    # corner to the tab bar, so an emptied pane used to flatten both buttons to
-    # zero pixels and leave nothing to click at all.
-    from PyQt6.QtWidgets import QApplication
-
-    tabs.resize(900, 300)
-    tabs.show()
-    QApplication.processEvents()
-    standing = tabs._add_btn.height()
-
-    tabs.close_all_subtabs()
-    QApplication.processEvents()
-
-    assert tabs._add_btn.height() == standing
-    assert tabs._close_all_btn.height() == standing
-
-
-def test_the_add_button_leads_the_row_then_close_all(tabs):
-    # "+" is leftmost and close-all next, ahead of every tab — so both controls
-    # stay in one place however many tabs are open and however wide they grow.
-    row = tabs._corner.layout()
-    assert [row.itemAt(i).widget() for i in range(row.count())] == [
-        tabs._add_btn, tabs._close_all_btn,
-    ]
-    assert tabs.cornerWidget(Qt.Corner.TopLeftCorner) is tabs._corner
-
-
-def _laid_out(tabs):
-    from PyQt6.QtWidgets import QApplication
-
-    tabs.resize(900, 300)
-    tabs.show()
-    QApplication.processEvents()
-
-
-def test_the_tab_row_buttons_open_the_row_and_the_tabs_follow(tabs):
-    # They lead the strip: the tabs begin where the buttons end, and adding a tab
-    # doesn't shift them.
-    _laid_out(tabs)
-    assert tabs._corner.x() < tabs.tabBar().x()
-    assert tabs.tabBar().x() >= tabs._corner.geometry().right()
-
-    before = tabs._corner.geometry()
+def test_the_tab_menu_closes_everything_to_the_right(tabs):
+    first, second = tabs.widget(0), tabs._add_subtab()
     tabs._add_subtab()
-    _laid_out(tabs)
-    assert tabs._corner.geometry() == before
+    tabs._add_subtab()  # four open
+
+    tabs._close_subtabs_to_the_right(tabs.indexOf(second))
+
+    assert tabs._config_panels() == [first, second]  # the ones at or before it
 
 
-def test_the_tab_row_buttons_cover_the_row_top_to_bottom(tabs):
-    # Shorter than the tabs and centred, they sat a pixel above them; taller and
-    # uncentred, they hung below the strip into the pane underneath. The row they
-    # occupy has to span the tabs' own band exactly.
-    _laid_out(tabs)
-    bar = tabs.tabBar()
-    top, bottom = bar.y(), bar.y() + bar.height()
-    corner = tabs._corner.geometry()
-    assert corner.top() <= top and corner.bottom() >= bottom - 1
-    assert tabs._add_btn.height() == corner.height()
-    assert tabs._close_all_btn.height() == corner.height()
+def test_the_tab_menu_offers_exactly_those_two_closes(tabs):
+    tabs._add_subtab()
+    menu = tabs._tab_menu(0)
+    assert [a.text() for a in menu.actions()] == ["Close others", "Close to the right"]
 
 
-def test_the_first_tab_is_spaced_off_the_buttons(tabs):
-    # The two buttons sit apart from each other, so the tabs must not be jammed
-    # against the second one.
-    _laid_out(tabs)
-    assert tabs.tabBar().x() - tabs._close_all_btn.geometry().right() >= 8
+def test_the_tab_menu_greys_out_what_would_close_nothing(tabs):
+    # Both entries always show, greyed when there is nothing for them to close, so
+    # the menu reads the same wherever it opens.
+    only = tabs._tab_menu(0)
+    assert [a.isEnabled() for a in only.actions()] == [False, False]
+
+    tabs._add_subtab()
+    last = tabs._tab_menu(1)
+    assert [a.isEnabled() for a in last.actions()] == [True, False]
+    first = tabs._tab_menu(0)
+    assert [a.isEnabled() for a in first.actions()] == [True, True]
 
 
-def test_the_tabs_never_run_under_the_buttons(tabs):
-    # Enough tabs to fill the row must not slide beneath the two buttons.
-    for _ in range(12):
-        tabs._add_subtab()
-    _laid_out(tabs)
-    assert tabs.tabBar().x() >= tabs._corner.geometry().right()
+def test_a_right_click_off_the_tabs_opens_no_menu(tabs):
+    from PyQt6.QtCore import QPoint
 
-
-def test_the_tab_row_buttons_wear_the_tab_style(tabs):
-    assert tabs._add_btn.objectName() == "tabBarButton"
-    assert tabs._close_all_btn.objectName() == "tabBarButton"
+    with patch.object(tabs, "_tab_menu") as spy:
+        tabs._open_tab_menu(QPoint(5, 4000))  # below the row: no tab there
+    spy.assert_not_called()
 
 
 # --- a read-only gallery (no client) ---------------------------------------
@@ -309,10 +230,6 @@ def test_a_tab_still_shows_without_a_client(qtbot, tmp_path):
     qtbot.addWidget(tabs)
     assert tabs.count() == 1  # a tab still shows, Generate disabled
     assert tabs.widget(0)._generate_btn.isEnabled() is False
-    assert not tabs._add_btn.isVisible()
-    # Neither corner button shows: with no "+" to reopen one, a close-all would
-    # strand the pane empty for the rest of the session.
-    assert tabs._corner.isHidden()
 
 
 def test_open_config_is_a_no_op_without_a_client(qtbot, tmp_path):
@@ -366,7 +283,7 @@ def test_strip_click_does_nothing_when_settings_match(tabs):
 
 def test_strip_click_matching_settings_ignores_random_seed(tabs):
     # The reported bug: a tab generated g1 and still has its seed on Random.
-    panel = tabs.currentWidget()
+    panel = _pick_workflow(tabs.currentWidget())
     panel._param_form.set_values({"positive_prompt": "cat"})  # leaves Random checked
     assert panel._param_form.seed_is_random() is True
     _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="cat", seed=777))
@@ -448,7 +365,9 @@ def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
     assert tabs.current_config_panel()._displayed_row is b
 
 
-def test_load_selection_opens_a_new_tab_for_a_different_folder(tabs):
+def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):
+    # Browsing item after item costs one tab, not one per item: each single click
+    # lands in the same italic tab.
     cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
     dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
     tabs.currentWidget()._preview.show_media = MagicMock()
@@ -457,8 +376,105 @@ def test_load_selection_opens_a_new_tab_for_a_different_folder(tabs):
 
     tabs.load_selection(dog, [cat, dog])  # a different settings folder
 
-    assert tabs.count() == count + 1  # forked a new tab rather than clobbering
+    assert tabs.count() == count
     assert tabs.current_config_panel()._displayed_row is dog
+
+
+# --- the preview tab: one click borrows it, a double-click keeps it ---------
+
+def _two_generations(tabs):
+    cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
+    dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
+    for panel in tabs._config_panels():
+        panel._preview.show_media = MagicMock()
+    return cat, dog
+
+
+def test_a_clicked_generation_makes_the_resting_tab_the_preview_tab(tabs):
+    cat, _dog = _two_generations(tabs)
+    resting = tabs.currentWidget()
+
+    tabs.load_selection(cat, [cat])
+
+    assert tabs._preview_panel is resting
+    assert tabs.tabBar().preview_index() == tabs.indexOf(resting)
+
+
+def test_pinning_the_front_tab_sends_the_next_click_to_a_new_one(tabs):
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    kept = tabs.current_config_panel()
+
+    tabs.pin_current_tab()  # the double-click half of the gesture
+    tabs.load_selection(dog, [cat, dog])
+
+    assert tabs._preview_panel is not kept
+    assert kept._displayed_row is cat  # the pinned tab kept what it was showing
+    assert tabs.current_config_panel()._displayed_row is dog
+    assert tabs.count() == 2
+
+
+def test_only_one_tab_is_ever_the_preview_tab(tabs):
+    # The new tab a click opens after a pin takes the italic over; nothing else
+    # should still be wearing it.
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    tabs.pin_current_tab()
+    tabs.load_selection(dog, [cat, dog])
+
+    fresh = tabs.current_config_panel()
+    assert tabs._preview_panel is fresh
+    assert tabs.tabBar().preview_index() == tabs.indexOf(fresh)
+
+
+def test_pinning_a_tab_that_was_never_the_preview_one_is_harmless(tabs):
+    tabs.pin_current_tab()
+    assert tabs._preview_panel is None
+    assert tabs.tabBar().preview_index() == -1
+
+
+def test_a_deliberately_opened_tab_is_not_a_preview_tab(tabs):
+    # open_config is someone asking for this configuration by name — a strip
+    # click, a queue row, a combine handoff — not a browse.
+    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
+    assert tabs._preview_panel is None
+    assert tabs.tabBar().preview_index() == -1
+
+
+def test_closing_the_preview_tab_leaves_no_tab_marked(tabs):
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+
+    tabs._close_subtab(tabs.currentIndex())
+
+    assert tabs._preview_panel is None
+    assert tabs.tabBar().preview_index() == -1
+
+
+def test_the_italic_mark_follows_a_dragged_tab(tabs):
+    # The bar draws the mark by index, and a drag changes it.
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+    tabs._add_subtab()  # a second tab, after it
+
+    tabs.tabBar().moveTab(tabs.indexOf(preview), 1)
+
+    assert tabs.tabBar().preview_index() == tabs.indexOf(preview) == 1
+
+
+def test_an_edited_tab_on_another_folder_is_left_alone(tabs):
+    # A pinned tab holding a different folder must not be clobbered by a click
+    # elsewhere: the click opens the preview tab instead.
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    pinned = tabs.current_config_panel()
+    tabs.pin_current_tab()
+    pinned._param_form.set_values({"positive_prompt": "a re-roll of the cat"})
+
+    tabs.load_selection(dog, [cat, dog])
+
+    assert pinned._param_form.get_values_static()["positive_prompt"] == "a re-roll of the cat"
 
 
 def test_current_config_panel_is_the_front_tab(tabs):
@@ -527,7 +543,7 @@ def test_show_result_in_current_tab_keeps_a_prompt_typed_while_it_ran(tabs):
     # wipe a prompt the user has since typed into that same tab's form.
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a cat", seed=1),
                         "sdxl_g1.png")
-    panel = tabs.current_config_panel()
+    panel = _pick_workflow(tabs.current_config_panel())
     panel._preview.show_media = MagicMock()
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
@@ -589,7 +605,7 @@ def test_the_run_a_tab_launched_survives_a_restart(tabs, qtbot):
     # A tab's Cancel and progress fill follow the run it started, so which run that
     # was has to come back with the tab — otherwise a restart mid-generation
     # reopens the tab with an idle button over a job still cooking.
-    tabs.currentWidget().note_launched("run-77")
+    _pick_workflow(tabs.currentWidget()).note_launched("run-77")
 
     fresh = InfoPaneTabs(tabs._client, tabs._db)
     qtbot.addWidget(fresh)
@@ -620,7 +636,7 @@ def test_generate_requested_surfaces_from_the_initial_tab(tabs):
     # re-roll — here from the initial tab. It carries the workflow and form params.
     requested = []
     tabs.generate_requested.connect(lambda wf, params: requested.append((wf, params)))
-    panel = tabs.currentWidget()
+    panel = _pick_workflow(tabs.currentWidget())
     panel._param_form.set_values({"positive_prompt": "a cat", "seed": 3})
 
     panel._on_generate()

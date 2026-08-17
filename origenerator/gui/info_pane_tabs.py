@@ -1,11 +1,18 @@
 """The gallery's info pane as a tabbed workspace of editable generate tabs.
 
 Every tab is the same plain, editable :class:`GenerateConfigPanel` — pick a
-workflow and set params — with no special or permanent tab. New tabs fork via the
-"+" button or a thumbnail double-click; the first one is created on construction.
-The corner's close-all — a tab's own ✕ beside the word "All" — empties the pane in
-one click, since a session that has spread across a dozen tabs otherwise costs a
-dozen clicks to clear.
+workflow and set params — with no special or permanent tab. The pane always holds
+at least one: closing the last tab opens a fresh blank one in its place, so the
+resting state is a whole generate form waiting on a workflow rather than an empty
+black rectangle. That is why there is no "+" — a tab is always there — and no
+close-all; a tab's right-click menu closes the others, or everything to its
+right, and tabs drag along the row to reorder.
+
+Tabs open the way an IDE opens files, so browsing doesn't leave a row of them
+behind. A single-clicked generation lands in the *preview* tab, drawn in italic:
+the next single click replaces it. A double-click pins that tab upright, and the
+click after it opens a new preview tab beside it.
+
 This owns every tab's lifecycle — add, close, rename, and session capture/restore
 of each tab's configuration.
 
@@ -14,25 +21,21 @@ this relays for the gallery to launch as a re-roll of the config's settings fold
 The gallery owns every in-flight job (a re-roll) and reconnects any left running
 after a restart, so the tabs carry no job state.
 
-Clicking a browser thumbnail loads that generation into the current tab (reusing
-it for the same settings folder, or forking a new tab for a different one), where
-its output shows in the preview, its settings seed the editable form, and a footer
-offers the source-image link / animations / Send-to-Evolver for its media type.
-Clicking a config tab's history-strip thumbnail opens (or reuses) a tab for that
-generation.
+Clicking a browser thumbnail loads that generation into a tab (see
+:meth:`load_selection`), where its output shows in the preview, its settings seed
+the editable form, and a footer offers the source-image link / animations /
+Send-to-Evolver for its media type. Clicking a config tab's history-strip
+thumbnail opens (or reuses) a tab for that generation.
 
 Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
-test) the corner buttons are hidden and :meth:`open_config` is a no-op — but a tab
-still shows, its form up for inspection with Generate disabled.
+test) :meth:`open_config` is a no-op — but a tab still shows, its form up for
+inspection with Generate disabled.
 """
 
 import time
 
-from PyQt6.QtWidgets import (
-    QTabWidget, QToolButton, QInputDialog, QApplication, QWidget, QHBoxLayout,
-    QStyle, QSizePolicy,
-)
-from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QTabWidget, QInputDialog, QApplication, QMenu
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -42,7 +45,6 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.gui.icons import tab_close_icon
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -60,89 +62,24 @@ class InfoPaneTabs(QTabWidget):
         # afterwards drops that setting (it doesn't carry to a new bar).
         self.setTabBar(ElidingTabBar())
         self.setTabsClosable(True)
+        # Drag a tab along the row to put it where you want it: the order is the
+        # user's, not the order things happened to open in.
+        self.setMovable(True)
         self.tabCloseRequested.connect(self._close_subtab)
         self.tabBarDoubleClicked.connect(self._rename_subtab)
-        self._add_btn = self._tab_row_button("+", "New configuration")
-        self._add_btn.clicked.connect(lambda: self._add_subtab())
-        self._close_all_btn = self._tab_row_button("All", "Close all configurations")
-        # The tabs' own close mark, at the tabs' own size, rather than a ✕ typed
-        # into the label: one control that closes tabs, spelled one way.
-        indicator = self.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
-        self._close_all_btn.setIcon(tab_close_icon())
-        self._close_all_btn.setIconSize(QSize(indicator, indicator))
-        self._close_all_btn.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-        )
-        self._close_all_btn.clicked.connect(self.close_all_subtabs)
-        # Both buttons share a row that opens the tab strip: "+" leftmost, then
-        # close-all, then the tabs. They lead the row rather than trailing it, so
-        # the two controls are always in the same place however many tabs are open
-        # and however wide they get.
-        self._corner = QWidget()
-        corner_row = QHBoxLayout(self._corner)
-        # The same gap after close-all as between the two buttons, so the first
-        # tab isn't jammed against it while they sit spaced from each other.
-        corner_row.setContentsMargins(0, 0, 8, 0)
-        # A gap of bare strip between them: both are flat and share the row's
-        # background, so the seam is invisible but unclickable — a miss on the "+"
-        # a user hits constantly lands on nothing rather than emptying the pane.
-        corner_row.setSpacing(8)
-        corner_row.addWidget(self._add_btn)
-        corner_row.addWidget(self._close_all_btn)
-        self._corner.setVisible(client is not None)  # nothing to run without a client
-        self.setCornerWidget(self._corner, Qt.Corner.TopLeftCorner)
+        bar = self.tabBar()
+        bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        bar.customContextMenuRequested.connect(self._open_tab_menu)
+        # A dragged tab lands at a new index, and the italic mark is drawn by index.
+        bar.tabMoved.connect(lambda _from, _to: self._sync_preview_tab())
+        # The tab a click opened and the next click may replace (see the module
+        # docstring). Tracked by panel rather than index, since tabs move.
+        self._preview_panel: GenerateConfigPanel | None = None
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
-        self._add_subtab()  # start with one editable tab
-
-    # --- the two buttons standing in the tab row ----------------------------
-
-    def _tab_row_button(self, text: str, tooltip: str) -> QToolButton:
-        """A button that belongs to the tab strip: flat, tab-coloured, tab-tall.
-
-        Styled as ``#tabBarButton`` (see :func:`build_stylesheet`) so it reads as
-        part of the row rather than a little toolbar bolted onto it.
-        """
-        button = QToolButton()
-        button.setObjectName("tabBarButton")
-        button.setText(text)
-        button.setToolTip(tooltip)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Fill the row's height rather than sit centred in it: a tab runs the full
-        # height of the strip, and these stand alongside tabs.
-        button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        return button
-
-    def _place_tab_row_buttons(self):
-        """Hold the button row to exactly the tab row's height.
-
-        Qt lays a corner widget out at the left edge with the tabs starting after
-        it — the placement this wants — but it places it by arithmetic of its own
-        that lands a pixel or three off the tabs, differently on each style. So
-        the height is set here and the position is corrected once Qt has finished:
-        guessing at that arithmetic is what left the buttons sitting off the line
-        twice already.
-        """
-        bar = self.tabBar()
-        row_height = bar.height() or bar.sizeHint().height()
-        for button in (self._add_btn, self._close_all_btn):
-            button.setMinimumHeight(row_height)
-        self._corner.setFixedHeight(row_height)
-        QTimer.singleShot(0, self._align_tab_row_buttons)
-
-    def _align_tab_row_buttons(self):
-        """Sit the button row on the tabs' own line, after Qt has placed it."""
-        self._corner.move(self._corner.x(), self.tabBar().y())
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._place_tab_row_buttons()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._place_tab_row_buttons()
+        self._add_subtab()  # the pane's resting tab
 
     # --- config tabs -------------------------------------------------------
 
@@ -158,8 +95,12 @@ class InfoPaneTabs(QTabWidget):
         widget = self.currentWidget()
         return widget if isinstance(widget, GenerateConfigPanel) else None
 
-    def _add_subtab(self) -> GenerateConfigPanel:
+    def _add_subtab(self, *, preview: bool = False) -> GenerateConfigPanel:
         """Build, add and select a fresh editable config tab.
+
+        ``preview`` opens it as the italic tab a later click may replace — what a
+        single-clicked generation gets, where a deliberate open gets a tab of its
+        own.
 
         Works even without a client: the tab shows for inspection, its Generate
         disabled. The tab's strip / source-link / animation signals are wired so a
@@ -168,9 +109,13 @@ class InfoPaneTabs(QTabWidget):
         panel = GenerateConfigPanel(self._client, self._db)
         index = self.addTab(panel, panel.title())
         panel.title_changed.connect(lambda text, p=panel: self._update_title(p, text))
-        panel.generate_requested.connect(self.generate_requested)  # relay every tab's Generate
+        panel.generate_requested.connect(  # relay every tab's Generate
+            lambda name, params, p=panel: self._on_panel_generate(p, name, params)
+        )
         panel.strip_activated.connect(self._on_strip_activated)
         self.setCurrentIndex(index)
+        if preview:
+            self._set_preview_panel(panel)
         self.tab_added.emit(panel)  # let the view wire its source/animation links
         return panel
 
@@ -178,7 +123,6 @@ class InfoPaneTabs(QTabWidget):
         index = self.indexOf(panel)
         if index >= 0:
             self.setTabText(index, text)
-            self._place_tab_row_buttons()  # a retitled tab is a differently wide one
 
     def _closed_within_double_click(self) -> bool:
         """Was a config tab closed within one double-click of now?
@@ -208,6 +152,8 @@ class InfoPaneTabs(QTabWidget):
         panel = self.widget(index)
         if not isinstance(panel, GenerateConfigPanel):
             return
+        if panel is self._preview_panel:
+            self._preview_panel = None
         self.removeTab(index)
         panel.teardown()
         panel.deleteLater()
@@ -215,31 +161,110 @@ class InfoPaneTabs(QTabWidget):
     def _close_subtab(self, index: int):
         self._last_close_at = time.monotonic()  # arm the stray-double-click guard
         self._discard_subtab(index)
+        self._keep_a_tab_open()
 
-    def close_all_subtabs(self):
-        """Close every open config tab at once, leaving the pane empty.
+    def _keep_a_tab_open(self):
+        """Never leave the pane empty.
 
-        The same end state as clicking each tab's ✕ in turn — an empty pane has
-        always been reachable that way, and every caller here already copes with
-        no tab in front — but at one click rather than one per tab. Walking from
-        the last index down keeps each index valid as the tabs below it shift.
+        Closing the last tab used to strand a black rectangle where the form had
+        been, with nothing in it to click. A fresh blank tab takes its place
+        instead — the pane's resting state, a whole generate form waiting on a
+        workflow.
+        """
+        if self.count() == 0:
+            self._add_subtab()
+
+    def _discard_all_subtabs(self):
+        """Tear down every open tab, leaving the pane momentarily empty.
+
+        For a caller that rebuilds the tabs itself (:meth:`restore_state`);
+        everything user-facing goes through the closes above, which top the pane
+        back up. Walking from the last index down keeps each index valid as the
+        tabs below it shift.
         """
         for index in range(self.count() - 1, -1, -1):
             self._discard_subtab(index)
 
-    def _sync_close_all(self):
-        """Grey out close-all when the pane is already empty."""
-        self._close_all_btn.setEnabled(self.count() > 0)
+    def _close_other_subtabs(self, index: int):
+        """Close every tab but this one — the right-click menu's "Close others"."""
+        keeper = self.widget(index)
+        for i in range(self.count() - 1, -1, -1):
+            if self.widget(i) is not keeper:
+                self._discard_subtab(i)
+
+    def _close_subtabs_to_the_right(self, index: int):
+        """Close every tab after this one — the right-click menu's "Close to the
+        right". Reads off position, so it follows a tab dragged elsewhere."""
+        for i in range(self.count() - 1, index, -1):
+            self._discard_subtab(i)
+
+    def _tab_menu(self, index: int) -> QMenu:
+        """The right-click menu for the tab at ``index``.
+
+        Both entries always show, greyed when they would close nothing, so the
+        menu reads the same wherever it opens instead of changing shape under the
+        cursor.
+        """
+        menu = QMenu(self)
+        others = menu.addAction("Close others")
+        others.setEnabled(self.count() > 1)
+        others.triggered.connect(lambda: self._close_other_subtabs(index))
+        to_right = menu.addAction("Close to the right")
+        to_right.setEnabled(index < self.count() - 1)
+        to_right.triggered.connect(lambda: self._close_subtabs_to_the_right(index))
+        return menu
+
+    def _open_tab_menu(self, pos):
+        """Pop the tab menu where a tab was right-clicked; nowhere else."""
+        index = self.tabBar().tabAt(pos)
+        if index >= 0:
+            self._tab_menu(index).exec(self.tabBar().mapToGlobal(pos))
+
+    # --- the preview tab ---------------------------------------------------
+
+    def _set_preview_panel(self, panel: GenerateConfigPanel | None):
+        """Make ``panel`` the one tab a later single click may replace."""
+        self._preview_panel = panel
+        self._sync_preview_tab()
+
+    def _sync_preview_tab(self):
+        """Tell the bar which tab to draw in italic, after anything that could
+        have moved it — an open, a close, or a drag along the row."""
+        panel = self._preview_panel
+        self.tabBar().set_preview_index(self.indexOf(panel) if panel is not None else -1)
+
+    def _pin_panel(self, panel):
+        """Stop ``panel`` being the tab a later click replaces."""
+        if self._preview_panel is panel:
+            self._set_preview_panel(None)
+
+    def pin_current_tab(self):
+        """Keep the front tab: a double-click's "I'm staying here".
+
+        The tab stops being the preview one, so the next single-clicked
+        generation opens beside it rather than over it. A no-op on a tab that was
+        already pinned.
+        """
+        self._pin_panel(self.currentWidget())
+
+    def _on_panel_generate(self, panel, workflow_name: str, params: dict):
+        """Relay a tab's Generate for the gallery to launch as a re-roll — and
+        keep that tab.
+
+        A tab with a run in flight is a tab being worked in: its Cancel and its
+        filling progress bar belong to that run, and a later click replacing the
+        tab would take both away while the job kept going.
+        """
+        self._pin_panel(panel)
+        self.generate_requested.emit(workflow_name, params)
 
     def tabInserted(self, index: int):  # Qt hook: every add path lands here
         super().tabInserted(index)
-        self._sync_close_all()
-        self._place_tab_row_buttons()  # the row just got wider
+        self._sync_preview_tab()  # the tabs after it just shifted right
 
     def tabRemoved(self, index: int):  # Qt hook: every close path lands here
         super().tabRemoved(index)
-        self._sync_close_all()
-        self._place_tab_row_buttons()  # ...and narrower
+        self._sync_preview_tab()  # ...and back left
 
     def _ids_for_settings(self, key) -> list[str]:
         """Every generation in a settings folder (workflow + signature), newest first."""
@@ -303,20 +328,29 @@ class InfoPaneTabs(QTabWidget):
     # --- loading the browser selection into a tab --------------------------
 
     def load_selection(self, row: dict, image_rows: list[dict]):
-        """Show a browsed generation in a tab: reuse the current tab when it's
-        blank or already on that settings folder, else fork a fresh tab.
+        """Show a single-clicked generation in a tab, without leaving a trail of
+        them behind.
 
-        A blank/unused tab (nothing displayed yet) or one already on the clicked
-        row's folder is replaced in place; a tab showing a different folder is left
-        alone and a new tab opened, so browsing distinct generations spreads across
-        tabs rather than clobbering an edited one.
+        Where it lands, in order: the front tab when that tab is the clicked row's
+        own settings folder already; the pane's untouched resting tab, which
+        becomes the preview tab by being clicked into; the preview tab, replaced
+        where it stands; or a new preview tab when none is open.
+
+        So a browse through a folder's items reuses one italic tab however many
+        are clicked, while a tab that was pinned (double-clicked) or edited into a
+        different folder is left where it is.
         """
         key = self._row_settings_key(row)
         cur = self.current_config_panel()
-        if cur is not None and (cur._displayed_row is None or cur.settings_key() == key):
-            target = cur
+        if cur is not None and not cur.is_blank() and cur.settings_key() == key:
+            target = cur  # already this generation's own tab, pinned or not
+        elif cur is not None and cur.is_blank():
+            target = cur  # the resting tab; a click is what makes it a preview tab
+            self._set_preview_panel(target)
+        elif self._preview_panel is not None:
+            target = self._preview_panel  # replace the italic tab, don't fork
         else:
-            target = self._add_subtab()
+            target = self._add_subtab(preview=True)
         target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
 
@@ -430,7 +464,7 @@ class InfoPaneTabs(QTabWidget):
             ))
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
-        self.close_all_subtabs()  # clear every tab before rebuilding from the snapshot
+        self._discard_all_subtabs()  # clear every tab before rebuilding from the snapshot
         for snapshot, title, launched in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)

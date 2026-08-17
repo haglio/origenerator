@@ -65,9 +65,9 @@ def test_tabs_collapse_further_as_more_open(qtbot):
 
 
 def test_the_row_keeps_its_height_when_the_last_tab_closes(qtbot):
-    # Qt sizes a tab widget's corner buttons to the bar, and a stock empty bar is
-    # zero pixels tall — which took the "+" off screen with the last tab and made
-    # an emptied pane a dead end. The row holds the height it had.
+    # A stock empty bar is zero pixels tall, so a bar that momentarily empties —
+    # a pane rebuilding its tabs from a saved session — would collapse the row it
+    # stands in and everything laid out beside it. The row holds the height it had.
     tabs = _tabs_with(qtbot, n=2)
     full = tabs.tabBar().sizeHint().height()
     assert full > 0
@@ -149,3 +149,103 @@ def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
     last.click()
 
     assert asked == [1]  # it is the second tab now, and says so
+
+
+# --- the preview tab, drawn in italic ----------------------------------------
+
+def _painted_label_font(bar, index):
+    """The font the bar's style would paint tab ``index``'s label with.
+
+    Read at the drawing call rather than off a rendered pixmap: the offscreen
+    platform this suite runs on paints italic and upright text identically, so a
+    picture of the bar cannot tell them apart.
+    """
+    from PyQt6.QtGui import QPainter, QPixmap
+
+    pixmap = QPixmap(400, 60)
+    painter = QPainter(pixmap)
+    try:
+        bar.style().drawItemText(painter, bar.tabRect(index), 0, bar.palette(),
+                                 True, bar.tabText(index))
+        return painter.font()
+    finally:
+        painter.end()
+
+
+def test_no_tab_is_the_preview_tab_to_begin_with(qtbot):
+    bar = _closable_bar(qtbot)
+    assert bar.preview_index() == -1
+    assert _painted_label_font(bar, 0).italic() is False
+
+
+def test_the_preview_tabs_label_is_painted_italic(qtbot):
+    # Qt has no per-tab font, so the slant is applied where the label is finally
+    # painted — this is the whole mechanism, and it is worth pinning down.
+    bar = _closable_bar(qtbot, count=3)
+    bar.set_preview_index(1)
+    assert _painted_label_font(bar, 1).italic() is True
+
+
+def test_the_other_tabs_stay_upright(qtbot):
+    # The painter carries its font from one label to the next, so an italic left
+    # behind would spread down the row.
+    bar = _closable_bar(qtbot, count=3)
+    bar.set_preview_index(1)
+    assert _painted_label_font(bar, 0).italic() is False
+    assert _painted_label_font(bar, 2).italic() is False
+
+
+def test_clearing_the_preview_tab_puts_its_label_back_upright(qtbot):
+    bar = _closable_bar(qtbot)
+    bar.set_preview_index(0)
+    bar.set_preview_index(-1)
+    assert _painted_label_font(bar, 0).italic() is False
+
+
+def test_an_index_past_the_last_tab_marks_nothing(qtbot):
+    # A stale index — the preview tab closed, its index not yet re-synced —
+    # must not slant whichever tab has since taken that slot.
+    bar = _closable_bar(qtbot, count=2)
+    bar.set_preview_index(5)
+    assert _painted_label_font(bar, 0).italic() is False
+    assert _painted_label_font(bar, 1).italic() is False
+
+
+def test_the_bars_style_is_owned_by_the_bar(qtbot):
+    # QProxyStyle takes ownership of a base style that has no parent, and setting
+    # an app stylesheet re-wraps every widget's own style in a QStyleSheetStyle —
+    # so an unparented proxy is deleted out from under Python the first time the
+    # app is themed, and the next thing to touch it faults the process.
+    bar = _closable_bar(qtbot)
+    assert bar._preview_style.parent() is bar
+
+
+def test_the_italic_mark_survives_the_app_being_themed(qtbot):
+    from PyQt6.QtWidgets import QApplication
+
+    from origenerator.gui.stylesheet import build_stylesheet
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    bar = _closable_bar(qtbot)
+    bar.set_preview_index(0)
+    try:
+        app.setStyleSheet(build_stylesheet())
+        assert _painted_label_font(bar, 0).italic() is True
+    finally:
+        app.setStyleSheet(prior)
+    assert _painted_label_font(bar, 0).italic() is True
+
+
+def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
+    # Reordering by drag is new; a tab's ✕ must still close the tab it rides on
+    # rather than whatever has taken its old slot.
+    bar = _closable_bar(qtbot, count=3)
+    first = _close_button(bar, 0)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+    bar.moveTab(0, 2)
+
+    first.click()
+
+    assert asked == [2]

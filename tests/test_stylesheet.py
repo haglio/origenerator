@@ -9,20 +9,14 @@ def test_build_stylesheet_resolves_shared_ui_and_returns_qss():
     assert "#" in qss
 
 
-def test_stylesheet_styles_the_subtab_add_button():
-    # The Generate tab's "+" corner button is a QToolButton; keep it themed.
-    assert "QToolButton" in build_stylesheet()
-
-
-def test_the_tab_row_buttons_are_styled_as_tabs_not_as_buttons():
-    # "✕ All" and "+" stand in the tab row beside the tabs, so they take the tabs'
-    # own flat look — the raised, rounded, bordered QToolButton default read as a
-    # separate little toolbar bolted onto the strip.
+def test_a_tabs_close_mark_is_styled_flat_not_as_a_button():
+    # All a tab's ✕ is is the style's own mark sitting on the tab; the default
+    # QToolButton look would box it in a raised, rounded border.
     qss = build_stylesheet()
-    rule = qss.split("QToolButton#tabBarButton {", 1)[1].split("}", 1)[0]
+    rule = qss.split("QToolButton#tabCloseButton {", 1)[1].split("}", 1)[0]
+    assert "background-color: transparent" in rule
     assert "border: none" in rule
     assert "border-radius: 0" in rule
-    assert "QToolButton#tabBarButton:hover" in qss
 
 
 def test_stylesheet_greys_disabled_buttons():

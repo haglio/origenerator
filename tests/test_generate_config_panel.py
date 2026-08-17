@@ -16,11 +16,20 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 @pytest.fixture
-def panel(qtbot, tmp_path):
+def blank_panel(qtbot, tmp_path):
+    """A panel as it opens: the picker on its placeholder, nothing chosen yet."""
     db = Database(tmp_path / "test.db")
     p = GenerateConfigPanel(ComfyUIClient(), db)
     qtbot.addWidget(p)
     return p
+
+
+@pytest.fixture
+def panel(blank_panel):
+    """A panel with its workflow answered — the state most of these tests are
+    about, where there is a form below the picker to poke at."""
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    return blank_panel
 
 
 def _combo_index(panel, key):
@@ -423,6 +432,61 @@ def test_restore_config_pins_concrete_seed_when_not_random(panel):
     assert snap.params["seed"] == 99
 
 
+# --- the resting state: a whole form, waiting on a workflow -----------------
+
+def test_a_fresh_panel_picks_no_workflow(blank_panel):
+    # The pane's resting tab asks which workflow to run rather than presenting
+    # whichever is registered first as a choice already made.
+    assert blank_panel._workflow_combo.currentIndex() == -1
+    assert blank_panel._workflow_combo.currentData() is None
+    assert blank_panel._workflow_combo.placeholderText()
+
+
+def test_a_fresh_panel_lays_out_nothing_the_workflow_decides(blank_panel):
+    # Which params exist is the workflow's answer, and so is its typical time —
+    # neither can be shown before the picker is answered.
+    assert blank_panel._param_form is None
+    assert blank_panel._estimate_label.isHidden()
+
+
+def test_a_fresh_panel_cannot_generate(blank_panel):
+    # Greyed rather than silently inert: there is no graph to submit.
+    assert blank_panel._generate_btn.isEnabled() is False
+
+
+def test_picking_a_workflow_fills_in_everything_below(blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    assert blank_panel._param_form is not None
+    assert not blank_panel._estimate_label.isHidden()
+    assert blank_panel._generate_btn.isEnabled() is True
+
+
+def test_a_fresh_panel_is_blank_and_a_used_one_is_not(blank_panel):
+    # What load_selection reads to decide whether a tab is free to be clicked into.
+    assert blank_panel.is_blank() is True
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    assert blank_panel.is_blank() is False
+
+
+def test_a_fresh_panel_shows_the_previews_placeholder_not_a_black_pane(blank_panel):
+    # Nothing has been generated with settings that don't exist yet, so the
+    # preview rests on its own "nothing selected" placeholder.
+    assert blank_panel._displayed_row is None
+
+
+def test_a_fresh_panel_names_itself_for_what_it_is(blank_panel):
+    # "unknown" would read as a workflow the app failed to recognize, rather than
+    # a question nobody has answered yet.
+    assert blank_panel.title() == "New generation"
+
+
+def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
+    fired = []
+    blank_panel.generate_requested.connect(lambda *a: fired.append(a))
+    blank_panel._on_generate()
+    assert fired == []
+
+
 # --- title ------------------------------------------------------------------
 
 def test_title_is_workflow_name_for_blank_config(panel):
@@ -471,6 +535,7 @@ class SpyDB:
 def _spy_panel(qtbot, db):
     panel = GenerateConfigPanel(ComfyUIClient(), db)
     qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     return panel
 
 
@@ -534,6 +599,7 @@ def saved_panel(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     panel = GenerateConfigPanel(ComfyUIClient(), db)
     qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "sdxl_t2i"))
     panel._preview.show_media = MagicMock()  # don't start real WMF playback
     return panel, db
 

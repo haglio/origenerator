@@ -53,8 +53,8 @@ class OrigeneratorWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(icon_path)))
 
         # One unified view: the gallery, whose info pane now holds the editable
-        # config tabs that used to be a separate Generate tab. Reuse Parameters,
-        # the re-roll "+", and the combine panel all feed it.
+        # config tabs that used to be a separate Generate tab. A clicked
+        # thumbnail, the re-roll "+", and the combine panel all feed it.
         self._gallery_view = GalleryView(db, client=client)
         self.setCentralWidget(self._gallery_view)
 

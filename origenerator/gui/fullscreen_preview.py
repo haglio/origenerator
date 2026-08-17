@@ -211,8 +211,9 @@ class FullscreenPreview(QWidget):
 
         The same gesture the slideshow uses, for the same reason — stopping on a
         picture is what says you want it, and here you have already stopped. The
-        gallery decides whether a run is wanted (it holds the settings and the
-        levels); ``True`` back means one started. ``E`` turns it off.
+        gallery decides whether a run is wanted (it holds the levels, and an
+        image already enhanced wants nothing); ``True`` back means one started.
+        ``E`` turns it off.
         """
         self._on_enhance = on_enhance
         self._ids_by_path = {str(k): v for k, v in ids_by_path.items()}

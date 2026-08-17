@@ -52,9 +52,10 @@ class SlideshowView(QWidget):
         super().__init__(parent)
         self._on_delete = on_delete
         # Holding a slide is also how you ask for it: Down enhances what is on
-        # screen if it hasn't already been made at the current settings, so the
-        # one you stopped on is the one that gets the better version. ``E``
-        # turns that off for the session, for when it is in the way.
+        # screen if it has never been enhanced, so the one you stopped on is the
+        # one that gets the better version — and one that already has a better
+        # version is left alone. ``E`` turns that off for the session, for when
+        # it is in the way.
         self._on_enhance = on_enhance
         self._enhance_on_hold = on_enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
@@ -232,7 +233,8 @@ class SlideshowView(QWidget):
         Stopping on a picture is the gesture that says you want it, so it is
         also the one that stars it and the one that asks for the better version
         — nothing extra to press, and the run happens while you keep looking at
-        it. Releasing the hold asks for nothing; only stopping does.
+        it. Releasing the hold asks for nothing; only stopping does, and only on
+        a picture that has never been enhanced (the gallery's call).
         """
         held = self._toggle_lock()
         if held:
@@ -250,10 +252,10 @@ class SlideshowView(QWidget):
     def _enhance_current(self):
         """Ask the gallery to enhance the slide on screen, if it wants one.
 
-        The gallery decides whether it does — it holds the settings, and it is
-        the one that knows whether this image already carries a version made at
-        exactly them. ``True`` back means a run started, and the corner says so
-        until the finished version arrives.
+        The gallery decides whether it does — it is the one that knows whether
+        this image has already been enhanced, and an enhanced one wants nothing.
+        ``True`` back means a run started, and the corner says so until the
+        finished version arrives.
         """
         if self._on_enhance is None or not self._enhance_on_hold:
             return

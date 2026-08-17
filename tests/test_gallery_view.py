@@ -7467,7 +7467,7 @@ def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     assert job.params["enhance_steps"] == 29
 
 
-def test_holding_a_slide_enhances_it_unless_it_already_has_that_version(qtbot, tmp_path):
+def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -7479,6 +7479,26 @@ def test_holding_a_slide_enhances_it_unless_it_already_has_that_version(qtbot, t
 
     # Asked again while that one is still cooking: nothing new is started.
     assert view._enhance_from_slideshow("g0") is False
+
+
+def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
+    # A hold is made with no view of the Enhance panel, so an image that already
+    # carries an enhancement must not be re-derived at whatever the knobs happen
+    # to say now — however far those settings have moved since. Re-enhancing is
+    # the thumbnail menu's job, pressed while looking at the settings it uses.
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps([
+        {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"},
+    ]), original_files=json.dumps(
+        [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _set_enhance(view, params={"enhance_steps": 41})  # nothing like what made it
+
+    assert view._enhance_from_slideshow("g0") is False
+    assert view._reroll_jobs == {}
 
 
 def test_a_landed_enhancement_upgrades_that_item_in_every_open_show(

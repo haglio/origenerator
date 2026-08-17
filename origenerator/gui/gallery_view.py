@@ -37,7 +37,10 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.slideshow import in_order
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, in_order
+from origenerator.voice.show_commands import (
+    ShowCommand, match_show_command, show_command_bias,
+)
 from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
@@ -120,6 +123,18 @@ def _is_deletable_folder(group) -> bool:
     )
 
 
+def _match_voice_command(text: str):
+    """The one command an utterance is, or ``None`` — the whole spoken
+    vocabulary, in the order it is tried.
+
+    Both matchers are strict about their own shape and neither can claim the
+    other's (a show command names the slideshow, a fix leads with "fix"), so the
+    order only decides which is asked first. Everything unclaimed falls through
+    to a prompt rewrite, which is why neither may be loose.
+    """
+    return match_show_command(text) or gallery.match_fix_command(text)
+
+
 class GalleryView(QWidget):
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
@@ -165,12 +180,14 @@ class GalleryView(QWidget):
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
-        # The matcher rides along so a spoken "fix teeth" during a slideshow is
+        # The matcher rides along so a spoken "fix teeth" or "start slideshow" is
         # executed as a command rather than steering a
         # prompt; the bias teaches whisper the command vocabulary, without
         # which a quiet mic's "fix <part>" transcribes as other words entirely.
-        self._voice = VoiceSteering(command_matcher=gallery.match_fix_command,
-                                    transcribe_bias=gallery.fix_command_bias())
+        self._voice = VoiceSteering(
+            command_matcher=_match_voice_command,
+            transcribe_bias=f"{gallery.fix_command_bias()} {show_command_bias()}",
+        )
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
         self._voice.edited.connect(self._on_voice_edited)
@@ -1769,6 +1786,10 @@ class GalleryView(QWidget):
                 lambda: self._working_prompts(self._voice_target_key),
                 lambda new: self._steer_prompts(self._voice_target_key, new),
             )
+            # The mic is open now, so the spoken commands are listened for too —
+            # "start slideshow" among them, which is only any use before there
+            # is a show.
+            self._sync_voice_commands()
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._auto_working.pop(key, None)  # the launch didn't take
@@ -1813,6 +1834,7 @@ class GalleryView(QWidget):
             self._pending_auto_key = None
             self._voice_status_timer.stop()
             self._voice_status.hide()
+            self._sync_voice_commands()  # the mic closes unless a show holds it
         self._sync_auto_button()
 
     # --- voice feedback: a floating caption of what voice heard and did --------
@@ -2017,25 +2039,77 @@ class GalleryView(QWidget):
         self._enqueue_enhancements([row])
         return True
 
-    # --- spoken targeted fixes: "fix teeth" over a fullscreen show ------------
+    # --- spoken commands: "fix teeth" over a show, "start slideshow" for one ---
 
     def _sync_voice_commands(self):
-        """Keep command listening tied to a fullscreen show being up: "fix
-        teeth" means something only while a picture fills the screen, and the
-        mic should not stay open for a view that has closed (unless a steered
-        auto loop is holding it anyway)."""
-        if self._slideshow is not None:
-            self._voice.start_commands(self._on_voice_fix)
+        """Listen for commands whenever the mic is open at all — while a show is
+        up, and while a steered auto loop is running.
+
+        Not only while a show is up, which is where this started: "start
+        slideshow" has to be heard when there is no show, or it can never be the
+        thing that opens one. The mic itself is still only ever open for a reason
+        (the Auto switch, or a show), so this widens what is listened *for*, not
+        when something is listening.
+        """
+        if self._slideshow is not None or self._voice_target_key is not None:
+            self._voice.start_commands(self._on_voice_command)
         else:
             self._voice.stop_commands()
+
+    def _on_voice_command(self, matched):
+        """One recognized utterance: a show command, or a targeted fix."""
+        if isinstance(matched, ShowCommand):
+            self._run_show_command(matched)
+        else:
+            self._on_voice_fix(matched)
+
+    def _run_show_command(self, command: ShowCommand):
+        """Get the show going, hold it, or close it.
+
+        Pausing is a pace of nought and starting is that pace back at the
+        standard number, because a show that never moves on is exactly what a
+        held picture is here — there is no separate paused state to keep.
+
+        The pace is set through the show when there is one, not only posted to
+        the app-wide number: a show sitting at nought while that number already
+        reads four would get no word of a change that never happened, and would
+        stay frozen through the very command meant to start it.
+        """
+        show = self._slideshow
+        if command is ShowCommand.STOP:
+            if show is None:
+                self._show_voice_status("🎤 no slideshow to close", transient=True)
+                return
+            show.close()
+            self._show_voice_status("🎤 slideshow closed", transient=True)
+            return
+        seconds = 0 if command is ShowCommand.PAUSE else DEFAULT_IMAGE_DWELL_MS // 1000
+        if show is None:
+            self._pace.set_seconds(seconds)  # what the next show opens at
+            if command is ShowCommand.PAUSE:
+                self._show_voice_status("🎤 no slideshow to pause", transient=True)
+                return
+            self._start_slideshow()
+            if self._slideshow is None:
+                self._show_voice_status("🎤 nothing here to play", transient=True)
+            return
+        show.set_dwell_s(seconds)
+        show.note_voice_command(
+            "🎤 slideshow paused" if command is ShowCommand.PAUSE
+            else f"🎤 slideshow at {seconds}s"
+        )
 
     def _on_voice_fix(self, part):
         """A spoken "fix <part>": aim a targeted detail pass at what's on screen.
 
         Answered out of the show's own note — the speaker is looking at it, not
-        at this pane."""
+        at this pane. Said with no show up there is no "on screen" to aim at, and
+        the utterance has already been claimed as a command by the time it gets
+        here, so the caption says so rather than letting it vanish."""
         show = self._slideshow
         if show is None:
+            self._show_voice_status(
+                f"🎤 a {part.name} fix needs a picture on screen", transient=True)
             return
         prompt_id, message = self._fix_part(show.voice_fix_target(), part)
         show.note_voice_fix(prompt_id, message)

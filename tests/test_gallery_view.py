@@ -27,6 +27,7 @@ from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.recovery import RETENTION_DAYS
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -7768,3 +7769,139 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
 
     assert view._reroll_jobs == {}
     assert "no teeth detector" in view._slideshow._note.text()
+
+
+# --- spoken show control: start it, pause it, close it ----------------------
+
+def _voiceable(qtbot, tmp_path, monkeypatch):
+    """A gallery on a playable folder with the mic armed for commands."""
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._voice.start_commands(view._on_voice_command)  # as an open mic would
+    return view
+
+
+def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeypatch):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    assert view._slideshow is None
+
+    view._voice.speak_command("start slideshow")
+
+    assert view._slideshow is not None
+    qtbot.addWidget(view._slideshow)
+    assert view._slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert view._slideshow._timer.isActive()
+    view._slideshow.close()
+
+
+def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+
+    view._voice.speak_command("open slideshow")
+
+    assert view._slideshow is not None
+    qtbot.addWidget(view._slideshow)
+    view._slideshow.close()
+
+
+def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
+    # The one a double-click opened is at nought; this is what un-pauses it,
+    # and there is no separate resume to learn.
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    show = _double_click_show(view, qtbot)
+    assert show.dwell_s == 0
+
+    view._voice.speak_command("start slideshow")
+
+    assert view._slideshow is show          # the open one, not a second window
+    assert show.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert show._timer.isActive()
+    show.close()
+
+
+def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._voice.speak_command("start slideshow")
+    show = view._slideshow
+    qtbot.addWidget(show)
+
+    view._voice.speak_command("pause slideshow")
+
+    assert show.dwell_s == 0
+    assert not show._timer.isActive()
+    assert view._slideshow is show  # paused, not closed
+    show.close()
+
+
+@pytest.mark.parametrize("said", ["stop slideshow", "end slideshow",
+                                  "close slideshow"])
+def test_stopping_the_show_closes_it(qtbot, tmp_path, monkeypatch, said):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._voice.speak_command("start slideshow")
+    show = view._slideshow
+    qtbot.addWidget(show)
+    show.show()
+
+    view._voice.speak_command(said)
+
+    assert not show.isVisible()
+    assert view._slideshow is None
+
+
+def test_a_show_command_with_no_show_up_answers_in_the_gallery(
+        qtbot, tmp_path, monkeypatch):
+    # There is no note to write on, so the caption that carries every other
+    # voice answer says it instead.
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+
+    view._voice.speak_command("close slideshow")
+
+    assert "no slideshow" in view._voice_status.text()
+
+
+def test_a_spoken_fix_with_no_show_up_says_so_rather_than_vanishing(
+        qtbot, tmp_path, monkeypatch):
+    # The mic now hears commands during a steered loop too, so "fix teeth" is
+    # claimed even with nothing on screen — it must not disappear silently.
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["teeth_yolov8n.pt"])
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+
+    view._voice.speak_command("fix teeth")
+
+    assert view._reroll_jobs == {}
+    assert "picture on screen" in view._voice_status.text()
+
+
+def test_the_mic_listens_for_commands_while_a_loop_is_steered(qtbot, tmp_path):
+    # "start slideshow" is only any use before there is a show, so it has to be
+    # heard whenever the mic is open — which the Auto switch is what opens.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    assert not view._voice.commands_on
+
+    view._toggle_auto(True)
+    assert view._voice.commands_on
+
+    view._toggle_auto(False)
+    assert not view._voice.commands_on
+    assert not view._auto.is_active(key)
+
+
+def test_a_show_holds_command_listening_open_after_a_loop_ends(qtbot, tmp_path,
+                                                               monkeypatch):
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._voice.speak_command("start slideshow")
+    qtbot.addWidget(view._slideshow)
+
+    view._on_auto_stopped("some-other-folder")  # a loop elsewhere ended
+
+    assert view._voice.commands_on  # the show is still up and still listening
+    view._slideshow.close()

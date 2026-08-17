@@ -982,6 +982,11 @@ class GalleryView(QWidget):
         self._slideshow.media_changed.connect(self._reconcile_osr2)
         self._slideshow.showFullScreen()
         self._reconcile_osr2()
+        # However the show was asked for, it now owns the card it is drawn with: a
+        # video generation would saturate that card, and a show is exactly the
+        # stretch when nobody is waiting on a video. The queue holds them until it
+        # closes and keeps making images.
+        self._reroll.hold_videos(True)
         return self._slideshow
 
     def _folder_level_playlists(self) -> dict:
@@ -1128,6 +1133,17 @@ class GalleryView(QWidget):
             logger.info("Branch session: base re-renders left to the live app")
             return 0
         return queue_base_renders(self._db.list_generations(), self._launch_base_render)
+
+    def flush_queue_to_server(self) -> int:
+        """Hand ComfyUI everything the queue is still holding, as the app closes.
+
+        The queue holds work back for the sake of whoever is watching — videos off
+        the GPU while a slideshow plays, one prompt at a time so the line stays
+        re-orderable — and closing the app ends every one of those reasons. ComfyUI
+        outlives it and works through the rest alone; the next launch picks up
+        whatever finished. Returns how many jobs went.
+        """
+        return self._reroll.flush_to_server()
 
     def _launch_base_render(self, workflow, params):
         """The batch's launch adapter: submit one re-render as a normal re-roll
@@ -1376,9 +1392,6 @@ class GalleryView(QWidget):
             # (see GenerationJob.refresh_backlog).
             job.refresh_backlog()
         self._refresh_foreign_queue()
-        # And re-read the order ComfyUI will work through its queue in, which a
-        # drag in the bottom strip changes (see RerollController.reorder).
-        self._reroll.refresh_queue_order()
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)
@@ -2752,11 +2765,15 @@ class GalleryView(QWidget):
         holds one frame per folder, and a batch of enhances shares a folder — so
         the frame there belongs to whichever of them ComfyUI is running, and
         lending it to the ones queued behind would show each of them a picture of
-        a different image. Queued, the tile says so instead."""
+        a different image. Queued, the tile says so instead — and "queued" covers
+        both waits the same way, whether the job is still in this app's line or
+        already sitting on ComfyUI, since neither has a frame to show."""
         for key, job in running:
             if gallery.enhance_targets_row(job.params.get("input_image"), row):
-                frame = self._enhance_frames.get(key) if job.state == "running" else None
-                return (job.state, frame, gallery.describe_enhance_params(job.params))
+                rendering = job.state == "running"
+                frame = self._enhance_frames.get(key) if rendering else None
+                return ("running" if rendering else "queued", frame,
+                        gallery.describe_enhance_params(job.params))
         return None
 
     def _auto_enhance_if_wanted(self, row: dict | None):
@@ -2788,11 +2805,12 @@ class GalleryView(QWidget):
                     show._playlist.order[:10])
 
     def _on_slideshow_closed(self):
-        """The show was dismissed (however): let it go and hand the OSR2 back to
-        whatever the toggle was driving. The mic is untouched — it answers to its
-        own button, and "start slideshow" has to still be heard now there is no
-        show to hear it over."""
+        """The show was dismissed (however): let it go, with the hold it put on
+        videos, and hand the OSR2 back to whatever the toggle was driving. The mic
+        is untouched — it answers to its own button, and "start slideshow" has to
+        still be heard now there is no show to hear it over."""
         self._slideshow = None
+        self._reroll.hold_videos(False)
         self._reconcile_osr2()
 
     def _slideshow_items(self, rows) -> list:

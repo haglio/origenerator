@@ -64,13 +64,17 @@ def test_still_queued_row_is_left_running(tmp_path):
     assert summary["running"] == 1
 
 
-def test_pending_row_still_queued_is_left(tmp_path):
+def test_a_row_the_queue_is_still_holding_is_left_alone(tmp_path):
+    # A pending row was never submitted — it is a job the app's own queue is
+    # holding, which the server has never heard of. Checking it against ComfyUI
+    # would find nothing and delete a queue the user is still waiting on.
     db = Database(tmp_path / "t.db")
-    _insert_in_flight(db, "p1", status="pending")  # pending counts as in flight
+    _insert_in_flight(db, "p1", status="pending")
 
-    reconcile_in_flight(db, FakeComfy(queue={"p1"}), tmp_path, tmp_path / "thumbs")
+    summary = reconcile_in_flight(db, FakeComfy(), tmp_path, tmp_path / "thumbs")
 
-    assert db.get_generation("p1") is not None
+    assert db.get_generation("p1")["status"] == "pending"
+    assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 
 
 def test_gone_row_is_cleared(tmp_path):

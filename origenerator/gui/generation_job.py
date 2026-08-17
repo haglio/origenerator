@@ -1,12 +1,17 @@
 """One in-flight generation, tracked independently of any Generate panel.
 
 The gallery re-rolls a folder's settings in place, so it needs to submit a
-workflow to ComfyUI and follow it — progress, live preview, completion, cancel,
-and a requeue that moves it down the line — without a panel or a Generate subtab.
-This wraps that lifecycle: it filters the
+workflow to ComfyUI and follow it — progress, live preview, completion, cancel —
+without a panel or a Generate subtab. This wraps that lifecycle: it filters the
 shared client's multiplexed signals down to its own job and reports them as
 plain Qt signals. It owns no database or widget state; the caller decides what
 to persist and how to display it.
+
+A job is built before it is sent. :meth:`GenerationJob.start` is the moment it
+reaches ComfyUI, and until then it is only a job this app is holding — which is
+what lets the queue order and gate its own line (see
+:mod:`origenerator.queue_line`) rather than take whatever order the server's
+queue happens to have.
 """
 
 import json
@@ -116,6 +121,18 @@ class GenerationJob(QObject):
         return self._state
 
     @property
+    def media_type(self) -> str:
+        """What this run will produce — ``"image"`` or ``"video"``.
+
+        Read off the workflow rather than off any file, since the whole point of
+        knowing it is to place the job in the line *before* it has run. A
+        workflow that declares nothing counts as an image: the queue's images go
+        first and start sooner, so an unfamiliar one being made promptly is the
+        harmless way to be wrong (see :mod:`origenerator.queue_line`).
+        """
+        return getattr(self.workflow, "output_type", None) or "image"
+
+    @property
     def last_progress(self) -> tuple[int, int]:
         return self._last_progress
 
@@ -204,6 +221,20 @@ class GenerationJob(QObject):
         job._state = "running"
         return job
 
+    @classmethod
+    def readopt(cls, client, workflow, params, prompt_id, **kwargs):
+        """Take back a job this app queued but never handed to ComfyUI.
+
+        The counterpart to :meth:`reconnect`, for a row the queue was still
+        holding when the app closed — a video waiting out a slideshow, say. The
+        server has never heard of it, so there is nothing to rebind to: it comes
+        back as a job that has not started, keeping its row's prompt id so the
+        row it already owns is the one it eventually runs under.
+        """
+        job = cls(client, workflow, params, **kwargs)
+        job.prompt_id = prompt_id
+        return job
+
     def start(self):
         """Submit the job and begin tracking it. Raises if the submit fails."""
         if self._state != "idle":
@@ -215,33 +246,6 @@ class GenerationJob(QObject):
             self._detach()
             raise
         self._state = "queued"
-
-    def requeue(self) -> bool:
-        """Send this job to the back of ComfyUI's queue, still under its own id.
-
-        ComfyUI has no reorder endpoint — a prompt's queue number is fixed when
-        it is submitted — so a job takes a later place by leaving the queue and
-        joining the back of it. The prompt id is ours and is reused, so the DB
-        row, this live job and ComfyUI's history stay the one thing they were,
-        and the signals this job is already listening on keep reaching it.
-
-        Returns whether it moved. A job ComfyUI has started can't: there is no
-        place in front of what is executing, and dropping it would throw work
-        away rather than reorder it. A re-submit that fails leaves the job off
-        the queue entirely, so it fails rather than claim to be waiting.
-        """
-        if self._state != "queued":
-            return False
-        try:
-            self._client.cancel_prompt(self.prompt_id)
-            self._client.submit_job(self.payload, self.prompt_id)
-        except Exception as e:
-            logger.warning("Could not requeue job %s: %s", self.prompt_id, e)
-            self._detach()
-            self._state = "failed"
-            self.failed.emit(str(e))
-            return False
-        return True
 
     def cancel(self):
         """Stop the job: interrupt it if running, else drop it from the queue."""

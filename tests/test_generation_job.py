@@ -396,56 +396,67 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     client.foreign_backlog.assert_called_once()  # and isn't asked for again
 
 
-# --- taking a later place in the queue (how a reorder is carried out) --------
+# --- what the queue needs of a job it has not sent yet -----------------------
 
-def test_requeue_leaves_the_queue_and_rejoins_the_back_of_it(qtbot, tmp_path):
-    # ComfyUI has no reorder endpoint, so a job moves down the queue by being
-    # dropped from it and submitted again — under the same prompt id, so its row,
-    # its live job and its history all stay the one thing they were.
-    job, client = _started_job(tmp_path)
-    client.submit_job.reset_mock()
+def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
+    # The queue places a job before it has run, so what it will produce has to be
+    # readable from the recipe alone.
+    image = GenerationJob(_client(), SDXL, _params())
+    video = GenerationJob(_client(), WORKFLOW_REGISTRY["wan22_i2v"],
+                          WORKFLOW_REGISTRY["wan22_i2v"].default_params())
 
-    assert job.requeue() is True
-
-    client.cancel_prompt.assert_called_once_with("comfy-A")
-    client.submit_job.assert_called_once_with(job.payload, "comfy-A")
-    assert job.state == "queued"
+    assert (image.media_type, video.media_type) == ("image", "video")
 
 
-def test_requeue_refuses_a_job_comfyui_has_already_started(qtbot, tmp_path):
-    # Nothing can be moved in front of what is executing, and dropping a running
-    # prompt would throw away work rather than reorder it.
-    job, client = _started_job(tmp_path)
-    client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
-    client.submit_job.reset_mock()
+def test_an_undeclared_workflow_counts_as_an_image(qtbot, tmp_path):
+    # Images go first and start sooner, so an unfamiliar one being made promptly
+    # is the harmless way to be wrong; treating it as a video could hold it back
+    # through a whole slideshow.
+    job = GenerationJob(_client(), SDXL, _params())
+    job.workflow = MagicMock(spec=[])  # a workflow declaring no output type
 
-    assert job.requeue() is False
+    assert job.media_type == "image"
 
-    client.cancel_prompt.assert_not_called()
+
+def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
+    # A built job is only a job this app is holding: nothing was submitted, so
+    # the queue is free to re-order it, gate it, or drop it.
+    client = _client()
+
+    job = GenerationJob(client, SDXL, _params())
+
     client.submit_job.assert_not_called()
-    assert job.state == "running"
+    assert job.state == "idle"
 
 
-def test_a_requeue_whose_resubmit_fails_leaves_the_job_off_the_queue(qtbot, tmp_path):
-    # The drop already happened, so a failed re-submit means the job is gone from
-    # ComfyUI: it must say so rather than report a queued job that isn't there.
-    job, client = _started_job(tmp_path)
-    client.submit_job = MagicMock(side_effect=RuntimeError("server said no"))
+def test_readopt_comes_back_unsent_under_the_rows_prompt_id(qtbot, tmp_path):
+    # The counterpart to reconnect, for a row the queue was still holding when the
+    # app closed: the server has never heard of it, so there is nothing to rebind
+    # to and everything to re-send when its turn comes.
+    client = _client()
 
-    assert job.requeue() is False
+    job = GenerationJob.readopt(client, SDXL, _params(), "held-1")
 
-    assert job.state == "failed"
+    assert (job.prompt_id, job.state) == ("held-1", "idle")
+    client.submit_job.assert_not_called()
+
+    job.start()
+    client.submit_job.assert_called_once_with(job.payload, "held-1")
 
 
-def test_requeue_keeps_listening_for_the_job_it_resubmitted(qtbot, tmp_path):
-    # A requeued job is the same job: its progress, preview and completion must
-    # still land, or a reordered run would finish invisibly.
-    job, client = _started_job(tmp_path)
-    job.requeue()
+def test_a_re_adopted_job_reports_the_run_it_is_finally_given(qtbot, tmp_path):
+    # It has to listen on the same id its row carries, or the run it eventually
+    # gets would finish invisibly.
+    client = _client()
+    job = GenerationJob.readopt(
+        client, SDXL, _params(), "held-1",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    job.start()
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
 
-    client.job_completed.emit("comfy-A", SDXL_HISTORY)
+    client.job_completed.emit("held-1", SDXL_HISTORY)
 
     assert len(finished) == 1
 

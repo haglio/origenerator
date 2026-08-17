@@ -13,10 +13,19 @@ actions (:meth:`start`, :meth:`cancel`, :meth:`reorder`) let their sole caller
 drive the follow-up UI directly; the signals carry the events that arrive
 asynchronously from a job.
 
-It also holds the order ComfyUI will work through its queue in
-(:attr:`queue_order`, re-read by :meth:`refresh_queue_order` on each poll), since
-that is what a display of the queue must sort by — a reorder moves jobs on the
-server without touching anything the database records about them.
+It also *is* the queue. ComfyUI is handed one prompt at a time and the rest of
+the line waits here, in the order :mod:`origenerator.queue_line` decides — images
+in front, videos at the back, and no video started at all while the slideshow is
+playing. A job waiting its turn has never been sent, so it can be re-ordered,
+gated or dropped for free; a job already on the server can only be interrupted,
+which is why the line lives on this side of the wire. :attr:`queue_order` is what
+that line looks like to whatever displays it.
+
+A waiting job still gets its database row up front (status ``pending``, the same
+row it will run under), so a queue held overnight is still there after a restart
+— :meth:`reconnect_running` picks the sent ones back up and re-adopts the unsent
+ones — and so the app closing can hand ComfyUI everything left
+(:meth:`flush_to_server`) rather than take it to the grave.
 """
 
 import json
@@ -25,7 +34,7 @@ import time
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from origenerator import gallery
+from origenerator import gallery, queue_line
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.gui.generation_job import (
     GenerationJob, insert_generation_row, mark_generation_completed,
@@ -40,15 +49,6 @@ logger = logging.getLogger(__name__)
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
 
 
-def _first_difference(current: list, wanted: list) -> int:
-    """The first index at which two orderings part company (their common length
-    when one is simply a prefix of the other)."""
-    for index, (now, then) in enumerate(zip(current, wanted)):
-        if now != then:
-            return index
-    return min(len(current), len(wanted))
-
-
 def _parse_progress_state(raw):
     """The persisted progress snapshot for a row, or ``None`` when absent/corrupt."""
     if not raw:
@@ -61,9 +61,14 @@ def _parse_progress_state(raw):
 
 
 class RerollController(QObject):
-    """Tracks one in-flight job (re-roll or combine) per settings-folder key and
-    drives each to completion, emitting the redraws the view should make along
-    the way.
+    """Tracks the in-flight jobs (re-rolls and combines) of each settings-folder
+    key and drives each to completion, emitting the redraws the view should make
+    along the way.
+
+    It is also the queue: a launched job joins a line kept here and is handed to
+    ComfyUI only when the machine is free and the queue's rules say it may go
+    (see :mod:`origenerator.queue_line`), which is what lets an image jump ahead
+    of a video and a slideshow keep videos off the GPU entirely.
 
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment (the one generator of jobs the user didn't ask for), so
@@ -83,7 +88,12 @@ class RerollController(QObject):
         self._client = client
         self._jobs: dict[str, list[GenerationJob]] = {}  # folder key -> its live jobs
         self._progress_persist_at: dict[str, float] = {}  # prompt_id -> last-write time
-        self._queue_order: list[str] = []  # prompt ids as ComfyUI last listed them
+        # The queue proper: what ComfyUI is holding for us (one job, normally —
+        # more only when a previous session left several), and the line waiting
+        # to be handed over, in the order it will be.
+        self._on_server: list[GenerationJob] = []
+        self._waiting: list[GenerationJob] = []
+        self._videos_held = False  # the slideshow's gate (see :meth:`hold_videos`)
 
     @property
     def jobs(self) -> dict:
@@ -271,12 +281,11 @@ class RerollController(QObject):
 
         User work preempts a background experiment here, at the one choke point
         every user path funnels through — so a Generate never sits behind an
-        experiment's run (see :meth:`_preempt_experiments`). A running row is
-        recorded before the job is submitted so an app restart mid-generation can
-        find it and reconnect, exactly as the Generate tab does.
+        experiment's run (see :meth:`_preempt_experiments`). The job joins the
+        line rather than the server: its row is written first (``pending``, the
+        row it will run under) so a restart can find it either way, and
+        :meth:`_pump` hands it over when its turn comes.
         """
-        if source != "experiment":
-            self._preempt_experiments()
         try:
             job = GenerationJob(self._client, workflow, params, source=source)
         except Exception as e:
@@ -285,17 +294,83 @@ class RerollController(QObject):
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
+        self._enqueue(job)
+        # Preempted after this job is in the line, not before: dropping an
+        # experiment frees the machine and starts whatever is at the front, and
+        # the front has to be this job by then or the wait it was preempted for
+        # is just handed to something else.
+        if source != "experiment":
+            self._preempt_experiments()
+        self._pump()
+        self.changed.emit()
+
+    # --- the line: joining it, and being handed over ------------------------
+
+    def _enqueue(self, job: GenerationJob):
+        """Put a built job in the line, wherever the queue's rules place it."""
+        self._waiting.insert(queue_line.insertion_index(self._waiting, job), job)
+
+    def _pump(self):
+        """Hand ComfyUI the next job it may start, if it isn't holding one of ours.
+
+        One at a time: the whole reason the line is kept here is that a prompt
+        already on the server can no longer be re-ordered or held back, so
+        nothing is sent until the machine is free to run it. A submit that fails
+        takes that job out of the line and the next one is tried, rather than the
+        queue stalling on a job the server refuses.
+        """
+        while not self._on_server:
+            job = queue_line.next_ready(self._waiting, videos_held=self._videos_held)
+            if job is None:
+                return  # nothing may start: an empty line, or only held videos
+            self._waiting.remove(job)
+            if self._hand_over(job):
+                return
+
+    def _hand_over(self, job: GenerationJob) -> bool:
+        """Submit one job to ComfyUI, reporting whether the server took it."""
+        key = self._key_of(job)
         try:
             job.start()
-            self._db.update_generation(job.prompt_id, status="running")
         except Exception as e:
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
             self._drop(key, job)
-        self.changed.emit()
+            return False
+        self._on_server.append(job)
+        self._db.update_generation(job.prompt_id, status="running")
+        return True
+
+    def flush_to_server(self) -> int:
+        """Hand ComfyUI everything still waiting, and say how much went.
+
+        What the closing app calls. ComfyUI outlives Origenerator and works
+        through its queue alone, so a line held back for the user's sake — the
+        videos a slideshow was keeping off the GPU, the batch of experiments the
+        close just queued — belongs to the server the moment there is no longer a
+        user to hold it for. Every rule this queue has is about not interrupting
+        somebody who is watching.
+        """
+        handed = 0
+        for job in list(self._waiting):
+            self._waiting.remove(job)
+            if self._hand_over(job):
+                handed += 1
+        if handed:
+            logger.info("Handed ComfyUI %d queued job(s) as the app closed", handed)
+        return handed
+
+    def _key_of(self, job: GenerationJob) -> str | None:
+        """The folder key a job was launched under, or ``None`` if it's untracked."""
+        return next((key for key, jobs in self._jobs.items() if job in jobs), None)
 
     def _drop(self, key: str, job: GenerationJob):
-        """Forget one job, and the folder's entry once its last one is gone."""
+        """Forget one job — its place in the line included — and the folder's
+        entry once its last one is gone."""
+        if job in self._waiting:
+            self._waiting.remove(job)
+        if job in self._on_server:
+            self._on_server.remove(job)
         jobs = self._jobs.get(key)
         if not jobs or job not in jobs:
             return
@@ -350,21 +425,35 @@ class RerollController(QObject):
             logger.debug("Could not persist progress for %s: %s", job.prompt_id, e)
 
     def reconnect_running(self):
-        """Rebind live jobs to any re-rolls left running by a previous session.
+        """Pick a previous session's in-flight generations back up.
 
-        Every still-in-flight row is picked back up so its completion is recorded
-        and its tile shows live progress again — even for a folder the user hasn't
+        Every still-in-flight row is taken back so its completion is recorded and
+        its tile shows live progress again — even for a folder the user hasn't
         opened yet. A tab's Generate is itself a re-roll, so no in-flight row is
         owned elsewhere. Called once at startup.
+
+        Two kinds, told apart by the row's status. A ``running`` row was handed to
+        ComfyUI and is the server's to finish, so it is rebound live. A
+        ``pending`` one never left this app — the line was still holding it when
+        the app closed — so it rejoins the line, oldest first, and the queue's own
+        rules put it back where it belongs. A held row whose workflow no longer
+        exists can never be sent, so it is dropped rather than left in flight
+        forever.
         """
         if self._client is None:
             return
         # Read the frame configs straight from the DB: the first tree rebuild
         # (which would populate the view's image rows) hasn't run yet at startup.
         index = self._image_config_index()
-        for row in self._db.list_generations():
-            if row.get("status") in ("running", "pending"):
+        # Oldest first, against the newest-first listing: the line is rebuilt by
+        # re-queuing each job in the order it was asked for, so the rules that
+        # ordered it the first time order it the same way again.
+        for row in reversed(self._db.list_generations()):
+            if row.get("status") == "running":
                 self._reconnect(row, index)
+            elif row.get("status") == "pending":
+                self._readopt(row, index)
+        self._pump()
         self.changed.emit()
 
     def _image_config_index(self) -> dict:
@@ -397,57 +486,80 @@ class RerollController(QObject):
             return
         job.origin = job.prompt_id  # a resumed run's chain, if any, is behind it
         self._register(key, job, self._on_finished)
+        self._on_server.append(job)  # it is ComfyUI's to finish, not ours to send
+
+    def _readopt(self, row: dict, image_index: dict):
+        """Take a row the line was still holding back into the line.
+
+        It was never submitted, so there is nothing on the server to rebind to
+        and nothing lost by rebuilding it: the job comes back unsent, under the
+        row's own prompt id, and waits its turn like any other. One whose
+        workflow the app no longer has is deleted instead — it could never be
+        sent, and left alone it would sit in the queue forever.
+        """
+        key = gallery.settings_folder_key(row, image_index)
+        if self.job_for_prompt(row["prompt_id"]) is not None:
+            return  # already tracked
+        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+        try:
+            if workflow is None:
+                raise ValueError(f"unknown workflow {row.get('workflow_name')!r}")
+            job = GenerationJob.readopt(
+                self._client, workflow, gallery.parse_params(row.get("params_json")),
+                row["prompt_id"], source=row.get("source") or "generated",
+            )
+        except Exception as e:
+            logger.warning("Dropping a queued generation we can no longer build: %s", e)
+            self._db.delete_generation(row["prompt_id"])
+            return
+        job.origin = job.prompt_id
+        self._register(key, job, self._on_finished)
+        self._enqueue(job)
 
     @property
     def queue_order(self) -> list[str]:
-        """Prompt ids in the order ComfyUI will run them, as of the last refresh.
+        """Prompt ids in the order they will run: what ComfyUI holds, then the line.
 
         Whatever displays the queue orders itself by this rather than by when the
-        rows were made: a reorder moves jobs in ComfyUI without touching anything
-        the database records about them.
+        rows were made — the rules that put an image in front of a video leave no
+        mark on anything the database records.
         """
-        return self._queue_order
+        return [job.prompt_id for job in self._on_server + self._waiting]
 
-    def refresh_queue_order(self):
-        """Re-read that order. A caller that polls invokes this each tick.
+    @property
+    def videos_held(self) -> bool:
+        """Whether the slideshow's gate is currently keeping videos off the GPU."""
+        return self._videos_held
 
-        A read that fails leaves the last known order standing — dropping to none
-        would reshuffle the queue on screen every time ComfyUI hiccups, and the
-        order it last gave is still the best answer available.
+    def held_jobs(self) -> list:
+        """The waiting jobs the gate is holding — what a surface names as held."""
+        return queue_line.held_back(self._waiting, videos_held=self._videos_held)
+
+    def hold_videos(self, held: bool):
+        """Keep videos off the GPU while a slideshow plays — or let them run again.
+
+        A video generation saturates the card the show is being drawn with, and a
+        show is exactly the stretch when nobody is waiting on a video. So while
+        one plays, videos are passed over and images still go; when it closes,
+        whatever the gate held starts at once.
         """
-        if self._client is None:
+        if held == self._videos_held:
             return
-        try:
-            self._queue_order = self._client.queue_order()
-        except Exception as e:
-            logger.debug("Could not read the queue order: %s", e)
+        self._videos_held = held
+        self._pump()
+        self.changed.emit()
 
     def reorder(self, prompt_ids: list[str]):
-        """Make ComfyUI work through this app's waiting jobs in ``prompt_ids`` order.
+        """Rearrange the waiting line into ``prompt_ids`` order.
 
-        A job moves by leaving the queue and rejoining the back of it (see
-        :meth:`GenerationJob.requeue`), so only the jobs from the first position
-        that differs onward are touched — requeuing one that hasn't moved would
-        push it behind another app's work for nothing. Ids no live job here owns
-        (another app's prompts, a finished one) and any job ComfyUI has already
-        started are skipped: neither can be moved from here.
-
-        A queue that can't be read leaves everything alone: "from where it first
-        differs" has no answer without the order as it stands now, and a reshuffle
-        on a guess is worse than none.
+        A drag in the queue strip, and it costs nothing: a waiting job has never
+        been sent, so its place is ours to change. Ids this app holds no waiting
+        job for are ignored — another app's prompts, a finished one, and the job
+        already on the server, which has no place in front of it to be moved to.
+        Any waiting job the list doesn't name keeps its place at the back.
         """
-        if self._client is None:
-            return
-        jobs = {job.prompt_id: job for job in self.all_jobs}
-        movable = {pid for pid, job in jobs.items() if job.state == "queued"}
-        wanted = [pid for pid in prompt_ids if pid in movable]
-        try:
-            current = [pid for pid in self._client.queue_order() if pid in movable]
-        except Exception as e:
-            logger.warning("Could not read the queue to reorder it: %s", e)
-            return
-        for pid in wanted[_first_difference(current, wanted):]:
-            jobs[pid].requeue()
+        place = {pid: index for index, pid in enumerate(prompt_ids)}
+        self._waiting.sort(key=lambda job: place.get(job.prompt_id, len(place)))
 
     def cancel(self, key: str):
         """Stop and forget the job leading a folder's queue, dropping its row.
@@ -476,6 +588,7 @@ class RerollController(QObject):
                     self._drop(key, job)
                     job.cancel()
                     self._db.delete_generation(prompt_id)  # drop the abandoned row
+                    self._pump()  # the machine is free: start whatever is next
                     return
 
     def _on_image_finished(self, key, image_job, files, thumb_path, duration,
@@ -490,14 +603,17 @@ class RerollController(QObject):
             video_params = {**video_params, "input_image": input_ref}
         self._launch(key, video_workflow, video_params, self._on_finished,
                      origin=image_job.origin)
+        self._pump()  # in case the video stage couldn't even be built
 
     def _on_finished(self, key, job, files, thumb_path, duration):
         self._drop(key, job)
+        self._pump()  # the machine is free: start whatever is next
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.finished.emit(key, job.prompt_id)
 
     def _on_failed(self, key, job, message):
         self._drop(key, job)
+        self._pump()  # the machine is free: start whatever is next
         self._db.update_generation(job.prompt_id, status="error", error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self.failed.emit(key)

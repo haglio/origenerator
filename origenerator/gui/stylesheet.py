@@ -188,11 +188,20 @@ def build_stylesheet() -> str:
         background-color: {_h(BLUE)};
         font-weight: bold;
     }}
-    /* While a run is in flight Generate greys out beside the active Cancel; the id
-       selector above out-specifies the base :disabled rule, so restate it here. */
+    /* A read-only gallery (no ComfyUI client) can never launch, so Generate greys
+       out; the id selector above out-specifies the base :disabled rule, so restate
+       it here. */
     QPushButton#generateBtn:disabled {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
+    }}
+    /* In progress mode the face IS the progress bar, so its resting colour steps
+       back to neutral and the blue fill has something to read against: primary blue
+       under a blue wash showed a blue edge creeping across an already-blue button.
+       It can't lean on the :disabled rule for that any more — the button stays
+       pressable now, since a press while a run is in flight queues another. */
+    QPushButton#generateBtn[generating="true"] {{
+        background-color: {_h(BG_SECONDARY)};
     }}
     /* A collapsible param-form section header: a flat, full-width divider row,
        not a raised button. Left-aligned with its fold arrow, and it must not

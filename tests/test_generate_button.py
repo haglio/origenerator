@@ -1,6 +1,14 @@
 import pytest
 
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
 from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
+
+from shared_ui.colors import BLUE
 
 
 @pytest.fixture
@@ -8,6 +16,29 @@ def button(qtbot):
     b = GenerateButton()
     qtbot.addWidget(b)
     return b
+
+
+@pytest.fixture
+def styled_button(qtbot):
+    """A button wearing the app's stylesheet, for the looks the sheet decides.
+    Styled through a parent, as the running app does — a self-styled widget
+    measures and paints slightly differently."""
+    host = QWidget()
+    host.setStyleSheet(build_stylesheet())
+    layout = QVBoxLayout(host)
+    b = GenerateButton()
+    layout.addWidget(b)
+    qtbot.addWidget(host)
+    host.resize(320, 60)
+    host.show()
+    qtbot.waitExposed(host)
+    yield b  # yield, so the host stays referenced: collected, it takes the button
+
+
+def _face(button):
+    """The button's colour well right of any fill — its resting face."""
+    image = button.grab().toImage()
+    return image.pixelColor(button.width() - 4, button.height() // 2)
 
 
 def test_idle_reads_generate_with_no_fill(button):
@@ -27,6 +58,27 @@ def test_a_run_in_flight_leaves_the_button_pressable(button):
     button.start()
     assert button.isEnabled()
     assert button.text() == "Generate"
+
+
+def test_progress_mode_drops_the_primary_blue_so_the_fill_can_read(styled_button):
+    # Reported: a blue progress edge crawling across a button that was already
+    # fully blue. The fill is a translucent blue wash, so the face under it steps
+    # back to neutral for the run — it can't grey out via :disabled any more, since
+    # the button stays pressable to queue another.
+    assert _face(styled_button) == BLUE          # idle: the primary blue
+
+    styled_button.start()
+
+    running = _face(styled_button)
+    assert running != BLUE                       # a face the wash can be seen on
+    styled_button.set_progress(1, 1)
+    assert _face(styled_button) != running       # and it is: the fill shows there
+
+
+def test_progress_mode_gives_the_primary_blue_back_when_the_run_ends(styled_button):
+    styled_button.start()
+    styled_button.finish(enabled=True)
+    assert _face(styled_button) == BLUE
 
 
 def test_set_progress_sets_the_fill_fraction(button):

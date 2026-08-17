@@ -11,6 +11,12 @@ Stopping is the user's word alone — :meth:`stop` (the Auto toggle) and
 :meth:`stop_all` (Esc). Cancelling the variation being made is not that word: it
 throws away *this seed*, which is what a loop of random seeds is for, so the loop
 takes it as its cue to try another at once.
+
+One folder at a time. A loop is a standing instruction to spend the whole machine
+on one recipe, and two of them would only take turns at it — each folder waiting
+out the other's render, both crawling, and the voice steering (which follows the
+loop) with two prompts to answer to. So turning it on somewhere new is also how
+it is turned off where it was.
 """
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -28,10 +34,21 @@ class AutoGenerateController(QObject):
         return key in self._active
 
     def start(self, key: str) -> None:
+        """Loop ``key``, ending whatever other folder was looping.
+
+        The hand-off happens only once the new folder's first variation is away:
+        a launch that doesn't take leaves the loop where it was rather than
+        stopping one loop and starting none. The folder it displaces reports
+        through :attr:`stopped` exactly as a hand-stop would, so its switch and
+        its voice steering are cleaned up the one way.
+        """
         if key in self._active:
             return  # already looping this folder
-        if self._launch(key):
-            self._active.add(key)
+        if not self._launch(key):
+            return
+        for other in list(self._active):
+            self._end(other)
+        self._active.add(key)
 
     def stop(self, key: str) -> None:
         """Stop a folder's loop — the in-flight variation still lands, but no more

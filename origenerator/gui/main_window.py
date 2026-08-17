@@ -12,6 +12,7 @@ from origenerator.db import Database
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.experiments.background import cancel_experiments
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.prompt_box import PROMPT_HEIGHTS
 
 # The open editable config tabs (in the gallery's info pane). Kept under its
 # historical key so sessions saved before the Generate/Gallery merge still restore.
@@ -26,6 +27,9 @@ _AUDIO_ENABLED_KEY = "audio_enabled"
 # The Enhance subpanel's settings. App-wide, so they belong to the session
 # rather than to any folder's row in the database.
 _ENHANCE_SETTINGS_KEY = "enhance_settings"
+# How tall the user has dragged each prompt box, by param key — app-wide for the
+# same reason, and restored before the first form is built (see __init__).
+_PROMPT_HEIGHTS_KEY = "prompt_heights"
 
 
 class OrigeneratorWindow(QMainWindow):
@@ -33,6 +37,10 @@ class OrigeneratorWindow(QMainWindow):
                  parent=None):
         super().__init__(parent)
         self._app_state = app_state
+        # Before anything below builds a param form: a prompt box reads its
+        # height as it is constructed, and the view built a few lines down brings
+        # its first one with it.
+        PROMPT_HEIGHTS.restore(app_state.get(_PROMPT_HEIGHTS_KEY))
         self.setWindowTitle("Origenerator")
         # A small floor (not the old 1000x700) so a tiling window manager can snap
         # the window into a monitor third (~853px) or a portrait-monitor half
@@ -128,6 +136,7 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_AUDIO_ENABLED_KEY, self._gallery_view.audio_enabled())
         self._app_state.set(
             _ENHANCE_SETTINGS_KEY, self._gallery_view.enhance_settings())
+        self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
         self._app_state.set(
             _GEOMETRY_KEY,
             base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),

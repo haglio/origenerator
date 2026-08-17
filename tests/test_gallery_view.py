@@ -3648,7 +3648,41 @@ def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
     assert client.submit_job.call_count == 1       # did not spin on the failure
 
 
-def test_cancelling_a_reroll_stops_the_auto_loop(qtbot, tmp_path):
+def test_cancelling_a_reroll_keeps_the_auto_loop_and_tries_another_seed(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    canceled = view._reroll_jobs[key].prompt_id
+
+    view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
+
+    assert view._auto.is_active(key)          # the loop is still on
+    assert view._auto_btn.isChecked()         # and the toggle still says so
+    assert client.submit_job.call_count == 2  # a fresh seed went out at once
+    assert view._reroll_jobs[key].prompt_id != canceled
+
+
+def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_path):
+    # The queue row's Cancel and a config tab's, which name the run to stop.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    canceled = view._reroll_jobs[key].prompt_id
+
+    view._cancel_job(canceled)
+
+    assert view._auto.is_active(key)
+    assert client.submit_job.call_count == 2
+    assert view._reroll_jobs[key].prompt_id != canceled
+
+
+def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -3656,7 +3690,12 @@ def test_cancelling_a_reroll_stops_the_auto_loop(qtbot, tmp_path):
     key = _select_first_leaf(view)
     view._toggle_auto(True)
 
-    view._cancel_reroll(key)  # cancelling the in-flight job also ends the loop
+    for _ in range(3):  # discard seed after seed — the loop keeps offering more
+        view._cancel_reroll(key)
+    assert view._auto.is_active(key)
+    assert client.submit_job.call_count == 4
+
+    view._toggle_auto(False)  # the user's own word is what stops it
 
     assert not view._auto.is_active(key)
 

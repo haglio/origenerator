@@ -1834,9 +1834,10 @@ class GalleryView(QWidget):
             row, gallery.build_image_config_index(self._image_rows))
 
     def _on_auto_stopped(self, key: str):
-        """A folder's loop ended (toggled off, cancelled, or failed): drop its
-        working params and, if it was the one being steered, leave voice with
-        nothing to steer. The mic stays as the button has it."""
+        """A folder's loop ended (toggled off, Esc'd, or failed — a cancelled
+        variation doesn't end it): drop its working params and, if it was the one
+        being steered, leave voice with nothing to steer. The mic stays as the
+        button has it."""
         self._auto_working.pop(key, None)
         if key == self._voice_target_key:
             self._voice_target_key = None
@@ -2787,8 +2788,14 @@ class GalleryView(QWidget):
         self._reroll.reconnect_running()
 
     def _cancel_reroll(self, key: str):
-        self._auto.stop(key)  # cancelling the in-flight job ends the loop too
+        """The live tile's Cancel: drop the variation it leads with.
+
+        An auto loop survives it and launches the next seed at once — cancel
+        discards the run, only the Auto toggle stops the loop. Told *after* the
+        drop, so the relaunch doesn't see the job it is replacing and no-op.
+        """
         self._drop_reroll(key)
+        self._auto.note_canceled(key)
 
     def _drop_reroll(self, key: str):
         """Cancel the re-roll leading a folder and redraw without it."""
@@ -2799,15 +2806,18 @@ class GalleryView(QWidget):
         """Stop one named run — a queue row's Cancel, and a config tab's.
 
         A folder can hold several runs at once, so the one to stop is named rather
-        than inferred from its folder; the redraw afterwards is the same.
+        than inferred from its folder; the redraw afterwards is the same. An auto
+        loop in that folder takes it as a discarded seed and launches the next —
+        after the drop, and a no-op while another of the folder's runs is still
+        alive (:meth:`_start_reroll`), so the loop never doubles up.
         """
         job = self._reroll.job_for_prompt(prompt_id)
         key = next((k for k, jobs in self._reroll.jobs_by_folder.items()
                     if job in jobs), None)
         self._reroll.cancel_job(prompt_id)
         if key is not None:
-            self._auto.stop(key)  # cancelling the in-flight job ends the loop too
             self._after_a_job_left(key)
+            self._auto.note_canceled(key)
 
     def _after_a_job_left(self, key: str):
         """Redraw the folder a run has just been taken out of."""

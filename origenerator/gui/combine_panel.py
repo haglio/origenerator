@@ -8,27 +8,35 @@ slot as the override path), and dropping a video wipes the dropdown back to "-".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while Open in generator hands it to a generate tab to edit before running.
 
+Under the dropdown, a pair of radios says what the result is *for*: a full-length
+video for the players (the default), or a Genau clip — one complete stroke, looping.
+That choice picks which recipes the act is answered from, so the dropdown's usable
+acts change with it: an act only the players' lane can answer greys out under Genau,
+and acts that aren't strokes at all are not offered there.
+
 Acts with nothing to answer a pick — no video to mine a recipe from and no curated
 recipe in the content overlay — are greyed out
 (:meth:`CombinePanel.set_available_categories`).
 
-The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown and
-the two buttons, and reports the request through one of four signals — a dropped
-video versus a picked act, crossed with run-now (:attr:`generate_requested` /
-:attr:`category_requested`) versus edit-first (:attr:`open_requested` /
-:attr:`open_category_requested`). The view owns the database, the slot predicates,
-the category→recipe routing, and both the generation and the generator tab.
+The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown, the
+intent radios and the two buttons, and reports the request through one of four
+signals — a dropped video versus a picked act, crossed with run-now
+(:attr:`generate_requested` / :attr:`category_requested`) versus edit-first
+(:attr:`open_requested` / :attr:`open_category_requested`). The act signals carry the
+chosen intent. The view owns the database, the slot predicates, the category→recipe
+routing, and both the generation and the generator tab.
 """
 
 from collections.abc import Callable, Collection
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
+    QRadioButton, QButtonGroup,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from origenerator.gui.drop_slot import DropSlot
-from origenerator.recipe_match import CATEGORIES
+from origenerator.recipe_match import CATEGORIES, GENAU, PLAYERS
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "-"
@@ -39,13 +47,14 @@ _OVERRIDE_PLACEHOLDER = "use custom action from video"
 
 
 class CombinePanel(QWidget):
-    """Image slot + a recipe (dropped video or picked act) + Generate."""
+    """Image slot + a recipe (dropped video or picked act) + an intent + Generate."""
 
     generate_requested = pyqtSignal(str, str)   # (image prompt_id, video prompt_id): a dropped recipe
-    category_requested = pyqtSignal(str, str)   # (image prompt_id, category): let the app find the recipe
+    category_requested = pyqtSignal(str, str, str)   # (image prompt_id, category, intent)
     # The same two recipe sources, but bound for the generator to edit rather than to run.
     open_requested = pyqtSignal(str, str)           # (image prompt_id, video prompt_id): a dropped recipe
-    open_category_requested = pyqtSignal(str, str)  # (image prompt_id, category): let the app find the recipe
+    open_category_requested = pyqtSignal(str, str, str)  # (image prompt_id, category, intent)
+    intent_changed = pyqtSignal(str)  # the players/Genau radio moved — regrey the acts
 
     def __init__(
         self,
@@ -81,6 +90,31 @@ class CombinePanel(QWidget):
         video_box.addWidget(self._category, 1)  # each takes half the video part's width
         video_box.addWidget(self.video_slot, 1)
 
+        # What the result is for. Players is the default because it is the long-
+        # standing behavior of this panel and by far the more common ask; Genau is
+        # the deliberate detour. Under it the act list narrows, so the radio sits
+        # directly beneath the dropdown it changes.
+        self._players_radio = QRadioButton("Players")
+        self._players_radio.setToolTip(
+            "Make a full-length video for the satellite players."
+        )
+        self._players_radio.setChecked(True)
+        self._genau_radio = QRadioButton("Genau")
+        self._genau_radio.setToolTip(
+            "Make a Genau clip: one complete stroke, looping, sent to Genau when done."
+        )
+        self._intent_group = QButtonGroup(self)
+        self._intent_group.addButton(self._players_radio)
+        self._intent_group.addButton(self._genau_radio)
+        self._intent_group.buttonToggled.connect(self._on_intent_changed)
+        self._intent_part = QWidget()
+        intent_box = QHBoxLayout(self._intent_part)
+        intent_box.setContentsMargins(0, 0, 0, 0)
+        intent_box.setSpacing(8)
+        intent_box.addWidget(self._players_radio)
+        intent_box.addWidget(self._genau_radio)
+        intent_box.addStretch(1)
+
         # Two ways to act on the same chosen recipe: run it now, or open it in the
         # generator to tweak first. Both gate on the same "image + recipe" readiness.
         self._generate_btn = QPushButton("Generate")
@@ -102,9 +136,31 @@ class CombinePanel(QWidget):
         layout.addWidget(self.image_slot)
         layout.addSpacing(8)  # set the video part apart from the image slot above it
         layout.addWidget(self._video_part)
+        layout.addWidget(self._intent_part)
         layout.addWidget(self._generate_btn)
         layout.addWidget(self._open_btn)
         self._sync()
+
+    # --- intent (what the result is for) ----------------------------------
+
+    def selected_intent(self) -> str:
+        """``PLAYERS`` or ``GENAU`` — which lane the chosen recipe is answered from."""
+        return GENAU if self._genau_radio.isChecked() else PLAYERS
+
+    def set_intent(self, intent: str):
+        """Select the ``PLAYERS``/``GENAU`` radio; anything else selects players."""
+        self._genau_radio.setChecked(intent == GENAU)
+        self._players_radio.setChecked(intent != GENAU)
+
+    def _on_intent_changed(self, _button, checked: bool):
+        """Announce the new lane once, on the radio that just went on.
+
+        ``buttonToggled`` fires twice for one click — off for the old radio, on for
+        the new — and the view answers by re-greying the whole act list, so only the
+        on edge is passed along.
+        """
+        if checked:
+            self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
 
@@ -120,19 +176,27 @@ class CombinePanel(QWidget):
         self._category.setCurrentIndex(index if index >= 1 else 0)
 
     def set_available_categories(self, available: Collection[str]):
-        """Grey out every act the gallery holds no video of — there's no recipe to mine
-        for it, so offering it could only ever answer "no recipe yet". A disabled item
-        says why on hover. The neutral "-" is never greyed."""
+        """Grey out every act the current lane has no recipe for — nothing to mine and
+        nothing pinned, so offering it could only ever answer "no recipe yet". A
+        disabled item says why on hover, naming the lane, since an act the players'
+        lane answers happily can still be unanswerable as a loop. The neutral "-" is
+        never greyed."""
+        genau = self.selected_intent() == GENAU
         model = self._category.model()
         for index in range(1, self._category.count()):
             act = self._category.itemText(index)
             usable = act in available
+            reason = (f"No past looping “{act}” clip to base a Genau recipe on yet" if genau
+                      else f"No past “{act}” video to base a recipe on yet")
             model.item(index).setEnabled(usable)
             self._category.setItemData(
-                index,
-                "" if usable else f"No past “{act}” video to base a recipe on yet",
-                Qt.ItemDataRole.ToolTipRole,
+                index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
             )
+            # A greyed-out act must not stay selected under it — the buttons would be
+            # live on a pick the lane cannot answer. Dropping to neutral is what the
+            # panel already means by "no act chosen".
+            if not usable and self._category.currentIndex() == index:
+                self._category.setCurrentIndex(0)
 
     def show_drop_candidates(self, prompt_id: str):
         """Light whichever slot accepts a now-dragging item, so its target is
@@ -182,12 +246,17 @@ class CombinePanel(QWidget):
 
     def _dispatch(self, video_signal, category_signal):
         """Emit the chosen recipe on the pair of signals for the requested action: a
-        picked act on ``category_signal``, else a dropped video on ``video_signal``."""
+        picked act on ``category_signal``, else a dropped video on ``video_signal``.
+
+        Only the act path carries the intent. A dropped video *is* the recipe, so
+        there is no lane to answer it from — what it makes is whatever that video's
+        workflow makes.
+        """
         image_id = self.image_slot.current_id()
         if not image_id:
             return
         category = self.selected_category()
         if category:
-            category_signal.emit(image_id, category)
+            category_signal.emit(image_id, category, self.selected_intent())
         elif self.video_slot.current_id():
             video_signal.emit(image_id, self.video_slot.current_id())

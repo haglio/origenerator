@@ -139,13 +139,18 @@ def settings_label(params: dict, distinguishing_keys=()) -> str:
 def _source_image_label(params: dict, image_index: dict) -> str:
     """The name of the source-image folder a video's start frame belongs to.
 
-    The image generation's own folder label when the frame is a known generation
-    (so a video's source folder reads the same as the image it animates), else the
-    frame's bare filename, and ``"(no input image)"`` when there is none.
+    The frame's own filename leads, then the image generation's folder label — so
+    a video's source folder still reads as the picture it animates while naming
+    *which* picture it is. The filename comes first because the tier is one frame
+    per folder, and two draws of one prompt make two folders whose labels would
+    otherwise be identical (and identically truncated, so the difference would
+    never even come into view). Falls back to the bare filename when the frame
+    isn't a known generation, and ``"(no input image)"`` when there is none.
     """
     input_image = params.get("input_image")
     name = _frame_name(input_image)
     if not name:
         return "(no input image)"
+    filename = _basename(_unannotated(input_image))
     entry = (image_index or {}).get(name)
-    return entry.label if entry is not None else _basename(_unannotated(input_image))
+    return f"{filename} · {entry.label}" if entry is not None else filename

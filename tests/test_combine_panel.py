@@ -72,11 +72,11 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel.image_slot.set_item("img1")
     panel.set_category("delta")
     opened = []
-    panel.open_category_requested.connect(lambda i, c: opened.append((i, c)))
+    panel.open_category_requested.connect(lambda i, c, n: opened.append((i, c, n)))
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "delta")]
+    assert opened == [("img1", "delta", recipe_match.PLAYERS)]
 
 
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
@@ -193,11 +193,11 @@ def test_generate_emits_the_picked_act(qtbot):
     panel.image_slot.set_item("img1")
     panel.set_category("delta")
     cats = []
-    panel.category_requested.connect(lambda i, c: cats.append((i, c)))
+    panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "delta")]
+    assert cats == [("img1", "delta", recipe_match.PLAYERS)]
 
 
 def test_clearing_a_slot_disables_generate_again(qtbot):
@@ -208,4 +208,75 @@ def test_clearing_a_slot_disables_generate_again(qtbot):
 
     panel.image_slot.clear()
 
+    assert not panel._generate_btn.isEnabled()
+
+
+# --- the players/Genau radio: what the result is for --------------------------
+
+
+def test_the_lane_defaults_to_players(qtbot):
+    # The long-standing behavior of this panel, and by far the more common ask, so
+    # the Genau clip is the deliberate detour rather than the default.
+    panel = _panel(qtbot)
+    assert panel.selected_intent() == recipe_match.PLAYERS
+    assert panel._players_radio.isChecked()
+    assert not panel._genau_radio.isChecked()
+
+
+def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
+    panel = _panel(qtbot)
+    layout = panel.layout()
+    order = [layout.itemAt(i).widget() for i in range(layout.count())]
+    assert order.index(panel._intent_part) == order.index(panel._video_part) + 1
+
+
+def test_generate_carries_the_chosen_lane(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.set_category("delta")
+    panel.set_intent(recipe_match.GENAU)
+    cats = []
+    panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
+
+    panel._generate_btn.click()
+
+    assert cats == [("img1", "delta", recipe_match.GENAU)]
+
+
+def test_switching_the_lane_announces_it_once(qtbot):
+    # buttonToggled fires for both radios on one click — the off edge and the on
+    # edge — and the view answers each by re-greying the whole act list.
+    panel = _panel(qtbot)
+    heard = []
+    panel.intent_changed.connect(heard.append)
+
+    panel.set_intent(recipe_match.GENAU)
+    assert heard == [recipe_match.GENAU]
+
+    panel.set_intent(recipe_match.PLAYERS)
+    assert heard == [recipe_match.GENAU, recipe_match.PLAYERS]
+
+
+def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
+    panel = _panel(qtbot)
+    panel.set_intent(recipe_match.GENAU)
+    panel.set_available_categories({"beta"})
+
+    reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
+    # An act the players' lane answers happily can still have no loop behind it, so
+    # the greyed-out reason has to name which lane it is talking about.
+    assert "looping" in reason.lower()
+
+
+def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
+    # Otherwise Generate stays lit on a pick the lane has no recipe for, and the
+    # click can only end in "no recipe yet".
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.set_category("gamma")
+    assert panel._generate_btn.isEnabled()
+
+    panel.set_available_categories({"beta"})  # gamma just went unanswerable
+
+    assert panel.selected_category() == ""
     assert not panel._generate_btn.isEnabled()

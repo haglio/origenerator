@@ -66,7 +66,8 @@ def test_start_prepared_launches_and_tracks_the_job(qtbot, tmp_path):
 
     started = controller.start_prepared("video/wf/deadbeef", _I2V, _params(seed=3, noise_seed=9))
 
-    assert started is True
+    # The launched run names itself, so a caller can act on the row it just made.
+    assert started == controller.jobs["video/wf/deadbeef"].prompt_id
     assert "video/wf/deadbeef" in controller.jobs
     client.submit_job.assert_called_once()
     rows = db.list_generations()
@@ -131,7 +132,7 @@ def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
 
     again = controller.start_prepared("k", _I2V, _params(seed=99))
 
-    assert again is True
+    assert again
     assert len(controller.all_jobs) == 2
     # Both are queued; only the first has been handed to ComfyUI, which holds one
     # prompt of ours at a time.
@@ -160,14 +161,14 @@ def test_an_experiment_never_stacks_onto_a_busy_folder(qtbot, tmp_path):
 
     again = controller.start_prepared("k", _I2V, _params(seed=99), source="experiment")
 
-    assert again is False
+    assert again is None
     client.submit_job.assert_called_once()
 
 
-def test_start_prepared_returns_false_without_a_client(qtbot, tmp_path):
+def test_start_prepared_returns_none_without_a_client(qtbot, tmp_path):
     controller = RerollController(Database(tmp_path / "test.db"), client=None)
 
-    assert controller.start_prepared("k", _I2V, _params()) is False
+    assert controller.start_prepared("k", _I2V, _params()) is None
 
 
 # --- per-item seed re-rolls: keep one seed, re-roll the other ----------------
@@ -300,7 +301,7 @@ def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
 
     started = controller.start_prepared("user-key", _I2V, _params(seed=7))
 
-    assert started is True
+    assert started
     client.interrupt.assert_called_once()              # the running experiment was stopped
     assert not controller.has("exp-key")
     assert db.get_generation(experiment.prompt_id) is None  # its abandoned row is dropped
@@ -360,7 +361,7 @@ def test_user_launch_claims_the_experiments_own_folder(qtbot, tmp_path):
 
     started = controller.start_prepared("k", _I2V, _params(seed=7))
 
-    assert started is True
+    assert started
     assert controller.job_for("k").source == "generated"
     assert client.submit_job.call_count == 2
 
@@ -590,7 +591,7 @@ def test_a_held_video_is_passed_over_rather_than_blocking_the_line(qtbot, tmp_pa
     behind = controller.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF],
                                        _image_params(), source="experiment")
 
-    assert behind is True
+    assert behind
     client.submit_job.assert_called_once()  # the image behind it, not the video
     assert controller.queue_order[-1] == video.prompt_id
 

@@ -197,3 +197,18 @@ def _collect_widgets_between_tests():
     """
     yield
     gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def _recipe_match_runs_inline(monkeypatch):
+    """Let the gallery's off-thread work run straight through.
+
+    The recipe match is asked on a pool thread in the app, because the model it
+    asks thinks for several seconds and the window must stay alive. A test wants
+    the opposite: launch and inspect in one call, with no event loop to pump. One
+    test exercises the real hop (test_gallery_view) by putting this back.
+    """
+    from origenerator.gui.gallery_view import GalleryView
+
+    monkeypatch.setattr(GalleryView, "_run_off_thread",
+                        lambda self, work, done: done(work()))

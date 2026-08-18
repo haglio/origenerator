@@ -96,6 +96,19 @@ COMFYUI_PORT = 8188
 # Origenerator's videos distinctly from other inbox sources.
 EVOLVER_INBOX_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
+# A Genau clip goes to the same inbox under its own source name. Evolver routes by
+# that name, so the folder is the whole signal: it upscales the clip on its usual
+# schedule and then delivers the result to Genau's clips folder rather than leaving
+# it in the outbox. Sending straight to Genau's folder instead would skip the
+# upscale, and a loop straight out of the graph is visibly softer than the clips
+# already there.
+#
+# From the overlay, not from source, because naming a folder in the library makes
+# that name library vocabulary: the sanitize harvester reads the library's folder
+# names into its blocklist, so a name hardcoded here comes back and fails the guard
+# on the very line that created it. Evolver reads the same key from its own overlay
+# and the two have to agree — the folder is the only thing passing between them.
+GENAU_SOURCE = _CONTENT["genau_source"]
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its
 # Structure Image picker opens here rather than in ComfyUI's input folder, which

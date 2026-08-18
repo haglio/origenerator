@@ -34,7 +34,7 @@ from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, THUMB_DIR,
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE, THUMB_DIR,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,8 @@ class GenerateConfigPanel(QWidget):
     slim strip of past runs. The main column stacks a fixed preview on top, then one
     scroll holding the File/Created block above the editable form and, at its bottom,
     the displayed generation's related media, then a single button bank
-    (Go-to-folder, Send-to-Evolver, Cancel, Generate). There's no status line —
+    (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
+    There's no status line —
     Generate itself doubles as the progress bar, filling as a run advances. Clicking a
     strip thumbnail re-emits its prompt id via ``strip_activated`` so a container can
     open (or reuse) a tab for it. The preview is driven from outside: a browsed
@@ -62,7 +63,8 @@ class GenerateConfigPanel(QWidget):
     (:meth:`show_saved_generation`): a File/Created block above the form, and at the
     bottom of the scroll the videos an image was animated into, or a clickable
     source-image tile for a video. Go-to-folder (any saved generation), Send-to-
-    Evolver (a video), and the Drive-OSR2 toggle key off the displayed row. A blank
+    Evolver and Send-to-Genau (a video), and the Drive-OSR2 toggle key off the
+    displayed row. A blank
     tab, or one showing a bare autoshow, hides them all.
 
     A fresh panel opens with no workflow picked — the picker sits on its
@@ -244,6 +246,13 @@ class GenerateConfigPanel(QWidget):
         )
         self._evolver_btn.clicked.connect(self._on_send_to_evolver)
         self._evolver_btn.hide()  # shown only for a video the tab is displaying
+        self._genau_btn = QPushButton("Send to Genau")
+        self._genau_btn.setToolTip(
+            "Send this clip down the Genau lane: Evolver upscales it on its usual "
+            "schedule, then delivers it to the folder Genau plays from."
+        )
+        self._genau_btn.clicked.connect(self._on_send_to_genau)
+        self._genau_btn.hide()  # shown only for a video the tab is displaying
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
@@ -253,6 +262,7 @@ class GenerateConfigPanel(QWidget):
         btn_row.addStretch()
         btn_row.addWidget(self._folder_btn)
         btn_row.addWidget(self._evolver_btn)
+        btn_row.addWidget(self._genau_btn)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         main_box.addLayout(btn_row)
@@ -717,6 +727,7 @@ class GenerateConfigPanel(QWidget):
         self._animated_strip.hide()
         self._folder_btn.hide()
         self._evolver_btn.hide()
+        self._genau_btn.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the read-only
@@ -741,6 +752,7 @@ class GenerateConfigPanel(QWidget):
         self._show_source_tile(row, image_rows, request)
         self._show_request_diff(request)
         self._update_evolver_button(preview)
+        self._update_genau_button(preview)
 
     def displayed_row(self) -> dict | None:
         """The saved generation this tab is showing, or ``None``.
@@ -947,6 +959,51 @@ class GenerateConfigPanel(QWidget):
 
     def _video_rows(self) -> list[dict]:
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]
+
+    # --- Send to Genau: hand a clip to the lane that ends in Genau's folder ---
+
+    def _update_genau_button(self, preview):
+        """Reflect the displayed generation on the Send-to-Genau button.
+
+        Shown only for a video with a file on disk — the Genau lane carries clips.
+        One already sent shows a persistent, disabled "Sent ✓", read from the row
+        rather than the button's state so it survives a restart. ``preview`` is the
+        resolved ``(path, media_type)``, or ``None``.
+        """
+        is_video = preview is not None and preview[1] == "video"
+        self._genau_btn.setVisible(is_video)
+        if not is_video:
+            return
+        already_sent = bool(self._displayed_row and self._displayed_row.get("genau_exported_at"))
+        self._genau_btn.setText("Sent to Genau ✓" if already_sent else "Send to Genau")
+        self._genau_btn.setEnabled(not already_sent)
+
+    def _on_send_to_genau(self):
+        """Copy the displayed video into the Genau lane's inbox and remember the send.
+
+        The same handoff as :meth:`_on_send_to_evolver` down to the re-read of the
+        persisted flag and the loud failure — only the source folder differs, which
+        is what tells Evolver to deliver the upscaled result to Genau.
+        """
+        if not self._displayed_row or self._displayed_row.get("genau_exported_at"):
+            return
+        path = self._displayed_video_path()
+        if path is None:
+            return
+        try:
+            evolver_export.export_video(path, EVOLVER_INBOX_DIR / GENAU_SOURCE)
+        except Exception as e:
+            logger.exception("Failed to send %s to Genau", path)
+            QMessageBox.warning(
+                self._preview, "Send to Genau failed",
+                f"Could not send this clip to Genau:\n\n{e}",
+            )
+            return
+        prompt_id = self._displayed_row["prompt_id"]
+        self._db.mark_genau_exported(prompt_id)
+        # Re-read so the row (and thus the button) reflects the persisted send.
+        self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
+        self._update_genau_button((path, "video"))
 
     # --- Send to Evolver: hand a displayed video to the sibling pipeline -------
 

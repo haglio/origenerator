@@ -13,13 +13,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize, pyqtSignal
 
 from origenerator import (
-    gallery, prompt_edit, recipe_match, recovery, search, timing,
+    evolver_export, gallery, prompt_edit, recipe_match, recovery, search, timing,
 )
 from origenerator.gui import icons
 from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
-    AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, STATE_DIR, THUMB_DIR,
+    AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, GENAU_SOURCE,
+    STATE_DIR, THUMB_DIR,
     LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
     VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
@@ -56,6 +57,7 @@ from origenerator.gui.reroll_prompt import (
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.inflight import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
@@ -214,7 +216,9 @@ def _match_voice_command(text: str):
     order only decides which is asked first. Everything unclaimed falls through
     to a prompt rewrite, which is why neither may be loose.
     """
-    return match_show_command(text) or gallery.match_fix_command(text)
+    return (match_show_command(text)
+            or gallery.match_fix_command(text)
+            or gallery.match_genau_command(text))
 
 
 class GalleryView(QWidget):
@@ -274,7 +278,7 @@ class GalleryView(QWidget):
         self._voice = VoiceSteering(
             command_matcher=_match_voice_command,
             dictation=RequestDictation(),
-            transcribe_bias=(f"{gallery.fix_command_bias()} {show_command_bias()} "
+            transcribe_bias=(f"{gallery.command_bias()} {show_command_bias()} "
                              f"{request_bias()}"),
         )
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
@@ -613,6 +617,9 @@ class GalleryView(QWidget):
         self._combine.category_requested.connect(self._generate_category)
         self._combine.open_requested.connect(self._open_combination)
         self._combine.open_category_requested.connect(self._open_category)
+        # Switching lanes re-asks which acts are answerable: an act with plenty of
+        # long-form video behind it may have no loop at all.
+        self._combine.intent_changed.connect(self._on_combine_intent_changed)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
         self._folder_panes.addWidget(toc)
@@ -1567,7 +1574,9 @@ class GalleryView(QWidget):
         # An act with no video behind it has no recipe to mine, so grey it out rather
         # than let it be picked only to answer "no recipe yet".
         self._combine.set_available_categories(
-            recipe_match.available_categories(self._rebuildable_videos(rows))
+            recipe_match.available_categories(
+                self._rebuildable_videos(rows), self._combine.selected_intent()
+            )
         )
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = self._review_queue(rows)
@@ -2895,19 +2904,26 @@ class GalleryView(QWidget):
             else f"🎤 slideshow at {seconds}s"
         )
 
-    def _on_voice_fix(self, part):
-        """A spoken "fix <part>": aim a targeted detail pass at what's on screen.
+    def _on_voice_fix(self, command):
+        """A spoken command about the picture on screen: a targeted "fix <part>",
+        or "genau it" to animate it as a Genau clip.
 
         Answered out of the show's own note — the speaker is looking at it, not
-        at this pane. Said with no show up there is no "on screen" to aim at, and
+        at this pane. Said with no show up there is no "on screen" to act on, and
         the utterance has already been claimed as a command by the time it gets
         here, so the caption says so rather than letting it vanish."""
         show = self._slideshow
         if show is None:
+            wants = ("a Genau clip" if command == gallery.GENAU_COMMAND
+                     else f"a {command.name} fix")
             self._show_voice_status(
-                f"🎤 a {part.name} fix needs a picture on screen", transient=True)
+                f"🎤 {wants} needs a picture on screen", transient=True)
             return
-        prompt_id, message = self._fix_part(show.voice_fix_target(), part)
+        target = show.voice_fix_target()
+        if command == gallery.GENAU_COMMAND:
+            prompt_id, message = self._genau_it(target)
+        else:
+            prompt_id, message = self._fix_part(target, command)
         show.note_voice_fix(prompt_id, message)
 
     def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
@@ -3414,7 +3430,7 @@ class GalleryView(QWidget):
         workflow, params, _video_row, _image_row = built
         self._info_tabs.open_config(workflow.name, params)
 
-    def _generate_combination(self, image_id: str, video_id: str):
+    def _generate_combination(self, image_id: str, video_id: str, send: bool = False):
         """Generate a new video from a dropped image + a dropped video's recipe.
 
         Reuses the video's workflow, settings and seed, swapping only the input
@@ -3426,6 +3442,14 @@ class GalleryView(QWidget):
         image), or both. A no-op if either row is gone, the video isn't a
         rebuildable image-conditioned recipe, the image has no output file, or that
         folder is already generating.
+
+        No lane reaches here: the lane chose which recipe ``video_id`` names, and
+        from that point a Genau clip is made exactly like any other video. ``send``
+        is the one thing that still rides along — a spoken "genau it" wants its
+        clip handed on the moment it exists. The re-draw-the-frame answer to the
+        reproduce dialog is the one path it can't reach: that launches the frame
+        first and the clip second, under an id this never sees, so such a clip
+        waits for the Send-to-Genau button like any other.
         """
         built = self._combined_params(image_id, video_id)
         if built is None:
@@ -3462,7 +3486,9 @@ class GalleryView(QWidget):
                 ):
                     self._reveal_combination(key)
                 return
-        if self._reroll.start_prepared(key, workflow, params):
+        prompt_id = self._reroll.start_prepared(key, workflow, params)
+        if prompt_id:
+            self._mark_for_sending(prompt_id, send)
             self._reveal_combination(key)
 
     def _rebuildable_videos(self, rows: list[dict]) -> list[dict]:
@@ -3487,47 +3513,88 @@ class GalleryView(QWidget):
             return image_prompts[source_id]
         return video_row.get("positive_prompt") or ""
 
-    def _resolve_category(self, image_id: str, category: str) -> str | None:
-        """The recipe (a rebuildable video's ``prompt_id``) that fits ``category`` for
-        the dropped image — the category dropdown's counterpart to a dropped video.
+    def _resolve_category(self, image_id: str, category: str, intent: str, then):
+        """Find the recipe that fits ``category`` for the dropped image, then call
+        ``then(video_id)`` with a rebuildable video's ``prompt_id`` — or ``None``.
 
         The local LLM picks the recipe whose starting scene matches this image's
         situation (:func:`recipe_match.smart_recipe`); if it's unreachable or finds no
         fit, it falls back to the act's most-used recipe
-        (:func:`recipe_match.best_recipe`). Returns ``None`` — with a hint — when the
-        gallery holds no video of the act, so a click never silently does nothing.
+        (:func:`recipe_match.best_recipe`). ``None`` comes with a hint on screen, so a
+        click never silently does nothing.
+
+        Under ``GENAU`` both tiers see only the looping clips, so the hint names that
+        narrower pool: the act may have plenty of long-form video and still nothing
+        that could be made into a loop.
+
+        The match runs off the UI thread and answers through ``then``, because asking
+        the model is an HTTP round trip to something that thinks for several seconds
+        — 4 to 9 of them, measured here. Inline, the window froze for exactly that
+        long, worst of all on the spoken command, where the window is the picture
+        being looked at. Everything the model needs is gathered first, so the pool
+        thread touches neither the database nor a widget.
         """
         image_row = self._db.get_generation(image_id)
         if image_row is None:
-            return None
+            return
         image_prompts = {r.get("prompt_id"): r.get("positive_prompt") or "" for r in self._image_rows}
         candidates = [{**row, "start_scene": self._start_scene(row, image_prompts)}
                       for row in self._category_candidates()]
-        video_id = recipe_match.smart_recipe(
-            category, image_row.get("positive_prompt") or "", candidates,
-            base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-            system_prompt=VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
-        ) or recipe_match.best_recipe(category, candidates)
-        logger.info("combine: category=%s image=%s -> recipe from %s",
-                    category, image_id, video_id)
-        if video_id is None:
-            QMessageBox.information(
-                self, "No recipe yet",
-                f"No past “{category}” video to base a recipe on yet — make one first, "
-                "or drop a specific video instead.",
-            )
-        return video_id
+        scene = image_row.get("positive_prompt") or ""
 
-    def _curated_combination(self, image_id: str, category: str):
-        """The ``(workflow, params)`` for ``category``'s overlay-curated recipe on
-        the dropped image — the pinned setup that outranks mining (see
+        def match():
+            return recipe_match.smart_recipe(
+                category, scene, candidates,
+                base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
+                system_prompt=VIDEO_SCENE_MATCH_SYSTEM_PROMPT, intent=intent,
+            ) or recipe_match.best_recipe(category, candidates, intent)
+
+        def resolved(video_id):
+            logger.info("combine: category=%s intent=%s image=%s -> recipe from %s",
+                        category, intent, image_id, video_id)
+            if video_id is None:
+                self._say_no_recipe(category, intent)
+            then(video_id)
+
+        self._run_off_thread(match, resolved)
+
+    def _run_off_thread(self, work, done):
+        """Run one slow call away from the UI and hand its result back here.
+
+        A seam as much as a call: the suite replaces this with a straight-through
+        version, so a test can launch and inspect in one breath rather than
+        pumping an event loop for every combine.
+        """
+        run_off_thread(work, done)
+
+    def _say_no_recipe(self, category: str, intent: str):
+        """Say the act has nothing to build a recipe from — in the corner of the
+        fullscreen surface being spoken to when one is up, and in a dialog
+        otherwise. A dialog thrown over a picture someone is looking at is the one
+        place this must never appear."""
+        what = ("looping “%s” clip" % category if intent == recipe_match.GENAU
+                else "“%s” video" % category)
+        if self._slideshow is not None:
+            self._slideshow.note_voice_fix(
+                None, f"🎤 no past {what} to base a recipe on yet")
+            return
+        QMessageBox.information(
+            self, "No recipe yet",
+            f"No past {what} to base a recipe on yet — make one first, "
+            "or drop a specific video instead.",
+        )
+
+    def _curated_combination(self, image_id: str, category: str,
+                             intent: str = recipe_match.PLAYERS):
+        """The ``(workflow, params)`` for ``category``'s overlay-curated ``intent``
+        recipe on the dropped image — the pinned setup that outranks mining (see
         :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
 
         ``None`` sends the caller on to mining: the act has no curated entry, the
         entry names an unknown or non-image-conditioned workflow, or the image
         row is gone or has no output file to seed from.
         """
-        spec = recipe_match.curated_recipe(category)
+        spec = recipe_match.curated_recipe(category, intent)
         if spec is None:
             return None
         workflow = WORKFLOW_REGISTRY.get(spec.get("workflow") or "")
@@ -3543,46 +3610,136 @@ class GalleryView(QWidget):
             return None
         return workflow, params
 
-    def _generate_curated(self, image_id: str, category: str) -> bool:
-        """Launch ``category``'s curated recipe on the dropped image; ``False``
-        when the act has no usable curated entry, so the caller falls back to
-        mining. No reproduce warning: the seeds are fresh every launch."""
-        built = self._curated_combination(image_id, category)
+    def _generate_curated(self, image_id: str, category: str, intent: str,
+                          send: bool) -> bool:
+        """Launch ``category``'s curated ``intent`` recipe on the dropped image;
+        ``False`` when the act has no usable curated entry, so the caller falls back
+        to mining. No reproduce warning: the seeds are fresh every launch."""
+        built = self._curated_combination(image_id, category, intent)
         if built is None:
             return False
         workflow, params = built
-        logger.info("combine: category=%s image=%s -> curated recipe", category, image_id)
+        logger.info("combine: category=%s intent=%s image=%s -> curated recipe",
+                    category, intent, image_id)
         key = gallery.settings_folder_key(
             {"workflow_name": workflow.name, "workflow_version": workflow.version,
              "params_json": json.dumps(params)},
             gallery.build_image_config_index(self._image_rows),
         )
-        if self._reroll.start_prepared(key, workflow, params):
+        prompt_id = self._reroll.start_prepared(key, workflow, params)
+        if prompt_id:
+            self._mark_for_sending(prompt_id, send)
             self._reveal_combination(key)
         return True
 
-    def _generate_category(self, image_id: str, category: str):
+    def _mark_for_sending(self, prompt_id: str, send: bool):
+        """Stamp a just-launched run to hand its clip on the moment it exists.
+
+        Only a spoken "genau it" asks for this. Pressing Generate leaves the clip
+        in the gallery for Send-to-Genau, because someone at the keyboard can look
+        at it first; someone talking to a fullscreen picture cannot.
+        """
+        if send:
+            self._db.mark_genau_requested(prompt_id)
+
+    def _generate_category(self, image_id: str, category: str,
+                           intent: str = recipe_match.PLAYERS, send: bool = False):
         """Run the recipe that fits ``category`` on the dropped image: the
         overlay's curated recipe when one is pinned for the act, else the mined
-        exemplar handed off to the shared combine launch."""
-        if self._generate_curated(image_id, category):
+        exemplar handed off to the shared combine launch. ``intent`` chooses which
+        lane both tiers answer from; ``send`` hands the finished clip to Genau
+        without a second ask."""
+        if self._generate_curated(image_id, category, intent, send):
             return
-        video_id = self._resolve_category(image_id, category)
-        if video_id is not None:
-            self._generate_combination(image_id, video_id)
+        self._resolve_category(
+            image_id, category, intent,
+            lambda video_id: video_id is not None
+            and self._generate_combination(image_id, video_id, send),
+        )
 
-    def _open_category(self, image_id: str, category: str):
+    def _open_category(self, image_id: str, category: str,
+                       intent: str = recipe_match.PLAYERS):
         """Open the recipe that fits ``category`` as an editable generate tab — the
         Open-in-generator counterpart to :meth:`_generate_category`, honoring the
-        same curated-over-mined order."""
-        built = self._curated_combination(image_id, category)
+        same curated-over-mined order and the same lane.
+
+        A run started from that tab is an ordinary Generate, so a Genau recipe opened
+        this way is not auto-sent; the tab's own Send-to-Genau does it once the clip
+        is there.
+        """
+        built = self._curated_combination(image_id, category, intent)
         if built is not None:
             workflow, params = built
             self._info_tabs.open_config(workflow.name, params)
             return
-        video_id = self._resolve_category(image_id, category)
-        if video_id is not None:
-            self._open_combination(image_id, video_id)
+        self._resolve_category(
+            image_id, category, intent,
+            lambda video_id: video_id is not None
+            and self._open_combination(image_id, video_id),
+        )
+
+    def _on_combine_intent_changed(self, _intent: str):
+        """Re-grey the act list for the lane just chosen."""
+        self._combine.set_available_categories(
+            recipe_match.available_categories(
+                self._rebuildable_videos(self._db.list_generations()),
+                self._combine.selected_intent(),
+            )
+        )
+
+    def _send_to_genau_if_requested(self, row: dict | None):
+        """Hand a just-finished clip to the Genau lane, if that is what it was for.
+
+        The last step of a spoken "genau it": the run was stamped at launch
+        (:meth:`_mark_for_sending`), so nothing here has to remember it. Only a
+        video with a file on disk that hasn't already gone is sent, and a failure
+        is logged rather than shown — the clip is safe in the gallery either way,
+        and Send-to-Genau is still there to retry with.
+        """
+        if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
+            return
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is None or preview[1] != "video":
+            return
+        try:
+            evolver_export.export_video(preview[0], EVOLVER_INBOX_DIR / GENAU_SOURCE)
+        except Exception as e:
+            logger.warning("Automatic send to Genau failed for %s: %s",
+                           row.get("prompt_id"), e)
+            return
+        self._db.mark_genau_exported(row["prompt_id"])
+        logger.info("genau: sent %s down the Genau lane", preview[0].name)
+
+    def _genau_it(self, image_id: str | None) -> tuple[str | None, str]:
+        """Animate an image as a Genau clip: the act read off its own prompt.
+
+        Returns the id it launched on (``None`` when it didn't) and the line the
+        speaking surface should say — the same shape as :meth:`_fix_part`, because
+        the speaker is looking at the picture, not at this pane.
+
+        Nothing is picked and nothing is dropped: the act comes from the image's
+        prompt (:func:`recipe_match.category_for_prompt`), and from there this is
+        the Genau lane's ordinary category path. An unreadable prompt or an act
+        with no loop recipe behind it says so rather than animating the wrong
+        thing. The run is stamped so its finished clip hands itself on without
+        being asked again — the whole point of saying it out loud is that the
+        picture is wanted moving *now*, and a second press to release it would be
+        one the speaker isn't near a keyboard to make.
+        """
+        row = self._db.get_generation(image_id) if image_id else None
+        if row is None or gallery.media_type_of_row(row) != "image":
+            return None, "🎤 only a picture can become a Genau clip"
+        category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
+        if category is None:
+            return None, "🎤 this prompt doesn't say what's happening — no act to animate"
+        available = recipe_match.available_categories(
+            self._rebuildable_videos(self._db.list_generations()), recipe_match.GENAU,
+        )
+        if category not in available:
+            return None, f"🎤 no looping “{category}” clip to base a recipe on yet"
+        logger.info("genau it: image=%s -> category=%s", image_id, category)
+        self._generate_category(image_id, category, recipe_match.GENAU, send=True)
+        return image_id, f"🎤 animating as a “{category}” loop"
 
     def _reveal_combination(self, key: str):
         """Show a just-launched combine. If its (image × settings) folder already
@@ -3757,6 +3914,7 @@ class GalleryView(QWidget):
                 finished_row = self._db.get_generation(source_id)
                 # A slideshow that asked for this one swaps the slide for it.
                 self._feed_slideshow_enhanced(finished_row)
+        self._send_to_genau_if_requested(finished_row)
         if key == self._selected_reroll_key:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()

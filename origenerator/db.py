@@ -42,7 +42,18 @@ CREATE TABLE IF NOT EXISTS generations (
     duration_seconds REAL,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     completed_at    TEXT,
-    evolver_exported_at TEXT
+    evolver_exported_at TEXT,
+    -- The twin of evolver_exported_at for the Genau lane: a clip sent to be
+    -- upscaled and delivered to Genau's folder. Separate because the two sends
+    -- go to different source folders and mean different things, so a video can
+    -- have had one, the other, or both.
+    genau_exported_at TEXT,
+    -- Set at launch on a run a spoken "genau it" started, so its completion hands
+    -- the clip on without being asked again. On the row rather than in memory
+    -- because a restart mid-generation is routine, and it is the only thing
+    -- separating such a run from the identical loop workflow started by hand,
+    -- which must stay put until Send-to-Genau is pressed.
+    genau_requested_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -123,6 +134,7 @@ _GENERATION_COLUMNS = (
     "output_files", "original_files", "enhance_history", "thumbnail_path",
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
+    "genau_exported_at", "genau_requested_at",
 )
 
 
@@ -150,6 +162,10 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
         if "evolver_exported_at" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
+        if "genau_exported_at" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN genau_exported_at TEXT")
+        if "genau_requested_at" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN genau_requested_at TEXT")
         if "progress_json" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN progress_json TEXT")
         if "starred" not in existing:
@@ -286,6 +302,34 @@ class Database:
         with self._connect() as conn:
             conn.execute(
                 "UPDATE generations SET evolver_exported_at = datetime('now')"
+                " WHERE prompt_id = ?",
+                (prompt_id,),
+            )
+
+    def mark_genau_exported(self, prompt_id: str):
+        """Record that this generation's clip was sent down the Genau lane.
+
+        The twin of :meth:`mark_evolver_exported`, and equally a plain marker: the
+        value is only ever tested for presence, so the button can show the send
+        across sessions.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET genau_exported_at = datetime('now')"
+                " WHERE prompt_id = ?",
+                (prompt_id,),
+            )
+
+    def mark_genau_requested(self, prompt_id: str):
+        """Record that a spoken "genau it" started this run.
+
+        Stamped at launch, read at completion: it is what tells the finished clip
+        to hand itself to the Genau lane without a second ask. Only ever tested
+        for presence.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET genau_requested_at = datetime('now')"
                 " WHERE prompt_id = ?",
                 (prompt_id,),
             )

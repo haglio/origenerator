@@ -11,12 +11,14 @@ from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
 from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
 
-from origenerator import gallery, search
+from origenerator import evolver_export, gallery, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
 from origenerator.gallery import detail_parts
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, GENAU_SOURCE, THUMB_DIR,
+)
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import diff_text
@@ -6803,8 +6805,9 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
     monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
     called = {}
 
-    def fake_best(category, candidates):
+    def fake_best(category, candidates, intent=recipe_match.PLAYERS):
         called["category"] = category
+        called["intent"] = intent
         return "vid"
 
     monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
@@ -9121,3 +9124,251 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
 
     view._voice.speak("no hat")
     assert "no hat" in view._slideshow._note.text()
+# --- the Genau lane: a looping clip, made but not sent anywhere ---------------
+
+
+def _genau_db(tmp_path):
+    """The combine DB plus a looping clip of the "dancing" act to mine as a recipe.
+
+    The long-form video the fixture already carries depicts the same act, so this
+    also pins that the Genau lane picks the loop over it.
+    """
+    db = _combine_db(tmp_path)
+    loop = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+    db.insert_generation(
+        prompt_id="loop", workflow_name="wan22_flf2v_loop", workflow_version=loop.version,
+        positive_prompt="dancing, one stroke", seed=7,
+        params_json=json.dumps(dict(loop.default_params(), seed=7, noise_seed=8,
+                                    positive_prompt="dancing, one stroke")),
+        workflow_json="{}",
+    )
+    db.update_generation("loop", status="completed",
+                         output_files=json.dumps([{"filename": "flf2v_loop_1.mp4", "subfolder": ""}]))
+    # A second image whose own prompt names an act, so a spoken "genau it" has
+    # something to read. The fixture's original "img" says only "a dog".
+    db.insert_generation(
+        prompt_id="img_act", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="she is dancing by the window", seed=2,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=2,
+                                    positive_prompt="she is dancing by the window")),
+        workflow_json="{}",
+    )
+    db.update_generation("img_act", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_act.png", "subfolder": ""}]))
+    return db
+
+
+def _genau_view(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_genau_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    return view
+
+
+def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+
+    view._generate_category("img", "dancing", recipe_match.GENAU)
+
+    job = next(iter(view._reroll_jobs.values()))
+    # The act has a long-form video too; the Genau lane can only use the loop.
+    assert job.workflow.name == "wan22_flf2v_loop"
+    assert job.params["input_image"] == "sdxl_pick.png [output]"
+
+
+def test_the_view_asks_the_players_lane_unless_told_otherwise(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    asked = []
+
+    def spy(category, candidates, intent=recipe_match.PLAYERS):
+        asked.append(intent)
+        return "vid"
+
+    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", spy)
+
+    view._generate_category("img", "dancing")
+    view._generate_category("img", "dancing", recipe_match.GENAU)
+
+    assert asked == [recipe_match.PLAYERS, recipe_match.GENAU]
+
+
+def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
+    # Someone at the keyboard can look at the loop first, so nothing leaves for
+    # Evolver until Send-to-Genau is pressed.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
+                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    sent = []
+    monkeypatch.setattr(evolver_export, "export_video", lambda src, dest: sent.append(src))
+
+    view._generate_category("img", "dancing", recipe_match.GENAU)
+    job = next(iter(view._reroll_jobs.values()))
+    assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
+
+    view._on_reroll_finished("k", "loop")
+    assert sent == []
+    assert view._db.get_generation("loop")["genau_exported_at"] is None
+
+
+# --- "genau it", spoken over a fullscreen picture -----------------------------
+
+
+def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+
+    # "img_act"'s own prompt names the act; nothing is picked and nothing is dropped.
+    prompt_id, message = view._genau_it("img_act")
+
+    assert prompt_id == "img_act"
+    assert "dancing" in message
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.workflow.name == "wan22_flf2v_loop"
+    assert job.params["input_image"] == "sdxl_act.png [output]"
+    # Spoken, so it hands itself on: whoever said it is not at the keyboard.
+    assert view._db.get_generation(job.prompt_id)["genau_requested_at"]
+
+
+def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+
+    prompt_id, message = view._genau_it("img")  # its prompt is "a dog" — no act
+
+    assert prompt_id is None
+    assert "doesn't say" in message
+    assert not view._reroll_jobs  # nothing was launched on a guess
+
+
+def test_genau_it_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path, monkeypatch):
+    db = _genau_db(tmp_path)
+    # An image of an act the gallery holds no looping clip of.
+    db.insert_generation(
+        prompt_id="img_delta", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a delta form scene", seed=3,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=3,
+                                    positive_prompt="a delta form scene")),
+        workflow_json="{}",
+    )
+    db.update_generation("img_delta", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_delta.png", "subfolder": ""}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    prompt_id, message = view._genau_it("img_delta")
+
+    assert prompt_id is None
+    assert "looping" in message
+    assert not view._reroll_jobs
+
+
+def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+
+    prompt_id, message = view._genau_it("loop")
+
+    assert prompt_id is None
+    assert "picture" in message
+
+
+def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+
+    class _Surface:
+        def __init__(self):
+            self.noted = None
+
+        def isActiveWindow(self):
+            return True
+
+        def voice_fix_target(self):
+            return "img_act"
+
+        def note_voice_fix(self, prompt_id, message):
+            self.noted = (prompt_id, message)
+
+    surface = _Surface()
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    # Answered in the surface's own corner, not in a dialog over it — the speaker
+    # is looking at the picture, not at this pane.
+    assert surface.noted[0] == "img_act"
+    assert "dancing" in surface.noted[1]
+    assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+
+
+def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._db.mark_genau_requested("loop")   # as a spoken launch would have
+    clip = Path("C:/out/flf2v_loop_1.mp4")
+    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
+                        lambda row, out: (clip, "video"))
+    sent = []
+    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
+                        lambda src, dest: sent.append((src, dest)) or dest / src.name)
+
+    view._on_reroll_finished("k", "loop")
+
+    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert view._db.get_generation("loop")["genau_exported_at"]
+
+
+def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch):
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._db.mark_genau_requested("loop")
+    view._db.mark_genau_exported("loop")
+    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
+                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    sent = []
+    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
+                        lambda src, dest: sent.append(src))
+
+    view._on_reroll_finished("k", "loop")
+
+    assert sent == []
+
+
+def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
+    # The inbox copy is the only thing that failed; the clip itself is fine, and
+    # Send-to-Genau is still there to retry with.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._db.mark_genau_requested("loop")
+    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
+                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+
+    def boom(src, dest):
+        raise OSError("the inbox is not there")
+
+    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video", boom)
+
+    view._on_reroll_finished("k", "loop")  # must not raise
+
+    assert view._db.get_generation("loop")["genau_exported_at"] is None
+
+
+def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
+    # The one test that puts the pool hop back: everything else runs it inline so a
+    # launch is observable in one call. What must hold is that a match taking real
+    # time does not hold the UI thread while it takes it.
+    monkeypatch.undo()  # drop the conftest fixture's straight-through override
+    import threading
+
+    db = _genau_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    asked_on = {}
+
+    def slow_match(*a, **k):
+        asked_on["thread"] = threading.current_thread().name
+        return None  # the model finds no fit; best_recipe answers instead
+
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", slow_match)
+
+    view._generate_category("img", "dancing", recipe_match.GENAU)
+
+    qtbot.waitUntil(lambda: bool(view._reroll_jobs), timeout=5000)
+    assert asked_on["thread"] != threading.main_thread().name
+    assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"

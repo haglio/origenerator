@@ -6,7 +6,7 @@ import pytest
 
 from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE
+from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
@@ -1247,3 +1247,84 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
     panel.layout().activate()
 
     assert gap() == before   # the column closed up; the space did not move down
+
+
+# --- the Genau lane: send a clip, or make one from an image -------------------
+
+
+def test_send_to_genau_shares_the_one_button_bank(panel):
+    main = panel._panes.widget(0)
+    bank = _layout_containing(main.layout(), panel._generate_btn)
+    assert bank.indexOf(panel._genau_btn) != -1
+
+
+def test_send_to_genau_shows_for_a_video_and_not_for_an_image(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(video, [])
+    assert not panel._genau_btn.isHidden()
+
+    image = _image_row(db, "img1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/img1.png"), "image"))
+    panel.show_saved_generation(image, [image])
+    assert panel._genau_btn.isHidden()   # the lane carries clips, not pictures
+
+
+def test_a_fresh_tab_offers_no_send_to_genau(saved_panel):
+    panel, _db = saved_panel
+    assert panel._genau_btn.isHidden()
+
+
+def test_send_to_genau_copies_the_clip_into_the_genau_lane(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    video_path = Path("C:/out/vid1.mp4")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (video_path, "video"))
+    export = MagicMock(return_value=EVOLVER_INBOX_DIR / GENAU_SOURCE / "vid1.mp4")
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    panel.show_saved_generation(video, [])
+    panel._on_send_to_genau()
+
+    # The lane is the source folder — the same inbox Evolver watches, under the name
+    # that tells it where the upscaled result belongs.
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / GENAU_SOURCE)
+    assert panel._displayed_row["genau_exported_at"]
+    assert panel._genau_btn.text() == "Sent to Genau ✓"
+    assert panel._genau_btn.isEnabled() is False
+
+
+def test_the_two_lanes_are_sent_independently(saved_panel, monkeypatch):
+    # Sending a video to Evolver must not read as having sent it to Genau: they are
+    # different errands with different destinations.
+    panel, db = saved_panel
+    video = _video_row(db, "vid1")
+    db.mark_evolver_exported("vid1")
+    video = db.get_generation("vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(video, [])
+
+    assert panel._evolver_btn.text() == "Sent to Evolver ✓"
+    assert panel._genau_btn.text() == "Send to Genau"
+    assert panel._genau_btn.isEnabled()
+
+
+def test_send_to_genau_does_not_re_export_an_already_sent_clip(saved_panel, monkeypatch):
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    db.mark_genau_exported("vid1")
+    video = db.get_generation("vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    export = MagicMock()
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    panel.show_saved_generation(video, [])
+    panel._on_send_to_genau()
+
+    export.assert_not_called()

@@ -15,8 +15,8 @@ Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
 (always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
 workflow declares no LoRA keys, so every branch nests the same depth), and — in
-the Videos tree only — the source image a video animates, i.e. the configuration
-of its start frame (:func:`_input_image_config`). The source-image level is a
+the Videos tree only — the source image a video animates, i.e. which picture its
+start frame is (:func:`_input_image_config`). The source-image level is a
 property of *videos*, so it grows only under Videos; a still an image-conditioned
 workflow happened to output (an imported PNG under a video prefix) lands under
 Images and is grouped like any other image. The settings group is the full key,
@@ -141,7 +141,10 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     if level == "lora":
         return _lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
     if level == "source_image":
-        config = _input_image_config(parse_params(params_json).get("input_image"), image_index)
+        # The tier exists only in the Videos tree, so it always asks which picture.
+        config = _input_image_config(
+            parse_params(params_json).get("input_image"), image_index, identify=True,
+        )
         return _source_image_key(media_type, workflow_name, config)
     if level == "settings":
         return settings_folder_key(row, image_index)
@@ -443,15 +446,17 @@ def _build_source_image_groups(
     media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
 ) -> list[SourceImageGroup]:
     """The source-image folders under one model/LoRA folder: videos split by the
-    configuration of the start frame they animate, each holding its settings leaves.
+    picture they animate, each holding its settings leaves.
 
-    Keyed by that configuration (:func:`_input_image_config`), the same projection
-    of the settings signature that the model and LoRA levels use for theirs — so
-    re-rolls of one image stay together while differently configured frames split."""
+    Keyed by which picture that is (:func:`_input_image_config`), the same
+    projection of the settings signature that the model and LoRA levels use for
+    theirs — so every settings folder in here explores one frame, and opening any
+    of them shows videos of that one image."""
     return _grouped_folders(
         rows, folder_meta, cls=SourceImageGroup,
         signature=lambda r: _input_image_config(
-            parse_params(r.get("params_json")).get("input_image"), image_index
+            parse_params(r.get("params_json")).get("input_image"), image_index,
+            identify=True,
         ),
         key_for=lambda sig: _source_image_key(media_type, wf_name, sig),
         label_for=lambda params: _source_image_label(params, image_index),

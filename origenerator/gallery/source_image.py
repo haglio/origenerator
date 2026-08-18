@@ -23,7 +23,8 @@ from origenerator.gallery.output import row_output_files
 class _ImageConfig:
     """How the gallery keys and names an image used as an i2v's start frame."""
 
-    signature: str  # the image's settings signature — groups a video with re-rolls of its frame
+    prompt_id: str  # which picture it is — what the source-image tier groups on
+    signature: str  # the image's settings signature — what names it below
     label: str      # the image's folder label — names the video's source-image folder
 
 
@@ -59,18 +60,23 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
 
 
 def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
-    """Map each image's output filename to the configuration that produced it.
+    """Map each image's output filename to the generation that produced it.
 
     Keyed by output basename (lowercased, matching how an ``input_image`` value
-    resolves), so an i2v row can look up its start frame's settings signature and
-    folder label in O(1). Built once per tree. Images that produced no file
-    contribute nothing.
+    resolves), so an i2v row can look up which picture its start frame is, plus
+    that picture's settings signature and folder label, in O(1). Built once per
+    tree. Images that produced no file contribute nothing.
+
+    Every file an image row lists points at the same entry, so a picture answers
+    as itself under any of its names — which is what keeps a video made from an
+    enhanced frame with one made from the frame before it was enhanced.
     """
     index: dict[str, _ImageConfig] = {}
     for image in image_rows:
         workflow_name = image.get("workflow_name")
         params = parse_params(image.get("params_json"))
         config = _ImageConfig(
+            prompt_id=image.get("prompt_id") or "",
             signature=settings_signature(workflow_name, image.get("params_json"),
                                          workflow_version=image.get("workflow_version")),
             label=settings_label(canonical_settings(workflow_name, params)),

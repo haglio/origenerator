@@ -161,20 +161,23 @@ class RerollController(QObject):
         return source != "experiment" or not self._jobs.get(key)
 
     def start_prepared(self, key: str, workflow, params: dict, *,
-                       source: str = "generated") -> bool:
+                       source: str = "generated") -> str | None:
         """Launch a job with already-built ``params`` under folder ``key``.
 
         Unlike :meth:`start`, the caller owns the params — no defaults are filled
         and no seed is re-rolled. This is the gallery's image+video combine (which
         reuses the recipe video's exact seed) and the background experimenter,
-        which tags its rows with ``source="experiment"``. Returns ``True`` once
-        the job is tracked; ``False`` when there's no client, an experiment already
-        holds ``key``, or the submit failed (``_launch`` drops the job then).
+        which tags its rows with ``source="experiment"``. Returns the launched
+        run's prompt id — truthy exactly where this used to return ``True``, so a
+        caller that only asks "did it go?" reads the same, while one acting on the
+        row it just made can name it. ``None`` when there's no client, an
+        experiment already holds ``key``, or the submit failed (``_launch`` drops
+        the job then).
         """
         if self._client is None or not self._launchable(key, source):
-            return False
-        self._launch(key, workflow, params, self._on_finished, source=source)
-        return self.has(key)
+            return None
+        job = self._launch(key, workflow, params, self._on_finished, source=source)
+        return job.prompt_id if job is not None and self.has(key) else None
 
     def start_reroll_from_image(self, key: str, image_row: dict, image_workflow,
                                 video_workflow, video_params: dict) -> bool:
@@ -275,6 +278,11 @@ class RerollController(QObject):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
 
+        Returns the job, so a caller can name the run it just started — what lets
+        the gallery stamp a spoken "genau it" onto its own row. ``None`` when the
+        job could not even be built; a job whose *submit* failed is returned but
+        has been dropped, which ``has(key)`` reports.
+
         ``origin`` is the prompt id the run began under, carried across a chained
         i2v's image→video hand-off so both stages read as one run; a fresh launch
         is its own origin.
@@ -290,7 +298,7 @@ class RerollController(QObject):
             job = GenerationJob(self._client, workflow, params, source=source)
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
-            return
+            return None
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
@@ -303,6 +311,7 @@ class RerollController(QObject):
             self._preempt_experiments()
         self._pump()
         self.changed.emit()
+        return job
 
     # --- the line: joining it, and being handed over ------------------------
 

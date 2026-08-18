@@ -3,6 +3,11 @@
 Evolver is a sibling app that watches ``0_inbox/<source>/`` and ingests any
 *finalized* video it finds there. This module is the Origenerator side of that
 handoff: it copies a gallery video into a given inbox folder.
+
+The folder is the whole message. Evolver routes by source name, so both of this
+app's lanes come through here and differ only in which one they are given: a
+plain video goes to the library lane, a Genau loop to the lane whose upscaled
+output Evolver delivers to Genau's clips folder.
 """
 
 from __future__ import annotations

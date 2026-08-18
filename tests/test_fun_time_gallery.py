@@ -31,6 +31,19 @@ def _fun_time_view(qtbot, rows=()):
     return view
 
 
+def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
+    """The room's audio and its microphone are the session's, not this app's:
+    the main player owns the sound and Fun Time owns the mic (it hears this
+    app's spoken commands too and posts them on the channel), so a second
+    switch for either would be a switch over something this window does not
+    hold."""
+    view = _fun_time_view(qtbot)
+    assert view._audio_btn is None
+    assert view._mic_btn is None
+    view.set_audio_enabled(True)   # a stale standalone session key must not crash
+    assert view.audio_enabled() is False
+
+
 def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
     assert view._osr2_stroke is None

@@ -7,6 +7,7 @@ from origenerator.gui import icons
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
+from PyQt6.QtGui import QMovie
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
 
 
@@ -235,3 +236,28 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
         assert img.pixelColor(8, 182) == fill    # behind the caption text
     finally:
         app.setStyleSheet(prior)
+
+
+def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
+    """The hosting session's OmniPause reaches these: a paused room with the
+    gallery in it must not be a wall of clips still playing."""
+    webp = tmp_path / "loop.webp"
+    Image.new("RGB", (40, 30)).save(webp)
+    tile = ThumbnailWidget("p1", None, "a clip", movie_path=str(webp))
+    qtbot.addWidget(tile)
+    assert tile._movie is not None
+
+    tile.set_preview_paused(True)
+    assert tile._movie.state() == QMovie.MovieState.Paused
+
+    tile.set_preview_paused(False)
+    assert tile._movie.state() == QMovie.MovieState.Running
+
+
+def test_a_still_tile_takes_the_freeze_inertly(qtbot, tmp_path):
+    still = tmp_path / "still.png"
+    Image.new("RGB", (40, 30)).save(still)
+    tile = ThumbnailWidget("p2", str(still), "a picture")
+    qtbot.addWidget(tile)
+
+    tile.set_preview_paused(True)  # nothing was moving; nothing to stop

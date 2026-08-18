@@ -64,7 +64,7 @@ def test_the_collecting_shelves_carry_orientation_subfolders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     top = _top_level(view._tree)
-    assert _children(top["Recents"]) == ["Portrait", "Landscape"]
+    assert _children(top["Latest"]) == ["Portrait", "Landscape"]
     assert _children(top["Favorites"]) == ["Portrait", "Landscape"]
     assert _children(top["Experiments"]) == ["Portrait", "Landscape"]
     assert _children(top[TRASH_LABEL]) == []  # look-only; nothing plays from it
@@ -136,6 +136,6 @@ def test_the_subfolders_are_visible_without_an_expander(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     top = _top_level(view._tree)
-    assert top["Recents"].isExpanded()
+    assert top["Latest"].isExpanded()
     assert top["Favorites"].isExpanded()
     assert top["Experiments"].isExpanded()

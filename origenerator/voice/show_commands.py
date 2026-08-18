@@ -37,6 +37,7 @@ class ShowCommand(Enum):
 # beside "slideshow" is not a command and falls through to prompt steering.
 _VERBS = {
     "start": ShowCommand.START,
+    "play": ShowCommand.START,
     "open": ShowCommand.START,
     "pause": ShowCommand.PAUSE,
     "stop": ShowCommand.STOP,

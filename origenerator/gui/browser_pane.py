@@ -144,6 +144,10 @@ class BrowserPane:
         self._visible_ids: list[str] = []   # generations on screen, in shown order
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
+        # Whether the room is OmniPaused: the tiles loop little clips of
+        # themselves, and a rebuild draws new ones, so this is remembered and
+        # re-applied rather than edged onto whatever was on screen at the time.
+        self._previews_paused = False
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
@@ -171,6 +175,13 @@ class BrowserPane:
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
         self._request_items = list(request_items)
+
+    def set_previews_paused(self, paused: bool) -> None:
+        """Freeze (or resume) every looping tile — the hosting session's
+        OmniPause, which stops the room rather than only its shows."""
+        self._previews_paused = paused
+        for tile in self._thumb_widgets.values():
+            tile.set_preview_paused(paused)
 
     def show_enhancing(self, frames: dict):
         """Mark every visible tile whose image is being enhanced, and stream the
@@ -559,6 +570,7 @@ class BrowserPane:
         flow.addWidget(tw)
         self._visible_ids.append(row["prompt_id"])
         self._thumb_widgets[row["prompt_id"]] = tw
+        tw.set_preview_paused(self._previews_paused)  # a rebuild mid-pause stays still
         return tw
 
     def _visible_inflight_items(self) -> list:
@@ -869,6 +881,7 @@ class BrowserPane:
         flow.addWidget(tile)
         self._visible_ids.append(row["prompt_id"])
         self._thumb_widgets[row["prompt_id"]] = tile
+        tile.set_preview_paused(self._previews_paused)
         return tile
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
@@ -1091,6 +1104,7 @@ class BrowserPane:
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
+            tw.set_preview_paused(self._previews_paused)
         self.show_widget(container)
 
     def _seed_reroll_actions(self, row) -> list:

@@ -730,32 +730,40 @@ class GalleryView(QWidget):
         )
         self._group_btn.hide()
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
-        # The other app-global switch, beside the OSR2's: while it's on, a few
-        # library clips play at once with only their sound — something to work
-        # over, tied to nothing on screen.
-        self._audio_btn = self._tool_button(
-            icons.audio_icon(),
-            f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
-            "shuffling endlessly",
-            self._on_audio_toggle, checkable=True,
-        )
-        self._audio_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
-        # The microphone, beside the other app-global switches: on is listening,
-        # off is not, and that is the whole of it. Nothing opens or closes the mic
-        # on its own any more — it used to come on with the Auto loop and with a
-        # fullscreen show, which meant the answer to "is it listening?" was a
-        # thing to work out rather than a thing to look at.
-        self._mic_btn = self._tool_button(
-            icons.mic_icon(),
-            "Listen: spoken slideshow commands, targeted fixes over a show, and "
-            "prompt steering while a folder is auto-generating",
-            self._on_mic_toggle, checkable=True,
-        )
-        self._mic_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
+        # The room's two shared appliances: the audio bed and the microphone.
+        # Hosted by Fun Time this app has neither — the session's main player
+        # owns the room's sound, and the session owns the mic (it hears every
+        # spoken command, this app's included, and posts them on the channel),
+        # so a second switch for either would be a switch over something this
+        # window does not hold.
+        self._audio_btn = None
+        self._mic_btn = None
+        if self._fun_time is None:
+            # While it's on, a few library clips play at once with only their
+            # sound — something to work over, tied to nothing on screen.
+            self._audio_btn = self._tool_button(
+                icons.audio_icon(),
+                f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
+                "shuffling endlessly",
+                self._on_audio_toggle, checkable=True,
+            )
+            self._audio_btn.setStyleSheet(
+                "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+            )
+            # The microphone: on is listening, off is not, and that is the whole
+            # of it. Nothing opens or closes the mic on its own any more — it
+            # used to come on with the Auto loop and with a fullscreen show,
+            # which meant the answer to "is it listening?" was a thing to work
+            # out rather than a thing to look at.
+            self._mic_btn = self._tool_button(
+                icons.mic_icon(),
+                "Listen: spoken slideshow commands, targeted fixes over a show, "
+                "and prompt steering while a folder is auto-generating",
+                self._on_mic_toggle, checkable=True,
+            )
+            self._mic_btn.setStyleSheet(
+                "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+            )
         # One switch for the device, wearing the waveform: on means Origenerator
         # is driving the OSR2, and the app picks the source — the funscript of
         # whatever scripted video is in front (the generate tab's, or one playing
@@ -1364,11 +1372,14 @@ class GalleryView(QWidget):
 
     def audio_enabled(self) -> bool:
         """Whether the audio bed's switch is on (for session persistence)."""
-        return self._audio_btn.isChecked()
+        return self._audio_btn is not None and self._audio_btn.isChecked()
 
     def set_audio_enabled(self, enabled):
-        """Restore the audio bed's switch from a saved session."""
-        self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
+        """Restore the audio bed's switch from a saved session.  With no switch
+        (hosted by Fun Time, whose main player owns the room's sound) a stale
+        saved value has nothing to restore."""
+        if self._audio_btn is not None:
+            self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
 
     # --- background experiments: the closing batch and the shelf's controls ---
 
@@ -2597,7 +2608,7 @@ class GalleryView(QWidget):
             self._voice_status_timer.stop()
 
     def _voice_status_revert(self):
-        if self._mic_btn.isChecked():  # still listening
+        if self._listening():  # still listening
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._voice_status.hide()
@@ -3002,6 +3013,15 @@ class GalleryView(QWidget):
 
     # --- spoken commands: "fix teeth" over a show, "start slideshow" for one ---
 
+    def _listening(self) -> bool:
+        """Whether this app is listening on its own mic.
+
+        Never when hosted: the session owns the microphone there, hears the
+        spoken commands for both of us, and posts this app's on its channel —
+        two listeners on one mic is two transcriptions of every utterance.
+        """
+        return self._mic_btn is not None and self._mic_btn.isChecked()
+
     def _on_mic_toggle(self, _on: bool):
         """The microphone switch: the one thing that opens or closes the mic."""
         self._sync_voice()
@@ -3018,7 +3038,7 @@ class GalleryView(QWidget):
         commands always, and the prompt steering only while a loop has a folder
         to steer. That is not a second switch, just nothing to steer.
         """
-        if not self._mic_btn.isChecked():
+        if not self._listening():
             self._voice.stop()           # both halves, so the listener closes
             self._voice.stop_commands()
             self._voice_status_timer.stop()
@@ -3033,6 +3053,22 @@ class GalleryView(QWidget):
         else:
             self._voice.stop()  # no loop to steer; the commands hold the mic open
         self._show_voice_status("🎤 Listening…", transient=False)
+
+    def run_spoken_command(self, text: str) -> bool:
+        """Run a command the HOSTING session heard, and say whether it was one.
+
+        Fun Time owns the microphone while this app is hosted — one mic, one
+        transcription — so its recognizer hears "landscape favorites", posts the
+        words on this app's channel, and they are matched here against this
+        app's own vocabulary: the session cannot know which shelves this tree
+        has or which detail parts have detectors installed.
+        """
+        matched = match_voice_command(text)
+        if matched is None:
+            logger.info("Voice (from the session): %r matched no command", text)
+            return False
+        self._on_voice_command(matched)
+        return True
 
     def _on_voice_command(self, matched):
         """One recognized utterance: a shelf to play, a show command, or a
@@ -3588,12 +3624,19 @@ class GalleryView(QWidget):
         """The hosting session's OmniPause, applied to every open show and
         remembered for the ones not opened yet (see :meth:`_present_surface`).
         The bridge calls this on the flag's edges; the memory is what makes
-        the freeze cover a show the user opens mid-pause."""
+        the freeze cover a show the user opens mid-pause.
+
+        And to this window's own moving pictures: every video tile in the
+        browser loops a little WebP of itself, so a paused room with the
+        gallery in it was a wall of clips still playing — OmniPause means the
+        room stops, not the shows stop.
+        """
         self._session_paused = paused
         for side in ("portrait", "landscape"):
             show = self.region_show(side)
             if show is not None and hasattr(show, "set_session_paused"):
                 show.set_session_paused(paused)
+        self._browser.set_previews_paused(paused)
 
     def region_show(self, side: str):
         """The show occupying satellite region *side*, or None — a closed

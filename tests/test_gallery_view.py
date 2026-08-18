@@ -323,7 +323,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     top = _top_level(view._tree)
     # The shelves, then one All row over the media roots — somewhere to stand
     # that means the whole library, which is what scopes a search to everything.
-    assert set(top) == {"Recents", "Favorites", "Experiments", "Requests",
+    assert set(top) == {"Latest", "Favorites", "Experiments", "Requests",
                         "Trash", "All"}
     assert set(_media_roots(view._tree)) == {"Images", "Videos"}
 
@@ -680,7 +680,7 @@ def test_the_box_says_what_it_would_search(qtbot):
     assert "Videos" in placeholder          # and every branch above it
 
     view._tree.setCurrentItem(view._recents_item)
-    assert view._search_edit.placeholderText() == "Search Recents…"
+    assert view._search_edit.placeholderText() == "Search Latest…"
 
 
 def test_the_box_shows_the_tail_of_a_path_too_long_for_it(qtbot):
@@ -1284,7 +1284,7 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     view._toggle_star(dog_key)
 
     # The Starred shelf sits just below Recents, above the media folders.
-    assert view._tree.topLevelItem(0).text(0) == "Recents"
+    assert view._tree.topLevelItem(0).text(0) == "Latest"
     assert view._tree.topLevelItem(1).text(0) == "Favorites"
     # Selecting it lists a tile for each starred folder, wherever it lives.
     shelf = _top_level(view._tree)["Favorites"]
@@ -1961,7 +1961,7 @@ def test_starred_shelf_is_absent_until_a_folder_exists(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     top = _top_level(view._tree)
-    assert "Recents" not in top
+    assert "Latest" not in top
     assert "Starred" not in top
 
 
@@ -1972,9 +1972,9 @@ def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
     view.refresh()
 
     # Recents is the very first row, above Starred and the media folders.
-    assert view._tree.topLevelItem(0).text(0) == "Recents"
+    assert view._tree.topLevelItem(0).text(0) == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert view.visible_prompt_ids() == ["i2", "i1"]
     assert view.visible_folder_keys() == []
 
@@ -1988,7 +1988,7 @@ def test_recents_shelf_excludes_imported_files(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert view.visible_prompt_ids() == ["gen"]
 
 
@@ -1998,7 +1998,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._thumb_widgets["i2"].clicked.emit("i2")  # click the recent tile for the dog
     # Its details fill the info pane, but the shelf stays put — no navigation, so
     # every recent item is still listed.
@@ -2013,7 +2013,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
@@ -2032,7 +2032,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._thumb_widgets["i2"].clicked.emit("i2")  # a plain click borrows the italic tab
     assert view._info_tabs._preview_panel is not None
 
@@ -2053,7 +2053,7 @@ def test_right_clicking_a_recent_item_offers_star_enhance_and_delete(qtbot, monk
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     labels = []
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec",
@@ -2074,7 +2074,7 @@ def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeyp
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     monkeypatch.setattr(  # Delete is the menu's last entry
         "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[-1]
     )
@@ -2090,7 +2090,7 @@ def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeyp
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     monkeypatch.setattr(  # Star/Unstar is the menu's first entry
         "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[0]
     )
@@ -2107,7 +2107,7 @@ def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     monkeypatch.setattr(  # Enhance sits between Star and Delete
         "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[1]
     )
@@ -2124,7 +2124,7 @@ def test_recents_shelf_shows_empty_state_when_only_imports_exist(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert view.visible_prompt_ids() == []  # nothing generated: just the hint
 
 
@@ -2132,11 +2132,11 @@ def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
     view.refresh()  # a poll-driven rebuild must not knock us off the shelf
 
-    assert view._tree.currentItem().text(0) == "Recents"
+    assert view._tree.currentItem().text(0) == "Latest"
 
 
 def _many_recents(count):
@@ -2155,7 +2155,7 @@ def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert len(view.visible_prompt_ids()) == 50
     # And it's the newest page — the shelf still reads newest-first.
     assert view.visible_prompt_ids()[0] == "i119"
@@ -2165,7 +2165,7 @@ def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
     bar = _scroll_bar(view)
     bar.setRange(0, 5000)          # a laid-out shelf with room to scroll
@@ -2189,7 +2189,7 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     bar = _scroll_bar(view)
     bar.setRange(0, 5000)
     bar.setValue(bar.maximum())
@@ -2216,7 +2216,7 @@ def test_recents_media_filter_checkboxes_default_on_and_only_show_on_the_shelf(q
     view._tree.setCurrentItem(_media_roots(view._tree)["Images"])
     assert view._recents_filter_bar.isHidden()
     # ...and shown the moment the shelf is open.
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert not view._recents_filter_bar.isHidden()
 
 
@@ -2225,7 +2225,7 @@ def test_recents_media_filter_hides_the_unchecked_media_type(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # both by default
 
     view._recents_video_cb.setChecked(False)          # hide videos
@@ -2245,7 +2245,7 @@ def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     bar = _scroll_bar(view)
     bar.setRange(0, 5000)
     bar.setValue(bar.maximum())
@@ -2265,7 +2265,7 @@ def test_recents_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qt
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert "rr1" in view._inflight_cards               # shown by default
 
     view._recents_video_cb.setChecked(False)           # hide videos
@@ -2297,7 +2297,7 @@ def test_recents_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mo
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
     assert view._thumb_widgets["v1"].findChildren(QMovie)          # the video loops
     assert view._thumb_widgets["i1"].findChildren(QMovie) == []    # the image is a still
@@ -2331,7 +2331,7 @@ def test_recents_tiles_are_badged_image_or_video(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
     def badge_type(pid):
         badges = view._thumb_widgets[pid].findChildren(MediaBadge)
@@ -2359,7 +2359,7 @@ def test_a_new_generation_appears_at_the_top_of_recents(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     assert view.visible_prompt_ids() == ["old"]
 
     # A fresh generation lands; a poll reflects it at the top of the running list.
@@ -2373,7 +2373,7 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Recents", "Favorites", "Experiments",
+    assert set(_top_level(view._tree)) == {"Latest", "Favorites", "Experiments",
                                            "Requests", "Trash", "All"}
     assert set(_media_roots(view._tree)) == {"Images"}
 
@@ -2959,7 +2959,7 @@ def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
     assert view._showing_recents() is False
     assert view._back_btn.isEnabled()                    # the shelf is somewhere to go back to
@@ -2980,7 +2980,7 @@ def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
     view._tree.setCurrentItem(
         _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
@@ -3052,7 +3052,7 @@ def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._thumb_widgets["i2"].clicked.emit("i2")         # select i2 on the shelf
     view._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
     assert view._showing_recents() is False
@@ -3073,7 +3073,7 @@ def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])    # land on a folder's item
     view._thumbnail_clicked("i1")
     landing = view.selected_generation()
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._thumb_widgets["i1"].clicked.emit("i1")         # browse a couple of previews
     view._thumb_widgets["i2"].clicked.emit("i2")
 
@@ -4917,7 +4917,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     # The shelves are collections of media too, so each plays as a folder does...
     view._tree.setCurrentItem(view._recents_item)
     assert not view._slideshow_btn.isHidden()
-    assert "Recents" in view._slideshow_btn.toolTip()
+    assert "Latest" in view._slideshow_btn.toolTip()
     view._tree.setCurrentItem(view._starred_item)
     assert not view._slideshow_btn.isHidden()
     assert "Favorites" in view._slideshow_btn.toolTip()
@@ -5997,7 +5997,7 @@ class _FakeRerollJob:
 
 
 def _open_recents(view):
-    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
 
 
 def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
@@ -6146,7 +6146,7 @@ def test_recents_shelf_appears_for_a_running_generation(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert "Recents" in _top_level(view._tree)
+    assert "Latest" in _top_level(view._tree)
     _open_recents(view)
     assert "gen1" in view._inflight_cards
 

@@ -41,7 +41,7 @@ def test_a_fix_can_name_the_side_it_means(text, side):
 @pytest.mark.parametrize("text, key, side", [
     ("favorites", STARRED_KEY, None),
     ("landscape favorites", STARRED_KEY, "landscape"),
-    ("portrait recents", RECENTS_KEY, "portrait"),
+    ("portrait latest", RECENTS_KEY, "portrait"),
     ("trash", TRASH_KEY, None),
     ("requests", REQUESTS_KEY, None),
 ])
@@ -75,7 +75,7 @@ def test_the_bias_teaches_whisper_the_whole_vocabulary():
     up front."""
     bias = voice_command_bias()
 
-    for word in ("fix", "teeth", "portrait", "landscape", "favorites", "recents"):
+    for word in ("fix", "teeth", "portrait", "landscape", "favorites", "latest"):
         assert word in bias
 
 

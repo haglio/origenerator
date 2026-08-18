@@ -57,14 +57,23 @@ class FunTimeBridge(QObject):
     # --- commands in --------------------------------------------------------
 
     def _drain_commands(self) -> None:
+        """Take the queued verbs, keeping the case of what a verb carries.
+
+        The players fold the whole payload, which suits verbs that carry no
+        argument; one here does — a spoken phrase, which is words rather than a
+        keyword — so the keyword alone is folded (see :meth:`_apply`).
+        """
         if self._session.command_file is None:
             return
-        for verb in consume_command_file(self._session.command_file, logger=logger):
+        for verb in consume_command_file(self._session.command_file, logger=logger,
+                                         uppercase=False):
             self._apply(verb.strip())
 
     def _apply(self, verb: str) -> None:
         if not verb:
             return
+        keyword, marker, argument = verb.partition(":")
+        verb = keyword.upper() + marker + argument  # the words keep their case
         if verb == "CLOSE_SHOWS":
             for side in _SIDES:
                 show = self._gallery.region_show(side)
@@ -76,10 +85,21 @@ class FunTimeBridge(QObject):
             return
         side, _, action = verb.partition("_")
         side = side.lower()
-        if side in _SIDES:
-            self._apply_side(side, action)
-        else:
+        if side not in _SIDES:
             logger.warning("Unknown Fun Time verb dropped: %s", verb)
+            return
+        spoken, marker, phrase = action.partition(":")
+        if spoken == "SAY":
+            # The session owns the microphone for the whole room, so a spoken
+            # command about one of these regions is heard THERE and sent here
+            # as the words themselves — matched by this app's own vocabulary,
+            # which is the only place that knows its shelves and its parts.
+            self._gallery.run_spoken_command(f"{side} {phrase}")
+            return
+        if marker:
+            logger.warning("Unknown Fun Time verb dropped: %s", verb)
+            return
+        self._apply_side(side, action)
 
     def _apply_side(self, side: str, action: str) -> None:
         """One transport verb onto whatever holds *side* — the shows answer the

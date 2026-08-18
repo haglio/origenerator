@@ -32,7 +32,10 @@ from origenerator.recovery import RETENTION_DAYS
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
-RECENTS_LABEL = "Recents"     # its row label; a clock is drawn in the caret column
+RECENTS_LABEL = "Latest"      # its row label; a clock is drawn in the caret column.
+# "Latest" rather than "Recents" because that is the word the players use
+# for the same ordering — a Fun Time session's browse says Latest, and this
+# shelf is that same newest-first listing of what the app has made.
 STARRED_KEY = "__starred__"   # synthetic tree node collecting every starred folder
 # Its row label: the same concept as a Fun Time player's favorites (the star
 # there IS the favorite mark), so it wears that name.  The key stays

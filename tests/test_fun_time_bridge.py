@@ -89,6 +89,37 @@ def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypat
     assert show._playlist.index == 0
 
 
+def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch):
+    """The session owns the room's microphone, so it hears "landscape
+    favorites" and posts the WORDS on this channel — matched here, against this
+    app's own vocabulary, because only this app knows what its shelves are."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    spoken = []
+    monkeypatch.setattr(view, "run_spoken_command", spoken.append)
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "LANDSCAPE_SAY:favorites\nPORTRAIT_SAY:fix teeth\n", encoding="utf-8")
+    bridge._tick()
+
+    assert spoken == ["landscape favorites", "portrait fix teeth"]
+
+
+def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
+    """End to end from the words: the phrase the session heard becomes the
+    command this app would have matched had it heard it itself."""
+    from origenerator.gui.gallery_tree import STARRED_KEY
+
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    played = []
+    monkeypatch.setattr(view, "_play_shelf_aloud", played.append)
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
+    bridge._tick()
+
+    assert [(c.shelf_key, c.side) for c in played] == [(STARRED_KEY, "landscape")]
+
+
 def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -112,6 +143,24 @@ def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monke
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
     assert show._timer.isActive()
+
+
+def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
+    """Every video tile loops a little clip of itself, so a paused room with
+    the gallery in it was a wall of clips still playing.  OmniPause stops the
+    room, not only its shows — and a rebuild during the pause draws tiles that
+    are already still."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    held = []
+    monkeypatch.setattr(view._browser, "set_previews_paused", held.append)
+
+    (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
+    bridge._tick()
+    assert held == [True]
+
+    (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
+    bridge._tick()
+    assert held == [True, False]
 
 
 def test_status_reports_which_regions_are_occupied(qtbot, tmp_path, monkeypatch):

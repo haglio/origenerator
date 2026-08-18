@@ -281,6 +281,17 @@ def main():
         # records the live install then imports as duplicates of its own.
         status("Skipping library maintenance (branch session)...")
         logger.info("Branch session: library maintenance left to the live app")
+        # The enhancement fold is the exception, because it is not maintenance
+        # of the library at all: it rewrites rows the seeded copy already holds,
+        # touching no file and reading no output history. Left out, a preview
+        # would show enhancements standing as images of their own long after the
+        # live app stopped doing that — a difference in the copy, not the code.
+        status("Folding enhancements into their images...")
+        from origenerator.gallery import fold_completed_enhancements
+        try:
+            fold_completed_enhancements(db)
+        except Exception as e:
+            logger.warning("Enhancement fold failed: %s", e)
     else:
         status("Adopting branch-session results...")
         # What a preview branch generated comes home as the rows that session
@@ -363,9 +374,10 @@ def main():
 
         status("Folding enhancements into their images...")
         # A standalone enhance is an upgrade of an existing image, not its own
-        # generation: fold any completed image_enhance row onto its source —
-        # completions that landed while the app was closed, and the rows from
-        # before enhancement folded at all.
+        # generation: fold every finished one onto its source. After the scan,
+        # because an enhance the live app never recorded — a branch session's
+        # above all — reaches here as a bare file, and the standalone image the
+        # scan just reconstructed from it is exactly what there is to fold away.
         from origenerator.gallery import fold_completed_enhancements
         try:
             fold_completed_enhancements(db)

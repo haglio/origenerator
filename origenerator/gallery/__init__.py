@@ -87,6 +87,7 @@ from origenerator.gallery.enhance import (
     original_files_of,
     fold_completed_enhancements,
     fold_enhancement,
+    is_enhance_product_row,
     is_enhanceable_row,
     is_enhanced_row,
     remove_enhance_levels,

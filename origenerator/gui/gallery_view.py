@@ -3154,14 +3154,24 @@ class GalleryView(QWidget):
         return self._slideshow
 
     def _play_shelf_aloud(self, command) -> None:
-        """A spoken shelf name: play it, on the named side's region.
+        """A spoken shelf name, on the named side.
 
-        The listing is the side's own shape (that shelf's Portrait or Landscape
-        subfolder), so what lands on a region is homogeneous exactly as it is
-        when the subfolder's own slideshow button opens it.  Standalone — and
-        hosted with no side named — it is the whole shelf, routed by its shape
-        like any other show.  The browser is left where it is: this starts a
-        show, it does not go browsing."""
+        "Favorites" is the exception, and it is the players' own meaning: on a
+        player that word is F-mode — narrow what is playing to the favorites —
+        so on a show it is the same switch, the one its HUD draws.  Opening the
+        shelf as a fresh show instead would answer a word the HUD already has a
+        button for with something else entirely.
+
+        The rest play: the listing is the side's own shape (that shelf's
+        Portrait or Landscape subfolder), so what lands on a region is
+        homogeneous exactly as it is when the subfolder's own slideshow button
+        opens it, and Latest plays newest-first the way that shelf's own show
+        does.  Standalone — and hosted with no side named — it is the whole
+        shelf, routed by its shape like any other show.  The browser is left
+        where it is: this starts a show, it does not go browsing."""
+        if command.shelf_key == _STARRED_KEY:
+            self._toggle_f_mode_aloud(command.side)
+            return
         orientation = command.side if self._fun_time is not None else None
         key = (oriented_key(command.shelf_key, orientation) if orientation
                else command.shelf_key)
@@ -3170,8 +3180,29 @@ class GalleryView(QWidget):
         if not items:
             self._show_voice_status("🎤 nothing there to play", transient=True)
             return
-        self._open_slideshow(items, location=key, side=command.side,
-                             starred_ids=self._starred_prompt_ids())
+        latest = command.shelf_key == _RECENTS_KEY
+        self._open_slideshow(
+            items, location=key, side=command.side,
+            shuffle=(lambda order: None) if latest else None,
+            order_label="Latest" if latest else "Shuffle",
+            starred_ids=self._starred_prompt_ids(),
+        )
+
+    def _toggle_f_mode_aloud(self, side) -> None:
+        """The spoken "favorites": the show's own F-mode switch, flipped.
+
+        The same thing its HUD button does and the same thing the word does on
+        a player, so the readout — the lit button and the status line — says so
+        without anything here having to draw it."""
+        show = self._voice_surface(side)
+        if show is None or not hasattr(show, "toggle_f_mode"):
+            self._show_voice_status(
+                "🎤 F-mode needs a show to narrow", transient=True)
+            return
+        show.toggle_f_mode()
+        self._show_voice_status(
+            "🎤 F-mode on" if getattr(show, "hud_f_mode", False) else "🎤 F-mode off",
+            transient=True)
 
     def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on

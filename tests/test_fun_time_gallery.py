@@ -417,27 +417,51 @@ def test_a_landing_reaches_only_the_show_playing_its_folder(qtbot, tmp_path, mon
 
 
 def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
-    """"landscape favorites": the Favorites shelf's landscape items, on the
-    landscape region — a show STARTED by voice, with nothing up beforehand and
-    the browser left wherever it was."""
+    """"landscape latest": that shelf's landscape items, on the landscape
+    region — a show STARTED by voice, with nothing up beforehand and the
+    browser left wherever it was.  Latest plays newest-first, and its HUD says
+    so, exactly as the shelf's own slideshow button opens it."""
     from origenerator.voice.commands import ShelfCommand
 
     view = _fun_time_view(qtbot)
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
-    rows = [{"prompt_id": "fav-1", "thumbnail_path": str(still)}]
+    rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
     monkeypatch.setattr(view._browser, "rows_for_shelf",
-                        lambda key: rows if key == "__starred__::landscape" else [])
+                        lambda key: rows if key == "__recents__::landscape" else [])
     monkeypatch.setattr(view, "_slideshow_items",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
                                    for row in r])
 
-    view._on_voice_command(ShelfCommand("__starred__", "landscape"))
+    view._on_voice_command(ShelfCommand("__recents__", "landscape"))
 
     show = view.region_show("landscape")
     assert show is not None and show.isVisible()
+    assert show.hud_order_label == "Latest"   # the HUD says which order it plays
     assert view.region_show("portrait") is None  # the other region is untouched
     qtbot.addWidget(show)
+
+
+def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch):
+    """On a player "favorites" is F-mode — narrow what is playing to them — so
+    on a show it is the same switch, the one its HUD already draws.  Opening
+    the shelf as a fresh show would answer a word the HUD has a button for with
+    something else entirely."""
+    from origenerator.voice.commands import ShelfCommand
+
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+
+    view._on_voice_command(ShelfCommand("__starred__", "portrait"))
+    assert show.hud_f_mode is True
+    assert len(show.hud_items()[0]) == 1     # narrowed to the one favorite
+
+    view._on_voice_command(ShelfCommand("__starred__", "portrait"))
+    assert show.hud_f_mode is False          # and the word widens it back
 
 
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):

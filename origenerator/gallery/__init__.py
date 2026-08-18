@@ -41,6 +41,7 @@ from origenerator.gallery.groups import (
     folder_detail,
     folder_level,
     group_level,
+    is_renamable,
     rows_under,
 )
 from origenerator.gallery.keys import folder_id

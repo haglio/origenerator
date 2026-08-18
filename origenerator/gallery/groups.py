@@ -136,6 +136,18 @@ def folder_level(group) -> str | None:
     return None
 
 
+def is_renamable(group) -> bool:
+    """Whether the user can give this folder a name of their own.
+
+    A folder whose name states a fact — a media root, a workflow, a model, a
+    LoRA, the source image a video animates — is named by what it holds, and a
+    name of your own there would only hide which one it is. The rest are named
+    by a generic code (:mod:`origenerator.gallery.keys`) or already by the user,
+    and naming those is the entire point of starting them off with a code.
+    """
+    return folder_level(group) is None
+
+
 def folder_detail(group) -> str:
     """What a folder's name doesn't say, for its tooltip — the prompt and settings
     behind a settings leaf. Empty for every folder whose own name already says

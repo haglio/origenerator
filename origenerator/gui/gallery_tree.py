@@ -187,7 +187,8 @@ class GalleryTree:
         # Starred state shows as the row's star icon (the delegate reads it from
         # the group), so the label itself carries no ★ prefix.
         item = QTreeWidgetItem([group.label])
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
+        if gallery.is_renamable(group):
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
         # A workflow / model / LoRA / source-image row wears a lettered chip
         # naming its recipe level, and a media root the glyph its own items wear,

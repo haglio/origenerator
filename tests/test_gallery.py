@@ -2,6 +2,9 @@ import json
 from unittest.mock import MagicMock
 
 from origenerator.gallery import (
+    ALL_KEY,
+    AllGroup,
+    CustomGroup,
     LoraGroup,
     MediaGroup,
     ModelGroup,
@@ -16,6 +19,7 @@ from origenerator.gallery import (
     folder_detail,
     folder_id,
     folder_level,
+    is_renamable,
     find_source_image_id,
     media_type_of_row,
     lora_label,
@@ -1404,6 +1408,22 @@ def test_a_custom_name_replaces_the_code_and_the_description_stays():
     named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0]         .workflow_groups[0].model_groups[0].children[0].children[0]
     assert named.label == "Cats"
     assert folder_detail(named) == "a cat"
+
+
+def test_only_a_folder_with_a_name_of_its_own_can_be_renamed():
+    # A folder named after the fact it stands for — a media root, a workflow, a
+    # model, a LoRA, the source image a video animates — has no name of its own
+    # to change, and changing it would only hide which one it is. The code-named
+    # leaves, the All row and the folders the user composed do.
+    assert not is_renamable(MediaGroup("image", "image", "Images", []))
+    assert not is_renamable(WorkflowGroup("k", "wf", "WF", []))
+    assert not is_renamable(ModelGroup("k", "M", []))
+    assert not is_renamable(LoraGroup("k", "L", []))
+    assert not is_renamable(SourceImageGroup("k", "3A7F2C10", []))
+
+    assert is_renamable(SettingsGroup("k", "3A7F2C10", []))
+    assert is_renamable(AllGroup(ALL_KEY, "All", []))
+    assert is_renamable(CustomGroup("__custom__/1", "Keepers", []))
 
 
 def test_settings_group_details_disambiguate_same_prompt_different_params():

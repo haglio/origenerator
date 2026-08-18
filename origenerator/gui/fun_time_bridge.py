@@ -7,9 +7,10 @@ shows the way it reaches the players:
 
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
   steps the portrait player — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
-  and the landscape side.  ``CLOSE_SHOWS`` clears both regions (the session
-  switching its satellites back to player mode), and ``QUIT`` closes the app
-  the way its own Ctrl+Alt+Q would.
+  and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
+  switching INTO origenerator mode, which opens playing rather than empty) and
+  ``CLOSE_SHOWS`` clears them again; ``QUIT`` closes the app the way its own
+  Ctrl+Alt+Q would.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -74,6 +75,9 @@ class FunTimeBridge(QObject):
             return
         keyword, marker, argument = verb.partition(":")
         verb = keyword.upper() + marker + argument  # the words keep their case
+        if verb == "OPEN_SHOWS":
+            self._gallery.fill_the_regions()
+            return
         if verb == "CLOSE_SHOWS":
             for side in _SIDES:
                 show = self._gallery.region_show(side)

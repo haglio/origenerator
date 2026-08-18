@@ -442,6 +442,26 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
     qtbot.addWidget(show)
 
 
+def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, monkeypatch):
+    """A show IS the seed row played round and round, so the map's loop button
+    is lit — and pressing the lit one stops the loop, which here means closing
+    the show and giving the region back."""
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
+    view = _fun_time_view(qtbot)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+
+    assert show_hud_model("portrait", show).active_loop == "seed"
+
+    hud._deliver("portrait_no_loop")
+
+    assert not show.isVisible()
+    assert view.region_show("portrait") is None
+
+
 def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch):
     """On a player "favorites" is F-mode — narrow what is playing to them — so
     on a show it is the same switch, the one its HUD already draws.  Opening
@@ -499,15 +519,20 @@ def test_a_lock_on_a_hosted_show_opens_its_generate_tab(qtbot, tmp_path, monkeyp
     row = _image("id-tall-0", "a cat", 50, 1)
     view = GalleryView(FakeDB([row]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    opened = []
-    monkeypatch.setattr(view._info_tabs, "reveal_config", opened.append)
+    opened, navigated = [], []
+    monkeypatch.setattr(view._info_tabs, "load_selection",
+                        lambda row, images, **kw: opened.append(row["prompt_id"]))
+    monkeypatch.setattr(view, "_on_source_link", navigated.append)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     show = view._region_shows["portrait"]
     qtbot.addWidget(show)
 
     show._toggle_lock()
 
+    # The item held, not a sibling of it: every seed of one recipe shares a
+    # settings folder, so a tab picked by folder came up on the wrong picture.
     assert opened == ["id-tall-0"]
+    assert navigated == ["id-tall-0"]  # and the browser went there too
 
     show._toggle_lock()  # release: no second tab
     assert len(opened) == 1
@@ -520,7 +545,8 @@ def test_a_standalone_show_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([row]))
     qtbot.addWidget(view)
     opened = []
-    monkeypatch.setattr(view._info_tabs, "reveal_config", opened.append)
+    monkeypatch.setattr(view._info_tabs, "load_selection",
+                        lambda row, images, **kw: opened.append(row["prompt_id"]))
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
 
     view._slideshow._toggle_lock()

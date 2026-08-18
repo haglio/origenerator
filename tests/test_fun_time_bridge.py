@@ -120,6 +120,20 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
     assert [(c.shelf_key, c.side) for c in played] == [(STARRED_KEY, "landscape")]
 
 
+def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
+    """Entering the mode opens it PLAYING, the way entering player mode leaves
+    two players playing — two empty rectangles asked the user to start the mode
+    they had just asked for."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    filled = []
+    monkeypatch.setattr(view, "fill_the_regions", lambda: filled.append(True))
+
+    (tmp_path / "origenerator_cmd.txt").write_text("OPEN_SHOWS\n", encoding="utf-8")
+    bridge._tick()
+
+    assert filled == [True]
+
+
 def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)

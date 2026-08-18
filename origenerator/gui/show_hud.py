@@ -75,6 +75,12 @@ def show_hud_model(side: str, host) -> HudModel | None:
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
         playing=("corner", 0) if position <= 1 else ("seed", position - 2),
+        # The seed row's loop button is lit, because a show is exactly that:
+        # this row, played round and round.  On a player the button starts such
+        # a loop; here the loop is already what is happening, so the light says
+        # so and a press ends it — which is the button meaning the same thing on
+        # both, "stop looping this row".
+        active_loop="seed",
         satellites_mode="origenerator",  # a show exists only in this mode
     )
 
@@ -190,6 +196,12 @@ class ShowHud(QLabel):
             # session's player-side F-mode is about a blacked player's browse.
             self._host.toggle_f_mode()
             self._tick()
+            return
+        if verb in (f"{self._side}_no_loop", f"{self._side}_seed_loop"):
+            # The seed row is the show, and its loop button is drawn lit for
+            # that reason — so the press that would stop the loop closes the
+            # show, and the region goes back to whatever it was doing.
+            self._host.close()
             return
         if verb == f"{self._side}_reset" and hasattr(self._host, "stroke_reset"):
             # The players' reset, meaning here what it means there: put the

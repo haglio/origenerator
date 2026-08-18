@@ -689,11 +689,26 @@ class BrowserPane:
         return cache[workflow_name]
 
     def _reveal_reroll(self, key: str):
-        """Open the folder a re-roll runs in and select its live tile."""
+        """Open the folder a re-roll runs in and select its live tile.
+
+        Leaves a running search first: results take the pane over, and picking
+        a tree row underneath them re-scopes the search rather than showing the
+        folder — so the click landed on the row and the wall of results stayed
+        up, which reads as the click doing nothing at all.
+        """
+        self._v._leave_search()
         item = self._v._item_by_key.get(key)
-        if item is not None:
-            self._v._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
-            self._v._select_reroll(key)
+        if item is None:
+            # A folder the tree has not drawn yet: the first run in a brand-new
+            # settings folder makes the node, and this click can land in the
+            # gap.  Rebuild and ask once more rather than dropping the gesture.
+            self._v.refresh()
+            item = self._v._item_by_key.get(key)
+        if item is None:
+            logger.info("Nothing to reveal for %s: no folder row", key)
+            return
+        self._v._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
+        self._v._select_reroll(key)
 
     def _on_inflight_clicked(self, key: str):
         item = self._inflight_by_key.get(key)

@@ -3153,6 +3153,28 @@ class GalleryView(QWidget):
             return self.region_show(side)
         return self._slideshow
 
+    def fill_the_regions(self) -> None:
+        """Put a show on each region: the whole library, shuffled, one shape each.
+
+        What entering origenerator mode means — the session's own mode opens
+        with both players playing, so this one opens with both regions playing
+        rather than with two empty rectangles and a mode that has to be started
+        by hand.  Each side gets the shape it can show, which is the same split
+        a shelf's Portrait/Landscape subfolders make, and a region already
+        holding a show is left alone: the switch is no reason to interrupt
+        something already up.
+        """
+        for side in ("portrait", "landscape"):
+            if self.region_show(side) is not None:
+                continue
+            key = oriented_key(_RECENTS_KEY, side)
+            items = self._slideshow_items(self._browser.rows_for_shelf(key) or [])
+            if not items:
+                logger.info("Nothing of %s shape to open on the %s region", side, side)
+                continue
+            self._open_slideshow(items, location=key, side=side,
+                                 starred_ids=self._starred_prompt_ids())
+
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
 
@@ -3574,15 +3596,22 @@ class GalleryView(QWidget):
         return gallery.rows_under(group) if group is not None else []
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
-        """A lock on a hosted show opens its item as a generate tab — the way
-        the RFB answers a lock by opening the video's tab: the hold says "this
-        one", and the core window answers with it ready to work on.
+        """A lock on a hosted show: go to the held item, in the browser and in
+        the tabs — the way the RFB answers a lock by opening the video's tab.
 
-        Through the pane's own reveal, so it behaves like every other way of
-        asking for a generation's settings: a tab already on that folder comes
-        forward rather than being opened twice.
+        The item itself, not one of its siblings.  Asking the pane to reveal a
+        config brings forward whichever tab is already on that SETTINGS folder,
+        and every seed of one recipe shares that folder — so the tab that came
+        up was a sibling of the held picture rather than the picture, which is
+        the "wrong item, a similar one" this used to open.  So the browser is
+        navigated to the item first (its own folder, its own tile picked), and
+        the tab is then loaded from the row that navigation selected.
         """
-        self._info_tabs.reveal_config(prompt_id)
+        row = self._row_for(prompt_id)
+        if row is None:
+            return
+        self._on_source_link(prompt_id)  # its folder, its tile, out of any search
+        self._info_tabs.load_selection(row, self._image_rows)
 
 
     def _starred_prompt_ids(self) -> set[str]:

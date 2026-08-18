@@ -10,13 +10,15 @@ tail hangs off the base pass without altering it — so re-running the recorded
 recipe with the tail switched off produces exactly the pixels that pass produced
 the first time.
 
-It is a lot of GPU, though: one full render per row, and the library here has
-well over a hundred. Doing that while the app is open would put every one of
-them in front of the user's own work, so this rides the same absence the
-background experimenter does — queued as the app closes, cleared when it opens.
+It is GPU nobody asked for, though — one full render per row, and the library
+here has well over a hundred — so doing it while the app is open would put every
+one of them in front of the user's own work. It rides the same absence the
+background experimenter does: queued as the app closes, cleared when it opens.
 ComfyUI outlives the app and works through the batch alone; the next launch
 folds whatever finished into the images it belongs to and drops whatever hadn't
-started. A few rows a night, and the backlog drains without ever costing a wait.
+started. How much goes is a time budget rather than a row count
+(:data:`BATCH_MINUTES`), because a repair costs exactly one render and that is
+seconds for an image and minutes for a video.
 
 The rows it makes are repairs, not generations: tagged ``source="base_render"``,
 kept out of the tree so a half-finished one never shows as a duplicate image,
@@ -28,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import statistics
 
 from origenerator import gallery
 from origenerator.gallery.enhance import BASE_RENDER_SOURCE as SOURCE
@@ -36,11 +39,21 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-# How many an absence gets. Each is a full render at whatever step count its row
-# recorded, so this is a night's work — small enough that a short absence still
-# finishes what it started, and the backlog drains over a week of evenings
-# rather than one long block nobody can use the machine during.
-BATCH_SIZE = 6
+# What an absence is allowed to spend on repairs, in minutes of GPU. Sized in
+# time rather than rows because the cost of one repair is the cost of one
+# render, and that is not a fixed thing: the first version of this handed out
+# six per absence on the reasoning that a render is a night's work, when the
+# rows needing repair are images this library finishes in a median of eight
+# seconds — which would have drained a 147-row backlog over twenty-five
+# evenings. The budget is read against what each workflow has actually taken
+# here (:func:`typical_seconds`), so a backlog of slow renders still queues few.
+BATCH_MINUTES = 45.0
+
+# What one repair is assumed to cost where the library has never timed that
+# workflow. Deliberately pessimistic: guessing high queues too few, which costs
+# another absence, where guessing low queues a batch ComfyUI cannot finish and
+# the next launch throws the remainder away.
+UNTIMED_SECONDS = 60.0
 
 # The params key carrying which row a re-render is repairing. Nothing in the
 # graph reads it, and the gallery's grouping only ever asks a workflow for the
@@ -97,24 +110,57 @@ def already_queued(rows: list[dict]) -> set[str]:
     } - {None}
 
 
-def queue_base_renders(rows: list[dict], launch, limit: int = BATCH_SIZE) -> int:
+def typical_seconds(rows: list[dict], workflow_name: str) -> float:
+    """How long one run of ``workflow_name`` has actually taken in this library.
+
+    The median of what it has recorded, so a handful of very slow runs (a model
+    loaded from cold, a machine busy with something else) doesn't decide the
+    budget for the rest. :data:`UNTIMED_SECONDS` where it has never been timed.
+    """
+    timed = [
+        row["duration_seconds"] for row in rows
+        if row.get("workflow_name") == workflow_name
+        and row.get("status") == "completed"
+        and row.get("duration_seconds")
+    ]
+    return statistics.median(timed) if timed else UNTIMED_SECONDS
+
+
+def queue_base_renders(rows: list[dict], launch, limit: int | None = None,
+                       budget_minutes: float = BATCH_MINUTES) -> int:
     """Hand ComfyUI a batch of base re-renders to run while the app is closed.
 
     ``launch(workflow, params)`` submits one and returns its prompt_id, or
     ``None`` when the launch didn't take. Returns how many were queued.
+
+    The batch is as much as fits in ``budget_minutes`` of estimated GPU, priced
+    per row from what its workflow has actually taken here — so a backlog of
+    quick images goes in one absence and a backlog of slow ones does not get
+    queued only for the next launch to discard it. ``limit`` caps the count on
+    top of that, for a caller that wants a fixed number.
     """
     pending = already_queued(rows)
+    cost: dict[str, float] = {}
+    budget = budget_minutes * 60
+    spent = 0.0
     queued = 0
     for row in rows_missing_their_base(rows):
-        if queued >= limit:
+        if limit is not None and queued >= limit:
             break
         if row["prompt_id"] in pending:
             continue
-        workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
+        name = row["workflow_name"]
+        if name not in cost:
+            cost[name] = typical_seconds(rows, name)
+        if queued and spent + cost[name] > budget:
+            break  # always at least one, however slow: the backlog has to move
+        workflow = WORKFLOW_REGISTRY[name]
         if launch(workflow, base_params_for(row, workflow)) is not None:
             queued += 1
+            spent += cost[name]
     if queued:
-        logger.info("Queued %d base re-render(s) to run while the app is closed", queued)
+        logger.info("Queued %d base re-render(s) (~%d min) to run while the app "
+                    "is closed", queued, round(spent / 60))
     return queued
 
 

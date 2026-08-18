@@ -1,4 +1,5 @@
 import base64
+import logging
 
 from PyQt6.QtCore import QByteArray, Qt
 from PyQt6.QtWidgets import QMainWindow
@@ -13,6 +14,8 @@ from origenerator.base_backfill import cancel_base_renders, fold_completed_base_
 from origenerator.experiments.background import cancel_experiments
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.prompt_box import PROMPT_HEIGHTS
+
+logger = logging.getLogger(__name__)
 
 # The open editable config tabs (in the gallery's info pane). Kept under its
 # historical key so sessions saved before the Generate/Gallery merge still restore.
@@ -128,11 +131,24 @@ class OrigeneratorWindow(QMainWindow):
         everything else the queue is still holding, then persist the session (open
         config tabs, gallery folder/selection) and the window geometry so the next
         launch reopens as it was."""
-        self._gallery_view.queue_experiments_for_absence()
-        self._gallery_view.queue_base_renders_for_absence()
-        # Last, so the batches above go with it: the queue holds work back for the
-        # sake of somebody watching, and there is about to be nobody watching.
-        self._gallery_view.flush_queue_to_server()
+        for chore in (self._gallery_view.queue_experiments_for_absence,
+                      self._gallery_view.queue_base_renders_for_absence,
+                      # Last, so the batches above go with it: the queue holds
+                      # work back for the sake of somebody watching, and there is
+                      # about to be nobody watching.
+                      self._gallery_view.flush_queue_to_server):
+            # Each on its own, and none of them able to take the session down with
+            # it. These are errands for a machine nobody is using; what the user
+            # actually loses if the close breaks is everything below — the open
+            # tabs, the folder they were in, the window's place on its monitor.
+            # A typo in one of these chores ate exactly that, silently, for three
+            # days (``gallery.BASE_RENDER_SOURCE``, which the package had never
+            # exported), and the app looked fine the whole time because nothing
+            # a closing window raises is ever shown to anyone.
+            try:
+                chore()
+            except Exception as e:
+                logger.warning("Close-time %s failed: %s", chore.__name__, e)
         self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
         self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
         self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())

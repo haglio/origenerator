@@ -782,6 +782,27 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
     assert view.visible_prompt_ids() == ["i1"]
 
 
+def test_a_folder_you_named_is_found_by_that_name(qtbot):
+    # A name is typed onto a folder to be remembered, so the search has to know
+    # it — end to end: rename the folder, then find its generations by the name.
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    leaf = _children_by_detail(
+        _media_roots(view._tree)["Images"].child(0).child(0).child(0))["a dog"]
+    view._tree.setCurrentItem(leaf)
+
+    view._title.edit_requested.emit()
+    view._title.edited.emit("Beach trip")
+    qtbot.waitUntil(lambda: view._search_edit.scope().endswith("Beach trip"))
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, "beach trip")
+
+    assert view.visible_prompt_ids() == ["i2"]
+
+
 def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
     # Naming a folder by a code took every prompt word out of the tree, so the
     # search has to reach the rows themselves — matching on a word that appears

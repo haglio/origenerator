@@ -25,10 +25,11 @@ emptied it instead of leaving the user to guess which one to drop.
 
 Precision is the hard half, and every guard here was put in by a measurement
 rather than a hunch — the comments name what each one cost on a real library.
-Only the positive prompt and the recipe's names are searched, decimals stay
-whole, and bare numbers are dropped from the recipe: a search is for what a
-generation is OF, and everything else in a row is either markup or bookkeeping
-that happens to be spelled like a word.
+Only the positive prompt, the recipe's names and the names the user gave the
+folders a row sits in are searched, decimals stay whole, and bare numbers are
+dropped from the recipe: a search is for what a generation is OF, and everything
+else in a row is either markup or bookkeeping that happens to be spelled like a
+word.
 
 The table below is plain, publishable English, and it is deliberately
 incomplete: the words describing the library itself — its own vocabulary for
@@ -137,7 +138,9 @@ _RELATED = 0.6
 
 # Where in a row the hit landed. The positive prompt is what a generation is
 # *of*; the model and LoRA names are what made it, so they answer a different
-# kind of question and rank below.
+# kind of question and rank below. A name the user typed onto a folder holding
+# the row ranks with the prompt: it is the most deliberate word in the index,
+# chosen for no reason but to find that folder again.
 #
 # The negative prompt is searched by neither, and that is a deliberate reversal:
 # it was, at a low weight, on the grounds that a word appearing nowhere else
@@ -146,6 +149,7 @@ _RELATED = 0.6
 # for — three quarters of the results for one real query were rows that had
 # explicitly excluded the searched-for thing.
 _POSITIVE_WEIGHT = 1.0
+_FOLDER_WEIGHT = 1.0
 _RECIPE_WEIGHT = 0.7
 
 
@@ -269,6 +273,11 @@ class _Entry:
     positive: frozenset[str]
     recipe: frozenset[str]
     seeds: frozenset[str]
+    # The names the user gave the folders this row sits in. Unlike the other
+    # fields this one isn't a property of the row, so it is taken fresh on every
+    # re-index rather than carried over with the cached stems — a folder renamed
+    # a moment ago has to be findable by its new name now.
+    folders: frozenset[str] = frozenset()
 
 
 def query_words(query: str) -> tuple[str, ...]:
@@ -330,6 +339,7 @@ def _term_score(term: QueryTerm, entry: _Entry) -> float:
         return _EXACT
     return max(
         _field_score(term, entry.positive) * _POSITIVE_WEIGHT,
+        _field_score(term, entry.folders) * _FOLDER_WEIGHT,
         _field_score(term, entry.recipe) * _RECIPE_WEIGHT,
     )
 
@@ -364,6 +374,22 @@ def _recipe_stems(row: dict, params: dict) -> set[str]:
             if not stem.replace(".", "").isdigit()}
 
 
+def _folder_stems(names, memo: dict) -> frozenset[str]:
+    """The searchable words of the folder names holding one row.
+
+    ``memo`` caches per name rather than per row: one name usually covers a whole
+    folder's worth of rows, so the tokenizing happens once however many rows sit
+    under it.
+    """
+    stems: set[str] = set()
+    for name in names:
+        cached = memo.get(name)
+        if cached is None:
+            cached = memo[name] = frozenset(_stems(name))
+        stems |= cached
+    return frozenset(stems)
+
+
 def _build_entry(row: dict) -> _Entry:
     params = gallery.parse_params(row.get("params_json"))
     seeds = {str(params.get(key)) for key in ("seed", "noise_seed")
@@ -392,7 +418,7 @@ class GallerySearch:
         self._order: list[str] = []       # prompt_ids, newest first, as given
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
-    def update(self, rows) -> None:
+    def update(self, rows, folder_names=None) -> None:
         """Re-index ``rows`` (newest first), keeping the stems already computed
         for a generation that was here last time and only swapping in its fresh
         row dict — a poll rewrites every row object, but not the words in it.
@@ -402,17 +428,28 @@ class GallerySearch:
         prompt_id given twice is indexed once, so the caller can hand over
         several row lists (the gallery's own, and the trash's held rows) without
         first working out whether they overlap.
+
+        ``folder_names`` is ``{prompt_id: [names]}`` — the names the user gave the
+        folders each row sits in (see
+        :func:`~origenerator.gallery.tree.named_folders_by_row`). It is the one
+        part of an entry that isn't a property of the row, so it is taken fresh
+        every time rather than carried over with the cached stems.
         """
         entries: dict[str, _Entry] = {}
         order: list[str] = []
+        folder_names = folder_names or {}
+        memo: dict[str, frozenset[str]] = {}
         for row in rows:
             prompt_id = row.get("prompt_id")
             if not prompt_id or prompt_id in entries \
                     or not gallery.produced_output(row):
                 continue
+            folders = _folder_stems(folder_names.get(prompt_id, ()), memo)
             known = self._entries.get(prompt_id)
-            entries[prompt_id] = _build_entry(row) if known is None \
-                else replace(known, row=row)
+            entries[prompt_id] = replace(
+                known if known is not None else _build_entry(row),
+                row=row, folders=folders,
+            )
             order.append(prompt_id)
         self._entries = entries
         self._order = order

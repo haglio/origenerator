@@ -24,9 +24,9 @@ def _row(prompt_id, positive, *, negative="", seed=1, workflow="sdxl_t2i",
     }
 
 
-def _index(rows):
+def _index(rows, folder_names=None):
     index = search.GallerySearch()
-    index.update(rows)
+    index.update(rows, folder_names)
     return index
 
 
@@ -237,6 +237,48 @@ def _lora_row(prompt_id, lora, prompt="a quiet street"):
         "lora_high": f"{lora}_high.safetensors",
         "lora_low": f"{lora}_low.safetensors",
     })
+
+
+# --- the names the user gave the folders a row sits in ----------------------
+
+
+def test_a_folder_name_finds_what_is_in_it():
+    # A name is typed onto a folder so the folder can be found again, so the
+    # words of that name reach every generation under it — even one whose own
+    # prompt says nothing of the kind.
+    rows = [_row("a", "a cat on a windowsill"), _row("b", "a dog in a field")]
+    index = _index(rows, {"a": ["Keepers from the beach trip"]})
+
+    assert _hits(index, "beach trip") == ["a"]
+    assert _hits(index, "beach cat") == ["a"]      # name and prompt, together
+
+
+def test_a_folder_name_reaches_related_words_like_a_prompt_does():
+    # It goes through the same widening the prompt does, so a name is findable
+    # by the word you remember rather than only the word you typed.
+    index = _index([_row("a", "a portrait")], {"a": ["two women"]})
+
+    assert _hits(index, "pair") == ["a"]
+
+
+def test_renaming_a_folder_is_searchable_at_once():
+    # The names are the one part of an entry that isn't a property of the row,
+    # so a re-index takes them fresh rather than keeping the cached ones.
+    rows = [_row("a", "a cat")]
+    index = search.GallerySearch()
+    index.update(rows, {"a": ["Rejects"]})
+    assert _hits(index, "rejects") == ["a"]
+
+    index.update(rows, {"a": ["Keepers"]})
+
+    assert _hits(index, "keepers") == ["a"]
+    assert _hits(index, "rejects") == []       # and the old name stops answering
+
+
+def test_an_unnamed_folders_row_is_reached_by_no_name():
+    index = _index([_row("a", "a cat")])
+
+    assert _hits(index, "keepers") == []
 
 
 def test_results_group_under_one_heading_per_model_and_lora():

@@ -18,6 +18,7 @@ from origenerator.base_backfill import (
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -345,7 +346,7 @@ def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
 
 # --- the batch a real close actually hands over -----------------------------
 
-def test_the_close_batch_reaches_the_queue(qtbot, tmp_path):
+def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
     # The batch runs only from a closing window, where an exception is shown to
     # nobody — so the wiring between the view and the queue is checked here
     # rather than left to the one place it can fail in silence. It failed
@@ -353,6 +354,11 @@ def test_the_close_batch_reaches_the_queue(qtbot, tmp_path):
     # which the package never exported, so every close raised before the session
     # was saved. Three days of closes queued no repair at all and lost the open
     # tabs, the gallery folder and the window's place, with nothing in the log.
+    #
+    # Everything but the socket is the real path: the submit is stubbed,
+    # because a job the server refuses is dropped from the line, which would
+    # leave this passing or failing on whether a ComfyUI happened to be up.
+    monkeypatch.setattr(GenerationJob, "start", lambda self: None)
     db = Database(tmp_path / "t.db")
     for i in range(3):
         _baked(db, f"baked{i}", seed=i)

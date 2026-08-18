@@ -21,6 +21,14 @@ from origenerator.gui import icons
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE
 from origenerator.recovery import RETENTION_DAYS
 
+# The tree used to narrow itself to a query typed above it. It no longer does:
+# a narrowed list of folder names is a poor answer to "where is the one with
+# the two of them on the couch", because the names are 60-character prompt
+# headlines and the thing you would actually recognize is the picture. The
+# search now fills the browser pane with matching thumbnails instead (see
+# BrowserPane.show_search_results), and the tree is left alone — so the folder
+# you were standing in is still there when the search clears.
+
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
 RECENTS_LABEL = "Recents"     # its row label; a clock is drawn in the caret column
@@ -32,20 +40,6 @@ REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queue
 REQUESTS_LABEL = "Requests"    # its row label; a mic is drawn in the caret column
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
-
-
-def _prompt_texts(row: dict, params: dict) -> tuple[str, str]:
-    """A generation's positive and negative prompt, lowercased for matching.
-
-    Read from the row's own columns first, falling back to the params it ran
-    with: the two are written together for a generation this app made, but an
-    imported file recovers its prompt from the graph in the file's metadata and
-    may end up carrying it in only one of them.
-    """
-    return tuple(
-        str(row.get(key) or params.get(key) or "").lower()
-        for key in ("positive_prompt", "negative_prompt")
-    )
 
 
 class GalleryTree:
@@ -63,13 +57,12 @@ class GalleryTree:
         self.requests_item: QTreeWidgetItem | None = None  # the "Requests" shelf row
         self.trash_item: QTreeWidgetItem | None = None     # the "Trash" shelf row
         self.custom_items: dict[str, QTreeWidgetItem] = {}  # custom folder key -> its row
-        self._filter = ""                       # active filter query, lowercased
-        self._pre_filter_expanded: set[str] | None = None  # expansion to restore on clear
-        self.seed_matches: dict[str, list[str]] = {}  # leaf key -> prompt_ids the query hit by seed
+        self._built = False  # whether a first populate has happened (see _open_all)
 
     def populate(self, tree_model, expanded_keys, *, show_recents: bool,
                  experiment_count: int = 0, trash_count: int = 0,
-                 request_count: int = 0, custom_folders=()):
+                 request_count: int = 0, custom_folders=(),
+                 folder_meta=None):
         """Rebuild the tree from ``tree_model``, restoring the folders in
         ``expanded_keys``. ``show_recents`` keeps the Recents shelf up even with no
         folders yet (in-flight work to show); Starred appears only once folders do.
@@ -78,7 +71,9 @@ class GalleryTree:
         ``trash_count`` (deleted items still recoverable) show in their shelves'
         labels so waiting work is visible from anywhere. ``custom_folders`` are
         the user's own groupings, each getting a row of its own between the
-        shelves and the media roots."""
+        shelves and the media roots. ``folder_meta`` is the same label/star
+        overlay the tree model was built with, so the All row it wraps around
+        that model can be renamed and starred like any folder under it."""
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
@@ -129,14 +124,32 @@ class GalleryTree:
         )
         for custom in custom_folders:
             self.custom_items[custom.key] = self._add_custom_folder(root, custom)
-        for media in tree_model:
-            self._add_node(media, root)
+        # One root over the media folders, standing for the library entire. It is
+        # what the search means by "everywhere": the tree selection scopes a query,
+        # so without a row above Images and Videos there is nowhere to stand that
+        # doesn't already narrow the answer by half.
+        if tree_model:
+            self._add_node(gallery.all_group(tree_model, folder_meta), root)
         # Folders default to collapsed; only restore folders the user had open.
         for key in expanded_keys:
             item = self.item_by_key.get(key)
             if item is not None:
                 item.setExpanded(True)
+        self._open_all(expanded_keys)
         self._tree.blockSignals(False)
+        self._built = True
+
+    def _open_all(self, expanded_keys) -> None:
+        """Open the All row on a gallery's first build.
+
+        Every other folder defaults shut, but All shut is a tree with nothing in
+        it — Images and Videos are where the gallery starts. Only on the first
+        build: after that its state is the user's, saved and restored with every
+        other folder's, so collapsing it sticks.
+        """
+        item = self.item_by_key.get(gallery.ALL_KEY)
+        if item is not None and not self._built and not expanded_keys:
+            item.setExpanded(True)
 
     def _add_shelf(self, root, label, key, icon, tooltip) -> QTreeWidgetItem:
         """Add a synthetic shelf row (Recents/Starred) leading the tree, its marker
@@ -170,14 +183,26 @@ class GalleryTree:
         item = QTreeWidgetItem([group.label])
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
-        # A workflow/model/LoRA row wears a lettered chip naming its recipe level,
-        # so its place in the hierarchy reads at a glance rather than by counting
-        # indentation; the level joins the tooltip too. Media roots and settings
-        # leaves get neither (folder_level returns None).
+        # A workflow / model / LoRA / source-image row wears a lettered chip
+        # naming its recipe level, and a media root the glyph its own items wear,
+        # so a row's place in the hierarchy reads at a glance rather than by
+        # counting indentation; the level joins the tooltip too. The All row and
+        # the settings leaves get neither (folder_level returns None).
+        #
+        # It is the row's *icon*, so it sits right of the caret and reads as the
+        # first character of the folder's name — which is what it is. What that
+        # costs is the label: Qt lays the text out after the icon, so a chipped
+        # row's text starts a chip-width right of an unchipped sibling's. The
+        # thing that stays uniform is where each row's name *block* begins, at
+        # exactly its depth times the indentation.
         level = gallery.folder_level(group)
         if level is not None:
             item.setIcon(0, icons.level_badge_icon(level))
-            item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
+            named = icons.LEVEL_LABELS[level]
+            # A media root is named after its own level ("Videos" at the video
+            # level), so joining the two would just say it twice.
+            item.setToolTip(0, group.label if named == group.label
+                            else f"{group.label} · {named}")
         else:
             item.setToolTip(0, group.label)
         self.item_by_key[group.key] = item
@@ -204,99 +229,6 @@ class GalleryTree:
 
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}
-
-    def persisted_expanded_keys(self) -> set[str]:
-        """The expansion a rebuild should save. While a filter is active that is
-        the user's pre-filter set — the branches the filter opened to reveal a
-        match are transient and must not stick once the filter clears."""
-        if self._filter:
-            return set(self._pre_filter_expanded or ())
-        return self.expanded_keys()
-
-    def apply_filter(self, query: str) -> None:
-        """Narrow the tree to rows matching ``query`` (case-insensitive substring
-        over the row label, or a settings leaf's generation seed or prompt text),
-        keeping each match's ancestors so its path shows and expanding down to it;
-        a matched folder keeps its whole subtree. Seed hits are recorded in
-        :attr:`seed_matches` for the view to jump to. An empty query restores
-        every row and the expansion the user had before filtering."""
-        query = (query or "").strip().lower()
-        if not query:
-            if self._filter:
-                self._restore_from_filter()
-            self._filter = ""
-            self.seed_matches = {}
-            return
-        if not self._filter:  # entering a filter: remember the user's expansion
-            self._pre_filter_expanded = self.expanded_keys()
-        self._filter = query
-        self._run_filter()
-
-    def reapply_filter(self) -> None:
-        """Re-narrow a freshly rebuilt tree to the active filter — ``populate``
-        rebuilds every row un-hidden, so the filter has to run again after it."""
-        if self._filter:
-            self._run_filter()
-
-    def _run_filter(self) -> None:
-        self.seed_matches = {}
-        root = self._tree.invisibleRootItem()
-        for i in range(root.childCount()):
-            self._filter_item(root.child(i), self._filter, ancestor_match=False)
-
-    def _filter_item(self, item, query, *, ancestor_match: bool) -> bool:
-        """Hide ``item`` unless it, an ancestor, a descendant, or (for a settings
-        leaf) one of its generations' seeds or prompt text matches; expand the path
-        down to any descendant match. Returns whether it stays visible."""
-        match = ancestor_match or query in item.text(0).lower()
-        seed_ids, prompt_match = self._generation_hits(item, query)
-        descendant_match = False
-        for i in range(item.childCount()):
-            if self._filter_item(item.child(i), query, ancestor_match=match):
-                descendant_match = True
-        visible = match or descendant_match or bool(seed_ids) or prompt_match
-        item.setHidden(not visible)
-        if descendant_match:
-            item.setExpanded(True)
-        if seed_ids:
-            self.seed_matches[item.data(0, GROUP_ROLE).key] = seed_ids
-        return visible
-
-    def _generation_hits(self, item, query) -> tuple[list[str], bool]:
-        """What a settings leaf's own generations match on: the prompt_ids whose
-        seed contains ``query``, and whether any of their prompt text does.
-
-        Neither rides on a folder label, so this is the only way the filter can
-        reach them. A seed names one specific item, so its hits are collected for
-        the view to jump to; the prompt belongs to the whole leaf — it is part of
-        the settings every row there shares — so it only decides whether the folder
-        stays on screen. The label does lead with the positive prompt, but as a
-        60-character headline: the words past it, and the negative prompt entirely,
-        are findable here or nowhere.
-
-        One parse of a row's params serves both checks, since scanning every
-        generation in the tree happens on each keystroke.
-        """
-        group = item.data(0, GROUP_ROLE)
-        if not isinstance(group, gallery.SettingsGroup):
-            return [], False
-        hits = []
-        prompt_match = False
-        for row in group.rows:
-            params = gallery.parse_params(row.get("params_json"))
-            seeds = (params.get("seed"), params.get("noise_seed"))
-            if any(s is not None and query in str(s).lower() for s in seeds):
-                hits.append(row["prompt_id"])
-            if not prompt_match:
-                prompt_match = any(query in text for text in _prompt_texts(row, params))
-        return hits, prompt_match
-
-    def _restore_from_filter(self) -> None:
-        keys = self._pre_filter_expanded or set()
-        for key, item in self.item_by_key.items():
-            item.setHidden(False)
-            item.setExpanded(key in keys)
-        self._pre_filter_expanded = None
 
     def selected_folder_key(self) -> str | None:
         item = self._tree.currentItem()

@@ -33,15 +33,28 @@ def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
 def test_level_badge_icons_render_for_each_level(qtbot):
     from PyQt6.QtCore import QSize
 
-    # Every hierarchy level maps to a rendered chip, and the labels name exactly
-    # the ones the gallery badges (workflow -> model -> LoRA -> source image).
-    assert set(icons.LEVEL_LABELS) == {"workflow", "model", "lora", "source_image"}
+    # Every badged level maps to a rendered chip: the four recipe levels
+    # (workflow -> model -> LoRA -> source image) and the two media roots.
+    assert set(icons.LEVEL_LABELS) == {
+        "workflow", "model", "lora", "source_image", "image", "video"}
     assert icons.LEVEL_LABELS["lora"] == "LoRA"
     assert icons.LEVEL_LABELS["source_image"] == "Source Image"
+    assert icons.LEVEL_LABELS["image"] == "Images"
     for level in icons.LEVEL_LABELS:
         icon = icons.level_badge_icon(level)
         assert not icon.isNull()
         assert not icon.pixmap(QSize(16, 16)).isNull()
+
+
+def test_the_media_roots_badge_with_their_own_glyphs(qtbot):
+    # Images and Videos share a parent in the tree, so each carries a badge in
+    # the same slot as the recipe levels — the play/photo glyphs their own items
+    # wear, telling them apart at a glance and apart from the lettered chips.
+    image = icons.level_badge_icon("image").pixmap(48, 48).toImage()
+    video = icons.level_badge_icon("video").pixmap(48, 48).toImage()
+    workflow = icons.level_badge_icon("workflow").pixmap(48, 48).toImage()
+    assert image != video          # a photo is never mistaken for a play triangle
+    assert image != workflow       # nor either of them for a lettered chip
 
 
 def test_media_type_badges_render_for_image_and_video(qtbot):

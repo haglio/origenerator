@@ -75,6 +75,23 @@ class MediaGroup:
 
 
 @dataclass
+class AllGroup:
+    """The whole library as one folder: the media roots, gathered under a row.
+
+    It exists so there is somewhere to *stand* that means everything. The tree
+    selection scopes the search, so without a root above Images and Videos there
+    would be no way to ask a question of the gallery as a whole — the shelves
+    are collections rather than folders, and picking either media root already
+    narrows the answer by half.
+    """
+
+    key: str
+    label: str
+    children: list[MediaGroup]
+    starred: bool = False
+
+
+@dataclass
 class CustomGroup:
     """A folder the user composed: the folders they gathered into it, in the
     order they were added.
@@ -94,12 +111,15 @@ class CustomGroup:
 
 def folder_level(group) -> str | None:
     """Which hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
-    ``"lora"``, or ``"source_image"`` — or ``None`` for the media roots and
-    settings leaves.
+    ``"lora"``, ``"source_image"``, or a media root's own ``"image"`` /
+    ``"video"`` — ``None`` for the All row and the settings leaves.
 
-    Powers the per-level badge the gallery draws on tree rows and browser tiles:
-    a media folder is self-evidently Images/Videos and a settings leaf is where
-    the generations themselves live, so neither needs one.
+    Powers the badge the gallery draws on tree rows and browser tiles: the
+    recipe levels get their lettered chip, and a media root gets the glyph its
+    own items wear, so the two roots are tellable apart at a glance in a tree
+    where they share a parent. A settings leaf is where the generations
+    themselves live, and the All row is everything there is, so neither is a
+    level anything needs naming.
     """
     for cls, level in (
         (WorkflowGroup, "workflow"), (ModelGroup, "model"),
@@ -107,6 +127,8 @@ def folder_level(group) -> str | None:
     ):
         if isinstance(group, cls):
             return level
+    if isinstance(group, MediaGroup):
+        return group.media_type
     return None
 
 
@@ -116,7 +138,8 @@ def child_groups(group) -> list:
         return group.workflow_groups
     if isinstance(group, WorkflowGroup):
         return group.model_groups
-    if isinstance(group, (ModelGroup, LoraGroup, SourceImageGroup, CustomGroup)):
+    if isinstance(group, (ModelGroup, LoraGroup, SourceImageGroup, CustomGroup,
+                          AllGroup)):
         return group.children
     return []
 
@@ -141,10 +164,12 @@ def rows_under(group) -> list[dict]:
 
 
 def group_level(group) -> str:
-    """Which tier of the tree ``group`` sits at: media, workflow, model, lora, or
-    settings. A bookmark records its tier so its key can be recomputed from a
-    member row under whatever key formula is current (see
+    """Which tier of the tree ``group`` sits at: all, media, workflow, model,
+    lora, or settings. A bookmark records its tier so its key can be recomputed
+    from a member row under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
+    if isinstance(group, AllGroup):
+        return "all"
     if isinstance(group, MediaGroup):
         return "media"
     if isinstance(group, WorkflowGroup):

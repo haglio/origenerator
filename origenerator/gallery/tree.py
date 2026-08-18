@@ -29,6 +29,7 @@ import json
 
 from origenerator.gallery.enhance import BASE_RENDER_SOURCE, ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
+    AllGroup,
     LoraGroup,
     MediaGroup,
     ModelGroup,
@@ -527,3 +528,18 @@ def build_gallery_tree(
             workflow_groups, media_starred,
         ))
     return tree
+
+
+# The row above Images and Videos, standing for the library entire. Not part of
+# the grouping — build_gallery_tree still returns the media roots, and everything
+# reading that (starred folders, custom folders, the browser's tiles) is unchanged
+# — this is a folder wrapped *around* the result, for somewhere to stand that
+# means everything.
+ALL_KEY = "__all__"
+ALL_LABEL = "All"
+
+
+def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
+    """The media roots gathered under one folder, renamable like any other."""
+    label, starred = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
+    return AllGroup(ALL_KEY, label, list(tree_model), starred)

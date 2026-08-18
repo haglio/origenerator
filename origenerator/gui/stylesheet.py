@@ -327,6 +327,23 @@ def build_stylesheet() -> str:
         font-weight: bold;
         padding: 2px 0;
     }}
+    /* The fold header over each model+LoRA band of search results. Brighter
+       than the muted captions and ruled off above, so it reads as the start of
+       a section rather than as a label belonging to the tiles before it; left
+       aligned and transparent so a flat button reads as a heading you can
+       click rather than as a button that happens to be wide. */
+    QPushButton#sectionHeading {{
+        color: {_h(TEXT_PRIMARY)};
+        font-weight: bold;
+        background: transparent;
+        border: none;
+        border-top: 1px solid {_h(BORDER_SUBTLE)};
+        padding: 6px 0 2px 0;
+        text-align: left;
+    }}
+    QPushButton#sectionHeading:hover {{
+        color: {_h(BLUE)};
+    }}
     QLabel#dropSlot {{
         border: 1px dashed {_h(BORDER_PANEL)};
         border-radius: 4px;

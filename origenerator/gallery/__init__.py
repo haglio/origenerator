@@ -27,6 +27,7 @@ from origenerator.gallery.custom import (
     selection_group,
 )
 from origenerator.gallery.groups import (
+    AllGroup,
     CustomGroup,
     LoraGroup,
     MediaGroup,
@@ -97,6 +98,9 @@ from origenerator.gallery.source_image import (
     videos_from_source_image,
 )
 from origenerator.gallery.tree import (
+    ALL_KEY,
+    ALL_LABEL,
+    all_group,
     build_gallery_tree,
     folder_key_at_level,
     legacy_preenhance_settings_folder_keys,

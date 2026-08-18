@@ -27,6 +27,12 @@ _AUDIO_ENABLED_KEY = "audio_enabled"
 # The Enhance subpanel's settings. App-wide, so they belong to the session
 # rather than to any folder's row in the database.
 _ENHANCE_SETTINGS_KEY = "enhance_settings"
+# How the gallery search lays its results out (newest first, or banded by model +
+# LoRA). The query itself is deliberately not saved — a search is something you
+# are doing, not somewhere you were — but which way you like to read the answer
+# is a preference, and re-picking it every launch is the kind of small friction
+# that makes a control feel unfinished.
+_SEARCH_SORT_KEY = "search_sort"
 # How tall the user has dragged each prompt box, by param key — app-wide for the
 # same reason, and restored before the first form is built (see __init__).
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
@@ -101,6 +107,7 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.set_audio_enabled(self._app_state.get(_AUDIO_ENABLED_KEY))
         self._gallery_view.set_enhance_settings(
             self._app_state.get(_ENHANCE_SETTINGS_KEY))
+        self._gallery_view.set_search_sort(self._app_state.get(_SEARCH_SORT_KEY))
 
     def _restore_geometry(self):
         """Reapply the saved window geometry: screen, size, and maximized state.
@@ -136,6 +143,7 @@ class OrigeneratorWindow(QMainWindow):
         self._app_state.set(_AUDIO_ENABLED_KEY, self._gallery_view.audio_enabled())
         self._app_state.set(
             _ENHANCE_SETTINGS_KEY, self._gallery_view.enhance_settings())
+        self._app_state.set(_SEARCH_SORT_KEY, self._gallery_view.search_sort())
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
         self._app_state.set(
             _GEOMETRY_KEY,

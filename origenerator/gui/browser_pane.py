@@ -5,6 +5,12 @@ settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Starred
 Experiments / Requests / Trash shelf overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
+One thing it renders comes from no tree row at all: the gallery search's results,
+which take the pane over while a query is running and hand it back when it clears.
+That is the whole point of searching here rather than in the tree — the answer to
+"where is the one with the two of them on the couch" is a wall of thumbnails you
+recognize, not a list of folder names you have to open one by one.
+
 It drives the surrounding pieces it doesn't own — the info pane on a click, the
 tree on a drill, the re-roll tile, the delete action — so it holds a reference to
 the GalleryView and calls back into it rather than standing alone. The view keeps
@@ -12,12 +18,16 @@ thin delegates so the pane's rendering and selection are one concern in one plac
 """
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QLabel, QMenu, QApplication
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QMenu, QApplication, QPushButton, QVBoxLayout,
+)
 from PyQt6.QtCore import Qt, QTimer
 
-from origenerator import gallery, timing
+from origenerator import gallery, search, timing
+from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
 from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
@@ -44,6 +54,38 @@ _STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shel
 # user arrives at it, rather than after a visible stop.
 _RECENTS_PAGE = 50
 _RECENTS_REACH = 600
+# Room above a search section's heading, so the headings read as the dividers
+# they are rather than as captions stuck to the row of tiles above them.
+_SECTION_SPACING = 14
+# The most result tiles a search draws at once. A one-word query over a full
+# library can match most of it, and building thousands of thumbnails in a single
+# pass locks the window for seconds — the Recents shelf pages for the same
+# reason. Search doesn't page: it is a narrowing tool, so the useful answer to
+# "too many to draw" is another word, and the count label says exactly that
+# rather than quietly showing a slice.
+SEARCH_DRAW_LIMIT = 200
+
+
+@dataclass(frozen=True)
+class SearchTile:
+    """One thing a search draws: a folder, or a single generation.
+
+    Several hits in one settings folder are one answer, not eight — they share a
+    prompt and settings and differ only by seed, so drawing each of them fills
+    the pane with near-copies of the same picture and buries the other places
+    the query reached. So the view collapses them onto their folder (``group``
+    set, ``rows`` the hits it stands for), and leaves a folder's lone hit as
+    itself (``group`` ``None``).
+
+    ``row`` is the newest hit either way: the tile's picture when it stands
+    alone, and what decides the model + LoRA band it lands in when sorted that
+    way — every row in a settings folder ran the same recipe, so any of them
+    answers that.
+    """
+
+    row: dict
+    group: object | None = None
+    rows: list = field(default_factory=list)
 # Vertical breathing room left around a tile a link scrolls to, so it lands with
 # its neighbors in view rather than flush against an edge of the pane.
 _REVEAL_MARGIN = 40
@@ -58,6 +100,27 @@ def _unique_rows(rows) -> list[dict]:
             seen.add(row["prompt_id"])
             unique.append(row)
     return unique
+
+
+def _search_empty_hint(outcome, query: str, scope: str) -> str:
+    """What an empty search says. Naming the words that reached nothing is the
+    whole of it: a search needs every word satisfied, so with four words typed
+    and no results the one thing worth knowing is which word to drop — and
+    "nothing matched" alone leaves the user re-typing the query at random.
+
+    ``scope`` is the folder being searched, named in both messages: a query that
+    would answer elsewhere in the gallery looks identical to one that answers
+    nowhere, and the fix for the first is to pick a wider folder rather than to
+    change a single word.
+    """
+    if outcome.unmatched:
+        missing = ", ".join(f"“{word}”" for word in outcome.unmatched)
+        return (f"Nothing in {scope} matches {missing}.\n\nEvery word has to be "
+                "found somewhere in a generation, so dropping that one — or "
+                "searching a wider folder — widens the search.")
+    return (f"No generation in {scope} matches all of “{query}”.\n\nEach of "
+            "those words is in there somewhere, but no single item has them "
+            "all — try fewer of them.")
 
 
 def _inflight_signature(items) -> tuple:
@@ -88,6 +151,8 @@ class BrowserPane:
         self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
+        self._search_rows: list[dict] = []  # the open search's hits, in shown order
+        self._showing_search = False        # a query owns the pane, whatever the tree says
         self._request_items: list[dict] = []  # spoken requests + what they made
 
     def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
@@ -139,15 +204,27 @@ class BrowserPane:
         self._forget_recents_paging()
         self.show_widget(QWidget())
 
-    def _new_tile_pane(self):
-        """A fresh container whose tiles flow to fill the pane's width."""
-        container = QWidget()
-        flow = FlowLayout(container, spacing=_TILE_SPACING)
+    def _reset_pane_state(self):
+        """Forget what the outgoing pane held, before the incoming one fills it.
+
+        Every renderer here starts by calling this (through :meth:`_new_tile_pane`
+        or directly), so no renderer has to remember to clear the state of the one
+        it is replacing — which is how a stale selection or a stale search flag
+        would otherwise outlive the tiles it referred to.
+        """
         self.clear_selection()
         self._v._reroll_tile = None  # re-created below only when this folder re-rolls
         self._visible_ids = []
         self._visible_keys = []
+        self._search_rows = []
+        self._showing_search = False
         self._forget_recents_paging()
+
+    def _new_tile_pane(self):
+        """A fresh container whose tiles flow to fill the pane's width."""
+        container = QWidget()
+        flow = FlowLayout(container, spacing=_TILE_SPACING)
+        self._reset_pane_state()
         return container, flow
 
     def _forget_recents_paging(self):
@@ -198,6 +275,144 @@ class BrowserPane:
             f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
             "pick several folders with Shift/Ctrl and group them."
         ))
+
+    # --- the search results: whatever the query reached, wherever it lives ---
+
+    def show_search_results(self, tiles, *, sort_mode: str, query: str, outcome,
+                            scope: str = "", collapsed=(), on_section_toggled=None):
+        """Fill the pane with ``tiles`` — the whole point of searching here rather
+        than in the tree, since a thumbnail is recognizable and a folder name is
+        not.
+
+        Two orders, because a search answers two different questions. Newest-first
+        is "where is the one I made recently"; by recipe is "which model and LoRA
+        was that", and there the tiles are cut into a labelled band per
+        combination rather than interleaved, so the answer is the heading you
+        stopped scrolling at. Those bands fold shut on their headers — with a
+        dozen combinations behind a broad query, being able to shut the ones you
+        are not asking about is what makes the sort usable rather than merely
+        sorted. ``collapsed`` is the set of headings to open shut, and
+        ``on_section_toggled(heading, collapsed)`` reports each click so the view
+        can remember it across a redraw. ``scope`` names the folder that was
+        searched, for an empty result to be honest about.
+
+        Either way the tiles behave exactly as they do elsewhere in the gallery: a
+        folder drills in on a click, and an item previews here, opens its own
+        folder on a double-click, drags to a combine slot and right-clicks for
+        star / enhance / delete — a result is the same thing wherever it was found.
+
+        At most :data:`SEARCH_DRAW_LIMIT` tiles are drawn, newest first; the
+        header's count names the whole number so a capped search reads as one.
+        """
+        self._reset_pane_state()
+        if not tiles:
+            self.show_widget(
+                self._empty_state(_search_empty_hint(outcome, query, scope)))
+            self._showing_search = True
+            return
+        drawn = list(tiles)[:SEARCH_DRAW_LIMIT]
+        container = self._sectioned_results(drawn, collapsed, on_section_toggled) \
+            if sort_mode == search.SORT_RECIPE else self._flat_results(drawn)
+        self.show_widget(container)
+        self._showing_search = True
+
+    def _flat_results(self, tiles) -> QWidget:
+        """Every tile in one flow, newest first."""
+        container = QWidget()
+        flow = FlowLayout(container, spacing=_TILE_SPACING)
+        for tile in tiles:
+            self._add_search_tile(flow, tile)
+        return container
+
+    def _sectioned_results(self, tiles, collapsed, on_toggled) -> QWidget:
+        """The tiles under one foldable heading per model + LoRA combination.
+
+        A column of flows rather than one flow with headings in it: a heading has
+        to take the pane's whole width to read as a divider, and a FlowLayout has
+        no notion of a row break — an item that happens to fit would sit beside it.
+        The column is also what makes folding cheap, since a band is one widget to
+        hide rather than a run of tiles to pick out of a shared layout.
+        """
+        container = QWidget()
+        column = QVBoxLayout(container)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(_SECTION_SPACING)
+        for heading, section in search.group_by_recipe(tiles):
+            band = QWidget()
+            band_flow = FlowLayout(band, spacing=_TILE_SPACING)
+            shut = heading in collapsed
+            column.addWidget(
+                self._section_header(heading, len(section), band, shut, on_toggled))
+            # A shut band's tiles are still built and still counted: they are the
+            # results, and folding is about what you are looking at, not what the
+            # search found — so unfolding is instant and the shown order (which
+            # Shift-select and the slideshow read) stays the order on screen.
+            for tile in section:
+                self._add_search_tile(band_flow, tile)
+            band.setVisible(not shut)
+            column.addWidget(band)
+        column.addStretch(1)  # sections stay their own height; slack falls to the end
+        return container
+
+    @staticmethod
+    def _section_header(heading: str, count: int, band: QWidget, shut: bool,
+                        on_toggled) -> QPushButton:
+        """The band's foldable header: an arrow, the recipe, and how many are in it.
+
+        A flat, full-width button rather than a label — the whole strip is the
+        target, which is what a fold control has to be when the bands are tall
+        enough that you are aiming at it after a scroll.
+        """
+        button = QPushButton()
+        button.setObjectName("sectionHeading")
+        button.setFlat(True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Doubled "&" so Qt renders it literally instead of swallowing it as a
+        # keyboard-accelerator marker, as CollapsibleSection's header does.
+        title = f"{heading}   ({count})".replace("&", "&&")
+
+        def paint(collapsed: bool):
+            button.setText(f"{_ARROW_SHUT if collapsed else _ARROW_OPEN}  {title}")
+
+        # The fold state is carried here rather than read back off the band: a
+        # widget whose window hasn't been shown yet reports isVisible() false
+        # however it was set, so asking it would make the first click on a
+        # freshly drawn pane a no-op.
+        state = {"shut": shut}
+
+        def toggle():
+            state["shut"] = not state["shut"]
+            band.setVisible(not state["shut"])
+            paint(state["shut"])
+            if on_toggled is not None:
+                on_toggled(heading, state["shut"])
+
+        button.clicked.connect(toggle)
+        paint(shut)
+        return button
+
+    def _add_search_tile(self, flow, tile: SearchTile):
+        """Draw one result — a folder tile or a single item — and record its place.
+
+        The shown order matters beyond the drawing: Shift-select and the slideshow
+        both read it, so it has to be the order the bands were laid out in rather
+        than the order the search scored them.
+        """
+        if tile.group is not None:
+            item = self._v._item_by_key.get(tile.group.key)
+            context = (self._v._tree_view.breadcrumb(item.parent())
+                       if item is not None and item.parent() is not None else "")
+            self._add_folder_tile(flow, tile.group, starred=tile.group.starred,
+                                  context=context)
+        else:
+            self._add_shelf_thumbnail(flow, tile.row)
+        self._search_rows.extend(tile.rows or [tile.row])
+
+    def showing_search(self) -> bool:
+        """Whether a query owns the pane. Unlike the shelves this is not a tree
+        row, so it is answered by what was last drawn rather than by what is
+        selected: the tree keeps whatever folder it had while a search runs."""
+        return self._showing_search
 
     # --- the Recents shelf: in-flight work, then recently finished items ----
 
@@ -743,6 +958,21 @@ class BrowserPane:
         bin is holding — deleted is not unwatchable, and a shelf of items you are
         deciding whether to keep is exactly one you want to sit and look through.
         A starred item inside a starred folder is one item, so repeats drop out.
+        A running search collects too — its hits are a gathered collection
+        exactly as a shelf's are, and sitting through what a search turned up is
+        one of the better reasons to have run it.
+        """
+        if self.showing_search():
+            return list(self._search_rows)
+        return self.selected_shelf_rows()
+
+    def selected_shelf_rows(self) -> list[dict] | None:
+        """What the *selected* shelf collects, whatever is currently drawn.
+
+        The same answer as :meth:`shelf_rows` off a search, and the one that
+        matters during one: a search standing on a shelf is scoped to that
+        shelf's items, and the results now on screen are no use for working out
+        what those are.
         """
         if self.showing_recents():
             return list(self._recent_rows)
@@ -824,8 +1054,13 @@ class BrowserPane:
         tw.drag_ended.connect(self._v._on_generation_drag_ended)
 
     def _drill_into(self, key: str):
+        """Open a folder tile's folder. Clicking one is a decision to go there, so
+        it puts a running search away first — a search's results are folder tiles
+        too, and this is how they open; without it the box would still be full
+        while the pane shows the folder it drilled into."""
         item = self._v._item_by_key.get(key)
         if item is not None:
+            self._v._leave_search()
             self._v._tree.setCurrentItem(item)
 
     def visible_prompt_ids(self) -> list[str]:

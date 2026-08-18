@@ -9,9 +9,9 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLineEdit, QWidget
+from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
 
-from origenerator import gallery
+from origenerator import gallery, search
 from origenerator.branch_session import ENV_FLAG
 from origenerator.gallery import detail_parts
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
@@ -293,6 +293,15 @@ def _top_level(tree):
             for i in range(tree.topLevelItemCount())}
 
 
+def _media_roots(tree):
+    """The Images / Videos rows, which hang under the All row that tops the tree."""
+    all_row = _top_level(tree).get("All")
+    if all_row is None:
+        return {}
+    return {all_row.child(i).text(0): all_row.child(i)
+            for i in range(all_row.childCount())}
+
+
 def _key(item):
     return item.data(0, _GROUP_ROLE).key
 
@@ -309,10 +318,13 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    assert set(top) == {"Recents", "Starred", "Experiments", "Requests", "Trash",
-                        "Images", "Videos"}
+    # The shelves, then one All row over the media roots — somewhere to stand
+    # that means the whole library, which is what scopes a search to everything.
+    assert set(top) == {"Recents", "Starred", "Experiments", "Requests",
+                        "Trash", "All"}
+    assert set(_media_roots(view._tree)) == {"Images", "Videos"}
 
-    workflow_node = top["Images"].child(0)
+    workflow_node = _media_roots(view._tree)["Images"].child(0)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
     # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
     # which the two seed variants collapse.
@@ -326,22 +338,69 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    videos = _top_level(view._tree)["Videos"]
+    videos = _media_roots(view._tree)["Videos"]
     workflow = videos.child(0)
     model = workflow.child(0)
     lora = model.child(0)
     source = lora.child(0)
     settings = source.child(0)
 
-    # Each level below the media root shows a chip icon and names itself in the
-    # tooltip...
+    # Each level below the media root carries a chip as its row icon — right of
+    # the caret, reading as the first character of the folder's name — and names
+    # itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
     assert not lora.icon(0).isNull() and "LoRA" in lora.toolTip(0)
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
-    # ...while the media root and the settings leaf carry no badge.
-    assert videos.icon(0).isNull()
+    # ...the media root wears its own kind's glyph, in the same slot...
+    assert not videos.icon(0).isNull() and "Videos" in videos.toolTip(0)
+    # ...and the settings leaf, where the generations live, names no level at
+    # all, so its tooltip is the folder alone and it carries no chip.
     assert settings.icon(0).isNull()
+    assert settings.toolTip(0) == settings.text(0)
+
+
+def test_every_tree_level_steps_by_one_caret_width(qtbot):
+    # The tree is six levels deep by the time it reaches a settings folder and it
+    # lives in the window's narrowest column, so every wasted pixel per level is
+    # six wasted at the bottom. Each step is one indentation and no more.
+    #
+    # Measured at the left edge of each row's *name block* — its chip when it has
+    # one, its text when it does not — because the chip reads as the first
+    # character of the name. Qt lays the text out after the icon, so the text
+    # alone would step unevenly wherever a chipped row meets an unchipped one.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.resize(1200, 800)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    tree = view._tree
+    step = tree.indentation()
+    assert step <= 16   # a caret's width, not the platform's roomy default
+
+    def name_x(item):
+        return tree.visualRect(tree.indexFromItem(item)).left()
+
+    def walk(item, depth):
+        item.setExpanded(True)
+        yield depth, item
+        for i in range(item.childCount()):
+            yield from walk(item.child(i), depth + 1)
+
+    root = tree.invisibleRootItem()
+    rows_by_depth = [pair for i in range(root.childCount())
+                     for pair in walk(root.child(i), 0)]
+    starts = {}
+    for depth, item in rows_by_depth:
+        starts.setdefault(depth, set()).add(name_x(item))
+    # One name position per depth — every row of a level lines up with its
+    # siblings, shelves and folders alike...
+    assert all(len(xs) == 1 for xs in starts.values()), starts
+    # ...and each level sits exactly one indentation right of the one above.
+    at = [next(iter(starts[d])) for d in sorted(starts)]
+    assert [b - a for a, b in zip(at, at[1:])] == [step] * (len(at) - 1)
 
 
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
@@ -349,7 +408,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     # The title carries the full breadcrumb, which the narrow tree truncates.
     assert "SDXL Text-to-Image" in view._title.display_text()
@@ -366,7 +425,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
     view._tree.setCurrentItem(lora)
     assert len(view.visible_folder_keys()) == 2
@@ -385,7 +444,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     view._tree.setCurrentItem(lora)
     a_tile_key = view.visible_folder_keys()[0]  # a settings tile under the LoRA folder
 
@@ -397,98 +456,255 @@ def _children_by_label(item):
     return {item.child(i).text(0): item.child(i) for i in range(item.childCount())}
 
 
-def test_toc_filter_hides_folders_whose_label_does_not_match(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+def _search_for(view, text):
+    """Type a query and let its debounce fire.
+
+    The box waits out a beat of quiet before searching (and a longer one before
+    asking the model to widen), so a test that only sets the text has typed but
+    not yet searched. Nothing under the minimum length searches at all, so that
+    case is left to the timer that never fires — as it is in the app.
+    """
+    view._search_edit.setText(text)
+    if view._search_timer.isActive():
+        view._search_timer.stop()
+        view._run_pending_search()
+
+
+def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
+    # The whole point of moving the search off the tree: the answer is the
+    # thumbnails themselves, in the middle pane, not a narrowed list of folder
+    # names whose labels are truncated prompt headlines.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _top_level(view._tree)["Images"]
-    lora = images.child(0).child(0).child(0)  # "(no LoRA)"
-    leaves = _children_by_label(lora)
+    _search_for(view, "cat")
 
-    view._filter_edit.setText("cat")
-
-    assert not leaves["a cat"].isHidden()   # the match stays
-    assert leaves["a dog"].isHidden()       # the non-match drops out
-    # its ancestors stay visible and expand, so the match is actually on screen.
-    assert not lora.isHidden() and lora.isExpanded()
-    assert not images.isHidden() and images.isExpanded()
+    assert view.visible_prompt_ids() == ["i1"]
+    assert view._browser.showing_search()
 
 
-def test_toc_filter_match_on_a_folder_keeps_its_whole_subtree(qtbot):
-    rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
+def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
+    # It used to hide every non-matching row and expand paths down to the hits.
+    # Now nothing in the tree moves, so clearing the box puts the user back in
+    # the folder they were standing in rather than somewhere the search wandered.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-
-    model = _top_level(view._tree)["Videos"].child(0).child(0)
-    loras = _children_by_label(model)
-    style_a = next(v for k, v in loras.items() if "styleA" in k)
-    style_b = next(v for k, v in loras.items() if "styleB" in k)
-
-    view._filter_edit.setText("styleA")
-
-    assert style_b.isHidden()               # the sibling LoRA drops out
-    assert not style_a.isHidden()
-    # matching the LoRA folder keeps everything beneath it (source image -> settings).
-    source = style_a.child(0)
-    assert not source.isHidden()
-    assert not source.child(0).isHidden()   # the settings leaf under it
-
-
-def test_clearing_the_toc_filter_restores_visibility_and_prior_expansion(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    images = _top_level(view._tree)["Images"]
-    images.setExpanded(True)                 # a folder the user had open...
-    workflow = images.child(0)               # ...its child left collapsed
-    lora = workflow.child(0).child(0)
+    images = _media_roots(view._tree)["Images"]
+    lora = images.child(0).child(0).child(0)
     dog = _children_by_label(lora)["a dog"]
+    before = view._tree.currentItem()
 
-    view._filter_edit.setText("cat")
-    assert dog.isHidden()
-    assert workflow.isExpanded()             # the filter opened the path to the match
+    _search_for(view, "cat")
 
-    view._filter_edit.setText("")            # clear the filter
-    assert not dog.isHidden()                # everything is back
-    assert images.isExpanded()               # the folder the user had open stays open
-    assert not workflow.isExpanded()         # the path the filter opened collapses back
+    assert not dog.isHidden()
+    assert not images.isExpanded()
+    assert view._tree.currentItem() is before
 
 
-def test_toc_filter_stays_applied_across_a_rebuild(qtbot):
+def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(_children_by_label(lora)["a dog"])
+    assert view.visible_prompt_ids() == ["i2"]
+
+    _search_for(view, "dog")
+    assert view.visible_prompt_ids() == ["i2"]
+
+    view._search_edit.setText("")
+
+    assert view.visible_prompt_ids() == ["i2"]   # back in the folder that was open
+    assert not view._browser.showing_search()
+
+
+def test_the_tree_selection_is_what_the_search_covers(qtbot):
+    # The tree scopes the query rather than being narrowed by it: standing in a
+    # folder asks the question there, and a hit outside it is not an answer.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == ["v1"]
+    assert "Videos" in view._title.display_text()  # the header says where it looked
+
+
+def test_picking_another_folder_re_asks_the_search_there(qtbot):
+    # Picking a folder mid-search is a new scope, not an exit — the same
+    # question, asked somewhere else, with the box left as it was.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    _search_for(view, "cat")
+    assert view.visible_prompt_ids() == ["v1"]
+
+    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])
+
+    assert view._search_edit.text() == "cat"
+    assert view._browser.showing_search()
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_the_all_row_searches_the_whole_library(qtbot):
+    # What All is for: every other folder narrows the answer before the query
+    # does, so without a row above the media roots there is nowhere to stand
+    # that means everything.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, "cat")
+
+    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
+
+
+def test_the_all_row_holds_the_media_roots_and_is_where_the_gallery_lands(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    all_row = _top_level(view._tree)["All"]
+    assert [all_row.child(i).text(0) for i in range(all_row.childCount())] == [
+        "Images", "Videos"]
+    assert all_row.isExpanded()   # shut, it would be a tree with nothing in it
+    assert view._tree.currentItem() is all_row
+
+
+def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
+    # A shelf is a collection of generations, so standing on one and searching it
+    # is the obvious thing to try — and it used to quietly search everything.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    rows[1]["starred"] = 1
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._starred_item)
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == ["i2"]     # the starred one alone
+    assert "Starred" in view._title.display_text()
+
+
+def test_the_trash_shelf_searches_what_it_is_holding(qtbot):
+    # A deleted row is out of the gallery's own list and lives only in the bin,
+    # so a Trash search finds nothing at all unless the bin is indexed too.
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
+                                     ("d2", _image("d2", "a dog", 50, 2))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._trash_item)
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == ["d1"]
+
+
+def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
+    # The bin shares the index so its shelf can be searched; it must not leak
+    # into a search of the gallery, where those items are gone.
+    view = GalleryView(_bin_db(rows=[_image("i1", "a dog", 50, 3)],
+                               held=[("d1", _image("d1", "a cat", 50, 1))]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == []
+
+
+def test_the_box_says_what_it_would_search(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert view._search_edit.placeholderText() == "Search All…"
+
+    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    assert view._search_edit.placeholderText() == "Search Videos…"
+
+    view._tree.setCurrentItem(view._recents_item)
+    assert view._search_edit.placeholderText() == "Search Recents…"
+
+
+def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
+    # A query that would answer elsewhere looks identical to one that answers
+    # nowhere, and the fix for the first is a wider folder, not a different word.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    _search_for(view, "dog")
+
+    assert "Videos" in view._scroll.widget().text()
+
+
+def test_search_matches_words_the_prompt_did_not_use(qtbot):
+    # "two women" has to reach "two dolls" and "two tall ladies" alike — a
+    # substring filter finds neither, which is what made the old one useless.
+    rows = [
+        _image("i1", "two dolls on a couch", 50, 1),
+        _image("i2", "two tall ladies at the beach", 50, 2),
+        _image("i3", "a single lady in the rain", 50, 3),
+        _image("i4", "an empty street", 50, 4),
+    ]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "two women")
+
+    # Both two-subject rows, and neither the lone lady nor the empty street:
+    # every word of the query has to be satisfied, so "two" rules i3 out.
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+
+
+def test_search_stays_applied_across_a_rebuild(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
+    _search_for(view, "cat")
 
-    view._filter_edit.setText("cat")
-    db.add(_image("i3", "a bird", 50, 9))    # a new generation lands...
-    view.refresh()                           # ...triggering a rebuild
+    db.add(_image("i3", "a cat on a fence", 50, 9))  # a new match lands...
+    view.refresh()                                   # ...triggering a rebuild
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
-    leaves = _children_by_label(lora)
-    assert not leaves["a cat"].isHidden()
-    assert leaves["a dog"].isHidden()        # still filtered after the rebuild
-    assert leaves["a bird"].isHidden()       # and the newcomer is filtered too
+    # The results are still on screen, and the newcomer joined them.
+    assert set(view.visible_prompt_ids()) == {"i1", "i3"}
+    assert view._browser.showing_search()
 
 
-def test_toc_pane_holds_a_filter_field_above_the_tree(qtbot):
+def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     toc = view._folder_panes.widget(0)
-    assert isinstance(view._filter_edit, QLineEdit)
-    assert toc.isAncestorOf(view._filter_edit)
-    # it leads the pane, above the folder tree it filters.
+    assert isinstance(view._search_edit, QLineEdit)
+    assert toc.isAncestorOf(view._search_edit)
+    # it leads the pane, above the tree it searches across.
     layout = toc.layout()
-    assert layout.indexOf(view._filter_edit) < layout.indexOf(view._tree)
+    assert layout.indexOf(view._search_edit) < layout.indexOf(view._tree)
 
 
-def test_toc_filter_matches_a_generation_by_its_seed(qtbot):
-    # The two seed variants collapse into one "a cat" leaf; "a dog" is a sibling.
+def test_search_matches_a_generation_by_its_seed(qtbot):
+    # A seed names one item, and rides on no folder label, so it is findable
+    # here or nowhere — and it lands on that item, not on its folder's siblings.
     rows = [
         _image("i1", "a cat", 50, 778899),
         _image("i2", "a cat", 50, 112233),
@@ -498,86 +714,303 @@ def test_toc_filter_matches_a_generation_by_its_seed(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
-    leaves = _children_by_label(lora)
+    _search_for(view, "778899")
 
-    view._filter_edit.setText("778899")     # a seed, carried by no folder label
-
-    assert not leaves["a cat"].isHidden()   # the folder holding that seed stays
-    assert leaves["a dog"].isHidden()       # every other folder drops out
+    assert view.visible_prompt_ids() == ["i1"]
 
 
-def test_a_unique_seed_filter_jumps_to_that_generation(qtbot):
-    rows = [
-        _image("i1", "a cat", 50, 778899),
-        _image("i2", "a cat", 50, 112233),
-        _image("i3", "a dog", 50, 445566),
-    ]
-    view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._filter_edit.setText("778899")
-
-    # Filtering opened the folder and selected the one item with that seed.
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # its folder is showing
-    assert view.selected_generation() == "i1"
-
-
-def test_find_matches_a_prompt_word_the_folder_label_truncates_away(qtbot):
-    # Two prompts alike for their first 60 characters, so the label each leaf gets
-    # is the very same headline; only the tail tells them apart, and only the rows
-    # carry it. Searching the label alone could never reach this.
+def test_search_matches_a_prompt_word_the_folder_label_truncates_away(qtbot):
+    # Two prompts alike for their first 60 characters, so both leaves carry the
+    # very same label; only the tail tells them apart, and only the rows have it.
     shared = "a cat asleep on a windowsill in the late afternoon sun, watching "
     rows = [_image("i1", shared + "sparrows", 50, 1),
             _image("i2", shared + "beetles", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    assert len({lora.child(i).text(0) for i in range(lora.childCount())}) == 1
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
-    leaves = [lora.child(i) for i in range(lora.childCount())]
-    assert len({leaf.text(0) for leaf in leaves}) == 1  # one label for both folders
+    _search_for(view, "beetles")
 
-    view._filter_edit.setText("beetles")
-
-    hidden = {leaf.data(0, _GROUP_ROLE).rows[0]["prompt_id"]: leaf.isHidden()
-              for leaf in leaves}
-    assert hidden == {"i1": True, "i2": False}
+    assert view.visible_prompt_ids() == ["i2"]
 
 
-def test_find_matches_a_generation_by_its_negative_prompt(qtbot):
-    # The negative prompt reaches no folder label at all, so the rows are the only
-    # place it can be found.
+def test_search_ignores_the_negative_prompt(qtbot):
+    # A negative prompt lists what a run was told to keep OUT, so a hit there is
+    # the opposite of what was asked for. On a real library three quarters of one
+    # query's results came from negatives — the bulk of "this doesn't work".
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    rows[1]["negative_prompt"] = "blurry, watermark"
+    rows[1]["negative_prompt"] = "cat, blurry"   # a run that asked for no cat
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
-    leaves = _children_by_label(lora)
+    _search_for(view, "cat")
 
-    view._filter_edit.setText("watermark")
-
-    assert not leaves["a dog"].isHidden()  # the folder whose row carries it stays
-    assert leaves["a cat"].isHidden()
+    assert view.visible_prompt_ids() == ["i1"]
 
 
-def test_a_prompt_match_narrows_the_tree_without_navigating(qtbot):
-    # Unlike a seed — which names one item and so jumps to it — a prompt belongs to
-    # a whole folder the user can see and click, so the find leaves the view alone
-    # rather than yanking it around mid-word.
+def test_search_matches_a_generation_by_its_lora(qtbot):
+    rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "styleA")
+
+    assert view.visible_prompt_ids() == ["v1"]
+
+
+def _section_headers(view):
+    """The fold headers of the open search's model + LoRA bands, in shown order."""
+    return [w for w in view._scroll.widget().findChildren(QPushButton)
+            if w.objectName() == "sectionHeading"]
+
+
+def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):
+    # The other question a search answers: not "where is it" but "which
+    # recipe was that" — so the hits are cut into a labelled band per
+    # model + LoRA combination instead of interleaved.
+    rows = [_i2v_video("v1", "styleA", prompt="a cat indoors"),
+            _i2v_video("v2", "styleA", prompt="a cat outdoors"),
+            _i2v_video("v3", "styleB", prompt="a cat on a fence")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.set_search_sort(search.SORT_RECIPE)
+
+    headings = [w.text() for w in _section_headers(view)]
+
+    assert len(headings) == 2
+    assert any("styleA" in h and h.endswith("(2)") for h in headings)
+    assert any("styleB" in h and h.endswith("(1)") for h in headings)
+    assert headings[0].endswith("(2)")   # the bigger band leads
+
+
+def test_a_recipe_band_folds_shut_on_its_heading(qtbot):
+    # With a dozen combinations behind a broad query, being able to shut the ones
+    # you are not asking about is what makes the sort usable rather than sorted.
+    rows = [_i2v_video("v1", "styleA", prompt="a cat"),
+            _i2v_video("v2", "styleB", prompt="a cat")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.set_search_sort(search.SORT_RECIPE)
+    header = _section_headers(view)[0]
+    band = view._scroll.widget().layout().itemAt(1).widget()
+    assert band.isVisible() or not view.isVisible()  # laid out open to begin with
+
+    header.click()
+
+    assert band.isHidden()
+    assert header.text().startswith("▸")   # and the arrow says so
+
+
+def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
+    # A rebuild, a landing generation or a widening all redraw the pane; springing
+    # the bands you shut back open each time would make folding pointless.
+    db = FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+                 _i2v_video("v2", "styleB", prompt="a cat")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.set_search_sort(search.SORT_RECIPE)
+    shut = next(h for h in _section_headers(view) if "styleA" in h.text())
+    shut.click()
+
+    db.add(_i2v_video("v3", "styleB", prompt="a cat on a fence"))
+    view.refresh()
+
+    redrawn = next(h for h in _section_headers(view) if "styleA" in h.text())
+    assert redrawn.text().startswith("▸")   # still shut
+    assert next(h for h in _section_headers(view)
+                if "styleB" in h.text()).text().startswith("▾")  # the other still open
+
+
+def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
+    # Every word has to be satisfied, so with several typed the one thing worth
+    # knowing is which to drop — "no results" alone leaves the user re-typing.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat aardvark")
+
+    assert view.visible_prompt_ids() == []
+    assert "aardvark" in view._scroll.widget().text()
+
+
+def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
+    # The deterministic tier draws first and the model only ever adds words, so a
+    # widening that arrives improves a view the user is already looking at.
+    rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    assert view.visible_prompt_ids() == []   # nothing says "cat"
+
+    view._search_expander.expanded.emit("cat", {"cat": ("kitten",)})
+
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
+    # A slow answer can land after the user has typed on; widening results for a
+    # query they are no longer running would put items on screen they can't
+    # account for.
+    rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "dog")
+
+    view._search_expander.expanded.emit("cat", {"cat": ("kitten",)})
+
+    assert view.visible_prompt_ids() == ["i2"]
+
+
+def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
+    # The tree still has a row selected while a search runs, but that folder is
+    # not what the pane shows — so Enhance All, auto-generate and delete-the-
+    # folder must not fire against something off screen.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    before = view._tree.currentItem()
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(_children_by_label(lora)["a dog"])
 
-    view._filter_edit.setText("cat")
+    _search_for(view, "cat")
 
-    assert view._tree.currentItem() is before
-    assert view.selected_generation() is None
+    assert view._current_group() is None
+    assert view._current_deletable_folder() is None
+    assert not view._auto_btn.isVisible()
+
+
+def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
+    # A one-word query over a full library can match most of it, and thousands of
+    # tiles in one pass locks the window. The cap is stated rather than silent —
+    # "2,000 results" alone would read as 2,000 tiles you could scroll to.
+    from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
+
+    over = SEARCH_DRAW_LIMIT + 5
+    rows = [_image(f"i{n}", f"a cat number {n}", 50, n) for n in range(over)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+
+    assert len(view.visible_prompt_ids()) == SEARCH_DRAW_LIMIT
+    assert f"{over:,} results" in view._search_count.text()
+    assert "add a word" in view._search_count.text()
+
+
+def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
+    # Rows in a settings folder share a prompt and differ only by seed, so a
+    # prompt match hits all of them — and eight near-copies of one picture bury
+    # every other place the query reached.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a cat", 50, 3), _image("i4", "a dog", 50, 4)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == []       # no loose thumbnails...
+    assert len(view.visible_folder_keys()) == 1  # ...one folder standing for all three
+    assert "1 result" in view._search_count.text()
+
+
+def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
+    # Collapsing is for the near-copies; a folder that answered once has nothing
+    # to collapse, and a folder tile there would hide the picture behind a name.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == ["i1"]
+    assert view.visible_folder_keys() == []
+
+
+def test_opening_a_result_folder_puts_the_search_away(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    (key,) = view.visible_folder_keys()
+
+    view._drill_into(key)   # the path a folder tile's click takes
+
+    assert view._search_edit.text() == ""
+    assert not view._browser.showing_search()
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # standing in the folder
+
+
+def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
+    # A search scores the whole library and rebuilds the pane; one per character
+    # churns the results under a word still being typed.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._search_edit.setText("cat")
+
+    assert not view._browser.showing_search()   # typed, not yet searched
+    assert view._search_timer.isActive()
+
+    view._search_timer.stop()
+    view._run_pending_search()
+
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_a_query_under_three_characters_searches_nothing(qtbot):
+    # One or two letters reach a large fraction of any library through stemming
+    # alone, so an as-you-type search would answer the first keystroke of every
+    # query with most of the gallery.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._search_edit.setText("ca")
+
+    assert not view._search_timer.isActive()
+    assert not view._browser.showing_search()
+
+    _search_for(view, "cat")
+    assert view._browser.showing_search()
+
+    view._search_edit.setText("ca")   # back under the floor: the search is over
+    assert not view._browser.showing_search()
+
+
+def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
+    # A search's results are a gathered collection exactly as a shelf's are, and
+    # sitting through what one turned up is a good reason to have run it.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _image("i3", "a dog", 50, 3)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+
+    assert [row["prompt_id"] for row in view._slideshow_rows()] == ["i1", "i2"]
+    assert "these results" in view._slideshow_btn.toolTip()
 
 
 def _press_ctrl_f(view, monkeypatch):
@@ -680,7 +1113,7 @@ def test_ctrl_f_falls_back_to_the_tree_find_with_no_prompts_in_front(qtbot, tmp_
     _press_ctrl_f(view, monkeypatch)
 
     assert not view._find_bar.isVisible()
-    assert view.focusWidget() is view._filter_edit
+    assert view.focusWidget() is view._search_edit
 
 
 def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, monkeypatch):
@@ -720,12 +1153,12 @@ def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     key = _key(workflow)
     view._apply_rename(key, "Best Models")
 
     assert db.folder_meta_map()[key]["custom_name"] == "Best Models"
-    assert _top_level(view._tree)["Images"].child(0).text(0) == "Best Models"
+    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Best Models"
 
 
 def test_starring_a_folder_persists_without_reordering(qtbot):
@@ -735,13 +1168,13 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     cat_key = _key(lora.child(0))
     dog_key = _key(lora.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
     # The star marks the folder in place; it does not jump above the cat.
     assert [_key(lora.child(i)) for i in range(lora.childCount())] == [cat_key, dog_key]
     # Starred state rides on the group (the row's star icon reads it), not a ★ text
@@ -758,7 +1191,7 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -855,14 +1288,14 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view.refresh()
     # Unreviewed, but already filed in the tree — the shelf is a queue over it,
     # not a holding pen outside it.
-    assert "Images" in _top_level(view._tree)
+    assert "Images" in _media_roots(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(view._experiments_item)
     assert view.visible_prompt_ids() == []          # reviewed: off the shelf...
-    assert "Images" in _top_level(view._tree)       # ...and still in its folder
+    assert "Images" in _media_roots(view._tree)       # ...and still in its folder
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
@@ -1121,7 +1554,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     view.restore_from_trash(["p1"])
 
-    assert "Images" in _top_level(view._tree)      # back in the tree...
+    assert "Images" in _media_roots(view._tree)      # back in the tree...
     assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left on the shelf
     assert view._db.list_deletions() == []
 
@@ -1350,7 +1783,7 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -1393,7 +1826,7 @@ def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)  # and a starred folder
 
@@ -1692,7 +2125,7 @@ def test_recents_media_filter_checkboxes_default_on_and_only_show_on_the_shelf(q
     assert view._recents_video_cb.isChecked()
 
     # The filter belongs to the Recents shelf: hidden on a media folder...
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
+    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])
     assert view._recents_filter_bar.isHidden()
     # ...and shown the moment the shelf is open.
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
@@ -1853,14 +2286,14 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments",
-                                           "Requests", "Trash", "Images"}
+                                           "Requests", "Trash", "All"}
+    assert set(_media_roots(view._tree)) == {"Images"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_top_level(view._tree)) == {
-        "Recents", "Starred", "Experiments", "Requests", "Trash", "Images", "Videos"}
+    assert set(_media_roots(view._tree)) == {"Images", "Videos"}
 
 
 def test_folders_start_collapsed(qtbot):
@@ -1868,7 +2301,7 @@ def test_folders_start_collapsed(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _top_level(view._tree)["Images"]
+    images = _media_roots(view._tree)["Images"]
     assert images.isExpanded() is False
     assert images.child(0).isExpanded() is False
 
@@ -1882,7 +2315,7 @@ def test_opening_a_folder_shows_its_grid_but_selects_nothing(qtbot):
     view.refresh()
 
     # A branch folder shows its child tiles but auto-selects no generation...
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     assert view._selected is None
 
@@ -1899,7 +2332,7 @@ def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     key = _key(workflow)
 
     view._begin_inline_rename(workflow, 0)   # double-click opens the editor
@@ -1907,7 +2340,7 @@ def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
 
     assert db.folder_meta_map()[key]["custom_name"] == "Models"
     view.refresh()
-    assert _top_level(view._tree)["Images"].child(0).text(0) == "Models"
+    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Models"
 
 
 def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
@@ -1916,7 +2349,7 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     key = _key(workflow)
 
@@ -1925,7 +2358,7 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     view._title.edited.emit("Favorites")  # commit
 
     assert db.folder_meta_map()[key]["custom_name"] == "Favorites"
-    assert _top_level(view._tree)["Images"].child(0).text(0) == "Favorites"
+    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Favorites"
 
 
 def _source_tile(view):
@@ -2025,7 +2458,7 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _top_level(view._tree)["Images"]  # a media group — not deletable, nothing picked
+    images = _media_roots(view._tree)["Images"]  # a media group — not deletable, nothing picked
     view._tree.setCurrentItem(images)
     assert not view._delete_btn.isEnabled()
 
@@ -2112,7 +2545,7 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
 
 def _video_leaf(view):
     """Open the settings folder under Videos, the deepest branch's only leaf."""
-    item = _top_level(view._tree)["Videos"]
+    item = _media_roots(view._tree)["Videos"]
     while item.childCount():
         item.setExpanded(True)
         item = item.child(0)
@@ -2385,7 +2818,7 @@ def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
 
     view._tree.setCurrentItem(
-        _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
+        _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
     )
     assert view._showing_recents() is False
     assert view._back_btn.isEnabled()
@@ -2400,7 +2833,7 @@ def test_back_walks_folders_the_way_it_walks_generations(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
     cat, dog = lora.child(0), lora.child(1)
     view._tree.setCurrentItem(cat)
     view._tree.setCurrentItem(dog)
@@ -2421,7 +2854,7 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    leaf = _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     depth = len(view._history._stack)
 
@@ -2436,7 +2869,7 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    dog_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0).child(1))
+    dog_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0).child(1))
     view._toggle_star(dog_key)
 
     view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
@@ -2722,7 +3155,7 @@ def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     assert view.selected_folder() == _key(workflow)
 
@@ -2734,7 +3167,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     qtbot.addWidget(saved)
     saved.refresh()
     # Images -> SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
-    dog_leaf = _top_level(saved._tree)["Images"].child(0).child(0).child(0).child(1)
+    dog_leaf = _media_roots(saved._tree)["Images"].child(0).child(0).child(0).child(1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
     chosen = set(saved.visible_prompt_ids())
@@ -2955,7 +3388,7 @@ def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Videos"].child(0)
+    workflow = _media_roots(view._tree)["Videos"].child(0)
     view._tree.setCurrentItem(workflow)
     assert view._avg_label.text() == "Average time: ~12 min (across 3 runs)"
 
@@ -2965,7 +3398,7 @@ def test_folder_without_timed_items_shows_no_average(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)
     assert view._avg_label.text() == ""
 
@@ -3035,7 +3468,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
 
 def _open_leaf(view):
     """Select the first settings-group leaf so its thumbnails are showing."""
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     leaf = workflow.child(0).child(0).child(0)  # workflow -> model -> "(no LoRA)" -> settings
     view._tree.setCurrentItem(leaf)
     return leaf
@@ -3184,7 +3617,7 @@ def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     view._tree.setCurrentItem(workflow)  # a whole-workflow folder
     view._confirm = lambda text: True    # even if it asked, it must not
 
@@ -3373,7 +3806,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    model = _top_level(view._tree)["Images"].child(0).child(0)
+    model = _media_roots(view._tree)["Images"].child(0).child(0)
     view._tree.setCurrentItem(model.child(0).child(0))  # one of the two settings leaves
     view._confirm = lambda text: True
 
@@ -3405,7 +3838,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # the (no LoRA) folder
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # the (no LoRA) folder
     first_leaf, second_leaf = lora.child(0), lora.child(1)
     first_key = first_leaf.data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
@@ -3426,7 +3859,7 @@ def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    images = _top_level(view._tree)["Images"]
+    images = _media_roots(view._tree)["Images"]
     view._confirm = lambda text: True
 
     view._delete_folder(images.data(0, _GROUP_ROLE))       # the Images media group
@@ -3442,7 +3875,7 @@ def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    model = _top_level(view._tree)["Images"].child(0).child(0)
+    model = _media_roots(view._tree)["Images"].child(0).child(0)
     view._tree.setCurrentItem(model)  # a model folder, nested in the workflow
     view._confirm = lambda text: True
 
@@ -3460,7 +3893,7 @@ def test_a_lora_folder_is_deletable_and_takes_only_its_own_rows(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     # Videos -> WAN I2V -> model -> LoRA (styleA is first by appearance).
-    lora = _top_level(view._tree)["Videos"].child(0).child(0).child(0)
+    lora = _media_roots(view._tree)["Videos"].child(0).child(0).child(0)
     assert isinstance(lora.data(0, _GROUP_ROLE), gallery.LoraGroup)
     view._tree.setCurrentItem(lora)
     view._confirm = lambda text: True
@@ -3532,7 +3965,7 @@ def test_renaming_goes_through_the_undoable_actions(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    key = _key(_top_level(view._tree)["Images"].child(0))
+    key = _key(_media_roots(view._tree)["Images"].child(0))
 
     view._apply_rename(key, "Best Models")
 
@@ -3545,7 +3978,7 @@ def test_inline_rename_is_undoable(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _top_level(view._tree)["Images"].child(0)
+    workflow = _media_roots(view._tree)["Images"].child(0)
     key = _key(workflow)
 
     view._editing_key = key            # an in-place edit is underway
@@ -3644,7 +4077,7 @@ def _reroll_tile(view):
 
 def _select_first_leaf(view):
     # media -> workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _top_level(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    leaf = _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -3851,7 +4284,7 @@ def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
-    settings = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    settings = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
     first = settings.child(0).data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(settings.child(0))
     view._toggle_auto(True)
@@ -4063,76 +4496,11 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     _select_first_leaf(view)
     assert not view._auto_btn.isHidden() and view._auto_btn.isEnabled()
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # a media root, not a leaf
+    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])  # a media root, not a leaf
 
     assert not view._auto_btn.isHidden()   # still there
     assert not view._auto_btn.isEnabled()  # with nothing to do from here
     assert "open a settings folder" in view._auto_btn.toolTip()
-
-
-def test_the_auto_switch_stays_lit_away_from_the_folder_looping(qtbot, tmp_path):
-    # The nightmare this ends: a loop running in a folder the user can't find,
-    # with nothing on screen to say one is running at all.
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_auto(True)
-
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # walk away from it
-
-    assert view._auto_btn.isChecked()   # lit: a loop is running
-    assert view._auto_btn.isEnabled()   # and stoppable from here
-    assert view._auto.is_active(key)
-    # And the tip that says so is the clickable one, so the plain tooltip stands
-    # down rather than both appearing.
-    assert "another folder" in view._auto_tip._html
-    assert view._auto_btn.toolTip() == ""
-
-
-def test_the_lit_auto_tip_links_to_the_folder_looping(qtbot, tmp_path):
-    # Naming the folder is no use — every folder is named for its prompt, and
-    # those run long and read alike — so the tip offers to take the user there.
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_auto(True)
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
-    assert "<a href=" in view._auto_tip._html
-
-    view._auto_tip.link_activated.emit("auto")  # the link, followed
-
-    assert view._selected_folder_key() == key
-
-
-def test_the_auto_tip_goes_when_the_loop_does(qtbot, tmp_path):
-    # A tip offering to take you to a loop that has ended is worse than none.
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._toggle_auto(True)
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
-    assert view._auto_tip._html
-
-    view._toggle_auto(False)
-
-    assert view._auto_tip._html == ""
-
-
-def test_switching_the_lit_auto_off_stops_the_loop_wherever_it_runs(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_auto(True)
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])
-
-    view._toggle_auto(False)  # clicked from a folder that isn't the one looping
-
-    assert not view._auto.is_active(key)
-    assert not view._auto_btn.isChecked()
 
 
 # --- a tab's Generate is a re-roll of its folder, navigated to at once ---------
@@ -4158,7 +4526,7 @@ def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     orig_folder = _select_first_leaf(view)      # the folder 'orig' already lives in
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"])  # navigate away first
+    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])  # navigate away first
 
     folder = _generate_in_current_tab(view, positive_prompt="a cat", seed=123)
 
@@ -4298,7 +4666,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
-    assert caption.bottom() <= view._filter_edit.mapTo(view, QPoint(0, 0)).y()
+    assert caption.bottom() <= view._search_edit.mapTo(view, QPoint(0, 0)).y()
 
 
 def test_esc_stops_auto_generate(qtbot, tmp_path):
@@ -4473,7 +4841,7 @@ def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypat
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
     view._toggle_star(_key(lora.child(0)))   # ...and a starred folder (the cat one)
     view._tree.setCurrentItem(view._starred_item)
 
@@ -5334,7 +5702,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Images"].child(0).child(0).child(0).child(0))
+    view._tree.setCurrentItem(_media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0))
     view._apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)
@@ -5497,7 +5865,7 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
     view._reroll._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
     )]
@@ -5572,7 +5940,7 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
     view._reroll._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
     _open_recents(view)
@@ -5594,7 +5962,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_top_level(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
     view._reroll._jobs[folder_key] = [job]
     _open_recents(view)
@@ -5825,7 +6193,7 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     gv._tree.setCurrentItem(gv._recents_item)
     assert pid in gv._inflight_cards
 
-    folder = _top_level(gv._tree)["Images"].child(0).child(0).child(0)
+    folder = _media_roots(gv._tree)["Images"].child(0).child(0).child(0)
     gv._tree.setCurrentItem(folder)              # navigate away
     gv._tree.setCurrentItem(gv._recents_item)    # and back
     assert pid in gv._inflight_cards, "card vanished after navigating away and back"
@@ -6694,7 +7062,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     _select_first_leaf(view)
     assert not view._enhance_panel.isHidden()
 
-    for item in (_top_level(view._tree)["Images"], view._recents_item,
+    for item in (_media_roots(view._tree)["Images"], view._recents_item,
                  view._starred_item, view._experiments_item, view._trash_item):
         view._tree.setCurrentItem(item)
         assert not view._enhance_panel.isHidden()
@@ -7751,7 +8119,7 @@ def _two_leaf_view(qtbot, extra=()):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _top_level(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
     return view, _key(lora.child(0)), _key(lora.child(1))
 
 
@@ -7854,7 +8222,7 @@ def test_a_custom_folder_is_not_where_the_gallery_lands_by_default(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
 
-    assert view._tree_view.default_item() is _top_level(view._tree)["Images"]
+    assert view._tree_view.default_item() is _top_level(view._tree)["All"]
 
 
 def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):

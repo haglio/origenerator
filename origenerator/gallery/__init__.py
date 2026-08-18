@@ -5,6 +5,8 @@ The logic is split by responsibility, in dependency order:
 
 * :mod:`.signatures` — parse a row's params and reduce them to the canonical keys
   the tree groups by (settings, model, LoRA, and an i2v's start-frame config).
+* :mod:`.keys` — the stable key each derived folder is identified by, and the
+  short code it is named by until the user names it.
 * :mod:`.groups` — the folder-tier dataclasses and the helpers that walk them.
 * :mod:`.custom` — the folders the user composes by hand, over those tiers.
 * :mod:`.output` — what a generation produced on disk: media type, preview, files.
@@ -36,10 +38,12 @@ from origenerator.gallery.groups import (
     SourceImageGroup,
     WorkflowGroup,
     child_groups,
+    folder_detail,
     folder_level,
     group_level,
     rows_under,
 )
+from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
     config_tab_title,
     lora_label,

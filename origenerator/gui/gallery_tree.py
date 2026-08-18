@@ -23,9 +23,9 @@ from origenerator.recovery import RETENTION_DAYS
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
 # a narrowed list of folder names is a poor answer to "where is the one with
-# the two of them on the couch", because the names are 60-character prompt
-# headlines and the thing you would actually recognize is the picture. The
-# search now fills the browser pane with matching thumbnails instead (see
+# the two of them on the couch", because a folder's name is a short code and the
+# thing you would actually recognize is the picture. The search now fills the
+# browser pane with matching thumbnails instead (see
 # BrowserPane.show_search_results), and the tree is left alone — so the folder
 # you were standing in is still there when the search clears.
 
@@ -40,6 +40,12 @@ REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queue
 REQUESTS_LABEL = "Requests"    # its row label; a mic is drawn in the caret column
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
+
+
+def _row_tip(group) -> str:
+    """A folder row's hover text: its name, and what its name doesn't say."""
+    detail = gallery.folder_detail(group)
+    return f"{group.label} · {detail}" if detail else group.label
 
 
 class GalleryTree:
@@ -204,7 +210,10 @@ class GalleryTree:
             item.setToolTip(0, group.label if named == group.label
                             else f"{group.label} · {named}")
         else:
-            item.setToolTip(0, group.label)
+            # A settings leaf is named by a code, so its tooltip is where the
+            # prompt and the settings that set it apart from its siblings are
+            # read — the row itself stays one short line.
+            item.setToolTip(0, _row_tip(group))
         self.item_by_key[group.key] = item
         parent_item.addChild(item)
         for child in gallery.child_groups(group):

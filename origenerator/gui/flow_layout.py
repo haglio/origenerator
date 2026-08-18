@@ -51,6 +51,8 @@ class FlowLayout(QLayout):
     def minimumSize(self):
         size = QSize()
         for item in self._items:
+            if item.isEmpty():
+                continue
             size = size.expandedTo(item.minimumSize())
         margins = self.contentsMargins()
         size += QSize(margins.left() + margins.right(),
@@ -69,6 +71,8 @@ class FlowLayout(QLayout):
         spacing = self.spacing()
         x, y, row_height = area.x(), area.y(), 0
         for item in self._items:
+            if item.isEmpty():
+                continue  # a hidden widget takes no slot, and no gap where one was
             hint = item.sizeHint()
             if x > area.x() and x + hint.width() > area.right():
                 x = area.x()                     # this item won't fit; wrap

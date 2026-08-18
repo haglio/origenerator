@@ -2,8 +2,12 @@
 
 Turns a row's raw params into the short strings the gallery shows — a workflow's
 display name, the cleaned model/LoRA filenames, a settings group's prompt-led
-headline, a Generate tab's default title, and a source image's folder name. Pure
-presentation over the identity layer; depends only on :mod:`.signatures`.
+description, a Generate tab's default title, and a source image's folder name.
+Pure presentation over the identity layer.
+
+A settings folder is *named* by its key rather than from here (see
+:mod:`.keys`); what :func:`settings_label` builds is the description behind that
+name, which the tree and the folder tiles show on hover.
 """
 
 import json
@@ -123,10 +127,12 @@ def _distinguishing_keys(settings_list: list[dict]) -> set[str]:
 
 
 def settings_label(params: dict, distinguishing_keys=()) -> str:
-    """A short, human-readable name for a settings group.
+    """A short, human-readable description of a settings group.
 
     Leads with the positive prompt, then appends the settings that set this
     group apart from its siblings so same-prompt folders stay tellable apart.
+    Rides the folder's tooltip rather than its name — the name is a code, so this
+    is what says which folder you are hovering over.
     """
     headline = _prompt_headline(params)
     detail_keys = [k for k in sorted(distinguishing_keys) if k != "positive_prompt"]
@@ -139,13 +145,14 @@ def settings_label(params: dict, distinguishing_keys=()) -> str:
 def _source_image_label(params: dict, image_index: dict) -> str:
     """The name of the source-image folder a video's start frame belongs to.
 
-    The frame's own filename leads, then the image generation's folder label — so
-    a video's source folder still reads as the picture it animates while naming
-    *which* picture it is. The filename comes first because the tier is one frame
-    per folder, and two draws of one prompt make two folders whose labels would
-    otherwise be identical (and identically truncated, so the difference would
-    never even come into view). Falls back to the bare filename when the frame
-    isn't a known generation, and ``"(no input image)"`` when there is none.
+    The frame's own filename leads, then the code of the image generation's own
+    folder — so a video's source folder names *which* picture it animates, and
+    reads as the same folder that picture sits in over in the Images tree. The
+    filename comes first because the tier is one frame per folder, and two draws
+    of one prompt land in one settings folder, so they would otherwise wear the
+    same code. Falls back to the bare filename when the frame isn't a known
+    generation — there is no folder to borrow a code from — and ``"(no input
+    image)"`` when there is none.
     """
     input_image = params.get("input_image")
     name = _frame_name(input_image)

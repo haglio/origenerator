@@ -24,7 +24,6 @@ so it nests beneath every projection. This module owns the grouping logic with n
 Qt dependency so it can be unit-tested directly.
 """
 
-import hashlib
 import json
 
 from origenerator.gallery.enhance import BASE_RENDER_SOURCE, ENHANCE_WORKFLOW
@@ -37,6 +36,13 @@ from origenerator.gallery.groups import (
     SourceImageGroup,
     WorkflowGroup,
     child_groups,
+)
+from origenerator.gallery.keys import (
+    folder_id,
+    lora_key,
+    model_key,
+    settings_key,
+    source_image_key,
 )
 from origenerator.gallery.labels import (
     _distinguishing_keys,
@@ -72,22 +78,6 @@ def _group_ordered(rows, key):
     return list(grouped.items())
 
 
-def _sig_key(media_type: str, workflow_name: str, signature: str, prefix: str = "") -> str:
-    """A folder's stable key from its signature, tagged by level.
-
-    The one-letter ``prefix`` (``m`` model, ``l`` LoRA, ``i`` source image; none
-    for settings) keeps each level's key clear of the others' — a settings
-    folder's segment is pure hex, so no prefixed key can collide with it in
-    ``folder_meta``.
-    """
-    digest = hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
-    return f"{media_type}/{workflow_name}/{prefix}{digest}"
-
-
-def _settings_key(media_type: str, workflow_name: str, signature: str) -> str:
-    return _sig_key(media_type, workflow_name, signature)
-
-
 def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     """The key of the settings-folder leaf a row belongs to in the gallery tree.
 
@@ -100,23 +90,11 @@ def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     """
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
-    return _settings_key(
+    return settings_key(
         media_type, workflow_name,
         settings_signature(workflow_name, row.get("params_json"), image_index,
                            workflow_version=row.get("workflow_version")),
     )
-
-
-def _model_key(media_type: str, workflow_name: str, signature: str) -> str:
-    return _sig_key(media_type, workflow_name, signature, "m")
-
-
-def _lora_key(media_type: str, workflow_name: str, signature: str) -> str:
-    return _sig_key(media_type, workflow_name, signature, "l")
-
-
-def _source_image_key(media_type: str, workflow_name: str, signature: str) -> str:
-    return _sig_key(media_type, workflow_name, signature, "i")
 
 
 def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) -> str:
@@ -137,15 +115,15 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     if level == "workflow":
         return f"{media_type}/{workflow_name}"
     if level == "model":
-        return _model_key(media_type, workflow_name, model_signature(workflow_name, params_json))
+        return model_key(media_type, workflow_name, model_signature(workflow_name, params_json))
     if level == "lora":
-        return _lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
+        return lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
     if level == "source_image":
         # The tier exists only in the Videos tree, so it always asks which picture.
         config = _input_image_config(
             parse_params(params_json).get("input_image"), image_index, identify=True,
         )
-        return _source_image_key(media_type, workflow_name, config)
+        return source_image_key(media_type, workflow_name, config)
     if level == "settings":
         return settings_folder_key(row, image_index)
     raise ValueError(f"unknown folder level: {level!r}")
@@ -161,7 +139,7 @@ def legacy_settings_folder_key(row: dict) -> str:
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
     signature = json.dumps(settings_only(parse_params(row.get("params_json"))), sort_keys=True)
-    return _settings_key(media_type, workflow_name, signature)
+    return settings_key(media_type, workflow_name, signature)
 
 
 def _preenhance_settings(workflow_name: str, params: dict) -> dict:
@@ -190,7 +168,7 @@ def legacy_preframe_settings_folder_key(row: dict) -> str:
         _preenhance_settings(workflow_name, parse_params(row.get("params_json"))),
         sort_keys=True, default=str,
     )
-    return _settings_key(media_type, workflow_name, signature)
+    return settings_key(media_type, workflow_name, signature)
 
 
 def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = None) -> str:
@@ -213,7 +191,7 @@ def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = 
             "input_image_config": _input_image_config(params.get("input_image"), image_index),
         }
     signature = json.dumps(settings, sort_keys=True, default=str)
-    return _settings_key(media_type, workflow_name, signature)
+    return settings_key(media_type, workflow_name, signature)
 
 
 def legacy_preenhance_settings_folder_keys(members, image_index: dict | None = None) -> set[str]:
@@ -242,7 +220,7 @@ def legacy_preenhance_settings_folder_keys(members, image_index: dict | None = N
                 **settings,
                 "input_image_config": _input_image_config(params.get("input_image"), image_index),
             }
-        keys.add(_settings_key(media_type, workflow_name,
+        keys.add(settings_key(media_type, workflow_name,
                                json.dumps(settings, sort_keys=True, default=str)))
     return keys
 
@@ -354,10 +332,13 @@ def _build_settings_groups(
     """The settings-group leaves under one model, LoRA, or source-image folder.
 
     Rows collapse by settings signature (all non-instance params, plus an i2v's
-    start-frame configuration), and each leaf's label is disambiguated only
-    against its siblings under the same parent — so a value the folder above
+    start-frame configuration). A leaf is *named* by its key (see
+    :func:`~origenerator.gallery.keys.folder_id`) — the prompt it ran is a
+    paragraph, and a folder name is a line — and what the prompt said rides its
+    ``detail`` instead, for the tooltip. That detail is disambiguated only
+    against its siblings under the same parent, so a value the folder above
     already pins (the model, the LoRA, and for an i2v the source image) is
-    constant here and never re-appears in a settings name.
+    constant here and never re-appears in it.
     """
     grouped = _group_ordered(
         rows, lambda r: settings_signature(wf_name, r.get("params_json"), image_index,
@@ -370,11 +351,12 @@ def _build_settings_groups(
     distinguishing = _distinguishing_keys(settings_dicts)
     groups = []
     for i, (sig, sig_rows) in enumerate(grouped):
-        key = _settings_key(media_type, wf_name, sig)
-        label, starred = _overlay(
-            settings_label(settings_dicts[i], distinguishing), key, folder_meta
-        )
-        groups.append(SettingsGroup(key, label, sig_rows, starred))
+        key = settings_key(media_type, wf_name, sig)
+        label, starred = _overlay(folder_id(key), key, folder_meta)
+        groups.append(SettingsGroup(
+            key, label, sig_rows, starred,
+            settings_label(settings_dicts[i], distinguishing),
+        ))
     return groups
 
 
@@ -402,7 +384,7 @@ def _build_model_groups(
     return _grouped_folders(
         rows, folder_meta, cls=ModelGroup,
         signature=lambda r: model_signature(wf_name, r.get("params_json")),
-        key_for=lambda sig: _model_key(media_type, wf_name, sig),
+        key_for=lambda sig: model_key(media_type, wf_name, sig),
         label_for=lambda params: model_label(wf_name, params),
         children_for=lambda sub: _build_lora_groups(media_type, wf_name, sub, folder_meta, image_index),
     )
@@ -419,7 +401,7 @@ def _build_lora_groups(
     return _grouped_folders(
         rows, folder_meta, cls=LoraGroup,
         signature=lambda r: lora_signature(wf_name, r.get("params_json")),
-        key_for=lambda sig: _lora_key(media_type, wf_name, sig),
+        key_for=lambda sig: lora_key(media_type, wf_name, sig),
         label_for=lambda params: lora_label(wf_name, params),
         children_for=lambda sub: _build_leaves(media_type, wf_name, sub, folder_meta, image_index),
     )
@@ -458,7 +440,7 @@ def _build_source_image_groups(
             parse_params(r.get("params_json")).get("input_image"), image_index,
             identify=True,
         ),
-        key_for=lambda sig: _source_image_key(media_type, wf_name, sig),
+        key_for=lambda sig: source_image_key(media_type, wf_name, sig),
         label_for=lambda params: _source_image_label(params, image_index),
         children_for=lambda sub: _build_settings_groups(media_type, wf_name, sub, folder_meta, image_index),
     )

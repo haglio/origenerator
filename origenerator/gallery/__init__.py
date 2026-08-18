@@ -69,6 +69,7 @@ from origenerator.gallery.voice_commands import (
     match_genau_command,
 )
 from origenerator.gallery.enhance import (
+    BASE_RENDER_SOURCE,
     ENHANCE_LEVEL_KEYS,
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,

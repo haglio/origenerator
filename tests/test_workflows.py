@@ -1948,3 +1948,46 @@ def test_flux_t2i_upscaled_extract_output_info():
     files = wf.extract_output_info(history)
     assert len(files) == 1
     assert files[0]["filename"] == "flux_t2i_upscaled_00004_.png"
+
+
+def test_every_enhance_capable_workflow_keeps_its_base_render():
+    # A workflow whose tail re-samples its own render must save that render too,
+    # or the row lands with one file and no "before" — enhanced pixels with
+    # nothing to compare them against, and the only recovery a full re-render at
+    # the recorded seed. 147 rows in this library needed exactly that repair.
+    # Asserted across the registry so a new enhance-capable workflow inherits the
+    # rule rather than a later reader having to know it.
+    enhancers = [wf for wf in WORKFLOW_REGISTRY.values()
+                 if "enhance" in wf.default_params()]
+    assert len(enhancers) >= 4  # the SDXL pair, Flux upscaled, WAN t2i, at least
+    for wf in enhancers:
+        assert wf.base_output_node_id is not None, wf.name
+        params = dict(wf.default_params(), enhance=True,
+                      input_image="a.png", pose_image="b.png")
+        saves = [
+            node["inputs"]["filename_prefix"]
+            for node in wf.build_api_payload(params).values()
+            if node.get("class_type") == "SaveImage"
+        ]
+        assert f"{params['filename_prefix']}_base" in saves, wf.name
+        # And the run's history reads that file back as the row's original, which
+        # is what makes it a level rather than a second picture.
+        history = {"outputs": {
+            wf.output_node_id: {wf.output_key: [{"filename": "enhanced.png"}]},
+            wf.base_output_node_id: {wf.output_key: [{"filename": "base.png"}]},
+        }}
+        assert [(f["filename"], f.get("role")) for f in wf.extract_output_info(history)] \
+            == [("enhanced.png", None), ("base.png", "original")], wf.name
+
+
+def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
+    # The base save exists to keep what the tail consumed; with no tail running,
+    # the primary save IS the base render and a second copy is just a duplicate.
+    for wf in WORKFLOW_REGISTRY.values():
+        if "enhance" not in wf.default_params():
+            continue
+        params = dict(wf.default_params(), enhance=False,
+                      input_image="a.png", pose_image="b.png")
+        saves = [node for node in wf.build_api_payload(params).values()
+                 if node.get("class_type") == "SaveImage"]
+        assert len(saves) == 1, wf.name

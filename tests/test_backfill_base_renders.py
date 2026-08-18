@@ -10,12 +10,15 @@ uses, since it is a full render per row and there are a great many of them.
 import json
 
 from origenerator import gallery
+from origenerator.app_state import AppState
 from origenerator.base_backfill import (
-    SOURCE, TARGET_KEY, attach_base, base_params_for, cancel_base_renders,
-    fold_base_render, fold_completed_base_renders, queue_base_renders,
-    rows_missing_their_base,
+    SOURCE, TARGET_KEY, UNTIMED_SECONDS, attach_base, base_params_for,
+    cancel_base_renders, fold_base_render, fold_completed_base_renders,
+    queue_base_renders, rows_missing_their_base, typical_seconds,
 )
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -275,3 +278,109 @@ def test_a_repair_never_grows_a_folder_of_its_own(tmp_path):
     tree = gallery.build_gallery_tree(db.list_generations())
     shown = [r["prompt_id"] for media in tree for r in gallery.rows_under(media)]
     assert shown == ["one"]
+
+
+# --- how much of the backlog one absence takes ------------------------------
+
+def _timed(db, prompt_id, *, seconds, workflow="sdxl_t2i"):
+    """A finished generation the library has a duration for — what the batch
+    prices its repairs from."""
+    row = _add(db, prompt_id, params={"seed": 1}, files=[_file(f"{prompt_id}.png")],
+               workflow=workflow)
+    db.update_generation(prompt_id, duration_seconds=seconds)
+    return row
+
+
+def test_the_batch_is_priced_from_what_the_renders_actually_take(tmp_path):
+    # Sized in GPU minutes, not rows: the first version handed out six per
+    # absence believing one repair was a night's work, which would have drained
+    # a 147-row backlog of eight-second images over twenty-five evenings.
+    db = Database(tmp_path / "t.db")
+    for i in range(40):
+        _baked(db, f"baked{i}", seed=i)
+    _timed(db, "timed", seconds=60)  # a minute a render, as this library records it
+    launched = []
+
+    queued = queue_base_renders(
+        db.list_generations(), lambda wf, p: launched.append(p[TARGET_KEY]) or "p",
+        budget_minutes=5,
+    )
+
+    assert queued == 5 and len(launched) == 5
+
+
+def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
+    # Nothing timed here at all: queue few. Too large a batch is thrown away by
+    # the next launch; too small a one only costs another absence.
+    db = Database(tmp_path / "t.db")
+    for i in range(40):
+        _baked(db, f"baked{i}", seed=i)
+
+    queued = queue_base_renders(db.list_generations(), lambda wf, p: "p",
+                                budget_minutes=5)
+
+    assert queued == 5 * 60 / UNTIMED_SECONDS
+
+
+def test_one_repair_always_goes_however_slow(tmp_path):
+    # A budget under the cost of a single render still moves the backlog by one,
+    # or a library of slow renders would never repair anything at all.
+    db = Database(tmp_path / "t.db")
+    _baked(db, "baked")
+    _timed(db, "timed", seconds=600)
+
+    assert queue_base_renders(db.list_generations(), lambda wf, p: "p",
+                              budget_minutes=1) == 1
+
+
+def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
+    db = Database(tmp_path / "t.db")
+    for i, seconds in enumerate((5, 6, 7, 8, 400)):  # one cold-start outlier
+        _timed(db, f"t{i}", seconds=seconds)
+
+    rows = db.list_generations()
+    assert typical_seconds(rows, "sdxl_t2i") == 7
+    assert typical_seconds(rows, "wan22_i2v") == UNTIMED_SECONDS
+
+
+# --- the batch a real close actually hands over -----------------------------
+
+def test_the_close_batch_reaches_the_queue(qtbot, tmp_path):
+    # The batch runs only from a closing window, where an exception is shown to
+    # nobody — so the wiring between the view and the queue is checked here
+    # rather than left to the one place it can fail in silence. It failed
+    # exactly that way: the launch adapter named ``gallery.BASE_RENDER_SOURCE``,
+    # which the package never exported, so every close raised before the session
+    # was saved. Three days of closes queued no repair at all and lost the open
+    # tabs, the gallery folder and the window's place, with nothing in the log.
+    db = Database(tmp_path / "t.db")
+    for i in range(3):
+        _baked(db, f"baked{i}", seed=i)
+    window = OrigeneratorWindow(ComfyUIClient(), db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(window)
+
+    assert window._gallery_view.queue_base_renders_for_absence() == 3
+
+    repairs = [r for r in db.list_generations() if r.get("source") == SOURCE]
+    assert {gallery.parse_params(r["params_json"])[TARGET_KEY] for r in repairs} == \
+        {"baked0", "baked1", "baked2"}
+
+
+def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
+                                                             monkeypatch):
+    # What a close is actually for is the session — the open tabs, the folder,
+    # the window's place on its monitor. An errand for the coming absence that
+    # raises must cost its own batch and nothing else.
+    def boom():
+        raise AttributeError("module 'origenerator.gallery' has no attribute 'X'")
+
+    db = Database(tmp_path / "t.db")
+    state_path = tmp_path / "ui.json"
+    window = OrigeneratorWindow(ComfyUIClient(), db, AppState(state_path))
+    qtbot.addWidget(window)
+    monkeypatch.setattr(window._gallery_view, "queue_base_renders_for_absence", boom)
+    window._gallery_view.select_generation("xyz")
+
+    window.close()
+
+    assert json.loads(state_path.read_text())["gallery_selection"] == "xyz"

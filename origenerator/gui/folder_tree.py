@@ -73,6 +73,12 @@ class FolderTree(QTreeWidget):
         self._star_on = icons.star_icon(filled=True)  # a starred leaf's filled star
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
+        # One indentation per level, no wider than the caret that sits in it. The
+        # tree is six levels deep by the time it reaches a settings folder and it
+        # lives in the window's narrowest column, so the platform default spends
+        # most of that column on empty margin: at Qt's 20px a leaf's label starts
+        # 120px in, leaving a thin strip for the label itself.
+        self.setIndentation(_ICON)
         self.setMouseTracking(True)  # so hover is tracked without a button held
         # Several folders at once: Shift takes a run, Ctrl a scattered set — the
         # gesture that composes a custom folder.
@@ -134,7 +140,9 @@ class FolderTree(QTreeWidget):
     def drawBranches(self, painter, rect, index):
         """Paint a shelf row's icon (Starred's star, Recents' clock) in its caret
         column, so its label aligns with the sibling folders' rather than sitting a
-        chevron-width off. Every other row keeps its normal disclosure control."""
+        chevron-width off. Every other row keeps its normal disclosure control —
+        and a folder's level chip is its row *icon*, drawn to the right of the
+        caret with the label, because the chip is part of the folder's name."""
         icon = index.data(BRANCH_ICON_ROLE)
         if isinstance(icon, QIcon):
             x = rect.left() + (rect.width() - _ICON) // 2

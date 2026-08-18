@@ -24,7 +24,8 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    TEXT_PRIMARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER, GREEN, RED,
+    TEXT_PRIMARY, TEXT_MUTED, BG_PRIMARY, BORDER_PANEL, BLUE, PINK, AMBER,
+    GREEN, RED,
 )
 
 _SIZE = 48  # drawn large, then scaled down on the button, so edges stay crisp
@@ -33,18 +34,22 @@ _SIZE = 48  # drawn large, then scaled down on the button, so edges stay crisp
 # the middle third of its canvas is a mark the eye can't find on the button: the
 # icon is already scaled down to fit, so the empty margin is scaled down with it.
 
-# Hierarchy level badges. A gallery folder below the media roots sits at one of
-# these levels; a small lettered chip names which, so a tree row or a browser
-# tile is self-describing without the reader counting indentation. The media
-# roots (Images/Videos) and the settings leaves carry none.
+# Hierarchy level badges. Every gallery folder above a settings leaf sits at one
+# of these levels, and a small chip names which, so a tree row or a browser tile
+# is self-describing without the reader counting indentation. The recipe levels
+# take a lettered chip in their own color; the two media roots take the play and
+# photo glyphs their own items wear, on a neutral chip — they are the shape of
+# the library rather than a step of a recipe, and the color says so.
 LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
+    "image": "Images", "video": "Videos",
 }
 _LEVEL_BADGES = {
     "workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER),
     "source_image": ("I", GREEN),
 }
+_MEDIA_LEVEL_CHIP = BORDER_PANEL  # Images / Videos: the library's shape, not a recipe's
 
 # The Recents shelf mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark chip,
@@ -342,20 +347,28 @@ def tab_close_icon(widget=None) -> QIcon:
 
 @lru_cache(maxsize=None)
 def level_badge_icon(level: str) -> QIcon:
-    """A filled, lettered chip marking a folder's recipe level (see LEVEL_LABELS).
+    """The chip marking a folder's place in the hierarchy (see LEVEL_LABELS).
 
-    Cached: the same three chips decorate many tree rows and tiles, so they're
+    A lettered chip in its own color for the recipe levels; for the two media
+    roots, the play / photo glyph their own items already wear, on a neutral
+    chip — same shape and size as the letters, so the roots read as part of the
+    same system, but plainly not a fifth step of a recipe.
+
+    Cached: the same few chips decorate many tree rows and tiles, so they're
     rendered once and shared rather than re-drawn per folder.
     """
-    letter, color = _LEVEL_BADGES[level]
     icon = QIcon()
+    glyph = {"video": _draw_play, "image": _draw_photo}.get(level)
+    if glyph is not None:
+        icon.addPixmap(_render_chip(_MEDIA_LEVEL_CHIP, glyph))
+        return icon
+    letter, color = _LEVEL_BADGES[level]
     icon.addPixmap(_render_badge(letter, color))
     return icon
 
 
-def _render_badge(letter: str, color) -> QPixmap:
-    """A rounded chip filled with ``color``, its ``letter`` centred in readable
-    contrast — dark on a light chip, light on a saturated one."""
+def _render_chip(color, draw) -> QPixmap:
+    """A rounded chip filled with ``color``, with ``draw`` painting its mark."""
     pixmap = QPixmap(_SIZE, _SIZE)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -363,14 +376,24 @@ def _render_badge(letter: str, color) -> QPixmap:
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(color)
     painter.drawRoundedRect(QRectF(3, 3, _SIZE - 6, _SIZE - 6), 12, 12)
-    font = painter.font()
-    font.setBold(True)
-    font.setPixelSize(30)
-    painter.setFont(font)
-    painter.setPen(_readable_on(color))
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, letter)
+    draw(painter)
     painter.end()
     return pixmap
+
+
+def _render_badge(letter: str, color) -> QPixmap:
+    """A chip with ``letter`` centered in readable contrast — dark on a light
+    chip, light on a saturated one."""
+    def draw(painter: QPainter):
+        font = painter.font()
+        font.setBold(True)
+        font.setPixelSize(30)
+        painter.setFont(font)
+        painter.setPen(_readable_on(color))
+        painter.drawText(QRectF(0, 0, _SIZE, _SIZE),
+                         Qt.AlignmentFlag.AlignCenter, letter)
+
+    return _render_chip(color, draw)
 
 
 def _readable_on(color):

@@ -35,15 +35,33 @@ from origenerator.gallery import (
 )
 
 
+def test_the_all_group_gathers_the_media_roots_and_walks_to_every_row():
+    from origenerator.gallery import ALL_KEY, all_group, child_groups, rows_under
+
+    leaf = SettingsGroup("s", "S", [{"prompt_id": "g1"}])
+    images = MediaGroup("image", "image", "Images", [
+        WorkflowGroup("w", "wf", "WF", [ModelGroup("m", "M", [LoraGroup("l", "L", [leaf])])])
+    ])
+    group = all_group([images])
+
+    assert group.key == ALL_KEY and group.label == "All"
+    assert child_groups(group) == [images]
+    assert rows_under(group) == [{"prompt_id": "g1"}]
+    assert folder_level(group) is None   # everything is not a level of anything
+
+
 def test_folder_level_names_the_recipe_levels_and_nothing_else():
     # The workflow -> model -> LoRA -> source-image folders each report their
-    # level; the media roots and the settings leaves report none (no badge).
+    # level, and a media root reports its own kind — they share a parent in the
+    # tree now, so each carries a badge saying which it is. A settings leaf is
+    # where the generations live and reports none.
     assert folder_level(WorkflowGroup("k", "wf", "WF", [])) == "workflow"
     assert folder_level(ModelGroup("k", "M", [])) == "model"
     assert folder_level(LoraGroup("k", "L", [])) == "lora"
     assert folder_level(SourceImageGroup("k", "I", [])) == "source_image"
     assert folder_level(SettingsGroup("k", "S", [])) is None
-    assert folder_level(MediaGroup("image", "image", "Images", [])) is None
+    assert folder_level(MediaGroup("image", "image", "Images", [])) == "image"
+    assert folder_level(MediaGroup("video", "video", "Videos", [])) == "video"
 
 
 def test_config_tab_title_leads_with_model_then_prompt():

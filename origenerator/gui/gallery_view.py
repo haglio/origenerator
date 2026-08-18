@@ -603,7 +603,8 @@ class GalleryView(QWidget):
         self._search_edit.set_scope(gallery.ALL_LABEL)
         self._search_edit.setToolTip(
             "Search every generation by what it is of — matching related words, "
-            "not just the ones you typed — or by model, LoRA or seed. The results "
+            "not just the ones you typed — or by model, LoRA, seed, or a name "
+            "you gave one of the folders holding it. The results "
             f"fill the middle pane; nothing is searched under {_SEARCH_MIN_CHARS} "
             "characters."
         )
@@ -1592,21 +1593,27 @@ class GalleryView(QWidget):
         tree_model = gallery.build_gallery_tree(rows, meta)
         unreviewed = self._review_queue(rows)
         held = self._held_rows = recovery.bin_items(self._bin_records())
+        self._live_ids = {row["prompt_id"] for row in rows}
+        self._custom_folders = gallery.build_custom_folders(
+            tree_model, self._db.list_custom_folders()
+        )
         # Re-index for the search box while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
         # already indexed keep their words and take the fresh row object, since a
         # poll rewrites every row dict without touching the text in it.
+        #
+        # A row also carries the names the user gave the folders it sits in, so a
+        # folder named to be remembered can be searched for by that name. Those
+        # come from the tree and the user's own groupings, which is why the
+        # indexing waits until both are built.
         #
         # The trash's held rows are indexed alongside the gallery's own, because
         # standing on the Trash shelf and searching it has to find something —
         # a deleted row is out of ``list_generations`` and lives only in the bin.
         # They are reachable only from that shelf: every other scope is a set of
         # ids drawn from the live tree (see :meth:`_search_scope`).
-        self._search.update(rows + held)
-        self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_folders = gallery.build_custom_folders(
-            tree_model, self._db.list_custom_folders()
-        )
+        self._search.update(rows + held, gallery.named_folders_by_row(
+            tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), rows)  # the Requests shelf
         self._browser.set_model(
             gallery.recent_generations(rows, self._recents_media_types()),

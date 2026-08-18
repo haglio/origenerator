@@ -23,6 +23,7 @@ from origenerator.gallery import (
     find_source_image_id,
     media_type_of_row,
     lora_label,
+    named_folders_by_row,
     lora_signature,
     model_label,
     model_signature,
@@ -829,15 +830,16 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
-    # A source-image folder wears the ID of the image folder it animates, so the
-    # two read as one folder from either tree and sibling source folders built
-    # from different images are tellable apart.
+    # A source-image folder names the frame it holds and then carries the code of
+    # the image folder that frame came from, so the two read as the same folder
+    # from either tree — and the prompt appears in neither name.
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows)
     images = [media for media in build_gallery_tree(rows) if media.media_type == "image"]
     (image_leaf,) = images[0].workflow_groups[0].model_groups[0].children[0].children
-    assert source.label == image_leaf.label
+    assert source.label == f"sdxl_t2i_face.png · {image_leaf.label}"
+    assert "smiling" not in source.label
 
 
 def test_i2v_settings_leaf_names_itself_by_video_prompt_not_the_frame():
@@ -1245,6 +1247,42 @@ def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
     assert settings[1].label == "Doggos"      # custom name applied in place
     assert settings[1].starred is True
     assert settings[0].starred is False
+
+
+def test_named_folders_credit_every_row_beneath_them():
+    # A name the user gave a folder belongs to everything inside it, at any
+    # depth — that is what makes the name a way of finding those generations.
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
+    tree = build_gallery_tree(rows)
+    workflow = tree[0].workflow_groups[0]
+    cat_leaf = workflow.model_groups[0].children[0].children[0]
+
+    named = named_folders_by_row(
+        tree, {workflow.key: {"custom_name": "Stills"},
+               cat_leaf.key: {"custom_name": "Keepers"}})
+
+    assert named["i1"] == ["Stills", "Keepers"]   # top-down, both of them
+    assert named["i2"] == ["Stills"]
+
+
+def test_a_folder_the_user_composed_names_what_it_gathers():
+    from origenerator.gallery import CustomGroup
+
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
+    tree = build_gallery_tree(rows)
+    cat_leaf = tree[0].workflow_groups[0].model_groups[0].children[0].children[0]
+
+    named = named_folders_by_row(
+        tree, {}, [CustomGroup("__custom__/1", "Beach trip", [cat_leaf])])
+
+    assert named == {"i1": ["Beach trip"]}
+
+
+def test_an_unnamed_tree_credits_nothing():
+    # Only names the user actually gave: a code is nobody's search term, and a
+    # model or LoRA name is already reachable through the row itself.
+    rows = [_img("i1", "a cat", 50, 1)]
+    assert named_folders_by_row(build_gallery_tree(rows), {}) == {}
 
 
 def test_starred_folders_collects_starred_across_every_level():

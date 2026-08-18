@@ -118,6 +118,7 @@ from origenerator.gallery.tree import (
     legacy_preframe_settings_folder_key,
     legacy_preversion_settings_folder_key,
     legacy_settings_folder_key,
+    named_folders_by_row,
     recent_generations,
     requested_generations,
     settings_folder_key,

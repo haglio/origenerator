@@ -3626,10 +3626,10 @@ class GalleryView(QWidget):
         The bridge calls this on the flag's edges; the memory is what makes
         the freeze cover a show the user opens mid-pause.
 
-        And to this window's own moving pictures: every video tile in the
-        browser loops a little WebP of itself, so a paused room with the
-        gallery in it was a wall of clips still playing — OmniPause means the
-        room stops, not the shows stop.
+        And to this window's own moving pictures — every video tile in the
+        browser loops a little WebP of itself, and the generate tabs play the
+        real thing — so a paused room with the gallery in it was a wall of
+        clips still going.  OmniPause means the room stops, not the shows stop.
         """
         self._session_paused = paused
         for side in ("portrait", "landscape"):
@@ -3637,6 +3637,7 @@ class GalleryView(QWidget):
             if show is not None and hasattr(show, "set_session_paused"):
                 show.set_session_paused(paused)
         self._browser.set_previews_paused(paused)
+        self._info_tabs.set_previews_paused(paused)
 
     def region_show(self, side: str):
         """The show occupying satellite region *side*, or None — a closed

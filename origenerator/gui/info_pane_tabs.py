@@ -380,6 +380,13 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel.show_completed_result(row, image_rows)
 
+    def set_previews_paused(self, paused: bool) -> None:
+        """Freeze (or resume) every tab's preview — the hosting session's
+        OmniPause, which stops the room rather than only its shows.  A tab
+        showing a still takes it inertly; one showing a video stops."""
+        for panel in self._config_panels():
+            panel.set_preview_paused(paused)
+
     def show_selection_preview(self, preview, prompt_id: str):
         """Point the current tab's preview at ``preview`` (a resolved
         ``(path, media_type)``, or ``None``) without touching its form or the tab

@@ -146,21 +146,22 @@ def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monke
 
 
 def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
-    """Every video tile loops a little clip of itself, so a paused room with
-    the gallery in it was a wall of clips still playing.  OmniPause stops the
-    room, not only its shows — and a rebuild during the pause draws tiles that
-    are already still."""
+    """Every video tile loops a little clip of itself and the generate tabs
+    play the real thing, so a paused room with the gallery in it was a wall of
+    clips still going.  OmniPause stops the room, not only its shows — and a
+    rebuild during the pause draws tiles that are already still."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    held = []
-    monkeypatch.setattr(view._browser, "set_previews_paused", held.append)
+    tiles, tabs = [], []
+    monkeypatch.setattr(view._browser, "set_previews_paused", tiles.append)
+    monkeypatch.setattr(view._info_tabs, "set_previews_paused", tabs.append)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    assert held == [True]
+    assert tiles == [True] and tabs == [True]
 
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
-    assert held == [True, False]
+    assert tiles == [True, False] and tabs == [True, False]
 
 
 def test_status_reports_which_regions_are_occupied(qtbot, tmp_path, monkeypatch):

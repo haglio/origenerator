@@ -156,6 +156,26 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   `gh pr create --fill`. Auto-merge arms itself; the queue rebases your PR onto
   `main`, runs the required check, and merges it when green. Don't ff-merge into
   the primary checkout, don't push `main` directly, and never force-push `main`.
+- **Never merge `main` into your branch. Rebase — and if that hurts, squash
+  first.** The queue's merge method is REBASE, so a branch carrying merge
+  commits is replayed as its *original* commits onto a `main` they were never
+  written against: the same conflicts, again, on every attempt, with
+  `github-merge-queue` evicting it each time "due to a conflict with the base
+  branch". A branch that has drifted far collapses to one commit before it goes
+  near the queue — `git reset --hard origin/main && git merge --squash <old-tip>`
+  keeps the tree byte-for-byte and leaves a rebase with nothing to do. That
+  costs a force-push, so do it before opening the PR, not after. The near miss
+  that still counts: reaching for `git merge origin/main` because it resolves
+  the conflicts *once* instead of once per commit — cheaper today, unlandable
+  forever, and it compounds every time `main` moves again (one branch merged
+  `main` three times and never landed).
+- **`gh pr view` saying `CLEAN` does not mean the queue can land it.**
+  `mergeStateStatus` answers whether a *merge* is clean; the queue rebases, and
+  those are different questions. Check the one that decides: `git rebase
+  origin/main` and see, or read the PR page, which says "This branch cannot be
+  rebased due to conflicts" in plain words. One session spent an hour
+  re-enqueueing a PR that `gh` called CLEAN and the bot evicted every time,
+  because it only ever asked `gh`.
 - **The branch is pruned for you when it merges** — this repo has GitHub's
   "automatically delete head branches" on. A branch you abandon without merging
   is still yours to remove: `git push origin --delete <branch>`.

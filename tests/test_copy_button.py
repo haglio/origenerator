@@ -32,3 +32,20 @@ def test_is_a_button_tagged_for_styling_and_lookup(qtbot):
     qtbot.addWidget(btn)
     assert isinstance(btn, QPushButton)
     assert btn.objectName() == "copyButton"
+
+
+def test_wears_the_familys_copy_mark(qtbot):
+    # Fun Time's log panel has a copy button too, and each app drew its own
+    # two-sheets glyph at its own proportions -- the same drift the microphone
+    # had. Both now come out of shared_ui, so the mark is one drawing.
+    from PyQt6.QtCore import QSize
+
+    from shared_ui.colors import TEXT_SECONDARY
+    from shared_ui.icons import CANVAS, glyph_pixmap
+
+    btn = CopyButton("x")
+    qtbot.addWidget(btn)
+    side = int(CANVAS)
+
+    drawn = btn.icon().pixmap(QSize(side, side)).toImage()
+    assert drawn == glyph_pixmap("copy", side, TEXT_SECONDARY).toImage()

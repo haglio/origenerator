@@ -6,14 +6,15 @@ time), so the same button serves a read-only label and an editable form field.
 """
 
 from PyQt6.QtWidgets import QApplication, QPushButton
-from PyQt6.QtCore import Qt, QSize, QRectF
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIcon
 
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import TEXT_SECONDARY
+from shared_ui.icons import CANVAS, glyph_pixmap
 
 
 class CopyButton(QPushButton):
@@ -38,40 +39,10 @@ class CopyButton(QPushButton):
 
 
 def _copy_icon() -> QIcon:
-    """The familiar two-overlapping-sheets copy glyph."""
-    icon = QIcon()
-    icon.addPixmap(_draw_copy_sheets(TEXT_SECONDARY), QIcon.Mode.Normal)
-    return icon
+    """The familiar two-overlapping-sheets copy glyph.
 
-
-def _draw_copy_sheets(color) -> QPixmap:
-    """Stroke the two sheets in ``color``. Both are outlines; a gap is cleared
-    around the front sheet so it reads as sitting in front of the back one where
-    they overlap."""
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    pen = QPen(color)
-    pen.setWidthF(6)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-
-    back = QRectF(24, 8, 28, 32)    # peeks out up and to the right
-    front = QRectF(12, 24, 28, 32)  # sits in front, down and to the left
-    radius = 6
-
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(back, radius, radius)
-
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(Qt.GlobalColor.black)
-    painter.drawRoundedRect(front.adjusted(-4, -4, 4, 4), radius + 3, radius + 3)
-
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(front, radius, radius)
-    painter.end()
-    return pixmap
+    The family's drawing, out of :mod:`shared_ui.icons` -- Fun Time's log-panel
+    copy button wears the same one.  Each app drew its own before, at its own
+    proportions, and the two apps sit on screen together.
+    """
+    return QIcon(glyph_pixmap("copy", int(CANVAS), TEXT_SECONDARY))

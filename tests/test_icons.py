@@ -230,3 +230,57 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
     assert not keep.pixmap(size).isNull()
     assert not reject.pixmap(size).isNull()
     assert keep.pixmap(size).toImage() != reject.pixmap(size).toImage()
+
+
+def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+
+    from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
+    from shared_ui.icons import glyph_pixmap
+
+    # The reason the glyphs left this module: a drawing kept here is a drawing
+    # that can drift from Fun Time's copy of it, and the two apps' microphones
+    # had already drifted into different shapes on one screen. So every button's
+    # mark has to BE the family glyph, pixel for pixel -- what this app still
+    # chooses is only which mark and in what color.
+    cases = (
+        (icons.back_icon(), "chevron_left", TEXT_PRIMARY),
+        (icons.forward_icon(), "chevron_right", TEXT_PRIMARY),
+        (icons.undo_icon(), "undo_arrow", TEXT_PRIMARY),
+        (icons.redo_icon(), "redo_arrow", TEXT_PRIMARY),
+        (icons.autoloop_icon(), "die", TEXT_PRIMARY),
+        (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
+        (icons.enhance_icon(), "plus", AMBER),
+        (icons.mic_icon(), "mic", TEXT_PRIMARY),
+        (icons.stroke_icon(), "wave", TEXT_PRIMARY),
+        (icons.audio_icon(), "speaker", TEXT_PRIMARY),
+        (icons.trash_icon(), "trash", TEXT_PRIMARY),
+        (icons.delete_icon(), "trash", RED),
+        (icons.star_icon(filled=True), "star", GREEN),
+        (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
+        (icons.clock_icon(), "clock", TEXT_PRIMARY),
+        (icons.flask_icon(), "flask", TEXT_PRIMARY),
+        (icons.custom_folder_icon(), "folder", TEXT_PRIMARY),
+    )
+    for icon, name, color in cases:
+        drawn = icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
+        assert drawn == glyph_pixmap(name, 48, color).toImage(), name
+
+
+def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QColor
+
+    from shared_ui.icons import glyph_pixmap
+
+    # The white line art on a thumbnail's hover buttons is the same family mark
+    # the toolbar wears, in the white these read in over a picture -- not a
+    # second set of drawings kept for the tiles.
+    white = QColor(255, 255, 255)
+    for icon, name in ((icons.experiment_verdict_icon("up"), "check"),
+                       (icons.experiment_verdict_icon("down"), "cross"),
+                       (icons.recovery_action_icon("restore"), "undo_arrow"),
+                       (icons.recovery_action_icon("purge"), "trash")):
+        drawn = icon.pixmap(QSize(48, 48)).toImage()
+        assert drawn == glyph_pixmap(name, 48, white).toImage(), name

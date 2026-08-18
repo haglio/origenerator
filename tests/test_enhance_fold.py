@@ -181,3 +181,158 @@ def test_each_version_carries_its_own_file_row(tmp_path):
         ("Original", "image/sdxl_t2i_src.png"),
     ]
     assert build_sections(row) == []
+
+
+# --- an enhancement the live app never recorded, arriving as a bare file -----
+
+def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
+                   checkpoint="example_xl_v1.safetensors",
+                   upscale_model="4xExample_v1.pt", detectors=()):
+    """The graph the enhance workflow embeds in every file it saves, as the
+    import scan reads it back."""
+    graph = {
+        "1": {"class_type": "CheckpointLoaderSimple",
+              "inputs": {"ckpt_name": checkpoint}},
+        "4": {"class_type": "UpscaleModelLoader",
+              "inputs": {"model_name": upscale_model}},
+        "5": {"class_type": "ImageUpscaleWithModel",
+              "inputs": {"upscale_model": ["4", 0], "image": ["2", 0]}},
+        "6": {"class_type": "ImageScaleBy",
+              "inputs": {"image": ["5", 0], "upscale_method": "lanczos",
+                         "scale_by": scale_by}},
+        "9": {"class_type": "KSampler",
+              "inputs": {"model": ["1", 0], "seed": 7, "steps": steps,
+                         "cfg": 7.5, "sampler_name": "euler",
+                         "scheduler": "normal", "denoise": denoise}},
+        "12": {"class_type": "SaveImage",
+               "inputs": {"images": ["11", 0],
+                          "filename_prefix": "image/image_enhance"}},
+    }
+    for offset, detector in enumerate(detectors):
+        base = 13 + offset * 3
+        graph[str(base)] = {"class_type": "UltralyticsDetectorProvider",
+                            "inputs": {"model_name": f"bbox/{detector}"}}
+        graph[str(base + 2)] = {"class_type": "DetailerForEach",
+                                "inputs": {"denoise": 0.45}}
+    return graph
+
+
+def _add_reconstructed_enhance(db, prompt_id, input_ref, filename, **graph_kwargs):
+    """What the import scan makes of an enhanced file it finds on disk with no
+    row claiming it: an image generation of its own, the workflow read off the
+    graph as the img2img pass it looks like, and the tail's numbers under the
+    generic sampler names."""
+    graph = _enhance_graph(**graph_kwargs)
+    sampler = graph["9"]["inputs"]
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="imported",
+        positive_prompt="a cat", seed=sampler["seed"],
+        params_json=json.dumps({
+            "positive_prompt": "a cat", "input_image": input_ref,
+            "checkpoint": graph["1"]["inputs"]["ckpt_name"],
+            "steps": sampler["steps"], "denoise": sampler["denoise"],
+            "cfg": sampler["cfg"], "sampler_name": "euler", "scheduler": "normal",
+            "seed": sampler["seed"],
+        }),
+        workflow_json=json.dumps(graph),
+        source="imported",
+    )
+    db.update_generation(
+        prompt_id, status="completed", thumbnail_path="imported_thumb.jpg",
+        output_files=json.dumps([{"filename": filename, "subfolder": "image",
+                                  "type": "output"}]))
+    return db.get_generation(prompt_id)
+
+
+def test_a_reconstructed_enhance_is_recognized_by_its_file(tmp_path):
+    # What names an enhancement is the file the enhance workflow wrote, not the
+    # workflow the import scan guessed from the graph — which for an enhance is
+    # an ordinary low-denoise img2img and reads as one.
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    stray = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
+                                       "image_enhance_00001_.png")
+    assert gallery.is_enhance_product_row(stray)
+    # An ordinary generation is not, whatever it was made from; nor is an image
+    # already folded into — there the enhancement is a level, not the row.
+    assert not gallery.is_enhance_product_row(db.get_generation("src"))
+    fold_enhancement(db, stray)
+    assert not gallery.is_enhance_product_row(db.get_generation("src"))
+
+
+def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
+    # A branch session's enhance folds in the worktree database, which adoption
+    # never carries home (a fold creates no row to adopt), so the enhanced file
+    # reaches the live install bare and the scan rebuilds it as a standalone
+    # image — pointing a start-frame tile at the very picture it is a version of.
+    db = Database(tmp_path / "t.db")
+    _add_source(db, starred=True)
+    _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
+                               "image_enhance_00001_.png")
+
+    assert fold_completed_enhancements(db) == 1
+
+    assert db.get_generation("i1") is None  # no separate image any more
+    upgraded = db.get_generation("src")
+    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
+        ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
+    assert upgraded["starred"] == 1
+    assert is_enhanced_row(upgraded)
+    assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
+        ["Enhance 1", "Original"]
+
+
+def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
+    # The row's own params name the sampler numbers generically and the upscale
+    # not at all, so the level reads its knobs off the graph that ran: the scale
+    # is what the 4x model's output was taken back down to, and the detail pass
+    # is there iff its detector nodes are.
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_reconstructed_enhance(
+        db, "i1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png",
+        scale_by=0.375, steps=24, denoise=0.25,
+        checkpoint="example_xl_v1.safetensors", upscale_model="4xExample_v1.pt",
+        detectors=("face_example.pt", "hand_example.pt"))
+    fold_completed_enhancements(db)
+
+    level = gallery.displayed_levels(db.get_generation("src"))[0]
+    assert level.params == {
+        "checkpoint": "example_xl_v1.safetensors",
+        "upscale_model": "4xExample_v1.pt",
+        "enhance_scale": 1.5, "enhance_steps": 24, "enhance_denoise": 0.25,
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
+        "enhance_face_detector": "face_example.pt",
+        "enhance_hand_detector": "hand_example.pt",
+    }
+
+
+def test_sweep_stacks_a_rebuilt_chain_oldest_first(tmp_path):
+    # An enhance made from an enhanced file resolves only once the file it ran
+    # on has been folded onto the image, so the sweep works forwards.
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
+                               "image_enhance_00001_.png")
+    _add_reconstructed_enhance(db, "i2", "image/image_enhance_00001_.png [output]",
+                               "image_enhance_00002_.png")
+
+    assert fold_completed_enhancements(db) == 2
+
+    upgraded = db.get_generation("src")
+    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
+        ["image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_src.png"]
+    assert [lvl.label for lvl in gallery.displayed_levels(upgraded)] == \
+        ["Enhance 2", "Enhance 1", "Original"]
+
+
+def test_sweep_leaves_an_ordinary_image_alone(tmp_path):
+    # A hand-run img2img in ComfyUI is a picture of its own however low its
+    # denoise: the enhance workflow did not write it, and nothing folds it away.
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    kept = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
+                                      "sdxl_refine_00001_.png")
+    assert not gallery.is_enhance_product_row(kept)
+    assert fold_completed_enhancements(db) == 0
+    assert db.get_generation("i1") is not None

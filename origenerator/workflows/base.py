@@ -24,7 +24,7 @@ SCHEDULER_OPTIONS = [
 # The native factor of the installed ESRGAN-family upscale models (both are 4x).
 # The enhance tail rescales the model's output DOWN from this to the requested
 # ``enhance_scale``, so the saved image lands at enhance_scale x the base render.
-_UPSCALE_MODEL_FACTOR = 4.0
+UPSCALE_MODEL_FACTOR = 4.0
 
 # The detail pass's fixed shape (see :meth:`WorkflowTemplate.detail_fix_nodes`).
 # All of these are the detector/detailer nodes' own defaults, kept here as named
@@ -255,7 +255,7 @@ class WorkflowTemplate(ABC):
         decoded image first runs through an ESRGAN-family upscale model — real
         edge reconstruction, so the enlargement is sharp rather than resampled —
         and is rescaled to ``enhance_scale`` x the base render (relative to the
-        model's own 4x output; see :data:`_UPSCALE_MODEL_FACTOR`). ``VAEEncode``
+        model's own 4x output; see :data:`UPSCALE_MODEL_FACTOR`). ``VAEEncode``
         then hands it to a second ``KSampler`` at ``enhance_denoise``: low
         enough to keep the composition, high enough that the checkpoint
         re-imagines fine texture — skin, hair, fabric — that no upscaler can
@@ -281,7 +281,7 @@ class WorkflowTemplate(ABC):
                 "inputs": {
                     "image": [upscale_id, 0],
                     "upscale_method": "lanczos",
-                    "scale_by": params["enhance_scale"] / _UPSCALE_MODEL_FACTOR,
+                    "scale_by": params["enhance_scale"] / UPSCALE_MODEL_FACTOR,
                 },
             },
             encode_id: {

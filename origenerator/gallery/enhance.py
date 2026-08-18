@@ -45,6 +45,7 @@ from origenerator.gallery.detail_parts import detector_for_part, detector_part_l
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -547,6 +548,127 @@ def fix_part_params(row: dict, part, settings: EnhanceSettings | None = None) ->
     return params
 
 
+def enhance_file_stem() -> str:
+    """The stem every file the enhance workflow saves is named with —
+    ``image_enhance`` for ``image/image_enhance_00042_.png``.
+
+    Read off the workflow's own ``filename_prefix`` rather than spelled out
+    here, so renaming the output can't leave the recognition below pointed at a
+    name nothing writes any more.
+    """
+    prefix = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params().get(
+        "filename_prefix", "")
+    return str(prefix).rsplit("/", 1)[-1]
+
+
+def is_enhance_product_row(row: dict) -> bool:
+    """Whether this row *is* an enhancement rather than an image carrying one.
+
+    An enhancement belongs inside the image it upgraded, so a row of its own is
+    always something to fold away — but the row does not always say
+    ``image_enhance``. A branch-session enhance folds in the worktree database,
+    which the live app never adopts (adoption carries rows the branch *created*,
+    and a fold creates none), so the enhanced file reaches the live install as a
+    bare file on disk and the import scan reconstructs it from the embedded
+    graph: a standalone image, workflow read as ``sdxl_t2i``, with a start-frame
+    tile pointing at the very picture it is a version of. That is the shape this
+    recognizes — what the enhance workflow wrote, however the row got here.
+
+    So the test is the file, not the workflow name: every output named with
+    :func:`enhance_file_stem`, and nothing already recording enhancements of its
+    own (``original_files`` / ``enhance_history``), which is what a source row
+    that has been folded into carries. A base-render repair is excluded outright
+    — it is the opposite errand, and folds by its own route.
+    """
+    if row.get("source") == BASE_RENDER_SOURCE:
+        return False
+    if original_files_of(row) or parse_file_list(row.get("enhance_history")):
+        return False
+    files = row_output_files(row)
+    if not files:
+        return False
+    stem = enhance_file_stem()
+    return all((f.get("filename") or "").startswith(f"{stem}_") for f in files)
+
+
+def _node_order(node_id) -> int:
+    """A graph node's id as a number, for reading the order the workflow built
+    its nodes in. Non-numeric ids (a hand-authored graph) sort last, together."""
+    try:
+        return int(node_id)
+    except (TypeError, ValueError):
+        return 1 << 30
+
+
+def _graph_level_params(row: dict) -> dict:
+    """The enhance knobs a row's stored ComfyUI graph gives up.
+
+    A row the import scan reconstructed keeps the tail's numbers under the
+    generic names any sampler has — ``steps`` and ``denoise`` — and says nothing
+    at all about the upscale, so folding it on its params alone would file the
+    level with a blank settings line and leave the Enhance panel unable to tell
+    it apart from a level it has not made yet. The graph that ran is exact about
+    all of it, and it is stored on the row: the upscale model by name, the scale
+    as the fraction of the model's own 4x output the result was taken back down
+    to, and the detail pass by whether its detector nodes are there at all.
+    """
+    try:
+        graph = json.loads(row.get("workflow_json") or "{}")
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(graph, dict):
+        return {}
+    found: dict = {}
+    detectors: list[tuple[int, str]] = []
+    for node_id, node in graph.items():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        node_type = node.get("class_type")
+        if node_type == "CheckpointLoaderSimple":
+            found["checkpoint"] = inputs.get("ckpt_name")
+        elif node_type == "UpscaleModelLoader":
+            found["upscale_model"] = inputs.get("model_name")
+        elif node_type == "ImageScaleBy":
+            scale = inputs.get("scale_by")
+            if isinstance(scale, (int, float)):
+                found["enhance_scale"] = scale * UPSCALE_MODEL_FACTOR
+        elif node_type == "KSampler":
+            found["enhance_steps"] = inputs.get("steps")
+            found["enhance_denoise"] = inputs.get("denoise")
+        elif node_type == "DetailerForEach":
+            found["enhance_detail_denoise"] = inputs.get("denoise")
+        elif node_type == "UltralyticsDetectorProvider":
+            name = inputs.get("model_name")
+            if isinstance(name, str):
+                # Sorted by node id below: the workflow lays the face half out
+                # before the hand half, so the ids say which is which where the
+                # graph's own key order only happens to.
+                detectors.append((_node_order(node_id), name.rsplit("/", 1)[-1]))
+    if detectors:
+        named = [name for _, name in sorted(detectors)]
+        found["enhance_detail_fix"] = True
+        found["enhance_face_detector"] = named[0]
+        found["enhance_hand_detector"] = named[1] if len(named) > 1 else ""
+    return {k: v for k, v in found.items() if v is not None and k in ENHANCE_LEVEL_KEYS}
+
+
+def enhance_level_params(row: dict) -> dict:
+    """The knobs one enhancement ran at, as the keys a level records.
+
+    The row's own params first — a standalone ``image_enhance`` row names every
+    one of them — then the stored graph for whatever they leave out, which is
+    everything but the sampler numbers on a row the import scan reconstructed.
+    """
+    params = parse_params(row.get("params_json"))
+    level = {k: params[k] for k in ENHANCE_LEVEL_KEYS if k in params}
+    for key, value in _graph_level_params(row).items():
+        level.setdefault(key, value)
+    return level
+
+
 def _history_entries(files: list[dict], params: dict) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
     name and the knobs that made it, so a level can name its own settings even
@@ -558,7 +680,8 @@ def _history_entries(files: list[dict], params: dict) -> list[dict]:
     ]
 
 
-def fold_enhancement(db, enhance_row: dict) -> str | None:
+def fold_enhancement(db, enhance_row: dict,
+                     image_rows: list[dict] | None = None) -> str | None:
     """Fold a finished standalone enhance into the image it enhanced.
 
     The source row becomes the enhanced image in place: the enhanced file
@@ -577,25 +700,31 @@ def fold_enhancement(db, enhance_row: dict) -> str | None:
     Returns the upgraded source's prompt_id, or ``None`` (and folds nothing)
     when the enhance produced no file or its source image is no longer in the
     database — such a row is left alone rather than half-migrated.
+
+    ``image_rows`` is the pool the start frame is matched against, for a caller
+    that already holds one: the startup sweep folds a whole backlog at once, and
+    re-reading every generation (graphs included) per fold is the difference
+    between a launch and a wait.
     """
     enhanced_files = row_output_files(enhance_row)
     if not enhanced_files:
         return None
-    enhance_params = parse_params(enhance_row.get("params_json"))
-    input_image = enhance_params.get("input_image")
-    image_rows = [
-        r for r in db.list_generations()
+    input_image = parse_params(enhance_row.get("params_json")).get("input_image")
+    if image_rows is None:
+        image_rows = db.list_generations()
+    candidates = [
+        r for r in image_rows
         if r.get("prompt_id") != enhance_row.get("prompt_id")
         and media_type_of_row(r) == "image"
     ]
-    source_id = source_image_id_for(input_image, image_rows)
+    source_id = source_image_id_for(input_image, candidates)
     if source_id is None:
         return None
     source = db.get_generation(source_id)
     updates = {
         "output_files": json.dumps(enhanced_files + row_output_files(source)),
         "enhance_history": json.dumps(
-            _history_entries(enhanced_files, enhance_params)
+            _history_entries(enhanced_files, enhance_level_params(enhance_row))
             + parse_file_list(source.get("enhance_history"))
         ),
     }
@@ -611,23 +740,44 @@ def fold_enhancement(db, enhance_row: dict) -> str | None:
 
 
 def fold_completed_enhancements(db) -> int:
-    """Fold every completed ``image_enhance`` row into its source image.
+    """Fold every finished enhancement standing as a row of its own into the
+    image it upgraded.
 
     The startup half of the fold: completions that landed while the app was
-    closed (reconciled from /history), and rows from before enhancement folded
-    at all — the retroactive fix that turns old "Image Enhance generations"
-    into upgrades of the images they enhanced. In-flight rows are left for
-    their live completion; sourceless rows (the enhanced image was deleted)
-    are left as they are. Returns how many rows were folded.
+    closed (reconciled from /history), rows from before enhancement folded at
+    all — the retroactive fix that turns old "Image Enhance generations" into
+    upgrades of the images they enhanced — and the ones the import scan
+    reconstructed from bare files, which is how a branch session's enhance
+    arrives (:func:`is_enhance_product_row`). In-flight rows are left for their
+    live completion; sourceless rows (the enhanced image was deleted) are left
+    as they are. Returns how many rows were folded.
+
+    Oldest first, so a stack of enhancements lands in the order it was made and
+    an enhance *of* an enhance finds its input already folded onto the image it
+    belongs to. The pool each fold matches against is read once and kept current
+    as folds land, because reading it per row would mean pulling every stored
+    graph in the library through memory for each one.
     """
+    rows = sorted(db.list_generations(), key=lambda r: r.get("id") or 0)
+    pool = [r for r in rows if media_type_of_row(r) == "image"]
     folded = 0
-    for row in db.list_generations():
-        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW:
-            continue
+    for row in rows:
         if row.get("status") != "completed":
             continue
-        if fold_enhancement(db, row) is not None:
-            folded += 1
+        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW                 and not is_enhance_product_row(row):
+            continue
+        source_id = fold_enhancement(db, row, image_rows=pool)
+        if source_id is None:
+            continue
+        folded += 1
+        # The pool's own copies go stale the moment a fold rewrites the source:
+        # refresh the one that changed (so the file it just gained can be found
+        # by an enhance made from it) and drop the row that no longer exists.
+        upgraded = db.get_generation(source_id)
+        pool = [r for r in pool if r.get("prompt_id") != row.get("prompt_id")]
+        for candidate in pool:
+            if candidate.get("prompt_id") == source_id and upgraded is not None:
+                candidate.update(upgraded)
     if folded:
         logger.info("Folded %d enhancements into their source images", folded)
     return folded

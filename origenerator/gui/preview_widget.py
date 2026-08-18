@@ -301,6 +301,30 @@ class PreviewWidget(QWidget):
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
+    def set_audio_muted(self, muted: bool) -> None:
+        """Silence (or voice) this pane's playback outright."""
+        self._audio.setMuted(muted)
+
+    def audio_muted(self) -> bool:
+        return self._audio.isMuted()
+
+    def set_playback_paused(self, paused: bool) -> None:
+        """Freeze or resume a playing video (a hosted session's OmniPause).
+
+        A no-op on anything but a video: images hold still by nature, and their
+        advance is the owning view's dwell timer, not this pane's.
+        """
+        if not self.is_showing_video():
+            return
+        if paused:
+            self._player.pause()
+        else:
+            self._player.play()
+
+    def current_media_path(self) -> str:
+        """The file on screen, or "" while showing a placeholder or live frame."""
+        return str(self._media[0]) if self._media is not None else ""
+
     def set_draggable_id(self, prompt_id: str | None) -> None:
         """Arm (or disarm) dragging the shown media out as a generation.
 

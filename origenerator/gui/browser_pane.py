@@ -41,6 +41,9 @@ from origenerator.gui.gallery_tree import (
     STARRED_KEY, STARRED_LABEL,
     TRASH_KEY, TRASH_LABEL,
 )
+from origenerator.gui.shelf_orientation import (
+    ORIENTATION_LABELS, filter_rows, split_key,
+)
 from origenerator.recovery import RETENTION_DAYS
 
 logger = logging.getLogger(__name__)
@@ -148,12 +151,16 @@ class BrowserPane:
         self._recents_flow = None           # the open shelf's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
         self._starred_groups: list = []     # folders the Starred shelf collects
-        self._starred_rows: list[dict] = [] # starred items the Starred shelf collects
+        self._starred_rows: list[dict] = [] # starred items the Favorites shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
         self._request_items: list[dict] = []  # spoken requests + what they made
+        # Which shape the open shelf view is narrowed to ("portrait" /
+        # "landscape"), or None on a parent shelf and off the shelves — set by
+        # each show_*_overview, read by the renderers and shelf_rows.
+        self._shelf_orientation: str | None = None
 
     def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
                   trash_rows, request_items=()):
@@ -416,20 +423,32 @@ class BrowserPane:
 
     # --- the Recents shelf: in-flight work, then recently finished items ----
 
-    def show_recents_overview(self):
+    def show_recents_overview(self, orientation: str | None = None):
         """Render the Recents shelf: a card for every in-flight generation (queued
         or running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight card reveals where its job runs; a
         finished one previews in the info pane, right here on the shelf, the way a
         thumbnail does inside a folder — and double-clicking it jumps to its own
         folder. Opens with the info pane cleared, so it shows nothing until an
-        item is picked."""
-        self._v._title.set_display(RECENTS_LABEL)
+        item is picked.
+
+        With an *orientation*, this is the shelf's Portrait or Landscape
+        subfolder: the same listing narrowed to that shape (in-flight cards
+        sit only on the parent — a job has no shape until it lands)."""
+        self._shelf_orientation = orientation
+        self._v._title.set_display(self._oriented_title(RECENTS_LABEL, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_recents()
         self._v._sync_action_buttons()
-        self._v._record_location(RECENTS_KEY)  # so Back can return to the shelf
+        # So Back can return to the shelf — the subfolder itself, when on one.
+        self._v._record_location(self._v._tree_view.selected_folder_key() or RECENTS_KEY)
+
+    @staticmethod
+    def _oriented_title(label: str, orientation: str | None) -> str:
+        if orientation is None:
+            return label
+        return f"{label} · {ORIENTATION_LABELS[orientation]}"
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
@@ -445,7 +464,7 @@ class BrowserPane:
         drawn = self._recents_drawn
         offset = self._scroll_bar().value() if self._recents_flow is not None else 0
         container, flow = self._new_tile_pane()  # which clears both of those
-        items = self._visible_inflight_items()
+        items = [] if self._shelf_orientation else self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
@@ -456,7 +475,7 @@ class BrowserPane:
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        if not (items or self._recent_rows):
+        if not (items or self._filtered_recent_rows()):
             self.show_widget(self._empty_state(self._recents_empty_hint()))
             return
         self._recents_flow = flow
@@ -464,10 +483,16 @@ class BrowserPane:
         self.show_widget(container)
         self._restore_scroll(offset)  # a no-op at 0: a shelf opened fresh starts on top
 
+    def _filtered_recent_rows(self) -> list[dict]:
+        """The listing the open Recents view draws: the whole shelf, or the one
+        shape its Portrait/Landscape subfolder keeps."""
+        return filter_rows(self._recent_rows, self._shelf_orientation)
+
     def _draw_recents_page(self, count: int):
         """Add up to ``count`` more finished items to the open shelf, picking up
         where the last page left off. Short (or empty) at the end of the list."""
-        page = self._recent_rows[self._recents_drawn:self._recents_drawn + count]
+        rows = self._filtered_recent_rows()
+        page = rows[self._recents_drawn:self._recents_drawn + count]
         for row in page:
             self._add_shelf_thumbnail(self._recents_flow, row)
         self._recents_drawn += len(page)
@@ -483,7 +508,8 @@ class BrowserPane:
         of zero is that not-yet-laid-out pane rather than a shelf scrolled to its
         bottom, so it waits rather than drawing pages nobody has scrolled to.
         """
-        if self._recents_flow is None or self._recents_drawn >= len(self._recent_rows):
+        if (self._recents_flow is None
+                or self._recents_drawn >= len(self._filtered_recent_rows())):
             return
         bar = self._scroll_bar()
         if bar.maximum() and bar.value() >= bar.maximum() - _RECENTS_REACH:
@@ -555,8 +581,8 @@ class BrowserPane:
                 "gallery re-roll — collect here, newest first.")
 
     def showing_recents(self) -> bool:
-        return (self._v._recents_item is not None
-                and self._v._tree.currentItem() is self._v._recents_item)
+        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        return base == RECENTS_KEY
 
     def refresh_inflight(self):
         """Between rebuilds, keep the in-flight cards live: push each tracked
@@ -682,19 +708,21 @@ class BrowserPane:
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
-    def show_experiments_overview(self):
+    def show_experiments_overview(self, orientation: str | None = None):
         """Render the Experiments shelf: what the background experimenter has come
         up with since the user last looked, newest first, each tile wearing
         keep/reject hover controls. A kept item just leaves the queue — it has been
         in its own folder since it ran; a rejected one is trashed and teaches the
         policy what to avoid. Clicking previews the item right here and
         double-clicking opens its folder, like the other shelves."""
-        self._v._title.set_display(EXPERIMENTS_LABEL)
+        self._shelf_orientation = orientation
+        self._v._title.set_display(self._oriented_title(EXPERIMENTS_LABEL, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_experiments()
         self._v._sync_action_buttons()
-        self._v._record_location(EXPERIMENTS_KEY)  # so Back can return to the shelf
+        self._v._record_location(
+            self._v._tree_view.selected_folder_key() or EXPERIMENTS_KEY)
 
     def _render_experiments(self):
         container, flow = self._new_tile_pane()
@@ -704,15 +732,16 @@ class BrowserPane:
             ("reject", icons.experiment_verdict_icon("down"),
              "Reject — trash it and steer future experiments away"),
         ]
-        for row in self._experiment_rows:
+        rows = filter_rows(self._experiment_rows, self._shelf_orientation)
+        for row in rows:
             tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
             tw.corner_action_triggered.connect(self._v._on_experiment_verdict)
-        self.show_widget(container if self._experiment_rows
+        self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
 
     def showing_experiments(self) -> bool:
-        return (self._v._experiments_item is not None
-                and self._v._tree.currentItem() is self._v._experiments_item)
+        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        return base == EXPERIMENTS_KEY
 
     def _experiments_empty_hint(self) -> str:
         if is_branch_session():
@@ -786,6 +815,7 @@ class BrowserPane:
         returns to its own folder, files and all; a purged one is gone for good,
         which is what the whole shelf exists to make deliberate rather than
         automatic."""
+        self._shelf_orientation = None
         self._v._title.set_display(TRASH_LABEL)
         self._v._avg_label.setText(self._trash_note())
         self._v._clear_metadata()
@@ -895,18 +925,32 @@ class BrowserPane:
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
-    def show_starred_overview(self):
+    def show_starred_overview(self, orientation: str | None = None):
         """Render the Starred shelf: the individual starred images and videos as
         thumbnails, then one tile per bookmarked folder (each captioned with its
         breadcrumb so identically-named folders stay tellable apart). A starred
         item previews here on click and opens its own folder on double-click; a
         folder tile lists its sub-folders."""
-        self._v._title.set_display(_STARRED_TITLE)
+        self._shelf_orientation = orientation
+        self._v._title.set_display(self._oriented_title(_STARRED_TITLE, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
-        self._show_starred(self._starred_groups, self._starred_rows)
+        if orientation is None:
+            self._show_starred(self._starred_groups, self._starred_rows)
+        else:
+            # The subfolder plays the shelf's whole collection (folder tiles
+            # stand for their folders' items), one shape of it — so it LISTS
+            # exactly that: the combined items, filtered, as thumbnails.
+            self._show_starred((), filter_rows(self._combined_starred_rows(),
+                                               orientation))
         self._v._sync_action_buttons()
-        self._v._record_location(STARRED_KEY)  # so Back can return to the shelf
+        self._v._record_location(
+            self._v._tree_view.selected_folder_key() or STARRED_KEY)
+
+    def _combined_starred_rows(self) -> list[dict]:
+        return _unique_rows(self._starred_rows + [
+            row for group in self._starred_groups for row in gallery.rows_under(group)
+        ])
 
     def _show_starred(self, groups, rows):
         container, flow = self._new_tile_pane()
@@ -923,8 +967,8 @@ class BrowserPane:
         ))
 
     def showing_starred(self) -> bool:
-        return (self._v._starred_item is not None
-                and self._v._tree.currentItem() is self._v._starred_item)
+        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        return base == STARRED_KEY
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
@@ -975,16 +1019,37 @@ class BrowserPane:
         what those are.
         """
         if self.showing_recents():
-            return list(self._recent_rows)
+            return self._filtered_recent_rows()
         if self.showing_starred():
-            return _unique_rows(self._starred_rows + [
-                row for group in self._starred_groups for row in gallery.rows_under(group)
-            ])
+            return filter_rows(self._combined_starred_rows(), self._shelf_orientation)
         if self.showing_experiments():
-            return list(self._experiment_rows)
+            return filter_rows(self._experiment_rows, self._shelf_orientation)
         if self.showing_requests():
             return [item["row"] for item in self._request_items]
         if self.showing_trash():
+            return list(self._trash_rows)
+        return None
+
+    def rows_for_shelf(self, key: str | None) -> list[dict] | None:
+        """What the shelf *key* collects right now — :meth:`shelf_rows` for a
+        shelf that is not the one on screen.
+
+        Named rather than "what is showing" because a hosted show outlives the
+        selection that opened it: inside Fun Time the shows run on the satellite
+        regions while the browser goes on being used elsewhere, so keeping a
+        running show fed — and answering a spoken "landscape favorites" — both
+        need a shelf's collection asked for by name.
+        """
+        base, orientation = split_key(key)
+        if base == RECENTS_KEY:
+            return filter_rows(self._recent_rows, orientation)
+        if base == STARRED_KEY:
+            return filter_rows(self._combined_starred_rows(), orientation)
+        if base == EXPERIMENTS_KEY:
+            return filter_rows(self._experiment_rows, orientation)
+        if base == REQUESTS_KEY:
+            return [item["row"] for item in self._request_items]
+        if base == TRASH_KEY:
             return list(self._trash_rows)
         return None
 

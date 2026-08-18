@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt
 from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE
+from origenerator.gui.shelf_orientation import ORIENTATION_LABELS, ORIENTATIONS, oriented_key
 from origenerator.recovery import RETENTION_DAYS
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
@@ -33,13 +34,21 @@ GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represent
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
 RECENTS_LABEL = "Recents"     # its row label; a clock is drawn in the caret column
 STARRED_KEY = "__starred__"   # synthetic tree node collecting every starred folder
-STARRED_LABEL = "Starred"     # its row label; the star is drawn in the caret column
+# Its row label: the same concept as a Fun Time player's favorites (the star
+# there IS the favorite mark), so it wears that name.  The key stays
+# "__starred__" so saved expansions and history survive the rename.
+STARRED_LABEL = "Favorites"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"    # its row label; a flask is drawn in the caret column
 REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queued
 REQUESTS_LABEL = "Requests"    # its row label; a mic is drawn in the caret column
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
+
+# The shelves that collect media of every shape at once — each breaks down into
+# a Portrait and a Landscape subfolder, so what a subfolder plays is one shape
+# and lands on one region (see origenerator.gui.shelf_orientation).
+ORIENTED_SHELF_KEYS = (RECENTS_KEY, STARRED_KEY, EXPERIMENTS_KEY)
 
 
 def _row_tip(group) -> str:
@@ -58,7 +67,7 @@ class GalleryTree:
         self.item_by_key: dict[str, QTreeWidgetItem] = {}  # folder key -> its tree row
         self.leaf_by_id: dict[str, QTreeWidgetItem] = {}   # prompt_id -> its settings row
         self.recents_item: QTreeWidgetItem | None = None   # the "Recents" shelf row
-        self.starred_item: QTreeWidgetItem | None = None   # the "★ Starred" shelf row
+        self.starred_item: QTreeWidgetItem | None = None   # the "★ Favorites" shelf row
         self.experiments_item: QTreeWidgetItem | None = None  # the "Experiments" shelf row
         self.requests_item: QTreeWidgetItem | None = None  # the "Requests" shelf row
         self.trash_item: QTreeWidgetItem | None = None     # the "Trash" shelf row
@@ -71,7 +80,7 @@ class GalleryTree:
                  folder_meta=None):
         """Rebuild the tree from ``tree_model``, restoring the folders in
         ``expanded_keys``. ``show_recents`` keeps the Recents shelf up even with no
-        folders yet (in-flight work to show); Starred appears only once folders do.
+        folders yet (in-flight work to show); Favorites appears only once folders do.
         ``experiment_count`` (unreviewed background experiments),
         ``request_count`` (items spoken requests have queued) and
         ``trash_count`` (deleted items still recoverable) show in their shelves'
@@ -94,30 +103,35 @@ class GalleryTree:
         # Synthetic shelves lead the tree: Recents (in-flight work plus recently
         # finished items) whenever there is anything to show — so a first-ever
         # generation is visible while it runs, before any folder exists — then
-        # Starred (bookmarked folders) once folders do, then Experiments,
-        # Requests and Trash, all three always present: the first hosts the
-        # background experimenter's switch and review queue, the second is where
-        # everything you asked for out loud lands, and the third is where every
-        # delete goes — and a bin you can only find once you have something to
-        # recover is no use. Each is reachable in one click however the tree is
-        # scrolled, and draws its marker in the caret column so its label lines
-        # up with the media folders below.
+        # Favorites (starred folders and items) once folders do, then
+        # Experiments, Requests and Trash, all three always present: the first
+        # hosts the background experimenter's switch and review queue, the
+        # second is where everything you asked for out loud lands, and the
+        # third is where every delete goes — and a bin you can only find once
+        # you have something to recover is no use. Each is reachable in one
+        # click however the tree is scrolled, and draws its marker in the caret
+        # column so its label lines up with the media folders below.  The
+        # collecting shelves mix every shape, so each carries a Portrait and a
+        # Landscape subfolder — the same listing, one shape, one region.
         if show_recents:
             self.recents_item = self._add_shelf(
                 root, RECENTS_LABEL, RECENTS_KEY, icons.clock_icon(), "Recently generated"
             )
+            self._add_orientation_children(self.recents_item, RECENTS_KEY)
         if tree_model:
             self.starred_item = self._add_shelf(
                 root, STARRED_LABEL, STARRED_KEY, icons.star_icon(filled=True),
-                "Your starred folders — drop a folder here to star it"
+                "Your favorite folders and items — drop a folder here to add it"
             )
-            # Starring is what Starred does with a dropped folder, so it collects.
+            # Favoriting is what the shelf does with a dropped folder, so it collects.
             self.starred_item.setData(0, DROP_KEY_ROLE, STARRED_KEY)
+            self._add_orientation_children(self.starred_item, STARRED_KEY)
         label = EXPERIMENTS_LABEL + (f" ({experiment_count})" if experiment_count else "")
         self.experiments_item = self._add_shelf(
             root, label, EXPERIMENTS_KEY, icons.flask_icon(),
             "Background experiments awaiting your review"
         )
+        self._add_orientation_children(self.experiments_item, EXPERIMENTS_KEY)
         label = REQUESTS_LABEL + (f" ({request_count})" if request_count else "")
         self.requests_item = self._add_shelf(
             root, label, REQUESTS_KEY, icons.mic_icon(),
@@ -158,7 +172,7 @@ class GalleryTree:
             item.setExpanded(True)
 
     def _add_shelf(self, root, label, key, icon, tooltip) -> QTreeWidgetItem:
-        """Add a synthetic shelf row (Recents/Starred) leading the tree, its marker
+        """Add a synthetic shelf row (Recents/Favorites) leading the tree, its marker
         drawn in the caret column so its label aligns with the media folders below."""
         item = QTreeWidgetItem([label])
         item.setData(0, BRANCH_ICON_ROLE, icon)  # marker in the caret column
@@ -166,6 +180,22 @@ class GalleryTree:
         root.addChild(item)
         self.item_by_key[key] = item
         return item
+
+    def _add_orientation_children(self, shelf_item, base_key: str) -> None:
+        """The shelf's Portrait / Landscape subfolders: the same listing, one
+        shape each, so what a subfolder plays lands on one region.
+
+        Expanded outright: a shelf row draws its marker IN the caret column,
+        so there is no expander to click — children left collapsed simply do
+        not exist on screen, which read as the subfolders not existing at all.
+        """
+        for orientation in ORIENTATIONS:
+            child = QTreeWidgetItem([ORIENTATION_LABELS[orientation]])
+            child.setToolTip(
+                0, f"Only the {orientation}-shaped items of this shelf")
+            shelf_item.addChild(child)
+            self.item_by_key[oriented_key(base_key, orientation)] = child
+        shelf_item.setExpanded(True)
 
     def _add_custom_folder(self, root, group) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a shelf-shaped row carrying
@@ -254,6 +284,11 @@ class GalleryTree:
             return REQUESTS_KEY  # so a rebuild keeps the shelf selected
         if item is self.trash_item:
             return TRASH_KEY  # so a rebuild keeps the shelf selected
+        for base in ORIENTED_SHELF_KEYS:
+            for orientation in ORIENTATIONS:
+                key = oriented_key(base, orientation)
+                if self.item_by_key.get(key) is item:
+                    return key  # a shelf's Portrait/Landscape subfolder
         group = item.data(0, GROUP_ROLE)
         return group.key if group else None
 

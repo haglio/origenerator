@@ -28,6 +28,7 @@ from origenerator.gui.request_worker import RevisionWorker
 from origenerator.prompt_edit import apply_request
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
 from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
+from origenerator.voice.commands import SurfaceCommand
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -322,7 +323,7 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     top = _top_level(view._tree)
     # The shelves, then one All row over the media roots — somewhere to stand
     # that means the whole library, which is what scopes a search to everything.
-    assert set(top) == {"Recents", "Starred", "Experiments", "Requests",
+    assert set(top) == {"Recents", "Favorites", "Experiments", "Requests",
                         "Trash", "All"}
     assert set(_media_roots(view._tree)) == {"Images", "Videos"}
 
@@ -626,7 +627,7 @@ def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["i2"]     # the starred one alone
-    assert "Starred" in view._title.display_text()
+    assert "Favorites" in view._title.display_text()
 
 
 def test_the_trash_shelf_searches_what_it_is_holding(qtbot):
@@ -1284,9 +1285,9 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
 
     # The Starred shelf sits just below Recents, above the media folders.
     assert view._tree.topLevelItem(0).text(0) == "Recents"
-    assert view._tree.topLevelItem(1).text(0) == "Starred"
+    assert view._tree.topLevelItem(1).text(0) == "Favorites"
     # Selecting it lists a tile for each starred folder, wherever it lives.
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_folder_keys() == [dog_key]
     assert view.visible_prompt_ids() == []
@@ -1297,11 +1298,11 @@ def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     # No "★ " text prefix: the star is drawn in the caret column instead, so the
     # "Starred" label lines up with "Images"/"Videos" rather than sitting a
     # chevron-width to the right of them.
-    assert shelf.text(0) == "Starred"
+    assert shelf.text(0) == "Favorites"
     assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
 
 
@@ -1874,7 +1875,7 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     view._drill_into(view.visible_folder_keys()[0])  # click the starred tile
     assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
@@ -1885,7 +1886,7 @@ def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_folder_keys() == []   # no tiles, just the hint
     assert view.visible_prompt_ids() == []
@@ -1899,7 +1900,7 @@ def test_starred_shelf_collects_starred_items_as_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i2"]  # the starred item, on the shelf
     assert view._thumb_widgets["i2"].is_starred() is True
@@ -1917,7 +1918,7 @@ def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)  # and a starred folder
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i1"]      # the item
     assert view.visible_folder_keys() == [dog_key]  # the folder
@@ -1931,7 +1932,7 @@ def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _top_level(view._tree)["Starred"]
+    shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i1"]
     # Right-click the shelf tile → Unstar (the menu's first entry).
@@ -1948,11 +1949,11 @@ def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
 
     view.refresh()  # a poll-driven rebuild must not knock us off the shelf
 
-    assert view._tree.currentItem().text(0) == "Starred"
+    assert view._tree.currentItem().text(0) == "Favorites"
 
 
 def test_starred_shelf_is_absent_until_a_folder_exists(qtbot):
@@ -2372,7 +2373,7 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments",
+    assert set(_top_level(view._tree)) == {"Recents", "Favorites", "Experiments",
                                            "Requests", "Trash", "All"}
     assert set(_media_roots(view._tree)) == {"Images"}
 
@@ -2775,11 +2776,14 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
+    # The tree's own collapse toggle leads the bank, and is Fun Time mode's
+    # alone — standalone that group is empty and takes no room.
     groups = [buttons for _gap, buttons in view._toolbar_groups]
-    assert groups[0] == (view._back_btn, view._forward_btn)
-    assert groups[1] == (view._undo_btn, view._redo_btn)
-    assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
-    assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
+    assert groups[0] == ()
+    assert groups[1] == (view._back_btn, view._forward_btn)
+    assert groups[2] == (view._undo_btn, view._redo_btn)
+    assert groups[4] == (view._star_btn, view._enhance_btn, view._delete_btn)
+    assert view._osr2_btn in groups[5] and view._auto_btn in groups[5]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -2793,10 +2797,10 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     _select_first_leaf(view)
 
     gaps = {id(gap): gap for gap, _ in view._toolbar_groups}
-    leading, group_gap = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
+    leading, group_gap = view._toolbar_groups[1][0], view._toolbar_groups[3][0]
     assert not leading.isVisible()          # nothing to separate from, at the front
     assert view._group_btn.isHidden() and not group_gap.isVisible()
-    assert view._toolbar_groups[3][0].isVisible()  # the trio is always there
+    assert view._toolbar_groups[4][0].isVisible()  # the trio is always there
     assert len(gaps) == len(view._toolbar_groups)
 
 
@@ -3033,7 +3037,7 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     dog_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0).child(1))
     view._toggle_star(dog_key)
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
     view._drill_into(view.visible_folder_keys()[0])      # into the dog folder
     view._thumbnail_clicked("i2")                        # view an item there
     assert view._tree.currentItem() is not view._starred_item
@@ -4916,7 +4920,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert "Recents" in view._slideshow_btn.toolTip()
     view._tree.setCurrentItem(view._starred_item)
     assert not view._slideshow_btn.isHidden()
-    assert "Starred" in view._slideshow_btn.toolTip()
+    assert "Favorites" in view._slideshow_btn.toolTip()
 
     # ...while a shelf holding nothing at all doesn't offer one.
     view._tree.setCurrentItem(view._experiments_item)
@@ -8432,14 +8436,14 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
 
 def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    folder_id = _make_folder(view, "Favorites", [cat, dog])
+    folder_id = _make_folder(view, "Keepers", [cat, dog])
     view._confirm = lambda text: True
 
     view._remove_custom_folder(view._group_for_key(gallery.custom_folder_key(folder_id)))
 
     assert view._db.list_custom_folders() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
-    assert "Favorites" not in _top_level(view._tree)
+    assert "Keepers" not in _top_level(view._tree)
 
 
 def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
@@ -9449,7 +9453,7 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     surface = _Surface()
     view._slideshow = surface
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     # Answered in the surface's own corner, not in a dialog over it — the speaker
     # is looking at the picture, not at this pane.

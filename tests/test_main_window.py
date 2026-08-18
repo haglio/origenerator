@@ -688,3 +688,43 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     assert reopened._gallery_view._combine.image_slot.current_id() == "img"
     assert reopened._gallery_view._combine.video_slot.current_id() == "vid"
+
+
+def _fun_time_session(main=(10, 20, 800, 600)):
+    from origenerator.fun_time_mode import FunTimeSession, Rect
+    return FunTimeSession(
+        main_rect=Rect(*main),
+        portrait_rect=Rect(2560, 0, 1440, 1870),
+        landscape_rect=Rect(853, 0, 1707, 1400),
+        command_file=None, paused_file=None, status_file=None,
+        dashboard_cmd_file=None,
+    )
+
+
+def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_fun_time_session(),
+    )
+    qtbot.addWidget(win)
+    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert win._gallery_view._fun_time is not None
+
+
+def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
+    # A Fun Time session's window sits at the session's rect, so the geometry it
+    # would save is meaningless to the standalone launch that reads it back.
+    path = tmp_path / "ui.json"
+    state = AppState(path)
+    state.set("window_geometry", "c3RhbmRhbG9uZQ==")
+    state.save()
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), state,
+        fun_time=_fun_time_session(),
+    )
+    qtbot.addWidget(win)
+    win.close()
+    assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="

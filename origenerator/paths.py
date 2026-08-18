@@ -12,6 +12,7 @@ worktree.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -32,7 +33,16 @@ def projects_root() -> Path:
 
 
 def ensure_sibling_on_path(name: str) -> None:
-    """Put the *name* checkout on ``sys.path`` so ``name`` is importable."""
+    """Put the *name* checkout on ``sys.path`` so ``name`` is importable.
+
+    Only when it is not importable already: a hosting session (or a test run)
+    that put a specific checkout of the sibling on ``PYTHONPATH`` has chosen
+    which copy this app runs, and inserting the walked-up primary AHEAD of
+    that choice would silently un-choose it — the hosted app then imports a
+    sibling missing the very modules the branch under judgment added there.
+    """
+    if importlib.util.find_spec(name) is not None:
+        return
     root = str(sibling_checkout(name))
     if root not in sys.path:
         sys.path.insert(0, root)

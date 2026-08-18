@@ -75,10 +75,22 @@ class SlideshowView(QWidget):
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
-                 player=None, stroke=None, pace=None, on_drive_toggle=None,
-                 parent=None):
+                 on_lock=None, player=None, stroke=None, pace=None,
+                 on_drive_toggle=None, parent=None, order_label="Shuffle",
+                 starred_ids=None):
         super().__init__(parent)
         self._on_delete = on_delete
+        # Told when a hold engages (with the held item's prompt_id): a hosting
+        # session answers a lock by opening that item as a generate tab.
+        self._on_lock = on_lock
+        # What the hosting session's HUD says about this show: how the set is
+        # ordered (Recents plays Latest, everything else Shuffle — the players'
+        # own vocabulary), and which items are favorites, so the star readout
+        # and the F-mode narrowing mean here what they mean on a player.
+        self.hud_order_label = order_label
+        self._starred_ids = set(starred_ids or ())
+        self._f_mode = False
+        self._all_items = list(items)
         # Holding a slide is also how you ask for it: Down enhances what is on
         # screen if it has never been enhanced, so the one you stopped on is the
         # one that gets the better version — and one that already has a better
@@ -169,6 +181,15 @@ class SlideshowView(QWidget):
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._advance)
+        # The hosting session's OmniPause, held here so it survives navigation:
+        # a step lands on a NEW slide (the room being frozen does not un-aim the
+        # transport), but the slide must arrive holding — no dwell armed, its
+        # video paused — rather than playing out from under the freeze.
+        self._session_paused = False
+        # Hosted on a region, the session's HUD replaces this view's own
+        # furnishings (the neighbor stills, the position plate) with the
+        # players' map — see adopt_session_hud.
+        self._session_dressed = False
 
         self._show_current()
 
@@ -195,6 +216,9 @@ class SlideshowView(QWidget):
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
+        if self._session_paused:
+            self._preview.set_playback_paused(True)  # arrive holding
+            return
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._timer.start(dwell)
@@ -261,6 +285,8 @@ class SlideshowView(QWidget):
             return
         if self._on_delete is not None and len(item) > 2:
             self._on_delete(item[2])
+        # Out of the full set too, so widening F-mode back cannot resurrect it.
+        self._all_items = [kept for kept in self._all_items if kept is not item]
         self._playlist.remove_current()
         if self._playlist.is_empty():
             self.close()
@@ -349,6 +375,28 @@ class SlideshowView(QWidget):
     def stroke_cull(self) -> None:
         self._delete_current()
 
+    def stroke_reset(self) -> None:
+        """Put the side back how it started, the players' own reset: F-mode
+        dropped, the hold released, and the top of the set on screen again.
+
+        A show's defaults are simply its whole set from the beginning — there
+        is no filter or loop here to clear, which on a player is most of what
+        reset means.
+        """
+        if self._f_mode:
+            self.toggle_f_mode()
+        self._playlist.unlock()
+        self._playlist.restart()
+        self._show_current()
+
+    def set_audio_muted(self, muted: bool) -> None:
+        """Silence (or voice) this show outright — what a hosting session does
+        to a show landing on a satellite region."""
+        self._preview.set_audio_muted(muted)
+
+    def audio_muted(self) -> bool:
+        return self._preview.audio_muted()
+
     def set_dwell_s(self, seconds: int) -> None:
         """Take a new pace, and hand it on: the number is app-wide, so a show
         opened at nought that is turned up sets the pace for the next one too.
@@ -359,6 +407,85 @@ class SlideshowView(QWidget):
         """
         self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
         self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
+
+    def current_media_path(self) -> str:
+        """The file on screen — what a hosting Fun Time session's status says."""
+        return self._preview.current_media_path()
+
+    # --- the hosting session's HUD, in the players' vocabulary --------------
+
+    @property
+    def hud_is_favorite(self) -> bool:
+        """Whether the item on screen is a favorite (starred) — the players'
+        star readout, over the same collection the Favorites shelf lists."""
+        current = self._playlist.current()
+        return bool(current and len(current) > 2 and current[2] in self._starred_ids)
+
+    @property
+    def hud_f_mode(self) -> bool:
+        return self._f_mode
+
+    def toggle_f_mode(self) -> None:
+        """Narrow the set to the favorites, or widen it back — the players' own
+        F-mode, over the starred items.  Ignored when no item of the set is a
+        favorite: an empty show is not a mode."""
+        if self._f_mode:
+            self._f_mode = False
+            self._replace_items(self._all_items)
+            return
+        narrowed = [item for item in self._all_items
+                    if len(item) > 2 and item[2] in self._starred_ids]
+        if not narrowed:
+            return
+        self._f_mode = True
+        self._replace_items(narrowed)
+
+    def _replace_items(self, items) -> None:
+        """Stand a fresh pass up over *items*, keeping the pace and the pause."""
+        self._playlist = SlideshowPlaylist(
+            items, image_dwell_ms=self._playlist.image_dwell_ms)
+        self._show_current()
+
+    def hud_items(self):
+        """The set for the hosting session's HUD: ``(path, still)`` per item in
+        stable order, the current item's 1-based position in that order, and
+        the lock."""
+        items = self._playlist.items
+        cells = [(item[0], still_for(item) or "") for item in items]
+        position = (self._playlist.order[self._playlist.index] + 1) if items else 0
+        return cells, position, self._playlist.locked
+
+    def show_item(self, path, *, hold: bool = False) -> None:
+        """Jump to the item the HUD map named — a thumbnail click, the same
+        jump a satellite's map makes; *hold* locks it there (the double-click),
+        exactly as it locks a player's clip."""
+        for index, item in enumerate(self._playlist.items):
+            if str(item[0]) != str(path):
+                continue
+            self._playlist.unlock()
+            self._playlist.jump_to(index)
+            self._show_current()
+            if hold:
+                self._toggle_lock()
+            return
+
+    def set_session_paused(self, paused: bool) -> None:
+        """Freeze or resume the show whole — the hosting session's OmniPause.
+
+        Distinct from the lock: a lock holds one slide by choice and replays
+        its clip; this stops time itself — the dwell clock and any playing
+        video — and hands both back on resume.  Held as state rather than
+        applied once: a step while frozen lands on a new slide, and that slide
+        must arrive holding too (see :meth:`_show_current`).
+        """
+        self._session_paused = paused
+        if paused:
+            self._timer.stop()
+        else:
+            dwell = self._playlist.dwell_ms()
+            if dwell is not None:
+                self._timer.start(dwell)
+        self._preview.set_playback_paused(paused)
 
     def _on_pace_changed(self, seconds: int) -> None:
         """The pace moved — here or in another window — so the slide on screen
@@ -577,6 +704,10 @@ class SlideshowView(QWidget):
             self._timer.stop()  # hold on the current item
             self._star_current()
             self._update_counter()
+            if self._on_lock is not None:
+                prompt_id = self._current_prompt_id()
+                if prompt_id is not None:
+                    self._on_lock(prompt_id)
             return True
         self._show_current()  # released, re-arming the dwell timer
         return False
@@ -604,12 +735,21 @@ class SlideshowView(QWidget):
 
     # --- the neighboring items ---------------------------------------------
 
+    def adopt_session_hud(self):
+        """A hosting session put its HUD on this show: the players' map now
+        says where in the set this is and what is around it, so the view's own
+        furnishings — the neighbor stills, the position plate — come off."""
+        self._session_dressed = True
+        self._neighbors.set_neighbors(None, None)
+        self._counter.hide()
+
     def _update_neighbors(self):
         """Draw the items either side of this one — nothing on a set too short
-        for a neighbor to be anything but the item already on screen, and nothing
+        for a neighbor to be anything but the item already on screen, nothing
         at all while this is following a generation, which has no place among
-        them yet."""
-        if self._live or len(self._playlist) < 2:
+        them yet, and nothing while a hosting session's HUD is drawing the map
+        these stills are the small version of."""
+        if self._session_dressed or self._live or len(self._playlist) < 2:
             self._neighbors.set_neighbors(None, None)
             return
         self._neighbors.set_neighbors(
@@ -630,7 +770,10 @@ class SlideshowView(QWidget):
 
     def _update_counter(self):
         """Say where in the set this is — nothing at all while following a
-        generation still being made, which is nowhere in it yet."""
+        generation still being made, which is nowhere in it yet, and nothing
+        while a hosting session's HUD is saying it instead."""
+        if self._session_dressed:
+            return  # the session's HUD says the position now
         if self._live or self._playlist.is_empty():
             self._counter.hide()
             return

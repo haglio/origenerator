@@ -5,6 +5,18 @@ git-ignored content.local.json, so a run here matches a public checkout.
 pytest imports this before any test module, and the app loads its content at
 import, so the pin has to happen here.
 """
+# Before anything that can pull PyQt6 in: the voice stack's native DLLs
+# (whisper's engine, its VAD, and torch where installed) die with a plain
+# access violation when first loaded AFTER Qt — the same crash
+# app._warm_voice_runtimes preloads its way past for the app, which took a
+# whole pytest run down mid-suite on a machine carrying the voice extra.
+# Guarded per module: none is required, and CI has none of them.
+for _voice_module in ("onnxruntime", "ctranslate2", "torch"):
+    try:
+        __import__(_voice_module)
+    except Exception:
+        pass  # no voice extra (or a broken one): the suite still runs
+
 from origenerator import content as _content
 
 _content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT

@@ -12,6 +12,7 @@ from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.experiments.background import cancel_experiments
+from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.prompt_box import PROMPT_HEIGHTS
 
@@ -43,9 +44,10 @@ _PROMPT_HEIGHTS_KEY = "prompt_heights"
 
 class OrigeneratorWindow(QMainWindow):
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
-                 parent=None):
+                 parent=None, *, fun_time: FunTimeSession | None = None):
         super().__init__(parent)
         self._app_state = app_state
+        self._fun_time = fun_time
         # Before anything below builds a param form: a prompt box reads its
         # height as it is constructed, and the view built a few lines down brings
         # its first one with it.
@@ -60,11 +62,23 @@ class OrigeneratorWindow(QMainWindow):
         icon_path = PROJECT_DIR / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
+        if fun_time is not None:
+            # A managed window of the hosting session: frameless so the client
+            # area IS the rect Fun Time named (the Random Favs Browser's), and
+            # in the topmost band where every managed window lives — Fun Time
+            # decides who within the band is in front.
+            self.setWindowFlags(
+                self.windowFlags()
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+            )
+            rect = fun_time.main_rect
+            self.setGeometry(rect.x, rect.y, rect.width, rect.height)
 
         # One unified view: the gallery, whose info pane now holds the editable
         # config tabs that used to be a separate Generate tab. A clicked
         # thumbnail, the re-roll "+", and the combine panel all feed it.
-        self._gallery_view = GalleryView(db, client=client)
+        self._gallery_view = GalleryView(db, client=client, fun_time=fun_time)
         self.setCentralWidget(self._gallery_view)
 
         # Ctrl+Alt+Q quits from anywhere in the app: an application-scoped shortcut
@@ -98,8 +112,11 @@ class OrigeneratorWindow(QMainWindow):
     def _restore_session(self):
         """Put the window back where it was — same monitor, size, and maximized
         state — and reopen the last session's config tabs, gallery folder, and
-        selected generation."""
-        self._restore_geometry()
+        selected generation.  Inside a Fun Time session the geometry is the
+        session's to dictate, so the saved one is neither restored nor (see
+        ``closeEvent``) overwritten."""
+        if self._fun_time is None:
+            self._restore_geometry()
         self._gallery_view.restore_config_tabs(self._app_state.get(_CONFIG_TABS_KEY))
         self._gallery_view.select_folder(self._app_state.get(_GALLERY_FOLDER_KEY))
         self._gallery_view.select_generation(self._app_state.get(_GALLERY_SELECTION_KEY))
@@ -161,9 +178,12 @@ class OrigeneratorWindow(QMainWindow):
             _ENHANCE_SETTINGS_KEY, self._gallery_view.enhance_settings())
         self._app_state.set(_SEARCH_SORT_KEY, self._gallery_view.search_sort())
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
-        self._app_state.set(
-            _GEOMETRY_KEY,
-            base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),
-        )
+        if self._fun_time is None:
+            # Hosted, the geometry is the session's to decide, so remembering
+            # this launch's would overwrite the window the user actually sizes.
+            self._app_state.set(
+                _GEOMETRY_KEY,
+                base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),
+            )
         self._app_state.save()
         super().closeEvent(event)

@@ -470,6 +470,13 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
 
 
+def _first_leaf(view):
+    """The first settings folder in the tree — the one tier a name of your own
+    can go on, since its own name is a generic code."""
+    images = _media_roots(view._tree)["Images"]
+    return images.child(0).child(0).child(0).child(0)
+
+
 def _children_by_detail(item):
     """A folder's settings children keyed by what they hold — the description
     behind their name, since the name itself is a code (see gallery.keys)."""
@@ -2391,15 +2398,43 @@ def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Images"].child(0)
-    key = _key(workflow)
+    leaf = _first_leaf(view)
+    key = _key(leaf)
 
-    view._begin_inline_rename(workflow, 0)   # double-click opens the editor
-    workflow.setText(0, "Models")            # committing fires itemChanged
+    view._begin_inline_rename(leaf, 0)   # double-click opens the editor
+    leaf.setText(0, "Cats")              # committing fires itemChanged
 
-    assert db.folder_meta_map()[key]["custom_name"] == "Models"
+    assert db.folder_meta_map()[key]["custom_name"] == "Cats"
     view.refresh()
-    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Models"
+    assert _first_leaf(view).text(0) == "Cats"
+
+
+def test_a_folder_named_after_what_it_holds_offers_no_rename(qtbot):
+    # A media root, a workflow, a model and a LoRA are named by the fact they
+    # stand for; renaming one would only hide which one it is. Neither the tree
+    # row, the header, nor the context menu opens an editor on them.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    images = _media_roots(view._tree)["Images"]
+    workflow, model = images.child(0), images.child(0).child(0)
+    lora = model.child(0)
+    for item in (images, workflow, model, lora):
+        assert not item.flags() & Qt.ItemFlag.ItemIsEditable
+        view._begin_inline_rename(item, 0)
+        assert view._editing_key is None          # nothing opened
+
+        view._tree.setCurrentItem(item)
+        view._title.edit_requested.emit()
+        assert not view._title._editing()
+
+    leaf = _first_leaf(view)                      # …the code-named leaf still does
+    assert leaf.flags() & Qt.ItemFlag.ItemIsEditable
+    view._tree.setCurrentItem(leaf)
+    view._title.edit_requested.emit()
+    assert view._title._editing()
 
 
 def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
@@ -2408,16 +2443,37 @@ def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Images"].child(0)
-    view._tree.setCurrentItem(workflow)
-    key = _key(workflow)
+    leaf = _first_leaf(view)
+    view._tree.setCurrentItem(leaf)
+    key = _key(leaf)
 
     view._title.edit_requested.emit()  # double-clicking the header starts editing
-    assert view._title._edit.text() == "SDXL Text-to-Image"  # prefilled with the name
+    assert view._title._edit.text() == leaf.text(0)  # prefilled with the folder's name
     view._title.edited.emit("Favorites")  # commit
 
     assert db.folder_meta_map()[key]["custom_name"] == "Favorites"
-    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Favorites"
+    qtbot.waitUntil(lambda: _first_leaf(view).text(0) == "Favorites")
+
+
+def test_committing_a_header_rename_rebuilds_after_the_click_that_ended_it(qtbot):
+    # A header edit is usually ended by clicking somewhere else, and somewhere
+    # else is usually a thumbnail. Rebuilding inside the editor's own focus-out
+    # deletes the pane Qt is still delivering that click to, and the app goes
+    # down with it — so the rebuild waits for the next turn of the event loop.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_first_leaf(view))
+
+    rebuilt = []
+    view.refresh = lambda: rebuilt.append(1)
+    view._title.edit_requested.emit()
+    view._title.edited.emit("Cats")
+
+    assert db.folder_meta_map()[_key(_first_leaf(view))]["custom_name"] == "Cats"
+    assert rebuilt == []                       # not while the click is in flight
+    qtbot.waitUntil(lambda: rebuilt == [1])    # on the next turn instead
 
 
 def _source_tile(view):

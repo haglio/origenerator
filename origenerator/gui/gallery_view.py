@@ -4471,7 +4471,9 @@ class GalleryView(QWidget):
             self._custom_folder_context_menu(group, global_pos)
             return
         menu = QMenu(self)
-        rename_action = menu.addAction("Rename…")
+        # No rename for a folder named after what it holds — a model, a LoRA, a
+        # workflow, a media root (see :func:`gallery.is_renamable`).
+        rename_action = menu.addAction("Rename…") if gallery.is_renamable(group) else None
         star_action = menu.addAction("Unstar" if group.starred else "Star")
         # Inside a folder the user made, a member tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
@@ -4487,7 +4489,7 @@ class GalleryView(QWidget):
             menu.addSeparator()
             delete_action = menu.addAction("Delete folder…")
         chosen = menu.exec(global_pos)
-        if chosen == rename_action:
+        if rename_action is not None and chosen == rename_action:
             self._rename_folder(key)
         elif chosen == star_action:
             self._toggle_star(key)
@@ -4541,9 +4543,11 @@ class GalleryView(QWidget):
         self._sync_history_buttons()
 
     def _begin_inline_rename(self, item, _column):
-        """Double-clicking a tree folder edits its name in place."""
+        """Double-clicking a tree folder edits its name in place — a folder named
+        after what it holds (see :func:`gallery.is_renamable`) has no name of its
+        own to edit, and its row carries no editable flag either."""
         group = item.data(0, _GROUP_ROLE)
-        if group is None:
+        if group is None or not gallery.is_renamable(group):
             return
         self._editing_key = group.key
         self._tree.editItem(item, 0)
@@ -4563,20 +4567,31 @@ class GalleryView(QWidget):
         """Double-clicking the title bar edits the selected folder's name — but not
         while several are picked, where the title is a count of them and the rename
         would land on whichever one happened to be current, and not over a search,
-        where the title is the query and there is no folder behind it to rename."""
+        where the title is the query and there is no folder behind it to rename.
+
+        Only the folder's own name is edited, not the path on show: the editor is
+        the size of that name, at the head of the path (see
+        :meth:`EditableHeader.begin_edit`)."""
         if self._selection_group is not None or self._showing_search():
             return
         item = self._tree.currentItem()
         group = item.data(0, _GROUP_ROLE) if item is not None else None
-        if group is not None:
+        if group is not None and gallery.is_renamable(group):
             self._title.begin_edit(group.label)
 
     def _commit_title_rename(self, name: str):
         key = self._tree_view.selected_folder_key()
-        if key is not None:
-            self._actions.rename_folder(key, name.strip() or None)
-            self.refresh()
-            self._sync_history_buttons()
+        if key is None:
+            return
+        self._actions.rename_folder(key, name.strip() or None)
+        self._sync_history_buttons()
+        # Rebuild on the next turn of the event loop rather than here. What
+        # usually ends this edit is a click somewhere else in the window, and
+        # "somewhere else" is most often a thumbnail — so refreshing inside the
+        # editor's own focus-out deletes the browser pane that Qt is still
+        # delivering that click to, and the app goes down with an access
+        # violation. The tree's inline rename defers for the same reason.
+        QTimer.singleShot(0, self.refresh)
 
     def _toggle_star(self, key: str):
         item = self._item_by_key.get(key)

@@ -1,10 +1,11 @@
 """Search the gallery by what a generation is of, not by the letters you typed.
 
-A folder label is a 60-character headline and a prompt is a paragraph, so a
-substring filter over either finds a fraction of what is actually there: search
-``two women`` and the run you had in mind — prompted "a pair of dolls on a
-couch" — never surfaces, and nothing on screen tells you it exists. This module
-is the matching layer that closes that gap, in two tiers:
+A folder is named by a code and a prompt is a paragraph, so a substring filter
+over the tree finds nothing at all and one over the prompts finds a fraction of
+what is actually there: search ``two women`` and the run you had in mind —
+prompted "a pair of dolls on a couch" — never surfaces, and nothing on screen
+tells you it exists. This module is the matching layer that closes that gap, in
+two tiers:
 
 * A **deterministic** pass that runs on every keystroke, off a prebuilt index,
   with no network anywhere near it. It stems words, folds number words into

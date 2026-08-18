@@ -240,7 +240,7 @@ class BrowserPane:
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), starred=starred, context=context,
-            level=gallery.folder_level(group),
+            level=gallery.folder_level(group), detail=gallery.folder_detail(group),
         )
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self._v._folder_context_menu)

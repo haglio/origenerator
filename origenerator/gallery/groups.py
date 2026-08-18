@@ -22,6 +22,10 @@ class SettingsGroup:
     label: str
     rows: list[dict]
     starred: bool = False
+    # What the folder's generic name doesn't say: the prompt it ran, plus the
+    # settings that set it apart from its siblings. Shown on hover rather than as
+    # the name, which is a short code (see :mod:`origenerator.gallery.keys`).
+    detail: str = ""
 
 
 @dataclass
@@ -130,6 +134,13 @@ def folder_level(group) -> str | None:
     if isinstance(group, MediaGroup):
         return group.media_type
     return None
+
+
+def folder_detail(group) -> str:
+    """What a folder's name doesn't say, for its tooltip — the prompt and settings
+    behind a settings leaf. Empty for every folder whose own name already says
+    what it holds (a model, a LoRA, a media root)."""
+    return getattr(group, "detail", "")
 
 
 def child_groups(group) -> list:

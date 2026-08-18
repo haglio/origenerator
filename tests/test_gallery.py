@@ -13,6 +13,8 @@ from origenerator.gallery import (
     build_image_config_index,
     child_groups,
     config_tab_title,
+    folder_detail,
+    folder_id,
     folder_level,
     find_source_image_id,
     media_type_of_row,
@@ -335,7 +337,7 @@ def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin()
     (lora,) = build_gallery_tree([enhanced, plain])[0].workflow_groups[0].model_groups[0].children
     (leaf,) = lora.children
     assert {r["prompt_id"] for r in leaf.rows} == {"e1", "p1"}
-    assert leaf.label == "a cat"
+    assert leaf.detail == "a cat"
 
 
 def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
@@ -823,12 +825,15 @@ def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():
-    # A source-image folder takes the name of the image generation it animates, so
-    # sibling folders built from different images read apart — the same label that
-    # image's own settings folder carries.
+    # A source-image folder wears the ID of the image folder it animates, so the
+    # two read as one folder from either tree and sibling source folders built
+    # from different images are tellable apart.
     face = _img("face", "a smiling face", 30, 1)
-    (source,) = _i2v_source_folders([_i2v_frame("vf", "sdxl_t2i_face.png"), face])
-    assert "smiling face" in source.label
+    rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
+    (source,) = _i2v_source_folders(rows)
+    images = [media for media in build_gallery_tree(rows) if media.media_type == "image"]
+    (image_leaf,) = images[0].workflow_groups[0].model_groups[0].children[0].children
+    assert source.label == image_leaf.label
 
 
 def test_i2v_settings_leaf_names_itself_by_video_prompt_not_the_frame():
@@ -839,8 +844,8 @@ def test_i2v_settings_leaf_names_itself_by_video_prompt_not_the_frame():
         [_i2v_frame("vf", "sdxl_t2i_face.png", prompt="a slow zoom"), face]
     )
     (leaf,) = source.children
-    assert leaf.label == "a slow zoom"
-    assert "smiling face" not in leaf.label
+    assert leaf.detail == "a slow zoom"
+    assert "smiling face" not in leaf.detail
 
 
 def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
@@ -1031,8 +1036,8 @@ def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
     for lora in model.children:
         (source,) = lora.children
         (settings,) = source.children
-        assert settings.label == "dance"
-        assert "safetensors" not in settings.label
+        assert settings.detail == "dance"
+        assert "safetensors" not in settings.detail
 
 
 def test_build_gallery_tree_nests_workflow_then_model_then_settings():
@@ -1081,8 +1086,8 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
     for model in workflow.model_groups:
         (lora,) = model.children
         (settings,) = lora.children
-        assert settings.label == "a cat"
-        assert "safetensors" not in settings.label
+        assert settings.detail == "a cat"
+        assert "safetensors" not in settings.detail
 
 
 def test_build_gallery_tree_excludes_failed_rows_that_produced_no_output():
@@ -1360,26 +1365,68 @@ def test_build_gallery_tree_labels_workflow_with_display_name():
     assert tree[0].label == "Images"
 
 
-def test_settings_group_labels_disambiguate_same_prompt_different_params():
-    # Same prompt, different steps -> two folders that must not share a label.
+def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
+    # A prompt is a paragraph where a folder name is a line, so a settings leaf
+    # is named from its key instead. What the prompt said is still there, as the
+    # description behind the name.
+    prompt = "a cat asleep on a windowsill in the late afternoon sun"
+    (lora,) = build_gallery_tree(
+        [_img("i1", prompt, 50, 1)])[0].workflow_groups[0].model_groups[0].children
+    (leaf,) = lora.children
+
+    assert leaf.label == folder_id(leaf.key)
+    assert leaf.label.isalnum() and leaf.label == leaf.label.upper()
+    assert "cat" not in leaf.label.lower()
+    assert folder_detail(leaf) == prompt
+
+
+def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
+    # The name has to be as stable as the folder — it is what the user reads a
+    # folder by, and one that changed as the library grew would be no name at all
+    # — and two folders on one screen must never wear the same one.
+    rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
+    lora = build_gallery_tree(rows)[0].workflow_groups[0].model_groups[0].children[0]
+    cat, dog = lora.children
+    assert cat.label != dog.label
+
+    grown = build_gallery_tree([_img("i3", "a bird", 50, 1), *rows])
+    again = {leaf.key: leaf.label
+             for leaf in grown[0].workflow_groups[0].model_groups[0].children[0].children}
+    assert again[cat.key] == cat.label and again[dog.key] == dog.label
+
+
+def test_a_custom_name_replaces_the_code_and_the_description_stays():
+    # The code is a starting name, not a fixed one: naming a folder replaces it,
+    # and what the folder holds still reads on hover.
+    rows = [_img("i1", "a cat", 50, 1)]
+    (leaf,) = build_gallery_tree(rows)[0]         .workflow_groups[0].model_groups[0].children[0].children
+
+    named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0]         .workflow_groups[0].model_groups[0].children[0].children[0]
+    assert named.label == "Cats"
+    assert folder_detail(named) == "a cat"
+
+
+def test_settings_group_details_disambiguate_same_prompt_different_params():
+    # Same prompt, different steps -> two folders whose descriptions must not
+    # read the same, since that description is what a hover has to tell apart.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 40, 2)])
-    labels = [sg.label for sg in
-              tree[0].workflow_groups[0].model_groups[0].children[0].children]
-    assert len(labels) == 2
-    assert labels[0] != labels[1]
-    assert all("a cat" in label for label in labels)
+    details = [sg.detail for sg in
+               tree[0].workflow_groups[0].model_groups[0].children[0].children]
+    assert len(details) == 2
+    assert details[0] != details[1]
+    assert all("a cat" in detail for detail in details)
     # the distinguishing param is surfaced so the folders are tellable apart
-    assert any("steps" in label for label in labels)
+    assert any("steps" in detail for detail in details)
 
 
-def test_settings_group_label_omits_params_when_only_one_group():
+def test_settings_group_detail_omits_params_when_only_one_group():
     # A lone settings folder needs no disambiguating suffix.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 50, 2)])
     (lora,) = tree[0].workflow_groups[0].model_groups[0].children
     (only,) = lora.children
-    assert only.label == "a cat"
+    assert only.detail == "a cat"
 
 
 def test_resolve_preview_returns_full_image_file(tmp_path):

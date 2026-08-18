@@ -12,6 +12,8 @@ class FolderTile(QFrame):
 
     Clicking drills into the folder; right-clicking asks for a context menu.
     Both signals carry the folder's stable key so the view can act on it.
+    ``detail`` is what the name doesn't say (a settings folder's prompt and
+    settings), shown on hover.
     """
 
     clicked = pyqtSignal(str)
@@ -20,7 +22,7 @@ class FolderTile(QFrame):
     _BADGE = 16  # on-tile size of the recipe-level chip
 
     def __init__(self, key, text, preview_paths, count, starred=False,
-                 context="", level=None, parent=None):
+                 context="", level=None, detail="", parent=None):
         super().__init__(parent)
         self._key = key
         self.setObjectName("folderTile")
@@ -64,6 +66,10 @@ class FolderTile(QFrame):
         caption = QLabel(("★ " if starred else "") + text)
         caption.setWordWrap(True)
         caption.setMaximumHeight(30)
+        # A settings folder is named by a code, so what it holds — the prompt and
+        # the settings that set it apart — is read on hover rather than under the
+        # collage, where it would take more of the tile than the pictures do.
+        caption.setToolTip(detail or text)
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)
 

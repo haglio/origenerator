@@ -357,9 +357,25 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     # ...the media root wears its own kind's glyph, in the same slot...
     assert not videos.icon(0).isNull() and "Videos" in videos.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
-    # all, so its tooltip is the folder alone and it carries no chip.
+    # all, so it carries no chip — and since its name is a code, its tooltip is
+    # where what it holds is read.
     assert settings.icon(0).isNull()
-    assert settings.toolTip(0) == settings.text(0)
+    assert settings.toolTip(0).startswith(settings.text(0))
+    assert "dance" in settings.toolTip(0)
+
+
+def test_the_header_path_carries_what_its_last_code_doesnt_say(qtbot):
+    # The path ends in a code, so the folder's prompt and settings are read by
+    # hovering it — and a header that isn't a folder carries nothing to read.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _select_first_leaf(view)
+    assert view._title.toolTip() == "a cat"
+
+    _search_for(view, "cat")
+    assert view._title.toolTip() == ""       # the header is the query now
 
 
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
@@ -454,8 +470,12 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
 
 
-def _children_by_label(item):
-    return {item.child(i).text(0): item.child(i) for i in range(item.childCount())}
+def _children_by_detail(item):
+    """A folder's settings children keyed by what they hold — the description
+    behind their name, since the name itself is a code (see gallery.keys)."""
+    children = [item.child(i) for i in range(item.childCount())]
+    return {gallery.folder_detail(child.data(0, _GROUP_ROLE)): child
+            for child in children}
 
 
 def _search_for(view, text):
@@ -497,7 +517,7 @@ def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
     view.refresh()
     images = _media_roots(view._tree)["Images"]
     lora = images.child(0).child(0).child(0)
-    dog = _children_by_label(lora)["a dog"]
+    dog = _children_by_detail(lora)["a dog"]
     before = view._tree.currentItem()
 
     _search_for(view, "cat")
@@ -513,7 +533,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
-    view._tree.setCurrentItem(_children_by_label(lora)["a dog"])
+    view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
     assert view.visible_prompt_ids() == ["i2"]
 
     _search_for(view, "dog")
@@ -631,17 +651,51 @@ def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
 
 
 def test_the_box_says_what_it_would_search(qtbot):
+    # The whole path down to the selected folder, not the folder's own name: a
+    # folder is named by a code, which places nothing on its own.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
+    view._search_edit.setFixedWidth(2000)  # room for any path, so nothing elides
     view.refresh()
     assert view._search_edit.placeholderText() == "Search All…"
 
-    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
-    assert view._search_edit.placeholderText() == "Search Videos…"
+    videos = _media_roots(view._tree)["Videos"]
+    view._tree.setCurrentItem(videos)
+    assert view._search_edit.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
+
+    leaf = videos.child(0).child(0).child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+    placeholder = view._search_edit.placeholderText()
+    assert placeholder == f"Search {view._tree_view.breadcrumb(leaf)}…"
+    assert leaf.text(0) in placeholder      # right down to the folder itself
+    assert "Videos" in placeholder          # and every branch above it
 
     view._tree.setCurrentItem(view._recents_item)
     assert view._search_edit.placeholderText() == "Search Recents…"
+
+
+def test_the_box_shows_the_tail_of_a_path_too_long_for_it(qtbot):
+    # A path that doesn't fit is elided from the left, keeping the folder itself
+    # and its nearest parents — the half that answers "search where?".
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    videos = _media_roots(view._tree)["Videos"]
+    leaf = videos.child(0).child(0).child(0).child(0).child(0)
+    view._tree.setCurrentItem(leaf)
+
+    # Wide enough for the folder's own name and little else.
+    metrics = view._search_edit.fontMetrics()
+    view._search_edit.setFixedWidth(
+        metrics.horizontalAdvance("Search …" + leaf.text(0)) + 24)
+
+    scope = view._search_edit.scope()
+    placeholder = view._search_edit.placeholderText()
+    assert placeholder.startswith("Search …")       # said to be cut, at the front
+    tail = placeholder[len("Search …"):]
+    assert scope.endswith(tail) and len(tail) < len(scope)  # elided from the left
+    assert placeholder.endswith(leaf.text(0))       # the folder itself survives
 
 
 def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
@@ -721,9 +775,10 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
     assert view.visible_prompt_ids() == ["i1"]
 
 
-def test_search_matches_a_prompt_word_the_folder_label_truncates_away(qtbot):
-    # Two prompts alike for their first 60 characters, so both leaves carry the
-    # very same label; only the tail tells them apart, and only the rows have it.
+def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
+    # Naming a folder by a code took every prompt word out of the tree, so the
+    # search has to reach the rows themselves — matching on a word that appears
+    # nowhere in any folder name, only in the prompt one generation ran.
     shared = "a cat asleep on a windowsill in the late afternoon sun, watching "
     rows = [_image("i1", shared + "sparrows", 50, 1),
             _image("i2", shared + "beetles", 50, 2)]
@@ -731,7 +786,9 @@ def test_search_matches_a_prompt_word_the_folder_label_truncates_away(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
-    assert len({lora.child(i).text(0) for i in range(lora.childCount())}) == 1
+    names = [lora.child(i).text(0) for i in range(lora.childCount())]
+    assert len(set(names)) == 2                      # a code apiece, never shared
+    assert not any("beetles" in name for name in names)
 
     _search_for(view, "beetles")
 
@@ -886,7 +943,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
-    view._tree.setCurrentItem(_children_by_label(lora)["a dog"])
+    view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
 
     _search_for(view, "cat")
 
@@ -2633,7 +2690,7 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     assert queued == [["i1"]]
 
 
-def test_the_bank_groups_its_buttons_with_a_rule_between(qtbot):
+def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     # Icon-only buttons lean on their neighbors to be read, so the bank is laid
     # out in groups: where you are, what you did, what you picked, what to do
     # with what's in front of you, and what the app is doing on its own.
@@ -2641,29 +2698,54 @@ def test_the_bank_groups_its_buttons_with_a_rule_between(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    groups = [buttons for _divider, buttons in view._toolbar_groups]
+    groups = [buttons for _gap, buttons in view._toolbar_groups]
     assert groups[0] == (view._back_btn, view._forward_btn)
     assert groups[1] == (view._undo_btn, view._redo_btn)
     assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
     assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
 
 
-def test_a_group_with_nothing_showing_takes_no_rule(qtbot):
-    # Group, Auto and Slideshow come and go; the rules in front of them must go
-    # with them, or the bank wears a stray line (or two in a row) where a hidden
-    # group used to be.
+def test_a_group_with_nothing_showing_takes_no_space(qtbot):
+    # Group, Auto and Slideshow come and go; the space in front of them must go
+    # with them, or the bank wears a stray gap (or two in a row) where a hidden
+    # group used to be, and starts indented.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view.show()
     _select_first_leaf(view)
 
-    dividers = {id(divider): divider for divider, _ in view._toolbar_groups}
-    leading, group_rule = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
-    assert not leading.isVisible()          # nothing to divide from, at the front
-    assert view._group_btn.isHidden() and not group_rule.isVisible()
+    gaps = {id(gap): gap for gap, _ in view._toolbar_groups}
+    leading, group_gap = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
+    assert not leading.isVisible()          # nothing to separate from, at the front
+    assert view._group_btn.isHidden() and not group_gap.isVisible()
     assert view._toolbar_groups[3][0].isVisible()  # the trio is always there
-    assert len(dividers) == len(view._toolbar_groups)
+    assert len(gaps) == len(view._toolbar_groups)
+
+
+def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot):
+    # In a narrow pane a horizontal bank squeezes every button until the glyphs
+    # are a row of smudges. Wrapped, a button is always the size it asks for and
+    # the bank just gets taller.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view.show()
+    host = view._toolbar_host
+    wanted = view._back_btn.sizeHint()
+
+    host.setFixedWidth(wanted.width() * 3)  # far narrower than the whole bank
+    host.updateGeometry()
+    qtbot.wait(10)
+
+    shown = [b for _gap, group in view._toolbar_groups for b in group
+             if not b.isHidden()]
+    assert len(shown) > 3                       # more buttons than fit on one row
+    for button in shown:
+        assert button.width() == button.sizeHint().width()  # none of them squeezed
+    rows = {button.y() for button in shown}
+    assert len(rows) > 1                        # so they went onto further rows
+    assert host.heightForWidth(host.width()) >= wanted.height() * len(rows)
 
 
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):

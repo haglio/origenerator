@@ -37,6 +37,7 @@ from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.find_bar import FindBar
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
@@ -61,6 +62,7 @@ from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
+from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
@@ -113,7 +115,7 @@ _SEARCH_MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
 _SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
 _TOOL_ICON_PX = 24  # the button bank's icons — see GalleryView._tool_button
-_TOOLBAR_RULE_INSET = 5  # the gap each side of a between-groups rule, and its inset
+_TOOLBAR_GROUP_GAP = 14  # the space that separates one group of the button bank from the next
 # Said the same way by the button and by the settings panel it would run, because
 # both go dark together the moment what's in front of you is a video.
 _NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
@@ -135,15 +137,19 @@ _SHELF_LABELS = {
 
 
 class _SearchScope(NamedTuple):
-    """What a search covers: the selected row's own label, its breadcrumb, and
-    the generations it holds (``None`` for no restriction at all)."""
+    """What a search covers: the selected row's breadcrumb and the generations it
+    holds (``None`` for no restriction at all).
 
-    name: str
+    The path rather than the folder's own name, everywhere it is said: a folder
+    is named by a short code, so "Search 3A7F2C10…" names nothing the user can
+    place, where the path they clicked down does.
+    """
+
     path: str
     ids: set[str] | None
 # What the lit Auto switch says while its loop runs in some other folder. It
-# doesn't name that folder: every folder is named for its prompt, and those run
-# long and read alike, so a name is no help in finding one. A link is.
+# doesn't name that folder: a folder is named by a code, which tells you nothing
+# about where it sits, so a name is no help in finding one. A link is.
 _AUTO_ELSEWHERE_TIP = (
     "Auto-generate is running in another folder<br>"
     f"{link('auto', 'Go to it')} · click the switch to stop it"
@@ -159,23 +165,19 @@ def _is_reusable_workflow(workflow_name) -> bool:
     return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
-def _toolbar_divider() -> QFrame:
-    """The hairline between two groups of the button bank.
+def _toolbar_gap() -> QWidget:
+    """The space between two groups of the button bank.
 
-    Drawn with an explicit background for the same reason the pane divider is
-    (see :func:`_bottom_divider`), and inset a little on each side so it reads
-    as a gap with a rule in it rather than as another button.
+    Space alone is what separates them — a rule here used to, and in a bank that
+    wraps onto a second row a rule can land at the end of one row or the start of
+    the next, marking nothing. An empty widget rather than layout spacing because
+    the gap comes and goes with the group behind it (see
+    :meth:`GalleryView._sync_toolbar_gaps`), and a widget is the thing a flow
+    layout can be told to leave out.
     """
-    line = QFrame()
-    # Wide enough for the margin the rule is inset by and still leave a pixel to
-    # paint: a 1px-wide frame with a 4px margin has nothing left to draw, and the
-    # bank shows a gap where the rule should be.
-    line.setFixedWidth(_TOOLBAR_RULE_INSET * 2 + 1)
-    line.setStyleSheet(
-        f"background-color: {BORDER_SUBTLE.name()};"
-        f" margin: {_TOOLBAR_RULE_INSET}px {_TOOLBAR_RULE_INSET}px;"
-    )
-    return line
+    gap = QWidget()
+    gap.setFixedSize(_TOOLBAR_GROUP_GAP, 1)
+    return gap
 
 
 def _bottom_divider() -> QFrame:
@@ -588,16 +590,17 @@ class GalleryView(QWidget):
         # The gallery search. It sits over the tree but no longer narrows it: what
         # it fills is the browser pane, with the matching generations themselves
         # (see :meth:`_run_search`), because a thumbnail is what the user
-        # recognizes and a folder name — a truncated prompt headline — is not.
+        # recognizes and a folder name — a short code — is not.
         # Matching is by meaning rather than by letters, so "two women" reaches
         # "a pair of dolls" and "two tall ladies" alike; a model name, a LoRA
         # name and a seed are searchable too. Its counterpart is the find strip below
         # the info pane, which searches *inside* the open tab's prompts.
-        self._search_edit = QLineEdit()
-        # Its placeholder names the scope and is kept current with the tree
-        # selection (_sync_search_placeholder); this is only what it says before
-        # the first one lands.
-        self._search_edit.setPlaceholderText(f"Search {gallery.ALL_LABEL}…")
+        self._search_edit = ScopeSearchEdit()
+        # Its placeholder names the scope — the whole path down to the selected
+        # folder — and is kept current with the tree selection
+        # (_sync_search_placeholder); this is only what it says before the first
+        # selection lands.
+        self._search_edit.set_scope(gallery.ALL_LABEL)
         self._search_edit.setToolTip(
             "Search every generation by what it is of — matching related words, "
             "not just the ones you typed — or by model, LoRA or seed. The results "
@@ -624,17 +627,17 @@ class GalleryView(QWidget):
         toc_box.addWidget(self._combine)
         self._folder_panes.addWidget(toc)
 
-        # Browser pane: a header (folder title, then a back/forward/undo toolbar)
-        # over the flowing contents. Double-clicking the title renames the folder.
+        # Browser pane: a header (the folder's path, then a back/forward/undo
+        # toolbar under it) over the flowing contents. Double-clicking the path
+        # renames the folder it ends at.
         browser = QWidget()
         browser_box = QVBoxLayout(browser)
         browser_box.setContentsMargins(*_PANE_MARGINS)
-        header = QHBoxLayout()
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
-        header.addWidget(self._title, 1)
-        # The button bank, in four groups a hairline apart (see the assembly at
+        browser_box.addWidget(self._title)
+        # The button bank, in five groups a space apart (see the assembly at
         # the end of this block): where you are, what you did, what to do with
         # what's in front of you, and what the app is doing on its own. Grouping
         # is what makes an icon-only bank readable — a button's neighbors say as
@@ -662,8 +665,8 @@ class GalleryView(QWidget):
         # away with its folder left one running with nothing on screen to say so
         # (see _sync_auto_button). It greys instead when there is nothing to do.
         # While the loop is somewhere else, its tip is one you can click into —
-        # naming that folder is no use when every name is a long prompt and they
-        # all look alike at a glance, so the tip offers to take the user there.
+        # naming that folder is no use when a name is a code with no branch
+        # attached to it, so the tip offers to take the user there instead.
         self._auto_tip = LinkTip(self._auto_btn)
         self._auto_tip.link_activated.connect(self._go_to_looping_folder)
         # Star, enhance, delete: the three things you can do to what is in front
@@ -728,8 +731,17 @@ class GalleryView(QWidget):
         self._osr2_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
-        toolbar = QHBoxLayout()
-        toolbar.setSpacing(2)
+        # The bank takes the pane's whole width, under the path rather than
+        # beside it, and wraps onto as many rows as that width needs. Beside the
+        # path it had to share a narrow pane with a folder name, and what a
+        # horizontal layout does when it runs out of room is squeeze every button
+        # until the glyphs are unreadable — a row of smudges. Wrapped, a button
+        # is always its own size; the bank just gets taller.
+        self._toolbar_host = QWidget()
+        policy = self._toolbar_host.sizePolicy()
+        policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
+        self._toolbar_host.setSizePolicy(policy)
+        toolbar = FlowLayout(self._toolbar_host, spacing=2)
         self._toolbar_groups = []
         for buttons in (
             (self._back_btn, self._forward_btn),                    # where you are
@@ -739,15 +751,13 @@ class GalleryView(QWidget):
             (self._slideshow_btn, self._auto_btn,                   # what the app is doing
              self._mic_btn, self._audio_btn, self._osr2_btn),
         ):
-            divider = _toolbar_divider()
-            toolbar.addWidget(divider)
+            gap = _toolbar_gap()
+            toolbar.addWidget(gap)
             for button in buttons:
                 toolbar.addWidget(button)
-            self._toolbar_groups.append((divider, buttons))
-        self._sync_toolbar_dividers()
-        header.addLayout(toolbar)
-        header.setAlignment(toolbar, Qt.AlignmentFlag.AlignTop)
-        browser_box.addLayout(header)
+            self._toolbar_groups.append((gap, buttons))
+        self._sync_toolbar_gaps()
+        browser_box.addWidget(self._toolbar_host)
         # The Recents shelf's image/video filter: two checkboxes choosing which
         # media types it lists, both on so the shelf opens showing everything. The
         # bar rides just under the header and appears only while that shelf is open.
@@ -955,14 +965,15 @@ class GalleryView(QWidget):
         (btn.toggled if checkable else btn.clicked).connect(handler)
         return btn
 
-    def _sync_toolbar_dividers(self):
-        """Show the rule in front of each group that has something to show, and
+    def _sync_toolbar_gaps(self):
+        """Show the space in front of each group that has something to show, and
         hide the leading one — so a bank whose optional buttons (Group, Auto,
-        Slideshow) are away never wears a stray or doubled line."""
+        Slideshow) are away never wears a stray or doubled gap, and never starts
+        indented."""
         leading = True
-        for divider, buttons in self._toolbar_groups:
+        for gap, buttons in self._toolbar_groups:
             showing = any(not button.isHidden() for button in buttons)
-            divider.setVisible(showing and not leading)
+            gap.setVisible(showing and not leading)
             leading = leading and not showing
 
     def _wire_config_panel(self, panel):
@@ -1763,31 +1774,33 @@ class GalleryView(QWidget):
         try. The All row above Images and Videos is what covers the library
         entire, since every other folder narrows the answer before the query does.
 
-        ``name`` is the row's own label, for the box to say what it will search;
-        ``path`` is its breadcrumb, for the header and the empty-result message,
-        where the extra words are worth the room.
+        ``path`` is the row's breadcrumb — what the box, the header and the
+        empty-result message all name the scope by. A shelf is a single row with
+        no branch above it, so its path is just its own name.
         """
         item = self._tree.currentItem()
         shelf = self._current_shelf_key()
         if shelf is not None:
-            name = _SHELF_LABELS[shelf]
             rows = self._browser.selected_shelf_rows() or []
-            return _SearchScope(name, name, {row["prompt_id"] for row in rows})
+            return _SearchScope(_SHELF_LABELS[shelf],
+                                {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
-            return _SearchScope(gallery.ALL_LABEL, gallery.ALL_LABEL, self._live_ids)
+            return _SearchScope(gallery.ALL_LABEL, self._live_ids)
         if isinstance(group, gallery.AllGroup):
             # Everything the *gallery* holds — the trash's held rows share the
             # index but belong to their shelf alone.
-            return _SearchScope(group.label, group.label, self._live_ids)
-        return _SearchScope(group.label, self._tree_view.breadcrumb(item),
+            return _SearchScope(group.label, self._live_ids)
+        return _SearchScope(self._tree_view.breadcrumb(item),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
     def _sync_search_placeholder(self):
         """Say in the empty box what a query typed there would search, so the
-        scope is visible before there is a header or a result to name it."""
-        self._search_edit.setPlaceholderText(
-            f"Search {self._search_scope().name}…")
+        scope is visible before there is a header or a result to name it.
+
+        The whole path goes in; the box shows as much of its tail as it is wide
+        enough for (:class:`ScopeSearchEdit`)."""
+        self._search_edit.set_scope(self._search_scope().path)
 
     def _run_search(self):
         """Fill the browser pane with what the standing query matches, within the
@@ -1804,6 +1817,7 @@ class GalleryView(QWidget):
         )
         self._search_tiles = self._collapse_to_folders(self._search_outcome.results)
         self._title.set_display(f"Search: “{self._search_query}” in {scope.path}")
+        self._title.setToolTip("")  # the header is the query now, not a folder
         self._avg_label.setText("")
         self._recents_filter_bar.hide()
         self._experiments_bar.hide()
@@ -1958,6 +1972,7 @@ class GalleryView(QWidget):
         self._experiments_bar.setVisible(current is self._experiments_item)
         if current is None:
             self._title.set_display("")
+            self._title.setToolTip("")
             self._avg_label.setText("")
             self._browser.show_empty()
             self._sync_action_buttons()
@@ -1985,6 +2000,10 @@ class GalleryView(QWidget):
             # so leaving a shelf for one is a step Back can undo at all.
             self._record_location(group.key)
         self._title.set_display(self._tree_view.breadcrumb(current))
+        # The path ends in a code, so what the folder holds — the prompt its
+        # generations ran, and the settings that set it apart from its siblings —
+        # is read by hovering the path, as it is by hovering the row itself.
+        self._title.setToolTip(gallery.folder_detail(group) if group else "")
         self._update_folder_average(group)
         self._show_group_contents(group)
         self._sync_action_buttons()
@@ -2035,6 +2054,7 @@ class GalleryView(QWidget):
         self._recents_filter_bar.hide()
         self._experiments_bar.hide()
         self._title.set_display(group.label)
+        self._title.setToolTip("")  # a count of folders, with no one folder behind it
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._sync_auto_button()  # greyed here, but still lit if a loop runs elsewhere
@@ -2064,7 +2084,7 @@ class GalleryView(QWidget):
         """Offer "group these" only while several folders are picked — one folder
         is not a grouping, and the button would only ask what it meant."""
         self._group_btn.setVisible(self._selection_group is not None)
-        self._sync_toolbar_dividers()
+        self._sync_toolbar_gaps()
 
     def _group_selection(self):
         """Save the picked folders as a folder of the user's own, under a name they
@@ -2483,7 +2503,7 @@ class GalleryView(QWidget):
         self._auto_btn.blockSignals(True)
         self._auto_btn.setChecked(looping is not None)
         self._auto_btn.blockSignals(False)
-        self._sync_toolbar_dividers()
+        self._sync_toolbar_gaps()
 
     def _auto_tooltip(self, available: bool, looping: str | None) -> str:
         """What the toggle says it will do, for every case but the loop being
@@ -2520,7 +2540,7 @@ class GalleryView(QWidget):
             bool(self._slideshow_items(self._slideshow_rows()))
         )
         self._slideshow_btn.setToolTip(f"Play {self._slideshow_subject()} as a slideshow")
-        self._sync_toolbar_dividers()
+        self._sync_toolbar_gaps()
 
     def _slideshow_rows(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
@@ -4763,7 +4783,7 @@ class GalleryView(QWidget):
         self._sync_enhance_button()
         self._sync_enhance_panel()
         self._sync_delete_button()
-        self._sync_toolbar_dividers()
+        self._sync_toolbar_gaps()
 
     def _sync_delete_button(self):
         """Enable Delete when there's a target — picked thumbnails, else the

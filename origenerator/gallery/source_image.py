@@ -3,19 +3,18 @@
 An i2v row references its start frame by filename; these helpers match that back
 to the image generation that produced the file, index every image by the
 configuration that made it (so a video can find its frame's settings signature and
-folder label in O(1)), and invert the relation to list the videos an image was
+folder name in O(1)), and invert the relation to list the videos an image was
 animated into. The bridge between the Images and Videos trees.
 """
 
 from dataclasses import dataclass
 
+from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.signatures import (
     _frame_name,
-    canonical_settings,
     parse_params,
     settings_signature,
 )
-from origenerator.gallery.labels import settings_label
 from origenerator.gallery.output import row_output_files
 
 
@@ -25,7 +24,7 @@ class _ImageConfig:
 
     prompt_id: str  # which picture it is — what the source-image tier groups on
     signature: str  # the image's settings signature — what names it below
-    label: str      # the image's folder label — names the video's source-image folder
+    label: str      # the image folder's own code — names the video's source-image folder
 
 
 def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str | None:
@@ -64,22 +63,26 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
 
     Keyed by output basename (lowercased, matching how an ``input_image`` value
     resolves), so an i2v row can look up which picture its start frame is, plus
-    that picture's settings signature and folder label, in O(1). Built once per
+    that picture's settings signature and folder name, in O(1). Built once per
     tree. Images that produced no file contribute nothing.
 
     Every file an image row lists points at the same entry, so a picture answers
     as itself under any of its names — which is what keeps a video made from an
     enhanced frame with one made from the frame before it was enhanced.
+
+    The name is the code of the image's own settings folder in the Images tree,
+    so the folder a video's start frames sit in and the folder those frames came
+    from read as the same folder from either tree.
     """
     index: dict[str, _ImageConfig] = {}
     for image in image_rows:
-        workflow_name = image.get("workflow_name")
-        params = parse_params(image.get("params_json"))
+        workflow_name = image.get("workflow_name") or "unknown"
+        signature = settings_signature(workflow_name, image.get("params_json"),
+                                       workflow_version=image.get("workflow_version"))
         config = _ImageConfig(
             prompt_id=image.get("prompt_id") or "",
-            signature=settings_signature(workflow_name, image.get("params_json"),
-                                         workflow_version=image.get("workflow_version")),
-            label=settings_label(canonical_settings(workflow_name, params)),
+            signature=signature,
+            label=folder_id(settings_key("image", workflow_name, signature)),
         )
         for f in row_output_files(image):
             name = _frame_name(f.get("filename"))

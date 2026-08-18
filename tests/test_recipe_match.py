@@ -22,6 +22,12 @@ def _video(pid, prompt, created, **params):
     }
 
 
+def _loop(pid, prompt, created, **params):
+    """The same row from a looping workflow — the only kind a Genau recipe can
+    come from, since a Genau clip has to return to the frame it started on."""
+    return {**_video(pid, prompt, created, **params), "workflow_name": "wan22_flf2v_loop"}
+
+
 def test_best_recipe_picks_the_most_used_recipe_for_the_act():
     rows = [
         _video("a1", "a slow alpha", "2026-01-01", lora_high="X", steps=20),
@@ -69,7 +75,7 @@ def test_curated_recipe_is_none_for_an_uncurated_act():
 
 def test_curated_recipe_is_none_for_a_malformed_entry(monkeypatch):
     # A junk entry must send the caller to mining, never fail the act outright.
-    monkeypatch.setattr(recipe_match, "_CURATED_RECIPES",
+    monkeypatch.setitem(recipe_match._CURATED_BY_INTENT, recipe_match.PLAYERS,
                         {"beta": "not a dict", "epsilon": {"params": {}}})
     assert recipe_match.curated_recipe("beta") is None      # not a dict
     assert recipe_match.curated_recipe("epsilon") is None   # names no workflow
@@ -192,3 +198,87 @@ def test_smart_recipe_returns_none_when_the_llm_errors(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(OSError("model down")))
     assert recipe_match.smart_recipe("alpha", "x", rows,
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
+
+
+# --- the two lanes: a full-length video, or one looping stroke ----------------
+
+
+def test_genau_mines_only_looping_videos():
+    rows = [
+        _video("v1", "a beta", "2026-01-01", lora_high="Z"),   # long-form: not a loop
+        _loop("l1", "a beta", "2026-01-02", lora_high="Z"),
+    ]
+    # The players' lane sees both and prefers the newer of the one shared recipe;
+    # the Genau lane can only use the loop, whatever else the act has behind it.
+    assert recipe_match.best_recipe("beta", rows) == "l1"
+    assert recipe_match.best_recipe("beta", rows, recipe_match.GENAU) == "l1"
+
+    long_form_only = [_video("v1", "a beta", "2026-01-01", lora_high="Z")]
+    assert recipe_match.best_recipe("beta", long_form_only) == "v1"
+    assert recipe_match.best_recipe("beta", long_form_only, recipe_match.GENAU) is None
+
+
+def test_genau_available_categories_need_a_loop_or_a_pinned_recipe():
+    rows = [
+        _video("v1", "an epsilon form moment", "2026-01-01", lora_high="Z"),
+        _loop("l1", "a delta form", "2026-01-02", lora_high="Z"),
+    ]
+    # epsilon has a video but no loop, so the Genau lane cannot answer it; delta can
+    # be mined from the loop; beta is pinned in the example overlay's genau_recipes.
+    assert recipe_match.available_categories(rows, recipe_match.GENAU) == {"delta", "beta"}
+    # The players' lane is unchanged by any of it — a loop is still a video there.
+    assert recipe_match.available_categories(rows) == {"epsilon", "delta", "gamma"}
+
+
+def test_the_two_curated_tables_are_independent():
+    # The same act can be pinned in one lane and mined in the other: one table keyed
+    # by act alone could never hold both.
+    assert recipe_match.curated_recipe("gamma")["workflow"] == "wan22_i2v"
+    assert recipe_match.curated_recipe("gamma", recipe_match.GENAU) is None
+    assert recipe_match.curated_recipe("beta", recipe_match.GENAU)["workflow"] == "wan22_flf2v_loop"
+    assert recipe_match.curated_recipe("beta") is None
+
+
+def test_smart_recipe_offers_the_genau_lane_only_loops(monkeypatch):
+    seen = {}
+
+    def _fake_post(base_url, model, messages, timeout):
+        seen["user"] = messages[1]["content"]
+        return {"choices": [{"message": {"content": '{"choice": 0}'}}]}
+
+    monkeypatch.setattr(recipe_match, "_post_chat", _fake_post)
+    rows = [
+        {**_video("v1", "a beta", "2026-01-01", lora_high="Z"), "start_scene": "a long-form scene"},
+        {**_loop("l1", "a beta", "2026-01-02", lora_high="Z"), "start_scene": "a looping scene"},
+    ]
+    chosen = recipe_match.smart_recipe(
+        "beta", "the dropped image", rows,
+        base_url="http://localhost", model="m", system_prompt="s",
+        intent=recipe_match.GENAU,
+    )
+    assert chosen == "l1"
+    # The long-form recipe was never even shown to the model.
+    assert "a long-form scene" not in seen["user"]
+    assert "a looping scene" in seen["user"]
+
+
+# --- category_for_prompt: let the image say what it is ------------------------
+
+
+def test_category_for_prompt_reads_the_act_off_a_prompt():
+    assert recipe_match.category_for_prompt("a beta form, slowly") == "beta"
+    assert recipe_match.category_for_prompt("she is dancing on a table") == "dancing"
+
+
+def test_category_for_prompt_is_none_when_the_prompt_names_no_act():
+    assert recipe_match.category_for_prompt("a portrait by a window") is None
+    assert recipe_match.category_for_prompt("") is None
+    assert recipe_match.category_for_prompt(None) is None
+
+
+def test_category_for_prompt_prefers_the_more_specific_reading():
+    # "beta form" (both acts' keyword lists overlap on the shorter "beta") must not
+    # be decided by dict order: the longer, more specific keyword wins.
+    assert recipe_match.category_for_prompt("beta form") == "beta"
+    # A prompt naming two acts outright resolves to the longer keyword it matched.
+    assert recipe_match.category_for_prompt("striptease, then a beta") == "dancing"

@@ -192,13 +192,12 @@ def test_settings_signature_drops_input_image_for_an_unknown_workflow():
     assert settings_signature(None, a) != settings_signature(None, c)  # a real setting differs
 
 
-def test_settings_signature_folds_the_start_frames_config_for_i2v():
-    # An i2v groups by the *configuration* that produced its start frame: two
-    # videos with identical video settings split when their frames were generated
-    # from different image configs, and rejoin when the frames share one config
-    # (a re-roll of a single image).
+def test_settings_signature_folds_which_picture_the_start_frame_is_for_i2v():
+    # A video groups by the *picture* it animates: two videos with identical video
+    # settings split whenever their frames are different pictures — even two draws
+    # of one prompt, which are two pictures however alike the recipe was.
     face1 = _img("face1", "a face", 30, 1)      # sdxl_t2i_face1.png
-    face2 = _img("face2", "a face", 30, 2)      # same image config, re-rolled file
+    face2 = _img("face2", "a face", 30, 2)      # same image config, a second draw
     scene = _img("scene", "a landscape", 30, 1)  # a differently configured frame
     index = build_image_config_index([face1, face2, scene])
 
@@ -208,8 +207,23 @@ def test_settings_signature_folds_the_start_frames_config_for_i2v():
     sig_face1 = settings_signature("wan22_i2v", vid("sdxl_t2i_face1.png"), index)
     sig_face2 = settings_signature("wan22_i2v", vid("sdxl_t2i_face2.png"), index)
     sig_scene = settings_signature("wan22_i2v", vid("sdxl_t2i_scene.png"), index)
-    assert sig_face1 == sig_face2  # re-rolled frame, same config -> one folder
-    assert sig_face1 != sig_scene  # differently configured frame -> a new folder
+    assert sig_face1 != sig_face2  # a second draw is a second picture -> its own folder
+    assert sig_face1 != sig_scene  # and so is an unrelated frame
+
+
+def test_settings_signature_folds_the_frames_config_for_an_image_result():
+    # An enhance is image-conditioned too, but its results live in the Images tree,
+    # which has no source-image tier — so a batch of enhances stays one folder of
+    # work rather than fragmenting into one folder per picture.
+    face1 = _img("face1", "a face", 30, 1)
+    face2 = _img("face2", "a face", 30, 2)
+    index = build_image_config_index([face1, face2])
+
+    def enhanced(frame):
+        return json.dumps({"positive_prompt": "", "input_image": frame})
+
+    assert settings_signature("image_enhance", enhanced("sdxl_t2i_face1.png"), index) == \
+        settings_signature("image_enhance", enhanced("sdxl_t2i_face2.png"), index)
 
 
 def test_settings_signature_falls_back_to_the_frame_filename_when_unresolvable():
@@ -426,20 +440,18 @@ def test_gallery_tree_splits_different_workflow_generations_into_folders():
         == [{"old"}, {"new"}]
 
 
-def test_reroll_regenerates_its_frame_and_stays_in_its_folder():
-    # A re-roll regenerates the start frame (same image config, a fresh file) then
-    # runs the video on it, building params via prepared_params (which fills every
-    # workflow default). The re-roll must land in the original's folder despite
-    # both the fresh filename and the default-filling: it keys on the frame's
-    # *config*, not its file, and canonical settings absorb the default-filling.
+def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
+    # A re-roll that keeps the frame and re-rolls only the video seed builds its
+    # params via prepared_params (which fills every workflow default). It must land
+    # in the original's folder despite that default-filling, which canonical
+    # settings absorb.
     from origenerator.gallery import settings_folder_key
     from origenerator.generation_config import prepared_params
     from origenerator.workflows import WORKFLOW_REGISTRY
 
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    frame_a = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
-    frame_b = _img("fb", "a face", 30, 2)  # same config, re-rolled -> sdxl_t2i_fb.png
-    index = build_image_config_index([frame_a, frame_b])
+    frame = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
+    index = build_image_config_index([frame])
 
     sparse = _row(
         workflow_name="wan22_i2v",
@@ -447,13 +459,33 @@ def test_reroll_regenerates_its_frame_and_stays_in_its_folder():
         output_files=json.dumps([{"filename": "wan22_i2v_a.mp4"}]),
     )
     reroll_params = prepared_params(sparse, wf)  # exactly what the gallery re-roll runs
-    reroll_params["input_image"] = "sdxl_t2i_fb.png"  # the freshly regenerated frame
     reroll = _row(
         workflow_name="wan22_i2v",
         params_json=json.dumps(reroll_params),
         output_files=json.dumps([{"filename": "wan22_i2v_b.mp4"}]),
     )
     assert settings_folder_key(reroll, index) == settings_folder_key(sparse, index)
+
+
+def test_a_video_reroll_on_a_fresh_frame_opens_that_frames_own_folder():
+    # Re-drawing the start frame makes a different picture, and a source-image
+    # folder holds one picture — so the new video files under the new frame rather
+    # than joining the old one's folder.
+    from origenerator.gallery import settings_folder_key
+
+    frame_a = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
+    frame_b = _img("fb", "a face", 30, 2)  # same settings, re-drawn -> sdxl_t2i_fb.png
+    index = build_image_config_index([frame_a, frame_b])
+
+    def video(frame, name):
+        return _row(
+            workflow_name="wan22_i2v",
+            params_json=json.dumps({"positive_prompt": "a wave", "input_image": frame}),
+            output_files=json.dumps([{"filename": name}]),
+        )
+
+    assert settings_folder_key(video("sdxl_t2i_fb.png", "b.mp4"), index) != \
+        settings_folder_key(video("sdxl_t2i_fa.png", "a.mp4"), index)
 
 
 def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
@@ -760,18 +792,34 @@ def test_i2v_videos_split_into_a_folder_per_input_image_config():
     }
 
 
-def test_i2v_videos_from_rerolls_of_one_image_share_a_source_folder():
-    # A frame re-rolled (same image config, fresh file) keeps its videos in one
-    # source-image folder, collapsed into a single settings leaf beneath it.
+def test_every_video_in_a_source_folder_animates_the_one_picture():
+    # The tier's whole promise: open any settings folder inside a source-image
+    # folder and every video in it ran on that one frame. Two draws of a single
+    # prompt are two pictures, so they get two folders however alike their recipes.
     face1 = _img("face1", "a face", 30, 1)
-    face2 = _img("face2", "a face", 30, 2)  # re-roll of the same image config
-    (source,) = _i2v_source_folders([
+    face2 = _img("face2", "a face", 30, 2)  # a second draw of the same settings
+    sources = _i2v_source_folders([
         _i2v_frame("v1", "sdxl_t2i_face1.png"),
         _i2v_frame("v2", "sdxl_t2i_face2.png"),
         face1, face2,
     ])
-    (leaf,) = source.children
-    assert {r["prompt_id"] for r in leaf.rows} == {"v1", "v2"}
+    assert len(sources) == 2
+    assert [{r["prompt_id"] for leaf in g.children for r in leaf.rows} for g in sources] == \
+        [{"v1"}, {"v2"}]
+
+
+def test_two_source_folders_of_one_prompt_are_told_apart_by_name():
+    # Their prompts are identical, so the frame's own filename has to lead the
+    # label — the prompt half is what gets truncated away in the tree.
+    face1 = _img("face1", "a face", 30, 1)
+    face2 = _img("face2", "a face", 30, 2)
+    first, second = _i2v_source_folders([
+        _i2v_frame("v1", "sdxl_t2i_face1.png"),
+        _i2v_frame("v2", "sdxl_t2i_face2.png"),
+        face1, face2,
+    ])
+    assert first.label != second.label
+    assert first.label.startswith("sdxl_t2i_face1.png")
 
 
 def test_i2v_source_folder_is_named_by_the_image_it_animates():

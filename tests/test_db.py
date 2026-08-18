@@ -567,3 +567,60 @@ def test_a_request_outlives_the_generation_it_queued(tmp_path):
     db.delete_generation("gen-1")
 
     assert db.get_request("gen-1") is not None
+def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    db.insert_generation(
+        prompt_id="clip-001",
+        workflow_name="wan22_flf2v_loop",
+        workflow_version="v006",
+        params_json="{}",
+        workflow_json="{}",
+    )
+    row = db.get_generation("clip-001")
+    assert row["genau_requested_at"] is None and row["genau_exported_at"] is None
+
+    db.mark_genau_requested("clip-001")   # a spoken "genau it" started this run
+    db.mark_genau_exported("clip-001")    # and it was handed on once it existed
+
+    reopened = Database(db_path).get_generation("clip-001")
+    assert reopened["genau_requested_at"] is not None
+    assert reopened["genau_exported_at"] is not None
+    # The two lanes are separate errands: sending down one says nothing about the other.
+    assert reopened["evolver_exported_at"] is None
+
+
+def test_opening_db_without_the_genau_columns_migrates_them(tmp_path):
+    db_path = tmp_path / "old.db"
+    # The schema as it stood when Evolver was the only place a video could be sent.
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE generations ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " prompt_id TEXT NOT NULL UNIQUE,"
+        " source TEXT NOT NULL DEFAULT 'generated',"
+        " workflow_name TEXT NOT NULL,"
+        " workflow_version TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'pending',"
+        " positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
+        " params_json TEXT NOT NULL,"
+        " workflow_json TEXT NOT NULL,"
+        " output_files TEXT, thumbnail_path TEXT, error_message TEXT,"
+        " duration_seconds REAL,"
+        " created_at TEXT NOT NULL DEFAULT (datetime('now')),"
+        " completed_at TEXT, evolver_exported_at TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO generations"
+        " (prompt_id, workflow_name, workflow_version, params_json, workflow_json)"
+        " VALUES ('old-001', 'wan22_flf2v_loop', 'v006', '{}', '{}')"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(db_path)
+    assert db.get_generation("old-001")["genau_exported_at"] is None
+    db.mark_genau_requested("old-001")
+    db.mark_genau_exported("old-001")
+    row = db.get_generation("old-001")
+    assert row["genau_requested_at"] is not None and row["genau_exported_at"] is not None

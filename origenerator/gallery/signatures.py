@@ -256,21 +256,48 @@ def _frame_name(image_ref: str | None) -> str:
     return _basename(_unannotated(image_ref or "")).lower()
 
 
-def _input_image_config(input_image: str | None, image_index: dict | None) -> str:
-    """The grouping key for an i2v's start frame: the settings signature of the
-    image generation that produced it, so a video groups with its own re-rolls
-    (same config, a freshly regenerated frame) yet splits from videos built off a
-    differently configured frame.
+def _outputs_video(workflow_name: str | None) -> bool:
+    """True when a workflow's results live in the Videos tree — the one tree with
+    a source-image tier under its LoRA folders."""
+    wf = _registered(workflow_name)
+    return wf is not None and wf.output_type == "video"
 
-    Falls back to the frame's own filename when it isn't a known generation
-    (hand-picked, external, or since deleted), so distinct frames still separate,
-    and to ``""`` when there's no input image at all.
+
+def _input_image_config(input_image: str | None, image_index: dict | None,
+                        *, identify: bool = False) -> str:
+    """The grouping key for a row's start frame.
+
+    ``identify`` picks which question is being asked of the frame. *Which picture
+    is it* (``True``) is what the Videos tree needs: its source-image tier means
+    one picture, and every settings folder under that tier explores the same
+    frame — a different prompt, a different CFG — so opening any of them must
+    show videos of the one image. *What configuration produced it* (``False``,
+    the default) is what everything else needs, where there is no such tier and a
+    batch of enhances of a dozen different pictures is one folder of work.
+
+    Identity is the generation that produced the frame, so a picture answers as
+    itself however it is named: an enhanced image keeps its original file listed
+    beside the enhanced one, and a video that ran on either is a video of that
+    picture. Both modes fall back to the frame's own filename when it isn't a
+    known generation (hand-picked, external, or since deleted) — distinct frames
+    still separate — and to ``""`` when there is no input image at all.
+
+    Videos grouped by configuration here until 2026-08-18, so that a video stayed
+    with its own image-seed re-rolls: a fresh draw of the same settings is the
+    same recipe, so it read as the same folder. But two draws of one prompt are
+    two different pictures, and collecting them made a source-image folder that
+    held several — precisely what that tier promises it never does. A re-drawn
+    frame now opens its own folder, which is what a new picture is.
     """
     name = _frame_name(input_image)
     if not name:
         return ""
     entry = (image_index or {}).get(name)
-    return entry.signature if entry is not None else name
+    if entry is None:
+        return name
+    if identify:
+        return entry.prompt_id or name
+    return entry.signature
 
 
 def rows_in_settings(rows, key, image_index=None):
@@ -303,12 +330,13 @@ def settings_signature(
     :func:`canonical_settings`), order-independent — the enhancement layer
     excluded, so an enhanced render keys the same as its unenhanced twin.
 
-    For an image-conditioned workflow the start frame's own configuration is
-    folded in — resolved through ``image_index`` (see
-    :func:`build_image_config_index`) — so videos built from differently
-    configured frames get distinct keys while a video and its re-rolls (same
-    frame config, a freshly regenerated file) share one. ``image_index`` may be
-    omitted for rows that aren't image-conditioned.
+    For an image-conditioned workflow the start frame is folded in — resolved
+    through ``image_index`` (see :func:`build_image_config_index`) — so rows built
+    from different frames get distinct keys. A video folds in *which picture* the
+    frame is, because the Videos tree files it under that picture's own folder;
+    anything else folds in the frame's configuration, so a batch of enhances of
+    many pictures stays one folder of work (see :func:`_input_image_config`).
+    ``image_index`` may be omitted for rows that aren't image-conditioned.
 
     The workflow generation is folded in too (see :func:`_grouping_version`), so
     rows made before and after a workflow's recipe changed never share a key. A
@@ -323,6 +351,9 @@ def settings_signature(
     if is_image_conditioned(workflow_name):
         settings = {
             **settings,
-            "input_image_config": _input_image_config(params.get("input_image"), image_index),
+            "input_image_config": _input_image_config(
+                params.get("input_image"), image_index,
+                identify=_outputs_video(workflow_name),
+            ),
         }
     return json.dumps(settings, sort_keys=True, default=str)

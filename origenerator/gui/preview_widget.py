@@ -5,6 +5,13 @@ static images are scaled to fit (and rescaled on resize), animated images
 (animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
 default, so selecting one gives an immediate moving preview without stealing audio,
 while the fullscreen slideshow opts in to sound.
+
+A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
+three controls a gallery thumbnail of the same generation wears in its corners,
+and offers the same right-click menu over the picture — because it IS the same
+generation, and where you are standing should not change what you can do to it.
+Unarmed — a live frame, a message, a slideshow's own inner pane — the picture is
+inert.
 """
 
 from __future__ import annotations
@@ -15,13 +22,14 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
-from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
+from PyQt6.QtGui import QCursor, QPixmap, QMovie, QImageReader, QDrag
 from PyQt6.QtCore import Qt, QUrl, QPoint, QRect, QSize, QEvent, pyqtSignal
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.combination_view import CombinationView
+from origenerator.gui.corner_controls import CornerControls
 from origenerator.gui.drag_thumbnail import (
     fit_thumbnail, label_thumbnail, set_drag_thumbnail,
 )
@@ -49,6 +57,8 @@ class PreviewWidget(QWidget):
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
     drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
+    action_triggered = pyqtSignal(str, str)  # a corner control: prompt_id, action
+    context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
@@ -84,7 +94,15 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self._drag_origin: QPoint | None = None
+        # The shown generation's prompt_id when the owner has armed the corner
+        # controls and the right-click menu over it, else None. Armed separately
+        # from the drag because they answer different questions: a drag needs
+        # something to carry, and these need a row to act on.
+        self._actions_id: str | None = None
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Right-click the picture for the same menu a gallery thumbnail of it gives.
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
         # along its bottom edge, so a scripted clip shows its stroke motion at a glance.
@@ -126,6 +144,9 @@ class PreviewWidget(QWidget):
             QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
         )
         self._player.mediaStatusChanged.connect(self._on_media_status)
+        # Until a clip's resolution arrives, media_rect can only answer "the whole
+        # pane"; the corners have to move to the real picture once it can.
+        self._player.metaDataChanged.connect(self._place_controls)
         self._stack.addWidget(self._video)
 
         # A third page, for what is not a generation at all: an image and the
@@ -155,6 +176,15 @@ class PreviewWidget(QWidget):
         self._notice.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self._notice.hide()
 
+        # The same three corner controls a gallery thumbnail of this generation
+        # wears, in the same three corners, so the acts are where they were learned
+        # whichever surface the picture is on. Native, because a video plays on a
+        # surface an ordinary sibling cannot paint over — the notice above it is
+        # native for the very same reason. They stay hidden until the owner arms
+        # them (:meth:`set_actions`): a live frame or a message is no row to act on.
+        self._controls = CornerControls(self, native=True)
+        self._controls.triggered.connect(self._on_control)
+
         # Opt-in funscript heatmap along the bottom edge (the info-pane and fullscreen
         # previews use it); hidden until a scripted video is shown.
         self._strip = FunscriptStrip() if show_funscript_strip else None
@@ -180,6 +210,7 @@ class PreviewWidget(QWidget):
     def show_image(self, path) -> None:
         self._player.stop()
         self.set_notice(None)  # a new picture, so any notice about the last one goes
+        self.set_actions(None)  # …and the corners are about the last one too
         self._media = (path, "image")
         self._end_live(self._media)
         reader = QImageReader(str(path))
@@ -196,6 +227,7 @@ class PreviewWidget(QWidget):
     def show_video(self, path) -> None:
         self._set_movie(None)
         self.set_notice(None)  # a new clip, so any notice about the last one goes
+        self.set_actions(None)  # …and the corners are about the last one too
         self._media = (path, "video")
         self._end_live(self._media)
         self._pixmap = None
@@ -221,6 +253,7 @@ class PreviewWidget(QWidget):
         self._media = None  # a transient live frame, not a file to open fullscreen
         self._live, self._live_frame = True, data  # …but a running generation to watch
         self._draggable_id = None  # nor a saved generation to drag out
+        self.set_actions(None)     # nor one to star, bin or enhance
         self._set_movie(None)
         self._pixmap = pixmap
         self._rescale()
@@ -245,6 +278,7 @@ class PreviewWidget(QWidget):
         self._media = None     # a pair to be made, not a file to open fullscreen
         self._end_live(None)
         self._draggable_id = None  # nor a saved generation to drag out
+        self.set_actions(None)     # nor one to star, bin or enhance
         self._set_movie(None)
         self._pixmap = None
         self._image_label.clear()
@@ -268,6 +302,7 @@ class PreviewWidget(QWidget):
         self._end_live(None)  # a message is no result to hand a following view
         self._live = live
         self._draggable_id = None  # nor a saved generation to drag out
+        self.set_actions(None)     # nor one to star, bin or enhance
         self._set_movie(None)
         self._pixmap = None
         self._image_label.setText(text)
@@ -402,6 +437,62 @@ class PreviewWidget(QWidget):
     def player(self) -> QMediaPlayer:
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
+
+    def set_actions(self, prompt_id: str | None, *, starred: bool = False,
+                    enhance: str | None = None) -> None:
+        """Arm the corner controls and the right-click menu over the shown media.
+
+        ``prompt_id`` is the saved generation on screen — the row every act here
+        lands on — with the state its corners report beside it: whether it is
+        bookmarked, and what its enhance corner has to say
+        (:func:`~origenerator.gui.corner_controls.enhance_state`). ``None`` leaves
+        the picture inert, which is what everything transient is: a live frame is
+        a file that does not exist yet, and a message is not a picture at all.
+
+        Re-armed rather than remembered, because the answers move under the
+        picture — a star toggled from the menu, an enhancement landing, a knob
+        turned on the Enhance panel — and the owner is what hears about that.
+        """
+        self._actions_id = prompt_id
+        if prompt_id is None:
+            self._controls.hide_all()
+            return
+        self._controls.show_for(starred=starred, enhance=enhance)
+        self._place_controls()
+
+    def _on_control(self, action: str) -> None:
+        if self._actions_id is not None:
+            self.action_triggered.emit(self._actions_id, action)
+
+    def _on_context_menu(self, pos: QPoint) -> None:
+        if self._actions_id is not None:
+            self.context_requested.emit(self._actions_id, self.mapToGlobal(pos))
+
+    def _place_controls(self) -> None:
+        """Put the corner controls back in the corners of the picture.
+
+        Re-run on every resize and every refit rather than once: what the corners
+        are pinned to is the media's own rectangle, which moves whenever the pane
+        does — and, for a video, again when its resolution finally arrives and the
+        pane stops guessing at where the picture is.
+        """
+        self._controls.place(self.media_rect())
+
+    def resizeEvent(self, event) -> None:
+        self._place_controls()
+        super().resizeEvent(event)
+
+    def enterEvent(self, event) -> None:
+        self._controls.set_revealed(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        # Moving onto a corner control fires this too; the controls are children,
+        # so the cursor is still over the picture and they must not vanish from
+        # under it.
+        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
+            self._controls.set_revealed(False)
+        super().leaveEvent(event)
 
     def set_draggable_id(self, prompt_id: str | None) -> None:
         """Arm (or disarm) dragging the shown media out as a generation.
@@ -595,5 +686,6 @@ class PreviewWidget(QWidget):
                 self._place_notice()
             # The label lags this widget going fullscreen, so anything placed
             # against the media's rect has to re-place when the refit lands.
+            self._place_controls()
             self.media_resized.emit()
         return super().eventFilter(obj, event)

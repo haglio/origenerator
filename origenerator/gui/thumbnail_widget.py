@@ -5,15 +5,16 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplicat
 from PyQt6.QtGui import QPixmap, QDrag, QCursor
 from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QEvent, QTimer, pyqtSignal
 
+from origenerator.gui.corner_controls import (
+    CHIP_CSS, CORNER_GAP, CORNER_INSET, CORNER_SIZE, CornerControls,
+)
 from origenerator.gui.drag_thumbnail import label_thumbnail, set_drag_thumbnail
-from origenerator.gui.enhanced_badge import EnhancedBadge
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.gui.star_badge import StarBadge
 from origenerator.timing import progress_status_label
 
 _IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
@@ -21,14 +22,12 @@ _BORDER_PX = 2                 # the image's own edge, which the overlays stay i
 _BAR_HEIGHT = 26               # the enhancement's bar, along the picture's foot
 _TICK_MS = 1000                # how often the bar's clock re-reads itself
 
-# Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls): a small
-# translucent chip in the top-left, blue on hover, sized to sit over the thumbnail.
-_CORNER_INSET = 6
-_CORNER_SIZE = 28
-_CORNER_GAP = 4
+# Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
+# shelf's keep/reject): the same translucent chip the corner controls sit on, blue
+# on hover, laid along the top of the tile after the star. They begin one slot in
+# because the star owns the corner itself — see :meth:`_corner_action_x`.
 _CORNER_BUTTON_CSS = (
-    "QPushButton { background: rgba(0,0,0,0.55); border: none; border-radius: 6px; }"
-    "QPushButton:hover { background: rgba(48,128,224,0.9); }"
+    CHIP_CSS + "QPushButton:hover { background: rgba(48,128,224,0.9); }"
 )
 
 # A selected thumbnail lightens its whole tile — behind both the image and the
@@ -53,17 +52,19 @@ class ThumbnailWidget(QWidget):
     drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
+    control_triggered = pyqtSignal(str, str)  # prompt_id, corner_controls.STAR/TRASH/ENHANCE
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, starred: bool = False,
-                 enhanced: bool = False,
+                 enhance: str | None = None, controls: bool = True,
                  enhancing: EnhancingRun | None = None,
                  corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
         self._starred = starred
+        self._enhance = enhance       # what the enhance corner has to say, if anything
         self._enhancing = enhancing   # the run being made of this image, if any
         # The tile's own picture, held aside while a running enhancement streams
         # its frames over the top, so the end of the run restores it.
@@ -120,21 +121,24 @@ class ThumbnailWidget(QWidget):
         self._apply_styles()
 
         # In a mixed listing (the Recents shelf) a corner badge names the kind;
-        # inside a single-type folder the caller leaves it off as redundant.
+        # inside a single-type folder the caller leaves it off as redundant. It
+        # takes the top-right, the one corner the controls below leave alone.
         if media_type:
             MediaBadge(media_type, self)
 
-        # A green star in the opposite (top-right) corner marks a bookmarked item,
-        # shown only while starred so an unstarred tile stays clean.
-        self._star_badge = StarBadge(self)
-        self._star_badge.setVisible(self._starred)
-
-        # A yellow plus in the bottom-right of the image area marks an enhanced
-        # image (upscaled + re-sampled), clear of the other corners' badges.
-        self._enhanced_badge = None
-        if enhanced:
-            image_bottom = layout.contentsMargins().top() + _IMAGE_SIZE.height()
-            self._enhanced_badge = EnhancedBadge(self, image_bottom)
+        # Star, trash and plus in the other three corners of the picture: what the
+        # item is (bookmarked, enhanced) and what can be done to it, as one mark
+        # each. A Trash-shelf tile passes controls=False — its item is already
+        # deleted, so there is nothing here to bookmark, bin or enhance, and its
+        # own restore/purge controls are the two acts left.
+        layout.activate()  # so the picture has a rectangle for the controls to sit in
+        self._controls = CornerControls(self) if controls else None
+        if self._controls is not None:
+            self._controls.place(self._image_label.geometry())
+            self._controls.triggered.connect(
+                lambda action: self.control_triggered.emit(self.prompt_id, action))
+            for button in self._controls.buttons():
+                button.installEventFilter(self)  # an off-tile exit from a control
 
         # While an enhancement of this image is cooking, the tile wears the same
         # two overlays an in-flight card does, so work in progress reads the same
@@ -152,12 +156,11 @@ class ThumbnailWidget(QWidget):
         self._enhancing_tick = QTimer(self)
         self._enhancing_tick.setInterval(_TICK_MS)
         self._enhancing_tick.timeout.connect(self._render_enhancing_timing)
-        layout.activate()  # or the frame has no place yet, and the overlays take 0,0
         self._place_enhancing_bar()
         self._show_enhancing_run()
 
-        # An i2v folder's tiles carry top-left hover controls to re-roll one seed
-        # on its own; other tiles pass none and grow no buttons.
+        # An i2v folder's tiles carry hover controls to re-roll one seed on its
+        # own, in a row beside the star; other tiles pass none and grow no buttons.
         self._build_corner_actions(corner_actions or [])
 
     def is_selected(self) -> bool:
@@ -174,11 +177,40 @@ class ThumbnailWidget(QWidget):
         return self._starred
 
     def set_starred(self, starred: bool):
-        """Show or hide the corner star as the item's bookmark is toggled."""
+        """Fill or hollow the corner star as the item's bookmark is toggled."""
         if starred == self._starred:
             return
         self._starred = starred
-        self._star_badge.setVisible(starred)
+        self._sync_controls()
+
+    def enhance_state(self) -> str | None:
+        """What this tile's enhance corner is saying, or ``None`` where it has no
+        plus at all (:mod:`origenerator.gui.corner_controls`)."""
+        return self._enhance
+
+    def set_enhance(self, enhance: str | None):
+        """Re-read the enhance corner without rebuilding the tile — what a turn of
+        the Enhance panel's knobs does to every picture on screen at once."""
+        if enhance == self._enhance:
+            return
+        self._enhance = enhance
+        self._sync_controls()
+
+    def _sync_controls(self):
+        """Point the corner controls at this tile's current state.
+
+        A tile with a run cooking on it drops them entirely: the bar along the
+        picture's foot is laid over those two corners, so a control there would
+        be a button nobody can see and everybody can press — and what is on the
+        tile meanwhile is a part-drawn frame of a file that does not exist yet,
+        which is nothing to bookmark or bin.
+        """
+        if self._controls is None:
+            return
+        if self._enhancing is not None:
+            self._controls.hide_all()
+        else:
+            self._controls.show_for(starred=self._starred, enhance=self._enhance)
 
     def is_enhancing(self) -> bool:
         return self._enhancing is not None
@@ -227,6 +259,7 @@ class ThumbnailWidget(QWidget):
         picture where it was, but a tile built before its layout ran has none yet.
         """
         run = self._enhancing
+        self._sync_controls()
         self._enhancing_overlay.cover(
             self._image_label, "Enhancing…" if run is not None else None,
             inset=_BORDER_PX)
@@ -287,7 +320,8 @@ class ThumbnailWidget(QWidget):
     # --- corner action buttons (hover-revealed per-seed re-rolls) -----------
 
     def _build_corner_actions(self, actions: list):
-        """Lay out one hidden top-left button per ``(action_id, icon, tooltip)``.
+        """Lay out one hidden button per ``(action_id, icon, tooltip)`` along the
+        top of the tile.
 
         Each fires :attr:`corner_action_triggered` with this tile's prompt_id and
         its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
@@ -297,30 +331,49 @@ class ThumbnailWidget(QWidget):
         for i, (action_id, icon, tooltip) in enumerate(actions):
             button = QPushButton(self)
             button.setIcon(icon)
-            button.setIconSize(QSize(_CORNER_SIZE - 8, _CORNER_SIZE - 8))
+            button.setIconSize(QSize(CORNER_SIZE - 8, CORNER_SIZE - 8))
             button.setToolTip(tooltip)
-            button.setFixedSize(_CORNER_SIZE, _CORNER_SIZE)
+            button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setStyleSheet(_CORNER_BUTTON_CSS)
-            button.move(_CORNER_INSET + i * (_CORNER_SIZE + _CORNER_GAP), _CORNER_INSET)
+            button.move(self._corner_action_x(i), self._image_label.y() + CORNER_INSET)
             button.setVisible(False)
             button.installEventFilter(self)  # keep the set up while hovering a button
             button.clicked.connect(lambda _=False, a=action_id: self.corner_action_triggered.emit(self.prompt_id, a))
             self._corner_buttons.append(button)
 
+    def _corner_action_x(self, index: int) -> int:
+        """Where the ``index``-th shelf action sits along the tile's top edge.
+
+        After the star, where the tile has one: the star owns the corner itself,
+        so a shelf's own controls queue up to its right rather than landing on
+        top of it. Where there is no star (a Trash-shelf tile) they start in the
+        corner, since nothing else is claiming it.
+        """
+        slot = index + (1 if self._controls is not None else 0)
+        return self._image_label.x() + CORNER_INSET + slot * (CORNER_SIZE + CORNER_GAP)
+
     def _set_corner_actions_visible(self, visible: bool):
         for button in self._corner_buttons:
             button.setVisible(visible)
+        if self._controls is not None:
+            self._controls.set_revealed(visible)
 
     def _cursor_over_tile(self) -> bool:
         """Whether the pointer is still anywhere within the tile — including over a
         corner button — so leaving for a button doesn't read as leaving the tile."""
         return self.rect().contains(self.mapFromGlobal(QCursor.pos()))
 
+    def _hover_buttons(self) -> list:
+        """Every child a cursor can be over while it is still "on the tile" — the
+        shelf's own actions and the three corner controls alike."""
+        controls = [] if self._controls is None else self._controls.buttons()
+        return self._corner_buttons + controls
+
     def eventFilter(self, obj, event):
         # A button is a child, so the cursor leaving it (back onto the tile, or off
         # the tile entirely) is where an off-tile exit from a button surfaces.
-        if event.type() == QEvent.Type.Leave and obj in self._corner_buttons:
+        if event.type() == QEvent.Type.Leave and obj in self._hover_buttons():
             if not self._cursor_over_tile():
                 self._set_corner_actions_visible(False)
         return super().eventFilter(obj, event)

@@ -28,6 +28,7 @@ from PyQt6.QtCore import Qt, QTimer
 
 from origenerator import gallery, search, timing
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
+from origenerator.gui.corner_controls import enhance_state
 from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
@@ -521,7 +522,7 @@ class BrowserPane:
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
-            enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
+            enhance=self._enhance_state(row),           # the plus in the picture's corner
             enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
@@ -530,6 +531,7 @@ class BrowserPane:
         # Every shelf gets the folder menu — an item is no less actionable for being
         # listed by when it was made or by its bookmark rather than by its settings.
         tw.context_requested.connect(self._thumbnail_context_menu)
+        tw.control_triggered.connect(self._on_tile_control)
         self._wire_drag(tw)
         flow.addWidget(tw)
         self._visible_ids.append(row["prompt_id"])
@@ -895,18 +897,18 @@ class BrowserPane:
         tiles carry) rather than jumping to its folder, which is the one thing a
         deleted item hasn't got.
 
-        What it doesn't get is the ordinary tile's right-click menu — star,
-        enhance, delete all want a row in the gallery — and no drag to a combine
-        slot, whose graphs read files out of ComfyUI's output folder, not ours. In
-        their place the corners and the menu offer the two actions that do apply:
-        restore, or end it now.
+        What it doesn't get is the ordinary tile's right-click menu or its corner
+        controls — star, enhance, delete all want a row in the gallery — and no
+        drag to a combine slot, whose graphs read files out of ComfyUI's output
+        folder, not ours. In their place the corners and the menu offer the two
+        actions that do apply: restore, or end it now.
         """
         tile = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
-            enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
+            controls=False,       # its two acts are restore and purge, in the corners
             corner_actions=corner_actions,
         )
         tile.clicked.connect(self._thumbnail_clicked)          # preview it here
@@ -1089,13 +1091,14 @@ class BrowserPane:
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
-                enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
+                enhance=self._enhance_state(row),           # the plus in the picture's corner
                 enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
+            tw.control_triggered.connect(self._on_tile_control)
             if i2v:
                 tw.corner_action_triggered.connect(self._v._reroll_item_seed)
             self._wire_drag(tw)
@@ -1235,44 +1238,43 @@ class BrowserPane:
         return [pid for pid in self._visible_ids if pid in self._selected_ids]
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        """Right-click menu for a thumbnail: star/unstar or delete the picked item(s).
+        """Right-click menu for a thumbnail: go to its folder, star/unstar,
+        enhance or delete the picked item(s).
 
         Right-clicking a tile that isn't part of the current selection first
-        selects just it, so the menu always acts on something visible. The star
-        entry reads Unstar only when every picked item is already starred, and
-        toggles the whole selection to the opposite state.
+        selects just it, so the menu always acts on something visible. The menu
+        itself is the gallery's, not this pane's — the preview in a config tab
+        raises the very same one over the very same generation
+        (:meth:`~origenerator.gui.gallery_view.GalleryView.generation_menu`).
         """
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
             self._v._on_thumbnail_clicked(prompt_id)
-        ids = self.selected_prompt_ids()
-        count = len(ids)
-        suffix = f" {count} item{'s' if count != 1 else ''}"
-        all_starred = all(self._is_starred(pid) for pid in ids)
-        # Enhance is offered when any picked item is a finished image — the
-        # handler skips the rest — and enhances deliberately, badge or not.
-        enhanceable = [pid for pid in ids if self._is_enhanceable(pid)]
-        menu = QMenu(self._v)
-        star_action = menu.addAction(("Unstar" if all_starred else "Star") + suffix)
-        enhance_action = None
-        if enhanceable:
-            n = len(enhanceable)
-            enhance_action = menu.addAction(
-                f"Enhance {n} image{'s' if n != 1 else ''}"
-            )
-        delete_action = menu.addAction("Delete" + suffix)
-        chosen = menu.exec(global_pos)
-        if chosen is delete_action:
-            self._v._delete_selection()
-        elif chosen is star_action:
-            self._v.set_items_starred(ids, not all_starred)
-        elif enhance_action is not None and chosen is enhance_action:
-            self._v.enhance_items(enhanceable)
+        self._v.generation_menu(self.selected_prompt_ids(), global_pos)
 
-    def _is_enhanceable(self, prompt_id: str) -> bool:
-        row = self._v._db.get_generation(prompt_id)
-        return bool(row and gallery.is_enhanceable_row(row))
+    def _on_tile_control(self, prompt_id: str, action: str):
+        """A tile's corner control was pressed: bookmark, bin or enhance THIS one.
 
-    def _is_starred(self, prompt_id: str) -> bool:
-        row = self._v._db.get_generation(prompt_id)
-        return bool(row and row.get("starred"))
+        One item, never the selection — the control is drawn on a particular
+        picture, in that picture's own corner, so it has already said which item
+        it is about. The menu is where a whole selection is acted on.
+        """
+        self._v.run_item_action(prompt_id, action)
+
+    def _enhance_state(self, row) -> str | None:
+        """What the plus in this row's bottom-right corner has to say, at the
+        Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
+        return enhance_state(row, self._v._enhance_settings)
+
+    def refresh_enhance_corners(self):
+        """Re-read every drawn tile's enhance corner, without rebuilding the pane.
+
+        Turning a knob in the Enhance subpanel changes what every picture on
+        screen would get from a press — an image holding the version the panel
+        described a moment ago is now one enhancement short of the new one — and
+        none of those tiles were touched, so nothing else would tell them.
+        """
+        for prompt_id, tile in self._thumb_widgets.items():
+            row = self._v._db.get_generation(prompt_id)
+            if row is not None:
+                tile.set_enhance(self._enhance_state(row))

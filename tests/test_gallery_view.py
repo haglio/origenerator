@@ -22,7 +22,7 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.gallery_actions import GalleryActions
-from origenerator.gui import diff_text
+from origenerator.gui import corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.request_worker import RevisionWorker
@@ -1983,10 +1983,7 @@ def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     shelf = _top_level(view._tree)["Starred"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i1"]
-    # Right-click the shelf tile → Unstar (the menu's first entry).
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
-    )
+    _answer_menu(monkeypatch, "Unstar 1 item")
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
@@ -2095,7 +2092,29 @@ def _right_click(view, prompt_id):
     view._thumb_widgets[prompt_id].customContextMenuRequested.emit(QPoint(0, 0))
 
 
-def test_right_clicking_a_recent_item_offers_star_enhance_and_delete(qtbot, monkeypatch):
+def _answer_menu(monkeypatch, label):
+    """Answer the next generation menu with the entry reading ``label``.
+
+    By its words rather than its place in the list: the menu grows and shrinks
+    with what the item can do — "Go to folder" is absent inside the item's own
+    folder, Enhance is absent for a video — so an index picks a different entry
+    depending on where it is raised.
+    """
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: next(act for act in menu.actions() if act.text() == label),
+    )
+
+
+def _menu_labels(monkeypatch, labels):
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: labels.extend(act.text() for act in menu.actions()),
+    )
+
+
+def test_right_clicking_a_recent_item_offers_its_folder_star_enhance_and_delete(
+        qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -2103,16 +2122,46 @@ def test_right_clicking_a_recent_item_offers_star_enhance_and_delete(qtbot, monk
 
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
     labels = []
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
-        lambda menu, *a: labels.extend(act.text() for act in menu.actions()),
-    )
+    _menu_labels(monkeypatch, labels)
 
     _right_click(view, "i2")
 
-    # The shelf's tiles carry the same menu a folder's tiles do.
-    assert labels == ["Star 1 item", "Enhance 1 image", "Delete 1 item"]
+    # A shelf gathers items from all over, so where this one actually lives is
+    # the question its menu is most often asked — it leads, above a separator.
+    assert labels == ["Go to folder", "", "Star 1 item", "Enhance 1 image",
+                      "Delete 1 item"]
     assert view.selected_prompt_ids() == ["i2"]  # right-clicking picked it
+
+
+def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch):
+    # Standing in the folder already, it is a click that changes nothing — which
+    # is what leaves it appearing exactly where it earns its place.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _right_click(view, "i1")
+
+    assert labels == ["Star 1 item", "Enhance 1 image", "Delete 1 item"]
+
+
+def test_go_to_folder_from_a_shelf_opens_the_folder_and_lands_on_the_item(
+        qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    _answer_menu(monkeypatch, "Go to folder")
+
+    _right_click(view, "i2")
+
+    assert view._tree.currentItem() is view._leaf_by_id["i2"]
+    assert view.selected_prompt_ids() == ["i2"]
 
 
 def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeypatch):
@@ -2139,9 +2188,7 @@ def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeyp
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    monkeypatch.setattr(  # Star/Unstar is the menu's first entry
-        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[0]
-    )
+    _answer_menu(monkeypatch, "Star 1 item")
 
     _right_click(view, "i1")
 
@@ -2156,9 +2203,7 @@ def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_pa
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    monkeypatch.setattr(  # Enhance sits between Star and Delete
-        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[1]
-    )
+    _answer_menu(monkeypatch, "Enhance 1 image")
 
     _right_click(view, "g0")
 
@@ -2833,6 +2878,122 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     view._on_enhance_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
     assert view._enhance_btn.isEnabled()
+
+
+# --- the controls a tile wears in its own corners -----------------------------
+
+def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])  # both on screen
+
+    view._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.STAR)
+
+    assert db.get_generation("i2")["starred"]
+    assert view._thumb_widgets["i2"].is_starred() is True   # redrawn on the rebuild
+    assert not db.get_generation("i1").get("starred")
+
+
+def test_a_starred_tiles_star_corner_takes_the_bookmark_away(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
+
+    assert not db.get_generation("i1")["starred"]
+
+
+def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
+    actions = FakeActions()
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])  # both on screen
+
+    view._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.TRASH)
+
+    assert [r["prompt_id"] for r in actions.deleted[0]] == ["i2"]
+
+
+def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
+    # The control is drawn on a particular picture, in that picture's own corner,
+    # so it has already said which item it is about. The menu is where a whole
+    # selection is acted on.
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])  # both on screen
+    view._thumbnail_clicked("i1")
+    view._browser.selected_ids.add("i2")   # both picked, as a Ctrl-click
+
+    view._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
+
+    assert db.get_generation("i1")["starred"]
+    assert not db.get_generation("i2").get("starred")
+
+
+def test_a_tiles_plus_corner_queues_an_enhance_of_that_image(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.ENHANCE)
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+
+
+def test_an_unenhanced_image_offers_its_first_enhancement_in_the_corner(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert view._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_OPEN
+
+
+def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+
+    assert view._thumb_widgets["v1"].enhance_state() is None
+
+
+def test_the_enhance_corner_offers_another_the_moment_a_knob_moves(qtbot, tmp_path):
+    # An image holding the very version the panel describes has nothing to gain
+    # from a press, so its plus is the solid yellow badge alone. Turn a knob and
+    # what it holds is one enhancement short of what the panel now describes, so
+    # the plus goes back to offering — with the one it has as a shadow behind it.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    settings = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 2.0})
+    view.set_enhance_settings(settings.to_json())
+    _enhanced_in_place(db)
+    db.update_generation("g0", enhance_history=json.dumps([
+        {"filename": "image_enhance_00001_.png",
+         "params": gallery.enhance_params_for(db.get_generation("g0"), settings)},
+    ]))
+    view.refresh()
+    _select_first_leaf(view)
+    assert view._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_HELD
+
+    view._on_enhance_settings_changed(
+        gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
+
+    # Re-read in place: no tile was touched and the pane was never rebuilt.
+    assert view._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_MORE
 
 
 def test_a_mixed_pick_enhances_the_images_in_it(qtbot):

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QPushButton, QScrollArea, QMessageBox,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 
 from origenerator import evolver_export
@@ -35,6 +35,7 @@ from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.timing import estimate_label
@@ -93,10 +94,15 @@ class GenerateConfigPanel(QWidget):
     The info appears only while the tab is displaying a saved generation
     (:meth:`show_saved_generation`): a File/Created block above the form, and at the
     bottom of the scroll the videos an image was animated into, or a clickable
-    source-image tile for a video. Go-to-folder (any saved generation), Send-to-
-    Evolver and Send-to-Genau (a video), and the Drive-OSR2 toggle key off the
-    displayed row. A blank
+    source-image tile for a video. Send-to-Evolver and Send-to-Genau (a video), and
+    the Drive-OSR2 toggle key off the displayed row. A blank
     tab, or one showing a bare autoshow, hides them all.
+
+    What acts on the generation itself does not live in the button bank at all:
+    the preview wears the same star / trash / plus corners a gallery thumbnail of
+    it does, and right-clicking it raises the same menu — go to its folder,
+    bookmark it, enhance it, bin it. A picture is where those belong, and a bank
+    under the settings was a strange place to keep a "Go to folder".
 
     A fresh panel opens with no workflow picked — the picker sits on its
     placeholder, and everything the workflow decides (its typical time, its param
@@ -110,7 +116,8 @@ class GenerateConfigPanel(QWidget):
     form_replaced = pyqtSignal()        # a new workflow swapped the param form out
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
-    containing_folder_requested = pyqtSignal(str)  # "Go to folder" clicked (prompt_id)
+    item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
+    context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
@@ -169,6 +176,11 @@ class GenerateConfigPanel(QWidget):
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
         self._preview.drag_started.connect(self.preview_drag_started)
         self._preview.drag_ended.connect(self.preview_drag_ended)
+        # Its corners and its right-click go to the gallery, which owns the
+        # bookmark, the bin and the enhance queue — the same route the browser
+        # pane's thumbnails take, so an act means the same thing either side.
+        self._preview.action_triggered.connect(self.item_action_requested)
+        self._preview.context_requested.connect(self.context_menu_requested)
         layout.addWidget(self._preview, 3)
         # One scroll under the preview holds everything else: the read-only info on
         # top, the editable form below it, so they scroll together. This replaces the
@@ -275,8 +287,8 @@ class GenerateConfigPanel(QWidget):
         layout.addWidget(self._scroll, 4)
 
         # One button bank, fixed under the scroll so Generate is always reachable.
-        # Go-to-folder and Send-to-Evolver show only while displaying a saved
-        # generation (Evolver only for a video); the discard button only while a run
+        # Send-to-Evolver shows only while displaying a saved
+        # generation (and only for a video); the discard button only while a run
         # this tab launched is in flight (the gallery owns the job and drives
         # set_generating), throwing it away from the tab like the folder's tile —
         # "Cancel", or "Next seed" while that folder is auto-generating. Generate
@@ -289,10 +301,6 @@ class GenerateConfigPanel(QWidget):
         # along a row, wider between wrapped rows — like the gallery's own bank.
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
-        self._folder_btn = QPushButton("Go to folder")
-        self._folder_btn.setToolTip("Open this generation's folder in the gallery.")
-        self._folder_btn.clicked.connect(self._on_go_to_folder)
-        self._folder_btn.hide()  # shown only while displaying a saved generation
         self._evolver_btn = QPushButton("Send to Evolver")
         self._evolver_btn.setToolTip(
             "Copy this video into Evolver's inbox for sorting and upscaling."
@@ -312,7 +320,6 @@ class GenerateConfigPanel(QWidget):
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        btn_row.addWidget(self._folder_btn)
         btn_row.addWidget(self._evolver_btn)
         btn_row.addWidget(self._genau_btn)
         btn_row.addWidget(self._cancel_btn)
@@ -360,11 +367,6 @@ class GenerateConfigPanel(QWidget):
                 + self._scroll.verticalScrollBar().sizeHint().width()
                 + 2 * self._scroll.frameWidth()
                 + 2 * _PANE_MARGIN)
-
-    def _on_go_to_folder(self):
-        """Ask the gallery to open the displayed generation's own folder."""
-        if self._displayed_row:
-            self.containing_folder_requested.emit(self._displayed_row["prompt_id"])
 
     def _can_generate(self) -> bool:
         """Is there anything to run? A run needs a server to send it to and a
@@ -660,6 +662,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()  # nothing generated with these settings yet
             self._displayed_row = None
+        self._arm_preview_actions()
         self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows
 
@@ -841,9 +844,30 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview, request)
+        self._arm_preview_actions()
         self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
+
+    def _arm_preview_actions(self):
+        """Point the preview's corners and right-click menu at what is on it.
+
+        Re-run after every change to the picture, because everything the corners
+        report can move under it: the row itself when the tab looks at another
+        generation, its bookmark when the menu toggles one, and what its plus is
+        offering whenever a knob turns on the Enhance panel. An autoshow arms them
+        as readily as an explicit selection — the footer stays hidden there because
+        an autoshow is a peek rather than a choice, but the picture is a real
+        generation and starring it means exactly what starring it anywhere means.
+        """
+        row = self._displayed_row
+        if row is None:
+            self._preview.set_actions(None)
+            return
+        self._preview.set_actions(
+            row["prompt_id"], starred=bool(row.get("starred")),
+            enhance=enhance_state(row, self._enhance_settings),
+        )
 
     def _note_displayed_config(self):
         """Take the settings the generation now on display is being shown under as
@@ -882,7 +906,6 @@ class GenerateConfigPanel(QWidget):
         self._pending_enhancement = None  # nothing on display to be enhancing
         self._source_tile.clear()
         self._animated_strip.hide()
-        self._folder_btn.hide()
         self._evolver_btn.hide()
         self._genau_btn.hide()
 
@@ -901,10 +924,6 @@ class GenerateConfigPanel(QWidget):
         # rather than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
         self._refresh_versions()
-        # Any saved generation has a containing folder to open — except a deleted
-        # one, whose folder it left when its row did. Everything else about it is
-        # still here to look at; there is just nowhere to go.
-        self._folder_btn.setVisible(row.get("deleted_at") is None)
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows, request)
         self._show_request_diff(request)
@@ -957,6 +976,7 @@ class GenerateConfigPanel(QWidget):
             return
         self._preview.show_media(*preview)
         self._preview.set_draggable_id(row["prompt_id"])
+        self._arm_preview_actions()
         self.refresh_modified_notice()  # the picture is back; so is anything said about it
 
     def set_fullscreen_factory(self, make):
@@ -978,6 +998,7 @@ class GenerateConfigPanel(QWidget):
             return
         self._enhance_settings = settings
         self._refresh_versions()
+        self._arm_preview_actions()
 
     def _on_enhance_requested(self):
         if self._displayed_row is not None:
@@ -1052,6 +1073,7 @@ class GenerateConfigPanel(QWidget):
         path = self._level_path(levels[position])
         if path.exists():
             self._preview.show_media(path, "image")
+            self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):

@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize, pyqtSig
 from origenerator import (
     evolver_export, gallery, prompt_edit, recipe_match, recovery, search, timing,
 )
-from origenerator.gui import icons
+from origenerator.gui import corner_controls, icons
 from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -1255,7 +1255,9 @@ class GalleryView(QWidget):
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source
-        image" link and an animation-tile click both navigate like any source link.
+        image" link and an animation-tile click both navigate like any source link,
+        and its preview's corner controls and right-click menu act on the shown
+        generation exactly as a browser thumbnail's do.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
         and re-reads whether the tab still owns a run in flight, a double-click on
         its preview opens the folder behind it as a held slideshow,
@@ -1263,7 +1265,11 @@ class GalleryView(QWidget):
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._on_source_link)
         panel.animated_activated.connect(self._on_source_link)
-        panel.containing_folder_requested.connect(self._browser.open_in_containing_folder)
+        # Its preview's corners and its right-click are the same acts, on the same
+        # generation, as a browser thumbnail's — so they land in the same places.
+        panel.item_action_requested.connect(self.run_item_action)
+        panel.context_menu_requested.connect(
+            lambda prompt_id, pos: self.generation_menu([prompt_id], pos))
         panel.displayed_changed.connect(self._reconcile_osr2)
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
@@ -3188,6 +3194,8 @@ class GalleryView(QWidget):
         # Whether a picked image already holds this exact version is what the
         # button is answering, so turning a knob is what brings it back.
         self._sync_enhance_button()
+        # Every picture on screen is answering it too, in its own corner.
+        self._browser.refresh_enhance_corners()
 
     def _enhance_all(self):
         """The folder button's action: queue a standalone enhance for every
@@ -5124,6 +5132,85 @@ class GalleryView(QWidget):
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
         self._browser._thumbnail_context_menu(prompt_id, global_pos)
+
+    def generation_menu(self, prompt_ids: list[str], global_pos):
+        """The right-click menu a generation's picture offers, wherever it is shown.
+
+        One menu rather than one per surface: a thumbnail in the browser pane and
+        the preview in a config tab are looking at the same generation, so a
+        right-click has to reach the same four acts either way — go to its folder,
+        bookmark it, enhance it, bin it.
+
+        "Go to folder" is left off when the pane already IS that folder, which is
+        what makes it appear exactly where it is worth having: on the shelves and
+        among a search's hits, where what you are looking at was gathered from
+        somewhere else. Enhance is offered whenever any picked item is a finished
+        image — the handler skips the rest — and enhances deliberately, so an
+        image that already holds one is re-enhanced rather than skipped; the
+        corner's plus is where "you already have this one" is said. The star entry
+        reads Unstar only when every picked item is already starred, and toggles
+        the whole selection to the opposite state.
+        """
+        rows = [row for pid in prompt_ids
+                if (row := self._db.get_generation(pid)) is not None]
+        if not rows:
+            return
+        count = len(rows)
+        suffix = f" {count} item{'s' if count != 1 else ''}"
+        menu = QMenu(self)
+        folder_action = None
+        if count == 1 and self._can_open_containing_folder(rows[0]):
+            folder_action = menu.addAction("Go to folder")
+            menu.addSeparator()
+        all_starred = all(row.get("starred") for row in rows)
+        star_action = menu.addAction(("Unstar" if all_starred else "Star") + suffix)
+        enhanceable = [row["prompt_id"] for row in rows
+                       if gallery.is_enhanceable_row(row)]
+        enhance_action = None
+        if enhanceable:
+            n = len(enhanceable)
+            enhance_action = menu.addAction(
+                f"Enhance {n} image{'s' if n != 1 else ''}"
+            )
+        delete_action = menu.addAction("Delete" + suffix)
+        chosen = menu.exec(global_pos)
+        if folder_action is not None and chosen is folder_action:
+            self._on_source_link(rows[0]["prompt_id"])
+        elif chosen is star_action:
+            self.set_items_starred([row["prompt_id"] for row in rows], not all_starred)
+        elif enhance_action is not None and chosen is enhance_action:
+            self.enhance_items(enhanceable)
+        elif chosen is delete_action:
+            self._delete_rows(rows)
+
+    def _can_open_containing_folder(self, row: dict) -> bool:
+        """Whether there is a folder to send this generation's picture to.
+
+        A deleted one has none — it left its folder when its row did — and neither
+        has one whose folder is already the pane you are standing in, where going
+        there would be a click that changes nothing.
+        """
+        if row.get("deleted_at") is not None:
+            return False
+        leaf = self._leaf_by_id.get(row.get("prompt_id"))
+        return leaf is not None and leaf is not self._tree.currentItem()
+
+    def run_item_action(self, prompt_id: str, action: str):
+        """Run one corner control's act on one generation.
+
+        The corner controls are drawn on a particular picture, so unlike the menu
+        they never act on a selection: pressing the star on a tile bookmarks THAT
+        tile, whichever tiles happen to be picked.
+        """
+        row = self._db.get_generation(prompt_id)
+        if row is None:
+            return
+        if action == corner_controls.STAR:
+            self.set_items_starred([prompt_id], not row.get("starred"))
+        elif action == corner_controls.TRASH:
+            self._delete_rows([row])
+        elif action == corner_controls.ENHANCE:
+            self.enhance_items([prompt_id])
 
     def set_items_starred(self, prompt_ids, starred: bool):
         """Star or unstar the given generations, then rebuild so their tiles pick

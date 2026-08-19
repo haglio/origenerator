@@ -865,3 +865,105 @@ def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path)
 
     assert w._stack.currentWidget() is w._image_label
     assert w._combination._movie is None
+# --- the corner controls over the picture ------------------------------------
+
+def _corners(w):
+    """The preview's star, trash can and plus, in that order."""
+    return w._controls.buttons()
+
+
+def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
+                                                                  tmp_path):
+    from origenerator.gui import icons
+
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    w.set_actions("p1", starred=True, enhance=icons.ENHANCE_HELD)
+
+    star, trash, plus = _corners(w)
+    assert not star.isHidden()   # the bookmark reports itself, cursor or no cursor
+    assert not plus.isHidden()
+    assert trash.isHidden()      # the offers wait for one
+    w._controls.set_revealed(True)
+    assert not trash.isHidden()
+
+
+def test_a_new_picture_takes_the_last_one_s_corners_away(make_preview, tmp_path):
+    # The corners are about the generation on screen, so they can no more outlive
+    # it than the "no longer these settings" notice can.
+    w = make_preview()
+    w.set_actions("p1", starred=True, enhance=None)
+
+    w.show_image(_make_png(tmp_path / "other.png"))
+
+    assert w._actions_id is None
+    assert all(b.isHidden() for b in _corners(w))
+
+
+def test_a_running_generation_has_no_corners_to_press(make_preview):
+    # Live frames are a part-drawn file that does not exist yet: nothing to
+    # bookmark, bin or enhance.
+    w = make_preview()
+    w.set_actions("p1", starred=False, enhance=None)
+
+    w.show_frame(_png_bytes())
+
+    assert w._actions_id is None
+    assert all(b.isHidden() for b in _corners(w))
+
+
+def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
+                                                                  tmp_path):
+    from origenerator.gui import corner_controls
+
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_actions("p1", starred=False, enhance=None)
+    fired = []
+    w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))
+
+    _corners(w)[0].click()
+
+    assert fired == [("p1", corner_controls.STAR)]
+
+
+def test_right_clicking_the_picture_asks_for_its_menu(make_preview, tmp_path):
+    from PyQt6.QtCore import QPoint
+
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_actions("p1", starred=False, enhance=None)
+    asked = []
+    w.context_requested.connect(lambda pid, pos: asked.append(pid))
+
+    w.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert asked == ["p1"]
+
+
+def test_right_clicking_an_unarmed_preview_asks_for_nothing(make_preview):
+    from PyQt6.QtCore import QPoint
+
+    # The placeholder, or a slideshow's own inner preview: there is no row here.
+    w = make_preview()
+    asked = []
+    w.context_requested.connect(lambda pid, pos: asked.append(pid))
+
+    w.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert asked == []
+
+
+def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_path):
+    # A portrait image in a wide pane is letterboxed, so corners pinned to the
+    # pane would float in the black surround instead of on the picture.
+    w = make_preview()
+    w.resize(400, 300)
+    w._image_label.resize(400, 300)
+    w.show_image(_make_tall_png(tmp_path / "tall.png"))
+    w.set_actions("p1", starred=True, enhance=None)
+
+    picture = w.media_rect()
+    assert picture.width() < w.width()          # it really is letterboxed
+    assert picture.contains(_corners(w)[0].geometry())

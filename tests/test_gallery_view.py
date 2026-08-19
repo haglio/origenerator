@@ -9385,12 +9385,13 @@ def test_a_show_with_the_mic_off_hears_nothing(qtbot, tmp_path):
     show.close()
 
 
-def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
-        qtbot, tmp_path, monkeypatch):
+def _fix_show(qtbot, tmp_path, monkeypatch, *detectors):
+    """A gallery playing one image fullscreen with the mic on, and exactly these
+    detectors installed — the state every spoken fix is said into."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
     monkeypatch.setattr(detail_parts, "list_detector_files",
-                        lambda: ["teeth_yolov8n.pt"])
+                        lambda: list(detectors))
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -9399,6 +9400,12 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     view._mic_btn.setChecked(True)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
+    return view
+
+
+def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
+        qtbot, tmp_path, monkeypatch):
+    view = _fix_show(qtbot, tmp_path, monkeypatch, "teeth_yolov8n.pt")
 
     assert view._voice.speak_command("Fix her teeth.") is not None
 
@@ -9409,19 +9416,38 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     assert "fixing teeth" in view._slideshow._note.text()
 
 
+def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
+        qtbot, tmp_path, monkeypatch):
+    # Two bad parts in one picture is one command, and one run that fixes both.
+    view = _fix_show(qtbot, tmp_path, monkeypatch,
+                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+
+    view._voice.speak_command("fix hands and mouth")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_detail_fixes"] == {
+        "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
+    assert "fixing hands & teeth" in view._slideshow._note.text()
+
+
+def test_fix_all_goes_over_every_part_something_can_find(
+        qtbot, tmp_path, monkeypatch):
+    # The whole table in a breath — minus the parts nothing installed can find,
+    # which the caption leaves out rather than claiming a pass that can't run.
+    view = _fix_show(qtbot, tmp_path, monkeypatch,
+                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+
+    view._voice.speak_command("fix everything")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_detail_fixes"] == {
+        "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
+    assert "fixing hands & teeth" in view._slideshow._note.text()
+
+
 def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
-    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: [])
-    db = _enhanceable_db(tmp_path, count=1)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
-    view._start_slideshow()
-    qtbot.addWidget(view._slideshow)
+    view = _fix_show(qtbot, tmp_path, monkeypatch)
 
     view._voice.speak_command("fix teeth")
 
@@ -10070,7 +10096,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 
     assert match("enhance") == gallery.ENHANCE_COMMAND
     assert match("go now") == gallery.GENAU_COMMAND
-    assert match("fix teeth").name == "teeth"
+    assert [part.name for part in match("fix teeth")] == ["teeth"]
     assert match("start slideshow") is not None
     assert match("make her hair longer") is None    # steering, not a command
 

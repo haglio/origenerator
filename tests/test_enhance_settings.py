@@ -23,7 +23,7 @@ from origenerator.gallery.enhance import (
     displayed_levels,
     enhance_levels,
     enhance_params_for,
-    fix_part_params,
+    fix_params_for,
     fold_enhancement,
     level_matching_params,
     level_matching_settings,
@@ -418,9 +418,9 @@ def test_describe_still_names_a_level_recorded_the_old_way():
 
 
 def _spoken(text):
-    part = gallery.match_fix_command(text)
-    assert part is not None
-    return part
+    parts = gallery.match_fix_command(text)
+    assert parts
+    return parts
 
 
 def _install_detectors(monkeypatch, *files):
@@ -437,8 +437,8 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
                   checkpoint="driftwood_v1.safetensors")
     row = db.get_generation("src")
 
-    params = fix_part_params(row, _spoken("fix teeth"),
-                             EnhanceSettings(params={"enhance_scale": 1.5}))
+    params = fix_params_for(row, _spoken("fix teeth"),
+                            EnhanceSettings(params={"enhance_scale": 1.5}))
 
     # Equivalent to the LATEST enhancement — not to whatever the panel says now.
     assert params["enhance_scale"] == 3.0
@@ -451,9 +451,46 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
 
 def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkeypatch):
     _install_detectors(monkeypatch, "hand_yolov8s.pt")
-    params = fix_part_params(_source_row(), _spoken("fix hands"),
-                             EnhanceSettings(params={"enhance_steps": 33}))
+    params = fix_params_for(_source_row(), _spoken("fix hands"),
+                            EnhanceSettings(params={"enhance_steps": 33}))
     assert params["enhance_steps"] == 33
+    assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}
+
+
+def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_boxes(
+        monkeypatch):
+    # The bug this is here for: a folder set to fix every part turned a spoken
+    # "fix teeth" into a pass over all of them — a redraw of the whole picture
+    # in answer to a command about one part of it. The panel's ticks configure
+    # what an *enhancement* fixes; a spoken fix says its own parts out loud.
+    _install_detectors(monkeypatch, "teeth_yolov8n.pt", "face_yolov8m.pt",
+                       "hand_yolov8s.pt", "eyes_yolov8n.pt")
+    panel = EnhanceSettings(params={"enhance_detail_fixes": {
+        "faces": 0.4, "hands": 0.5, "teeth": 0.6, "eyes": 0.3}})
+
+    params = fix_params_for(_source_row(), _spoken("fix teeth"), panel)
+
+    # Its own number for that part, since nobody says a denoise out loud — and
+    # nothing else the panel happens to have ticked.
+    assert params["enhance_detail_fixes"] == {"teeth": 0.6}
+
+
+def test_a_spoken_fix_can_ask_for_several_parts_at_once(monkeypatch):
+    _install_detectors(monkeypatch, "hand_yolov8s.pt", "teeth_yolov8n.pt")
+
+    params = fix_params_for(_source_row(), _spoken("fix hands and mouth"))
+
+    assert params["enhance_detail_fixes"] == {
+        "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
+
+
+def test_a_part_with_nothing_to_find_it_is_dropped_from_a_combination(monkeypatch):
+    # The hands still get fixed; a missing teeth detector would otherwise have
+    # ComfyUI reject the whole prompt.
+    _install_detectors(monkeypatch, "hand_yolov8s.pt")
+
+    params = fix_params_for(_source_row(), _spoken("fix hands and mouth"))
+
     assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}
 
 
@@ -461,7 +498,7 @@ def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch
     # Nobody says a denoise out loud, so the panel's own number for that part is
     # what the command means — its default only where the panel leaves it alone.
     _install_detectors(monkeypatch, "hand_yolov8s.pt")
-    params = fix_part_params(
+    params = fix_params_for(
         _source_row(), _spoken("fix hands"),
         EnhanceSettings(params={"enhance_detail_fixes": {"hands": 0.7}}))
     assert params["enhance_detail_fixes"] == {"hands": 0.7}
@@ -471,7 +508,7 @@ def test_a_spoken_fix_with_no_detector_for_the_part_declines(monkeypatch):
     # The caller answers "install one" out loud; a pass that finds nothing is
     # not a fix.
     _install_detectors(monkeypatch, "face_yolov8m.pt", "hand_yolov8s.pt")
-    assert fix_part_params(_source_row(), _spoken("fix teeth")) is None
+    assert fix_params_for(_source_row(), _spoken("fix teeth")) is None
 
 
 def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
@@ -485,7 +522,7 @@ def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
                   enhance_detail_fixes={"teeth": 0.5})
 
-    params = fix_part_params(db.get_generation("src"), _spoken("fix eyes"))
+    params = fix_params_for(db.get_generation("src"), _spoken("fix eyes"))
 
     assert params["enhance_detail_fixes"] == {
         "teeth": 0.5, "eyes": DEFAULT_FIX_DENOISE}
@@ -503,7 +540,7 @@ def test_a_spoken_fix_accumulates_onto_a_level_recorded_the_old_way(
                   enhance_face_detector="teeth_yolov8n.pt",
                   enhance_hand_detector="")
 
-    params = fix_part_params(db.get_generation("src"), _spoken("fix eyes"))
+    params = fix_params_for(db.get_generation("src"), _spoken("fix eyes"))
 
     assert params["enhance_detail_fixes"] == {
         "teeth": 0.45, "eyes": DEFAULT_FIX_DENOISE}
@@ -513,12 +550,12 @@ def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatc
     _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
     db = Database(tmp_path / "t.db")
     _seed_source(db)
-    first = fix_part_params(db.get_generation("src"), _spoken("fix teeth"))
+    first = fix_params_for(db.get_generation("src"), _spoken("fix teeth"))
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
                   **{k: first[k] for k in gallery.ENHANCE_LEVEL_KEYS})
     row = db.get_generation("src")
 
     # Asking again would remake the level it already has; a different part is a
     # different enhancement and runs.
-    assert level_matching_params(row, fix_part_params(row, _spoken("fix teeth"))) == 0
-    assert level_matching_params(row, fix_part_params(row, _spoken("fix eyes"))) is None
+    assert level_matching_params(row, fix_params_for(row, _spoken("fix teeth"))) == 0
+    assert level_matching_params(row, fix_params_for(row, _spoken("fix eyes"))) is None

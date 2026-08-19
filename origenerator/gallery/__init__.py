@@ -64,7 +64,10 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
-from origenerator.workflows.detail_parts import match_fix_command
+from origenerator.workflows.detail_parts import (
+    match_fix_command,
+    name_parts,
+)
 from origenerator.gallery.voice_commands import (
     ENHANCE_COMMAND,
     GENAU_COMMAND,
@@ -85,7 +88,7 @@ from origenerator.gallery.enhance import (
     enhance_levels,
     enhance_params_for,
     enhance_targets_row,
-    fix_part_params,
+    fix_params_for,
     level_matching_params,
     level_matching_settings,
     original_files_of,

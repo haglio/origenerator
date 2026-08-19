@@ -47,7 +47,7 @@ from origenerator.gallery.source_image import source_image_id_for
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 from origenerator.workflows.detail_parts import (
-    DEFAULT_FIX_DENOISE, detail_fixes_of, detector_for_part, detector_part_label,
+    DEFAULT_FIX_DENOISE, detail_fixes_of, detector_part_label, fixable_parts,
 )
 
 logger = logging.getLogger(__name__)
@@ -528,27 +528,38 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     return params
 
 
-def fix_part_params(row: dict, part, settings: EnhanceSettings | None = None) -> dict | None:
+def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) -> dict | None:
     """The ``image_enhance`` params for a spoken "fix <part>": the row's latest
-    enhancement done again, with the detail pass aimed at that part.
+    enhancement done again, with a detail pass aimed at each part named.
 
     The base is the newest level's own recorded knobs — the ask is "the same
     enhancement, plus the fix", so it must not quietly change the scale or
     model the image was finished at. An image never enhanced runs at
     ``settings`` the way any first enhance would.
 
-    "Plus" is cumulative: the passes the newest level already ran ride along,
-    so a "fix eyes" after a "fix teeth" redraws both rather than trading the
-    mended teeth away — every enhance re-derives from the original, so a pass
-    left out is a fix undone on screen. Asking for a part again replaces its
-    earlier pass instead of doubling it (which is also what lets the duplicate
-    check read a repeat as a repeat). Spoken commands name no number, so the
-    part runs at whatever the panel has it set to, or
-    :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where the
-    panel leaves it alone. ``None`` when no installed detector finds the part,
-    or the row has nothing to enhance; the caller says which out loud.
+    **The passes are what was asked for and what the picture already carries —
+    never what the panel happens to have ticked.** A spoken fix is a targeted
+    act made with no view of the Enhance panel, so a folder configured to fix
+    every part must not turn "fix teeth" into a pass over all of them: that is
+    a redraw of the whole picture in answer to a command about one part of it.
+    The panel is still read for the *number* each part runs at, since nobody
+    says a denoise out loud —
+    :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where it
+    has none.
+
+    What the picture already carries does ride along: a "fix eyes" after a "fix
+    teeth" redraws both rather than trading the mended teeth away — every
+    enhance re-derives from the original, so a pass left out is a fix undone on
+    screen. Asking for a part again replaces its earlier pass instead of
+    doubling it (which is also what lets the duplicate check read a repeat as a
+    repeat).
+
+    ``None`` when nothing installed can find any part asked for
+    (:func:`~origenerator.workflows.detail_parts.fixable_parts`), or the row has
+    nothing to enhance; the caller says which out loud.
     """
-    if detector_for_part(part) is None:
+    wanted = fixable_parts(parts)
+    if not wanted:
         return None
     newest = next((lvl for lvl in enhance_levels(row)
                    if not lvl.is_original and lvl.params), None)
@@ -557,9 +568,11 @@ def fix_part_params(row: dict, part, settings: EnhanceSettings | None = None) ->
     if params is None:
         return None
     configured = detail_fixes_of(settings.params if settings else {})
+    already = detail_fixes_of(newest.params) if newest is not None else {}
     params["enhance_detail_fixes"] = dict(
-        detail_fixes_of(params),
-        **{part.name: configured.get(part.name, DEFAULT_FIX_DENOISE)},
+        already,
+        **{part.name: configured.get(part.name, DEFAULT_FIX_DENOISE)
+           for part in wanted},
     )
     return params
 

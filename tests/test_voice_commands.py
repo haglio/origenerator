@@ -34,11 +34,17 @@ def test_a_sentence_merely_mentioning_it_is_not_a_command():
 
 
 def test_the_three_commands_do_not_shadow_each_other():
-    fix = voice_commands.match_command("fix teeth")
-    assert fix is not None and fix.name == "teeth"
+    (fix,) = voice_commands.match_command("fix teeth")
+    assert fix.name == "teeth"
     assert voice_commands.match_command("genau it") == voice_commands.GENAU_COMMAND
     assert voice_commands.match_command("enhance") == voice_commands.ENHANCE_COMMAND
     assert voice_commands.match_command("make her hair longer") is None
+
+
+def test_a_fix_that_names_no_part_falls_through_like_any_other_miss():
+    # The empty tuple a partless "fix" comes back as must not reach the mic as a
+    # command — everything unmatched is a prompt rewrite, and this is one.
+    assert voice_commands.match_command("fix the lighting") is None
 
 
 def test_the_bias_offers_whisper_every_command_word():

@@ -1,9 +1,10 @@
 """What a spoken utterance over a fullscreen picture can ask for.
 
 Three commands share one mic. "fix <part>" aims a targeted detail pass at what's
-on screen (:mod:`~origenerator.workflows.detail_parts` owns the parts and the
-match); "genau it" animates the picture as a Genau clip; "enhance" asks for the
-better version of it. :func:`match_command` is the one matcher the voice surface
+on screen — one part, several ("fix hands and mouth"), or the lot ("fix all"),
+with :mod:`~origenerator.workflows.detail_parts` owning the parts and the match;
+"genau it" animates the picture as a Genau clip; "enhance" asks for the better
+version of it. :func:`match_command` is the one matcher the voice surface
 is given, so adding a verb here is all it takes to teach it — and
 :func:`command_bias` hands every word to whisper up front, which is what makes a
 short imperative off a quiet mic land at all.
@@ -80,10 +81,12 @@ def match_enhance_command(text: str) -> str | None:
 def match_command(text: str):
     """The command an utterance asks for, or ``None`` when it asks for none.
 
-    A :class:`~origenerator.workflows.detail_parts.DetailPart` for a targeted fix,
-    :data:`GENAU_COMMAND`, or :data:`ENHANCE_COMMAND`. Fixes are tried first:
-    they are the oldest and most tightly-shaped of the three, and none of the
-    three vocabularies overlaps another.
+    A tuple of :class:`~origenerator.workflows.detail_parts.DetailPart` for a
+    targeted fix, :data:`GENAU_COMMAND`, or :data:`ENHANCE_COMMAND`. Fixes are
+    tried first: they are the oldest and most tightly-shaped of the three, and
+    none of the three vocabularies overlaps another. A fix that names no part
+    is no fix, and the empty tuple it comes back as falls through the chain the
+    way any other miss does.
     """
     return (match_fix_command(text) or match_genau_command(text)
             or match_enhance_command(text))

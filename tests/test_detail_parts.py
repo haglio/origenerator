@@ -15,8 +15,15 @@ from origenerator.workflows.detail_parts import (
     detail_fixes_of,
     detector_for_part,
     detector_part_label,
+    fixable_parts,
     match_fix_command,
+    name_parts,
 )
+
+
+def _named(text):
+    """The parts an utterance asks for, as the words that name them."""
+    return [part.name for part in match_fix_command(text)]
 
 
 # --- recognizing a spoken command -------------------------------------------
@@ -34,7 +41,24 @@ from origenerator.workflows.detail_parts import (
     ("Mix her hands.", "hands"),   # one letter off "fix" still reads as it
 ])
 def test_a_short_fix_utterance_names_its_part(text, part):
-    assert match_fix_command(text).name == part
+    assert _named(text) == [part]
+
+
+@pytest.mark.parametrize("text, parts", [
+    ("fix hands and mouth", ["hands", "teeth"]),
+    ("Fix her eyes and teeth.", ["teeth", "eyes"]),
+    ("fix face, hands and eyes", ["faces", "hands", "eyes"]),
+])
+def test_one_command_can_ask_for_several_parts(text, parts):
+    # Two bad parts in one picture is one command, not two — and the answer
+    # comes back in the table's order however they were said, so the same ask
+    # always builds the same graph.
+    assert _named(text) == parts
+
+
+@pytest.mark.parametrize("text", ["fix all", "Fix everything.", "fix all of it"])
+def test_fix_all_asks_for_every_part_there_is(text):
+    assert _named(text) == [part.name for part in detail_parts.DETAIL_PARTS]
 
 
 @pytest.mark.parametrize("text", [
@@ -48,7 +72,7 @@ def test_a_short_fix_utterance_names_its_part(text, part):
     ". . . .",
 ])
 def test_anything_else_is_left_for_prompt_steering(text):
-    assert match_fix_command(text) is None
+    assert match_fix_command(text) == ()
 
 
 # --- resolving a part to an installed detector ------------------------------
@@ -72,6 +96,23 @@ def test_a_part_with_no_installed_detector_resolves_to_nothing(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
     assert detector_for_part(_part("teeth")) is None
+
+
+def test_only_the_parts_something_can_find_are_fixable(monkeypatch):
+    # One part with nothing to find it must not take the rest of the command
+    # down with it: ComfyUI rejects the whole prompt over a detector it lacks.
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["hand_yolov8s.pt"])
+    asked = (_part("hands"), _part("teeth"))
+    assert fixable_parts(asked) == (_part("hands"),)
+    assert fixable_parts((_part("teeth"),)) == ()
+
+
+def test_the_parts_of_one_fix_are_named_the_way_its_level_will_be():
+    # The caption an enhancement's passes get, said out loud before it runs.
+    assert name_parts([_part("teeth")]) == "teeth"
+    assert name_parts([_part("hands"), _part("teeth")]) == "hands & teeth"
+    assert name_parts([]) == ""
 
 
 def test_a_detector_in_a_subfolder_is_matched_by_its_own_name(monkeypatch):
@@ -117,7 +158,7 @@ def test_overlay_parts_join_the_vocabulary_whole(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["zeta_yolov8n.pt"])
 
-    part = match_fix_command("fix her zetas")
+    (part,) = match_fix_command("fix her zetas")
     assert part.name == "zeta"
     assert detector_for_part(part) == "zeta_yolov8n.pt"
     assert detector_part_label("zeta_yolov8n.pt") == "zeta"
@@ -125,8 +166,8 @@ def test_overlay_parts_join_the_vocabulary_whole(monkeypatch):
 
 def test_a_bare_overlay_part_answers_to_its_own_name(monkeypatch):
     _with_overlay(monkeypatch, [{"name": "Zeta"}])
-    part = match_fix_command("fix zeta")
-    assert part is not None and part.name == "Zeta"
+    (part,) = match_fix_command("fix zeta")
+    assert part.name == "Zeta"
     assert part.matches == ("zeta",)
 
 
@@ -142,7 +183,8 @@ def test_the_whisper_bias_names_every_spoken_word_once(monkeypatch):
     # come back with "fix <part>" if it has heard of the part.
     _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
     bias = detail_parts.fix_command_bias()
-    for word in ("fix", "fixed", "teeth", "hands", "eyes", "zeta", "zetas"):
+    for word in ("fix", "fixed", "all", "everything",
+                 "teeth", "hands", "eyes", "zeta", "zetas"):
         assert word in bias
     assert bias.count("fix,") == 1  # each word once, not once per part
 

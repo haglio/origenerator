@@ -199,6 +199,7 @@ class RerollController(QObject):
             lambda k, job, files, thumb, dur: self._on_image_finished(
                 k, job, files, thumb, dur, video_workflow, video_params
             ),
+            run_media_type=video_workflow.output_type,  # a frame opening a video
         )
         return self.has(key)
 
@@ -262,6 +263,7 @@ class RerollController(QObject):
                 lambda k, job, files, thumb, dur: self._on_image_finished(
                     k, job, files, thumb, dur, workflow, video_params
                 ),
+                run_media_type=workflow.output_type,  # a frame opening a video
             )
 
     def _reroll_source_image(self, row: dict, image_rows: list[dict]):
@@ -276,7 +278,7 @@ class RerollController(QObject):
         return (source, workflow) if workflow is not None else None
 
     def _launch(self, key, workflow, params, on_finished, *, source="generated",
-                origin=None):
+                origin=None, run_media_type=None):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
 
@@ -287,7 +289,10 @@ class RerollController(QObject):
 
         ``origin`` is the prompt id the run began under, carried across a chained
         i2v's image→video hand-off so both stages read as one run; a fresh launch
-        is its own origin.
+        is its own origin. ``run_media_type`` is what that whole run makes, for a
+        stage that doesn't make it itself: the chain's first prompt draws a still,
+        and the line must place it as the video it was asked for, or asking for a
+        video would jump every picture already waiting.
 
         User work preempts a background experiment here, at the one choke point
         every user path funnels through — so a Generate never sits behind an
@@ -302,6 +307,7 @@ class RerollController(QObject):
             logger.warning("Could not build a re-roll for %s: %s", key, e)
             return None
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
+        job.run_media_type = run_media_type or job.media_type
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
         self._enqueue(job)

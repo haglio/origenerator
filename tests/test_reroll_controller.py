@@ -532,6 +532,38 @@ def test_an_image_jumps_ahead_of_the_videos_waiting(qtbot, tmp_path):
     ]
 
 
+def test_a_combines_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
+    # A chained i2v draws its start frame first, but a video is what was asked
+    # for: placed as the image that prompt makes, it would take the front of the
+    # line and put minutes of GPU ahead of every picture already queued.
+    controller = RerollController(Database(tmp_path / "test.db"), _client())
+    _launch_video(controller, "v", seed=1)  # takes the server, so the rest wait
+    waiting = _launch_image(controller, "i1")
+
+    controller.start_reroll_from_image(
+        "k", _image_row(), WORKFLOW_REGISTRY[_IMAGE_WF], _I2V, _params()
+    )
+
+    frame = controller.newest_job_for("k")
+    assert controller.queue_order[1:] == [waiting.prompt_id, frame.prompt_id]
+
+
+def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
+    # The same for the whole-folder re-roll, which regenerates the frame before
+    # running the video on it.
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, _client())
+    image = _image_row(seed=100)
+    db.restore_generation(image)  # _reroll_source_image reads the full row from the DB
+    _launch_video(controller, "v", seed=1)  # takes the server, so the rest wait
+    waiting = _launch_image(controller, "i1")
+
+    controller.start("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
+
+    frame = controller.newest_job_for("k")
+    assert controller.queue_order[1:] == [waiting.prompt_id, frame.prompt_id]
+
+
 def test_images_stack_newest_first(qtbot, tmp_path):
     # The last picture asked for is the next one made: it was asked for while
     # looking at the one before it, so it is the one being waited on.

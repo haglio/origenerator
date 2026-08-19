@@ -158,9 +158,10 @@ def test_a_queue_of_any_length_is_one_progress_bar_tall(queue):
     assert len(queue.rows()) == 12  # all of them, the rest a scroll away
 
 
-def test_the_clock_reads_above_the_bar_it_measures(queue):
-    # Stacked, not side by side: the numbers sit over the bar they explain, and
-    # neither is made to give up width to the other.
+def test_the_clock_is_written_across_the_bar_it_measures(queue):
+    # One object, not a line of text with a separate stripe under it: the numbers
+    # are read off the face of the bar they measure, the way an in-flight card's
+    # are.
     from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running", progress=(10, 20),
@@ -168,8 +169,9 @@ def test_the_clock_reads_above_the_bar_it_measures(queue):
     QApplication.processEvents()
     preview = queue.running_preview()
 
-    assert preview._caption.geometry().bottom() <= preview._progress.geometry().top()
-    assert preview._caption.x() == preview._progress.x()  # and they line up
+    assert preview._progress.caption() == "50% · 1:30 elapsed · ~6:02 left"
+    assert preview._progress.isTextVisible()
+    assert preview._caption.isHidden()  # the plain line stands down for the bar
 
 
 def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
@@ -401,17 +403,18 @@ def test_a_running_job_still_takes_the_half_while_others_are_held(queue):
 # --- how long it's been, and how long is left ---------------------------------
 
 def _timing(queue) -> str:
-    return queue.running_preview()._caption.text()
+    return queue.running_preview().status_text()
 
 
-def test_shows_the_elapsed_time_and_what_is_left(queue):
-    # A 12-minute video job 90 seconds in: the bar now has both numbers above it
-    # instead of creeping along with nothing to measure it against. The
-    # half-seconds keep both readings a clear half-second off a rollover, so the
+def test_shows_how_far_along_it_is_the_elapsed_time_and_what_is_left(queue):
+    # A 12-minute video job 90 seconds in: the bar carries all three readings
+    # instead of creeping along with nothing to measure it against, and the
+    # percentage is written out rather than left to be eyeballed off the fill. The
+    # half-seconds keep both clocks a clear half-second off a rollover, so the
     # time the test itself takes can't tip either one.
     queue.set_items([_item(status="running", progress=(10, 20),
                            started_at=time.time() - 90.5, typical_seconds=725.0)])
-    assert _timing(queue) == "1:30 elapsed · ~6:02 left"
+    assert _timing(queue) == "50% · 1:30 elapsed · ~6:02 left"
 
 
 def test_shows_the_elapsed_time_alone_with_no_estimate(queue):
@@ -419,7 +422,7 @@ def test_shows_the_elapsed_time_alone_with_no_estimate(queue):
     # too early to pace off — the elapsed count still stands on its own.
     queue.set_items([_item(status="running", progress=(1, 20),
                            started_at=time.time() - 45.5)])
-    assert _timing(queue) == "0:45 elapsed"
+    assert _timing(queue) == "5% · 0:45 elapsed"
 
 
 def test_no_clock_on_a_job_comfyui_has_not_started(queue):
@@ -449,8 +452,9 @@ def test_the_clock_stops_when_the_queue_empties(queue):
 
 
 def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
-    # The clock and the foreign-queue line share the line above the bar: ours
-    # while we have a job, theirs when we don't.
+    # The bar and the foreign-queue line share the slot beside the frame: our
+    # job's bar while we have one, their plain line when we don't — there is no
+    # run of ours there for a bar to be measuring.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
     assert "elapsed" in _timing(queue)
 

@@ -1,3 +1,4 @@
+import time
 from io import BytesIO
 
 from PIL import Image
@@ -17,11 +18,13 @@ class FakeJob(QObject):
     progress = pyqtSignal(int, int)
     preview = pyqtSignal(bytes)
 
-    def __init__(self, state="queued", last_progress=(0, 0), last_preview=None):
+    def __init__(self, state="queued", last_progress=(0, 0), last_preview=None,
+                 started_at=None):
         super().__init__()
         self._state = state
         self._last_progress = last_progress
         self._last_preview = last_preview
+        self._started_at = started_at
 
     @property
     def state(self):
@@ -35,6 +38,10 @@ class FakeJob(QObject):
     def last_preview(self):
         return self._last_preview
 
+    @property
+    def started_at(self):
+        return self._started_at
+
 
 def _has_image(tile):
     return not tile._image.pixmap().isNull()
@@ -45,6 +52,8 @@ def test_idle_tile_shows_plus_and_hides_cancel(qtbot):
     qtbot.addWidget(tile)
     assert tile._image.text() == "+"
     assert tile._cancel.isHidden()
+    assert tile._status.text() == "New (random seed)"
+    assert tile._bar.isHidden()  # nothing running: nothing for a bar to measure
 
 
 def test_idle_tile_emits_add_requested_on_click(qtbot):
@@ -56,10 +65,14 @@ def test_idle_tile_emits_add_requested_on_click(qtbot):
     assert clicks == [True]
 
 
-def test_active_queued_tile_shows_waiting_with_cancel(qtbot):
+def test_active_queued_tile_says_waiting_over_the_picture(qtbot):
+    # The stage is read on the scrim over the picture, the way an in-flight card
+    # and an enhancing thumbnail say theirs — not in a caption underneath, which
+    # cost the tile a row to repeat what the picture is already about.
     tile = RerollTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._status.text() == "Waiting…"
+    assert tile._scrim.text() == "Waiting…"
+    assert tile._status.isHidden()
     assert not tile._cancel.isHidden()
     assert tile._cancel.text() == "Cancel"
 
@@ -125,20 +138,56 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
     assert "dashed" in tile.styleSheet()
 
 
-def test_started_signal_switches_status_to_generating(qtbot):
+def test_started_signal_switches_the_scrim_to_generating(qtbot):
     job = FakeJob(state="queued")
     tile = RerollTile(job)
     qtbot.addWidget(tile)
+    job._state = "running"
     job.started.emit()
-    assert tile._status.text().startswith("Generating")
+    assert tile._scrim.text() == "Generating…"
 
 
-def test_progress_signal_shows_percentage(qtbot):
-    job = FakeJob(state="queued")
-    tile = RerollTile(job)
+def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
+    # The same line the bottom strip's queue writes for the same job, so a run
+    # reads identically wherever it is being watched.
+    job = FakeJob(state="running", last_progress=(10, 20),
+                  started_at=time.time() - 90.5)
+    tile = RerollTile(job, typical_seconds=725.0)
     qtbot.addWidget(tile)
+    assert tile._bar.caption() == "50% · ~6:02 left"
+    assert (tile._bar.value(), tile._bar.maximum()) == (10, 20)
+
+
+def test_progress_signal_advances_the_bar(qtbot):
+    job = FakeJob(state="running", started_at=time.time() - 30.5)
+    tile = RerollTile(job, typical_seconds=100.0)
+    qtbot.addWidget(tile)
+    job._last_progress = (3, 10)
     job.progress.emit(3, 10)
-    assert tile._status.text() == "Generating… 30%"
+    assert tile._bar.caption().startswith("30% · ")
+    assert (tile._bar.value(), tile._bar.maximum()) == (3, 10)
+
+
+def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
+    # Its wait is the strip's queue to explain; a zero counting up over a bar that
+    # has not moved says the run is going nowhere.
+    tile = RerollTile(FakeJob(state="queued"))
+    qtbot.addWidget(tile)
+    assert tile._bar.caption() == ""
+    assert tile._bar.maximum() == 0  # indeterminate: sweeping, not stuck at 0%
+
+
+def test_the_clock_advances_between_polls(qtbot):
+    # The gallery re-renders on its own schedule, which would make a seconds count
+    # skip; the tile re-reads the clock itself so it moves a second at a time.
+    job = FakeJob(state="running", started_at=time.time() - 5.5)
+    tile = RerollTile(job, typical_seconds=100.0)
+    qtbot.addWidget(tile)
+    assert tile._bar.caption() == "~1:34 left"
+
+    job._started_at -= 3  # as if three seconds had gone by
+    tile._tick.timeout.emit()
+    assert tile._bar.caption() == "~1:31 left"
 
 
 def test_preview_signal_renders_image(qtbot):
@@ -150,10 +199,24 @@ def test_preview_signal_renders_image(qtbot):
     assert _has_image(tile)
 
 
+def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
+    # Overlaid rather than laid out beneath, so a running tile is the same size
+    # and shape as the idle one it replaced — the picture keeps its full height.
+    tile = RerollTile(FakeJob(state="running"))
+    qtbot.addWidget(tile)
+    picture, bar = tile._image.geometry(), tile._bar.geometry()
+
+    assert bar.bottom() == picture.bottom()
+    assert bar.left() == picture.left() and bar.width() == picture.width()
+    assert bar.top() > picture.center().y()
+
+
 def test_tile_rebinds_to_running_job_from_cached_state(qtbot):
     # A tile rebuilt mid-run (navigation/poll) must show the job's current state.
-    job = FakeJob(state="running", last_progress=(5, 10), last_preview=_png_bytes())
+    job = FakeJob(state="running", last_progress=(5, 10), last_preview=_png_bytes(),
+                  started_at=time.time() - 20.5)
     tile = RerollTile(job)
     qtbot.addWidget(tile)
     assert _has_image(tile)
-    assert tile._status.text() == "Generating… 50%"
+    assert tile._scrim.text() == "Generating…"
+    assert tile._bar.caption().startswith("50% · ")

@@ -4816,9 +4816,9 @@ def test_turning_auto_off_says_cancel_again_with_the_run_still_cooking(qtbot, tm
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     # Reported: pressing the tile's "New (random seed)" left the tab looking at that
-    # very folder with no button to discard the run and an unfilled Generate, while
-    # the pane beside it streamed the frames of the run it had just started. Nothing
-    # had claimed a launch that came from outside a tab.
+    # very folder with no button to discard the run, while the pane beside it
+    # streamed the frames of the run it had just started. Nothing had claimed a
+    # launch that came from outside a tab.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -4831,8 +4831,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     panel = view._info_tabs.current_config_panel()
     job = next(iter(view._reroll_jobs.values()))
     assert panel._cancel_btn.isHidden() is False
-    assert panel._generating_prompt_id == job.prompt_id
-    assert panel._generate_btn._fraction == 0.0  # in progress mode, filling from 0
+    assert panel.launched_runs() == [job.origin]
 
 
 def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
@@ -4848,13 +4847,13 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
     view._toggle_auto(True)
     first = view._reroll_jobs[key]
-    assert view._info_tabs.current_config_panel()._generating_prompt_id == first.prompt_id
+    assert view._info_tabs.current_config_panel().launched_runs() == [first.origin]
 
     client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # the loop moves on
 
     panel = view._info_tabs.current_config_panel()
     assert panel._cancel_btn.isHidden() is False
-    assert panel._generating_prompt_id == view._reroll_jobs[key].prompt_id
+    assert panel.launched_runs() == [view._reroll_jobs[key].origin]
 
 
 def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
@@ -6644,7 +6643,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     assert item.typical_seconds == 724.0   # the median of the three timed runs
 
     view._update_queue()
-    assert view._queue.running_preview()._caption.text() == "1:30 elapsed · ~6:02 left"
+    assert view._queue.running_preview().status_text() == "50% · 1:30 elapsed · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
@@ -6658,7 +6657,7 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     view.refresh()
 
     assert view._inflight_items()[0].started_at is None
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
 
 
 def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
@@ -7901,7 +7900,8 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._reroll.jobs) == 1
-    assert view.is_enhancing(db.get_generation("g1"))  # the one behind counts too
+    # The one behind counts too — and reads as queued, since it isn't rendering.
+    assert view.enhancing_run(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
     assert first._pending_enhancement == (
@@ -9060,7 +9060,7 @@ def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview()._caption.text() == (
+    assert view._queue.running_preview().status_text() == (
         "3 jobs from another app are queued on ComfyUI")
     assert not view._queue._clear.isHidden()
 
@@ -9070,7 +9070,7 @@ def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
     assert view._queue._clear.isHidden()
 
 
@@ -9154,7 +9154,7 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     client._foreign = ForeignQueue(running=[], pending=[])  # the clear empties it
     view._queue._clear.click()
 
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
     assert view._queue._clear.isHidden()
 
 

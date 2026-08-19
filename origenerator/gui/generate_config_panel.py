@@ -124,8 +124,7 @@ class GenerateConfigPanel(QWidget):
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._param_form: ParamForm | None = None
-        self._generating = False                       # a run this tab launched is in flight (drives the progress button)
-        self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
+        self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
@@ -146,7 +145,6 @@ class GenerateConfigPanel(QWidget):
         self._caption_timer.setInterval(_CAPTION_DELAY_MS)
         self._caption_timer.timeout.connect(self._apply_generate_caption)
         self._build_ui()
-        self._connect_signals()
 
     def _build_ui(self):
         # One column: the preview over the settings form and the Generate button.
@@ -276,8 +274,8 @@ class GenerateConfigPanel(QWidget):
         # this tab launched is in flight (the gallery owns the job and drives
         # set_generating), throwing it away from the tab like the folder's tile —
         # "Cancel", or "Next seed" while that folder is auto-generating. Generate
-        # itself doubles as the progress bar — it fills as the run advances — so
-        # there's no status line.
+        # only ever submits: a run in flight is watched in the strip's queue and on
+        # the browser pane's card, so the button says nothing about one.
         # A flow rather than a row: the bank wraps onto a second line when the pane
         # is too narrow to hold it, instead of squeezing every label down to an
         # unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
@@ -357,37 +355,6 @@ class GenerateConfigPanel(QWidget):
                 + 2 * self._scroll.frameWidth()
                 + 2 * _PANE_MARGIN)
 
-    def _connect_signals(self):
-        if self._client is None:
-            return  # a read-only gallery: no client to track
-        # Mirror the running job's step progress onto the Generate button.
-        self._client.progress.connect(self._on_progress)
-
-    def teardown(self):
-        """Disconnect from the shared client before the panel is destroyed."""
-        if self._client is None:
-            return  # never connected
-        try:
-            self._client.progress.disconnect(self._on_progress)
-        except TypeError:
-            pass
-
-    def _on_progress(self, prompt_id: str, value: int, max_val: int):
-        """Fill the Generate button with this tab's own run's progress.
-
-        The client's progress is multiplexed across every job on the server, and
-        generation is no longer serial from this tab's point of view — a background
-        experiment can be executing while this tab's job still waits — so the event
-        must match the tracked prompt, not just arrive while generating. Without
-        the check, an experiment's steps filled the user's button, then their real
-        run reset it to zero: "progress" that lies. A caller that never learned the
-        prompt id (``set_generating(True)`` bare) keeps the old any-run behavior."""
-        if not self._generating:
-            return
-        if self._generating_prompt_id is not None and prompt_id != self._generating_prompt_id:
-            return  # someone else's run (e.g. a background experiment)
-        self._generate_btn.set_progress(value, max_val)
-
     def _on_go_to_folder(self):
         """Ask the gallery to open the displayed generation's own folder."""
         if self._displayed_row:
@@ -427,8 +394,7 @@ class GenerateConfigPanel(QWidget):
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
         self.refresh_generate_caption()
-        if not self._generating:
-            self._generate_btn.setEnabled(self._can_generate())
+        self._generate_btn.setEnabled(self._can_generate())
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
 
@@ -590,42 +556,26 @@ class GenerateConfigPanel(QWidget):
         else:
             self._launched_runs = [r for r in self._launched_runs if r not in origins]
 
-    def set_generating(self, generating: bool, prompt_id: str | None = None,
-                       *, auto_generating: bool = False):
+    def set_generating(self, generating: bool, *, auto_generating: bool = False):
         """Reflect whether a run of this config's folder is in flight.
 
-        While it is, the discard button shows and the Generate button switches to
-        progress mode (filling as the run advances) so it can't be relaunched over;
-        when it ends, Generate returns — still disabled where there is nothing to
-        run: a read-only gallery with no client, or a tab with no workflow picked.
-
-        ``prompt_id`` names the run, so the button fills only with that job's
-        progress (see :meth:`_on_progress`). It's tracked even on a redundant
-        re-assert, because a chained i2v swaps to a new prompt mid-flight (image
-        stage, then video stage) without ever leaving the generating state.
+        All it moves is the discard button, which shows while there is a run of
+        this tab's to throw away. Generate itself is untouched: it submits, and
+        every reading of the run it submitted is in the strip's queue and on the
+        browser pane's in-flight card.
 
         ``auto_generating`` says the run's folder is auto-looping, which is what
         the discard button reads as "Next seed" rather than "Cancel" (see
         :func:`inflight.discard_run_text`). Re-labeled ahead of the idempotence
         guard below, because the Auto toggle flips mid-run without the generating
         state ever changing.
-
-        Idempotent: only an actual change flips the button, because ``start`` resets
-        the fill to zero. The gallery re-asserts this state on every rebuild (so a
-        reconnected run lights the right tab's button), and re-entering progress mode
-        on each of those would keep snapping a filling bar back to empty.
         """
-        self._generating_prompt_id = prompt_id if generating else None
         self._cancel_btn.setText(discard_run_text(auto_generating))
         self._cancel_btn.setToolTip(discard_run_tooltip(auto_generating))
         if generating == self._generating:
             return
         self._generating = generating
         self._cancel_btn.setVisible(generating)
-        if generating:
-            self._generate_btn.start()
-        else:
-            self._generate_btn.finish(enabled=self._can_generate())
 
     def use_random_seed(self):
         """Switch this config's seed(s) to Random.

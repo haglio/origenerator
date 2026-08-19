@@ -198,14 +198,6 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
     }}
-    /* In progress mode the face IS the progress bar, so its resting colour steps
-       back to neutral and the blue fill has something to read against: primary blue
-       under a blue wash showed a blue edge creeping across an already-blue button.
-       It can't lean on the :disabled rule for that any more — the button stays
-       pressable now, since a press while a run is in flight queues another. */
-    QPushButton#generateBtn[generating="true"] {{
-        background-color: {_h(BG_SECONDARY)};
-    }}
     /* A collapsible param-form section header: a flat, full-width divider row,
        not a raised button. Left-aligned with its fold arrow, and it must not
        flash the primary blue on click the way the base :pressed rule would. */

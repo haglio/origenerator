@@ -1,5 +1,4 @@
 import json
-from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -126,11 +125,9 @@ def test_add_subtab_increases_count_and_focuses_new(tabs):
     assert tabs.currentIndex() == 1
 
 
-def test_close_subtab_removes_and_tears_down(tabs):
+def test_close_subtab_removes_the_panel(tabs):
     panel = tabs._add_subtab()
-    with patch.object(panel, "teardown", wraps=panel.teardown) as spy:
-        tabs._close_subtab(tabs.indexOf(panel))
-    spy.assert_called_once()
+    tabs._close_subtab(tabs.indexOf(panel))
     assert tabs._config_panels() == [tabs.widget(0)]
 
 
@@ -156,20 +153,6 @@ def test_the_tab_menu_closes_the_others(tabs):
 
     assert tabs.count() == 1
     assert tabs.widget(0) is keep
-
-
-def test_closing_the_others_tears_each_one_down(tabs):
-    # A tab closed in bulk must release what it holds, exactly as its own ✕ does.
-    keep = tabs.widget(0)
-    doomed = [tabs._add_subtab(), tabs._add_subtab()]
-    with ExitStack() as stack:
-        spies = [
-            stack.enter_context(patch.object(p, "teardown", wraps=p.teardown))
-            for p in doomed
-        ]
-        tabs._close_other_subtabs(tabs.indexOf(keep))
-        for spy in spies:
-            spy.assert_called_once()
 
 
 def test_the_tab_menu_closes_everything_to_the_right(tabs):

@@ -329,7 +329,6 @@ def test_tolerates_a_missing_client(qtbot, tmp_path):
     qtbot.addWidget(p)
     assert p._generate_btn.isEnabled() is False
     p._on_generate()                      # no-op, no crash
-    p.teardown()                          # never connected, so a no-op too
 
 
 # --- Cancel the in-flight run from the tab -----------------------------------
@@ -360,10 +359,10 @@ def test_set_generating_offers_cancel_beside_a_still_pressable_generate(panel):
 def test_the_discard_button_says_next_seed_while_the_folder_auto_generates(panel):
     # Same button, honest label: with the folder looping, the press discards this
     # seed and the loop starts another — nothing stops.
-    panel.set_generating(True, "p1", auto_generating=True)
+    panel.set_generating(True, auto_generating=True)
     assert panel._cancel_btn.text() == "Next seed"
 
-    panel.set_generating(True, "p1")  # Auto switched off mid-run: a plain cancel
+    panel.set_generating(True)  # Auto switched off mid-run: a plain cancel
     assert panel._cancel_btn.text() == "Cancel"
 
 
@@ -1055,54 +1054,15 @@ def test_panel_forwards_the_preview_drag_signals(panel):
     assert ended == [True]
 
 
-def test_generate_button_fills_with_run_progress_only_while_generating(panel):
+def test_the_tab_watches_no_run_of_its_own(panel):
+    # Generate submits and is done with it. It used to fill with the tracked run's
+    # steps, which took a third telling of one run — differently worded from the
+    # strip's queue and the shelf's card — and wired the control that starts work
+    # to the state of work already going.
     panel.set_generating(True)
-    panel._on_progress("pid", 3, 12)
-    assert panel._generate_btn._fraction == 0.25   # the run's step progress
-
-    panel.set_generating(False)                    # run ended: back to the idle button
-    panel._on_progress("pid", 9, 12)               # a stray later event is ignored
-    assert panel._generate_btn._fraction is None
-
-
-def test_set_generating_true_again_keeps_the_fill(panel):
-    # The gallery re-asserts the generating state on every rebuild, so re-marking an
-    # already-running tab must NOT snap its filling button back to empty — otherwise
-    # a reconnected run's bar would reset to 0 on each poll instead of advancing.
-    panel.set_generating(True)
-    panel._on_progress("pid", 6, 12)               # filled to halfway
-    assert panel._generate_btn._fraction == 0.5
-
-    panel.set_generating(True)                     # redundant re-assert on a rebuild
-    assert panel._generate_btn._fraction == 0.5    # still halfway, not reset to 0
-
-
-def test_generate_button_ignores_another_jobs_progress(panel):
-    # The client's progress is multiplexed across every job on the server; while a
-    # background experiment executes, its steps must not fill this tab's button —
-    # only the tracked run's own progress counts once the tab knows its prompt id.
-    panel.set_generating(True, prompt_id="mine")
-
-    panel._on_progress("experiment", 6, 12)        # someone else's run
-    assert panel._generate_btn._fraction == 0.0    # untouched (progress mode starts at 0)
-
-    panel._on_progress("mine", 3, 12)              # this tab's own run
-    assert panel._generate_btn._fraction == 0.25
-
-
-def test_reasserting_generating_retargets_the_tracked_prompt(panel):
-    # A chained i2v swaps to a new prompt mid-flight (image stage, then video
-    # stage) without leaving the generating state; the re-assert must adopt the
-    # new prompt id so the second stage's progress still drives the button.
-    panel.set_generating(True, prompt_id="image-stage")
-    panel._on_progress("image-stage", 6, 12)
-    assert panel._generate_btn._fraction == 0.5
-
-    panel.set_generating(True, prompt_id="video-stage")  # stage swap, still generating
-    panel._on_progress("image-stage", 9, 12)       # stale stage: ignored now
-    assert panel._generate_btn._fraction == 0.5
-    panel._on_progress("video-stage", 3, 12)
-    assert panel._generate_btn._fraction == 0.25
+    assert panel._generate_btn.text() == "Generate"
+    assert not hasattr(panel, "_on_progress")
+    assert not hasattr(panel, "_generating_prompt_id")
 
 
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):

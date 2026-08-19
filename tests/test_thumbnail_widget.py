@@ -1,9 +1,12 @@
+import time
+
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import icons, thumbnail_widget
+from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
@@ -278,3 +281,113 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
         assert img.pixelColor(8, 182) == fill    # behind the caption text
     finally:
         app.setStyleSheet(prior)
+
+
+# --- the enhancement being made of this image --------------------------------
+
+def _run(**kw):
+    base = dict(status="running", frame=None)
+    base.update(kw)
+    return EnhancingRun(**base)
+
+
+def _png_bytes(color=(30, 90, 160)):
+    from io import BytesIO
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_a_resting_tile_wears_neither_overlay(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    assert tw.is_enhancing() is False
+    assert tw._enhancing_overlay.isHidden()
+    assert tw._enhancing_bar.isHidden()
+
+
+def test_an_enhancing_tile_says_so_over_the_picture_and_on_a_bar(qtbot):
+    # The same pair an in-flight card wears: the stage on a dimming scrim, and
+    # how far along the run is on a bar at the picture's foot. The tile used to
+    # get the scrim alone, so the one thing it couldn't say was how long.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(
+        progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0))
+    qtbot.addWidget(tw)
+
+    assert tw.is_enhancing() is True
+    assert tw._enhancing_overlay.text() == "Enhancing…"
+    assert tw._enhancing_bar.caption() == "50% · ~6:02 left"
+    assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
+
+
+def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
+    # Overlaid rather than laid out beneath, so an enhancing tile is the same
+    # size and shape as a resting one and still flows with them.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
+    qtbot.addWidget(tw)
+    picture, bar = tw._image_label.geometry(), tw._enhancing_bar.geometry()
+
+    assert picture.contains(bar)
+    assert bar.top() > picture.center().y()
+    assert tw.size() == ThumbnailWidget("p2", None, "label").size()
+
+
+def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
+    # Nothing has begun, so there is no percentage and no clock: a determinate
+    # bar parked at 0% would say it had started and gone nowhere.
+    tw = ThumbnailWidget("p1", None, "label",
+                         enhancing=_run(status="queued", progress=(0, 0)))
+    qtbot.addWidget(tw)
+
+    assert tw._enhancing_bar.caption() == ""
+    assert tw._enhancing_bar.maximum() == 0
+    assert not tw._enhancing_tick.isActive()
+
+
+def test_a_fresh_run_updates_the_overlays_in_place(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(status="queued"))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(progress=(5, 20), started_at=time.time() - 30.5,
+                          typical_seconds=100.0))
+
+    assert tw._enhancing_bar.caption().startswith("25% · ")
+    assert tw._enhancing_tick.isActive()
+
+
+def test_the_clock_advances_between_polls(qtbot):
+    # The gallery reconciles on its own schedule, which would make a countdown
+    # skip; the tile re-reads the clock itself so it moves a second at a time.
+    tw = ThumbnailWidget("p1", None, "label",
+                         enhancing=_run(started_at=time.time() - 5.5,
+                                        typical_seconds=100.0))
+    qtbot.addWidget(tw)
+    assert tw._enhancing_bar.caption() == "~1:34 left"
+
+    tw._enhancing.started_at -= 3  # as if three seconds had gone by
+    tw._enhancing_tick.timeout.emit()
+    assert tw._enhancing_bar.caption() == "~1:31 left"
+
+
+def test_a_streamed_frame_paints_the_picture_under_the_overlays(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(frame=_png_bytes()))
+
+    assert not tw._image_label.pixmap().isNull()
+    assert tw._enhancing_overlay.text() == "Enhancing…"  # still not the finished file
+    assert not tw._enhancing_bar.isHidden()
+
+
+def test_the_run_ending_takes_both_overlays_away(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(frame=_png_bytes()))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(None)
+
+    assert tw.is_enhancing() is False
+    assert tw._enhancing_overlay.isHidden()
+    assert tw._enhancing_bar.isHidden()
+    assert not tw._enhancing_tick.isActive()

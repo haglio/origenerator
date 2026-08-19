@@ -122,6 +122,22 @@ def remaining_seconds(elapsed: float, progress: tuple[int, int] | None,
     return max(projected - elapsed, 0.0)
 
 
+def remaining_label(elapsed: float | None, progress: tuple[int, int] | None,
+                    typical: float | None) -> str:
+    """The countdown on its own: ``"~4:10 left"``, or ``"finishing"`` for a run
+    with nothing left to count.
+
+    ``""`` when there is nothing to count down from — a job that hasn't started,
+    or a first run of a workflow too early to have a pace worth reading.
+    """
+    if elapsed is None:
+        return ""
+    remaining = remaining_seconds(elapsed, progress, typical)
+    if remaining is None:
+        return ""
+    return "finishing" if remaining < 1 else f"~{clock_duration(remaining)} left"
+
+
 def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,
                         typical: float | None) -> str:
     """The running bar's live line: ``"1:23 elapsed · ~4:10 left"``.
@@ -132,12 +148,47 @@ def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,
     if elapsed is None:
         return ""
     label = f"{clock_duration(elapsed)} elapsed"
-    remaining = remaining_seconds(elapsed, progress, typical)
-    if remaining is None:
-        return label
-    if remaining < 1:
-        return f"{label} · finishing"
-    return f"{label} · ~{clock_duration(remaining)} left"
+    remaining = remaining_label(elapsed, progress, typical)
+    return f"{label} · {remaining}" if remaining else label
+
+
+def percent_label(progress: tuple[int, int] | None) -> str:
+    """How far through its sampling a run is, as a whole percent.
+
+    ``""`` when there is nothing to read it off — a job ComfyUI hasn't started,
+    or one whose workflow reports no step counts — so the caller joins what it
+    has rather than showing a 0% that never moved.
+    """
+    if not progress:
+        return ""
+    done, total = progress
+    if total <= 0:
+        return ""
+    return f"{int(done * 100 / total)}%"
+
+
+def progress_status_label(elapsed: float | None, progress: tuple[int, int] | None,
+                          typical: float | None, *, compact: bool = False) -> str:
+    """The one line every surface writes across a running job's bar:
+    ``"45% · 1:23 elapsed · ~4:10 left"``.
+
+    One wording, shared by the bottom strip's queue, the shelf's in-flight cards
+    and a folder's re-roll tile, so the same run reads the same wherever it is
+    being watched — three surfaces used to each say a different half of it in
+    different words.
+
+    ``compact`` is that line in a gallery tile's width, which is a third of the
+    strip's: it drops the elapsed count and keeps the two readings that answer
+    "how much longer" — ``"45% · ~4:10 left"``. The full line is a good half wider
+    than a 180px tile at the app's own font, so a tile carrying it would elide the
+    countdown away on exactly the long runs worth counting down.
+
+    Whichever readings are unknown drop out, down to ``""`` for a job that has
+    neither started nor reported a step.
+    """
+    clock = (remaining_label(elapsed, progress, typical) if compact
+             else progress_time_label(elapsed, progress, typical))
+    return " · ".join(part for part in (percent_label(progress), clock) if part)
 
 
 def _coarse_duration(seconds: float) -> str:

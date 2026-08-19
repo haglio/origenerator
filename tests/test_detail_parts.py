@@ -15,6 +15,7 @@ from origenerator.workflows.detail_parts import (
     detail_fixes_of,
     detector_for_part,
     detector_part_label,
+    fix_command_spelling,
     fixable_parts,
     match_fix_command,
     name_parts,
@@ -73,6 +74,32 @@ def test_fix_all_asks_for_every_part_there_is(text):
 ])
 def test_anything_else_is_left_for_prompt_steering(text):
     assert match_fix_command(text) == ()
+
+
+# --- saying a command back in the word it is named by ------------------------
+
+
+@pytest.mark.parametrize("text, spelled", [
+    ("Fix teeth.", "fix teeth"),
+    ("Fixed the eyes.", "fix the eyes"),
+    ("six-teeth.", "fix teeth"),      # whisper, quiet mic: "fix teeth" verbatim
+    ("Mix her hands.", "fix her hands"),
+])
+def test_a_fix_is_said_back_with_its_verb_spelled_right(text, spelled):
+    # The lead is the word the matcher stretches to cover, so it is the one a
+    # caption would otherwise misspell — "six-teeth." over a run that is in fact
+    # fixing teeth.
+    assert fix_command_spelling(text) == spelled
+
+
+def test_the_part_is_said_in_whatever_word_named_it():
+    # "mouth" is a name for this part, not a mishearing of one, so it stands.
+    assert fix_command_spelling("Fix her mouth") == "fix her mouth"
+
+
+@pytest.mark.parametrize("text", ["fix the lighting", "make her teeth whiter", "", None])
+def test_nothing_that_is_not_a_fix_is_respelled_as_one(text):
+    assert fix_command_spelling(text) is None
 
 
 # --- resolving a part to an installed detector ------------------------------

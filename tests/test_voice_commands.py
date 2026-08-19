@@ -83,3 +83,44 @@ def test_a_sentence_that_merely_wants_something_nicer_is_not_the_command():
     assert voice_commands.match_enhance_command("make her dress more enhanced") is None
     assert voice_commands.match_enhance_command("") is None
     assert voice_commands.match_enhance_command(None) is None
+
+
+# --- saying an utterance back in the words it was recognized as --------------
+
+
+def test_a_mangled_command_is_said_back_in_the_word_the_app_knows_it_by():
+    # The whole complaint: a caption printed "gunow it" and then went and made a
+    # Genau clip, so the spelling on screen was the one thing that had not been
+    # understood.
+    for heard in ("gunow it", "go now it", "genow it", "Genau it!"):
+        assert voice_commands.recognized_spelling(heard) == "Genau it"
+    assert voice_commands.recognized_spelling("ganau") == "Genau"
+
+
+def test_every_command_has_its_own_spelling():
+    assert voice_commands.recognized_spelling("Enhanced!") == "enhance"
+    assert voice_commands.recognized_spelling("six-teeth.") == "fix teeth"
+
+
+def test_what_is_no_command_is_left_exactly_as_it_was_heard():
+    # Everything unmatched is a prompt edit, and a prompt edit that mentions a
+    # command word is still the speaker's own sentence.
+    assert voice_commands.recognized_spelling("make this one a genau clip later") is None
+    assert voice_commands.recognized_spelling("make her hair longer") is None
+    assert voice_commands.recognized_spelling("") is None
+    assert voice_commands.recognized_spelling(None) is None
+
+
+def test_the_spelling_answers_exactly_what_the_matcher_claims():
+    # A respelled caption promises the command is about to run, so the two have
+    # to agree utterance for utterance.
+    for heard in ("gunow it", "enhanced", "fix hands and mouth", "fix the lighting",
+                  "make her hair longer", "we should go now and eat", ""):
+        assert (voice_commands.recognized_spelling(heard) is not None) == (
+            bool(voice_commands.match_command(heard)))
+
+
+def test_the_gallery_facade_exposes_the_spelling_too():
+    # The voice surface is given the matcher through the facade and reads the
+    # caption's words from the same place.
+    assert gallery.recognized_spelling("gunow it") == "Genau it"

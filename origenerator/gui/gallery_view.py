@@ -2558,8 +2558,18 @@ class GalleryView(QWidget):
             self._voice_status.hide()
 
     def _on_voice_heard(self, text: str):
+        """Say what the mic heard — a command in the words the app knows it by,
+        anything else as it was transcribed.
+
+        Whisper renders a command word a dozen ways and the matcher answers to
+        all of them, so the transcription of one is a misspelling of a word that
+        was understood perfectly well: "gunow it" printed over a caption that
+        then goes and makes a Genau clip. The spelling it was recognized as is
+        the truthful thing to show
+        (:func:`~origenerator.gallery.voice_commands.recognized_spelling`).
+        """
         if any(char.isalpha() for char in text):
-            self._say_of_voice(f"🎤 heard: “{text}”")
+            self._say_of_voice(f"🎤 heard: “{gallery.recognized_spelling(text) or text}”")
 
     def _on_voice_edited(self, _new_prompt: str):
         self._say_of_voice("🎤 ✓ prompt updated")

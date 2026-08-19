@@ -73,6 +73,7 @@ from origenerator.gallery.voice_commands import (
     GENAU_COMMAND,
     command_bias,
     match_command,
+    recognized_spelling,
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,

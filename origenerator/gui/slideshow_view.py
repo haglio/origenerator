@@ -403,14 +403,56 @@ class SlideshowView(QWidget):
         """Whether what is on screen is being held — the console's padlock."""
         return self._playlist.locked
 
-    def stroke_step(self, delta: int) -> None:
+    # --- the transport, for whoever is driving: a key, the console, a word ---
+
+    def step(self, delta: int) -> None:
+        """Move a slide either way — what the arrows do, for a caller with no
+        keyboard to press them with."""
         self._step(delta)
 
-    def stroke_toggle_hold(self) -> None:
+    def toggle_hold(self) -> None:
+        """Hold the slide on screen, or let it go — Down's whole gesture."""
         self._hold_current()
 
-    def stroke_cull(self) -> None:
+    def cull(self) -> None:
+        """Take the slide on screen away and move on — Up's."""
         self._delete_current()
+
+    def set_held(self, held: bool) -> bool:
+        """Hold the slide on screen or let it go, saying which way rather than
+        flipping; ``True`` when that moved it.
+
+        Spoken "lock" and "unlock" are two words for a reason: someone talking
+        to a picture is asking for a state, not for the other one — and cannot
+        see the counter's padlock to know which the flip would give them.
+        Holding is Down's whole gesture here, star and enhance included, because
+        that is what holding means in this view and a spoken hold must not
+        quietly mean less than a pressed one.
+        """
+        if held == self._playlist.locked:
+            return False
+        self._hold_current() if held else self._toggle_lock()
+        return True
+
+    def star(self) -> bool:
+        """Bookmark the slide on screen; ``False`` when there is nothing to
+        bookmark — a live generation has no row of its own yet."""
+        item = self._playlist.current()
+        if self._on_star is None or item is None or len(item) <= 2:
+            return False
+        self._on_star(item[2])
+        return True
+
+    # The stroke console reaches the three above by its own names: it drives this
+    # view through a host protocol the main window's console shares.
+    def stroke_step(self, delta: int) -> None:
+        self.step(delta)
+
+    def stroke_toggle_hold(self) -> None:
+        self.toggle_hold()
+
+    def stroke_cull(self) -> None:
+        self.cull()
 
     def set_dwell_s(self, seconds: int) -> None:
         """Take a new pace, and hand it on: the number is app-wide, so a show
@@ -667,17 +709,11 @@ class SlideshowView(QWidget):
         """
         if self._playlist.toggle_lock():
             self._timer.stop()  # hold on the current item
-            self._star_current()
+            self.star()
             self._update_counter()
             return True
         self._show_current()  # released, re-arming the dwell timer
         return False
-
-    def _star_current(self):
-        """Bookmark the item on screen, if a starrer is wired and it has an id."""
-        item = self._playlist.current()
-        if self._on_star is not None and item is not None and len(item) > 2:
-            self._on_star(item[2])
 
     def _open_current(self):
         """Enter: leave the slideshow and hand its item to the gallery, which

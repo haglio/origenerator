@@ -90,8 +90,8 @@ class FakeVoiceSteering(QObject):
     download from the one that does.
 
     ``say`` simulates a heard-and-rewritten utterance steering a loop's prompt,
-    ``speak_command`` one the matcher recognizes, and ``speak`` one fed through
-    the real request dictation.
+    ``speak_command`` one either matcher recognizes, and ``speak`` one fed
+    through the real request dictation.
     """
 
     error = pyqtSignal(str)
@@ -99,12 +99,14 @@ class FakeVoiceSteering(QObject):
     edited = pyqtSignal(str)
     request = pyqtSignal(object)
 
-    def __init__(self, *, command_matcher=None, dictation=None, transcribe_bias=None):
+    def __init__(self, *, command_matcher=None, bare_matcher=None, dictation=None,
+                 transcribe_bias=None):
         super().__init__()
         self.started = False
         self.stopped = False
         self.commands_on = False
         self._matcher = command_matcher
+        self._bare_matcher = bare_matcher
         self._dictation = dictation
         self._execute = None
         self._set = None
@@ -128,16 +130,31 @@ class FakeVoiceSteering(QObject):
         self._set(new_prompt)
 
     def speak_command(self, text):
-        """One spoken utterance while commands are armed: matched → executed."""
-        matched = self._matcher(text) if self.commands_on and self._matcher else None
+        """One spoken utterance while commands are armed: matched → executed.
+
+        Both vocabularies, bare one first — the order the live steering uses."""
+        if not self.commands_on:
+            return None
+        matched = self._bare_matcher(text) if self._bare_matcher else None
+        if matched is None and self._matcher is not None:
+            matched = self._matcher(text)
         if matched is not None:
             self._execute(matched)
         return matched
 
     def speak(self, text):
-        """One utterance through the real dictation, as the mic would feed it:
-        part of a request is re-emitted, anything else falls through to the
-        command matcher exactly as the live steering routes it."""
+        """One utterance through the real dictation, as the mic would feed it.
+
+        The live routing, in its own order: a whole-utterance command outranks
+        an opening request (and nothing else does), then an open dictation
+        swallows what it hears, then the looser matcher gets what is left.
+        """
+        collecting = self._dictation is not None and self._dictation.listening
+        if not collecting and self.commands_on and self._bare_matcher is not None:
+            bare = self._bare_matcher(text)
+            if bare is not None:
+                self._execute(bare)
+                return bare
         spoken = self._dictation.push(text) if self._dictation is not None else None
         if spoken is not None:
             self.request.emit(spoken)

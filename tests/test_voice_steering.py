@@ -244,6 +244,70 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
     assert not steering._dictation.listening
 
 
+# --- the bare vocabulary, which outranks an opening request ------------------
+
+
+def _bare_steering(transcribe):
+    """Steering wired as the gallery wires it: a dictation, a loose matcher, and
+    a strict whole-utterance one that gets its say before a request can open."""
+    from origenerator.voice.dictation import RequestDictation
+
+    listener = FakeListener()
+    worker = VoiceWorker(lambda audio: transcribe,
+                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+    steering = VoiceSteering(
+        listener=listener, worker=worker, dictation=RequestDictation(),
+        command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
+        bare_matcher=lambda text: (
+            text.strip().lower() if text.strip().lower() in ("requests", "weird") else None
+        ),
+    )
+    return steering, listener
+
+
+def test_a_bare_command_word_beats_an_opening_request(qtbot):
+    # "requests" is a shelf and "request" opens a dictation; whole and alone,
+    # the word is the command — otherwise the shelf would be unreachable.
+    steering, listener = _bare_steering("requests")
+    ran, spoken = [], []
+    steering.request.connect(spoken.append)
+    steering.start_commands(ran.append)
+
+    listener.utterance.emit(object())
+
+    assert ran == ["requests"]
+    assert spoken == []
+    assert not steering._dictation.listening
+
+
+def test_an_open_request_takes_the_word_back(qtbot):
+    # Mid-sentence the dictation is in front again: a command word said inside a
+    # request is one of the request's words, not an order.
+    steering, listener = _bare_steering("Request.")
+    ran, spoken = [], []
+    steering.request.connect(spoken.append)
+    steering.start_commands(ran.append)
+
+    listener.utterance.emit(object())          # opens the request
+    steering._worker._transcribe = lambda audio: "requests"
+    listener.utterance.emit(object())
+
+    assert ran == []
+    assert len(spoken) == 2
+
+
+def test_a_bare_command_needs_a_surface_listening_for_commands(qtbot):
+    # With a loop steering and nothing listening for commands, the word is not a
+    # command — it steers, like anything else both matchers decline.
+    steering, listener = _bare_steering("weird")
+    prompts = {"positive": "a woman", "negative": ""}
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
+
+    listener.utterance.emit(object())
+
+    assert prompts["positive"] == "a woman, weird"
+
+
 def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
     class BrokenListener(QObject):
         utterance = pyqtSignal(object)

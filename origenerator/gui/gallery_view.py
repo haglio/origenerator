@@ -48,6 +48,9 @@ from origenerator.gui.request_worker import RevisionWorker, ReviseTask
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, in_order
+from origenerator.voice.app_commands import (
+    AppCommand, app_command_bias, match_app_command,
+)
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
 from origenerator.voice.show_commands import (
     ShowCommand, match_show_command, show_command_bias,
@@ -236,16 +239,18 @@ def _is_deletable_folder(group) -> bool:
 
 
 # What a spoken command about the picture is asking for, in the words its "no
-# picture on screen" answer names it by. A fix names its own parts instead.
+# picture on screen" answer names it by. A fix names its own parts instead, and
+# "enhance" never gets here with no show — it is a bank button as well as an
+# order about the picture, and with no picture filling the screen it is the
+# button (see :meth:`GalleryView._on_picture_command`).
 _VOICE_WANTS = {
     gallery.GENAU_COMMAND: "a Genau clip",
-    gallery.ENHANCE_COMMAND: "an enhancement",
 }
 
 
 def _match_voice_command(text: str):
-    """The one command an utterance is, or ``None`` — the whole spoken
-    vocabulary, in the order it is tried.
+    """The one command an utterance is, or ``None`` — the vocabularies that
+    tolerate a filler word or two, in the order they are tried.
 
     The show's own controls, then everything said about the picture on screen
     (:func:`~origenerator.gallery.voice_commands.match_command`, which owns that
@@ -253,8 +258,80 @@ def _match_voice_command(text: str):
     another's — a show command names the slideshow, a fix leads with "fix" — so
     the order only decides which is asked first. Everything unclaimed falls
     through to a prompt rewrite, which is why none of them may be loose.
+
+    The bare vocabulary (:mod:`origenerator.voice.app_commands`) is not here.
+    It matches whole utterances only, which is strict enough to be asked ahead
+    of an opening request — so the mic is given it separately, as its
+    ``bare_matcher``.
     """
     return match_show_command(text) or gallery.match_command(text)
+
+
+# The shelf each spoken shelf name stands you in. What to call it back comes
+# from ``_SHELF_LABELS``, so a row renamed is renamed in one place.
+_VOICE_SHELVES = {
+    AppCommand.RECENTS: _RECENTS_KEY,
+    AppCommand.STARRED: _STARRED_KEY,
+    AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
+    AppCommand.REQUESTS: _REQUESTS_KEY,
+    AppCommand.TRASH: _TRASH_KEY,
+}
+
+# The stroke knob each spoken word turns, as (the driver's method, its argument
+# or ``None`` for a method that takes none) — the very moves the keys make (see
+# :mod:`origenerator.gui.stroke_hud`), said out loud instead of pressed.
+_VOICE_STROKE = {
+    AppCommand.SPEED_UP: ("adjust_speed", 5),
+    AppCommand.SPEED_DOWN: ("adjust_speed", -5),
+    AppCommand.AMP_UP: ("adjust_amplitude", 10),
+    AppCommand.AMP_DOWN: ("adjust_amplitude", -10),
+    AppCommand.CENTER_UP: ("adjust_center", 5),
+    AppCommand.CENTER_DOWN: ("adjust_center", -5),
+    AppCommand.NEXT_SHAPE: ("cycle_shape", 1),
+    AppCommand.PREVIOUS_SHAPE: ("cycle_shape", -1),
+    AppCommand.CRUISE: ("toggle_cruise", None),
+    AppCommand.OFFSET: ("quarter_offset", None),
+}
+
+# The app-wide switch each spoken word flips, as (the button's attribute, the
+# state asked for — ``None`` flips whichever way it is standing — and what the
+# answer calls it). Set through the button rather than around it, so a spoken
+# switch and a clicked one are the same event and the bank shows both.
+_VOICE_SWITCHES = {
+    AppCommand.AUTO: ("_auto_btn", None, "auto-generate"),
+    AppCommand.AUTO_ON: ("_auto_btn", True, "auto-generate"),
+    AppCommand.AUTO_OFF: ("_auto_btn", False, "auto-generate"),
+    AppCommand.AUDIO: ("_audio_btn", None, "the audio bed"),
+    AppCommand.AUDIO_ON: ("_audio_btn", True, "the audio bed"),
+    AppCommand.AUDIO_OFF: ("_audio_btn", False, "the audio bed"),
+    AppCommand.DRIVE: ("_osr2_btn", None, "the OSR2"),
+    AppCommand.DRIVE_ON: ("_osr2_btn", True, "the OSR2"),
+    AppCommand.DRIVE_OFF: ("_osr2_btn", False, "the OSR2"),
+    AppCommand.MIC_OFF: ("_mic_btn", False, "the mic"),
+}
+
+# The bank button each spoken word presses with no show up, as (the button, the
+# action it runs, what to say when it cannot run — ``None`` to use the button's
+# own tooltip, which for most of them already says why: "Nothing to undo",
+# "Nothing here to star"). Only the two whose tips are bare labels, and Group,
+# whose tip explains the button rather than refusing it, carry their own words.
+_VOICE_BANK_ACTIONS = {
+    AppCommand.BACK: ("_back_btn", "_go_back", "nowhere back"),
+    AppCommand.FORWARD: ("_forward_btn", "_go_forward", "nowhere forward"),
+    AppCommand.CULL: ("_delete_btn", "_delete_selection", None),
+    AppCommand.STAR: ("_star_btn", "_star_selection", None),
+    AppCommand.UNDO: ("_undo_btn", "_undo", None),
+    AppCommand.REDO: ("_redo_btn", "_redo", None),
+    AppCommand.GROUP: ("_group_btn", "_group_selection", "pick some folders first"),
+}
+
+# The words that are about the slide on screen when there is one. The rest of
+# the bank (undo, redo, group) is the gallery's whether or not a show covers it:
+# undoing a cull you regret is exactly a thing to do mid-show.
+_ABOUT_THE_SLIDE = frozenset({
+    AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
+    AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.STAR,
+})
 
 
 class GalleryView(QWidget):
@@ -317,9 +394,10 @@ class GalleryView(QWidget):
         # transcribe as other words entirely.
         self._voice = VoiceSteering(
             command_matcher=_match_voice_command,
+            bare_matcher=match_app_command,
             dictation=RequestDictation(),
             transcribe_bias=(f"{gallery.command_bias()} {show_command_bias()} "
-                             f"{request_bias()}"),
+                             f"{app_command_bias()} {request_bias()}"),
         )
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
@@ -894,8 +972,10 @@ class GalleryView(QWidget):
         # to an app that wasn't listening.
         self._mic_btn = self._tool_button(
             icons.mic_icon(),
-            "Listen: spoken slideshow commands, orders over a show (“enhance”, "
-            "“fix hands”, “genau it”), and prompt steering while a folder is "
+            "Listen: bare words for the shelves and this bank (“experiments”, "
+            "“undo”, “star”), Fun Time's own words over a show (“next”, "
+            "“weird”, “lock”), orders about the picture (“enhance”, “fix "
+            "hands”, “genau it”), and prompt steering while a folder is "
             "auto-generating (left listening by Esc, which stops everything else)",
             self._on_mic_toggle, checkable=True,
         )
@@ -3190,12 +3270,24 @@ class GalleryView(QWidget):
         self._show_voice_status("🎤 Listening…", transient=False)
 
     def _on_voice_command(self, matched):
-        """One recognized utterance: a show command, or an order about the
-        picture on screen."""
+        """One recognized utterance: a show command, a bare word about the app
+        or the slide in front of the speaker, or an order about the picture."""
         if isinstance(matched, ShowCommand):
             self._run_show_command(matched)
+        elif isinstance(matched, AppCommand):
+            self._run_app_command(matched)
         else:
             self._on_picture_command(matched)
+
+    def _answer_command(self, message: str):
+        """Say what a spoken command did, where the speaker is looking — the
+        show's own corner while one is up, since the window behind it is covered
+        by the very thing being talked to, and this pane's caption otherwise."""
+        show = self._slideshow
+        if show is not None:
+            show.note_voice_command(message)
+        else:
+            self._show_voice_status(message, transient=True)
 
     def _run_show_command(self, command: ShowCommand):
         """Get the show going, hold it, or close it.
@@ -3233,17 +3325,149 @@ class GalleryView(QWidget):
             else f"🎤 slideshow at {seconds}s"
         )
 
+    # --- the bare vocabulary: a shelf, a switch, a knob, or the slide --------
+
+    def _run_app_command(self, command: AppCommand):
+        """One bare spoken word.
+
+        Four kinds, and which it is decides where it lands: a shelf name stands
+        the tree in that shelf, a switch word flips one of the app-wide
+        switches, a knob word turns the stroke — and everything else is about
+        whatever surface is in front of the speaker, which is the fullscreen
+        show while one is up and the gallery otherwise.
+        """
+        if command in _VOICE_SHELVES:
+            self._go_to_shelf(command)
+        elif command in _VOICE_SWITCHES:
+            self._flip_switch(command)
+        elif command in _VOICE_STROKE:
+            self._turn_stroke_knob(command)
+        elif self._slideshow is not None and command in _ABOUT_THE_SLIDE:
+            self._run_on_show(self._slideshow, command)
+        else:
+            self._run_in_gallery(command)
+
+    def _go_to_shelf(self, command: AppCommand):
+        """Stand in the shelf a spoken name asks for, exactly as clicking its
+        row does.
+
+        Said over a show it still moves — the tree is behind the show, and the
+        move is what the show leaves you standing in — so the answer says which
+        shelf rather than refusing a command whose whole effect is out of sight.
+        """
+        key = _VOICE_SHELVES[command]
+        label = _SHELF_LABELS[key]
+        item = self._item_by_key.get(key)
+        if item is None:  # Recents and Starred appear only once there is one
+            self._answer_command(f"🎤 no {label} shelf yet")
+            return
+        self._tree.setCurrentItem(item)  # whose signal draws it
+        self._answer_command(f"🎤 {label}")
+
+    def _flip_switch(self, command: AppCommand):
+        """Set one of the app-wide switches, through its button rather than
+        around it — a spoken switch is the same event as a clicked one, so the
+        bank lights the same way and nothing has to be kept in step.
+
+        "Mic off" is the one with no way back: a shut mic hears nothing, so the
+        button is what turns it on again. Its answer is still worth saying —
+        with a show up it lands in the show's corner, where the bank is not
+        visible to say it instead.
+        """
+        attribute, want, name = _VOICE_SWITCHES[command]
+        button = getattr(self, attribute)
+        if not button.isEnabled():
+            self._answer_command(f"🎤 {name} can't be switched here")
+            return
+        on = (not button.isChecked()) if want is None else want
+        button.setChecked(on)  # its toggled signal is what does the work
+        self._answer_command(f"🎤 {name} {'on' if on else 'off'}")
+
+    def _turn_stroke_knob(self, command: AppCommand):
+        """Turn one of the stroke's knobs — the move its key makes.
+
+        The driver is app-wide, so this answers from the gallery and from a show
+        alike, and the knobs read the same whether or not the device is running:
+        a stroke can be set up before it is started, exactly as the panel allows.
+        """
+        method, argument = _VOICE_STROKE[command]
+        turn = getattr(self._osr2_stroke, method)
+        turn() if argument is None else turn(argument)
+        self._answer_command(f"🎤 {self._osr2_stroke.status_text()}")
+
+    def _run_on_show(self, show, command: AppCommand):
+        """A word about the slide filling the screen: step off it either way,
+        take it away, hold it, or bookmark it.
+
+        The words are Fun Time's, and so is what they do — "weird" condemns what
+        is on screen, a lock holds it — because the two rooms are one room to
+        whoever is speaking, and a word that means one thing there and another
+        here is a word nobody can use.
+        """
+        if command is AppCommand.BACK:
+            show.step(-1)
+            said = "🎤 back"
+        elif command is AppCommand.FORWARD:
+            show.step(1)
+            said = "🎤 next"
+        elif command is AppCommand.CULL:
+            show.cull()
+            said = "🎤 gone"
+        elif command is AppCommand.STAR:
+            said = "🎤 starred" if show.star() else "🎤 nothing here to star"
+        elif command is AppCommand.LOCK:
+            said = "🎤 holding this one" if show.set_held(True) else "🎤 already holding it"
+        else:  # UNLOCK
+            said = "🎤 let go" if show.set_held(False) else "🎤 nothing was held"
+        self._answer_command(said)
+
+    def _run_in_gallery(self, command: AppCommand):
+        """A word said with no show to take it: the bank button it names, aimed
+        exactly as a click on it would be."""
+        if command in (AppCommand.LOCK, AppCommand.UNLOCK):
+            self._answer_command(f"🎤 {command.value} is a slideshow's — none is up")
+            return
+        attribute, action, refusal = _VOICE_BANK_ACTIONS[command]
+        self._press_bank_button(getattr(self, attribute), getattr(self, action),
+                                refusal)
+
+    def _press_bank_button(self, button, act, refusal: str | None = None):
+        """Do what a bank button does, and answer in that button's own words.
+
+        Its tip already says what it will do to what is in front of you — "Star
+        3 items", "Undo: delete of 2 items" — which is precisely what a speaker
+        who is not looking at the bank needs told back, and it cannot drift from
+        what the button does. A button that is away or dead says why instead of
+        quietly doing nothing: ``refusal``, or its tip where that already reads
+        as one.
+        """
+        if button.isHidden() or not button.isEnabled():
+            self._answer_command(f"🎤 {refusal or button.toolTip()}")
+            return
+        said = button.toolTip()  # read first: the action re-aims the bank
+        act()
+        self._answer_command(f"🎤 {said}")
+
     def _on_picture_command(self, command):
         """A spoken command about the picture on screen: a targeted "fix <part>"
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau clip.
 
         Answered out of the show's own note — the speaker is looking at it, not
-        at this pane. Said with no show up there is no "on screen" to act on, and
-        the utterance has already been claimed as a command by the time it gets
-        here, so the caption says so rather than letting it vanish."""
+        at this pane. Said with no show up, "enhance" falls to the bank button of
+        the same name; the other two have no "on screen" to act on, and the
+        utterance has already been claimed as a command by the time it gets here,
+        so the caption says so rather than letting it vanish."""
         show = self._slideshow
         if show is None:
+            if command == gallery.ENHANCE_COMMAND:
+                # The word names a bank button too, and with no picture filling
+                # the screen the button is what it means — aimed the way a click
+                # aims it, at the picked thumbnails else the folder's unenhanced
+                # images. A refusal here would be a dead end where there is a
+                # perfectly good thing to do.
+                self._press_bank_button(self._enhance_btn, self._enhance_selection)
+                return
             wants = _VOICE_WANTS.get(command) or f"a {gallery.name_parts(command)} fix"
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)

@@ -805,7 +805,14 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
 def _enhanced_image_row(db, prompt_id="img1"):
     """An image that has been enhanced once: the enhanced file leads, the
     original stays listed, and the level's settings are recorded."""
-    row = _image_row(db, prompt_id)
+    _image_row(db, prompt_id)
+    return _fold_enhancement(db, prompt_id)
+
+
+def _fold_enhancement(db, prompt_id="img1"):
+    """Fold an enhancement onto an image already recorded — what the gallery does
+    to the row when a standalone enhance lands: the enhanced file leads, the
+    original stays listed behind it, and the level's settings are recorded."""
     db.update_generation(
         prompt_id,
         output_files=json.dumps([
@@ -1589,6 +1596,32 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
     # ...and it goes on standing as the run streams, rather than blinking off
     # with every frame that arrives.
     panel.set_pending_enhancement(("running", _frame_bytes(tmp_path, 10), "2x"))
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
+                                                          monkeypatch):
+    # The enhancement folds into the row the tab is showing — the image gains a
+    # version, and nothing about the settings moves. So the edits made while it
+    # cooked are still edits, and the mark saying so stays up rather than being
+    # wiped by the picture arriving. Re-taking the mark here read those very
+    # edits as the new baseline.
+    panel, db = saved_panel
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    for name in ("sdxl_img1.png", "image_enhance_00001_.png"):
+        (output_dir / "image" / name).write_bytes(b"x")
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+
+    enhanced = _fold_enhancement(db, "img1")
+    panel.refresh_displayed(enhanced, [enhanced])
+    panel.set_pending_enhancement(None)  # the run is over; the pane goes back
 
     assert _notice(panel) == "(not yet generated with modifications)"
 

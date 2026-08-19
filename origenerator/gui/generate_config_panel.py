@@ -837,6 +837,8 @@ class GenerateConfigPanel(QWidget):
         """Point the preview and footer at ``row`` — the shared tail of showing a
         generation, whether freshly browsed or just completed. The form is left
         untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
+        arriving = (self._displayed_row is None
+                    or self._displayed_row.get("prompt_id") != row.get("prompt_id"))
         self._displayed_row = row
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
@@ -846,7 +848,17 @@ class GenerateConfigPanel(QWidget):
             self._preview.clear()
         self._show_footer(row, image_rows, preview, request)
         self._arm_preview_actions()
-        self._note_displayed_config()
+        if arriving:
+            self._note_displayed_config()
+        else:
+            # The same generation, changed under the tab: an enhancement folded
+            # in, a version deleted. Nothing about the settings moved, so the mark
+            # edits are measured against stays where it is — re-taking it read the
+            # user's edits as the new baseline, and the "not yet generated with
+            # modifications" plate vanished the moment an enhancement landed, from
+            # over the very frames it had been standing over. Only re-asserted,
+            # because the picture put up above took the notice off with the old one.
+            self.refresh_modified_notice()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
@@ -897,10 +909,15 @@ class GenerateConfigPanel(QWidget):
         self.refresh_modified_notice()
 
     def _note_displayed_config(self):
-        """Take the settings the generation now on display is being shown under as
-        the mark to measure edits against, and clear any notice left from the last
-        one. From here it is the form moving away from these that says the picture
-        is no longer what a Generate would make."""
+        """Take the settings a generation arriving in this tab is being shown under
+        as the mark to measure edits against, and clear any notice left from the
+        last one. From here it is the form moving away from these that says the
+        picture is no longer what a Generate would make.
+
+        For a generation *arriving* — the one the form was just seeded from, or the
+        result this tab's own Generate made. What happens to the generation already
+        on display leaves the mark alone (see :meth:`_display_result`).
+        """
         self._displayed_config = (
             self.current_config() if self._displayed_row is not None else None
         )

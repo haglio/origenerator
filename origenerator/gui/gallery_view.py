@@ -235,6 +235,13 @@ def _is_deletable_folder(group) -> bool:
     )
 
 
+# The whole answer to "genau it" on a picture that has already been Genau'd:
+# said in the show's corner, and nothing runs. Deliberately not a dialog — the
+# combine panel asks which seed to re-roll when a press would reproduce a run,
+# and that question thrown over the picture someone is talking to is the one
+# thing that must never appear (:meth:`GalleryView._generate_combination`).
+ALREADY_GENAUD = "🎤 already Genau'd"
+
 # What a spoken command about the picture is asking for, in the words its "no
 # picture on screen" answer names it by. A fix names its own parts instead.
 _VOICE_WANTS = {
@@ -388,7 +395,7 @@ class GalleryView(QWidget):
         self._image_rows: list[dict] = []
         # Pictures whose spoken "genau it" is still choosing a recipe, so a
         # second one said into that wait is refused rather than queued twice
-        # (:meth:`_genau_already_coming`). Only until the launch is a row.
+        # (:meth:`_already_genaud`). Only until the launch is a row.
         self._genau_resolving: set[str] = set()
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
         # --- the gallery search (the box over the tree, the results in the middle
@@ -3867,20 +3874,19 @@ class GalleryView(QWidget):
         Reuses the video's workflow, settings and seed, swapping only the input
         image to the dropped one, and lands the result in the folder for that
         (image × settings) combination. A pinned seed can reproduce an identical
-        past run, so this warns first via the shared "already generated" dialog —
-        which, when the dropped image is itself a re-buildable generation, offers a
-        fresh video seed (same frame), a fresh image seed (re-draw the dropped
-        image), or both. A no-op if either row is gone, the video isn't a
-        rebuildable image-conditioned recipe, the image has no output file, or that
-        folder is already generating.
+        past run, so a *pressed* combine warns first via the shared "already
+        generated" dialog — which, when the dropped image is itself a re-buildable
+        generation, offers a fresh video seed (same frame), a fresh image seed
+        (re-draw the dropped image), or both. A no-op if either row is gone, the
+        video isn't a rebuildable image-conditioned recipe, the image has no
+        output file, or that folder is already generating.
 
         No lane reaches here: the lane chose which recipe ``video_id`` names, and
         from that point a Genau clip is made exactly like any other video. ``send``
         is the one thing that still rides along — a spoken "genau it" wants its
-        clip handed on the moment it exists. The re-draw-the-frame answer to the
-        reproduce dialog is the one path it can't reach: that launches the frame
-        first and the clip second, under an id this never sees, so such a clip
-        waits for the Send-to-Genau button like any other.
+        clip handed on the moment it exists, and wants no dialog at all: it is
+        answered in the show's corner and nothing runs, so the re-roll answers
+        (and the frame re-draw behind them) belong to the pressed path alone.
         """
         built = self._combined_params(image_id, video_id)
         if built is None:
@@ -3899,6 +3905,15 @@ class GalleryView(QWidget):
             gallery.build_image_config_index(self._image_rows),
         )
         if self._would_reproduce_a_completed_run(workflow, params):
+            if send:
+                # Spoken. The dialog below asks which of two seeds to re-roll,
+                # and that question thrown over the fullscreen picture someone
+                # is talking to is the one thing that must never appear — so the
+                # spoken path gives the same answer the up-front guard gives and
+                # stops. This is the case that guard can't see: the identical run
+                # was made by hand, not said.
+                self._say_already_genaud()
+                return
             image_workflow = WORKFLOW_REGISTRY.get(image_row.get("workflow_name") or "")
             can_reroll_image = (
                 image_workflow is not None
@@ -3921,6 +3936,16 @@ class GalleryView(QWidget):
         if prompt_id:
             self._mark_for_sending(prompt_id, send)
             self._reveal_combination(key)
+
+    def _say_already_genaud(self):
+        """Say this picture has its clip already, where the speaker is looking.
+
+        Only ever reached from a spoken command, which only runs with a show up
+        — and where :meth:`_say_no_recipe` falls back to a dialog, this one has
+        nothing to fall back to: a modal is precisely what it exists to avoid.
+        """
+        if self._slideshow is not None:
+            self._slideshow.note_voice_run(None, ALREADY_GENAUD)
 
     def _rebuildable_videos(self, rows: list[dict]) -> list[dict]:
         """The completed, rebuildable i2v videos among ``rows`` — the pool an act's
@@ -4084,7 +4109,7 @@ class GalleryView(QWidget):
 
         ``send`` also holds the picture until the launch is a row, because only a
         spoken "genau it" sets it and only a spoken one can be said again into
-        the wait — see :meth:`_genau_already_coming`."""
+        the wait — see :meth:`_already_genaud`."""
         if send:
             self._genau_resolving.add(image_id)
         if self._generate_curated(image_id, category, intent, send):
@@ -4100,7 +4125,7 @@ class GalleryView(QWidget):
         found anything.
 
         The picture is let go of either way — a launch is a row from here on,
-        which is where :meth:`_genau_already_coming` reads it, and a match that
+        which is where :meth:`_already_genaud` reads it, and a match that
         found nothing leaves nothing to wait for.
         """
         try:
@@ -4162,9 +4187,9 @@ class GalleryView(QWidget):
         self._db.mark_genau_exported(row["prompt_id"])
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
-    def _genau_already_coming(self, row: dict) -> bool:
-        """Whether a Genau clip of this picture was asked for out loud already
-        and hasn't landed yet — still choosing its recipe, queued, or running.
+    def _already_genaud(self, row: dict) -> bool:
+        """Whether this picture has been Genau'd — a clip made from it already,
+        or one on the way.
 
         Saying it twice is what someone does when the first time appeared to do
         nothing, and it usually did appear to: the clip queues behind whatever
@@ -4172,13 +4197,17 @@ class GalleryView(QWidget):
         that with a second identical run spends minutes of the one GPU making a
         clip that already exists, and sends both to Genau.
 
-        Both halves of "hasn't landed" are asked. A launched run is a row the
-        database calls pending or running, stamped as spoken for
-        (:meth:`_mark_for_sending`) — read from there rather than from the live
-        jobs, so a run reconnected after a restart still counts. Before that
-        there is a stretch with no row at all: the mined tier asks the local
-        model which recipe fits and that thinks for several seconds, which is
-        exactly the silence a second command is said into, so the picture is
+        A run is a row stamped as spoken for (:meth:`_mark_for_sending`) and
+        matched to this picture by its start frame — counted whether it is still
+        coming (pending, running) or has landed, since both mean this picture
+        has its clip. Read from the database rather than the live jobs, so a run
+        reconnected after a restart still counts, and one made in a session
+        since closed counts forever. A row that errored counts as nothing: it
+        made no clip, and asking again is the only way to get one.
+
+        There is also a stretch with no row at all: the mined tier asks the
+        local model which recipe fits and that thinks for several seconds, which
+        is exactly the silence a second command is said into, so the picture is
         held in :attr:`_genau_resolving` from the moment the command is heard
         until its row exists.
         """
@@ -4186,7 +4215,7 @@ class GalleryView(QWidget):
             return True
         return any(
             other.get("genau_requested_at")
-            and gallery.is_in_progress(other)
+            and (gallery.is_in_progress(other) or gallery.produced_output(other))
             and gallery.find_source_image_id(other, [row]) is not None
             for other in self._db.list_generations()
         )
@@ -4210,8 +4239,8 @@ class GalleryView(QWidget):
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != "image":
             return None, "🎤 only a picture can become a Genau clip"
-        if self._genau_already_coming(row):
-            return None, "🎤 a Genau clip of this one is already on the way"
+        if self._already_genaud(row):
+            return None, ALREADY_GENAUD
         category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
         if category is None:
             return None, "🎤 this prompt doesn't say what's happening — no act to animate"

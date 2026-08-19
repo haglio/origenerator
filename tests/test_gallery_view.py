@@ -10557,7 +10557,7 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
 
     view._on_voice_command(gallery.GENAU_COMMAND)
 
-    assert surface.noted == (None, "🎤 a Genau clip of this one is already on the way")
+    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -10576,7 +10576,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     view._on_voice_command(gallery.GENAU_COMMAND)
     view._on_voice_command(gallery.GENAU_COMMAND)
 
-    assert surface.noted == (None, "🎤 a Genau clip of this one is already on the way")
+    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
     assert len(thinking) == 1
     work, done = thinking[0]
     done(work())  # the match comes back, and the one run it was for goes out
@@ -10596,20 +10596,60 @@ def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, mo
     assert view._genau_resolving == set()
 
 
-def test_the_same_picture_can_be_asked_again_once_its_clip_has_landed(
+def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
-    # The bar is one *queued* at a time; a clip that has arrived is no reason to
-    # refuse another of the same picture.
+    # A clip that has arrived is still a clip of this picture — asking again
+    # would only re-make it, so it is answered rather than run.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    surface = _VoiceSurface("img_act")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+    (made,) = _spoken_genau_rows(view)
+    view._db.update_generation(made["prompt_id"], status="completed",
+                               output_files=json.dumps([{"filename": "loop_2.mp4"}]))
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
+    assert len(_spoken_genau_rows(view)) == 1
+
+
+def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
+        qtbot, tmp_path, monkeypatch):
+    # Asking again is the only way to get a clip after a failure, so a row that
+    # produced nothing must not read as this picture having been Genau'd.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._slideshow = _VoiceSurface("img_act")
 
     view._on_voice_command(gallery.GENAU_COMMAND)
-    (queued,) = _spoken_genau_rows(view)
-    view._db.update_generation(queued["prompt_id"], status="completed")
+    (failed,) = _spoken_genau_rows(view)
+    view._db.update_generation(failed["prompt_id"], status="error")
 
     view._on_voice_command(gallery.GENAU_COMMAND)
 
     assert len(_spoken_genau_rows(view)) == 2
+
+
+def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monkeypatch):
+    # A modal thrown over the fullscreen picture someone is talking to is the one
+    # thing that must never appear. This is the case the up-front guard cannot
+    # see: the identical combination was made by hand, not said.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    asked = []
+    monkeypatch.setattr(gallery_view_module, "offer_reroll",
+                        lambda *a, **k: asked.append(a) or None)
+    monkeypatch.setattr(view, "_would_reproduce_a_completed_run", lambda *a: True)
+    surface = _VoiceSurface("img_act")
+    notes = []
+    surface.note_voice_run = lambda prompt_id, message: notes.append((prompt_id, message))
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert asked == []
+    assert (None, gallery_view_module.ALREADY_GENAUD) in notes
+    assert _spoken_genau_rows(view) == []
 
 
 def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(

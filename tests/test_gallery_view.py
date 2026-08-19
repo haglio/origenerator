@@ -6697,15 +6697,47 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
+    floated = view._slideshow.queue()
 
-    # Fed at the opening rather than a poll and a half later.
-    assert view._slideshow._queue.lines()
-    assert not view._slideshow._queue.isHidden()
+    # Filled at the opening rather than a poll and a half later, and with the
+    # same rows and the same live half the docked strip is showing.
+    assert floated.keys() == view._queue.keys() == ["gen1"]
+    assert floated.running_preview().key == "gen1"
+    assert not floated.isHidden()
 
     db.delete_generation("gen1")  # the job ends
     view._poll()
-    assert view._slideshow._queue.isHidden()  # nothing being made, nothing said
+    assert floated.isHidden()  # nothing in flight, nothing over the picture
 
+    view._slideshow.close()
+
+
+def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
+    # The float is the same widget as the bottom strip and asks for the same
+    # things, so it reaches the same handler.
+    from unittest.mock import patch
+
+    from origenerator.gui.reroll_controller import RerollController
+
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_row("gen1", prompt="a dog"))
+    db.add(_row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
+                status="pending", output_files="[]"))
+    db.add(_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
+                status="pending", output_files="[]"))
+    with patch.object(RerollController, "reorder") as reorder:
+        view = GalleryView(db)
+        qtbot.addWidget(view)
+        view.refresh()
+        _select_first_leaf(view)
+        view._start_slideshow()
+        qtbot.addWidget(view._slideshow)
+
+        before = view._slideshow.queue().keys()
+        view._slideshow.queue().move_row(2, 1)  # the last waiting job, up one
+
+        reorder.assert_called_once_with([before[0], before[2], before[1]])
     view._slideshow.close()
 
 

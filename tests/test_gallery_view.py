@@ -5920,8 +5920,8 @@ def test_the_enhanced_filter_narrows_what_a_show_would_play(qtbot, monkeypatch):
                                _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
-    view._enhanced_filter.set_active(True)
+    _open_recents(view)
+    view._filters.set_enhanced(True)
 
     view._start_slideshow()
 
@@ -5938,15 +5938,15 @@ def test_the_enhanced_filter_narrows_a_show_that_is_already_up(qtbot, monkeypatc
                                _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
+    _open_recents(view)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
     assert len(view._slideshow._playlist) == 2
 
-    view._enhanced_filter.set_active(True)
+    view._filters.set_enhanced(True)
 
     assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
-    view._enhanced_filter.set_active(False)   # and back again, all of them
+    view._filters.set_enhanced(False)   # and back again, all of them
     assert len(view._slideshow._playlist) == 2
     view._slideshow.close()
 
@@ -5956,10 +5956,10 @@ def test_the_slideshow_button_goes_away_when_nothing_here_is_enhanced(qtbot, mon
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
+    _open_recents(view)
     assert not view._slideshow_btn.isHidden()
 
-    view._enhanced_filter.set_active(True)
+    view._filters.set_enhanced(True)
 
     assert view._slideshow_btn.isHidden()
 
@@ -5972,8 +5972,8 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_filtered_show(
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
-    view._enhanced_filter.set_active(True)
+    _open_recents(view)
+    view._filters.set_enhanced(True)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
 
@@ -5983,22 +5983,82 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_filtered_show(
     view._slideshow.close()
 
 
+def test_the_favorites_filter_narrows_a_show_to_the_starred_ones(qtbot, monkeypatch):
+    # A folder you have been through once has stars on the ones worth coming
+    # back to — a different question from which came out best.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _row("i2", "sdxl_t2i",
+                                    {"positive_prompt": "a cat", "steps": 50, "seed": 2},
+                                    "sdxl_t2i_i2.png", starred=1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+
+    view._filters.set_favorites(True)
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
+    view._slideshow.close()
+
+
+def test_both_filters_at_once_keep_only_what_answers_both(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    starred_plain = _row("i2", "sdxl_t2i",
+                         {"positive_prompt": "a cat", "steps": 50, "seed": 2},
+                         "sdxl_t2i_i2.png", starred=1)
+    starred_enhanced = _row("i3", "sdxl_t2i",
+                            {"positive_prompt": "a cat", "steps": 50, "seed": 3,
+                             "enhance": True},
+                            "sdxl_t2i_i3.png", starred=1)
+    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
+                               starred_plain, starred_enhanced]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+
+    view._filters.set_favorites(True)
+    view._filters.set_enhanced(True)
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i3"]
+    view._slideshow.close()
+
+
+def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch):
+    # With more than one switch to clear, the phrase has to mean all of them —
+    # which is what it means on every satellite in this family.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+    view._filters.set_favorites(True)
+    view._filters.set_enhanced(True)
+
+    view._run_app_command(AppCommand.FILTER_OFF)
+
+    assert view._filters.any_on is False
+
+
 def test_filter_enhanced_turns_it_on_and_says_what_is_left(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
+    _open_recents(view)
 
     view._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert view._enhanced_filter.active is True
+    assert view._filters.enhanced is True
     assert "1 to play" in view._voice_status.text()
 
     view._run_app_command(AppCommand.FILTER_OFF)
 
-    assert view._enhanced_filter.active is False
+    assert view._filters.enhanced is False
     assert "all of them" in view._voice_status.text()
 
 
@@ -6007,7 +6067,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._recents_item)
+    _open_recents(view)
 
     view._run_app_command(AppCommand.FILTER_ENHANCED)
 

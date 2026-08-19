@@ -118,7 +118,7 @@ class SlideshowView(QWidget):
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
                  on_lock=None, player=None, stroke=None, pace=None,
-                 on_drive_toggle=None, enhanced_filter=None, parent=None,
+                 on_drive_toggle=None, filters=None, parent=None,
                  order_label="Shuffle", starred_ids=None, on_reset=None,
                  looping=True):
         super().__init__(parent)
@@ -249,11 +249,11 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        # The console carries the enhanced-only switch, so it has to be handed
-        # the one the gallery owns: the same switch on both surfaces, the way
-        # the pace is the same number on both.
+        # The console carries the show filters, so it has to be handed the ones
+        # the gallery owns: the same switches on both surfaces, the way the pace
+        # is the same number on both.
         self._stroke_panel = StrokePanel(
-            stroke, self, host=self, enhanced_filter=enhanced_filter,
+            stroke, self, host=self, filters=filters,
         ) if stroke is not None else None
 
         self._timer = QTimer(self)

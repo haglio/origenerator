@@ -199,6 +199,170 @@ def _rows_by_rel_path(rows: list[dict]) -> dict:
     return by_path
 
 
+def adopt_branch_curation(db, worktrees_root: Path) -> int:
+    """Bring the stars and folder bookmarks a branch session made home too.
+
+    :func:`adopt_branch_rows` carries a star only on a generation the branch made
+    itself, because there the star is one column of the row being adopted. Every
+    other star had nowhere to go: a preview's database is a *copy* of this one,
+    so starring a library item there writes a row this app already has -- exactly
+    the rows adoption skips -- and folder bookmarks were never read at all. Both
+    were simply lost when the worktree went.
+
+    What makes this safe to run at every launch is remembering what each worktree
+    looked like the last time it was read (``branch_curation``). Only what
+    *changed* there since is applied, so a star the user has since removed here
+    is not reinstated on every launch by a worktree copy that still carries it,
+    and an unstar made in a preview crosses over exactly once. A worktree seen
+    for the first time has no such baseline -- its database may have been seeded
+    from a much older state of this one, and a zero in it is as likely to be that
+    age as the user's intent -- so that first pass adds but never takes away, and
+    records the baseline the passes after it diff against.
+
+    Returns how many bookmarks were applied. Runs after the rows are adopted, so
+    a star on a generation the branch itself made finds its row already here, and
+    before the folder reconcile, which heals any key the branch derived under a
+    formula this code has since moved on from.
+    """
+    worktrees_root = Path(worktrees_root)
+    if not worktrees_root.is_dir():
+        return 0
+    rows = db.list_generations()
+    known = {row["prompt_id"] for row in rows}
+    starred = {row["prompt_id"] for row in rows if row.get("starred")}
+    folders = {row["folder_key"]: row for row in db.folder_meta_full()}
+    applied = 0
+    for branch_db in sorted(worktrees_root.glob("*/state/origenerator.db")):
+        branch = Path(branch_db).parts[-3]
+        state = _curation_state(branch_db)
+        if state is None:
+            continue  # mid-write, half-deleted, or older than the columns read here
+        prior = db.branch_curation_state(branch)
+        for prompt_id, star in _star_changes(state, prior):
+            if prompt_id not in known:
+                continue  # nothing here to bookmark (the file never came over)
+            if (prompt_id in starred) == star:
+                continue  # already the way the branch left it
+            db.set_generation_starred(prompt_id, star)
+            if star:
+                starred.add(prompt_id)
+            else:
+                starred.discard(prompt_id)
+            applied += 1
+        for folder_key, meta in _folder_changes(state, prior):
+            live = folders.get(folder_key)
+            if meta is None:
+                if live is None:
+                    continue
+                db.delete_folder_meta(folder_key)
+                del folders[folder_key]
+                applied += 1
+                continue
+            merged = _merged_folder_meta(live, meta, additive=prior is None)
+            if merged is None:
+                continue
+            db.upsert_folder_meta(
+                folder_key, custom_name=merged["custom_name"],
+                starred=merged["starred"], level=merged["level"],
+                ref_prompt_id=merged["ref_prompt_id"])
+            folders[folder_key] = dict(merged, folder_key=folder_key)
+            applied += 1
+        db.set_branch_curation_state(branch, state)
+    return applied
+
+
+def _curation_state(branch_db: Path) -> dict | None:
+    """A worktree database's bookmarks, in the shape ``branch_curation`` stores:
+    the prompt ids it stars, and its folder_meta rows by key.
+
+    ``None`` when the database cannot be read this way -- a worktree mid-write, a
+    half-deleted one, or one seeded before these columns existed. Skipping it
+    beats adopting from a partial reading and then recording that reading as the
+    baseline, which would make the branch's untouched bookmarks look like
+    deletions on the very next launch.
+    """
+    try:
+        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
+        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
+            conn.row_factory = sqlite3.Row
+            stars = [r["prompt_id"] for r in conn.execute(
+                "SELECT prompt_id FROM generations WHERE starred = 1"
+                " ORDER BY prompt_id")]
+            folders = {r["folder_key"]: {
+                "custom_name": r["custom_name"],
+                "starred": bool(r["starred"]),
+                "level": r["level"],
+                "ref_prompt_id": r["ref_prompt_id"],
+            } for r in conn.execute(
+                "SELECT folder_key, custom_name, starred, level, ref_prompt_id"
+                " FROM folder_meta")}
+    except sqlite3.Error:
+        return None
+    return {"stars": stars, "folders": folders}
+
+
+def _star_changes(state: dict, prior: dict | None) -> list[tuple[str, bool]]:
+    """Which item stars the branch itself changed, as ``(prompt_id, starred)``.
+
+    Against a prior reading that is the symmetric difference -- what it starred
+    and what it unstarred. With no prior reading there is no telling a star the
+    branch added from one this app has since dropped, so only its stars are
+    offered, never its unstars.
+    """
+    now = set(state.get("stars") or ())
+    if prior is None:
+        return [(prompt_id, True) for prompt_id in sorted(now)]
+    was = set(prior.get("stars") or ())
+    return ([(prompt_id, True) for prompt_id in sorted(now - was)]
+            + [(prompt_id, False) for prompt_id in sorted(was - now)])
+
+
+def _folder_changes(state: dict, prior: dict | None) -> list[tuple[str, dict | None]]:
+    """Which folder bookmarks the branch itself changed, as ``(key, meta)`` --
+    ``meta`` ``None`` for one it dropped.
+
+    Same asymmetry as :func:`_star_changes`: with no prior reading only what the
+    branch *holds* is offered, since a bookmark missing from a copy is
+    indistinguishable from one this app never had.
+    """
+    now = state.get("folders") or {}
+    if prior is None:
+        return sorted(now.items())
+    was = prior.get("folders") or {}
+    changed = [(key, meta) for key, meta in sorted(now.items()) if was.get(key) != meta]
+    return changed + [(key, None) for key in sorted(was) if key not in now]
+
+
+def _merged_folder_meta(live: dict | None, branch: dict, *,
+                        additive: bool) -> dict | None:
+    """The folder_meta values to write for a bookmark the branch changed, or
+    ``None`` when there is nothing to write.
+
+    A diffed pass takes the branch's row whole: it is what the user left there.
+    A first, baseline-less pass may only add -- it lights a star this app lacks
+    and fills in a name it has none for, and leaves the rest alone.
+    """
+    base = {"custom_name": None, "starred": False, "level": None,
+            "ref_prompt_id": None}
+    if live is not None:
+        base = {key: live.get(key) for key in base}
+    if not additive:
+        merged = {key: branch.get(key) for key in base}
+        return merged if merged != base else None
+    merged = dict(base)
+    if branch.get("starred"):
+        merged["starred"] = True
+    if branch.get("custom_name") and not merged["custom_name"]:
+        merged["custom_name"] = branch["custom_name"]
+    if merged == base:
+        return None
+    # Carry the branch's bookmark identity onto a key this app had nothing for,
+    # so the reconcile can re-point it when the key formula next moves.
+    merged["level"] = merged["level"] or branch.get("level")
+    merged["ref_prompt_id"] = merged["ref_prompt_id"] or branch.get("ref_prompt_id")
+    return merged
+
+
 def seed_branch_db(primary_db: Path, branch_db: Path) -> bool:
     """Start the branch's database from the primary's, once; return whether it did.
 

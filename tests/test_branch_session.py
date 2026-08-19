@@ -275,3 +275,142 @@ def test_adoption_costs_no_query_per_seeded_row(tmp_path):
 
     assert adopted == 2                     # each worktree's own row came home
     assert len(calls) < len(seeded), calls  # and the 80 seeded ones cost no queries
+
+
+# --- adoption: the bookmarks a branch session made come home too
+
+
+def _completed_row(db, prompt_id, filename):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v1",
+        positive_prompt="a fox", negative_prompt="", seed=7,
+        params_json="{}", workflow_json="{}",
+    )
+    db.update_generation(
+        prompt_id, status="completed",
+        output_files=json.dumps([{"filename": filename, "subfolder": ""}]),
+    )
+
+
+def _seeded_pair(tmp_path, worktree="wt-a", prompt_id="lib1"):
+    """A live database and a worktree copy of it, as seeding leaves them: the
+    same library row in both, starred in neither."""
+    from origenerator.db import Database
+    live = _live_db(tmp_path)
+    _completed_row(live, prompt_id, "lib1.png")
+    branch = Database(tmp_path / "worktrees" / worktree / "state" / "origenerator.db")
+    _completed_row(branch, prompt_id, "lib1.png")
+    return live, branch
+
+
+def _adopt(live, tmp_path):
+    from origenerator.branch_session import adopt_branch_curation
+    return adopt_branch_curation(live, tmp_path / "worktrees")
+
+
+def test_a_star_made_in_a_preview_comes_home(tmp_path):
+    # The star adoption used to lose entirely: the item already exists here, so
+    # row adoption skips it by design and the bookmark went with the worktree.
+    live, branch = _seeded_pair(tmp_path)
+    branch.set_generation_starred("lib1", True)
+
+    assert _adopt(live, tmp_path) == 1
+    assert live.get_generation("lib1")["starred"] == 1
+    assert _adopt(live, tmp_path) == 0  # and the next launch has nothing to do
+
+
+def test_a_folder_bookmark_made_in_a_preview_comes_home(tmp_path):
+    live, branch = _seeded_pair(tmp_path)
+    branch.set_folder_starred("sdxl_t2i/model-a", True)
+    branch.rename_folder("sdxl_t2i/model-a", "the good one")
+
+    assert _adopt(live, tmp_path) == 1
+    meta = live.folder_meta_map()["sdxl_t2i/model-a"]
+    assert meta["starred"] is True and meta["custom_name"] == "the good one"
+
+
+def test_a_first_sighting_adds_bookmarks_but_takes_none_away(tmp_path):
+    """A worktree may have been seeded months ago, so a bookmark it lacks says
+    nothing about the user's intent — only that this app has moved on since."""
+    live, branch = _seeded_pair(tmp_path)
+    live.set_generation_starred("lib1", True)      # starred here, after the seed
+    live.set_folder_starred("sdxl_t2i/model-a", True)
+
+    assert _adopt(live, tmp_path) == 0
+    assert live.get_generation("lib1")["starred"] == 1
+    assert live.folder_meta_map()["sdxl_t2i/model-a"]["starred"] is True
+
+
+def test_a_bookmark_the_user_has_since_dropped_is_not_reinstated(tmp_path):
+    """The reason a baseline is kept at all: without one, a worktree still
+    carrying yesterday's star would re-light it at every single launch."""
+    live, branch = _seeded_pair(tmp_path)
+    branch.set_generation_starred("lib1", True)
+    _adopt(live, tmp_path)
+    live.set_generation_starred("lib1", False)     # the user changed their mind
+
+    assert _adopt(live, tmp_path) == 0
+    assert live.get_generation("lib1")["starred"] == 0
+
+
+def test_an_unstar_made_in_a_preview_crosses_over_once_a_baseline_exists(tmp_path):
+    live, branch = _seeded_pair(tmp_path)
+    live.set_generation_starred("lib1", True)
+    branch.set_generation_starred("lib1", True)
+    _adopt(live, tmp_path)                         # the baseline: starred in both
+
+    branch.set_generation_starred("lib1", False)   # taken back in the preview
+    assert _adopt(live, tmp_path) == 1
+    assert live.get_generation("lib1")["starred"] == 0
+
+
+def test_a_folder_bookmark_dropped_in_a_preview_crosses_over_too(tmp_path):
+    live, branch = _seeded_pair(tmp_path)
+    branch.set_folder_starred("sdxl_t2i/model-a", True)
+    _adopt(live, tmp_path)
+
+    branch.delete_folder_meta("sdxl_t2i/model-a")
+    assert _adopt(live, tmp_path) == 1
+    assert "sdxl_t2i/model-a" not in live.folder_meta_map()
+
+
+def test_a_star_on_a_generation_the_branch_made_needs_no_second_pass(tmp_path):
+    # It rides home as one column of the adopted row; the bookmark pass must not
+    # count it again.
+    from origenerator.branch_session import adopt_branch_rows
+    from origenerator.db import Database
+    live = _live_db(tmp_path)
+    branch_path = _branch_db_with(
+        tmp_path, "wt-a", [{"prompt_id": "b7", "filename": "fox7.png"}])
+    Database(branch_path).set_generation_starred("b7", True)
+    out = _output_file(tmp_path, "fox7.png")
+
+    assert adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs") == 1
+    assert live.get_generation("b7")["starred"] == 1
+    assert _adopt(live, tmp_path) == 0
+
+
+def test_bookmark_adoption_skips_a_database_predating_stars(tmp_path):
+    """An old worktree is passed over whole rather than read in part — recording
+    a partial reading as the baseline would make its untouched bookmarks look
+    like deletions at the next launch. The worktrees beside it still come home."""
+    import sqlite3
+    live, fresh = _seeded_pair(tmp_path, worktree="wt-new")
+    fresh.set_generation_starred("lib1", True)
+    old = tmp_path / "worktrees" / "wt-old" / "state" / "origenerator.db"
+    old.parent.mkdir(parents=True)
+    with sqlite3.connect(old) as conn:
+        conn.execute("CREATE TABLE generations (prompt_id TEXT)")
+        conn.execute("INSERT INTO generations VALUES ('lib1')")
+
+    assert _adopt(live, tmp_path) == 1
+    assert live.get_generation("lib1")["starred"] == 1
+
+
+def test_bookmark_adoption_ignores_a_star_on_something_not_here(tmp_path):
+    live, branch = _seeded_pair(tmp_path)
+    _completed_row(branch, "only-there", "gone.png")
+    branch.set_generation_starred("only-there", True)
+
+    assert _adopt(live, tmp_path) == 0
+    assert live.get_generation("only-there") is None

@@ -138,6 +138,30 @@ _SHELF_LABELS = {
 }
 
 
+class _Running(NamedTuple):
+    """What the app is doing under its own steam — everything Esc turns off, and
+    everything a second Esc turns back on.
+
+    Not the mic, which Esc never touches, and not the work already in flight: a
+    generation that is rendering lands either way. What is here is the standing
+    instructions — the device, the loop, the show, the sound.
+    """
+
+    osr2: bool = False       # the device switch: a funscript, or the stroke behind it
+    stroke: bool = False     # the bare stroke, running with the switch off
+    auto: str | None = None  # the folder looping, if one is
+    audio: bool = False      # the audio bed
+    show: bool = False       # a fullscreen slideshow is up
+    # ...and the pass it was playing, to take up again. A show following a
+    # generation in flight has none, which is why this is asked separately from
+    # whether there is a show at all.
+    show_pass: tuple | None = None
+
+    @property
+    def anything(self) -> bool:
+        return bool(self.osr2 or self.stroke or self.auto or self.audio or self.show)
+
+
 class _SearchScope(NamedTuple):
     """What a search covers: the selected row's breadcrumb and the generations it
     holds (``None`` for no restriction at all).
@@ -433,6 +457,9 @@ class GalleryView(QWidget):
         # What another app has on the shared ComfyUI, re-read on every poll so the
         # bottom bar can say the server is busy before a Generate goes in behind it.
         self._foreign_queue = ForeignQueue(running=[], pending=[])
+        # What the last Esc took off, for the next one to put back — cleared as
+        # soon as it is put back, so the key goes on alternating.
+        self._stopped_by_escape: _Running | None = None
         self._build_ui()
         self._sync_history_buttons()
         self._sync_nav_buttons()
@@ -502,7 +529,10 @@ class GalleryView(QWidget):
     def _handle_escape(self) -> bool:
         """Esc turns off everything the app is doing, wherever focus is: the OSR2
         drive (a funscript or the genau stroke), the auto-generate loop, the
-        fullscreen slideshow, and the audio bed.
+        fullscreen slideshow, and the audio bed. Pressed again with all of it
+        off, it puts back exactly what it took away — the same folder looping,
+        the same show on the same picture, the sound, the device — the way
+        leaving an OmniPause hands the room back.
 
         Everything except the microphone, which is why that switch stands on its
         own in the bank. A stop that closed the mic too would take with it the
@@ -517,25 +547,77 @@ class GalleryView(QWidget):
         """
         if self._other_window_owns_keys() and not self._our_show_is_in_front():
             return False
-        handled = False
-        if self._osr2_enabled:
+        running = self._running_now()
+        if running.anything:
+            # Whatever is on when it is pressed, however it came to be on — so
+            # something started by hand after a stop is taken away by the next
+            # Esc, and is what the one after that offers back.
+            self._stopped_by_escape = running
+            self._stop_running(running)
+            return True
+        if self._stopped_by_escape is None:
+            return False  # nothing running and nothing to put back: not ours
+        self._resume(self._stopped_by_escape)
+        self._stopped_by_escape = None
+        return True
+
+    def _running_now(self) -> _Running:
+        """Everything the app is doing under its own steam right now."""
+        show = self._slideshow
+        return _Running(
+            osr2=self._osr2_enabled,
+            # Space reaches the switch rather than the stroke, so a stroke
+            # running with the switch off is one something else started — the
+            # stop has always covered that case, and so does the resume.
+            stroke=self._osr2_stroke.active and not self._osr2_enabled,
+            auto=self._auto.active_key(),
+            audio=self._audio_btn.isChecked(),
+            show=show is not None,
+            show_pass=show.playing_now() if show is not None else None,
+        )
+
+    def _stop_running(self, running: _Running) -> None:
+        """Take all of ``running`` off."""
+        if running.osr2:
             # One switch, so one thing to turn off: untoggling stops whichever
             # source is on the device — a funscript drive or the stroke.
             self._osr2_btn.setChecked(False)
-            handled = True
-        elif self._osr2_stroke.active:
-            self._osr2_stroke.stop()  # nothing else should own it, but say so anyway
-            handled = True
-        if self._auto.any_active():
+        elif running.stroke:
+            self._osr2_stroke.stop()
+        if running.auto:
             self._auto.stop_all()
-            handled = True
-        if self._slideshow is not None:
+        if running.show:
             self._slideshow.close()  # _on_slideshow_closed lets it go
-            handled = True
-        if self._audio_btn.isChecked():
+        if running.audio:
             self._audio_btn.setChecked(False)  # drives _on_audio_toggle → silence
-            handled = True
-        return handled
+
+    def _resume(self, stopped: _Running) -> None:
+        """Put back what Esc took away.
+
+        In the order that leaves each one aimed where it was: the show goes up
+        before the device switch, so the one reconcile that picks a drive source
+        finds the show's video in front of it exactly as it did the first time.
+
+        A loop resumes in the folder it was running in rather than the one on
+        screen — the gallery is somewhere else by now as often as not, and the
+        loop was never about where the user is looking. A show that was
+        following a generation in flight is the one thing not put back: it has
+        no pass to take up, and what it was watching has landed or gone.
+        """
+        if stopped.audio:
+            self._audio_btn.setChecked(True)
+        if stopped.show_pass is not None:
+            items, index, dwell_ms = stopped.show_pass
+            self._open_slideshow(items, start=index, image_dwell_ms=dwell_ms,
+                                 shuffle=in_order)
+        if stopped.auto:
+            self._begin_auto(stopped.auto)
+            self._sync_auto_button()      # a resumed loop lights its switch again
+            self._sync_discard_buttons()  # and its run offers a next seed, not a cancel
+        if stopped.osr2:
+            self._osr2_btn.setChecked(True)
+        elif stopped.stroke:
+            self._osr2_stroke.start()
 
     def _our_show_is_in_front(self) -> bool:
         """True when the window ahead of the gallery is our own fullscreen
@@ -2552,7 +2634,15 @@ class GalleryView(QWidget):
             self._auto_working.pop(key, None)  # the launch didn't take
 
     def _capture_working(self, key: str):
-        group = self._current_group()
+        """Hold the folder's settings as the loop's working params.
+
+        The folder on screen when it is the one being looped, which is every
+        press of the Auto switch; otherwise the one ``key`` names, looked up in
+        the tree — Esc resuming a loop is the case where the two differ, and the
+        folder the user has navigated to since is not the one to capture.
+        """
+        group = (self._current_group() if key == self._selected_folder_key()
+                 else self._group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")

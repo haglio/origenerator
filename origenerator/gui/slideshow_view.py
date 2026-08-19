@@ -227,6 +227,21 @@ class SlideshowView(QWidget):
         else:
             self._show_current()
 
+    def playing_now(self):
+        """This pass as another show could take it up — its items in the order it
+        is playing them, which one is on screen, and how long a slide holds — or
+        ``None`` when there is no pass to take up.
+
+        What Esc keeps when it closes the show, so pressing it again opens the
+        same set on the same picture rather than a fresh shuffle of the folder.
+        A show still following a generation has no items of its own and answers
+        ``None``: what it was watching is either finished or gone by then.
+        """
+        if self._live or self._playlist.is_empty():
+            return None
+        return (self._playlist.in_play_order(), self._playlist.index,
+                self._dwell_s * 1000)
+
     def set_levels(self, levels_by_path: dict) -> None:
         """Arm Shift+Left/Right to step an image's enhancement levels.
 

@@ -91,6 +91,12 @@ class SlideshowPlaylist:
         """The shuffled play order (item indices) — exposed for diagnostics."""
         return list(self._order)
 
+    def in_play_order(self) -> list:
+        """The items in the order this pass is playing them, rather than the order
+        the set was handed over in — so a playlist built from these, in order,
+        takes up where this one stopped."""
+        return [self._items[index] for index in self._order]
+
     def peek(self, offset: int):
         """The item ``offset`` steps away in the running pass, wrapping — what the
         view draws either side of the one on screen. ``None`` when empty."""

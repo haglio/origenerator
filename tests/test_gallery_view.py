@@ -9152,6 +9152,108 @@ def test_esc_over_the_show_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path
     show.close()
 
 
+def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch):
+    # The other half of the panic-stop: press it once and the room goes quiet,
+    # press it again and it comes back as it was — the way leaving an OmniPause
+    # hands the room back rather than leaving every switch to be found again.
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    playing = view._slideshow.playing_now()
+
+    _press_escape(view)
+    assert not view._auto.is_active(key) and view._slideshow is None
+
+    assert _press_escape(view) is True
+
+    assert view._auto.is_active(key)
+    assert view._audio_btn.isChecked() and bed.starts == 2
+    assert view._slideshow is not None
+    qtbot.addWidget(view._slideshow)
+    assert view._slideshow.playing_now() == playing  # same set, same picture
+
+
+def test_the_resumed_show_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
+                                                                monkeypatch):
+    # Not a fresh shuffle of the folder: the pass it was playing, taken up where
+    # it stopped, so what comes next is what would have come next.
+    view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    show = view._slideshow
+    show._step(1)
+    show._step(1)
+    was_showing, was_at = show._playlist.current(), show._playlist.index
+
+    _press_escape(view)
+    _press_escape(view)
+
+    qtbot.addWidget(view._slideshow)
+    assert view._slideshow._playlist.current() == was_showing
+    assert view._slideshow._playlist.index == was_at
+
+
+def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_path,
+                                                                    monkeypatch):
+    # A loop is a standing instruction about one recipe, and the gallery has
+    # usually moved on by the time Esc is pressed twice: it goes back to the
+    # folder it was running in, whatever is selected now.
+    view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    _press_escape(view)
+    other = next(k for k in view._item_by_key if k != key)
+    view._tree.setCurrentItem(view._item_by_key[other])
+
+    _press_escape(view)
+
+    assert view._auto.is_active(key) and not view._auto.is_active(other)
+    if view._slideshow is not None:
+        qtbot.addWidget(view._slideshow)
+
+
+def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
+    # What is put back is put back for good: a third press stops it all over
+    # again rather than the key doing nothing from there on.
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+
+    _press_escape(view)
+    _press_escape(view)
+    if view._slideshow is not None:
+        qtbot.addWidget(view._slideshow)
+
+    assert _press_escape(view) is True
+    assert not view._auto.is_active(key)
+    assert not view._audio_btn.isChecked() and bed.stops == 2
+    assert view._slideshow is None
+
+
+def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
+                                                         monkeypatch):
+    # It holds what it took, not a growing memory of everything ever stopped:
+    # something switched on by hand after a stop is all the next press takes
+    # away, and all the one after that puts back.
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    _press_escape(view)
+    view._audio_btn.setChecked(True)  # by hand, with everything else still off
+
+    _press_escape(view)
+    _press_escape(view)
+
+    assert view._audio_btn.isChecked()
+    assert not view._auto.is_active(key) and view._slideshow is None
+
+
+def test_esc_puts_back_a_stroke_that_was_running_without_the_switch(qtbot,
+                                                                    monkeypatch):
+    # Started by a stroke key rather than the OSR2 switch, so it is the stroke
+    # itself that has to be started again — the switch was never on to restore.
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    view._auto.stop_all()
+    view._osr2_stroke.start()
+
+    _press_escape(view)
+    assert not view._osr2_stroke.active
+
+    _press_escape(view)
+    assert view._osr2_stroke.active and not view._osr2_btn.isChecked()
+
+
 def test_esc_stops_the_audio_bed_on_its_own(qtbot):
     # Nothing else running: the switch alone is enough for Esc to have acted.
     view, bed = _audio_view(qtbot)

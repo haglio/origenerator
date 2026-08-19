@@ -37,7 +37,7 @@ from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
-from origenerator.gui.enhanced_filter import EnhancedFilter
+from origenerator.gui.show_filters import ShowFilters
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.inflight import EnhancingRun, InFlightItem
 from origenerator.gui.flow_layout import FlowLayout
@@ -448,10 +448,11 @@ class GalleryView(QWidget):
         # is on — including this one, with nothing playing, where it is what
         # the next slideshow opens at.
         self._pace = SlideshowPace(parent=self)
-        # Whether a show plays only the pictures that have been enhanced — the
-        # console's own switch, app-wide for the same reason the pace is.
-        self._enhanced_filter = EnhancedFilter(parent=self)
-        self._enhanced_filter.changed.connect(self._on_enhanced_filter_changed)
+        # What a show may play — the favorites, the enhanced ones, or all of
+        # it. The console's own switches, app-wide for the same reason the pace
+        # is, and read wherever a show is decided from.
+        self._filters = ShowFilters(parent=self)
+        self._filters.changed.connect(self._on_show_filters_changed)
         # Guards the one reconcile that owns both drive sources: starting or
         # stopping the stroke is something it does, not something it reacts to.
         self._reconciling_osr2 = False
@@ -1314,9 +1315,8 @@ class GalleryView(QWidget):
         bottom.setSpacing(12)
         self._stroke_panel = None
         if self._osr2_stroke is not None:
-            self._stroke_panel = StrokePanel(
-                self._osr2_stroke, pace=self._pace,
-                enhanced_filter=self._enhanced_filter)
+            self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace,
+                                             filters=self._filters)
             bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its box on) each image the app newly generates.
@@ -1647,7 +1647,7 @@ class GalleryView(QWidget):
                      if self._fun_time is not None else None),
             on_reset=(self.reset_region if self._fun_time is not None else None),
             pace=self._pace, stroke=self._osr2_stroke,
-            enhanced_filter=self._enhanced_filter,
+            filters=self._filters,
             # Its Space reaches the one OSR2 switch, like every other surface's.
             on_drive_toggle=self._toggle_osr2_drive, **kwargs)
         self._live_shows.append((self._slideshow, location))
@@ -3455,22 +3455,22 @@ class GalleryView(QWidget):
     def _slideshow_rows(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
         shelf's collection on a shelf, else everything under the selected folder
-        — narrowed to the enhanced ones while that filter is on.
+        — narrowed by whichever of the show filters are on.
 
-        The one place the filter is applied, so everything a show is decided by
-        goes through it: what one opens with, whether the button has anything to
+        The one place they are applied, so everything a show is decided by goes
+        through it: what one opens with, whether the button has anything to
         play, and whether a generation that lands mid-show joins it.
         """
         rows = self._browser.shelf_rows()
         if rows is None:
             group = self._current_group()
             rows = gallery.rows_under(group) if group is not None else []
-        if not self._enhanced_filter.active:
+        if not self._filters.any_on:
             return rows
-        return [row for row in rows if gallery.is_enhanced_row(row)]
+        return [row for row in rows if self._filters.keeps(row)]
 
-    def _on_enhanced_filter_changed(self, active: bool):
-        """The enhanced-only switch moved — from the console, or from a word.
+    def _on_show_filters_changed(self):
+        """A show filter moved — from the console, or from a word.
 
         A show that is up narrows (or widens) where it stands, the way turning
         the pace changes a running show under you: the console is on screen over
@@ -3482,7 +3482,8 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()
         if self._slideshow is not None:
             self._slideshow.refilter(self._slideshow_items(self._slideshow_rows()))
-        logger.info("Enhanced-only filter %s", "on" if active else "off")
+        logger.info("Show filters: favorites=%s enhanced=%s",
+                    self._filters.favorites, self._filters.enhanced)
 
     def _slideshow_subject(self) -> str:
         """What the slideshow button would play, named for its tooltip."""
@@ -3990,11 +3991,16 @@ class GalleryView(QWidget):
         it, and "nothing here is enhanced" is the one answer worth hearing at
         once. Said even when the switch was already that way — a word that did
         nothing and said nothing reads as a mic that missed it.
+
+        Turning it off clears the other switch with it: "clear filter" is the
+        way out of ALL of the narrowing, which is what the same phrase means on
+        every satellite in this family.
         """
-        self._enhanced_filter.set_active(active)
         if not active:
+            self._filters.clear()
             self._answer_command("🎤 showing all of them")
             return
+        self._filters.set_enhanced(True)
         count = len(self._slideshow_items(self._slideshow_rows()))
         self._answer_command(
             f"🎤 enhanced only — {count} to play" if count

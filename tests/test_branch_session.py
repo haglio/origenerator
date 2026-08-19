@@ -236,3 +236,42 @@ def test_adoption_survives_a_branch_database_predating_requests(tmp_path):
     out = _output_file(tmp_path, "fox6.png")
 
     assert adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs") == 1
+
+
+def test_adoption_costs_no_query_per_seeded_row(tmp_path):
+    """A worktree database is a *copy* of the live one, so nearly every row in it
+    is a row the live app already has. Asking the database about each of those
+    one at a time made launch cost a query per seeded row per worktree — 10,000
+    round trips, twelve seconds of a startup that used to take half of one, and
+    it grew every time an agent opened another worktree. The rows the live app
+    already holds are in hand before the scan starts; recognizing them there is
+    what keeps the cost flat."""
+    from origenerator.branch_session import adopt_branch_rows
+    live = _live_db(tmp_path)
+    seeded = [{"prompt_id": f"s{i}", "filename": f"seed{i}.png"} for i in range(40)]
+    for row in seeded:
+        live.insert_generation(
+            prompt_id=row["prompt_id"], workflow_name="sdxl_t2i",
+            workflow_version="v1", positive_prompt="a fox", negative_prompt="",
+            seed=7, params_json="{}", workflow_json="{}",
+        )
+        live.update_generation(
+            row["prompt_id"], status="completed",
+            output_files=json.dumps([{"filename": row["filename"], "subfolder": ""}]),
+        )
+    # Two worktrees, each carrying the whole seeded copy plus one row of its own.
+    _branch_db_with(tmp_path, "wt-a", seeded + [{"prompt_id": "a1", "filename": "own_a.png"}])
+    _branch_db_with(tmp_path, "wt-b", seeded + [{"prompt_id": "b1", "filename": "own_b.png"}])
+    out = _output_file(tmp_path, "own_a.png")
+    _output_file(tmp_path, "own_b.png")
+
+    calls = []
+    real = type(live).get_generation
+    type(live).get_generation = lambda self, pid: (calls.append(pid), real(self, pid))[1]
+    try:
+        adopted = adopt_branch_rows(live, tmp_path / "worktrees", out, tmp_path / "thumbs")
+    finally:
+        type(live).get_generation = real
+
+    assert adopted == 2                     # each worktree's own row came home
+    assert len(calls) < len(seeded), calls  # and the 80 seeded ones cost no queries

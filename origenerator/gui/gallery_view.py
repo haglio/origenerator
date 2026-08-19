@@ -93,6 +93,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
 from shared_ui.colors import BORDER_SUBTLE
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ _SEARCH_DELAY_MS = 300
 _SEARCH_MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
 _SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
-_TOOL_ICON_PX = 24  # the button bank's icons — see GalleryView._tool_button
+_TOOL_ICON_PX = BUTTON_ICON  # the family's icon size — see GalleryView._tool_button
 _TOOLBAR_GROUP_GAP = 14  # the space that separates one group of the button bank from the next
 # Said the same way by the button and by the settings panel it would run, because
 # both go dark together the moment what's in front of you is a video.
@@ -741,7 +742,11 @@ class GalleryView(QWidget):
         policy = self._toolbar_host.sizePolicy()
         policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
         self._toolbar_host.setSizePolicy(policy)
-        toolbar = FlowLayout(self._toolbar_host, spacing=2)
+        # The family's own gap along a row, and its wider one between wrapped
+        # rows -- at the single small gap this used, a bank that wrapped had its
+        # two rows all but touching.
+        toolbar = FlowLayout(self._toolbar_host, spacing=BUTTON_GAP,
+                             row_spacing=BUTTON_ROW_GAP)
         self._toolbar_groups = []
         for buttons in (
             (self._back_btn, self._forward_btn),                    # where you are

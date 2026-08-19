@@ -10,9 +10,16 @@ class FlowLayout(QLayout):
     tiles uses the whole width instead of stopping at an arbitrary column.
     """
 
-    def __init__(self, parent=None, *, margin=0, spacing=6):
+    def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None):
+        """*row_spacing* is the gap BETWEEN wrapped rows, defaulting to *spacing*.
+
+        They are separate because a row of buttons wants its members close and
+        its rows apart: at one gap for both, two wrapped rows read as a single
+        crowded block rather than as two rows.
+        """
         super().__init__(parent)
         self._items = []
+        self._row_spacing = spacing if row_spacing is None else row_spacing
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
 
@@ -76,7 +83,7 @@ class FlowLayout(QLayout):
             hint = item.sizeHint()
             if x > area.x() and x + hint.width() > area.right():
                 x = area.x()                     # this item won't fit; wrap
-                y += row_height + spacing
+                y += row_height + self._row_spacing
                 row_height = 0
             if place:
                 item.setGeometry(QRect(QPoint(x, y), hint))

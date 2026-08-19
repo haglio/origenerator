@@ -146,6 +146,15 @@ def test_the_mic_can_be_shut_by_voice_but_not_opened():
     assert match_app_command("mic on") is None
 
 
+def test_the_show_filter_is_said_either_way_round_not_toggled():
+    # A speaker mid-show is not looking at the console to see which way it is
+    # set, so a single word that flipped it would do the opposite half the time.
+    assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED
+    assert match_app_command("enhanced only") is AppCommand.FILTER_ENHANCED
+    assert match_app_command("clear filter") is AppCommand.FILTER_OFF
+    assert match_app_command("no filter") is AppCommand.FILTER_OFF
+
+
 def test_the_star_button_and_the_starred_shelf_are_different_words():
     assert match_app_command("star") is AppCommand.STAR
     assert match_app_command("starred") is AppCommand.STARRED

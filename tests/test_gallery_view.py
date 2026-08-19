@@ -42,6 +42,7 @@ from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import RequestDictation
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
@@ -286,6 +287,14 @@ def _row(prompt_id, workflow_name, params, filename, **extra):
 def _image(prompt_id, prompt, steps, seed):
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed},
+                f"sdxl_t2i_{prompt_id}.png")
+
+
+def _enhanced_image(prompt_id, prompt, steps, seed):
+    """An image whose recipe ran the enhance tail — one wearing the yellow plus."""
+    return _row(prompt_id, "sdxl_t2i",
+                {"positive_prompt": prompt, "steps": steps, "seed": seed,
+                 "enhance": True},
                 f"sdxl_t2i_{prompt_id}.png")
 
 
@@ -5901,6 +5910,108 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
 
     view._image_cb.setChecked(False)  # nothing left on the shelf to play
     assert view._slideshow_btn.isHidden()
+
+
+def test_the_enhanced_filter_narrows_what_a_show_would_play(qtbot, monkeypatch):
+    # A folder enhanced through carries both versions of everything, and a pass
+    # of that is every picture twice — the second time being the point.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._enhanced_filter.set_active(True)
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
+    view._slideshow.close()
+
+
+def test_the_enhanced_filter_narrows_a_show_that_is_already_up(qtbot, monkeypatch):
+    # The console carrying the switch is drawn OVER the show, so a press that
+    # only took effect on the next one would look like a button doing nothing.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    assert len(view._slideshow._playlist) == 2
+
+    view._enhanced_filter.set_active(True)
+
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
+    view._enhanced_filter.set_active(False)   # and back again, all of them
+    assert len(view._slideshow._playlist) == 2
+    view._slideshow.close()
+
+
+def test_the_slideshow_button_goes_away_when_nothing_here_is_enhanced(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    assert not view._slideshow_btn.isHidden()
+
+    view._enhanced_filter.set_active(True)
+
+    assert view._slideshow_btn.isHidden()
+
+
+def test_a_generation_that_lands_unenhanced_stays_out_of_a_filtered_show(
+        qtbot, monkeypatch):
+    # The show takes in what lands while it runs; the filter decides that too,
+    # or a narrowed show would fill back up with the very rows it left out.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._enhanced_filter.set_active(True)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    view._feed_slideshow_finished(_image("i3", "a cat", 50, 3))
+
+    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
+    view._slideshow.close()
+
+
+def test_filter_enhanced_turns_it_on_and_says_what_is_left(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+
+    view._run_app_command(AppCommand.FILTER_ENHANCED)
+
+    assert view._enhanced_filter.active is True
+    assert "1 to play" in view._voice_status.text()
+
+    view._run_app_command(AppCommand.FILTER_OFF)
+
+    assert view._enhanced_filter.active is False
+    assert "all of them" in view._voice_status.text()
+
+
+def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+
+    view._run_app_command(AppCommand.FILTER_ENHANCED)
+
+    assert "nothing here is enhanced" in view._voice_status.text()
 
 
 def test_slideshow_plays_the_experiments_shelf(qtbot, monkeypatch):

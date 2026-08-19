@@ -6,6 +6,7 @@ lookalike), and that each command it posts reaches the right thing here.
 """
 
 from origenerator import stroke_engine
+from origenerator.gui.enhanced_filter import EnhancedFilter
 from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
 from origenerator.stroke_engine import Stroke
 from player_core import wave_stack
@@ -74,10 +75,10 @@ class FakeHost:
         self.calls.append(("dwell", self.dwell_s))
 
 
-def _panel(qtbot, stroke=None, host=None):
+def _panel(qtbot, stroke=None, host=None, enhanced_filter=None):
     stroke = stroke if stroke is not None else FakeStroke()
     host = host if host is not None else FakeHost()
-    panel = StrokePanel(stroke, host=host)
+    panel = StrokePanel(stroke, host=host, enhanced_filter=enhanced_filter)
     qtbot.addWidget(panel)
     return panel, stroke, host
 
@@ -92,6 +93,44 @@ def _press(panel, action):
     x, y, w, h = rect
     margin = StrokePanel.MARGIN
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
+
+
+def test_the_enhanced_filter_is_offered_only_where_there_is_one(qtbot):
+    # Genau's own console draws this console too, and an enhancement is a thing
+    # only this app makes — so the button appears because it was handed a
+    # filter, not because the console is in genau mode.
+    bare, _stroke, _host = _panel(qtbot)
+    bare.render_console()
+    assert "genau_filter_enhanced" not in [b.action for _r, b in bare._painter.buttons]
+
+    panel, _stroke, _host = _panel(qtbot, enhanced_filter=EnhancedFilter())
+    panel.render_console()
+    assert "genau_filter_enhanced" in [b.action for _r, b in panel._painter.buttons]
+
+
+def test_pressing_the_filter_button_flips_the_switch(qtbot):
+    switch = EnhancedFilter()
+    panel, _stroke, _host = _panel(qtbot, enhanced_filter=switch)
+    panel.render_console()
+
+    _press(panel, "genau_filter_enhanced")
+    assert switch.active is True
+
+    panel.render_console()  # the rects move with the fill, so re-read them
+    _press(panel, "genau_filter_enhanced")
+    assert switch.active is False
+
+
+def test_the_console_says_enhanceds_while_the_filter_is_on(qtbot):
+    # The status line is the HUD's own answer to "what am I looking at", and a
+    # narrowed show is exactly the thing it must not leave unsaid.
+    switch = EnhancedFilter()
+    _panel_off, stroke, host = _panel(qtbot, enhanced_filter=switch)
+    assert "Enhanceds" not in console_hud(stroke, host, enhanced_filter=switch).status_line
+
+    switch.set_active(True)
+
+    assert "Enhanceds" in console_hud(stroke, host, enhanced_filter=switch).status_line
 
 
 def test_the_picture_is_the_console_player_core_paints(qtbot):

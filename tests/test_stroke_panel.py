@@ -187,6 +187,38 @@ def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
     assert console_hud(stroke, FakeHost()).console.osr2 == "genau"
 
 
+def test_a_stroke_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
+    # The stroke goes on stroking with the device unplugged — it cannot see the
+    # wire — so without this the console animated a blue wave nobody was riding.
+    # Saying "off" is also what greys the readout and holds its trace still: the
+    # painter reads who has the device off this one value (player_core).
+    from player_core.drive_readout import DRIVEN_BY_NOTHING
+
+    stroke = FakeStroke()
+    stroke.active = True
+
+    hud = console_hud(stroke, FakeHost(), device_on=False)
+
+    assert hud.console.osr2 == "off"
+    assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
+
+
+def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
+    # Asked per draw rather than once: the OSR2 is switched on and off behind
+    # this app's back, so a console that read it at build time would go on
+    # claiming whatever was true when it opened.
+    answers = [False, True]
+    stroke = FakeStroke()
+    stroke.active = True
+    panel = StrokePanel(stroke, host=FakeHost(), device_on=lambda: answers.pop(0))
+    qtbot.addWidget(panel)
+
+    panel.render_console()
+    assert answers == [True]  # it asked
+    panel.render_console()
+    assert answers == []      # and asked again rather than reusing the answer
+
+
 def test_the_slideshows_pace_rides_the_console(qtbot):
     panel, stroke, host = _panel(qtbot)
     host.dwell_s = 7

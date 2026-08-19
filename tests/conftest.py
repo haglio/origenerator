@@ -166,7 +166,7 @@ def _never_take_the_real_device(monkeypatch):
     exercises one for its own sake injects its own; this only replaces the
     default, so nothing is left reaching the hardware by accident.
     """
-    from origenerator.gui import osr2_driver, osr2_stroke_driver
+    from origenerator.gui import osr2_driver, osr2_stroke_driver, stroke_panel
 
     class _NoDevice:
         def pause_genau(self): pass
@@ -183,6 +183,13 @@ def _never_take_the_real_device(monkeypatch):
     monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     monkeypatch.setattr(osr2_stroke_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     monkeypatch.setattr(osr2_stroke_driver, "_TickThread", _NoTicker)
+    # And off the broker's serial stamps, which the console reads to say whether
+    # the device is answering: those are live files whose freshness depends on
+    # whether the OSR2 happens to be switched on right now, so a suite reading
+    # them would pass or fail with the hardware. The stand-in says it is there —
+    # the console's own state before it could tell — and the tests about the
+    # device being off inject their own.
+    monkeypatch.setattr(stroke_panel.osr2, "device_on", lambda **_kw: True)
 
 
 @pytest.fixture(autouse=True)

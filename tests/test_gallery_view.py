@@ -296,20 +296,35 @@ def _top_level(tree):
             for i in range(tree.topLevelItemCount())}
 
 
-def _media_roots(tree):
-    """The Images / Videos rows, which hang under the All row that tops the tree."""
-    all_row = _top_level(tree).get("All")
-    if all_row is None:
-        return {}
-    return {all_row.child(i).text(0): all_row.child(i)
-            for i in range(all_row.childCount())}
-
-
 def _key(item):
     return item.data(0, _GROUP_ROLE).key
 
 
-def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
+def _workflow_rows(tree, media=None):
+    """The workflow rows, which hang under the All row that tops the tree, by
+    label — narrowed to one media type ("image"/"video") when ``media`` says so."""
+    all_row = _top_level(tree).get("All")
+    if all_row is None:
+        return {}
+    rows = [all_row.child(i) for i in range(all_row.childCount())]
+    if media is not None:
+        rows = [row for row in rows if _key(row).startswith(f"{media}/")]
+    return {row.text(0): row for row in rows}
+
+
+def _image_workflow(tree):
+    """The sole image workflow's row — where a one-recipe gallery starts."""
+    (row,) = _workflow_rows(tree, "image").values()
+    return row
+
+
+def _video_workflow(tree):
+    """The sole video workflow's row."""
+    (row,) = _workflow_rows(tree, "video").values()
+    return row
+
+
+def test_refresh_builds_workflow_model_settings_tree(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
         _image("i2", "a cat", 50, 2),  # same settings, different seed
@@ -321,13 +336,16 @@ def test_refresh_builds_media_workflow_model_settings_tree(qtbot):
     view.refresh()
 
     top = _top_level(view._tree)
-    # The shelves, then one All row over the media roots — somewhere to stand
-    # that means the whole library, which is what scopes a search to everything.
+    # The shelves, then one All row over the workflow folders — somewhere to
+    # stand that means the whole library, which is what scopes a search to
+    # everything.
     assert set(top) == {"Recents", "Starred", "Experiments", "Requests",
                         "Trash", "All"}
-    assert set(_media_roots(view._tree)) == {"Images", "Videos"}
+    # Media type grows no folder of its own any more; the two boxes over the
+    # tree are what says which kinds are listed.
+    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
 
-    workflow_node = _media_roots(view._tree)["Images"].child(0)
+    workflow_node = _image_workflow(view._tree)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
     # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
     # which the two seed variants collapse.
@@ -341,22 +359,18 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    videos = _media_roots(view._tree)["Videos"]
-    workflow = videos.child(0)
+    workflow = _video_workflow(view._tree)
     model = workflow.child(0)
     lora = model.child(0)
     source = lora.child(0)
     settings = source.child(0)
 
-    # Each level below the media root carries a chip as its row icon — right of
-    # the caret, reading as the first character of the folder's name — and names
-    # itself in the tooltip.
+    # Each level carries a chip as its row icon — right of the caret, reading as
+    # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
     assert not lora.icon(0).isNull() and "LoRA" in lora.toolTip(0)
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
-    # ...the media root wears its own kind's glyph, in the same slot...
-    assert not videos.icon(0).isNull() and "Videos" in videos.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
     # all, so it carries no chip — and since its name is a code, its tooltip is
     # where what it holds is read.
@@ -427,11 +441,11 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     # The title carries the full breadcrumb, which the narrow tree truncates.
     assert "SDXL Text-to-Image" in view._title.display_text()
-    assert "Images" in view._title.display_text()
+    assert "All" in view._title.display_text()
 
 
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
@@ -444,7 +458,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
     view._tree.setCurrentItem(lora)
     assert len(view.visible_folder_keys()) == 2
@@ -463,7 +477,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     view._tree.setCurrentItem(lora)
     a_tile_key = view.visible_folder_keys()[0]  # a settings tile under the LoRA folder
 
@@ -474,8 +488,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
 def _first_leaf(view):
     """The first settings folder in the tree — the one tier a name of your own
     can go on, since its own name is a generic code."""
-    images = _media_roots(view._tree)["Images"]
-    return images.child(0).child(0).child(0).child(0)
+    return _image_workflow(view._tree).child(0).child(0).child(0)
 
 
 def _children_by_detail(item):
@@ -523,15 +536,15 @@ def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    images = _media_roots(view._tree)["Images"]
-    lora = images.child(0).child(0).child(0)
+    workflow = _image_workflow(view._tree)
+    lora = workflow.child(0).child(0)
     dog = _children_by_detail(lora)["a dog"]
     before = view._tree.currentItem()
 
     _search_for(view, "cat")
 
     assert not dog.isHidden()
-    assert not images.isExpanded()
+    assert not workflow.isExpanded()
     assert view._tree.currentItem() is before
 
 
@@ -540,7 +553,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
     assert view.visible_prompt_ids() == ["i2"]
 
@@ -561,11 +574,11 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    view._tree.setCurrentItem(_video_workflow(view._tree))
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["v1"]
-    assert "Videos" in view._title.display_text()  # the header says where it looked
+    assert "I2V" in view._title.display_text()  # the header says where it looked
 
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
@@ -575,11 +588,11 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    view._tree.setCurrentItem(_video_workflow(view._tree))
     _search_for(view, "cat")
     assert view.visible_prompt_ids() == ["v1"]
 
-    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])
+    view._tree.setCurrentItem(_image_workflow(view._tree))
 
     assert view._search_edit.text() == "cat"
     assert view._browser.showing_search()
@@ -588,8 +601,8 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
 
 def test_the_all_row_searches_the_whole_library(qtbot):
     # What All is for: every other folder narrows the answer before the query
-    # does, so without a row above the media roots there is nowhere to stand
-    # that means everything.
+    # does, so without a row above the workflow folders there is nowhere to
+    # stand that means everything.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -601,7 +614,7 @@ def test_the_all_row_searches_the_whole_library(qtbot):
     assert set(view.visible_prompt_ids()) == {"i1", "v1"}
 
 
-def test_the_all_row_holds_the_media_roots_and_is_where_the_gallery_lands(qtbot):
+def test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -609,7 +622,7 @@ def test_the_all_row_holds_the_media_roots_and_is_where_the_gallery_lands(qtbot)
 
     all_row = _top_level(view._tree)["All"]
     assert [all_row.child(i).text(0) for i in range(all_row.childCount())] == [
-        "Images", "Videos"]
+        "SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"]
     assert all_row.isExpanded()   # shut, it would be a tree with nothing in it
     assert view._tree.currentItem() is all_row
 
@@ -668,16 +681,16 @@ def test_the_box_says_what_it_would_search(qtbot):
     view.refresh()
     assert view._search_edit.placeholderText() == "Search All…"
 
-    videos = _media_roots(view._tree)["Videos"]
+    videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
     assert view._search_edit.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
 
-    leaf = videos.child(0).child(0).child(0).child(0).child(0)
+    leaf = videos.child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     placeholder = view._search_edit.placeholderText()
     assert placeholder == f"Search {view._tree_view.breadcrumb(leaf)}…"
     assert leaf.text(0) in placeholder      # right down to the folder itself
-    assert "Videos" in placeholder          # and every branch above it
+    assert videos.text(0) in placeholder    # and every branch above it
 
     view._tree.setCurrentItem(view._recents_item)
     assert view._search_edit.placeholderText() == "Search Recents…"
@@ -689,8 +702,8 @@ def test_the_box_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    videos = _media_roots(view._tree)["Videos"]
-    leaf = videos.child(0).child(0).child(0).child(0).child(0)
+    videos = _video_workflow(view._tree)
+    leaf = videos.child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
 
     # Wide enough for the folder's own name and little else.
@@ -714,10 +727,11 @@ def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_media_roots(view._tree)["Videos"])
+    videos = _video_workflow(view._tree)
+    view._tree.setCurrentItem(videos)
     _search_for(view, "dog")
 
-    assert "Videos" in view._scroll.widget().text()
+    assert videos.text(0) in view._scroll.widget().text()
 
 
 def test_search_matches_words_the_prompt_did_not_use(qtbot):
@@ -791,7 +805,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     leaf = _children_by_detail(
-        _media_roots(view._tree)["Images"].child(0).child(0).child(0))["a dog"]
+        _image_workflow(view._tree).child(0).child(0))["a dog"]
     view._tree.setCurrentItem(leaf)
 
     view._title.edit_requested.emit()
@@ -814,7 +828,7 @@ def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     names = [lora.child(i).text(0) for i in range(lora.childCount())]
     assert len(set(names)) == 2                      # a code apiece, never shared
     assert not any("beetles" in name for name in names)
@@ -971,7 +985,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
 
     _search_for(view, "cat")
@@ -1241,12 +1255,12 @@ def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     key = _key(workflow)
     view._apply_rename(key, "Best Models")
 
     assert db.folder_meta_map()[key]["custom_name"] == "Best Models"
-    assert _media_roots(view._tree)["Images"].child(0).text(0) == "Best Models"
+    assert _image_workflow(view._tree).text(0) == "Best Models"
 
 
 def test_starring_a_folder_persists_without_reordering(qtbot):
@@ -1256,13 +1270,13 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     cat_key = _key(lora.child(0))
     dog_key = _key(lora.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     # The star marks the folder in place; it does not jump above the cat.
     assert [_key(lora.child(i)) for i in range(lora.childCount())] == [cat_key, dog_key]
     # Starred state rides on the group (the row's star icon reads it), not a ★ text
@@ -1288,7 +1302,7 @@ def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
 
     tree = view._tree
     _top_level(tree)["All"].setExpanded(True)
-    images = _media_roots(tree)["Images"]
+    images = _image_workflow(tree)
     images.setExpanded(True)
     key = _key(images)
     row = tree.visualRect(tree.indexFromItem(images))
@@ -1302,7 +1316,7 @@ def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     view._on_tree_context_menu(caret)
 
     assert db.folder_meta_map()[key]["starred"] is True
-    assert _media_roots(view._tree)["Images"].isExpanded()
+    assert _image_workflow(view._tree).isExpanded()
 
 
 def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
@@ -1312,7 +1326,7 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -1409,14 +1423,14 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view.refresh()
     # Unreviewed, but already filed in the tree — the shelf is a queue over it,
     # not a holding pen outside it.
-    assert "Images" in _media_roots(view._tree)
+    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(view._experiments_item)
     assert view.visible_prompt_ids() == []          # reviewed: off the shelf...
-    assert "Images" in _media_roots(view._tree)       # ...and still in its folder
+    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)       # ...and still in its folder
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
@@ -1676,7 +1690,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     view.restore_from_trash(["p1"])
 
-    assert "Images" in _media_roots(view._tree)      # back in the tree...
+    assert "SDXL Text-to-Image" in _workflow_rows(view._tree)      # back in the tree...
     assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left on the shelf
     assert view._db.list_deletions() == []
 
@@ -1905,7 +1919,7 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -1948,7 +1962,7 @@ def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)  # and a starred folder
 
@@ -2236,25 +2250,41 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
 
 
-def test_recents_media_filter_checkboxes_default_on_and_only_show_on_the_shelf(qtbot):
+def test_the_media_filter_sits_between_the_search_box_and_the_tree(qtbot):
+    # Where the boxes are is the point: they prune the tree, so they belong to it
+    # rather than to whichever shelf happens to be open below.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    column = view._search_edit.parentWidget().layout()
+    order = [column.itemAt(i).widget() for i in range(column.count())]
+    assert (order.index(view._search_edit)
+            < order.index(view._image_cb.parentWidget())
+            < order.index(view._tree))
+    assert view._image_cb.parentWidget() is view._video_cb.parentWidget()
+
+
+def test_media_filter_boxes_default_on_and_stay_up_wherever_you_stand(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Both boxes start checked, so the shelf opens listing every media type.
-    assert view._recents_image_cb.isChecked()
-    assert view._recents_video_cb.isChecked()
+    # Both boxes start checked, so the gallery opens holding every media type.
+    assert view._image_cb.isChecked()
+    assert view._video_cb.isChecked()
 
-    # The filter belongs to the Recents shelf: hidden on a media folder...
-    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])
-    assert view._recents_filter_bar.isHidden()
-    # ...and shown the moment the shelf is open.
+    # They belong to the gallery, not to one shelf, so they are reachable from
+    # a folder as well as from Recents — which is what lets an unchecked box be
+    # checked again from wherever it emptied the pane.
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+    assert not view._image_cb.isHidden() and not view._video_cb.isHidden()
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    assert not view._recents_filter_bar.isHidden()
+    assert not view._image_cb.isHidden() and not view._video_cb.isHidden()
 
 
-def test_recents_media_filter_hides_the_unchecked_media_type(qtbot):
+def test_media_filter_hides_the_unchecked_media_type_on_a_shelf(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2262,15 +2292,38 @@ def test_recents_media_filter_hides_the_unchecked_media_type(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
     assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # both by default
 
-    view._recents_video_cb.setChecked(False)          # hide videos
+    view._video_cb.setChecked(False)          # hide videos
     assert view.visible_prompt_ids() == ["i1"]
 
-    view._recents_video_cb.setChecked(True)
-    view._recents_image_cb.setChecked(False)          # hide images instead
+    view._video_cb.setChecked(True)
+    view._image_cb.setChecked(False)          # hide images instead
     assert view.visible_prompt_ids() == ["v1"]
 
-    view._recents_video_cb.setChecked(False)          # both off: nothing to show
+    view._video_cb.setChecked(False)          # both off: nothing to show
     assert view.visible_prompt_ids() == []
+
+
+def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
+    # The point of moving the boxes over the tree: an unchecked kind takes its
+    # folders with it, so a gallery of images alone has no video folder to open.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert len(_workflow_rows(view._tree)) == 2
+
+    view._video_cb.setChecked(False)
+
+    assert list(_workflow_rows(view._tree)) == ["SDXL Text-to-Image"]
+
+    view._video_cb.setChecked(True)
+    view._image_cb.setChecked(False)
+
+    assert list(_workflow_rows(view._tree)) == ["WAN 2.2 I2V (Image-to-Video)"]
+
+    view._video_cb.setChecked(False)   # both off: no folders at all
+
+    assert "All" not in _top_level(view._tree)
 
 
 def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
@@ -2285,13 +2338,13 @@ def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
     bar.setValue(bar.maximum())
     assert len(view.visible_prompt_ids()) == 100
 
-    view._recents_video_cb.setChecked(False)  # images only — still all 120 of them
+    view._video_cb.setChecked(False)  # images only — still all 120 of them
 
     assert len(view.visible_prompt_ids()) == 50
     assert view.visible_prompt_ids()[0] == "i119"
 
 
-def test_recents_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
+def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
     # The filter narrows the whole shelf, so an in-flight card of a hidden type
     # drops out alongside the finished thumbnails.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -2302,7 +2355,7 @@ def test_recents_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qt
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
     assert "rr1" in view._inflight_cards               # shown by default
 
-    view._recents_video_cb.setChecked(False)           # hide videos
+    view._video_cb.setChecked(False)           # hide videos
     assert "rr1" not in view._inflight_cards
 
 
@@ -2409,13 +2462,13 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     view.refresh()
     assert set(_top_level(view._tree)) == {"Recents", "Starred", "Experiments",
                                            "Requests", "Trash", "All"}
-    assert set(_media_roots(view._tree)) == {"Images"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image"}
 
     # A new video lands in the DB; a poll tick reflects it with no Refresh button.
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_media_roots(view._tree)) == {"Images", "Videos"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
 
 
 def test_folders_start_collapsed(qtbot):
@@ -2423,9 +2476,9 @@ def test_folders_start_collapsed(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _media_roots(view._tree)["Images"]
-    assert images.isExpanded() is False
-    assert images.child(0).isExpanded() is False
+    workflow = _image_workflow(view._tree)
+    assert workflow.isExpanded() is False
+    assert workflow.child(0).isExpanded() is False
 
 
 def test_opening_a_folder_shows_its_grid_but_selects_nothing(qtbot):
@@ -2437,7 +2490,7 @@ def test_opening_a_folder_shows_its_grid_but_selects_nothing(qtbot):
     view.refresh()
 
     # A branch folder shows its child tiles but auto-selects no generation...
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert view._selected is None
 
@@ -2466,18 +2519,18 @@ def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
 
 
 def test_a_folder_named_after_what_it_holds_offers_no_rename(qtbot):
-    # A media root, a workflow, a model and a LoRA are named by the fact they
-    # stand for; renaming one would only hide which one it is. Neither the tree
-    # row, the header, nor the context menu opens an editor on them.
+    # A workflow, a model and a LoRA are named by the fact they stand for;
+    # renaming one would only hide which one it is. Neither the tree row, the
+    # header, nor the context menu opens an editor on them.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _media_roots(view._tree)["Images"]
-    workflow, model = images.child(0), images.child(0).child(0)
+    workflow = _image_workflow(view._tree)
+    model = workflow.child(0)
     lora = model.child(0)
-    for item in (images, workflow, model, lora):
+    for item in (workflow, model, lora):
         assert not item.flags() & Qt.ItemFlag.ItemIsEditable
         view._begin_inline_rename(item, 0)
         assert view._editing_key is None          # nothing opened
@@ -2629,8 +2682,8 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    images = _media_roots(view._tree)["Images"]  # a media group — not deletable, nothing picked
-    view._tree.setCurrentItem(images)
+    workflow = _image_workflow(view._tree)  # a workflow — not deletable, nothing picked
+    view._tree.setCurrentItem(workflow)
     assert not view._delete_btn.isEnabled()
 
     _select_first_leaf(view)                    # a settings folder — deletable
@@ -2715,8 +2768,9 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
 
 
 def _video_leaf(view):
-    """Open the settings folder under Videos, the deepest branch's only leaf."""
-    item = _media_roots(view._tree)["Videos"]
+    """Open the settings folder under the video workflow, its deepest branch's
+    only leaf."""
+    item = _video_workflow(view._tree)
     while item.childCount():
         item.setExpanded(True)
         item = item.child(0)
@@ -3020,7 +3074,7 @@ def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
 
     view._tree.setCurrentItem(
-        _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
+        _image_workflow(view._tree).child(0).child(0).child(0)
     )
     assert view._showing_recents() is False
     assert view._back_btn.isEnabled()
@@ -3035,7 +3089,7 @@ def test_back_walks_folders_the_way_it_walks_generations(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     cat, dog = lora.child(0), lora.child(1)
     view._tree.setCurrentItem(cat)
     view._tree.setCurrentItem(dog)
@@ -3056,7 +3110,7 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    leaf = _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    leaf = _image_workflow(view._tree).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     depth = len(view._history._stack)
 
@@ -3071,7 +3125,7 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    dog_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0).child(1))
+    dog_key = _key(_image_workflow(view._tree).child(0).child(0).child(1))
     view._toggle_star(dog_key)
 
     view._tree.setCurrentItem(_top_level(view._tree)["Starred"])
@@ -3253,7 +3307,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     view._tree.setCurrentItem(_children_by_detail(lora)["a cat"])
     depth = len(view._history._stack)
 
@@ -3509,7 +3563,7 @@ def test_selected_folder_returns_current_folder_key(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert view.selected_folder() == _key(workflow)
 
@@ -3520,8 +3574,8 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    # Images -> SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
-    dog_leaf = _media_roots(saved._tree)["Images"].child(0).child(0).child(0).child(1)
+    # SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
+    dog_leaf = _image_workflow(saved._tree).child(0).child(0).child(1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
     chosen = set(saved.visible_prompt_ids())
@@ -3776,7 +3830,7 @@ def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Videos"].child(0)
+    workflow = _video_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert view._avg_label.text() == "Average time: ~12 min (across 3 runs)"
 
@@ -3786,7 +3840,7 @@ def test_folder_without_timed_items_shows_no_average(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert view._avg_label.text() == ""
 
@@ -3856,7 +3910,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
 
 def _open_leaf(view):
     """Select the first settings-group leaf so its thumbnails are showing."""
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     leaf = workflow.child(0).child(0).child(0)  # workflow -> model -> "(no LoRA)" -> settings
     view._tree.setCurrentItem(leaf)
     return leaf
@@ -4005,7 +4059,7 @@ def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)  # a whole-workflow folder
     view._confirm = lambda text: True    # even if it asked, it must not
 
@@ -4194,7 +4248,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    model = _media_roots(view._tree)["Images"].child(0).child(0)
+    model = _image_workflow(view._tree).child(0)
     view._tree.setCurrentItem(model.child(0).child(0))  # one of the two settings leaves
     view._confirm = lambda text: True
 
@@ -4226,7 +4280,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # the (no LoRA) folder
+    lora = _image_workflow(view._tree).child(0).child(0)  # the (no LoRA) folder
     first_leaf, second_leaf = lora.child(0), lora.child(1)
     first_key = first_leaf.data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
@@ -4242,16 +4296,14 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     assert current.key == first_key
 
 
-def test_delete_folder_refuses_workflow_and_media_groups(qtbot):
+def test_delete_folder_refuses_a_workflow_group(qtbot):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    images = _media_roots(view._tree)["Images"]
     view._confirm = lambda text: True
 
-    view._delete_folder(images.data(0, _GROUP_ROLE))       # the Images media group
-    view._delete_folder(images.child(0).data(0, _GROUP_ROLE))  # the workflow group
+    view._delete_folder(_image_workflow(view._tree).data(0, _GROUP_ROLE))
 
     assert actions.deleted == []  # only folders inside a workflow may go
 
@@ -4263,7 +4315,7 @@ def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    model = _media_roots(view._tree)["Images"].child(0).child(0)
+    model = _image_workflow(view._tree).child(0)
     view._tree.setCurrentItem(model)  # a model folder, nested in the workflow
     view._confirm = lambda text: True
 
@@ -4280,8 +4332,8 @@ def test_a_lora_folder_is_deletable_and_takes_only_its_own_rows(qtbot):
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    # Videos -> WAN I2V -> model -> LoRA (styleA is first by appearance).
-    lora = _media_roots(view._tree)["Videos"].child(0).child(0).child(0)
+    # WAN I2V -> model -> LoRA (styleA is first by appearance).
+    lora = _video_workflow(view._tree).child(0).child(0)
     assert isinstance(lora.data(0, _GROUP_ROLE), gallery.LoraGroup)
     view._tree.setCurrentItem(lora)
     view._confirm = lambda text: True
@@ -4353,7 +4405,7 @@ def test_renaming_goes_through_the_undoable_actions(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    key = _key(_media_roots(view._tree)["Images"].child(0))
+    key = _key(_image_workflow(view._tree))
 
     view._apply_rename(key, "Best Models")
 
@@ -4366,7 +4418,7 @@ def test_inline_rename_is_undoable(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    workflow = _media_roots(view._tree)["Images"].child(0)
+    workflow = _image_workflow(view._tree)
     key = _key(workflow)
 
     view._editing_key = key            # an in-place edit is underway
@@ -4464,8 +4516,8 @@ def _reroll_tile(view):
 
 
 def _select_first_leaf(view):
-    # media -> workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
-    leaf = _media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0)
+    # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
+    leaf = _image_workflow(view._tree).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
 
@@ -4672,7 +4724,7 @@ def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
-    settings = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    settings = _image_workflow(view._tree).child(0).child(0)
     first = settings.child(0).data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(settings.child(0))
     view._toggle_auto(True)
@@ -4981,7 +5033,7 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     _select_first_leaf(view)
     assert not view._auto_btn.isHidden() and view._auto_btn.isEnabled()
 
-    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])  # a media root, not a leaf
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 
     assert not view._auto_btn.isHidden()   # still there
     assert not view._auto_btn.isEnabled()  # with nothing to do from here
@@ -5011,7 +5063,7 @@ def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     orig_folder = _select_first_leaf(view)      # the folder 'orig' already lives in
-    view._tree.setCurrentItem(_media_roots(view._tree)["Images"])  # navigate away first
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # navigate away first
 
     folder = _generate_in_current_tab(view, positive_prompt="a cat", seed=123)
 
@@ -5280,13 +5332,13 @@ def test_slideshow_plays_the_recents_shelf(qtbot, monkeypatch):
     view._slideshow.close()
 
 
-def test_recents_slideshow_honors_the_media_type_filter(qtbot, monkeypatch):
+def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._recents_item)
-    view._recents_video_cb.setChecked(False)  # the shelf now lists images only
+    view._video_cb.setChecked(False)  # the shelf now lists images only
 
     view._start_slideshow()
 
@@ -5295,7 +5347,7 @@ def test_recents_slideshow_honors_the_media_type_filter(qtbot, monkeypatch):
     assert [item[2] for item in view._slideshow._playlist._items] == ["i1"]
     view._slideshow.close()
 
-    view._recents_image_cb.setChecked(False)  # nothing left on the shelf to play
+    view._image_cb.setChecked(False)  # nothing left on the shelf to play
     assert view._slideshow_btn.isHidden()
 
 
@@ -5345,7 +5397,7 @@ def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypat
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
     view._toggle_star(_key(lora.child(0)))   # ...and a starred folder (the cat one)
     view._tree.setCurrentItem(view._starred_item)
 
@@ -6270,7 +6322,7 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
     view.refresh()
-    view._tree.setCurrentItem(_media_roots(view._tree)["Images"].child(0).child(0).child(0).child(0))
+    view._tree.setCurrentItem(_image_workflow(view._tree).child(0).child(0).child(0))
     view._apply_selection("i1", _NO_MOD)
 
     qtbot.keyClick(view, Qt.Key.Key_Delete)
@@ -6433,7 +6485,7 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_image_workflow(view._tree).child(0).child(0))
     view._reroll._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
     )]
@@ -6508,7 +6560,7 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_image_workflow(view._tree).child(0).child(0))
     view._reroll._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
     _open_recents(view)
@@ -6530,7 +6582,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    folder_key = _key(_media_roots(view._tree)["Images"].child(0).child(0).child(0))
+    folder_key = _key(_image_workflow(view._tree).child(0).child(0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
     view._reroll._jobs[folder_key] = [job]
     _open_recents(view)
@@ -6887,7 +6939,7 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     gv._tree.setCurrentItem(gv._recents_item)
     assert pid in gv._inflight_cards
 
-    folder = _media_roots(gv._tree)["Images"].child(0).child(0).child(0)
+    folder = _image_workflow(gv._tree).child(0).child(0)
     gv._tree.setCurrentItem(folder)              # navigate away
     gv._tree.setCurrentItem(gv._recents_item)    # and back
     assert pid in gv._inflight_cards, "card vanished after navigating away and back"
@@ -7842,7 +7894,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     _select_first_leaf(view)
     assert not view._enhance_panel.isHidden()
 
-    for item in (_media_roots(view._tree)["Images"], view._recents_item,
+    for item in (_image_workflow(view._tree), view._recents_item,
                  view._starred_item, view._experiments_item, view._trash_item):
         view._tree.setCurrentItem(item)
         assert not view._enhance_panel.isHidden()
@@ -8940,7 +8992,7 @@ def _two_leaf_view(qtbot, extra=()):
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    lora = _image_workflow(view._tree).child(0).child(0)
     return view, _key(lora.child(0)), _key(lora.child(1))
 
 

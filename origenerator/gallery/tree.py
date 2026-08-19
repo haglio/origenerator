@@ -1,7 +1,7 @@
 """Nest a flat list of generations into the gallery's folder tree.
 
 The gallery view organizes generations as nested folders:
-media type (Images/Videos) -> workflow -> model -> LoRA -> [source image] ->
+workflow -> model -> LoRA -> [source image] ->
 settings group (rows sharing every setting except per-instance ones: the seed,
 and — for an image-to-video workflow — the specific start-frame *file*. A re-roll
 regenerates that frame, so the raw filename is per-instance; but the
@@ -11,17 +11,22 @@ while two built from differently configured images split apart. The enhance
 tail's params are excluded too, so an enhanced render and its unenhanced twin
 land in one folder — enhancement is a finish on an image, not another image).
 
+Media type is not a folder of its own — the gallery's Images/Videos checkboxes
+decide which kinds are listed (``media_types``) — but it still keys every folder,
+so a workflow that has produced both gets one workflow folder per kind. That
+split is what lets the source-image level stay a property of *videos* alone: it
+grows under a video workflow folder, while a still an image-conditioned workflow
+happened to output (an imported PNG under a video prefix) sits in that workflow's
+image folder and is grouped like any other image.
+
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
 (always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
-workflow declares no LoRA keys, so every branch nests the same depth), and — in
-the Videos tree only — the source image a video animates, i.e. which picture its
-start frame is (:func:`_input_image_config`). The source-image level is a
-property of *videos*, so it grows only under Videos; a still an image-conditioned
-workflow happened to output (an imported PNG under a video prefix) lands under
-Images and is grouped like any other image. The settings group is the full key,
-so it nests beneath every projection. This module owns the grouping logic with no
-Qt dependency so it can be unit-tested directly.
+workflow declares no LoRA keys, so every branch nests the same depth), and — for
+videos — the source image a video animates, i.e. which picture its start frame is
+(:func:`_input_image_config`). The settings group is the full key, so it nests
+beneath every projection. This module owns the grouping logic with no Qt
+dependency so it can be unit-tested directly.
 """
 
 import json
@@ -34,7 +39,6 @@ from origenerator.gallery.enhance import (
 from origenerator.gallery.groups import (
     AllGroup,
     LoraGroup,
-    MediaGroup,
     ModelGroup,
     SettingsGroup,
     SourceImageGroup,
@@ -71,8 +75,6 @@ from origenerator.gallery.signatures import (
     settings_signature,
 )
 from origenerator.gallery.source_image import build_image_config_index
-
-MEDIA_LABELS = {"image": "Images", "video": "Videos"}
 
 
 def _group_ordered(rows, key):
@@ -116,6 +118,10 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     workflow_name = row.get("workflow_name") or "unknown"
     params_json = row.get("params_json")
     if level == "media":
+        # A tier the tree no longer grows — the Images/Videos folders became the
+        # gallery's two checkboxes — but a star made while it did still records
+        # it, so the key stays computable. It matches no current folder, and the
+        # reconcile orphans that bookmark rather than raising over its tier.
         return media_type
     if level == "workflow":
         return f"{media_type}/{workflow_name}"
@@ -124,7 +130,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     if level == "lora":
         return lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
     if level == "source_image":
-        # The tier exists only in the Videos tree, so it always asks which picture.
+        # The tier grows under video folders only, so it always asks which picture.
         config = _input_image_config(
             parse_params(params_json).get("input_image"), image_index, identify=True,
         )
@@ -236,7 +242,7 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
     return (meta.get("custom_name") or label, bool(meta.get("starred")))
 
 
-def starred_folders(tree: list[MediaGroup]) -> list:
+def starred_folders(tree: list[WorkflowGroup]) -> list:
     """Every starred folder in ``tree``, at any depth, in top-down tree order.
 
     Powers the gallery's Starred shelf: a folder is bookmarked in place (its
@@ -292,9 +298,7 @@ def named_folders_by_row(
     return named
 
 
-def recent_generations(
-    rows: list[dict], media_types: set[str] | None = None
-) -> list[dict]:
+def recent_generations(rows: list[dict]) -> list[dict]:
     """Every generated row, newest first — the whole of the Recents shelf's list.
 
     "Generated" means this app produced the row, from a Generate tab or a gallery
@@ -316,14 +320,13 @@ def recent_generations(
     generated, and the pane draws a page of tiles at a time as it's scrolled into
     (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow_recents`).
 
-    ``media_types`` is the shelf's image/video filter (its checkboxes): a set of
-    the ``media_type_of_row`` values to keep. ``None`` (the default) keeps every
-    type; an empty set keeps none.
+    The gallery's image/video filter is applied to ``rows`` before they reach
+    here (:func:`rows_of_media_types`), the same way it is for every other
+    shelf.
     """
     listed = [
         row for row in rows
         if (row.get("source") or "generated") == "generated" and produced_output(row)
-        and (media_types is None or media_type_of_row(row) in media_types)
     ]
     # Ids are the order the caller already handed them in, so a row with no
     # enhancement sorts exactly where it arrived, and rows that tie (a caller
@@ -474,9 +477,10 @@ def _build_leaves(
     leaves directly.
 
     The split is by *media type*, not just the workflow: a source image is what a
-    video animates, so only the Videos tree grows the level. An image-conditioned
-    workflow can still output a still — an imported PNG under a video prefix — which
-    lands under Images and animates nothing, so it is grouped like any other image.
+    video animates, so only a video folder grows the level. An image-conditioned
+    workflow can still output a still — an imported PNG under a video prefix —
+    which lands in that workflow's image folder and animates nothing, so it is
+    grouped like any other image.
     """
     if media_type == "video" and is_image_conditioned(wf_name):
         return _build_source_image_groups(media_type, wf_name, rows, folder_meta, image_index)
@@ -506,15 +510,24 @@ def _build_source_image_groups(
 
 
 def build_gallery_tree(
-    rows: list[dict], folder_meta: dict[str, dict] | None = None
-) -> list[MediaGroup]:
-    """Nest rows into media -> workflow -> model -> LoRA -> [source image] ->
-    settings folders.
+    rows: list[dict], folder_meta: dict[str, dict] | None = None,
+    media_types: set[str] | None = None,
+) -> list[WorkflowGroup]:
+    """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
+    folders.
+
+    ``media_types`` is the gallery's image/video filter: the
+    :func:`media_type_of_row` values whose folders to build. ``None`` (the
+    default) builds every type; an empty set builds nothing. It narrows the
+    *folders*, never the index behind them — the start-frame configurations that
+    key a video's source-image folders are read from every finished image
+    whichever way the filter stands, so hiding images can't re-key, and so
+    re-shuffle, the video folders that name them.
 
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
-    it to a single "(no LoRA)" folder. The source-image level appears only in the
-    Videos tree (a still an image-conditioned workflow output is grouped like any
-    other image). A row is included once it has something to place: it either
+    it to a single "(no LoRA)" folder. The source-image level appears only under
+    a video workflow folder (a still an image-conditioned workflow output is
+    grouped like any other image). A row is included once it has something to place: it either
     :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
     running/pending generation whose folder must appear at once, its live tile
     standing in until its output lands). A terminal file-less row — a failed
@@ -554,39 +567,36 @@ def build_gallery_tree(
          if media_type_of_row(row) == "image" and produced_output(row)]
     )
     tree = []
+    # Media type is still the outer grouping, and still the first part of every
+    # key below — it just no longer earns a folder of its own. So a workflow that
+    # has made both kinds gets a folder per kind, which is what keeps the
+    # source-image level a property of videos alone (see :func:`_build_leaves`).
     for media_type, media_rows in _group_ordered(rows, media_type_of_row):
-        workflow_groups = []
+        if media_types is not None and media_type not in media_types:
+            continue
         for wf_name, wf_rows in _group_ordered(
             media_rows, lambda r: r.get("workflow_name") or "unknown"
         ):
             wf_key = f"{media_type}/{wf_name}"
             wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
-            workflow_groups.append(WorkflowGroup(
+            tree.append(WorkflowGroup(
                 wf_key, wf_name, wf_label,
                 _build_model_groups(media_type, wf_name, wf_rows, folder_meta, image_index),
                 wf_starred,
             ))
-
-        media_label, media_starred = _overlay(
-            MEDIA_LABELS.get(media_type, media_type.title()), media_type, folder_meta
-        )
-        tree.append(MediaGroup(
-            media_type, media_type, media_label,
-            workflow_groups, media_starred,
-        ))
     return tree
 
 
-# The row above Images and Videos, standing for the library entire. Not part of
-# the grouping — build_gallery_tree still returns the media roots, and everything
-# reading that (starred folders, custom folders, the browser's tiles) is unchanged
-# — this is a folder wrapped *around* the result, for somewhere to stand that
-# means everything.
+# The row over the workflow folders, standing for the library entire. Not part of
+# the grouping — build_gallery_tree still returns the workflow folders, and
+# everything reading that (starred folders, custom folders, the browser's tiles)
+# is unchanged — this is a folder wrapped *around* the result, for somewhere to
+# stand that means everything.
 ALL_KEY = "__all__"
 ALL_LABEL = "All"
 
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
-    """The media roots gathered under one folder, renamable like any other."""
+    """The workflow folders gathered under one folder, renamable like any other."""
     label, starred = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
     return AllGroup(ALL_KEY, label, list(tree_model), starred)

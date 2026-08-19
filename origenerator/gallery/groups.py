@@ -1,6 +1,6 @@
 """The folder tree's node types and the helpers that walk them.
 
-Each level of the gallery hierarchy — media, workflow, model, LoRA, source image,
+Each level of the gallery hierarchy — workflow, model, LoRA, source image,
 settings — is a small dataclass holding its stable key, display label, star state,
 and children. The walkers (:func:`child_groups`, :func:`rows_under`) and the
 tier/level classifiers (:func:`folder_level`, :func:`group_level`) work off those
@@ -70,28 +70,19 @@ class WorkflowGroup:
 
 
 @dataclass
-class MediaGroup:
-    key: str
-    media_type: str
-    label: str
-    workflow_groups: list[WorkflowGroup]
-    starred: bool = False
-
-
-@dataclass
 class AllGroup:
-    """The whole library as one folder: the media roots, gathered under a row.
+    """The whole library as one folder: every workflow folder, gathered under a row.
 
     It exists so there is somewhere to *stand* that means everything. The tree
-    selection scopes the search, so without a root above Images and Videos there
-    would be no way to ask a question of the gallery as a whole — the shelves
-    are collections rather than folders, and picking either media root already
-    narrows the answer by half.
+    selection scopes the search, so without a root over the workflow folders
+    there would be no way to ask a question of the gallery as a whole — the
+    shelves are collections rather than folders, and a workflow folder is already
+    one recipe out of many.
     """
 
     key: str
     label: str
-    children: list[MediaGroup]
+    children: list[WorkflowGroup]
     starred: bool = False
 
 
@@ -115,15 +106,14 @@ class CustomGroup:
 
 def folder_level(group) -> str | None:
     """Which hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
-    ``"lora"``, ``"source_image"``, or a media root's own ``"image"`` /
-    ``"video"`` — ``None`` for the All row and the settings leaves.
+    ``"lora"`` or ``"source_image"`` — ``None`` for the All row and the settings
+    leaves.
 
-    Powers the badge the gallery draws on tree rows and browser tiles: the
-    recipe levels get their lettered chip, and a media root gets the glyph its
-    own items wear, so the two roots are tellable apart at a glance in a tree
-    where they share a parent. A settings leaf is where the generations
-    themselves live, and the All row is everything there is, so neither is a
-    level anything needs naming.
+    Powers the lettered chip the gallery draws on tree rows and browser tiles, so
+    a folder's place in the hierarchy reads at a glance rather than by counting
+    indentation. A settings leaf is where the generations themselves live, and
+    the All row is everything there is, so neither is a level anything needs
+    naming.
     """
     for cls, level in (
         (WorkflowGroup, "workflow"), (ModelGroup, "model"),
@@ -131,17 +121,15 @@ def folder_level(group) -> str | None:
     ):
         if isinstance(group, cls):
             return level
-    if isinstance(group, MediaGroup):
-        return group.media_type
     return None
 
 
 def is_renamable(group) -> bool:
     """Whether the user can give this folder a name of their own.
 
-    A folder whose name states a fact — a media root, a workflow, a model, a
-    LoRA, the source image a video animates — is named by what it holds, and a
-    name of your own there would only hide which one it is. The rest are named
+    A folder whose name states a fact — a workflow, a model, a LoRA, the source
+    image a video animates — is named by what it holds, and a name of your own
+    there would only hide which one it is. The rest are named
     by a generic code (:mod:`origenerator.gallery.keys`) or already by the user,
     and naming those is the entire point of starting them off with a code.
     """
@@ -151,14 +139,12 @@ def is_renamable(group) -> bool:
 def folder_detail(group) -> str:
     """What a folder's name doesn't say, for its tooltip — the prompt and settings
     behind a settings leaf. Empty for every folder whose own name already says
-    what it holds (a model, a LoRA, a media root)."""
+    what it holds (a workflow, a model, a LoRA)."""
     return getattr(group, "detail", "")
 
 
 def child_groups(group) -> list:
     """The sub-folders directly under a folder (empty for a settings leaf)."""
-    if isinstance(group, MediaGroup):
-        return group.workflow_groups
     if isinstance(group, WorkflowGroup):
         return group.model_groups
     if isinstance(group, (ModelGroup, LoraGroup, SourceImageGroup, CustomGroup,
@@ -187,14 +173,12 @@ def rows_under(group) -> list[dict]:
 
 
 def group_level(group) -> str:
-    """Which tier of the tree ``group`` sits at: all, media, workflow, model,
-    lora, or settings. A bookmark records its tier so its key can be recomputed
-    from a member row under whatever key formula is current (see
+    """Which tier of the tree ``group`` sits at: all, workflow, model, lora,
+    source_image, custom, or settings. A bookmark records its tier so its key can
+    be recomputed from a member row under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
     if isinstance(group, AllGroup):
         return "all"
-    if isinstance(group, MediaGroup):
-        return "media"
     if isinstance(group, WorkflowGroup):
         return "workflow"
     if isinstance(group, ModelGroup):

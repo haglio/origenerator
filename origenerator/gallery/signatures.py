@@ -257,8 +257,8 @@ def _frame_name(image_ref: str | None) -> str:
 
 
 def _outputs_video(workflow_name: str | None) -> bool:
-    """True when a workflow's results live in the Videos tree — the one tree with
-    a source-image tier under its LoRA folders."""
+    """True when a workflow's results are videos — the one kind whose folders grow
+    a source-image tier under their LoRA folders."""
     wf = _registered(workflow_name)
     return wf is not None and wf.output_type == "video"
 
@@ -268,7 +268,7 @@ def _input_image_config(input_image: str | None, image_index: dict | None,
     """The grouping key for a row's start frame.
 
     ``identify`` picks which question is being asked of the frame. *Which picture
-    is it* (``True``) is what the Videos tree needs: its source-image tier means
+    is it* (``True``) is what a video's folders need: their source-image tier means
     one picture, and every settings folder under that tier explores the same
     frame — a different prompt, a different CFG — so opening any of them must
     show videos of the one image. *What configuration produced it* (``False``,
@@ -333,7 +333,7 @@ def settings_signature(
     For an image-conditioned workflow the start frame is folded in — resolved
     through ``image_index`` (see :func:`build_image_config_index`) — so rows built
     from different frames get distinct keys. A video folds in *which picture* the
-    frame is, because the Videos tree files it under that picture's own folder;
+    frame is, because a video is filed under that picture's own folder;
     anything else folds in the frame's configuration, so a batch of enhances of
     many pictures stays one folder of work (see :func:`_input_image_config`).
     ``image_index`` may be omitted for rows that aren't image-conditioned.

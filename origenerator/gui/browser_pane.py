@@ -186,18 +186,6 @@ class BrowserPane:
         for prompt_id, tile in self._thumb_widgets.items():
             tile.set_enhancing(runs.get(prompt_id))
 
-    def set_recent_rows(self, recent_rows):
-        """Replace just the finished-items list the Recents shelf lists and, if that
-        shelf is open, redraw it — the media-type filter changing between rebuilds.
-
-        A new filter is a new listing, so the shelf reopens on its first page at the
-        top rather than holding the pages and offset the old listing was read at."""
-        self._recent_rows = recent_rows
-        if self.showing_recents():
-            self._recents_flow = None  # a fresh listing, not a redraw to be preserved
-            self._recents_drawn = 0
-            self._render_recents()
-
     # --- folder-tile overview ----------------------------------------------
 
     def show_widget(self, widget: QWidget):
@@ -232,6 +220,13 @@ class BrowserPane:
         flow = FlowLayout(container, spacing=_TILE_SPACING)
         self._reset_pane_state()
         return container, flow
+
+    def restart_recents_listing(self):
+        """Drop the pages the Recents shelf has drawn so its next render starts
+        over at the newest item — what a change of the gallery's media filter
+        deserves, being a new listing rather than a redraw of the old one at the
+        offset the old one was read at."""
+        self._forget_recents_paging()
 
     def _forget_recents_paging(self):
         """Drop the Recents shelf's paging state, because the pane it was drawn in
@@ -542,9 +537,9 @@ class BrowserPane:
         return tw
 
     def _visible_inflight_items(self) -> list:
-        """The in-flight items the shelf draws: what its media-type filter keeps,
-        less the enhancements. The full set still decides whether the shelf exists
-        at all (so its filter stays reachable); this narrows only what is drawn.
+        """The in-flight items the shelf draws: what the gallery's media-type
+        filter keeps, less the enhancements. The full set still decides whether the
+        shelf exists at all; this narrows only what is drawn.
 
         A standalone enhance never earns a card of its own here, for the reason it
         never earns a folder in the tree: it is not a result, it is an upgrade of
@@ -555,17 +550,17 @@ class BrowserPane:
         strip's queue still lists the job, which is where a run that has the GPU
         belongs.
         """
-        media_types = self._v._recents_media_types()
+        media_types = self._v._media_types()
         return [it for it in self._inflight_items()
                 if it.media_type in media_types and it.job_kind != ENHANCE_KIND]
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —
         which media types (if any) it's looking for."""
-        media_types = self._v._recents_media_types()
+        media_types = self._v._media_types()
         if not media_types:
-            return ("No media types selected.\n\nCheck Images or Videos above to "
-                    "list your recent generations.")
+            return ("No media types selected.\n\nCheck Images or Videos over the "
+                    "folder list to bring your recent generations back.")
         noun = "generations" if len(media_types) == 2 else (
             "images" if "image" in media_types else "videos")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "

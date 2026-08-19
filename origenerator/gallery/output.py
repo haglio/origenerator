@@ -64,7 +64,7 @@ def media_type_of_row(row: dict) -> str:
     """Classify a row as ``"image"`` or ``"video"``.
 
     The actual output file is authoritative — a still saved under a video
-    workflow's prefix is an image and must not surface in the Videos folder.
+    workflow's prefix is an image and must not surface among the videos.
     Rows with no file yet (pending) fall back to the workflow's declared type,
     then to ``"image"``.
     """
@@ -73,6 +73,21 @@ def media_type_of_row(row: dict) -> str:
         if inferred:
             return inferred
     return workflow_output_type(row.get("workflow_name")) or "image"
+
+
+def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -> list[dict]:
+    """The rows whose kind is one of ``media_types`` — the gallery's Images/Videos
+    checkboxes applied to any list of generations.
+
+    ``None`` keeps every type; an empty set keeps none. The two boxes narrow the
+    whole gallery rather than one shelf, so every list the browser pane draws
+    (Recents, Starred, Experiments, Requests, Trash, and the search index behind
+    them) passes through here, and the folder tree takes the same set (see
+    :func:`~origenerator.gallery.tree.build_gallery_tree`).
+    """
+    if media_types is None:
+        return list(rows)
+    return [row for row in rows if media_type_of_row(row) in media_types]
 
 
 def output_file_path(file: dict, output_dir: Path) -> Path:

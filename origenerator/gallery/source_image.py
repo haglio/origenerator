@@ -4,7 +4,7 @@ An i2v row references its start frame by filename; these helpers match that back
 to the image generation that produced the file, index every image by the
 configuration that made it (so a video can find its frame's settings signature and
 folder name in O(1)), and invert the relation to list the videos an image was
-animated into. The bridge between the Images and Videos trees.
+animated into. The bridge between a video's folders and its start frame's.
 """
 
 from dataclasses import dataclass
@@ -70,9 +70,9 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
     as itself under any of its names — which is what keeps a video made from an
     enhanced frame with one made from the frame before it was enhanced.
 
-    The name is the code of the image's own settings folder in the Images tree,
-    so the folder a video's start frames sit in and the folder those frames came
-    from read as the same folder from either tree.
+    The name is the code of the image's own settings folder, so the folder a
+    video's start frames sit in and the folder those frames came from read as the
+    same folder from either side.
     """
     index: dict[str, _ImageConfig] = {}
     for image in image_rows:

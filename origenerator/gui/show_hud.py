@@ -62,15 +62,21 @@ def show_hud_model(side: str, host) -> HudModel | None:
     f_mode = bool(getattr(host, "hud_f_mode", False))
     order_label = getattr(host, "hud_order_label", "")
     order_label = SHUFFLE_LABEL if order_label == "Shuffle" else order_label
+    # A show someone ASKED for is a loop -- this set, played round and round --
+    # and the map's loop button is lit for it.  A region's base state is not:
+    # it is that side browsing its whole library, exactly what a satellite does
+    # with no loop on, so the button is dark and the line just names the order.
+    looping = bool(getattr(host, "hud_looping", True))
     return HudModel(
         side=side,
         locked=locked,
-        # A show IS a seed row played round and round, which is why the map's
-        # loop button below is lit -- so the line says the same thing the light
-        # does, in the words a satellite says it in.  The two HUDs are one HUD
-        # in two places; a reader glancing between them reads one sentence.
-        lock_label=status_line(playing_set=looping_label("seed"), locked=locked,
-                               order=order_label, f_mode=f_mode),
+        # The line says what the light says, in the words a satellite says it
+        # in -- the two HUDs are one HUD in two places.  Nothing playing_set
+        # when nothing is looping, so the base state reads "Unlocked · Shuffle"
+        # exactly as a satellite browsing its library does.
+        lock_label=status_line(
+            playing_set=looping_label("seed") if looping else "",
+            locked=locked, order=order_label, f_mode=f_mode),
         # The players' favorite star and F-mode, over the same collection the
         # Favorites shelf lists: the star lights when the item on screen is a
         # favorite, and F-mode narrows the set to them.
@@ -80,12 +86,12 @@ def show_hud_model(side: str, host) -> HudModel | None:
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
         playing=("corner", 0) if position <= 1 else ("seed", position - 2),
-        # The seed row's loop button is lit, because a show is exactly that:
-        # this row, played round and round.  On a player the button starts such
-        # a loop; here the loop is already what is happening, so the light says
-        # so and a press ends it — which is the button meaning the same thing on
-        # both, "stop looping this row".
-        active_loop="seed",
+        # Lit only while a set someone asked for is playing: on a player the
+        # button starts a loop, and here that loop is already what is
+        # happening, so the light says so and a press ends it — the button
+        # meaning the same thing on both, "stop looping this row".  Dark in the
+        # base state, where nothing is being looped.
+        active_loop="seed" if looping else "",
         satellites_mode="origenerator",  # a show exists only in this mode
     )
 
@@ -203,10 +209,14 @@ class ShowHud(QLabel):
             self._tick()
             return
         if verb in (f"{self._side}_no_loop", f"{self._side}_seed_loop"):
-            # The seed row is the show, and its loop button is drawn lit for
-            # that reason — so the press that would stop the loop closes the
-            # show, and the region goes back to whatever it was doing.
-            self._host.close()
+            # Stop looping this row: the region goes back to what it does when
+            # nothing is looping, which is browse its whole library — the same
+            # place its reset button leads, and the same thing the press means
+            # on a player.  Pressed while nothing is looping it is the dark
+            # button it looks like: a show cannot start a loop it is not in.
+            if getattr(self._host, "hud_looping", True):
+                self._host.stroke_reset()
+                self._tick()
             return
         if verb == f"{self._side}_reset" and hasattr(self._host, "stroke_reset"):
             # The players' reset, meaning here what it means there: put the

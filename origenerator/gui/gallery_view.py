@@ -340,6 +340,10 @@ class GalleryView(QWidget):
         # region, at most one each.  A show is "open" while its window is
         # visible; a closed one just goes stale in its slot until something
         # replaces it.
+        # Whether the hosting session has asked for its regions (OPEN_SHOWS,
+        # until CLOSE_SHOWS): a region it wants is never left empty -- what
+        # covers it may end, but the base state comes back under it.
+        self._regions_wanted = False
         self._region_shows: dict[str, QWidget | None] = (
             {"portrait": None, "landscape": None} if fun_time is not None else {}
         )
@@ -1686,6 +1690,13 @@ class GalleryView(QWidget):
         meta = self._db.folder_meta_map()
         self._fingerprint = _fingerprint(rows, meta)
         self._rebuild(rows, meta)
+        if self._regions_wanted:
+            # The tree this rebuild just made is what the base state is read
+            # from, and the session's OPEN_SHOWS can land before the first one
+            # (its launch races this app's boot).  Filling here costs nothing
+            # when both regions are already playing, and is the only thing that
+            # rescues a session that opened into the mode a moment too early.
+            self.fill_the_regions()
 
     def _poll(self):
         # Backstop for a missed completion frame: finish any re-roll ComfyUI has
@@ -3177,16 +3188,56 @@ class GalleryView(QWidget):
         holding a show is left alone: the switch is no reason to interrupt
         something already up.
         """
+        self._regions_wanted = True
         for side in ("portrait", "landscape"):
             if self.region_show(side) is not None:
                 continue
             key = self.region_base_location(side)
             items = self._slideshow_items(self._rows_at(key))
             if not items:
-                logger.info("Nothing of %s shape to open on the %s region", side, side)
+                # Not a dead end: the tree this reads is built by the first
+                # refresh, and the session's OPEN_SHOWS can arrive before it
+                # (the launch races the boot).  A region owed its base state
+                # gets it on the next refresh -- see :meth:`refresh` -- because
+                # a black rectangle is what this mode's base state exists to
+                # not be.
+                logger.info("Nothing of %s shape to open on the %s region yet",
+                            side, side)
                 continue
-            self._open_slideshow(items, location=key, side=side,
+            logger.info("The %s region opens on the library of its shape: %d items",
+                        side, len(items))
+            self._open_slideshow(items, location=key, side=side, looping=False,
                                  starred_ids=self._starred_prompt_ids())
+
+    def close_the_regions(self) -> None:
+        """Give both regions back -- the session leaving origenerator mode.
+
+        The wanting is dropped first: a show closing while the mode still wants
+        its regions is refilled with the base state, and these closes must not
+        be.
+        """
+        self._regions_wanted = False
+        for side in ("portrait", "landscape"):
+            show = self.region_show(side)
+            if show is not None:
+                show.close()
+
+    def _refill_region(self, side: str) -> None:
+        """Put *side* back on its base state, if the mode still wants it there.
+
+        What a region does when the show covering it ends -- the loop button
+        pressed off, an Escape, a set culled empty.  In origenerator mode the
+        player underneath is blacked for the whole mode, so a region left empty
+        is a black rectangle rather than a fallback.
+        """
+        if not self._regions_wanted or self.region_show(side) is not None:
+            return
+        key = self.region_base_location(side)
+        items = self._slideshow_items(self._rows_at(key))
+        if not items:
+            return
+        self._open_slideshow(items, location=key, side=side, looping=False,
+                             starred_ids=self._starred_prompt_ids())
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""
@@ -3216,7 +3267,7 @@ class GalleryView(QWidget):
         # a generation landing in the library must reach a reset region.
         self._live_shows = [(held, key if held is show else where)
                             for held, where in self._live_shows]
-        show.retune(items, order_label="Shuffle")
+        show.retune(items, order_label="Shuffle", looping=False)
 
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
@@ -3608,11 +3659,19 @@ class GalleryView(QWidget):
         """
         self._live_shows = [entry for entry in self._live_shows
                             if entry[0] is not show]
+        side = self._side_of(show) if show is not None else None
         if show is None or self._slideshow is show:
             self._slideshow = next((s for s, _loc in reversed(self._live_shows)), None)
         if self._slideshow is None:
             self._reroll.hold_videos(False)
         self._reconcile_osr2()
+        if side is not None:
+            # Whatever ended it -- the loop button pressed off, an Escape, a set
+            # culled empty -- the region goes back to browsing its library.  The
+            # player under it is blacked for the whole mode, so an empty region
+            # is a black rectangle, which is the one thing the base state is for.
+            self._region_shows[side] = None
+            self._refill_region(side)
 
     def _show_location(self):
         """Where the view on screen is playing FROM, as something re-askable:

@@ -443,13 +443,19 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
 
 
 def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, monkeypatch):
-    """A show IS the seed row played round and round, so the map's loop button
-    is lit — and pressing the lit one stops the loop, which here means closing
-    the show and giving the region back."""
+    """A show someone ASKED for is the seed row played round and round, so the
+    map's loop button is lit — and pressing the lit one stops that loop, which
+    means the region goes back to browsing its library."""
     from origenerator.gui.show_hud import ShowHud, show_hud_model
 
     view = _fun_time_view(qtbot)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(5)]
+    monkeypatch.setattr(view, "_rows_at",
+                        lambda key: base if key == "__all__::portrait" else [])
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
@@ -464,7 +470,67 @@ def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, 
 
     hud._deliver("portrait_no_loop")
 
-    assert not show.isVisible()
+    assert show.isVisible()                      # the region is not handed back
+    assert len(show.hud_items()[0]) == len(base)  # it browses its library again
+    dropped = show_hud_model("portrait", show)
+    assert dropped.active_loop == ""
+    assert "Looping" not in dropped.lock_label
+
+
+def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
+    """A region browsing its whole library is what a satellite does with no loop
+    on, so its HUD must read that way: the loop button dark, the map unboxed,
+    and the line naming the order rather than a loop.  It said "Looping seeds"
+    over the base state, which is the one place there is no loop at all."""
+    from origenerator.gui.show_hud import show_hud_model
+
+    view = _fun_time_view(qtbot)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(4)]
+    monkeypatch.setattr(view, "_rows_at",
+                        lambda key: base if key == "__all__::portrait" else [])
+    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+
+    view.fill_the_regions()
+
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    model = show_hud_model("portrait", show)
+    assert model.active_loop == ""
+    assert model.lock_label == "Unlocked · Shuffle"
+
+
+def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypatch):
+    """The player under a region is blacked for the whole mode, so a region left
+    empty is a black rectangle — not a fallback.  Two ways it can be left empty
+    and both are answered: the show covering it ends, and the base state was
+    asked for before the tree it reads had been built (the session's OPEN_SHOWS
+    races this app's boot)."""
+    view = _fun_time_view(qtbot)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(4)]
+    library = {"rows": []}
+    monkeypatch.setattr(view, "_rows_at",
+                        lambda key: library["rows"] if key == "__all__::portrait" else [])
+    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+
+    view.fill_the_regions()          # asked for too early: nothing to play yet
+    assert view.region_show("portrait") is None
+
+    library["rows"] = base
+    view.refresh()                   # the tree exists now, and so does the show
+    show = view.region_show("portrait")
+    assert show is not None
+    qtbot.addWidget(show)
+
+    show.close()                     # and it comes back under whatever ends
+    later = view.region_show("portrait")
+    assert later is not None and later is not show
+    qtbot.addWidget(later)
+
+    view.close_the_regions()         # until the session says it is done with them
     assert view.region_show("portrait") is None
 
 

@@ -48,6 +48,8 @@ a clip that carries a funscript instead offers itself as an
 the inline preview stays muted.
 """
 
+import logging
+
 from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
@@ -60,6 +62,8 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import SlideshowPlaylist, in_order
+
+logger = logging.getLogger(__name__)
 
 _GENERATING = "Generating…"
 
@@ -77,7 +81,7 @@ class SlideshowView(QWidget):
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
                  on_lock=None, player=None, stroke=None, pace=None,
                  on_drive_toggle=None, parent=None, order_label="Shuffle",
-                 starred_ids=None, on_reset=None):
+                 starred_ids=None, on_reset=None, looping=True):
         super().__init__(parent)
         self._on_delete = on_delete
         # Where reset means something bigger than this show: hosted, a region
@@ -92,6 +96,12 @@ class SlideshowView(QWidget):
         # own vocabulary), and which items are favorites, so the star readout
         # and the F-mode narrowing mean here what they mean on a player.
         self.hud_order_label = order_label
+        # Whether this show is a LOOP as a player means it: a set someone asked
+        # for, played round and round.  A region's base state is not one -- it
+        # is that side browsing its whole library, the same thing a satellite
+        # does when no loop is on -- so its HUD must not light the loop button
+        # or say "Looping seeds" over it.
+        self.hud_looping = looping
         self._starred_ids = set(starred_ids or ())
         self._f_mode = False
         self._all_items = list(items)
@@ -150,6 +160,7 @@ class SlideshowView(QWidget):
                                       show_funscript_strip=True, mute_audio=False,
                                       on_double_click=self.close)
         self._preview.video_ended.connect(self._on_video_ended)
+        self._preview.video_unplayable.connect(self._on_video_unplayable)
         # The media is refitted a beat after the window resizes (and again when a
         # video's resolution arrives), so re-place the neighbors when it lands.
         self._preview.media_resized.connect(self._reposition_neighbors)
@@ -404,7 +415,7 @@ class SlideshowView(QWidget):
         self._playlist.restart()
         self._show_current()
 
-    def retune(self, items, *, order_label="Shuffle") -> None:
+    def retune(self, items, *, order_label="Shuffle", looping=False) -> None:
         """Point this show at *items* instead, back at its own defaults.
 
         What a hosted reset does with the region's base set.  The window stays
@@ -416,6 +427,7 @@ class SlideshowView(QWidget):
         self._f_mode = False
         self._all_items = list(items)
         self.hud_order_label = order_label
+        self.hud_looping = looping
         self._live = not items
         self._replace_items(self._all_items)
 
@@ -542,6 +554,17 @@ class SlideshowView(QWidget):
             self._show_current()
         else:
             self._advance()
+
+    def _on_video_unplayable(self):
+        """A clip this backend cannot open: step past it, whatever holds it.
+
+        Unlike a clip that ended, this one never will, so the replay a lock or
+        a pace of nought asks for would hold a black screen for the rest of the
+        session.  The item stays in the set — the fault is the backend's, not
+        the file's — but the show moves on.
+        """
+        logger.warning("Slideshow: a clip would not play; stepping past it")
+        self._advance()
 
     # --- the hold a spoken request puts on the show ------------------------
 

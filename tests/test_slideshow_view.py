@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QApplication
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.slideshow import in_order
 from origenerator.stroke_engine import Stroke
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -896,3 +897,49 @@ def test_a_finished_request_answers_in_the_corner(qtbot):
     view = _view(qtbot, _KEYED)
     view.note_request("🎤 dropped “a hat” — generating")
     assert "dropped" in view._note.text()
+
+
+def test_a_clip_the_backend_cannot_open_does_not_park_the_show(qtbot, tmp_path):
+    """A video carries no dwell timer — its own length is its dwell — so a clip
+    that never reports an end is a black screen for the rest of the session.
+    One this backend has no codec for is exactly that, and browsing the whole
+    library is where it turns up.  It gets stepped past instead."""
+    from PyQt6.QtMultimedia import QMediaPlayer
+
+    first, second = tmp_path / "a.png", tmp_path / "b.png"
+    for path in (first, second):
+        Image.new("RGB", (40, 30)).save(path)
+    clip = tmp_path / "broken.mp4"
+    clip.write_bytes(b"not a video")
+    items = [(str(clip), "video", "v-1", None),
+             (str(first), "image", "i-1", None),
+             (str(second), "image", "i-2", None)]
+    view = SlideshowView(items, shuffle=in_order)
+    qtbot.addWidget(view)
+    assert view._playlist.current()[2] == "v-1"
+
+    view._preview._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
+
+    assert view._playlist.current()[2] == "i-1"
+
+
+def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
+    """A lock replays the clip it holds, and a pace of nought never moves on —
+    both of which would hold a clip that cannot play forever.  So this one step
+    happens regardless: the item stays in the set, but the screen does not stay
+    black."""
+    from PyQt6.QtMultimedia import QMediaPlayer
+
+    still = tmp_path / "a.png"
+    Image.new("RGB", (40, 30)).save(still)
+    clip = tmp_path / "broken.mp4"
+    clip.write_bytes(b"not a video")
+    view = SlideshowView([(str(clip), "video", "v-1", None),
+                          (str(still), "image", "i-1", None)],
+                         shuffle=in_order)
+    qtbot.addWidget(view)
+    view._playlist.toggle_lock()
+
+    view._preview.video_unplayable.emit()
+
+    assert view._playlist.current()[2] == "i-1"

@@ -35,6 +35,9 @@ def _path_key(path) -> str:
 
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
+    # This backend cannot open the clip at all — a different thing from ending,
+    # and the one a show has to be told about (see _on_media_status).
+    video_unplayable = pyqtSignal()
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
     drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
@@ -118,6 +121,7 @@ class PreviewWidget(QWidget):
             QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
         )
         self._player.mediaStatusChanged.connect(self._on_media_status)
+        self._player.errorOccurred.connect(self._on_media_error)
         self._stack.addWidget(self._video)
 
         self._stack.setCurrentWidget(self._image_label)
@@ -448,9 +452,25 @@ class PreviewWidget(QWidget):
         return self._fullscreen
 
     def _on_media_status(self, status) -> None:
-        """Report a finished (non-looping) video so a slideshow can advance."""
+        """Report a finished video so a slideshow can advance — and separately,
+        one this backend cannot open at all.
+
+        The second is not a kind of ending, and treating it as one is what left
+        a show on a black rectangle: a clip with no codec here never reports
+        EndOfMedia, and a video carries no dwell timer (its own length is its
+        dwell), so nothing was ever going to move the show off it again.  A
+        browse of the whole library is exactly where such a clip turns up.
+        """
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.video_ended.emit()
+        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
+            self.video_unplayable.emit()
+
+    def _on_media_error(self, error, _message: str = "") -> None:
+        """Same report, from the other direction: the backend can raise the
+        error without ever moving the status to InvalidMedia."""
+        if error != QMediaPlayer.Error.NoError and self.is_showing_video():
+            self.video_unplayable.emit()
 
     def _release(self) -> None:
         """Tear down the media pipeline so shutdown can't deadlock the backend."""

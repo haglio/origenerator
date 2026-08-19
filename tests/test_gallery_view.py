@@ -8338,6 +8338,8 @@ class _VoiceSurface:
         self.culled = 0
         self.starred = 0
         self.held = False
+        self.queued = []     # what the poll last fed its corner queue
+        self.in_flight = set()
 
     def isActiveWindow(self):
         return True
@@ -8371,6 +8373,37 @@ class _VoiceSurface:
             return False
         self.held = held
         return True
+
+    # The gallery's poll feeds every open show its queue and what is in flight,
+    # and it fires while these tests run: a stand-in that answered none of that
+    # blew up inside the Qt event loop, on whichever test the timer happened to
+    # land in.
+    def set_queue(self, items, foreign_queued=0):
+        self.queued = list(items)
+
+    def is_live(self):
+        return False
+
+    def holds(self, prompt_id):
+        return False
+
+    def note_in_flight(self, prompt_ids):
+        self.in_flight = set(prompt_ids)
+
+
+def test_the_poll_runs_over_a_show_being_spoken_to(qtbot, tmp_path):
+    # The 1.5s poll feeds every open show, and it lands mid-test wherever it
+    # lands: a stand-in that had drifted out of step with what a show answers
+    # raised inside the Qt event loop, failing whichever test it fired in rather
+    # than the one that let it drift.
+    view = GalleryView(_enhanceable_db(tmp_path, count=1))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._slideshow = _VoiceSurface("g0")
+
+    view._update_queue()
+
+    assert view._slideshow.queued == []
 
 
 def _enhanceable_db(tmp_path, count=2):

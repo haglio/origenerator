@@ -1682,3 +1682,144 @@ def test_editing_the_settings_takes_the_random_seed_caption_back_off(panel, qtbo
 
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate")
     assert panel._generate_btn.toolTip() == ""
+
+
+# --- asking for changes to a whole folder ------------------------------------
+
+_FOLDER_KEY = "image/sdxl_t2i/abcdef123456"
+_FOLDER_LABEL = "AB12CD34"
+
+
+def _folder_params(prompt="a cat on a couch"):
+    return dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                positive_prompt=prompt, negative_prompt="blurry", seed=7)
+
+
+def _images(tmp_path, count):
+    from PIL import Image
+    paths = []
+    for n in range(count):
+        path = tmp_path / f"folder_{n}.png"
+        Image.new("RGB", (12, 9), (30 * n, 90, 140)).save(path)
+        paths.append(str(path))
+    return paths
+
+
+@pytest.fixture
+def requesting(blank_panel, tmp_path):
+    """A tab opened on a three-image folder's prompt, ready to be rewritten."""
+    blank_panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+                                    _folder_params(), _images(tmp_path, 3))
+    return blank_panel
+
+
+def _positive_field(panel):
+    return panel._param_form._widgets["positive_prompt"]
+
+
+def test_a_request_tab_shows_the_whole_folder_in_its_preview(requesting):
+    # Every image the press will re-run, tiled — not the newest one of them,
+    # which would say the edit was about that image.
+    preview = requesting._preview
+    assert preview._stack.currentWidget() is preview._sheet
+    assert preview._sheet.count() == 3
+
+
+def test_the_press_asks_for_changes_and_counts_them_in_the_hover(requesting):
+    # The button asks for one thing — this folder, said the way it now reads —
+    # so how many runs that costs is a hover away rather than on its face.
+    assert requesting._generate_btn.text() == "Request changes"
+    assert "all 3 images" in requesting._generate_btn.toolTip()
+
+
+def test_a_one_image_folder_gets_its_own_wording(blank_panel, tmp_path):
+    # Not the plural switched off, which read "Run all 1 image ... each with
+    # its own seed".
+    blank_panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+                                    _folder_params(), _images(tmp_path, 1))
+    assert "one image" in blank_panel._generate_btn.toolTip()
+    assert "1 image" not in blank_panel._generate_btn.toolTip()
+
+
+def test_every_prompt_is_marked_against_what_it_says_now(requesting):
+    from origenerator.gui import tracked_prompt
+    tracked = {tracked_prompt.baseline(w) for w in requesting._param_form.text_fields()}
+    assert tracked == {"a cat on a couch", "blurry"}
+
+
+def test_the_tab_is_named_after_the_folder_it_asks_about(requesting):
+    assert requesting.title() == f"Request {_FOLDER_LABEL}"
+
+
+def test_a_request_tab_holds_no_generation_of_its_own(requesting):
+    # It is about a folder, so there is no file on display and nothing for the
+    # "not yet generated with modifications" notice to be measured against.
+    assert requesting.displayed_row() is None
+    assert requesting._displayed_config is None
+
+
+def test_generate_asks_for_the_folder_rather_than_these_settings(requesting, qtbot):
+    _positive_field(requesting).setPlainText("a dog on a couch")
+
+    with qtbot.waitSignal(requesting.changes_requested) as caught:
+        requesting._generate_btn.click()
+
+    folder_key, workflow_name, params = caught.args
+    assert folder_key == _FOLDER_KEY
+    assert workflow_name == "sdxl_t2i"
+    assert params["positive_prompt"] == "a dog on a couch"
+
+
+def test_a_request_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
+        requesting, qtbot):
+    # Unchanged, the press would run every seed in the folder to re-create the
+    # folder — so it asks for the rewrite instead of filling the queue.
+    fired = []
+    requesting.changes_requested.connect(lambda *a: fired.append(a))
+
+    requesting._generate_btn.click()
+
+    assert fired == []
+    assert requesting._generate_btn.text() == "Rewrite the prompt first"
+
+
+def test_showing_a_generation_ends_the_request(requesting, tmp_path):
+    row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
+           "params_json": json.dumps(_folder_params()), "output_files": "[]"}
+
+    requesting.show_saved_generation(row, [])
+
+    from origenerator.gui import tracked_prompt
+    assert requesting.requesting_changes() is None
+    assert all(tracked_prompt.baseline(w) is None
+               for w in requesting._param_form.text_fields())
+    assert requesting._generate_btn.text() == "Generate"
+
+
+def test_ending_the_request_gives_the_prompts_their_undo_back(requesting):
+    # Undo is off while a field is tracked, since the document is rewritten under
+    # the typist; a field left behind must not keep that.
+    assert not _positive_field(requesting).isUndoRedoEnabled()
+
+    requesting._end_folder_request()
+
+    assert _positive_field(requesting).isUndoRedoEnabled()
+
+
+def test_picking_another_workflow_ends_the_request(requesting):
+    requesting._workflow_combo.setCurrentIndex(_combo_index(requesting, "wan22_i2v"))
+
+    assert requesting.requesting_changes() is None
+    assert requesting._generate_btn.text() == "Generate"
+
+
+def test_a_landed_run_does_not_take_the_wall_of_images_away(requesting):
+    # The batch lands an image at a time; each one would otherwise swap the
+    # folder for whichever finished last.
+    row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
+           "params_json": json.dumps(_folder_params()), "output_files": "[]"}
+
+    requesting.show_completed_result(row, [])
+
+    assert requesting.displayed_row() is None
+    assert requesting._preview._stack.currentWidget() is requesting._preview._sheet

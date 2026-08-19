@@ -154,3 +154,40 @@ def test_foreign_queue_text_counts_the_whole_of_somebody_elses_queue():
     assert foreign_queue_text(1) == "1 job from another app is queued on ComfyUI"
     assert foreign_queue_text(0) is None
     assert foreign_queue_text(None) is None
+
+
+# --- what a queued run came from, blurred behind the wait -------------------
+
+
+def _source_file(tmp_path):
+    path = tmp_path / "asked_of.png"
+    Image.new("RGB", (32, 24), (40, 160, 80)).save(path)
+    return str(path)
+
+
+def test_a_queued_run_stands_what_it_came_from_behind_the_wait(qtbot, tmp_path):
+    # A line of queued runs is otherwise a line of identical blank plates. What
+    # each one was asked of is the only picture it has until it draws its own.
+    card = InFlightCard(_item(status="queued", source_picture=_source_file(tmp_path)))
+    qtbot.addWidget(card)
+
+    assert not card._image.pixmap().isNull()
+
+
+def test_a_run_that_came_from_nothing_keeps_its_plain_plate(qtbot):
+    card = InFlightCard(_item(status="queued", source_picture=None))
+    qtbot.addWidget(card)
+
+    assert card._image.pixmap().isNull()
+
+
+def test_the_run_s_own_frame_replaces_what_it_came_from(qtbot, tmp_path):
+    backdrop = InFlightCard(_item(status="queued", source_picture=_source_file(tmp_path)))
+    qtbot.addWidget(backdrop)
+    standing_in = backdrop._image.pixmap().toImage()
+
+    backdrop.update_item(_item(status="running", frame=_png_bytes(),
+                               source_picture=_source_file(tmp_path)))
+
+    assert backdrop._image.pixmap().toImage() != standing_in
+

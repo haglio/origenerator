@@ -58,6 +58,12 @@ class InFlightItem:
     # what an i2v (and an enhance) is *of*. Its picture is the fastest way to
     # tell two queued videos apart, their captions being their shared recipe.
     source_image: str | None = None
+    # A file on disk showing what this run came from — the start frame above,
+    # or the image a request was made of. A queued run has no picture of its
+    # own, so surfaces that would otherwise show a blank plate stand this
+    # behind the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
+    # where the run came from nothing, which is most images.
+    source_picture: str | None = None
     # The act picked in the Combine panel's dropdown, for a run launched from
     # there — "" for every other run, and for a combine that was given a dropped
     # video instead of a picked act. It is the one word saying what this video
@@ -98,8 +104,9 @@ def queue_lead_text(item: InFlightItem) -> str:
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt
     for is the kind that piles up unnoticed (an auto-generate loop makes one
-    every few seconds), and a spoken request is the kind that is easy not to
-    recognize later. A hand-launched job says neither, and needs to say neither.
+    every few seconds, a folder-wide request a run per image at once), and a
+    request is the kind that is easy not to recognize later. A hand-launched job
+    says neither, and needs to say neither.
     """
     parts = [queue_estimate_label(item.typical_seconds)]
     if item.job_kind:
@@ -132,7 +139,8 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     if item.auto_generating:
         lines.append("Queued by its folder's auto-generate loop")
     if item.requested:
-        lines.append("Queued by a spoken request")
+        lines.append("Queued by a request — spoken, or one image of a "
+                     "request made of a whole folder")
     return "\n".join(lines)
 
 

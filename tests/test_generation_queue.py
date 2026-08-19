@@ -801,7 +801,7 @@ def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
     assert tip.startswith("Alpha Workflow › a kite")
     assert "No timing data" in tip
     assert "start frame" in tip
-    assert "spoken request" in tip
+    assert "Queued by a request" in tip
 
 
 # --- the picture a queued job can be recognized by ----------------------------

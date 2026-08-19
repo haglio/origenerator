@@ -24,16 +24,17 @@ import time
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QRect, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QRect, QSize, QTimer, pyqtSignal
 
+from origenerator.gui import grid_card
+from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 from origenerator.timing import progress_status_label
 
-_CARD_SIZE = (180, 200)   # matches ThumbnailWidget so cards flow with finished tiles
-_IMAGE_SIZE = (172, 160)
+_IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
 # A blue "in progress" edge, distinct from a resting tile's.
 _BORDER = f"{_BORDER_PX}px solid #3080e0"
@@ -57,8 +58,8 @@ class InFlightCard(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
+        layout.setSpacing(grid_card.CARD_SPACING)
 
         self._image = QLabel()
         self._image.setFixedSize(*_IMAGE_SIZE)
@@ -69,7 +70,7 @@ class InFlightCard(QWidget):
         self._caption = QLabel()
         self._caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._caption.setWordWrap(True)
-        self._caption.setMaximumHeight(30)
+        grid_card.style_caption(self._caption)  # the grid's shared caption size
         self._caption.setStyleSheet("background-color: transparent;")
 
         # Let clicks fall through the children to the card itself.
@@ -91,7 +92,7 @@ class InFlightCard(QWidget):
         self._tick.setInterval(_TICK_MS)
         self._tick.timeout.connect(self._render_timing)
 
-        self.setFixedSize(*_CARD_SIZE)
+        self.setFixedSize(*grid_card.card_size())
         self._place_overlays()  # once: the card is a fixed size and never moves them
         self.update_item(item)
 
@@ -116,6 +117,8 @@ class InFlightCard(QWidget):
                 *_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             ))
+        else:
+            self._show_backdrop(item)
         self._scrim.cover(self._image, self._stage_message(item), inset=_BORDER_PX)
         self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._render_timing()
@@ -125,6 +128,19 @@ class InFlightCard(QWidget):
             self._tick.stop()
         else:
             self._tick.start()
+
+    def _show_backdrop(self, item: InFlightItem):
+        """Until this run streams a frame of its own, stand what it came from
+        behind the wait — blurred, so it reads as where the result is coming
+        from rather than as the result (:mod:`origenerator.gui.blurred`).
+
+        A run that came from nothing keeps the plain plate: there is no honest
+        picture to put there, and a queued image looks like every other queued
+        image because it genuinely is.
+        """
+        backdrop = blurred_backdrop(item.source_picture, QSize(*_IMAGE_SIZE))
+        if backdrop is not None:
+            self._image.setPixmap(backdrop)
 
     @staticmethod
     def _stage_message(item: InFlightItem) -> str:

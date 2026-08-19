@@ -41,6 +41,7 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_LABEL, RECENTS_LABEL, REQUESTS_LABEL, STARRED_LABEL, TRASH_LABEL,
 )
 from origenerator.recovery import RETENTION_DAYS
+from origenerator.workflows.derived_size import resolve_input_image_path
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +210,8 @@ class BrowserPane:
         """
         self.clear_selection()
         self._v._reroll_tile = None  # re-created below only when this folder re-rolls
+        self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
+        self._inflight_by_key = {}
         self._visible_ids = []
         self._visible_keys = []
         self._search_rows = []
@@ -574,11 +577,20 @@ class BrowserPane:
 
     def refresh_inflight(self):
         """Between rebuilds, keep the in-flight cards live: push each tracked
-        re-roll's latest frame into its card, and re-render only when the *set* of
-        in-flight jobs changes (a defensive guard — a started or finished re-roll
-        normally moves the DB fingerprint and forces a full rebuild anyway)."""
+        re-roll's latest frame into its card.
+
+        Whichever pane drew them — the Recents shelf, or a settings folder with
+        a batch cooking in it. Only the shelf re-renders on a change to the
+        *set* of jobs (a defensive guard — a started or finished re-roll
+        normally moves the DB fingerprint and forces a full rebuild anyway); a
+        folder is rebuilt by that same fingerprint and must not be redrawn as
+        the shelf. A pane holding no cards asks the database nothing.
+        """
+        if not self._inflight_cards and not self.showing_recents():
+            return
         items = self._visible_inflight_items()
-        if _inflight_signature(items) != self._inflight_signature:
+        if (self.showing_recents()
+                and _inflight_signature(items) != self._inflight_signature):
             self._render_recents()
             return
         for item in items:
@@ -615,9 +627,10 @@ class BrowserPane:
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
         held = {job.prompt_id for job in self._v._reroll.held_jobs()}
-        # Which of these the user asked for out loud. One listing rather than a
+        # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
-        requested = {r["prompt_id"] for r in self._v._db.list_requests()}
+        requested = {r["prompt_id"]: r["source_prompt_id"]
+                     for r in self._v._db.list_requests()}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
@@ -671,6 +684,10 @@ class BrowserPane:
                 # placed the way every other image's is — by the folder it joins.
                 source_image=(params.get("input_image")
                               if kind in SOURCE_FRAME_KINDS else None),
+                # What to stand behind the wait: the image this run was
+                # requested of, else the frame it animates or enhances.
+                source_picture=self._source_picture(
+                    requested.get(pid), thumb_by_id, params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, being the recipe
@@ -689,6 +706,24 @@ class BrowserPane:
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    it.status != "running"))
         return items
+
+    @staticmethod
+    def _source_picture(requested_of, thumb_by_id: dict, params: dict,
+                        kind: str) -> str | None:
+        """A file showing what a queued run came from, or ``None``.
+
+        The image a request was made of comes first: a folder-wide request
+        queues a run per image and every one of them animates nothing, so the
+        thing it was asked about is the only picture it has. Failing that, the
+        start frame an i2v or an enhance is built on.
+        """
+        asked_of = thumb_by_id.get(requested_of) if requested_of else None
+        if asked_of:
+            return asked_of
+        if kind not in SOURCE_FRAME_KINDS:
+            return None
+        frame = resolve_input_image_path(params.get("input_image"))
+        return str(frame) if frame is not None else None
 
     def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
         """A few thumbnails already in the folder a queued job is headed for.
@@ -853,7 +888,10 @@ class BrowserPane:
         return ("Nothing requested yet.\n\nWith a picture on screen, say "
                 "“Request”, then what you want changed, then “over” — "
                 "“Request… no hat… over”. The revision is queued straight away "
-                "and lands here; open one and its prompt shows what moved.")
+                "and lands here; open one and its prompt shows what moved.\n\n"
+                "A folder's Request card lands here too — it asks the same "
+                "thing of every image in that folder at once, typed rather "
+                "than spoken.")
 
     # --- the Trash shelf: deleted items, still recoverable -------------------
 
@@ -1084,6 +1122,10 @@ class BrowserPane:
         # below rather than drawn as a broken, output-less thumbnail.
         if self._v._can_reroll(group):
             self._v._add_reroll_tile(flow, group)
+        # ...and beside it its mirror: the same seeds again, said differently.
+        if self._v._can_request_changes(group):
+            self._v._add_folder_request_tile(flow, group)
+        self._add_folder_inflight_cards(flow, group)
         for row in group.rows:
             if not gallery.produced_output(row):
                 continue  # still in flight — represented by the RerollTile, not a tile
@@ -1106,6 +1148,41 @@ class BrowserPane:
             self._visible_ids.append(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         self.show_widget(container)
+
+    def _add_folder_inflight_cards(self, flow, group):
+        """A card for every other run still cooking in this folder.
+
+        The re-roll tile shows the one in front, and used to be the whole of
+        what a folder said about work in flight — so a request over a folder,
+        which queues a run per image at once, showed up as a single card the
+        images then arrived through one at a time. They are all being made;
+        the folder shows them all, each on the image it was asked of
+        (:mod:`origenerator.gui.blurred`), and each turns into its own
+        thumbnail where it stands.
+
+        Newest first, like everything else in the grid: an in-flight row is
+        the newest thing in the folder, so the cards lead the finished
+        pictures. Costs nothing in a folder with nothing cooking, which is
+        almost all of them — the listing behind the cards is only built once
+        there is a card to build.
+        """
+        leading = self._v._reroll.job_for(group.key)
+        in_front = leading.prompt_id if leading is not None else None
+        waiting = [row["prompt_id"] for row in group.rows
+                   if not gallery.produced_output(row)
+                   and row["prompt_id"] != in_front]
+        if not waiting:
+            return
+        items = {item.key: item for item in self._visible_inflight_items()}
+        for pid in waiting:
+            item = items.get(pid)
+            if item is None:
+                continue  # a row no longer in flight by the time this drew
+            card = InFlightCard(item)
+            card.clicked.connect(self._on_inflight_clicked)
+            flow.addWidget(card)
+            self._inflight_cards[item.key] = card
+            self._inflight_by_key[item.key] = item
 
     def _seed_reroll_actions(self, row) -> list:
         """The per-seed re-roll hover controls for an i2v item: always the video

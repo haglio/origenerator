@@ -69,6 +69,9 @@ class InfoPaneTabs(QTabWidget):
 
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
     generate_requested = pyqtSignal(str, dict)  # any tab's Generate: (workflow_name, params)
+    # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
+    # run per picture in that folder rather than one run of these settings.
+    changes_requested = pyqtSignal(str, str, dict)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
         super().__init__(parent)
@@ -128,6 +131,9 @@ class InfoPaneTabs(QTabWidget):
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         panel.generate_requested.connect(  # relay every tab's Generate
             lambda name, params, p=panel: self._on_panel_generate(p, name, params)
+        )
+        panel.changes_requested.connect(  # ...and a rewrite tab's, which asks for more
+            lambda key, name, params, p=panel: self._on_panel_changes(p, key, name, params)
         )
         self.setCurrentIndex(index)
         if preview:
@@ -334,6 +340,14 @@ class InfoPaneTabs(QTabWidget):
         self._pin_panel(panel)
         self.generate_requested.emit(workflow_name, params)
 
+    def _on_panel_changes(self, panel, folder_key: str, workflow_name: str,
+                           params: dict):
+        """Relay a rewrite tab's Generate — and keep that tab, for the reason a
+        launched tab is kept: the runs are its, and a later click replacing it
+        would take their Cancel and their progress away mid-batch."""
+        self._pin_panel(panel)
+        self.changes_requested.emit(folder_key, workflow_name, params)
+
     def tabInserted(self, index: int):  # Qt hook: every add path lands here
         super().tabInserted(index)
         self._sync_preview_tab()  # the tabs after it just shifted right
@@ -366,6 +380,25 @@ class InfoPaneTabs(QTabWidget):
             return None
         panel = self._landing_panel()
         panel.prefill(workflow_name, params)
+        self.setCurrentWidget(panel)
+        return panel
+
+    def open_folder_request(self, folder_key: str, label: str, workflow_name: str,
+                      params: dict, pictures: list) -> GenerateConfigPanel | None:
+        """Open a folder's prompt rewrite in a tab (see
+        :meth:`GenerateConfigPanel.open_folder_request`).
+
+        Lands where an open lands, then keeps the tab upright: a rewrite is
+        something being written, not a generation being looked at, so the next
+        clicked thumbnail must open beside it rather than over it.
+
+        A no-op without a client — nothing could run the rewrite.
+        """
+        if self._client is None:
+            return None
+        panel = self._landing_panel()
+        panel.open_folder_request(folder_key, label, workflow_name, params, pictures)
+        self._pin_panel(panel)
         self.setCurrentWidget(panel)
         return panel
 

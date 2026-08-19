@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QEvent, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
-from origenerator.gui import diff_text
+from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
@@ -307,6 +307,23 @@ class ParamForm(QWidget):
         """Collapse every marked field back to its plain prompt."""
         for widget in self.text_fields():
             diff_text.clear_diff(widget)
+
+    def track_prompt_rewrites(self) -> None:
+        """Mark every prompt on the form as a rewrite of what it says right now —
+        arriving words lit as they are typed, departing ones struck through once
+        the field is left (:mod:`origenerator.gui.tracked_prompt`).
+
+        Every prompt rather than a named pair: a workflow that grows another one
+        (the Foley audio prompts did) is marked the day it lands, for the same
+        reason :meth:`text_fields` asks the widgets what they are.
+        """
+        for widget in self.text_fields():
+            tracked_prompt.track(widget, diff_text.live_text(widget))
+
+    def clear_prompt_rewrites(self) -> None:
+        """Stop tracking every field, leaving each an ordinary prompt input."""
+        for widget in self.text_fields():
+            tracked_prompt.untrack(widget)
 
     def text_fields(self) -> list[QPlainTextEdit]:
         """The form's multiline text inputs — its prompts — in the order they lay

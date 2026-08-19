@@ -19,22 +19,21 @@ import time
 
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QRect, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QRect, QSize, QTimer, pyqtSignal
 
+from origenerator.gui import grid_card
+from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 from origenerator.timing import progress_status_label
 
-# Idle/active resting look (a dashed "+" box) versus the solid border that marks
-# the tile as the selected item driving the info pane, mirroring a thumbnail.
-_IDLE_FRAME_CSS = (
-    "#rerollTile { border: 1px dashed #4a4a4a; border-radius: 4px; }"
-    "#rerollTile:hover { border-color: #6f6f6f; }"
-)
-_SELECTED_FRAME_CSS = "#rerollTile { border: 2px solid #8a8a8a; border-radius: 4px; }"
+# The dashed resting box and the solid selected border are the family look every
+# non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
+_IDLE_FRAME_CSS = grid_card.idle_css("rerollTile")
+_SELECTED_FRAME_CSS = grid_card.selected_css("rerollTile")
 
-_IMAGE_SIZE = (166, 150)
+_IMAGE_SIZE = grid_card.PICTURE_SIZE
 _BAR_HEIGHT = 26  # the bar laid along the frame's foot, the way a player's is
 # How often the tile re-reads the clock. Its own timer rather than the gallery's
 # poll, which would make a seconds count skip every other tick.
@@ -47,21 +46,24 @@ class RerollTile(QFrame):
     selected = pyqtSignal()  # a running tile was clicked to drive the info pane
 
     def __init__(self, job=None, parent=None, *, auto_generating=False,
-                 typical_seconds=None):
+                 typical_seconds=None, source_picture=None):
         """``typical_seconds`` is what this folder's workflow usually takes, so a
         bound job's bar can say how much of its run is left; ``None`` where there
-        is no history to say it from."""
+        is no history to say it from. ``source_picture`` is a file showing what
+        the bound run came from, stood blurred behind the wait until the run
+        streams a frame of its own."""
         super().__init__(parent)
         self._job = job
+        self._source_picture = source_picture
         self._selected = False
         self._typical_seconds = typical_seconds
         self.setObjectName("rerollTile")
-        self.setFixedSize(180, 200)
+        self.setFixedSize(*grid_card.card_size())
         self.set_selected(False)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
+        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
+        layout.setSpacing(grid_card.CARD_SPACING)
 
         self._image = QLabel()
         self._image.setFixedSize(*_IMAGE_SIZE)
@@ -74,7 +76,7 @@ class RerollTile(QFrame):
         self._status = QLabel()
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status.setWordWrap(True)
-        self._status.setMaximumHeight(28)
+        grid_card.style_caption(self._status)  # the grid's shared caption size
         layout.addWidget(self._status)
 
         self._cancel = QPushButton(discard_run_text(auto_generating))
@@ -102,9 +104,7 @@ class RerollTile(QFrame):
 
     def _show_idle(self):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._image.setStyleSheet(
-            "color: #6f6f6f; font-size: 56px; background: #2a2a2a; border-radius: 3px;"
-        )
+        self._image.setStyleSheet(grid_card.glyph_css())
         self._image.setText("+")
         self._status.setText("New (random seed)")
         self._cancel.hide()
@@ -124,6 +124,10 @@ class RerollTile(QFrame):
 
         if job.last_preview:
             self._on_preview(job.last_preview)
+        else:
+            backdrop = blurred_backdrop(self._source_picture, QSize(*_IMAGE_SIZE))
+            if backdrop is not None:
+                self._image.setPixmap(backdrop)
         self._render_state()
         self._tick.start()
 

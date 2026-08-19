@@ -74,6 +74,25 @@ _FLOOR_CAP = 330
 # on it: that picture was generated, these settings have not been.
 _MODIFIED_NOTICE = "(not yet generated with modifications)"
 
+# What a tab opened on a folder-wide request says on its Generate and above
+# its tabs. The count is in the hover rather than on the face: the press does
+# submit that many runs at once, which is worth being able to read, but what
+# the button asks for is one thing — this folder, said the way it now reads.
+_REQUEST_CAPTION = "Request changes"
+_REQUEST_TIP = (
+    "Run all {count} images in this folder again, each with its own seed and "
+    "the prompt as you have rewritten it, landing them together in a new "
+    "folder."
+)
+# Its own wording rather than a plural switched off, which left "Run all 1
+# image ... each with its own seed" on a folder holding one.
+_REQUEST_TIP_ONE = (
+    "Run this folder's one image again with its own seed and the prompt as "
+    "you have rewritten it, landing it in a new folder."
+)
+_REQUEST_GUARD = "Rewrite the prompt first"
+_REQUEST_TITLE = "Request {folder}"
+
 
 class GenerateConfigPanel(QWidget):
     """One generation configuration: pick a workflow and set its params.
@@ -119,6 +138,10 @@ class GenerateConfigPanel(QWidget):
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
+    # Generate clicked on a folder rewrite: (source folder key, workflow_name, form
+    # params). A separate signal because it asks for something else entirely — one
+    # run per picture in that folder, each keeping its own seed.
+    changes_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
@@ -145,6 +168,11 @@ class GenerateConfigPanel(QWidget):
         # preview as no longer showing what a Generate would make; None whenever
         # there's no saved generation on display to be modified away from.
         self._displayed_config: ConfigSnapshot | None = None
+        # Set while this tab is a whole folder's prompt rewrite rather than one
+        # configuration: the folder being rewritten, what to call it, how many
+        # pictures the press will run, and the settings it opened on — which is
+        # what says whether anything has actually been rewritten yet.
+        self._folder_request: dict | None = None
         # Where this tab's settings came from, when the Combine panel opened them
         # here: the act picked in its dropdown and the video whose recipe they
         # are, as (category, video_prompt_id). Carried so a run launched from this
@@ -380,6 +408,11 @@ class GenerateConfigPanel(QWidget):
         # rather than riding onto an unrelated launch. Set again after a prefill,
         # which is what re-picks the workflow in the first place.
         self._recipe_source = ("", None)
+        # And a folder's rewrite is a rewrite of that folder's own recipe. Swap
+        # the workflow and the form is rebuilt from scratch — the tracked prompt
+        # fields with it — so what is left is an ordinary config, not a rewrite
+        # of anything.
+        self._end_folder_request()
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
@@ -503,6 +536,13 @@ class GenerateConfigPanel(QWidget):
 
     def _apply_generate_caption(self):
         """Say on the button what a press will do, and why, or leave it plain."""
+        if self._folder_request is not None:
+            count = self._folder_request["count"]
+            self._generate_btn.set_caption(_REQUEST_CAPTION)
+            self._generate_btn.setToolTip(
+                _REQUEST_TIP_ONE if count == 1
+                else _REQUEST_TIP.format(count=count))
+            return
         wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
         config = self.current_config()
         duplicate = (
@@ -543,6 +583,15 @@ class GenerateConfigPanel(QWidget):
             self._generate_btn.flash_guard(
                 f"Select an input image ({', '.join(missing_images)})"
             )
+            return
+        if self._folder_request is not None:
+            # A request that asked for nothing would re-run every seed in the
+            # folder to re-create the folder, so the press says what it still
+            # needs rather than filling the queue with copies.
+            if configs_match(self._folder_request["opened_on"], self.current_config()):
+                self._generate_btn.flash_guard(_REQUEST_GUARD)
+                return
+            self.changes_requested.emit(self._folder_request["folder_key"], key, params)
             return
         self.generate_requested.emit(key, params)
 
@@ -702,6 +751,8 @@ class GenerateConfigPanel(QWidget):
         has no item to name it, so it takes its folder's name — the same name the
         folder wears in the tree, code or typed.
         """
+        if self._folder_request is not None:
+            return _REQUEST_TITLE.format(folder=self._folder_request["label"])
         name = item_label(self._displayed_row)
         if not name:
             key = self.settings_key()
@@ -725,6 +776,11 @@ class GenerateConfigPanel(QWidget):
         return icons.media_type_icon(media) if media else QIcon()
 
     def prefill(self, workflow_name: str, params: dict):
+        # Seeding the form with one configuration is the end of any folder-wide
+        # rewrite this tab was holding: the prompts it lands are a recipe to run,
+        # not a change to a folder's. (:meth:`open_folder_request` prefills first and
+        # arms the rewrite afterwards, so it is not undoing itself.)
+        self._end_folder_request()
         # Switch to the matching workflow. A registered workflow the picker
         # normally hides (machinery, selectable False) is added on demand, so
         # reusing such a row still lands on the right form instead of silently
@@ -754,6 +810,59 @@ class GenerateConfigPanel(QWidget):
         if self._param_form:
             self._param_form.set_seed_random(snapshot.seed_is_random)
 
+    # --- rewriting a whole folder's prompt ------------------------------------
+
+    def open_folder_request(self, folder_key: str, label: str, workflow_name: str,
+                      params: dict, pictures: list) -> None:
+        """Open this tab as a rewrite of one folder's prompt.
+
+        The folder's own settings fill the form, its prompts are marked against
+        what they say now — lit where words arrive, struck through where they go
+        (:mod:`origenerator.gui.tracked_prompt`) — and its images fill the
+        preview, all of them, tiled. Nothing about it is one generation, so the
+        tab shows no file, no footer and no "modified" notice: what the settings
+        are about is the wall above them.
+
+        ``pictures`` carries one entry per run the press will make, whether or
+        not there is a thumbnail to draw for it, so the count in the hover is
+        the number of images rather than of readable files.
+        """
+        self.prefill(workflow_name, params)  # ends any rewrite already here
+        self._folder_request = {
+            "folder_key": folder_key,
+            "label": label,
+            "count": len(pictures),
+            # What the tab opened on, so a press can tell a rewrite from a
+            # re-run of the folder it was rewriting.
+            "opened_on": self.current_config(),
+        }
+        self._hide_footer()
+        self._displayed_row = None     # a folder, not a generation on display
+        self._displayed_config = None  # ...so no settings for a notice to deviate from
+        self._preview.show_folder(pictures)
+        if self._param_form is not None:
+            self._param_form.track_prompt_rewrites()
+        self._apply_generate_caption()
+        self._emit_title()
+
+    def _end_folder_request(self) -> None:
+        """Stop this tab being a folder rewrite, leaving an ordinary config.
+
+        The prompt fields go back to plain inputs holding the prompts they show —
+        a marked-up field left behind would go on measuring edits against a
+        folder the tab is no longer about, and would keep its undo switched off.
+        """
+        if self._folder_request is None:
+            return
+        self._folder_request = None
+        if self._param_form is not None:
+            self._param_form.clear_prompt_rewrites()
+        self._apply_generate_caption()
+
+    def requesting_changes(self) -> str | None:
+        """The folder this tab is rewriting the prompt of, or ``None``."""
+        return None if self._folder_request is None else self._folder_request["folder_key"]
+
     # --- displaying a saved generation (the browsed selection) ----------------
 
     def show_saved_generation(self, row: dict, image_rows: list[dict], request=None):
@@ -775,6 +884,7 @@ class GenerateConfigPanel(QWidget):
         """
         self.forget_launched()
         self._recipe_source = ("", None)
+        self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))
@@ -792,7 +902,12 @@ class GenerateConfigPanel(QWidget):
         already holds the settings that made this result, and the user may have kept
         editing the next prompt while the run was in flight. Re-seeding here would
         wipe those edits, so the completed result touches only the preview and info.
+        A tab holding a folder rewrite takes none of it: that tab is about the
+        folder, and the batch it launched lands a picture at a time — each one
+        would swap the wall of pictures for whichever finished last.
         """
+        if self._folder_request is not None:
+            return
         self._display_result(row, image_rows)
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):

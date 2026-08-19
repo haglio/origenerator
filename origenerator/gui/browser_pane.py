@@ -22,9 +22,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QMenu, QApplication, QPushButton, QVBoxLayout,
+    QWidget, QLabel, QMenu, QApplication, QPushButton, QScrollArea, QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator import gallery, search, timing
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
@@ -70,6 +70,31 @@ _SECTION_SPACING = 14
 # "too many to draw" is another word, and the count label says exactly that
 # rather than quietly showing a slice.
 SEARCH_DRAW_LIMIT = 200
+
+
+class BrowserScrollArea(QScrollArea):
+    """The middle pane's scroll area, which says when a click landed on nothing.
+
+    Every tile in here answers its own press and keeps it, so a press that
+    arrives at this widget travelled the whole pane without meeting one: the
+    background between the tiles, or the room under the last row. That is the
+    gesture every file browser answers by putting the selection down, and this
+    pane needs it for more than tidiness — Star, Enhance and Delete all aim at
+    the picked thumbnails when there are any and at the folder on screen when
+    there are none, so "Enhance every image in this folder" is out of reach
+    while a single tile stays picked, with nothing on screen saying why.
+    """
+
+    background_clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        # Left only: a right-click opens a context menu, and losing the
+        # selection out from under one would aim it at nothing.
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.background_clicked.emit()
+            event.accept()  # nothing above wants it — end the walk up here
+            return
+        super().mousePressEvent(event)
 
 
 @dataclass(frozen=True)

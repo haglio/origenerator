@@ -445,14 +445,14 @@ def test_double_clicking_leaves_the_slideshow(qtbot):
 
 def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):
     view = _view(qtbot, _KEYED)
-    assert view.voice_fix_target() == "id-a"
+    assert view.voice_target() == "id-a"
     _press(view, Qt.Key.Key_Right)
-    assert view.voice_fix_target() == "id-b"
+    assert view.voice_target() == "id-b"
 
 
 def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
     view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
-    view.note_voice_fix("id-a", "🎤 fixing teeth…")
+    view.note_voice_run("id-a", "🎤 fixing teeth…")
     assert "fixing teeth" in view._note.text()
     # The flash fades into the same note a hold's enhance earns, until the
     # upgraded version lands.
@@ -462,7 +462,7 @@ def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
 
 def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
     view = _view(qtbot, _KEYED)
-    view.note_voice_fix(None, "🎤 no teeth detector installed")
+    view.note_voice_run(None, "🎤 no teeth detector installed")
     assert "no teeth detector" in view._note.text()
     view._refresh_note()
     assert view._note.isHidden()
@@ -642,7 +642,7 @@ def test_a_version_step_keeps_the_item_as_the_enhance_target(qtbot, tmp_path):
 
     _shift(view, Qt.Key.Key_Right)
 
-    assert view.voice_fix_target() == "id-a"
+    assert view.voice_target() == "id-a"
 
 
 def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
@@ -871,7 +871,7 @@ def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
 
     view._on_video_ended()  # the clip on screen ran out mid-sentence
 
-    assert view.voice_request_target() == "id-a"
+    assert view.voice_target() == "id-a"
 
 
 def test_releasing_the_hold_leaves_a_locked_slide_locked(qtbot):
@@ -887,9 +887,9 @@ def test_releasing_the_hold_leaves_a_locked_slide_locked(qtbot):
 
 def test_a_request_targets_the_slide_on_screen(qtbot):
     view = _view(qtbot, _KEYED)
-    assert view.voice_request_target() == "id-a"
+    assert view.voice_target() == "id-a"
     _press(view, Qt.Key.Key_Right)
-    assert view.voice_request_target() == "id-b"
+    assert view.voice_target() == "id-b"
 
 
 def test_a_finished_request_answers_in_the_corner(qtbot):

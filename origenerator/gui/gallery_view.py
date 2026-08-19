@@ -210,18 +210,26 @@ def _is_deletable_folder(group) -> bool:
     )
 
 
+# What a spoken command about the picture is asking for, in the words its "no
+# picture on screen" answer names it by. A fix names its own part instead.
+_VOICE_WANTS = {
+    gallery.GENAU_COMMAND: "a Genau clip",
+    gallery.ENHANCE_COMMAND: "an enhancement",
+}
+
+
 def _match_voice_command(text: str):
     """The one command an utterance is, or ``None`` — the whole spoken
     vocabulary, in the order it is tried.
 
-    Both matchers are strict about their own shape and neither can claim the
-    other's (a show command names the slideshow, a fix leads with "fix"), so the
-    order only decides which is asked first. Everything unclaimed falls through
-    to a prompt rewrite, which is why neither may be loose.
+    The show's own controls, then everything said about the picture on screen
+    (:func:`~origenerator.gallery.voice_commands.match_command`, which owns that
+    half's order). Each matcher is strict about its own shape and none can claim
+    another's — a show command names the slideshow, a fix leads with "fix" — so
+    the order only decides which is asked first. Everything unclaimed falls
+    through to a prompt rewrite, which is why none of them may be loose.
     """
-    return (match_show_command(text)
-            or gallery.match_fix_command(text)
-            or gallery.match_genau_command(text))
+    return match_show_command(text) or gallery.match_command(text)
 
 
 class GalleryView(QWidget):
@@ -708,8 +716,9 @@ class GalleryView(QWidget):
         # thing to work out rather than a thing to look at.
         self._mic_btn = self._tool_button(
             icons.mic_icon(),
-            "Listen: spoken slideshow commands, targeted fixes over a show, and "
-            "prompt steering while a folder is auto-generating",
+            "Listen: spoken slideshow commands, orders over a show (“enhance”, "
+            "“fix hands”, “genau it”), and prompt steering while a folder is "
+            "auto-generating",
             self._on_mic_toggle, checkable=True,
         )
         self._mic_btn.setStyleSheet(
@@ -2858,28 +2867,14 @@ class GalleryView(QWidget):
         """Holding a slide asked for it to be enhanced. Returns whether a run
         started — the slideshow shows its corner note only if one did.
 
-        Only an image that has received NO enhancement gets one, the same gate
-        Enhance All and the Auto switch use. A hold is a glance-speed gesture
-        made with no view of the Enhance panel, so an image already carrying an
-        enhancement someone chose must not be re-derived at whatever the knobs
-        happen to say now: that spends a run and hangs a level nobody asked for
-        beside the one they did. Re-enhancing stays a deliberate act — the
-        thumbnail menu's Enhance, or the info pane's ``+ Enhance`` card, both of
-        which are pressed while looking at the settings they will use.
+        The same ask as a spoken "enhance" over the same picture, so the same
+        decision makes it (:meth:`_enhance_it`); a hold has no corner line to
+        fill, so its answer is dropped. The decision is on this side rather than
+        in the slideshow because it is this side that holds the levels — and a
+        video has none to receive."""
+        return self._enhance_it(prompt_id)[0] is not None
 
-        The decision is here rather than in the slideshow because it is this
-        side that holds the levels — and a video has none to receive."""
-        row = self._db.get_generation(prompt_id)
-        if row is None or not gallery.is_enhanceable_row(row):
-            return False
-        if gallery.is_enhanced_row(row):
-            return False
-        if self.is_enhancing(row):
-            return False
-        self._enqueue_enhancements([row])
-        return True
-
-    # --- spoken commands: "fix teeth" over a show, "start slideshow" for one ---
+    # --- spoken commands: "enhance" over a show, "start slideshow" for one ---
 
     def _on_mic_toggle(self, _on: bool):
         """The microphone switch: the one thing that opens or closes the mic."""
@@ -2914,11 +2909,12 @@ class GalleryView(QWidget):
         self._show_voice_status("🎤 Listening…", transient=False)
 
     def _on_voice_command(self, matched):
-        """One recognized utterance: a show command, or a targeted fix."""
+        """One recognized utterance: a show command, or an order about the
+        picture on screen."""
         if isinstance(matched, ShowCommand):
             self._run_show_command(matched)
         else:
-            self._on_voice_fix(matched)
+            self._on_picture_command(matched)
 
     def _run_show_command(self, command: ShowCommand):
         """Get the show going, hold it, or close it.
@@ -2956,9 +2952,10 @@ class GalleryView(QWidget):
             else f"🎤 slideshow at {seconds}s"
         )
 
-    def _on_voice_fix(self, command):
+    def _on_picture_command(self, command):
         """A spoken command about the picture on screen: a targeted "fix <part>",
-        or "genau it" to animate it as a Genau clip.
+        "enhance" for the better version of it, or "genau it" to animate it as a
+        Genau clip.
 
         Answered out of the show's own note — the speaker is looking at it, not
         at this pane. Said with no show up there is no "on screen" to act on, and
@@ -2966,17 +2963,39 @@ class GalleryView(QWidget):
         here, so the caption says so rather than letting it vanish."""
         show = self._slideshow
         if show is None:
-            wants = ("a Genau clip" if command == gallery.GENAU_COMMAND
-                     else f"a {command.name} fix")
+            wants = _VOICE_WANTS.get(command) or f"a {command.name} fix"
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)
             return
-        target = show.voice_fix_target()
+        target = show.voice_target()
         if command == gallery.GENAU_COMMAND:
             prompt_id, message = self._genau_it(target)
+        elif command == gallery.ENHANCE_COMMAND:
+            prompt_id, message = self._enhance_it(target)
         else:
             prompt_id, message = self._fix_part(target, command)
-        show.note_voice_fix(prompt_id, message)
+        show.note_voice_run(prompt_id, message)
+
+    def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+        """Enhance the picture on screen: the id it launched on (``None`` when it
+        didn't) and the line the speaking surface should say.
+
+        Only an image that has received no enhancement gets one, the same gate a
+        fullscreen hold's Down uses — spoken over a show, this is a gesture made
+        with no view of the Enhance panel, and an image already carrying an
+        enhancement someone chose must not be re-derived at whatever the knobs
+        happen to say now. Re-enhancing stays a deliberate act made in front of
+        the settings it will use (the thumbnail menu, the ``+ Enhance`` card).
+        """
+        row = self._db.get_generation(prompt_id) if prompt_id else None
+        if row is None or not gallery.is_enhanceable_row(row):
+            return None, "🎤 only a finished image can be enhanced"
+        if gallery.is_enhanced_row(row):
+            return None, "🎤 this one is enhanced already"
+        params = gallery.enhance_params_for(row, self._enhance_settings)
+        if params is None:
+            return None, "🎤 this one has no file to enhance"
+        return self._launch_spoken_enhance(row, params, "enhance", "enhancing…")
 
     def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
@@ -2995,13 +3014,26 @@ class GalleryView(QWidget):
                           "(ComfyUI models/ultralytics/bbox)")
         if gallery.level_matching_params(row, params) is not None:
             return None, f"🎤 already has this {part.name} fix"
+        return self._launch_spoken_enhance(row, params, f"{part.name} fix",
+                                           f"fixing {part.name}…")
+
+    def _launch_spoken_enhance(self, row: dict, params: dict, what: str,
+                               doing: str) -> tuple[str | None, str]:
+        """The tail both spoken enhancements share: refuse one already cooking,
+        else launch and say so.
+
+        A targeted fix and a plain "enhance" differ in what they refuse and in
+        what they run; from here on they are one act. ``what`` names the run in
+        a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
+        while it runs.
+        """
         if self.is_enhancing(row):
             return None, "🎤 an enhance of this image is already running"
-        logger.info("Voice fix: %s on %s at %s", part.name, row.get("prompt_id"),
+        logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
                     gallery.describe_enhance_params(params))
         if not self._launch_enhance(row, params):
-            return None, f"🎤 couldn't launch the {part.name} fix — see the log"
-        return row["prompt_id"], f"🎤 fixing {part.name}…"
+            return None, f"🎤 couldn't launch the {what} — see the log"
+        return row["prompt_id"], f"🎤 {doing}"
 
     # --- spoken requests: "Request … over" over whatever is on screen ---------
 
@@ -3033,7 +3065,7 @@ class GalleryView(QWidget):
         """What a request just opened is about: the slide filling the screen
         when a show is up, else the generation picked in the gallery."""
         if show is not None:
-            return show.voice_request_target()
+            return show.voice_target()
         return self.selected_generation()
 
     def _hold_for_request(self, show, spoken):
@@ -3627,7 +3659,7 @@ class GalleryView(QWidget):
         what = ("looping “%s” clip" % category if intent == recipe_match.GENAU
                 else "“%s” video" % category)
         if self._slideshow is not None:
-            self._slideshow.note_voice_fix(
+            self._slideshow.note_voice_run(
                 None, f"🎤 no past {what} to base a recipe on yet")
             return
         QMessageBox.information(

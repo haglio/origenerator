@@ -33,10 +33,11 @@ def test_a_sentence_merely_mentioning_it_is_not_a_command():
     assert voice_commands.match_genau_command(None) is None
 
 
-def test_the_two_commands_do_not_shadow_each_other():
+def test_the_three_commands_do_not_shadow_each_other():
     fix = voice_commands.match_command("fix teeth")
-    assert fix is not None and fix is not voice_commands.GENAU_COMMAND
+    assert fix is not None and fix.name == "teeth"
     assert voice_commands.match_command("genau it") == voice_commands.GENAU_COMMAND
+    assert voice_commands.match_command("enhance") == voice_commands.ENHANCE_COMMAND
     assert voice_commands.match_command("make her hair longer") is None
 
 
@@ -52,4 +53,27 @@ def test_the_gallery_facade_exposes_the_one_matcher():
     # What the voice surface is actually given; a verb added to the module has to
     # reach it without the caller changing.
     assert gallery.match_command("genau it") == gallery.GENAU_COMMAND
+    assert gallery.match_command("enhance") == gallery.ENHANCE_COMMAND
     assert gallery.command_bias() == voice_commands.command_bias()
+
+
+def test_enhance_asks_for_the_better_version_of_what_is_on_screen():
+    assert voice_commands.match_enhance_command("enhance") == voice_commands.ENHANCE_COMMAND
+    assert voice_commands.match_enhance_command("Enhance it!") == voice_commands.ENHANCE_COMMAND
+
+
+def test_whisper_is_offered_the_enhance_word_too():
+    # Off a quiet mic a short imperative is mangled unless the transcriber is
+    # told to expect it, which is what actually made "fix <part>" land.
+    bias = voice_commands.command_bias()
+    for phrase in voice_commands.ENHANCE_PHRASES:
+        assert phrase in bias
+
+
+def test_a_sentence_that_merely_wants_something_nicer_is_not_the_command():
+    # Everything unmatched falls through to a prompt rewrite, and "enhance the
+    # lighting" is one of those — a command is the word and nothing more.
+    assert voice_commands.match_enhance_command("enhance the lighting on her face") is None
+    assert voice_commands.match_enhance_command("make her dress more enhanced") is None
+    assert voice_commands.match_enhance_command("") is None
+    assert voice_commands.match_enhance_command(None) is None

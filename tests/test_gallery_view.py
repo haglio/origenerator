@@ -7309,6 +7309,23 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
     {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]}}}
 
 
+class _VoiceSurface:
+    """A show standing in for the one being spoken over."""
+
+    def __init__(self, prompt_id):
+        self._prompt_id = prompt_id
+        self.noted = None
+
+    def isActiveWindow(self):
+        return True
+
+    def voice_target(self):
+        return self._prompt_id
+
+    def note_voice_run(self, prompt_id, message):
+        self.noted = (prompt_id, message)
+
+
 def _enhanceable_db(tmp_path, count=2):
     """A DB whose one SDXL folder holds ``count`` finished, un-enhanced images
     (pre-enhance v002 rows: no enhance params, so nothing marks them)."""
@@ -9671,20 +9688,7 @@ def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
 def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    class _Surface:
-        def __init__(self):
-            self.noted = None
-
-        def isActiveWindow(self):
-            return True
-
-        def voice_fix_target(self):
-            return "img_act"
-
-        def note_voice_fix(self, prompt_id, message):
-            self.noted = (prompt_id, message)
-
-    surface = _Surface()
+    surface = _VoiceSurface("img_act")
     view._slideshow = surface
 
     view._on_voice_command(gallery.GENAU_COMMAND)
@@ -9694,6 +9698,106 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     assert surface.noted[0] == "img_act"
     assert "dancing" in surface.noted[1]
     assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+
+
+def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):
+    # The spoken form of the Enhance button, aimed at the picture being watched.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _set_enhance(view, params={"enhance_steps": 29})
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_steps"] == 29
+    # Answered in the show's own corner: the speaker is looking at the picture.
+    assert surface.noted == ("g0", "🎤 enhancing…")
+
+
+def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
+    # Said over a show, this is a gesture made with no view of the Enhance panel
+    # — the same reason a hold's Down leaves one alone — so it says so rather
+    # than re-deriving the picture at whatever the knobs happen to read now.
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps([
+        {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"},
+    ]), original_files=json.dumps(
+        [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 this one is enhanced already")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps(
+        [{"filename": "clip.mp4", "subfolder": "video", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 only a finished image can be enhanced")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path):
+    # A row can hold an output entry with no name; it reads as a finished image
+    # everywhere else, and there is nothing to feed the enhancer.
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps(
+        [{"subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 this one has no file to enhance")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_with_no_show_up_says_what_it_wanted(qtbot, tmp_path):
+    # The utterance has already been claimed as a command by the time it gets
+    # here, so it is answered in this pane rather than vanishing.
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert view._voice_status.text() == "🎤 an enhancement needs a picture on screen"
+    assert view._reroll_jobs == {}
+
+
+def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
+    # One matcher reaches the mic, so a verb added to the vocabulary lands there
+    # without this module listing the parts a second time and drifting from it.
+    match = gallery_view_module._match_voice_command
+
+    assert match("enhance") == gallery.ENHANCE_COMMAND
+    assert match("go now") == gallery.GENAU_COMMAND
+    assert match("fix teeth").name == "teeth"
+    assert match("start slideshow") is not None
+    assert match("make her hair longer") is None    # steering, not a command
 
 
 def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):

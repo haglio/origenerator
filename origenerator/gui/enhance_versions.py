@@ -133,9 +133,20 @@ class _Row(QWidget):
         # at all, so the selection fill would never show.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(_ROW_CSS)
-        box = QHBoxLayout(self)
-        box.setContentsMargins(2, 2, 2, 2)
+        # Two layouts, not one: the picture and the facts sit side by side while
+        # there is room for both, and the facts drop underneath the picture when
+        # there is not — see :meth:`_reflow`. A row that could only sit side by
+        # side would be the widest thing in the tab, and would decide how narrow
+        # the whole pane could be dragged before its settings scrolled sideways.
+        self._column = QVBoxLayout(self)
+        self._column.setContentsMargins(2, 2, 2, 2)
+        self._column.setSpacing(6)
+        box = QHBoxLayout()
+        box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(8)
+        self._column.addLayout(box)
+        self._beside = box
+        self._wrapped = False
         self._picture = QLabel()
         self._picture.setFixedSize(_TILE, _TILE)
         self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -161,6 +172,39 @@ class _Row(QWidget):
         self._facts = facts
         self._fact_cells: list[QWidget] = []
         box.addLayout(facts, 1)
+
+    def minimumSizeHint(self):
+        """As narrow as the row gets — which is the wrapped arrangement's width,
+        whichever one it is in at the moment: the facts can always drop below the
+        picture, so the pair's widths never add up."""
+        hint = super().minimumSizeHint()
+        margins = self._column.contentsMargins()
+        widest = max(self._picture.minimumSizeHint().width(),
+                     self._facts.minimumSize().width())
+        hint.setWidth(widest + margins.left() + margins.right())
+        return hint
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow(event.size().width())
+
+    def _reflow(self, width: int) -> None:
+        """Put the facts beside the picture or underneath it, by whether both fit."""
+        margins = self._column.contentsMargins()
+        beside = (self._picture.sizeHint().width() + self._beside.spacing()
+                  + self._facts.minimumSize().width()
+                  + margins.left() + margins.right())
+        wrapped = width < beside
+        if wrapped == self._wrapped:
+            return
+        if wrapped:
+            self._beside.removeItem(self._facts)
+            self._column.addItem(self._facts)
+        else:
+            self._column.removeItem(self._facts)
+            self._beside.addLayout(self._facts, 1)
+        self._wrapped = wrapped
+        self.updateGeometry()   # the row is a different height in each shape
 
     def _show_facts(self, items: list[MetaItem]) -> None:
         """Lay this row's facts out as the same ``label: value`` cells a metadata

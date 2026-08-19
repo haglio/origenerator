@@ -20,7 +20,7 @@ from PyQt6.QtGui import QFontMetrics
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
-from origenerator.gui.eliding import ElidingButton
+from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
 
@@ -165,8 +165,11 @@ def _reveal_button(target: str) -> QPushButton:
 
 
 def _label_widget(text: str, width: int) -> QLabel:
-    label = QLabel(text)
-    label.setMinimumWidth(width)
+    # ``width`` lines this key up with the others in its group by asking for that
+    # much, not by demanding it: squeezed, the key gives way and elides, so a file
+    # row can be read in a narrow pane instead of setting its floor. See
+    # :class:`~origenerator.gui.eliding.ElidingLabel`.
+    label = ElidingLabel(text, preferred_width=width)
     label.setStyleSheet(f"color: {_h(TEXT_MUTED)};")
     label.setAlignment(Qt.AlignmentFlag.AlignTop)
     return label

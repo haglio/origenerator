@@ -948,8 +948,11 @@ class GalleryView(QWidget):
         # third or a portrait-monitor half.
         toc.setMinimumWidth(120)
         browser.setMinimumWidth(210)
-        self._info_tabs.setMinimumWidth(300)
-        info_pane.setMinimumWidth(300)  # the pane in the splitter is the wrapper now
+        # No floor of its own on the info pane: the config tab inside it reports
+        # what its settings need (GenerateConfigPanel.minimumSizeHint), and an
+        # explicit minimum here would replace that number rather than join it —
+        # pinning the pane narrower than its contents and putting a horizontal
+        # scroll bar back under the form.
         self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
         self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
         self._folder_panes.setSizes([220, 560])

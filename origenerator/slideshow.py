@@ -6,10 +6,12 @@ set in a random order, reshuffled each pass, with the shuffle injectable so the
 order is deterministic under test; a lock holds one item against the advance,
 answering Fun Time's padlock. The set grows as generations land in what the show
 is playing (:meth:`SlideshowPlaylist.add`) — a folder that is auto-generating is
-the case that asks for it. Videos aren't dwell-timed: they play once and the
-view advances when they end, so ``dwell_ms`` returns ``None`` for them. Keeping
-this a plain, Qt-free object lets the policy be unit-tested without a window or
-a clock.
+the case that asks for it — and it grows earlier still for one that is only being
+made: a :data:`LIVE` slide is the frames ComfyUI is streaming of a run, standing
+in for the file until :meth:`SlideshowPlaylist.replace_live` swaps it for one.
+Videos aren't dwell-timed: they play once and the view advances when they end,
+so ``dwell_ms`` returns ``None`` for them. Keeping this a plain, Qt-free object
+lets the policy be unit-tested without a window or a clock.
 
 A dwell of zero means never: the show holds whatever is on screen until an arrow
 moves it. That is the shape a double-clicked picture opens in — one show, opened
@@ -33,6 +35,13 @@ from dataclasses import dataclass
 # Genau's console shows this as its clip-seconds pace and sets it from
 # there, so the number it opens at has to be the one the slideshow uses.
 DEFAULT_IMAGE_DWELL_MS = 4000
+
+# The media type of a slide that is a generation still being made. Its "path" is
+# the newest frame ComfyUI has streamed of it, held as encoded bytes, because
+# there is no file to point at yet. A run with no frame yet is no slide at all:
+# a black screen reading "Generating…" is nothing to watch, but the first
+# iterations coming in are the most exciting thing in a folder that is filling.
+LIVE = "live"
 
 
 @dataclass(frozen=True)
@@ -189,20 +198,83 @@ class SlideshowPlaylist:
         hour away. The rest of the pass then carries on where it left off.
         """
         prompt_id = item[2] if len(item) > 2 else None
-        if prompt_id is not None and any(len(held) > 2 and held[2] == prompt_id
-                                         for held in self._items):
+        if prompt_id is not None and self.holds(prompt_id):
             return False
         self._items.append(item)
         self._order.insert(self._pos + 1, len(self._items) - 1)
         return True
 
+    def holds(self, prompt_id) -> bool:
+        """Whether this set already has a slide for that generation, whatever
+        state it is in — frames still coming in, or the file it landed as."""
+        return any(len(item) > 2 and item[2] == prompt_id for item in self._items)
+
+    def live_ids(self) -> list:
+        """The generations this set is playing as frames rather than as files —
+        who to ask about, when the question is which runs are still going."""
+        return [item[2] for item in self._items
+                if len(item) > 2 and item[1] == LIVE]
+
+    def current_is_live(self) -> bool:
+        item = self.current()
+        return item is not None and item[1] == LIVE
+
+    def update_live(self, prompt_id, frame) -> bool:
+        """Point a slide that is still being made at the newest frame of it.
+        Returns whether there was such a slide.
+
+        Only a live one. A frame arriving after the run landed — a message from
+        the tail of it, or a poll a beat behind — must not take the finished
+        picture back off the screen and put a half-rendered one there.
+        """
+        found = False
+        for index, item in enumerate(self._items):
+            if len(item) > 2 and item[2] == prompt_id and item[1] == LIVE:
+                self._items[index] = _upgraded(item, frame)
+                found = True
+        return found
+
+    def replace_live(self, prompt_id, path, media_type, still=None) -> bool:
+        """Swap the frames of a slide still being made for the file it landed as.
+        Returns whether such a slide was here.
+
+        The same item, finished — not a second one. Without this the show would
+        hold both the frames it watched arrive and the file they became, and play
+        the stale pair of them every pass.
+        """
+        if not any(len(item) > 2 and item[2] == prompt_id and item[1] == LIVE
+                   for item in self._items):
+            return False
+        return self.replace_item(prompt_id, path, media_type, still)
+
     def remove_current(self):
         """Drop the current item; the item that followed it becomes current."""
-        if not self._items:
-            return
-        removed = self._order[self._pos]
-        del self._items[removed]
-        self._order = [i - 1 if i > removed else i for i in self._order if i != removed]
+        if self._items:
+            self._remove(self._order[self._pos])
+
+    def drop(self, prompt_id) -> bool:
+        """Take a named item out of the set wherever it sits, rather than only
+        while it is the one on screen. Returns whether it was here.
+
+        What a run that stopped being made leaves behind: cancelled or failed, it
+        has no file coming and its last frame would otherwise sit in the pass
+        forever.
+        """
+        for index, item in enumerate(self._items):
+            if len(item) > 2 and item[2] == prompt_id:
+                self._remove(index)
+                return True
+        return False
+
+    def _remove(self, index: int) -> None:
+        """Take the item at ``index`` out of the set and out of the running pass,
+        keeping the show standing where it stands: on the item that followed one
+        removed from under it, and on the same item otherwise."""
+        at = self._order.index(index)
+        del self._items[index]
+        self._order = [i - 1 if i > index else i for i in self._order if i != index]
+        if at < self._pos:
+            self._pos -= 1  # the pass got shorter in front of where we are
         if not self._order or self._pos >= len(self._order):
             self._pos = 0
 

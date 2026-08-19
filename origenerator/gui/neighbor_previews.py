@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QRect, QSize
 
+from origenerator.slideshow import LIVE
+
 _MARGIN = 12            # gap from the screen edge, and from the media in a gutter
 _WIDTH_FRACTION = 0.12  # a still's box, as a share of the view's width…
 _HEIGHT_FRACTION = 0.5  # …and of its height
@@ -25,14 +27,15 @@ def still_for(item):
 
     Its stored thumbnail when the item carries one (a video's only still), else
     the item itself when that's an image — so a slideshow assembled without
-    thumbnails still shows its image neighbors.
+    thumbnails still shows its image neighbors. A generation still being made is
+    drawn as the frame it has got to, which is the whole of what there is of it.
     """
     if item is None:
         return None
     still = item[3] if len(item) > 3 else None
     if still:
         return still
-    return item[0] if item[1] == "image" else None
+    return item[0] if item[1] in ("image", LIVE) else None
 
 
 def side_x(side: str, host_width: int, media_rect: QRect, label_width: int) -> int:

@@ -37,9 +37,15 @@ on screen and a show that pages on mid-sentence would aim it at the wrong slide.
 It is independent of the lock, so releasing it never unlocks a held slide.
 
 The set is not frozen at the opening. It holds only generations there is
-something to look at — one still being made is not a slide — and the gallery
-hands each one over as it lands (:meth:`SlideshowView.note_added`), so a show of
-a folder that is auto-generating keeps up with it.
+something to look at, and the gallery hands each one over the moment there is
+— which is well before it lands. A run with no frame yet is no slide: a black
+screen reading "Generating…" is nothing to watch. But the first iterations
+coming in are the most exciting thing in a folder that is filling, and they are
+what a show of one is being watched for, so the run joins the set on its first
+frame (:meth:`SlideshowView.note_generating`), keeps the newest one from there,
+and swaps its frames for the file when it lands
+(:meth:`SlideshowView.note_added`). A show of a folder that is auto-generating
+therefore watches the loop work rather than only its results.
 
 It also opens over a generation that's still running: built with no items, it
 shows that generation's streamed low-res frames (:meth:`show_frame`) until the
@@ -73,7 +79,7 @@ from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
-from origenerator.slideshow import ShowState, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, ShowState, SlideshowPlaylist, in_order
 
 _GENERATING = "Generating…"
 # What the corner says about an enhancement of the slide on screen. Which of the
@@ -119,6 +125,10 @@ class SlideshowView(QWidget):
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
+        # Every run this show has already taken in as a slide of its own frames.
+        # A run is offered once: one culled off the show would otherwise be put
+        # straight back by its next frame, which is the opposite of what Up says.
+        self._seen_live: set[str] = set()
         self._frame = frame  # the frame the double-click landed on, if any
         # The item to hand the gallery on the way out, once there is one: Enter
         # names it outright, and a lock names it by being the slide the show
@@ -226,7 +236,11 @@ class SlideshowView(QWidget):
             return
         self._level_base = None  # a new item, so its own versions from the top
         self._level_index = 0
-        self._preview.show_media(item[0], item[1])
+        if item[1] == LIVE:
+            # Still being made: what it looks like so far, rather than a file.
+            self._preview.show_frame(item[0])
+        else:
+            self._preview.show_media(item[0], item[1])
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
@@ -345,10 +359,72 @@ class SlideshowView(QWidget):
         while it runs — the ones being watched for — are the ones it never gets
         to. The slide on screen is left alone; only the counter and the stills
         either side move, since the set they describe just grew.
+
+        One the show has been watching being made is already in the set as its
+        own frames, and finishing is not a second slide: it keeps its place in
+        the pass and simply becomes the file.
         """
+        if self._playlist.replace_live(prompt_id, path, media_type, still):
+            if self._current_prompt_id() == prompt_id:
+                self._show_current()  # the file itself now, and on a clock again
+            self._update_neighbors()  # it may be the still riding either side
+            return
         if self._playlist.add((path, media_type, prompt_id, still)):
             self._update_counter()
             self._update_neighbors()
+
+    def note_generating(self, prompt_id: str, frame: bytes) -> None:
+        """A generation that belongs to what this show is playing has started to
+        look like something: it joins the set on that first frame, and keeps
+        whichever is newest from there.
+
+        The wait is not worth a slide, but the first iterations arriving are the
+        best thing in a folder that is filling — so the show puts them up as soon
+        as there is anything to see, queued to come up next like any other
+        arrival, rather than waiting out the minutes to the finished file.
+
+        Offered once. A run taken off the show (its Up key) does not come back on
+        its next frame, which would make that key mean nothing at all.
+        """
+        if self._live:
+            return  # already following one run full-screen; this is that job
+        if self._playlist.update_live(prompt_id, frame):
+            if self._current_prompt_id() == prompt_id:
+                self._preview.show_frame(frame)
+            else:
+                self._update_neighbors()  # it may be the still riding either side
+            return
+        if prompt_id in self._seen_live:
+            return
+        self._seen_live.add(prompt_id)
+        if self._playlist.add((frame, LIVE, prompt_id, None)):
+            self._update_counter()
+            self._update_neighbors()
+
+    def note_in_flight(self, prompt_ids) -> None:
+        """Which runs are still being made, so a slide that has stopped being one
+        leaves rather than holding the pass with the half-finished frame it got
+        to. Cancelled and failed runs are what this is for; a finished one is out
+        of this set too, but by then it is a file (:meth:`note_added`) and no
+        longer a live slide to drop.
+        """
+        for prompt_id in [pid for pid in self._playlist.live_ids()
+                          if pid not in prompt_ids]:
+            showing = self._current_prompt_id() == prompt_id
+            self._playlist.drop(prompt_id)
+            if self._playlist.is_empty():
+                self.close()  # a show of nothing but that run has nothing left
+                return
+            if showing:
+                self._show_current()
+            else:
+                self._update_counter()
+                self._update_neighbors()
+
+    def holds(self, prompt_id: str) -> bool:
+        """Whether this show already has a slide for that generation — what the
+        gallery asks before working out whether a run belongs in here at all."""
+        return self._playlist.holds(prompt_id)
 
     def _advance(self):
         self._playlist.advance()
@@ -360,12 +436,18 @@ class SlideshowView(QWidget):
         self._preview.release_media(paths)
 
     def _delete_current(self):
-        """Delete the current item (if a deleter is wired) and advance to the next."""
+        """Delete the current item (if a deleter is wired) and advance to the next.
+
+        A slide that is still being made has nothing to condemn: the run is on the
+        GPU and its row is a record of that, not a picture that has been judged.
+        Up takes such a slide off the show and leaves the run alone — calling one
+        off is the queue plate's Cancel, in the corner of this very screen.
+        """
         self._playlist.unlock()  # the held slide is the one being culled
         item = self._playlist.current()
         if item is None:
             return
-        if self._on_delete is not None and len(item) > 2:
+        if self._on_delete is not None and len(item) > 2 and item[1] != LIVE:
             self._on_delete(item[2])
         self._playlist.remove_current()
         if self._playlist.is_empty():
@@ -600,6 +682,8 @@ class SlideshowView(QWidget):
         """
         if self._on_enhance is None or not self._enhance_on_hold:
             return
+        if self._playlist.current_is_live():
+            return  # no file yet to make a better version of; the hold still holds
         prompt_id = self._current_prompt_id()
         if prompt_id is None or prompt_id in self._enhancing:
             return
@@ -665,9 +749,12 @@ class SlideshowView(QWidget):
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
-        are keyed by."""
+        are keyed by. Empty for one still being made: its slide is frames rather
+        than a file, and nothing is keyed off those."""
         item = self._playlist.current()
-        return str(item[0]) if item is not None else ""
+        if item is None or item[1] == LIVE:
+            return ""
+        return str(item[0])
 
     def voice_target(self):
         """The generation a spoken order or request is about: the slide on
@@ -691,16 +778,21 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         """Say what there is to say about the item on screen: the request being
-        spoken (which holds the show, so it outranks the rest), where the version
-        being made of it has got to, or — failing those — which of its versions
-        this one is.
+        spoken (which holds the show, so it outranks the rest), that this slide
+        is still being made, where the version being made of it has got to, or —
+        failing those — which of its versions this one is.
 
         Stepping levels is invisible without the last line: two versions of one
         picture differ by texture, which is exactly what you cannot tell apart
-        from memory.
+        from memory. And an early iteration looks exactly like a bad generation,
+        so a slide that is still cooking says so, in the same corner and for the
+        same reason an enhancement in flight does.
         """
         if self._request_note:
             self._show_note(self._request_note)
+            return
+        if self._playlist.current_is_live():
+            self._show_note(_GENERATING)
             return
         prompt_id = self._current_prompt_id()
         if prompt_id is not None and prompt_id in self._enhancing:

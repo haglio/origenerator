@@ -1,6 +1,6 @@
 """The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
 
-from origenerator.slideshow import SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, SlideshowPlaylist, in_order
 
 
 def _playlist(**kw):
@@ -329,3 +329,101 @@ def test_the_lock_can_be_put_back_where_a_closed_show_left_it():
     assert playlist.dwell_ms() is None     # held, so nothing moves it on
     playlist.set_locked(False)
     assert not playlist.locked
+
+
+# --- a generation still being made, as a slide of its own frames -------------
+
+
+def test_a_run_being_made_joins_as_a_slide_of_its_frames():
+    # Waiting for the file is waiting minutes for the one thing a show of a
+    # generating folder is being watched for.
+    playlist = _four()
+
+    assert playlist.add((b"frame-1", LIVE, "id-new", None)) is True
+
+    assert playlist.peek(1) == (b"frame-1", LIVE, "id-new", None)
+    assert playlist.live_ids() == ["id-new"]
+    assert playlist.holds("id-new")
+
+
+def test_a_live_slide_takes_the_newest_frame_of_itself():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.update_live("id-new", b"frame-2") is True
+
+    assert playlist.peek(1)[0] == b"frame-2"
+
+
+def test_a_frame_for_a_slide_that_already_landed_is_ignored():
+    # A message from the tail of a run, or a poll a beat behind: it must not take
+    # the finished picture back off the screen and put a half-rendered one there.
+    playlist = _four()
+
+    assert playlist.update_live("id-a", b"frame-late") is False
+
+    assert playlist.current() == ("a.png", "image", "id-a")
+
+
+def test_a_live_slide_becomes_the_file_it_lands_as():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.replace_live("id-new", "new.mp4", "video", "thumb.png") is True
+
+    assert len(playlist) == 5                        # the same slide, finished
+    assert playlist.peek(1) == ("new.mp4", "video", "id-new", "thumb.png")
+    assert playlist.live_ids() == []
+
+
+def test_an_item_that_was_never_live_is_not_replaced_as_one():
+    playlist = _four()
+    assert playlist.replace_live("id-a", "other.png", "image") is False
+    assert playlist.current() == ("a.png", "image", "id-a")
+
+
+def test_a_live_slide_dwells_like_an_image():
+    # It is a picture, however far along: only a video advances on its own end.
+    playlist = SlideshowPlaylist([(b"frame-1", LIVE, "id-new")], shuffle=in_order)
+    assert playlist.dwell_ms() == 4000
+    assert not playlist.current_is_video()
+    assert playlist.current_is_live()
+
+
+def test_a_run_that_stopped_being_made_is_dropped_wherever_it_sits():
+    # Cancelled or failed: no file is coming, and its last frame would otherwise
+    # hold a place in the pass forever.
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.drop("id-new") is True
+
+    assert playlist.live_ids() == []
+    assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]
+    assert playlist.current()[2] == "id-a"           # nothing moved under us
+
+
+def test_dropping_an_item_behind_the_slide_on_screen_keeps_that_slide():
+    playlist = _four()
+    playlist.advance()
+    playlist.advance()                                # standing on id-c
+
+    assert playlist.drop("id-a") is True
+
+    assert playlist.current()[2] == "id-c"
+    assert playlist.order_ids() == ["id-b", "id-c", "id-d"]
+
+
+def test_dropping_the_slide_on_screen_leaves_the_one_after_it():
+    playlist = _four()
+    playlist.advance()                                # standing on id-b
+
+    assert playlist.drop("id-b") is True
+
+    assert playlist.current()[2] == "id-c"
+
+
+def test_dropping_something_that_was_never_here_changes_nothing():
+    playlist = _four()
+    assert playlist.drop("id-elsewhere") is False
+    assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]

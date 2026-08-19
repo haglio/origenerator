@@ -75,7 +75,11 @@ class RerollController(QObject):
     a Generate starts at once instead of queuing behind a long experiment run."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
-    preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
+    # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
+    # as by folder: a folder can have several in flight at once, and a surface
+    # that shows the frame as the run itself — a slideshow slide of a generation
+    # being made — has to know which of them it just saw.
+    preview = pyqtSignal(str, str, bytes)
     # (folder key, prompt_id, origin) a re-roll finished and was saved. The
     # prompt_id tells the view whose completion this is — a background experiment
     # leaves the tabs alone. The origin is the id the run began under (its own,
@@ -423,7 +427,9 @@ class RerollController(QObject):
             lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
         )
         job.failed.connect(lambda msg, k=key, j=job: self._on_failed(k, j, msg))
-        job.preview.connect(lambda data, k=key: self.preview.emit(k, data))
+        job.preview.connect(
+            lambda data, k=key, j=job: self.preview.emit(k, j.prompt_id, data)
+        )
         # Persist the job's live progress onto its row so a restart mid-run can resume
         # the bar at its last position (see GenerationJob.reconnect(progress_state=…)).
         job.progress.connect(lambda value, mx, j=job: self._persist_progress(j))

@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.slideshow import LIVE
 from origenerator.stroke_engine import Stroke
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -1292,3 +1293,127 @@ def test_the_state_read_as_a_show_closes_still_shows_its_hold(qtbot):
 
     assert seen[0].current == "id-a"
     assert seen[0].locked
+
+
+# --- a generation that is still being made ----------------------------------
+
+def test_a_run_that_starts_to_look_like_something_joins_the_show(qtbot):
+    # Not the wait — a black screen saying "Generating…" is nothing to watch —
+    # but the first iterations coming in, which are what the show is being
+    # watched for in the first place.
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+
+    view.note_generating("id-run", _png_bytes())
+
+    assert len(view._playlist) == 2
+    assert view._playlist.current()[2] == "id-a"      # the slide on screen is left alone
+    assert view._playlist.peek(1)[1] == LIVE
+    assert view.holds("id-run")
+
+
+def test_a_live_slide_shows_the_newest_frame_while_it_is_on_screen(qtbot):
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+    _press(view, Qt.Key.Key_Right)                    # step onto it
+
+    later = _png_bytes()
+    view.note_generating("id-run", later)
+
+    assert view._preview._live_frame == later
+
+
+def test_a_live_slide_becomes_the_file_when_the_run_lands(qtbot, tmp_path):
+    # The same slide, finished — not a second one beside the frames it arrived as.
+    landed = _png(tmp_path / "landed.png")
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+    _press(view, Qt.Key.Key_Right)
+
+    view.note_added(landed, "image", "id-run", None)
+
+    assert len(view._playlist) == 2
+    assert view._playlist.current() == (landed, "image", "id-run", None)
+    assert view._preview._media[0] == landed
+
+
+def test_a_run_that_was_cancelled_leaves_the_show(qtbot, tmp_path):
+    # No file is coming, so the half-rendered frame it got to would otherwise
+    # hold a place in the pass forever.
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+
+    view.note_in_flight(set())
+
+    assert len(view._playlist) == 1
+    assert not view.holds("id-run")
+
+
+def test_a_run_still_going_keeps_its_slide(qtbot):
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+
+    view.note_in_flight({"id-run"})
+
+    assert view.holds("id-run")
+
+
+def test_culling_a_slide_being_made_calls_nothing_off(qtbot, tmp_path):
+    # The run is on the GPU and its row is a record of that, not a picture that
+    # has been judged. Up takes it off the show and leaves the run alone.
+    condemned = []
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")],
+                 on_delete=condemned.append)
+    view.note_generating("id-run", _png_bytes())
+    _press(view, Qt.Key.Key_Right)
+
+    _press(view, Qt.Key.Key_Up)
+
+    assert condemned == []
+    assert not view.holds("id-run")
+
+
+def test_a_culled_run_does_not_come_back_on_its_next_frame(qtbot, tmp_path):
+    # Offered once, or Up over it would mean nothing at all.
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+    _press(view, Qt.Key.Key_Right)
+    _press(view, Qt.Key.Key_Up)
+
+    view.note_generating("id-run", _png_bytes())
+
+    assert not view.holds("id-run")
+
+
+def test_holding_a_slide_being_made_asks_for_no_enhancement(qtbot, tmp_path):
+    # There is no file yet to make a better version of; the hold still holds.
+    asked = []
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")],
+                 on_enhance=lambda pid: asked.append(pid) or True)
+    view.note_generating("id-run", _png_bytes())
+    _press(view, Qt.Key.Key_Right)
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert asked == []
+    assert view._playlist.locked
+
+
+def test_a_show_following_one_run_full_screen_takes_no_live_slides(qtbot):
+    # It is already showing that generation; a slide of it would be it twice.
+    view = _view(qtbot, [], frame=_png_bytes())
+
+    view.note_generating("id-run", _png_bytes())
+
+    assert view._playlist.is_empty()
+
+
+def test_a_slide_still_being_made_says_so(qtbot, tmp_path):
+    # An early iteration looks exactly like a bad generation, so the corner says
+    # which it is — the same corner an enhancement in flight speaks from.
+    view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")])
+    view.note_generating("id-run", _png_bytes())
+
+    _press(view, Qt.Key.Key_Right)
+
+    assert view._note.text() == "Generating…"
+    assert not view._note.isHidden()

@@ -136,6 +136,8 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
     # Icon-only buttons are only as good as the glyphs telling each other apart,
     # and two of these were near-identical before: undo against auto-generate
     # (both a circular arrow), and undo against the redo it now sits beside.
+    # Auto-generate wears a ring again, so this is the check that its bolt is
+    # doing the work of telling it from the two arcs three buttons away.
     size = QSize(24, 24)
     drawn = {
         name: make().pixmap(size).toImage()
@@ -249,7 +251,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.forward_icon(), "chevron_right", TEXT_PRIMARY),
         (icons.undo_icon(), "undo_arrow", TEXT_PRIMARY),
         (icons.redo_icon(), "redo_arrow", TEXT_PRIMARY),
-        (icons.autoloop_icon(), "die", TEXT_PRIMARY),
+        (icons.autoloop_icon(), "bolt_ring", TEXT_PRIMARY),
         (icons.slideshow_icon(), "slideshow", TEXT_PRIMARY),
         (icons.enhance_icon(), "plus", AMBER),
         (icons.mic_icon(), "mic", TEXT_PRIMARY),

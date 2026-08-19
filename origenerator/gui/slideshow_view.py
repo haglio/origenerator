@@ -14,6 +14,11 @@ a show on a locked slide leaves for that slide's folder too: holding one is the
 user saying this is the one, so the gallery lands there rather than back where
 it was when the show started.
 
+Closing one doesn't lose your place in it. :meth:`SlideshowView.state` is where
+a show was — the pass, the slide, the hold on it — and :meth:`SlideshowView.resume`
+opens the next one there, so the look at the folder behind a picture that closing
+the show is usually for doesn't cost the picture.
+
 **Double-clicking a picture opens this same view at a pace of nought** — its
 folder in the browser's own order, starting on the picture that was clicked,
 holding it until an arrow moves it. There used to be a second full-screen
@@ -68,7 +73,7 @@ from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
-from origenerator.slideshow import SlideshowPlaylist, in_order
+from origenerator.slideshow import ShowState, SlideshowPlaylist, in_order
 
 _GENERATING = "Generating…"
 # What the corner says about an enhancement of the slide on screen. Which of the
@@ -292,6 +297,44 @@ class SlideshowView(QWidget):
         says."""
         counter = None if self._counter.isHidden() else self._counter.geometry()
         self._queue.reposition(avoid=counter)
+
+    # --- picking a closed show back up --------------------------------------
+
+    def state(self) -> ShowState:
+        """Where this show is, in the terms a later one can be opened at."""
+        return ShowState(
+            order=tuple(self._playlist.order_ids()),
+            current=self._current_prompt_id(),
+            locked=self._playlist.locked,
+            level_index=self._level_index,
+            enhance_on_hold=self._enhance_on_hold,
+        )
+
+    def resume(self, state: ShowState) -> bool:
+        """Open where a closed show left off rather than at the top of a fresh
+        shuffle. Returns whether the place carried.
+
+        Closing a show is usually a detour — the folder behind the picture, a fix
+        in a tab — so coming back is coming back to that picture: the slide it
+        ended on, still held if it was held, still showing the version it had been
+        stepped to. The switch (holding-to-enhance) carries whether or not the
+        place does; the place carries only while that slide is among these items,
+        since a show of another folder has nowhere to put it.
+
+        Called after :meth:`set_levels`, because which version a slide was showing
+        is only a version once the levels behind it are armed.
+        """
+        if self._on_enhance is not None:
+            self._enhance_on_hold = state.enhance_on_hold
+        if self._live or not self._playlist.resume(state.order, state.current):
+            return False
+        self._playlist.set_locked(state.locked)
+        self._show_current()
+        if state.level_index:
+            # A fresh slide sits at its top version, so the remembered index is
+            # exactly the number of steps down to the one that was on screen.
+            self._step_level(state.level_index)
+        return True
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None) -> None:
         """A generation that belongs to what this show is playing has landed: it
@@ -818,10 +861,13 @@ class SlideshowView(QWidget):
         landing = self._land_on
         if landing is None and self._playlist.locked:
             landing = self._current_prompt_id()
-        # Cleared before the signals go out, so a second close hands over nothing.
+        # Both cleared before a second close could read them, so the handover
+        # happens once. The lock outlives the first emit because the gallery
+        # reads this show's state there, and a slide closed under a hold is one
+        # a reopened show holds.
         self._land_on = None
-        self._playlist.unlock()
         self.closed.emit()
+        self._playlist.unlock()
         if landing is not None:
             self.open_requested.emit(landing)
         super().closeEvent(event)

@@ -47,7 +47,7 @@ from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.request_worker import RevisionWorker, ReviseTask
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, in_order
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import (
     AppCommand, app_command_bias, match_app_command,
 )
@@ -441,6 +441,9 @@ class GalleryView(QWidget):
         # double-clicking a picture (that folder in order, held at a pace of
         # nought). One slot, because it is one view.
         self._slideshow = None
+        # Where the last show was when it closed, so opening one comes back to
+        # the slide it left off on rather than the top of a fresh shuffle.
+        self._show_state = ShowState()
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -1368,13 +1371,15 @@ class GalleryView(QWidget):
                                     image_dwell_ms=0, shuffle=in_order,
                                     folder_items=self._folder_media())
 
-    def _open_slideshow(self, items, *, folder_items=None, **kwargs):
+    def _open_slideshow(self, items, *, folder_items=None, resume=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a show is made, however it was asked for, so the toolbar's
         and a double-click's differ only in the order and the pace they pass.
         ``folder_items`` is what to arm a show that opened over a running
-        generation with, since that one has no items of its own yet.
+        generation with, since that one has no items of its own yet, and
+        ``resume`` where a closed show left off, for one picking that back up
+        rather than naming its own opening slide.
         """
         self._slideshow = SlideshowView(
             items, on_delete=self._trash_generation,
@@ -1391,6 +1396,10 @@ class GalleryView(QWidget):
         # on screen, so a level can be compared against the one below it at full
         # size rather than in a thumbnail.
         self._slideshow.set_levels(self._folder_level_playlists())
+        if resume is not None:
+            # After the levels: the version a slide was left showing is only a
+            # version once they are armed.
+            self._slideshow.resume(resume)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
         self._slideshow.closed.connect(self._on_slideshow_closed)
         self._slideshow.media_changed.connect(self._reconcile_osr2)
@@ -3873,20 +3882,29 @@ class GalleryView(QWidget):
 
     def _start_slideshow(self):
         """Open what's on screen — a folder, or the Recents/Starred shelf — as a
-        fullscreen slideshow, shuffled and running at the app-wide pace."""
+        fullscreen slideshow, shuffled and running at the app-wide pace, and
+        standing where the last show was closed when that slide is in here."""
         items = self._slideshow_items(self._slideshow_rows())
         if not items:
             return
-        show = self._open_slideshow(items)
+        show = self._open_slideshow(items, resume=self._show_state)
         logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
                     self._slideshow_subject(), len(items),
                     show._playlist.order[:10])
 
     def _on_slideshow_closed(self):
-        """The show was dismissed (however): let it go, with the hold it put on
-        videos, and hand the OSR2 back to whatever the toggle was driving. The mic
-        is untouched — it answers to its own button, and "start slideshow" has to
-        still be heard now there is no show to hear it over."""
+        """The show was dismissed (however): note where it had got to, let it go
+        with the hold it put on videos, and hand the OSR2 back to whatever the
+        toggle was driving. The mic is untouched — it answers to its own button,
+        and "start slideshow" has to still be heard now there is no show to hear
+        it over.
+
+        Noted because closing a show is rarely being done with it: the next one
+        opens back on the slide this one ended on, so the look at the folder
+        behind a picture doesn't cost the place among them.
+        """
+        if self._slideshow is not None:
+            self._show_state = self._slideshow.state()
         self._slideshow = None
         self._reroll.hold_videos(False)
         self._reconcile_osr2()

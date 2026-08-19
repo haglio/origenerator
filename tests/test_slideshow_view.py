@@ -1170,3 +1170,125 @@ def test_a_finished_request_answers_in_the_corner(qtbot):
     view = _view(qtbot, _KEYED)
     view.note_request("🎤 dropped “a hat” — generating")
     assert "dropped" in view._note.text()
+
+
+# --- picking a closed show back up ------------------------------------------
+
+_THREE = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
+          ("c.png", "image", "id-c")]
+
+
+def test_the_state_names_the_pass_and_the_slide_it_is_on(qtbot):
+    view = _view(qtbot, _THREE)
+    _press(view, Qt.Key.Key_Right)
+
+    state = view.state()
+
+    assert state.order == ("id-a", "id-b", "id-c")
+    assert state.current == "id-b"
+    assert state.locked is False
+
+
+def test_a_reopened_show_stands_where_the_last_one_was_closed(qtbot):
+    # Closing a show is usually a detour — the folder behind the picture, a fix
+    # in a tab — so coming back is coming back to that picture.
+    closed = _view(qtbot, _THREE)
+    _press(closed, Qt.Key.Key_Right)
+    _press(closed, Qt.Key.Key_Right)
+
+    reopened = _view(qtbot, _THREE, shuffle=lambda order: order.reverse())
+    assert reopened.resume(closed.state()) is True
+
+    assert reopened._playlist.current()[2] == "id-c"
+    assert reopened._preview._media[0] == "c.png"
+    assert reopened._counter.text().startswith("3 / 3")
+
+
+def test_a_reopened_show_carries_on_in_the_order_it_was_playing(qtbot):
+    closed = _view(qtbot, _THREE, shuffle=lambda order: order.reverse())  # c, b, a
+    _press(closed, Qt.Key.Key_Right)   # -> b
+
+    reopened = _view(qtbot, _THREE)    # a fresh shuffle would lead with a
+    reopened.resume(closed.state())
+
+    _press(reopened, Qt.Key.Key_Right)
+    assert reopened._playlist.current()[2] == "id-a"   # the closed show's pass
+
+
+def test_a_slide_closed_under_a_hold_reopens_under_it(qtbot):
+    closed = _view(qtbot, _THREE)
+    _press(closed, Qt.Key.Key_Down)    # held: this is the one
+    state = closed.state()
+    closed.close()
+
+    reopened = _view(qtbot, _THREE)
+    reopened.resume(state)
+
+    assert reopened._playlist.locked
+    assert not reopened._timer.isActive()          # held, so nothing moves it on
+    assert "locked" in reopened._counter.text()
+
+
+def test_a_show_of_a_set_without_that_slide_starts_fresh(qtbot):
+    # Another folder, or one the slide has since been culled from: there is
+    # nowhere in here to put it, so the shuffle it opened with stands.
+    closed = _view(qtbot, _THREE)
+    _press(closed, Qt.Key.Key_Down)
+
+    elsewhere = _view(qtbot, [("x.png", "image", "id-x"), ("y.png", "image", "id-y")])
+    assert elsewhere.resume(closed.state()) is False
+
+    assert elsewhere._playlist.current()[2] == "id-x"
+    assert not elsewhere._playlist.locked
+
+
+def test_a_reopened_show_shows_the_version_that_was_on_screen(qtbot, tmp_path):
+    enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
+    levels = {enhanced: [(enhanced, "image"), (original, "image")]}
+    closed = _view(qtbot, [(enhanced, "image", "id-a")])
+    closed.set_levels(levels)
+    _shift(closed, Qt.Key.Key_Right)   # stepped down to the original
+
+    reopened = _view(qtbot, [(enhanced, "image", "id-a")])
+    reopened.set_levels(levels)        # armed before the resume, as the gallery does
+    reopened.resume(closed.state())
+
+    assert reopened._preview._media[0] == original
+
+
+def test_a_reopened_show_keeps_the_enhance_on_hold_switch(qtbot):
+    # Turned off because it was in the way; a show that came back with it on
+    # would fire a run on the next hold.
+    closed = _view(qtbot, _THREE, on_enhance=lambda pid: True)
+    _press(closed, Qt.Key.Key_E)
+
+    asked = []
+    reopened = _view(qtbot, _THREE, on_enhance=lambda pid: asked.append(pid) or True)
+    reopened.resume(closed.state())
+    _press(reopened, Qt.Key.Key_Down)
+
+    assert asked == []
+
+
+def test_a_show_following_a_running_generation_resumes_nothing(qtbot):
+    # It has no items of its own yet, so there is no slide in it to stand on.
+    closed = _view(qtbot, _THREE)
+    live = _view(qtbot, [], frame=_png_bytes())
+
+    assert live.resume(closed.state()) is False
+    assert live.is_live()
+
+
+def test_the_state_read_as_a_show_closes_still_shows_its_hold(qtbot):
+    # The gallery reads it from the ``closed`` signal, and the lock is dropped
+    # immediately after — a slide closed under a hold has to still be held there,
+    # or a reopened show would come back to it released.
+    view = _view(qtbot, _THREE)
+    _press(view, Qt.Key.Key_Down)
+    seen = []
+    view.closed.connect(lambda: seen.append(view.state()))
+
+    view.close()
+
+    assert seen[0].current == "id-a"
+    assert seen[0].locked

@@ -5473,6 +5473,56 @@ def test_a_show_ended_on_an_unheld_slide_leaves_the_gallery_alone(qtbot, monkeyp
     assert view._tree.currentItem() is view._recents_item
 
 
+def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
+    # Closing a show is usually a detour, not being done with it — so the next
+    # one stands where the last was left rather than at the top of a fresh
+    # shuffle, and the item you were looking at doesn't have to be found again.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _image("i2", "a dog", 50, 2),
+                               _image("i3", "a fox", 50, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    first = view._slideshow
+    qtbot.addWidget(first)
+    first.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Right, _NO_MOD))
+    stopped_on = first._playlist.current()[2]
+    order = first._playlist.order_ids()
+    first.close()
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert view._slideshow._playlist.current()[2] == stopped_on
+    assert view._slideshow._playlist.order_ids() == order   # the same pass, too
+    view._slideshow.close()
+
+
+def test_a_show_reopened_on_a_held_slide_comes_back_holding_it(qtbot, monkeypatch):
+    # A hold is the user saying this is the one: it lands the gallery in that
+    # slide's folder, and the show reopened there is still stopped on it.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    first = view._slideshow
+    qtbot.addWidget(first)
+    first.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    held = first._playlist.current()[2]
+    first.close()
+
+    view._start_slideshow()
+
+    qtbot.addWidget(view._slideshow)
+    assert view._slideshow._playlist.current()[2] == held
+    assert view._slideshow._playlist.locked
+    view._slideshow.close()
+
+
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     # The neighbor stills either side of the shown item are drawn from these —
     # a video has no other still to show small.

@@ -18,14 +18,38 @@ at a pace of nought, rather than a second full-screen viewer with its own keys.
 A third hold — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
 the user's or the pace's: speaking a request stops the advance for as long as
 the sentence takes, and releases it without disturbing either of the others.
+
+Closing a show is rarely being done with it, so where one was is kept:
+:class:`ShowState` says it and :meth:`SlideshowPlaylist.resume` lays a fresh
+pass back out that way. It is said in generation ids rather than in places,
+because the set the next show plays is not the one this one held — items landed
+while it was away, and anything it culled is gone.
 """
 
 import random
+from dataclasses import dataclass
 
 # How long an image holds the screen unless something says otherwise.
 # Genau's console shows this as its clip-seconds pace and sets it from
 # there, so the number it opens at has to be the one the slideshow uses.
 DEFAULT_IMAGE_DWELL_MS = 4000
+
+
+@dataclass(frozen=True)
+class ShowState:
+    """Where a show was when it closed, for whichever one opens next.
+
+    ``order`` is the pass it was playing and ``current`` the slide it stood on,
+    both as generation ids. The rest is what that slide was doing — held against
+    the advance, showing which of its versions — and ``enhance_on_hold`` the
+    switch the show was set to.
+    """
+
+    order: tuple = ()
+    current: str | None = None
+    locked: bool = False
+    level_index: int = 0
+    enhance_on_hold: bool = True
 
 
 def in_order(order: list) -> None:
@@ -96,6 +120,41 @@ class SlideshowPlaylist:
         the set was handed over in — so a playlist built from these, in order,
         takes up where this one stopped."""
         return [self._items[index] for index in self._order]
+
+    def order_ids(self) -> list:
+        """The pass in ids rather than in places — how a closing show hands its
+        order to the next one, over a set that will have moved on."""
+        return [self._id_of(index) for index in self._order]
+
+    def resume(self, order_ids, current_id) -> bool:
+        """Lay the pass back out the way a closed show left it, standing on the
+        slide it was showing. Returns whether that slide is still here to stand on.
+
+        It may not be — culled while the show was away, or this is another
+        folder's set entirely — and then nothing is disturbed: a pass laid out
+        around an item that isn't in it would open the show on an arbitrary
+        stranger, which is worse than the shuffle it already has.
+
+        Items the remembered order doesn't name follow the ones it does, keeping
+        the order the shuffle gave them. They were no part of the pass being
+        picked back up, and the next pass reshuffles the lot anyway.
+        """
+        places = {pid: index for index, pid in
+                  ((i, self._id_of(i)) for i in range(len(self._items)))
+                  if pid is not None}
+        if current_id not in places:
+            return False
+        remembered = [places[pid] for pid in order_ids if pid in places]
+        held = set(remembered)
+        self._order = remembered + [i for i in self._order if i not in held]
+        self._pos = self._order.index(places[current_id])
+        return True
+
+    def _id_of(self, index: int):
+        """The id the item at ``index`` was generated under, or ``None`` — a set
+        assembled without ids (a test's) names nothing."""
+        item = self._items[index]
+        return item[2] if len(item) > 2 else None
 
     def peek(self, offset: int):
         """The item ``offset`` steps away in the running pass, wrapping — what the
@@ -190,6 +249,11 @@ class SlideshowPlaylist:
     def toggle_lock(self) -> bool:
         self._locked = not self._locked
         return self._locked
+
+    def set_locked(self, locked: bool) -> None:
+        """Put the lock back where a closed show left it — a slide it was closed
+        holding is one it reopens holding."""
+        self._locked = bool(locked)
 
     def unlock(self) -> None:
         self._locked = False

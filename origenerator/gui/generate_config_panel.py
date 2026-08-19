@@ -68,10 +68,6 @@ _PANE_MARGIN = 8
 # slot it has to fit (see tests/test_main_window.py). Past this the settings scroll
 # sideways after all, which is the smaller of the two losses.
 _FLOOR_CAP = 330
-# ...and how narrow it is allowed to get when its contents would fit in less: a
-# tab that can be dragged down to its picker and a button is a cramped strip, not
-# a pane, whatever fits in it.
-_COMFORTABLE_FLOOR = 280
 
 # What the preview says once the form has been edited away from the generation
 # on it: that picture was generated, these settings have not been.
@@ -340,10 +336,15 @@ class GenerateConfigPanel(QWidget):
         this hint rather than joining it, so one would pin the floor at its own
         number and put the scroll bar back. Capped at ``_FLOOR_CAP``, which is
         where holding the floor would cost the window its tiling slot.
+
+        It *replaces* the width the layout would otherwise ask for rather than
+        joining it, and there is no comfortable-looking minimum under it: the
+        settings are the only thing here with a claim on how narrow the pane may
+        be, and any other floor — the preview's, a round number that looks about
+        right — stops the drag while there is still room to give.
         """
-        floor = max(_COMFORTABLE_FLOOR, min(self._contents_floor(), _FLOOR_CAP))
         hint = super().minimumSizeHint()
-        hint.setWidth(max(hint.width(), floor))
+        hint.setWidth(min(self._contents_floor(), _FLOOR_CAP))
         return hint
 
     def _contents_floor(self) -> int:

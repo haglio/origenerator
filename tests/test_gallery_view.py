@@ -3372,15 +3372,18 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert not view._panes.widget(1).isAncestorOf(view._queue)
 
 
-def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
+def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # The floor is the config tab's own now (GenerateConfigPanel.minimumSizeHint),
-    # since only the tab knows what its settings need — the pane carries no
-    # explicit minimum, which would replace that number rather than join it. It
-    # still must never collapse to a cramped strip, and stays low enough that the
-    # whole window can tile into a narrow monitor slot.
-    assert view._panes.widget(1).minimumSizeHint().width() >= 280
+    # Only the tab knows how narrow it can go — what its settings fit in — so the
+    # floor is its (GenerateConfigPanel.minimumSizeHint) and the pane carries none
+    # of its own. An explicit minimum here would *replace* that number rather than
+    # join it: too high and the drag stops while there is still room to give, too
+    # low and the settings scroll sideways.
+    panel = view._info_tabs.current_config_panel()
+    assert view._panes.widget(1).minimumWidth() == 0
+    assert view._panes.widget(1).minimumSizeHint().width() >= panel.minimumSizeHint().width()
+    assert panel.minimumSizeHint().width() == panel._contents_floor()
 
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):

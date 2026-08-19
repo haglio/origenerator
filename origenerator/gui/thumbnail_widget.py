@@ -35,19 +35,12 @@ _SELECTED_BG = "#3a3a3a"
 _SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
 _BORDER_UNSELECTED = "2px solid #3f3f3f"
 _BORDER_SELECTED = "2px solid #8a8a8a"
-# Hover highlight: a blue accent marking every thumbnail that shares the hovered
-# one's settings — a preview of the folder a click would carry into a new tab.
-_HIGHLIGHT_BG = "#24405e"
-_HIGHLIGHT_TILE_CSS = f"#thumbnailTile {{ background-color: {_HIGHLIGHT_BG}; border-radius: 4px; }}"
-_BORDER_HIGHLIGHT = "2px solid #3080e0"
 
 
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
-    hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
-    unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
     drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
@@ -60,7 +53,6 @@ class ThumbnailWidget(QWidget):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
-        self._highlighted = False
         self._starred = starred
         self._enhancing = enhancing
         # The tile's own picture, held aside while a running enhancement streams
@@ -212,22 +204,8 @@ class ThumbnailWidget(QWidget):
         self._enhancing_overlay.setGeometry(self._image_label.geometry())
         self._enhancing_overlay.raise_()
 
-    def is_highlighted(self) -> bool:
-        return self._highlighted
-
-    def set_highlighted(self, highlighted: bool):
-        """Mark the tile as part of the hovered settings group (blue accent)."""
-        if highlighted == self._highlighted:
-            return
-        self._highlighted = highlighted
-        self._apply_styles()
-
     def _apply_styles(self):
-        # Hover-highlight takes visual priority over a resting selection.
-        if self._highlighted:
-            self.setStyleSheet(_HIGHLIGHT_TILE_CSS)
-            border = _BORDER_HIGHLIGHT
-        elif self._selected:
+        if self._selected:
             self.setStyleSheet(_SELECTED_TILE_CSS)
             border = _BORDER_SELECTED
         else:
@@ -280,12 +258,10 @@ class ThumbnailWidget(QWidget):
         return super().eventFilter(obj, event)
 
     def enterEvent(self, event):
-        self.hovered.emit(self.prompt_id)
         self._set_corner_actions_visible(True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self.unhovered.emit(self.prompt_id)
         if not self._cursor_over_tile():  # moving onto a button isn't leaving the tile
             self._set_corner_actions_visible(False)
         super().leaveEvent(event)

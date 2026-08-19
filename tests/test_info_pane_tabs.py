@@ -60,20 +60,6 @@ def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
     return db.get_generation(prompt_id)
 
 
-def _strip_ids(tabs):
-    strip = tabs.currentWidget()._strip
-    return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
-
-
-def _has_ancestor(widget, ancestor) -> bool:
-    node = widget.parent()
-    while node is not None:
-        if node is ancestor:
-            return True
-        node = node.parent()
-    return False
-
-
 # --- every tab is a plain editable config tab -------------------------------
 
 def test_starts_with_one_editable_config_tab(tabs):
@@ -127,11 +113,6 @@ def test_the_first_tab_is_renamable(tabs, monkeypatch):
 def test_config_panels_includes_the_first_tab(tabs):
     tabs._add_subtab()
     assert len(tabs._config_panels()) == 2
-
-
-def test_thumbnail_strip_sits_within_the_tabbed_content(tabs):
-    panel = tabs._add_subtab()
-    assert _has_ancestor(panel._strip, tabs)
 
 
 def test_add_subtab_increases_count_and_focuses_new(tabs):
@@ -256,89 +237,10 @@ def test_open_config_adds_and_prefills_tab(tabs):
     assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
 
 
-def test_open_config_seeds_the_new_tab_strip(tabs):
-    _insert_gen(tabs._db, "x1", _sdxl_full(positive_prompt="cat"))
-    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))
-    assert _strip_ids(tabs) == ["x1"]
-
-
 def test_tab_text_follows_gallery_folder_name(tabs):
     tabs.open_config("sdxl_t2i", {"positive_prompt": "a dragon"})
     idx = tabs.currentIndex()
     assert tabs.tabText(idx) == "SDXL Text-to-Image › a dragon"
-
-
-def test_strip_click_opens_new_tab_when_settings_differ(tabs):
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="cat", seed=5))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # the current tab is a different folder
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == 2  # the current tab + a new one for g1
-    panel = tabs.currentWidget()
-    assert panel._workflow_combo.currentData() == "sdxl_t2i"
-    assert panel._param_form.get_values_static()["seed"] == 5
-
-
-def test_strip_click_does_nothing_when_settings_match(tabs):
-    params = _sdxl_full(positive_prompt="cat", seed=5)
-    _insert_gen(tabs._db, "g1", params)
-    tabs.currentWidget().prefill("sdxl_t2i", params)  # active tab now has g1's settings
-    count = tabs.count()
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == count
-
-
-def test_strip_click_matching_settings_ignores_random_seed(tabs):
-    # The reported bug: a tab generated g1 and still has its seed on Random.
-    panel = _pick_workflow(tabs.currentWidget())
-    panel._param_form.set_values({"positive_prompt": "cat"})  # leaves Random checked
-    assert panel._param_form.seed_is_random() is True
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="cat", seed=777))
-    count = tabs.count()
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == count  # same settings folder -> no duplicate
-
-
-def test_opening_tab_from_a_thumbnail_populates_strip_with_its_folder(tabs):
-    _insert_gen(tabs._db, "cat1", _sdxl_full(positive_prompt="cat", seed=1))
-    _insert_gen(tabs._db, "cat2", _sdxl_full(positive_prompt="cat", seed=2))
-    _insert_gen(tabs._db, "dog1", _sdxl_full(positive_prompt="dog", seed=1))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # a different folder so the click opens a new tab
-    tabs._on_strip_activated("cat1")
-    assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
-    assert _strip_ids(tabs) == ["cat2", "cat1"]  # the whole cat folder, newest first
-
-
-# --- bringing a generation's own tab forward -------------------------------
-
-def test_reveal_config_opens_a_tab_for_a_generation_with_none(tabs):
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # the open tab is a different folder
-
-    tabs.reveal_config("g1")
-
-    assert tabs.count() == 2
-    assert tabs.currentWidget()._param_form.get_values_static()["positive_prompt"] == "a heron"
-
-
-def test_reveal_config_brings_forward_a_tab_that_already_has_it(tabs):
-    # A queued job's row is clicked while its own tab sits behind another: that
-    # tab comes forward rather than a duplicate of it opening.
-    params = _sdxl_full(positive_prompt="a heron", seed=4)
-    _insert_gen(tabs._db, "g1", params)
-    tabs.currentWidget().prefill("sdxl_t2i", params)
-    its_tab = tabs.currentWidget()
-    tabs._add_subtab()  # some other tab is in front now
-
-    tabs.reveal_config("g1")
-
-    assert tabs.count() == 2  # no third tab
-    assert tabs.currentWidget() is its_tab
-
-
-def test_reveal_config_ignores_a_generation_that_is_gone(tabs):
-    count = tabs.count()
-    tabs.reveal_config("never-existed")
-    assert tabs.count() == count
 
 
 # --- load_selection: single-click a browser thumbnail ----------------------

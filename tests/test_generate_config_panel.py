@@ -48,29 +48,21 @@ def _is_descendant(widget, ancestor) -> bool:
     return False
 
 
-# --- layout: preview-over-form beside a slim history strip -----------------
+# --- layout: one preview-over-form column ----------------------------------
 
-def test_panel_lays_out_two_resizable_panes(panel):
+def test_the_panel_is_one_column_with_no_side_pane(panel):
+    # The tab is a single column now — no splitter, no second pane beside it.
     from PyQt6.QtWidgets import QSplitter
-    assert isinstance(panel._panes, QSplitter)
-    assert panel._panes.count() == 2
+    assert panel.findChildren(QSplitter) == []
 
 
-def test_thumbnail_history_is_the_right_pane(panel):
-    from origenerator.gui.thumbnail_strip import ThumbnailStrip
-    right = panel._panes.widget(1)
-    assert right is panel._strip
-    assert isinstance(right, ThumbnailStrip)
-
-
-def test_preview_over_form_share_the_main_pane(panel):
-    # Preview-over-form: the preview sits on top of the settings in the left "main"
-    # pane, with the status bar and the Generate button under it — beside the slim
-    # history strip. The preview is no longer its own splitter pane.
-    main = panel._panes.widget(0)
-    assert _is_descendant(panel._preview, main)
-    assert _is_descendant(panel._generate_btn, main)
-    assert panel._preview is not main  # nested inside the pane, not the pane itself
+def test_preview_leads_the_column_over_the_form_and_generate(panel):
+    # Preview-over-form: the preview sits on top of the settings, with the
+    # Generate button under them, all in the panel's own column.
+    column = panel.layout()
+    assert column.indexOf(panel._preview) == 0
+    assert column.indexOf(panel._preview) < column.indexOf(panel._scroll)
+    assert _is_descendant(panel._generate_btn, panel)
 
 
 def _layout_containing(root, widget):
@@ -107,8 +99,7 @@ def test_file_info_above_form_related_media_below(panel):
 def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
     # same row as Cancel and Generate.
-    main = panel._panes.widget(0)
-    bank = _layout_containing(main.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn)
     assert bank is not None
     assert bank.indexOf(panel._folder_btn) != -1
     assert bank.indexOf(panel._evolver_btn) != -1
@@ -213,7 +204,7 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     # gallery marks the tab generating.
     from PyQt6.QtWidgets import QPushButton
     assert isinstance(panel._cancel_btn, QPushButton)
-    assert _is_descendant(panel._cancel_btn, panel._panes.widget(0))  # the main pane
+    assert _is_descendant(panel._cancel_btn, panel)  # in the tab's own column
     assert panel._cancel_btn.parent() is panel._generate_btn.parent()  # same button row host
     assert panel._cancel_btn.isHidden()
 
@@ -1253,8 +1244,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
 
 
 def test_send_to_genau_shares_the_one_button_bank(panel):
-    main = panel._panes.widget(0)
-    bank = _layout_containing(main.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn)
     assert bank.indexOf(panel._genau_btn) != -1
 
 

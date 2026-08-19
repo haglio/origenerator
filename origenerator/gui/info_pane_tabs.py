@@ -25,8 +25,7 @@ after a restart, so the tabs carry no job state.
 Clicking a browser thumbnail loads that generation into a tab (see
 :meth:`load_selection`), where its output shows in the preview, its settings seed
 the editable form, and a footer offers the source-image link / animations /
-Send-to-Evolver for its media type. Clicking a config tab's history-strip
-thumbnail opens (or reuses) a tab for that generation.
+Send-to-Evolver for its media type.
 
 Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
 test) :meth:`open_config` is a no-op — but a tab still shows, its form up for
@@ -41,9 +40,9 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    build_image_config_index, media_type_of_row, rows_in_settings, settings_signature,
+    build_image_config_index, media_type_of_row, settings_signature,
 )
-from origenerator.generation_config import ConfigSnapshot, merge_denormalized
+from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -104,8 +103,8 @@ class InfoPaneTabs(QTabWidget):
         own.
 
         Works even without a client: the tab shows for inspection, its Generate
-        disabled. The tab's strip / source-link / animation signals are wired so a
-        click in any of them reaches the gallery.
+        disabled. The tab's source-link / animation signals are wired so a click
+        in either of them reaches the gallery.
         """
         panel = GenerateConfigPanel(self._client, self._db)
         index = self.addTab(panel, panel.title())
@@ -113,7 +112,6 @@ class InfoPaneTabs(QTabWidget):
         panel.generate_requested.connect(  # relay every tab's Generate
             lambda name, params, p=panel: self._on_panel_generate(p, name, params)
         )
-        panel.strip_activated.connect(self._on_strip_activated)
         self.setCurrentIndex(index)
         if preview:
             self._set_preview_panel(panel)
@@ -276,14 +274,6 @@ class InfoPaneTabs(QTabWidget):
         super().tabRemoved(index)
         self._sync_preview_tab()  # ...and back left
 
-    def _ids_for_settings(self, key) -> list[str]:
-        """Every generation in a settings folder (workflow + signature), newest first."""
-        rows = self._db.list_generations()  # newest first
-        index = build_image_config_index(
-            [r for r in rows if media_type_of_row(r) == "image"]
-        )
-        return [row["prompt_id"] for row in rows_in_settings(rows, key, index)]
-
     def _row_settings_key(self, row: dict):
         """The settings folder (workflow + signature) a stored row lands in."""
         workflow_name = row.get("workflow_name", "")
@@ -292,35 +282,6 @@ class InfoPaneTabs(QTabWidget):
         )
         return workflow_name, settings_signature(workflow_name, row.get("params_json"), index,
                                                  workflow_version=row.get("workflow_version"))
-
-    def _on_strip_activated(self, prompt_id: str):
-        self.reveal_config(prompt_id)
-
-    def reveal_config(self, prompt_id: str):
-        """Bring a generation's settings forward as an editable tab.
-
-        A tab already on that settings folder is selected rather than duplicated —
-        the pane spreads across tabs by folder, so a second one for the same
-        settings would be the same tab twice. Otherwise a fresh tab is opened,
-        prefilled from the generation.
-
-        This is where a click lands on a config tab's history strip and on a row
-        of the generation queue: both name a generation and mean "show me its
-        settings". A no-op for a generation the database no longer has.
-        """
-        row = self._db.get_generation(prompt_id)
-        if not row:
-            return
-        row_key = self._row_settings_key(row)
-        existing = next(
-            (p for p in self._config_panels() if p.settings_key() == row_key), None
-        )
-        if existing is not None:
-            self.setCurrentWidget(existing)
-            return
-        params = merge_denormalized(row)
-        if params:
-            self.open_config(row.get("workflow_name", ""), params)
 
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel | None:
         """Open (and select) an editable config tab prefilled from a generation.
@@ -331,8 +292,6 @@ class InfoPaneTabs(QTabWidget):
             return None
         panel = self._add_subtab()
         panel.prefill(workflow_name, params)
-        # Seed the new tab's strip with its settings folder; it accumulates from there.
-        panel.seed_strip(self._ids_for_settings(panel.settings_key()))
         return panel
 
     # --- loading the browser selection into a tab --------------------------
@@ -481,7 +440,6 @@ class InfoPaneTabs(QTabWidget):
         for snapshot, title, launched in restored:
             panel = self._add_subtab()
             panel.restore_config(snapshot)
-            panel.seed_strip(self._ids_for_settings(panel.settings_key()))
             if title:
                 panel.set_custom_title(title)
             # Runs this tab started and the app was closed on: the gallery

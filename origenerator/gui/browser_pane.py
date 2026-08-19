@@ -36,10 +36,7 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
-    RECENTS_KEY, RECENTS_LABEL, REQUESTS_KEY, REQUESTS_LABEL,
-    STARRED_KEY, STARRED_LABEL,
-    TRASH_KEY, TRASH_LABEL,
+    EXPERIMENTS_LABEL, RECENTS_LABEL, REQUESTS_LABEL, STARRED_LABEL, TRASH_LABEL,
 )
 from origenerator.recovery import RETENTION_DAYS
 
@@ -429,7 +426,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_recents()
         self._v._sync_action_buttons()
-        self._v._record_location(RECENTS_KEY)  # so Back can return to the shelf
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
@@ -694,7 +691,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_experiments()
         self._v._sync_action_buttons()
-        self._v._record_location(EXPERIMENTS_KEY)  # so Back can return to the shelf
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_experiments(self):
         container, flow = self._new_tile_pane()
@@ -747,7 +744,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_requests()
         self._v._sync_delete_button()
-        self._v._record_location(REQUESTS_KEY)  # so Back can return to the shelf
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_requests(self):
         container, flow = self._new_tile_pane()
@@ -791,7 +788,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_trash()
         self._v._sync_action_buttons()
-        self._v._record_location(TRASH_KEY)  # so Back can return to the shelf
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_trash(self):
         container, flow = self._new_tile_pane()
@@ -906,7 +903,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._show_starred(self._starred_groups, self._starred_rows)
         self._v._sync_action_buttons()
-        self._v._record_location(STARRED_KEY)  # so Back can return to the shelf
+        self._v._record_location()  # so Back can return to the shelf
 
     def _show_starred(self, groups, rows):
         container, flow = self._new_tile_pane()

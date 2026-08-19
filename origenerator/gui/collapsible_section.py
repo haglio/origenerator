@@ -6,10 +6,10 @@ below, a ``QFormLayout`` callers fill with ``label: field`` rows. Used by
 into the sections defined in :mod:`origenerator.gui.param_sections`.
 """
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QPushButton,
-)
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout
 from PyQt6.QtCore import Qt, pyqtSignal
+
+from origenerator.gui.eliding_button import ElidingButton
 
 # Prefixed to the header title so the fold state reads at a glance: a down
 # triangle when open, a right-pointing one when shut.
@@ -36,7 +36,9 @@ class CollapsibleSection(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(2)
 
-        self._header = QPushButton()
+        # Elides its title rather than propping the whole form open at the
+        # title's own width; it also handles the "&" in "Model & LoRA".
+        self._header = ElidingButton()
         self._header.setObjectName("sectionHeader")
         self._header.setFlat(True)
         self._header.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -55,6 +57,11 @@ class CollapsibleSection(QWidget):
         self._form.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
+        # Squeezed past what a label and its field can share, put the field on its
+        # own line under the label rather than making the pane scroll sideways.
+        # At any comfortable width this changes nothing: rows only wrap once the
+        # pair no longer fits.
+        self._form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         outer.addWidget(self._content)
 
         self._apply_state()
@@ -77,10 +84,7 @@ class CollapsibleSection(QWidget):
     def _apply_state(self):
         self._content.setVisible(not self._collapsed)
         arrow = _ARROW_SHUT if self._collapsed else _ARROW_OPEN
-        # Double any "&" so QPushButton renders it literally ("Model & LoRA")
-        # instead of swallowing it as a keyboard-accelerator marker.
-        title = self._title.replace("&", "&&")
-        self._header.setText(f"{arrow}  {title}")
+        self._header.setText(f"{arrow}  {self._title}")
 
     # --- content -------------------------------------------------------------
 

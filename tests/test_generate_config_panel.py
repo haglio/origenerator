@@ -68,6 +68,27 @@ def test_preview_leads_the_column_over_the_form_and_generate(panel):
     assert _is_descendant(panel._generate_btn, panel)
 
 
+def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
+    """The settings scroll never grows a horizontal bar: squeezed, the form gives
+    up width — the pickers elide, the labels wrap, a row drops its field onto its
+    own line — rather than push the whole column out of view sideways.
+
+    The failure this exists for: a model picker asked for its longest file name,
+    a section header for its whole title and the workflow picker for its
+    placeholder, so the pane could not be narrowed without a sideways scroll.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)   # every field on show: the widest the form gets
+    panel.show()
+
+    for width in (600, 420, 300):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        assert not panel._scroll.horizontalScrollBar().isVisible(), f"at {width}px"
+
+
 def _layout_containing(root, widget):
     """DFS a layout tree for the layout directly holding ``widget``."""
     for i in range(root.count()):

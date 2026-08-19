@@ -196,18 +196,26 @@ class ParamForm(QWidget):
 
         The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
         as well as its input: the label is what you are looking at when you
-        wonder what a setting is, and hovering the word is the natural move."""
+        wonder what a setting is, and hovering the word is the natural move.
+
+        The label wraps. A phrase like "CFG (High) (0 = CFG Scale)" asks for three
+        hundred pixels on one line, and a non-wrapping label hands that on as a
+        floor under the whole form — which is how a narrow pane ended up scrolling
+        sideways instead of squeezing its fields."""
         title = param_sections.section_title(key)
         keys = self._present_keys[title]
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
         form.insertRow(index, label, field)
         keys.insert(index, key)
+        label_widget = form.itemAt(index, form.ItemRole.LabelRole)
+        label_widget = label_widget.widget() if label_widget is not None else None
+        if label_widget is not None:
+            label_widget.setWordWrap(True)
         help_text = param_help(key)
         if help_text:
-            label_widget = form.itemAt(index, form.ItemRole.LabelRole)
-            if label_widget is not None and label_widget.widget() is not None:
-                label_widget.widget().setToolTip(help_text)
+            if label_widget is not None:
+                label_widget.setToolTip(help_text)
             widget = self._widgets.get(key)
             if widget is not None:
                 widget.setToolTip(help_text)

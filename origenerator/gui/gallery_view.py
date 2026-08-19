@@ -3978,10 +3978,16 @@ class GalleryView(QWidget):
         if show is not None and show.is_live():
             show.close()
 
-    def _on_reroll_finished(self, key: str, prompt_id: str):
+    def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         """A re-roll saved its result (finalized by the controller): drop it as the
         info-pane source, rebuild so it shows as a normal thumbnail, and load it into
-        the front tab so a Generate ends on its finished output, not the placeholder."""
+        the tab that launched it so a Generate ends on its finished output, not the
+        placeholder."""
+        # Which tab that is, read now: the rebuild below reconciles the finish, and
+        # a tab lets go of its runs as they end. A launch no tab made — the folder
+        # tile's "+", the auto-generate loop — has no owner unless a tab on that
+        # very folder claimed it, and then no tab is touched at all.
+        launcher = self._info_tabs.panel_that_launched(origin or prompt_id)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is not None and finished_row.get("source") == "experiment":
             # A background experiment landed: it waits on the Experiments shelf
@@ -4001,11 +4007,14 @@ class GalleryView(QWidget):
                 # A slideshow that asked for this one swaps the slide for it.
                 self._feed_slideshow_enhanced(finished_row)
         self._send_to_genau_if_requested(finished_row)
-        if key == self._selected_reroll_key:
+        was_mirrored = key == self._selected_reroll_key  # the pane held its live frames
+        if was_mirrored:
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_slideshow_finished(finished_row)  # a show of its folder gains it
-        self._show_reroll_result_in_tab(finished_row)
+        self._show_reroll_result_in_tab(finished_row, launcher)
+        if was_mirrored:
+            self._show_mirrored_result(finished_row, launcher)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
@@ -4027,8 +4036,9 @@ class GalleryView(QWidget):
         self._sync_enhance_button()  # a landed enhance may retire the button
         self._reconcile_pending_enhancements()  # the live tile gives way to the level
 
-    def _show_reroll_result_in_tab(self, finished_row: dict | None):
-        """After a re-roll finishes, load its result into the front config tab.
+    def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
+        """After a re-roll finishes, load its result into the tab that launched it
+        — and into no other, ``launcher`` being ``None`` when no tab did.
 
         The finished row is handed over directly rather than resolved through the
         folder the job was keyed under: a re-roll of an old-generation folder
@@ -4037,8 +4047,27 @@ class GalleryView(QWidget):
         newest row is not this result. Loading it leaves the tab showing the
         finished image/video and its footer — the completed end-state of a
         Generate — instead of the live-frame placeholder it held while running."""
-        if finished_row is not None and gallery.produced_output(finished_row):
-            self._info_tabs.show_result_in_current_tab(finished_row, self._image_rows)
+        if launcher is not None and finished_row is not None \
+                and gallery.produced_output(finished_row):
+            launcher.show_completed_result(finished_row, self._image_rows)
+
+    def _show_mirrored_result(self, finished_row: dict | None, launcher):
+        """The run the info pane was mirroring has landed: put its picture where its
+        live frames were, in the tab in front.
+
+        The frames were streaming there whoever launched the run (see
+        :meth:`InfoPaneTabs.show_reroll_frame`), so without this a pane watching a
+        loop — or a fullscreen show opened over those frames — would sit on the
+        last partial frame of a run that has finished. Only the preview changes:
+        the tab holds no more of a run it didn't ask for. Skipped when the tab in
+        front is the one that launched it, which has just been given the whole
+        end-state instead.
+        """
+        if finished_row is None or not gallery.produced_output(finished_row):
+            return
+        if launcher is not None and launcher is self._info_tabs.current_config_panel():
+            return
+        self._info_tabs.show_reroll_result(finished_row)
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if

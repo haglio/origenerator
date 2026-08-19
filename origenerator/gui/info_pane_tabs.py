@@ -396,18 +396,29 @@ class InfoPaneTabs(QTabWidget):
         target.show_saved_generation(row, image_rows, request)
         self.setCurrentWidget(target)
 
-    def show_result_in_current_tab(self, row: dict, image_rows: list[dict]):
-        """Load a just-finished generation into the front tab, replacing its live
-        preview with the saved output and footer.
+    def panel_that_launched(self, origin: str | None):
+        """The tab that launched the run beginning at ``origin``, or ``None``.
 
-        The tab in front is the one whose Generate launched this re-roll, so its
-        result lands right there — it ends showing the finished image/video, not the
-        idle placeholder. The form is left as the user left it (they may have kept
-        typing the next prompt while it ran), so only the preview and footer update.
-        A no-op if every tab has been closed."""
-        panel = self.current_config_panel()
-        if panel is not None:
-            panel.show_completed_result(row, image_rows)
+        A run's result belongs to the tab that asked for it: that tab ends showing
+        the finished image/video rather than the live-frame placeholder. Every
+        other tab is left alone — including the pane's resting tab, which the
+        gallery's own launches (the folder tile's "+", the auto-generate loop)
+        used to fill with a picture nothing in it had asked for. That left the
+        resting tab no longer blank, so the next clicked generation opened a tab
+        beside it instead of loading into it, and a loop running while the user
+        browsed grew a row of them.
+
+        A tab claims a gallery-side launch only while it is showing that very
+        folder (see ``GalleryView._claim_launch``), so what a loop lands in is a
+        tab already following it, never one parked elsewhere.
+
+        Read *before* the finish is reconciled — a tab lets go of its runs as they
+        end (see ``GalleryView._reconcile_generating``).
+        """
+        if not origin:
+            return None
+        return next((panel for panel in self._config_panels()
+                     if origin in panel.launched_runs()), None)
 
     def show_selection_preview(self, preview, prompt_id: str):
         """Point the current tab's preview at ``preview`` (a resolved
@@ -454,6 +465,18 @@ class InfoPaneTabs(QTabWidget):
             panel._preview.show_frame(frame)
         else:
             panel._preview.show_message(note or "Waiting for preview…", live=True)
+
+    def show_reroll_result(self, row: dict):
+        """The re-roll whose frames the front tab was mirroring has landed: its
+        saved output takes their place there, so a run watched to the end shows the
+        picture it made instead of freezing on its last partial frame.
+
+        The preview alone — the tab keeps its own form, footer and generation (see
+        :meth:`GenerateConfigPanel.show_finished_media`); the whole end-state goes
+        to the tab that launched the run, if a tab did."""
+        panel = self.current_config_panel()
+        if panel is not None:
+            panel.show_finished_media(row)
 
     def clear_current_preview(self):
         """Empty the current tab's preview (a re-roll ended with nothing to show,

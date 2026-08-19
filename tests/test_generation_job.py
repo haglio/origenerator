@@ -68,9 +68,10 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
 
 
 def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
-    # A dual-noise video job samples in two passes. ComfyUI counts each pass from
-    # its own zero, so the job must accumulate them into one 0-to-total ramp
-    # rather than forward a bar that resets halfway through.
+    # A dual-noise video job samples in two passes, then scores itself in a third
+    # — 20 video steps and 50 of audio. ComfyUI counts each pass from its own
+    # zero, so the job must accumulate them into one 0-to-total ramp rather than
+    # forward a bar that resets partway through.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     client = _client()
     job = GenerationJob(
@@ -82,11 +83,11 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
 
-    client.progress.emit("comfy-A", 10, 10)  # first pass finishes (10 of 20)
+    client.progress.emit("comfy-A", 10, 10)  # first pass finishes (10 of 70)
     client.progress.emit("comfy-A", 1, 10)   # second pass restarts its own count
 
-    assert seen == [(10, 20), (11, 20)]       # continues past the halfway mark
-    assert job.last_progress == (11, 20)
+    assert seen == [(10, 70), (11, 70)]       # continues past the first pass's end
+    assert job.last_progress == (11, 70)
 
 
 def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):
@@ -278,10 +279,10 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
                         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
     job.prompt_id = "pid"
     job._on_progress("pid", 10, 10)   # first pass done
-    job._on_progress("pid", 3, 10)    # second pass at 3 -> 13/20
+    job._on_progress("pid", 3, 10)    # second pass at 3 -> 13 of the run's 70
 
     state = job.progress_state()
-    assert state["last_progress"] == [13, 20]
+    assert state["last_progress"] == [13, 70]
 
 
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):

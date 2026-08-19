@@ -73,42 +73,53 @@ _PACE_MIN_FRACTION = 0.25
 _PACE_MIN_STEPS = 2
 
 
-def _pace_remaining(elapsed: float, progress: tuple[int, int] | None) -> float | None:
-    """Seconds left at the pace this run has been sampling at.
+def _pace_projection(elapsed: float, progress: tuple[int, int] | None) -> float | None:
+    """How long this run is on course to take, at the pace it has been going.
 
-    ``None`` while it's too early for that pace to mean anything, and once the
-    last step is done — past there the step count has nothing left to say.
+    The whole run rather than the part left, so it can be weighed against the
+    workflow's typical time, which is also a whole run. ``None`` while it's too
+    early for the pace to mean anything.
     """
     if not progress or elapsed <= 0:
         return None
     done, total = progress
-    if total <= 0 or done <= 0 or done >= total:
+    if total <= 0 or done <= 0:
         return None
     if done < max(_PACE_MIN_STEPS, total * _PACE_MIN_FRACTION):
         return None
-    return elapsed * (total - done) / done
+    return elapsed * total / done
 
 
 def remaining_seconds(elapsed: float, progress: tuple[int, int] | None,
                       typical: float | None) -> float | None:
     """How much longer a running generation has to go, from two readings.
 
-    Whichever says more is left wins. The run's own sampling pace is what catches
-    a run going slower than usual, but it only measures sampling — a video job
-    still has a VAE decode and an audio pass after its last step, and the step
-    count knows nothing about those. The workflow's typical time covers that
-    tail, so taking the larger keeps the number from sitting at zero through it.
+    The workflow's typical time is a weak prior: it is the median of that
+    workflow's last ten runs whatever length, resolution and step count each was
+    asked for, and those differ by a factor of ten. So it opens the estimate,
+    while the run is too new to have a pace worth reading, and then hands over to
+    the run's own pace in proportion to how much of the run has actually gone by.
+    A prior that never hands over is what left a five-and-a-half minute run
+    claiming four minutes still to come as it finished.
 
-    ``0.0`` once both readings are spent — the run is over its time, which is
-    worth saying — against ``None`` when there was never anything to go on.
+    A run that has already outlasted the typical time takes it out of the blend
+    altogether rather than blending against a number it has disproved: past there
+    the prior can only drag the estimate below what the run says about itself,
+    which is the one thing still worth believing.
+
+    ``0.0`` once both readings are spent — the run is over its time, or into a
+    tail too short to report steps for, which is worth saying — against ``None``
+    when there was never anything to go on.
     """
-    readings = [r for r in (
-        None if typical is None else typical - elapsed,
-        _pace_remaining(elapsed, progress),
-    ) if r is not None]
-    if not readings:
-        return None
-    return max(max(readings), 0.0)
+    pace = _pace_projection(elapsed, progress)
+    if pace is None:
+        return None if typical is None else max(typical - elapsed, 0.0)
+    if typical is None or elapsed >= typical:
+        return max(pace - elapsed, 0.0)
+    done, total = progress
+    settled = min(1.0, done / total)
+    projected = settled * pace + (1.0 - settled) * typical
+    return max(projected - elapsed, 0.0)
 
 
 def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,

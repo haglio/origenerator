@@ -118,11 +118,23 @@ def test_remaining_uses_the_pace_alone_with_no_history():
     assert remaining_seconds(200.0, (10, 20), None) == 200.0
 
 
-def test_remaining_holds_the_typical_time_through_the_tail():
-    # Every sampler step is done but the VAE decode and audio pass aren't — the
-    # step count can't see those, so the typical time is what carries the number
-    # rather than dropping it to zero while the job visibly keeps working.
-    assert remaining_seconds(600.0, (20, 20), 724.0) == 124.0
+def test_remaining_hands_over_to_the_pace_as_the_run_settles():
+    # The bug this guards. A run half-done in 90s is on course for 180s of its
+    # own, while the workflow's median says 724s — a median over runs of every
+    # length, so a weak claim about this one. Half-way through, the estimate sits
+    # half-way between the two; by the last steps the run's own pace is what
+    # decides, so a run faster than its median stops finishing with minutes still
+    # on its clock.
+    assert remaining_seconds(90.0, (10, 20), 724.0) == 362.0        # 452 projected
+    assert round(remaining_seconds(180.0, (18, 20), 724.0)) == 72   # 252 projected
+    assert remaining_seconds(200.0, (20, 20), 724.0) == 0.0         # 200: the pace
+
+
+def test_remaining_is_zero_through_a_tail_that_reports_no_steps():
+    # Every step ComfyUI reports is done and the job is still saving its output.
+    # Nothing measures that tail, so the honest reading is zero — which the label
+    # says as "finishing" — not the typical time's guess at how long it runs.
+    assert remaining_seconds(600.0, (20, 20), 724.0) == 0.0
 
 
 def test_remaining_is_zero_not_none_once_a_run_is_over_its_time():
@@ -134,8 +146,9 @@ def test_remaining_is_none_with_nothing_to_go_on():
 
 
 def test_progress_time_label_reads_elapsed_and_left():
-    # 724s typical less the 83s already spent, the pace agreeing there's more to go.
-    assert progress_time_label(83.0, (10, 20), 724.0) == "1:23 elapsed · ~10:41 left"
+    # Half the steps done in 83s: the run's own pace is on course for 166s, the
+    # workflow's median for 724s, and half-way through the estimate splits them.
+    assert progress_time_label(83.0, (10, 20), 724.0) == "1:23 elapsed · ~6:02 left"
 
 
 def test_progress_time_label_is_elapsed_alone_with_no_estimate():

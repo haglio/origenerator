@@ -25,3 +25,12 @@ def test_window_title_identifies_app(qtbot):
     screen = LoadingScreen()
     qtbot.addWidget(screen)
     assert "Origenerator" in screen.windowTitle()
+
+
+def test_the_splash_never_wears_the_apps_own_caption(qtbot):
+    # A hosting Fun Time session resolves the main window by the exact caption
+    # "Origenerator"; a splash (any process's) wearing it could be mistaken
+    # for the app.
+    screen = LoadingScreen()
+    qtbot.addWidget(screen)
+    assert screen.windowTitle() != "Origenerator"

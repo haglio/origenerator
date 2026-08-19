@@ -133,6 +133,19 @@ def _launch_imports() -> list[str]:
     return statements
 
 
+def _checkouts_parent():
+    """The directory holding the sibling checkouts — ``REPO_ROOT``'s own parent
+    in the primary layout the launcher models.  A WORKTREE's parent is
+    ``.claude/worktrees``, which holds no siblings, so walk up to the level
+    that does (the same walk the app's own sibling resolution makes); without
+    this, every import of a sibling read as a launch failure in any worktree
+    run of the suite."""
+    for parent in [REPO_ROOT.parent, *REPO_ROOT.parents]:
+        if (parent / "app_support" / "app_support" / "__init__.py").exists():
+            return parent
+    return REPO_ROOT.parent
+
+
 def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedProcess:
     """Run them the way ``launch_origenerator.vbs`` runs the app.
 
@@ -141,7 +154,7 @@ def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedPr
     pytest happens to be carrying is dropped, because the icon does not get it.
     """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    env["PYTHONPATH"] = str(REPO_ROOT.parent)
+    env["PYTHONPATH"] = str(_checkouts_parent())
     env["QT_QPA_PLATFORM"] = "offscreen"
 
     driver = "\n".join(

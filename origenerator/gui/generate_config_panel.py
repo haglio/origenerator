@@ -1389,6 +1389,10 @@ class GenerateConfigPanel(QWidget):
 
     # --- Drive OSR2: what the (global) driver should stream for this tab -------
 
+    def set_preview_paused(self, paused: bool) -> None:
+        """Freeze or resume this tab's preview video (the session's OmniPause)."""
+        self._preview.set_playback_paused(paused)
+
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the shown video, or ``None``.
 

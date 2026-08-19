@@ -91,11 +91,12 @@ class ThumbnailWidget(QWidget):
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # A video tile loops its short WebP preview; an image (or a video whose
-        # WebP couldn't be built) shows its static frame.
+        # WebP couldn't be built) shows its static frame.  The preview runs (and
+        # holds, under a session's OmniPause) from looping_movie, which is where
+        # every one of these lives.
         if movie_path and Path(movie_path).exists():
-            movie = looping_movie(movie_path, _IMAGE_SIZE, self._image_label)
-            self._image_label.setMovie(movie)
-            movie.start()
+            self._image_label.setMovie(
+                looping_movie(movie_path, _IMAGE_SIZE, self._image_label))
         elif thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
             self._image_label.setPixmap(
@@ -414,3 +415,4 @@ class ThumbnailWidget(QWidget):
         # already selected the tile, so the handler acts on the current selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self.prompt_id)
+

@@ -74,9 +74,7 @@ class AnimatedVideoStrip(QWidget):
         tile = _VideoTile(prompt_id)
         tile.clicked.connect(self.video_activated)
         if movie_path:
-            movie = looping_movie(movie_path, QSize(_TILE, _TILE), tile)
-            tile.setMovie(movie)
-            movie.start()
+            tile.setMovie(looping_movie(movie_path, QSize(_TILE, _TILE), tile))
         elif still_path:
             pixmap = QPixmap(str(still_path))
             if not pixmap.isNull():

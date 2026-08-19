@@ -36,10 +36,12 @@ from origenerator.generation_config import (
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.inflight import EnhancingRun, InFlightItem
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tree import FolderTree
+from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
@@ -51,10 +53,17 @@ from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import (
     AppCommand, DialSetting, app_command_bias, match_app_command,
 )
+from origenerator.voice.commands import (
+    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
+    sided_app_command, split_side, voice_command_bias,
+)
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
 from origenerator.voice.show_commands import (
     ShowCommand, match_show_command, show_command_bias,
 )
+from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
+from origenerator.voice.show_commands import ShowCommand
+from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
@@ -79,6 +88,7 @@ from origenerator.gui.browser_pane import (
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
+    SideModel,
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
     GROUP_ROLE as _GROUP_ROLE,
@@ -91,6 +101,19 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
     TRASH_LABEL as _TRASH_LABEL,
 )
+from origenerator.gui.orientation import (
+    ORIENTATIONS as _ORIENTATIONS,
+    ORIENTATION_LABELS as _ORIENTATION_LABELS,
+    LANDSCAPE as _LANDSCAPE,
+    base_of as _base_of,
+    filter_rows,
+    oriented_key,
+    orientation_of as _orientation_of,
+    requested_orientation,
+    split_key as _split_shelf_key,
+    split_rows,
+)
+from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -102,6 +125,32 @@ from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
+
+
+def _shared_hud_widget():
+    """The players' HUD widget, or ``None`` where player_core has not got one.
+
+    Reached for here rather than imported at module top, and reached for at all
+    rather than assumed, for the same reason: the panel lives in the newest
+    player_core, while this app's other reaches into that sibling (genau's
+    console, the stroke) resolve against an older checkout perfectly well.  A
+    session names the checkout it wants on PYTHONPATH; a plain launch walks up
+    to the primary one, and that one only grows the panel when it lands.
+
+    So a checkout without it starts, browses and generates exactly as before,
+    and a show opened on it is the show that used to be: its own neighbor
+    stills and position plate, no map.  Losing the panel is a bad afternoon;
+    losing the fullscreen view over the panel would be a dead app.
+    """
+    try:
+        from origenerator.gui.show_hud import ShowHud
+    except ImportError:
+        logger.warning(
+            "This player_core carries no shared HUD, so shows wear none",
+            exc_info=True)
+        return None
+    return ShowHud
+
 
 _POLL_INTERVAL_MS = 1500
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
@@ -360,10 +409,15 @@ class GalleryView(QWidget):
                  actions: GalleryActions | None = None,
                  osr2_stroke: Osr2StrokeDriver | None = None,
                  ambient_audio: AmbientAudio | None = None,
-                 search_expander: SearchExpander | None = None):
+                 search_expander: SearchExpander | None = None,
+                 fun_time: FunTimeSession | None = None):
         super().__init__(parent)
         self._db = db
         self._client = client
+        # The Fun Time session hosting this app, or None standalone.  Inside one
+        # the layout goes vertical, the fullscreen surfaces land on the satellite
+        # regions, and the OSR2 is Fun Time's alone (see origenerator.fun_time_mode).
+        self._fun_time = fun_time
         # The app-global audio bed behind the toolbar's audio switch: several
         # library clips at once, sound only. Injectable so tests never open a
         # real media backend. Built before _build_ui, whose switch drives it.
@@ -375,7 +429,12 @@ class GalleryView(QWidget):
         # drives it through the shared stroke keys, and while it holds the device
         # the funscript reconcile stands down. Injectable so tests never touch
         # the broker. Built before _build_ui, which wires its window feedback.
-        self._osr2_stroke = osr2_stroke if osr2_stroke is not None else Osr2StrokeDriver(parent=self)
+        # None inside a Fun Time session: the OSR2 there is the main player's
+        # alone, so no surface of this app may reach the device.
+        if fun_time is not None:
+            self._osr2_stroke = None
+        else:
+            self._osr2_stroke = osr2_stroke if osr2_stroke is not None else Osr2StrokeDriver(parent=self)
         # How long a slide holds the screen, app-wide: Genau's console shows
         # it as clip seconds and sets it, from whichever window the console
         # is on — including this one, with nothing playing, where it is what
@@ -413,11 +472,11 @@ class GalleryView(QWidget):
         # mic's "fix <part>" — or the marker words the whole request hangs on —
         # transcribe as other words entirely.
         self._voice = VoiceSteering(
-            command_matcher=_match_voice_command,
-            bare_matcher=match_app_command,
+            command_matcher=match_voice_command,
+            bare_matcher=sided_app_command,
             dictation=RequestDictation(),
-            transcribe_bias=(f"{gallery.command_bias()} {show_command_bias()} "
-                             f"{app_command_bias()} {request_bias()}"),
+            transcribe_bias=(f"{voice_command_bias()} {app_command_bias()} "
+                             f"{request_bias()}"),
         )
         self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
         self._voice.heard.connect(self._on_voice_heard)
@@ -461,6 +520,25 @@ class GalleryView(QWidget):
         # double-clicking a picture (that folder in order, held at a pace of
         # nought). One slot, because it is one view.
         self._slideshow = None
+        # Every show currently up, each with the shelf/folder key it opened
+        # from: what a landing generation is offered to, so a show keeps up
+        # with an auto-generating folder however far the browser has moved on.
+        # A list rather than one, because Fun Time runs two at once.
+        self._live_shows: list[tuple] = []
+        # Inside Fun Time, what occupies each satellite region — a show per
+        # region, at most one each.  A show is "open" while its window is
+        # visible; a closed one just goes stale in its slot until something
+        # replaces it.
+        # Whether the hosting session has asked for its regions (OPEN_SHOWS,
+        # until CLOSE_SHOWS): a region it wants is never left empty -- what
+        # covers it may end, but the base state comes back under it.
+        self._regions_wanted = False
+        self._region_shows: dict[str, QWidget | None] = (
+            {"portrait": None, "landscape": None} if fun_time is not None else {}
+        )
+        # Whether the hosting session is OmniPaused, remembered so a show
+        # opened mid-pause opens frozen (see set_session_paused).
+        self._session_paused = False
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
@@ -696,7 +774,7 @@ class GalleryView(QWidget):
             # stop has always covered that case, and so does the resume.
             stroke=self._osr2_stroke.active and not self._osr2_enabled,
             auto=self._auto.active_key(),
-            audio=self._audio_btn.isChecked(),
+            audio=self._audio_btn is not None and self._audio_btn.isChecked(),
             show=show is not None,
             show_pass=show.playing_now() if show is not None else None,
         )
@@ -710,7 +788,9 @@ class GalleryView(QWidget):
         drives. Each one is only what its own button does, so a folder that can't
         be looped or has nothing to show simply doesn't start.
         """
-        return _Running(osr2=True, auto=self._selected_folder_key(),
+        # The folder's own key, side stripped: a loop belongs to the folder, and
+        # both sides of the tree draw the same one.
+        return _Running(osr2=True, auto=_base_of(self._selected_folder_key()),
                         audio=True, show=True)
 
     def _stop_running(self, running: _Running) -> None:
@@ -726,7 +806,8 @@ class GalleryView(QWidget):
         if running.show:
             self._slideshow.close()  # _on_slideshow_closed lets it go
         if running.audio:
-            self._audio_btn.setChecked(False)  # drives _on_audio_toggle → silence
+            if self._audio_btn is not None:
+                self._audio_btn.setChecked(False)  # drives _on_audio_toggle → silence
 
     def _resume(self, stopped: _Running) -> None:
         """Put back what Esc took away.
@@ -745,7 +826,8 @@ class GalleryView(QWidget):
         landed or gone by now.
         """
         if stopped.audio:
-            self._audio_btn.setChecked(True)
+            if self._audio_btn is not None:
+                self._audio_btn.setChecked(True)
         if stopped.show_pass is not None:
             items, index, dwell_ms = stopped.show_pass
             self._open_slideshow(items, start=index, image_dwell_ms=dwell_ms,
@@ -816,6 +898,10 @@ class GalleryView(QWidget):
         # are where the user reads and edits a generation, and a strip cutting
         # across their foot would take that height for a queue they can already
         # see next to it.
+        #
+        # Hosted by Fun Time the rect is an upright column, so that whole left
+        # column and the info pane stack vertically in _stack instead of sitting
+        # side by side — the TOC pane keeps the left edge either way.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
@@ -825,19 +911,25 @@ class GalleryView(QWidget):
         self._left_column = QSplitter(Qt.Orientation.Vertical)
         self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
         self._left_column.setHandleWidth(6)
+        self._stack = None
+        if self._fun_time is not None:
+            self._stack = QSplitter(Qt.Orientation.Vertical)
+            self._stack.setChildrenCollapsible(False)
+            self._stack.setHandleWidth(6)
 
         # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
         # -> settings; a LoRA-less workflow collapses the LoRA level to one
         # "(no LoRA)" folder, and the source-image level shows only for
         # image-conditioned workflows). Folders start collapsed and only expand on
         # the disclosure arrow; double-click renames.
-        self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
-        self._tree_view = GalleryTree(self._tree)  # builds it + the key/prompt→item maps
-        self._tree.setHeaderHidden(True)
+        # One tree per shape, each under a standing label and each scrolling on
+        # its own: the table of contents exists twice over, and which half you
+        # are in is what decides the screen a slideshow goes to.
+        self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
+        self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)
-        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         # Picking several folders (Shift/Ctrl) shows them together, as the folder
         # they would make; this fires after currentItemChanged, so it has the last
@@ -901,7 +993,7 @@ class GalleryView(QWidget):
         media_row.addWidget(self._video_cb)
         media_row.addStretch(1)
         toc_box.addWidget(media_filter)
-        toc_box.addWidget(self._tree, 1)  # the tree takes the height; combine sits below
+        toc_box.addWidget(self._tree, 1)  # the trees take the height; combine sits below
         # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
         # on the image. Needs a client to generate, so it hides without one.
         self._combine = CombinePanel(
@@ -919,7 +1011,10 @@ class GalleryView(QWidget):
         self._combine.intent_changed.connect(self._on_combine_intent_changed)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
-        self._folder_panes.addWidget(toc)
+        # Hosted, the tree is the upright column's own left edge (collapsible,
+        # see _toc_toggle) rather than a member of the folder row, so it goes
+        # straight into the outer splitter.
+        (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
 
         # Browser pane: a header (the folder's path, then a back/forward/undo
         # toolbar under it) over the flowing contents. Double-clicking the path
@@ -927,6 +1022,16 @@ class GalleryView(QWidget):
         browser = QWidget()
         browser_box = QVBoxLayout(browser)
         browser_box.setContentsMargins(*_PANE_MARGINS)
+        # Fun Time's column is narrow, so the folder tree earns a collapse
+        # toggle at the head of the button bank: the tree's width goes to the
+        # browser while it's away, and the divider can be dragged shut too.
+        self._toc_toggle = None
+        if self._fun_time is not None:
+            self._toc_toggle = QToolButton()
+            self._toc_toggle.setObjectName("iconButton")
+            self._toc_toggle.setArrowType(Qt.ArrowType.LeftArrow)
+            self._toc_toggle.setToolTip("Collapse or restore the folder tree")
+            self._toc_toggle.clicked.connect(self._toggle_toc)
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
@@ -982,41 +1087,43 @@ class GalleryView(QWidget):
         )
         self._group_btn.hide()
         self._delete_btn = self._tool_button(icons.delete_icon(), "Delete", self._delete_selection)
-        # The other app-global switch, beside the OSR2's: while it's on, a few
-        # library clips play at once with only their sound — something to work
-        # over, tied to nothing on screen.
-        self._audio_btn = self._tool_button(
-            icons.audio_icon(),
-            f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
-            "shuffling endlessly",
-            self._on_audio_toggle, checkable=True,
-        )
-        self._audio_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
-        # The microphone, standing apart from the switches above: those are what
-        # the app is doing, and Esc turns all of them off at once — the mic is
-        # the one thing it leaves alone, since speaking is how any of them get
-        # going again without the keyboard. On is listening, off is not, and that
-        # is the whole of it. Nothing opens or closes the mic on its own — it used
-        # to come on with the Auto loop and with a fullscreen show, which meant
-        # the answer to "is it listening?" was a thing to work out rather than a
-        # thing to look at. The app opens with it on (see :meth:`set_mic_enabled`):
-        # the commands are worth nothing unheard, and a switch the user has to
-        # remember to flip before speaking is one they find out about by talking
-        # to an app that wasn't listening.
-        self._mic_btn = self._tool_button(
-            icons.mic_icon(),
-            "Listen: bare words for the shelves and this bank (“experiments”, "
-            "“undo”, “star”), Fun Time's own words over a show (“next”, "
-            "“weird”, “lock”), orders about the picture (“enhance”, “fix "
-            "hands”, “genau it”), and prompt steering while a folder is "
-            "auto-generating (left listening by Esc, which stops everything else)",
-            self._on_mic_toggle, checkable=True,
-        )
-        self._mic_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
+        # The room's two shared appliances: the audio bed and the microphone.
+        # Hosted by Fun Time this app has neither — the session's main player
+        # owns the room's sound, and the session owns the mic (it hears every
+        # spoken command, this app's included, and posts them on the channel),
+        # so a second switch for either would be a switch over something this
+        # window does not hold.
+        self._audio_btn = None
+        self._mic_btn = None
+        if self._fun_time is None:
+            # While it's on, a few library clips play at once with only their
+            # sound — something to work over, tied to nothing on screen.
+            self._audio_btn = self._tool_button(
+                icons.audio_icon(),
+                f"Play {AMBIENT_AUDIO_VOICES} library clips at once, sound only, "
+                "shuffling endlessly",
+                self._on_audio_toggle, checkable=True,
+            )
+            self._audio_btn.setStyleSheet(
+                "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+            )
+            # The microphone, standing apart from the switches above: those
+            # are what the app is doing, and Esc turns all of them off at once —
+            # the mic is the one thing it leaves alone, since speaking is how
+            # any of them get going again without the keyboard.  On is
+            # listening, off is not, and that is the whole of it.
+            self._mic_btn = self._tool_button(
+                icons.mic_icon(),
+                "Listen: bare words for the shelves and this bank (“experiments”, "
+                "“undo”, “star”), Fun Time's own words over a show (“next”, "
+                "“weird”, “lock”), orders about the picture (“enhance”, “fix "
+                "hands”, “genau it”), and prompt steering while a folder is "
+                "auto-generating (left listening by Esc, which stops everything else)",
+                self._on_mic_toggle, checkable=True,
+            )
+            self._mic_btn.setStyleSheet(
+                "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+            )
         # One switch for the device, wearing the waveform: on means Origenerator
         # is driving the OSR2, and the app picks the source — the funscript of
         # whatever scripted video is in front (the generate tab's, or one playing
@@ -1024,16 +1131,22 @@ class GalleryView(QWidget):
         # script to follow. It used to be two buttons, which asked the user to
         # answer a question the app can answer for itself, and let both sources
         # be armed at once. Always visible (it's app-wide), lit when on.
-        self._osr2_btn = self._tool_button(
-            icons.stroke_icon(),
-            "Drive the OSR2 — the funscript of the video in front, or a "
-            f"self-generated stroke when there is none ({STROKE_KEY_LEGEND}; "
-            "Esc to stop)",
-            self._on_osr2_toggle, checkable=True,
-        )
-        self._osr2_btn.setStyleSheet(
-            "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
-        )
+        #
+        # None where this app may not touch the device at all: a Fun Time
+        # session keeps the OSR2 on its main player, so a hosted gallery builds
+        # no switch and the device is unreachable from here.
+        self._osr2_btn = None
+        if self._osr2_stroke is not None:
+            self._osr2_btn = self._tool_button(
+                icons.stroke_icon(),
+                "Drive the OSR2 — the funscript of the video in front, or a "
+                f"self-generated stroke when there is none ({STROKE_KEY_LEGEND}; "
+                "Esc to stop)",
+                self._on_osr2_toggle, checkable=True,
+            )
+            self._osr2_btn.setStyleSheet(
+                "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
+            )
         # The bank takes the pane's whole width, under the path rather than
         # beside it, and wraps onto as many rows as that width needs. Beside the
         # path it had to share a narrow pane with a folder name, and what a
@@ -1051,6 +1164,7 @@ class GalleryView(QWidget):
                              row_spacing=BUTTON_ROW_GAP)
         self._toolbar_groups = []
         for buttons in (
+            (self._toc_toggle,),                                    # the tree itself
             (self._back_btn, self._forward_btn),                    # where you are
             (self._undo_btn, self._redo_btn),                       # what you did
             (self._group_btn,),                                     # …to the picked folders
@@ -1059,6 +1173,7 @@ class GalleryView(QWidget):
              self._audio_btn, self._osr2_btn),                      # doing, and Esc stops
             (self._mic_btn,),                                       # what it hears with
         ):
+            buttons = tuple(b for b in buttons if b is not None)
             gap = _toolbar_gap()
             toolbar.addWidget(gap)
             for button in buttons:
@@ -1136,7 +1251,9 @@ class GalleryView(QWidget):
         self._queue.clear_queue_requested.connect(self._clear_foreign_queue)
         self._left_column.addWidget(self._folder_panes)
         self._left_column.addWidget(self._queue)
-        self._panes.addWidget(self._left_column)
+        (self._stack if self._stack is not None else self._panes).addWidget(
+            self._left_column)
+
 
         # Info pane: a tabbed workspace of identical editable generate panels
         # (form + Generate). No special or permanent tab — the first opens on
@@ -1154,18 +1271,24 @@ class GalleryView(QWidget):
         # nothing to drive it stops. self._osr2_driving is the (video, player) currently
         # driven, so a redundant reconcile doesn't churn the device. Built before the
         # panels are wired, since wiring connects their displayed_changed here.
-        self._osr2_driver = Osr2Driver(parent=self)
+        # None where this app may not touch the device at all (hosted by Fun
+        # Time, whose main player owns the OSR2).
+        self._osr2_driver = Osr2Driver(parent=self) if self._osr2_stroke is not None else None
         self._osr2_enabled = False
         self._osr2_driving = None
         # The bottom of the center (browser) pane, shared by two panels that each
         # take their own room rather than floating over anyone's buttons: genau's
         # readout, copied, held to the left at its fixed size, and the open
-        # folder's Enhance settings taking the width left beside it.
+        # folder's Enhance settings taking the width left beside it.  Hosted by
+        # Fun Time there is no readout — the real console is on the session's
+        # main player — so the Enhance settings take the row alone.
         bottom = QHBoxLayout()
         bottom.setContentsMargins(0, 0, 0, 0)
         bottom.setSpacing(12)
-        self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
-        bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
+        self._stroke_panel = None
+        if self._osr2_stroke is not None:
+            self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
+            bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its box on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
@@ -1182,6 +1305,7 @@ class GalleryView(QWidget):
         # don't belong to the folder they happen to be sitting under.
         browser_box.addWidget(_bottom_divider())
         browser_box.addLayout(bottom)
+
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs._config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -1190,8 +1314,9 @@ class GalleryView(QWidget):
         # so a closed app doesn't leave the OSR2 held and genau silently disabled.
         app = QApplication.instance()
         if app is not None:
-            app.aboutToQuit.connect(self._osr2_driver.stop)
-            app.aboutToQuit.connect(self._osr2_stroke.stop)
+            if self._osr2_driver is not None:
+                app.aboutToQuit.connect(self._osr2_driver.stop)
+                app.aboutToQuit.connect(self._osr2_stroke.stop)
             # Same reason the preview releases its player: a live media player at
             # Qt/Python shutdown can deadlock the real (WMF) backend.
             app.aboutToQuit.connect(self._ambient_audio.stop)
@@ -1212,35 +1337,72 @@ class GalleryView(QWidget):
         info_box.setContentsMargins(0, 0, 0, 0)
         info_box.addWidget(self._info_tabs, 1)
         info_box.addWidget(self._find_bar)
-        self._panes.addWidget(info_pane)
 
-        # The TOC pane holds its width; the browser and info panes both grow with
-        # the window (the browser faster), so the info pane stays comfortably wide
-        # instead of a thin strip on a large screen. Long metadata values wrap
-        # rather than scroll sideways, so these floors only need to keep the panes
-        # readable — kept low enough that the window can still tile into a monitor
-        # third or a portrait-monitor half.
-        toc.setMinimumWidth(120)
-        browser.setMinimumWidth(210)
-        # No floor of its own on the info pane: the config tab inside it reports
-        # what its settings need (GenerateConfigPanel.minimumSizeHint), and an
-        # explicit minimum here would replace that number rather than join it —
-        # pinning the pane narrower than its contents and putting a horizontal
-        # scroll bar back under the form.
-        self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
-        self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
-        self._folder_panes.setSizes([220, 560])
-        # The strip opens at its own height and stays there: all the growth goes
-        # to the folders above it, so a taller window is more gallery rather than
-        # more queue.
-        self._left_column.setStretchFactor(0, 1)
-        self._left_column.setStretchFactor(1, 0)
-        self._left_column.setSizes([600, self._queue.minimumHeight()])
-        self._panes.setStretchFactor(0, 3)
-        self._panes.setStretchFactor(1, 2)
-        self._panes.setSizes([780, 440])
+        if self._stack is not None:
+            # The upright arrangement: the folder column over the generate tabs
+            # (with the find bar riding under them), the pair beside a
+            # collapsible tree.  The floors shrink with the column — the info
+            # pane spans the stack's whole width, so its side-by-side floor
+            # would only fight the tree for room it no longer shares.
+            self._stack.addWidget(info_pane)
+            self._panes.addWidget(self._stack)
+            self._panes.setCollapsible(0, True)  # the tree may be dragged shut
+            toc.setMinimumWidth(120)
+            browser.setMinimumWidth(210)
+            self._info_tabs.setMinimumWidth(210)
+            info_pane.setMinimumWidth(210)
+            self._left_column.setStretchFactor(0, 1)
+            self._left_column.setStretchFactor(1, 0)
+            self._left_column.setSizes([600, self._queue.minimumHeight()])
+            self._panes.setStretchFactor(0, 0)
+            self._panes.setStretchFactor(1, 1)
+            self._panes.setSizes([180, 660])
+            self._stack.setStretchFactor(0, 3)
+            self._stack.setStretchFactor(1, 2)
+            self._stack.setSizes([600, 480])
+        else:
+            self._panes.addWidget(info_pane)
+            # The TOC pane holds its width; the browser and info panes both grow
+            # with the window (the browser faster), so the info pane stays
+            # comfortably wide instead of a thin strip on a large screen. Long
+            # metadata values wrap rather than scroll sideways, so these floors
+            # only need to keep the panes readable — kept low enough that the
+            # window can still tile into a monitor third or a portrait-monitor
+            # half.
+            toc.setMinimumWidth(120)
+            browser.setMinimumWidth(210)
+            # No floor of its own on the info pane: the config tab inside it
+            # reports what its settings need (GenerateConfigPanel.minimumSizeHint),
+            # and an explicit minimum here would replace that number rather than
+            # join it — pinning the pane narrower than its contents and putting a
+            # horizontal scroll bar back under the form.
+            self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
+            self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
+            self._folder_panes.setSizes([220, 560])
+            # The strip opens at its own height and stays there: all the growth
+            # goes to the folders above it, so a taller window is more gallery
+            # rather than more queue.
+            self._left_column.setStretchFactor(0, 1)
+            self._left_column.setStretchFactor(1, 0)
+            self._left_column.setSizes([600, self._queue.minimumHeight()])
+            self._panes.setStretchFactor(0, 3)
+            self._panes.setStretchFactor(1, 2)
+            self._panes.setSizes([780, 440])
 
         layout.addWidget(self._panes, 1)
+
+    def _toggle_toc(self):
+        """Collapse or restore the folder tree (the Fun Time column's toggle).
+
+        Hiding the splitter child hands its width to the browser stack; the
+        arrow flips to show which way the next press moves it.
+        """
+        toc = self._panes.widget(0)
+        showing = not toc.isVisible()
+        toc.setVisible(showing)
+        self._toc_toggle.setArrowType(
+            Qt.ArrowType.LeftArrow if showing else Qt.ArrowType.RightArrow
+        )
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
         """An icon-only button for the browser-pane header's bank. A
@@ -1324,8 +1486,12 @@ class GalleryView(QWidget):
         """Flip the one switch — what Space does, from any surface. The stroke's
         own toggle is deliberately not reachable from a key any more: with two
         sources for one device, whichever one a key started would have been
-        streaming alongside whatever the switch already had going."""
-        self._osr2_btn.setChecked(not self._osr2_btn.isChecked())
+        streaming alongside whatever the switch already had going.
+
+        A no-op with no switch to flip: hosted by Fun Time the device belongs
+        to the session's main player, so nothing here may start it."""
+        if self._osr2_btn is not None:
+            self._osr2_btn.setChecked(not self._osr2_btn.isChecked())
 
     def _reconcile_osr2(self):
         """Put the right thing on the device, or nothing.
@@ -1342,6 +1508,8 @@ class GalleryView(QWidget):
         ``active_changed``, and a listener that reconciles must not land back
         here mid-flight.
         """
+        if self._osr2_driver is None:
+            return  # hosted by Fun Time — the device is the main player's
         if self._reconciling_osr2:
             return
         self._reconciling_osr2 = True
@@ -1406,11 +1574,19 @@ class GalleryView(QWidget):
             items, index = [], 0
         elif not items:  # the shown item isn't in the folder listing: play it alone
             items, index = [(media[0], media[1], None, None)], 0
+        # Neither shuffled nor newest-first, and not a loop: this is one folder
+        # in the browser's own order, held on one picture.  Said plainly rather
+        # than left at the defaults, because the HUD reads them now — an order
+        # slot saying "Shuffle" over a folder listed in its own order would be
+        # the panel making something up.
         return self._open_slideshow(items, start=index, frame=frame,
                                     image_dwell_ms=0, shuffle=in_order,
-                                    folder_items=self._folder_media())
+                                    folder_items=self._folder_media(),
+                                    order_label="", looping=False,
+                                    starred_ids=self._starred_prompt_ids())
 
-    def _open_slideshow(self, items, *, folder_items=None, resume=None, **kwargs):
+    def _open_slideshow(self, items, *, folder_items=None, location=None,
+                        side=None, resume=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a show is made, however it was asked for, so the toolbar's
@@ -1419,15 +1595,26 @@ class GalleryView(QWidget):
         generation with, since that one has no items of its own yet, and
         ``resume`` where a closed show left off, for one picking that back up
         rather than naming its own opening slide.
+
+        ``location`` is the shelf or folder key the set came from, kept so the
+        show can be fed what lands there while it runs
+        (:meth:`_feed_slideshow_finished`) — a running show has to keep up with
+        the folder it is playing, and the browser will have moved on by then.
+        ``side`` names the satellite region to land it on inside Fun Time,
+        for a show asked for by side rather than routed by its own shape.
         """
         self._show_refused = set()  # a new show, a new set to be judged against
         self._slideshow = SlideshowView(
             items, on_delete=self._trash_generation,
             on_enhance=self._enhance_from_slideshow,
             on_star=self._star_generation,
+            on_lock=(self._open_generate_tab_for
+                     if self._fun_time is not None else None),
+            on_reset=(self.reset_region if self._fun_time is not None else None),
             pace=self._pace, stroke=self._osr2_stroke,
             # Its Space reaches the one OSR2 switch, like every other surface's.
             on_drive_toggle=self._toggle_osr2_drive, **kwargs)
+        self._live_shows.append((self._slideshow, location))
         if folder_items and self._slideshow.is_live():
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
@@ -1441,9 +1628,13 @@ class GalleryView(QWidget):
             # version once they are armed.
             self._slideshow.resume(resume)
         self._slideshow.open_requested.connect(self._open_from_slideshow)
-        self._slideshow.closed.connect(self._on_slideshow_closed)
+        show = self._slideshow
+        show.closed.connect(lambda s=show: self._on_slideshow_closed(s))
         self._slideshow.media_changed.connect(self._reconcile_osr2)
-        self._slideshow.showFullScreen()
+        # Standalone that is a monitor to take over; hosted, it is one of the
+        # satellite regions — the side asked for, else the one this set's own
+        # shape belongs on.
+        self._present_surface(self._slideshow, side or region_for_items(items))
         self._reconcile_osr2()
         # However the show was asked for, it now owns the card it is drawn with: a
         # video generation would saturate that card, and a show is exactly the
@@ -1512,8 +1703,25 @@ class GalleryView(QWidget):
         return media
 
 
+    def _open_surfaces(self) -> list:
+        """Every tracked full-screen surface, each once: the standalone singles
+        and whatever the satellite regions hold inside Fun Time.  The
+        enhancement feed and the media release address all of them — a surface
+        that has since closed takes the note inertly, so nothing here polices
+        visibility; only region occupancy does (see :meth:`region_show`)."""
+        candidates = [self._slideshow, *self._region_shows.values()]
+        surfaces, seen = [], set()
+        for surface in candidates:
+            if surface is None or id(surface) in seen:
+                continue
+            seen.add(id(surface))
+            surfaces.append(surface)
+        return surfaces
+
+
     def _group_for_key(self, key: str):
-        item = self._item_by_key.get(key)
+        """The folder ``key`` names, as the side it is being looked at holds it."""
+        item = self._tree_item_for(key)
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
@@ -1529,8 +1737,10 @@ class GalleryView(QWidget):
         return self._osr2_enabled
 
     def set_osr2_enabled(self, enabled):
-        """Restore the global OSR2 toggle from a saved session."""
-        self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
+        """Restore the global OSR2 toggle from a saved session.  With no OSR2
+        surface (hosted by Fun Time) a stale saved value has nothing to restore."""
+        if self._osr2_btn is not None:
+            self._osr2_btn.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
 
     # --- the audio bed: one app-global switch, following nothing on screen ----
 
@@ -1545,17 +1755,26 @@ class GalleryView(QWidget):
 
     def audio_enabled(self) -> bool:
         """Whether the audio bed's switch is on (for session persistence)."""
-        return self._audio_btn.isChecked()
+        return self._audio_btn is not None and self._audio_btn.isChecked()
 
     def set_audio_enabled(self, enabled):
-        """Restore the audio bed's switch from a saved session."""
-        self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
+        """Restore the audio bed's switch from a saved session.  With no switch
+        (hosted by Fun Time, whose main player owns the room's sound) a stale
+        saved value has nothing to restore."""
+        if self._audio_btn is not None:
+            self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
 
     # --- the microphone: the one switch Esc leaves alone ---------------------
 
     def mic_enabled(self) -> bool:
-        """Whether the mic switch is on (for session persistence)."""
-        return self._mic_btn.isChecked()
+        """Whether the mic switch is on (for session persistence).
+
+        Hosted there is no switch — the session owns the room's microphone — so
+        the answer is no.  Asked on the way out either way, and an
+        AttributeError raised inside closeEvent takes the whole process down
+        with it rather than surfacing anywhere.
+        """
+        return self._mic_btn is not None and self._mic_btn.isChecked()
 
     def set_mic_enabled(self, enabled):
         """Restore the mic switch from a saved session — on when the session has
@@ -1566,7 +1785,8 @@ class GalleryView(QWidget):
         something, and it is the only way back in after Esc has stopped everything
         else — so off is a state to be chosen, not one to be arrived at.
         """
-        self._mic_btn.setChecked(True if enabled is None else bool(enabled))
+        if self._mic_btn is not None:  # hosted, the session owns the microphone
+            self._mic_btn.setChecked(True if enabled is None else bool(enabled))
 
     # --- background experiments: the closing batch and the shelf's controls ---
 
@@ -1852,7 +2072,7 @@ class GalleryView(QWidget):
         rebuilds, then drills into that folder and points the info pane at the tile.
         """
         self.refresh()
-        item = self._item_by_key.get(key)
+        item = self._tree_item_for(key)
         if item is not None:
             self._tree.setCurrentItem(item)
             self._select_reroll(key)
@@ -1873,6 +2093,13 @@ class GalleryView(QWidget):
         meta = self._db.folder_meta_map()
         self._fingerprint = _fingerprint(rows, meta)
         self._rebuild(rows, meta)
+        if self._regions_wanted:
+            # The tree this rebuild just made is what the base state is read
+            # from, and the session's OPEN_SHOWS can land before the first one
+            # (its launch races this app's boot).  Filling here costs nothing
+            # when both regions are already playing, and is the only thing that
+            # rescues a session that opened into the mode a moment too early.
+            self.fill_the_regions()
 
     def _poll(self):
         # Backstop for a missed completion frame: finish any re-roll ComfyUI has
@@ -1967,25 +2194,18 @@ class GalleryView(QWidget):
         self._search.update(listed + held, gallery.named_folders_by_row(
             tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
+        # Every side is built from the rows the media filter keeps, so switching
+        # videos off empties both halves of them rather than one.
+        sides, starred_by_side = self._build_sides(listed, meta, unreviewed, held, requested)
         self._browser.set_model(
             gallery.recent_generations(listed),
-            gallery.starred_folders(tree_model),
+            starred_by_side,
             gallery.starred_generations(listed),
             unreviewed,
             held,
             requested,
         )
-        # The Recents shelf stays up when it is the media filter that emptied the
-        # gallery — unchecking both boxes leaves no folders at all, and a pane
-        # with nothing in it and no shelf to explain it says nothing about why.
-        self._tree_view.populate(tree_model, expanded,
-                                 show_recents=bool(tree_model or rows
-                                                   or self._browser._inflight_items()),
-                                 experiment_count=len(unreviewed),
-                                 trash_count=len(held),
-                                 request_count=len(requested),
-                                 custom_folders=self._custom_folders,
-                                 folder_meta=meta)
+        self._tree_view.populate(sides, expanded, folder_meta=meta)
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None
@@ -1997,7 +2217,11 @@ class GalleryView(QWidget):
         # trashed item) is taken off a tab now.
         self._selected_row = None
         self._info_tabs.drop_previews_of_gone_rows(self._live_ids)
-        target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
+        # _tree_item_for rather than a bare lookup, so a restore target saved as
+        # a folder key — a session from before the tree grew sides — still lands
+        # on that folder instead of falling back to the default.
+        target = (self._tree_item_for(selected_key) if selected_key
+                  else None) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
         self._suppress_history = True
@@ -2037,6 +2261,37 @@ class GalleryView(QWidget):
         # moved, so every tab re-reads what its Generate would now do.
         for panel in self._info_tabs._config_panels():
             panel.refresh_generate_caption()
+
+    def _build_sides(self, rows, meta, unreviewed, held, requested):
+        """The two sides of the tree, and the starred folders each one holds.
+
+        A side is the whole table of contents over one shape's rows: its own
+        media/workflow/model/LoRA/settings hierarchy, its own copies of the
+        folders the user composed, and shelves whose counts are its own — a
+        number covering both sides would send you to a shelf that then showed
+        you nothing.  Built from a single deal of the rows, because measuring
+        each row's shape is the expensive part and a rebuild runs on every poll.
+        """
+        dealt = split_rows(rows)
+        custom_records = self._db.list_custom_folders()
+        request_rows = [item["row"] for item in requested]
+        inflight = self._browser.inflight_orientations()
+        sides, starred = [], {}
+        for orientation in _ORIENTATIONS:
+            model = gallery.build_gallery_tree(dealt[orientation], meta)
+            starred[orientation] = gallery.starred_folders(model)
+            sides.append(SideModel(
+                orientation=orientation,
+                tree_model=model,
+                custom_folders=gallery.build_custom_folders(model, custom_records),
+                # Recents keeps a side up with no folders yet, so a first-ever
+                # generation of that shape is visible while it runs.
+                show_recents=bool(model) or orientation in inflight,
+                experiment_count=len(filter_rows(unreviewed, orientation)),
+                request_count=len(filter_rows(request_rows, orientation)),
+                trash_count=len(filter_rows(held, orientation)),
+            ))
+        return sides, starred
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -2157,16 +2412,21 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         shelf = self._current_shelf_key()
         if shelf is not None:
+            base, orientation = _split_shelf_key(shelf)
+            name = _SHELF_LABELS[base]
+            if orientation:
+                # The same path shape a folder's breadcrumb has, since a shelf is
+                # one side's now: which half of the library is being searched has
+                # to read the same way wherever you are standing.
+                name = f"{_ORIENTATION_LABELS[orientation]}  ›  {name}"
             rows = self._browser.selected_shelf_rows() or []
-            return _SearchScope(_SHELF_LABELS[shelf],
-                                {row["prompt_id"] for row in rows})
+            return _SearchScope(name, {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
+            # Nothing selected, or the caret resting on a side's header row: the
+            # whole gallery, since neither names a folder to narrow to. The
+            # trash's held rows share the index but belong to their shelf alone.
             return _SearchScope(gallery.ALL_LABEL, self._live_ids)
-        if isinstance(group, gallery.AllGroup):
-            # Everything the *gallery* holds — the trash's held rows share the
-            # index but belong to their shelf alone.
-            return _SearchScope(group.label, self._live_ids)
         return _SearchScope(self._tree_view.breadcrumb(item),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
@@ -2362,8 +2622,11 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
         self._sync_enhance_button()  # enhance-all fits a folder with plain images
         self._sync_group_button()      # grouping fits only a multi-selection
-        # The experimenter's switch belongs to the Experiments shelf alone.
-        self._experiments_bar.setVisible(current is self._experiments_item)
+        # The experimenter's switch belongs to the Experiments shelf alone, and
+        # which shelf is showing is read off the key rather than off an item
+        # identity — there are two of every row now, one per side.
+        base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
+        self._experiments_bar.setVisible(base == _EXPERIMENTS_KEY)
         if current is None:
             self._title.set_display("")
             self._title.setToolTip("")
@@ -2371,24 +2634,28 @@ class GalleryView(QWidget):
             self._browser.show_empty()
             self._sync_action_buttons()
             return
-        if current is self._recents_item:
-            self._browser.show_recents_overview()
+        if base == _RECENTS_KEY:
+            self._browser.show_recents_overview(orientation)
             return
-        if current is self._starred_item:
-            self._browser.show_starred_overview()
+        if base == _STARRED_KEY:
+            self._browser.show_starred_overview(orientation)
             return
-        if current is self._experiments_item:
+        if base == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-            self._browser.show_experiments_overview()
+            self._browser.show_experiments_overview(orientation)
             return
-        if current is self._requests_item:
-            self._browser.show_requests_overview()
+        if base == _REQUESTS_KEY:
+            self._browser.show_requests_overview(orientation)
             return
-        if current is self._trash_item:
-            self._browser.show_trash_overview()
+        if base == _TRASH_KEY:
+            self._browser.show_trash_overview(orientation)
             return
         group = current.data(0, _GROUP_ROLE)
-        self._note_folder_visit(group.key if group is not None else None)
+        # A folder's place in the tree is where the user is standing, side and
+        # all, so that — not the folder's own key — is what history and the
+        # return-after-delete trail record.
+        here = self._tree_view.selected_folder_key()
+        self._note_folder_visit(here if group is not None else None)
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
             # so leaving a shelf for one is a step Back can undo at all.
@@ -2511,7 +2778,7 @@ class GalleryView(QWidget):
         self._selection_group = None
         self.refresh()
         self._sync_history_buttons()
-        item = self._item_by_key.get(gallery.custom_folder_key(folder_id))
+        item = self._tree_item_for(gallery.custom_folder_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
 
@@ -2647,29 +2914,47 @@ class GalleryView(QWidget):
     def _leaf_by_id(self) -> dict:
         return self._tree_view.leaf_by_id
 
-    @property
-    def _recents_item(self):
-        return self._tree_view.recents_item
-
-    @property
-    def _starred_item(self):
-        return self._tree_view.starred_item
-
-    @property
-    def _experiments_item(self):
-        return self._tree_view.experiments_item
-
-    @property
-    def _requests_item(self):
-        return self._tree_view.requests_item
-
-    @property
-    def _trash_item(self):
-        return self._tree_view.trash_item
-
     def _selected_folder_key(self) -> str | None:
-        """The selected folder's key (or a shelf's), from the tree renderer."""
+        """The selected row's tree key (or a shelf's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
+
+    def _current_side(self) -> str:
+        """Which of the two sides the tree is standing on.
+
+        Every row lives under one, so this is only ever a fallback: nothing
+        selected at all (a fresh window, a rebuild that found no target) reads
+        as Landscape, the roomier side and the one an unmeasurable item files
+        under everywhere else.
+        """
+        return _orientation_of(self._selected_folder_key()) or _LANDSCAPE
+
+    def _tree_item_for(self, key: str):
+        """The tree row for ``key`` — a tree key resolves to its own row, and a
+        folder's own key to the copy of it on the side being browsed.
+
+        A folder key names a folder, not a place: a re-roll, a combine, a folder
+        tile and a delete's return target all hold one, and each side draws its
+        own row for it. Staying on the side already open is the answer that
+        doesn't teleport the user across the tree; a folder only the other side
+        holds is followed there rather than dropped.
+
+        A key that already names a side is answered by that side alone. Falling
+        back across the split would hand a portrait region a landscape library
+        the moment the portrait one happened to be empty, which is the whole of
+        what the split exists to prevent.
+        """
+        item = self._item_by_key.get(key)
+        if item is not None or _orientation_of(key):
+            return item
+        drawn = self._tree_view.keys_for_folder(key)
+        if not drawn:
+            return None
+        here = oriented_key(key, self._current_side())
+        return self._item_by_key[here if here in drawn else drawn[0]]
+
+    def _shelf_item(self, shelf_key: str, orientation: str | None = None):
+        """One side's copy of a shelf row — the side being browsed by default."""
+        return self._tree_view.shelf_item(shelf_key, orientation or self._current_side())
 
     def _current_group(self):
         """The folder on screen, or ``None`` (a shelf, a search, or an empty
@@ -2769,7 +3054,9 @@ class GalleryView(QWidget):
         leaves (:meth:`Database.record_request`).
         """
         wf = WORKFLOW_REGISTRY.get(workflow_name)
-        item = self._item_by_key.get(folder_key)
+        # _tree_item_for, not a bare lookup: a folder has a row per side now and
+        # the key a tab carries is the folder's own, with no side on it.
+        item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         rows = self._folder_request_rows(group) if group is not None else []
         if self._client is None or wf is None or not rows:
@@ -2888,9 +3175,7 @@ class GalleryView(QWidget):
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
             self._reroll.start_prepared(key, working["workflow"], params)
         else:
-            item = self._item_by_key.get(key)
-            group = item.data(0, _GROUP_ROLE) if item else None
-            self._reroll.start(key, group, self._image_rows)
+            self._reroll.start(key, self._group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         if from_auto:
             self._note_auto_launch(key)  # its result is the loop's, not a tab's
@@ -2925,11 +3210,13 @@ class GalleryView(QWidget):
         prompt to steer, so an open mic starts steering when one begins — but the
         mic itself is the button's, and only the button's.
         """
-        key = self._selected_folder_key()
+        # The folder's own key, not the row's: a loop is filed with the jobs it
+        # launches, and those are keyed by folder wherever it is being watched from.
+        group = self._current_group()
         if not checked:
             self._auto.stop_all()
-        elif key is not None:
-            self._begin_auto(key)
+        elif group is not None:
+            self._begin_auto(group.key)
         self._sync_auto_button()  # reflect the real state — a start may not take
         self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
@@ -3023,7 +3310,7 @@ class GalleryView(QWidget):
             self._voice_status_timer.stop()
 
     def _voice_status_revert(self):
-        if self._mic_btn.isChecked():  # still listening
+        if self._listening():  # still listening
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._voice_status.hide()
@@ -3083,7 +3370,7 @@ class GalleryView(QWidget):
         group = self._current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
         looping = self._auto.active_key()
-        elsewhere = looping is not None and looping != self._selected_folder_key()
+        elsewhere = looping is not None and looping != getattr(group, "key", None)
         self._auto_btn.setEnabled(available or looping is not None)
         self._auto_btn.setToolTip("" if elsewhere else self._auto_tooltip(available, looping))
         self._auto_tip.set_html(_AUTO_ELSEWHERE_TIP if elsewhere else "")
@@ -3142,12 +3429,13 @@ class GalleryView(QWidget):
         """What the slideshow button would play, named for its tooltip."""
         if self._showing_search():
             return "these results"
-        return {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
-                _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL,
-                _REQUESTS_KEY: _REQUESTS_LABEL,
-                _TRASH_KEY: _TRASH_LABEL}.get(
-            self._current_shelf_key(), "this folder"
-        )
+        base, orientation = _split_shelf_key(self._current_shelf_key())
+        label = _SHELF_LABELS.get(base, "this folder")
+        if orientation and base in _SHELF_LABELS:
+            # The side leads, as it does in the shelf's own header and in a
+            # folder's breadcrumb — one wording for where you are standing.
+            label = f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
+        return label
 
     # --- standalone enhance: the bank button, the selection action, the queue ---
 
@@ -3424,6 +3712,15 @@ class GalleryView(QWidget):
 
     # --- spoken commands: "enhance" over a show, "start slideshow" for one ---
 
+    def _listening(self) -> bool:
+        """Whether this app is listening on its own mic.
+
+        Never when hosted: the session owns the microphone there, hears the
+        spoken commands for both of us, and posts this app's on its channel —
+        two listeners on one mic is two transcriptions of every utterance.
+        """
+        return self._mic_btn is not None and self._mic_btn.isChecked()
+
     def _on_mic_toggle(self, _on: bool):
         """The microphone switch: the one thing that opens or closes the mic."""
         self._sync_voice()
@@ -3440,7 +3737,7 @@ class GalleryView(QWidget):
         commands always, and the prompt steering only while a loop has a folder
         to steer. That is not a second switch, just nothing to steer.
         """
-        if not self._mic_btn.isChecked():
+        if not self._listening():
             self._voice.stop()           # both halves, so the listener closes
             self._voice.stop_commands()
             self._voice_status_timer.stop()
@@ -3456,17 +3753,61 @@ class GalleryView(QWidget):
             self._voice.stop()  # no loop to steer; the commands hold the mic open
         self._show_voice_status("🎤 Listening…", transient=False)
 
+    def run_spoken_command(self, text: str) -> bool:
+        """Run a command the HOSTING session heard, and say whether it was one.
+
+        Fun Time owns the microphone while this app is hosted — one mic, one
+        transcription — so its recognizer hears "landscape favorites", posts the
+        words on this app's channel, and they are matched here against this
+        app's own vocabulary: the session cannot know which shelves this tree
+        has or which detail parts have detectors installed.
+
+        A request has first refusal, exactly as it does on this app's own mic.
+        "Request … over" runs to as many utterances as the speaker takes
+        breaths, so a matcher that only ever saw one at a time could not hear a
+        sentence said in three; while one is open the dictation swallows what
+        it hears, which is what keeps the words of a request from also matching
+        a command.  The side is split off first — it rides every utterance the
+        session posts, and fed in it would become the first word of the
+        request instead of the region the request is about.
+        """
+        side, rest = split_side(text)
+        spoken = self._voice.push_dictation(rest)
+        if spoken is not None:
+            self._on_spoken_request(spoken, side=side)
+            return True
+        matched = match_voice_command(text)
+        if matched is None:
+            logger.info("Voice (from the session): %r matched no command", text)
+            return False
+        self._on_voice_command(matched)
+        return True
+
     def _on_voice_command(self, matched):
-        """One recognized utterance: a show command, a bare word about the app
-        or the slide in front of the speaker, or an order about the picture."""
-        if isinstance(matched, ShowCommand):
+        """One recognized utterance: a shelf to play, a show command, a bare
+        word about the app or the slide in front of the speaker, or an order
+        about the picture — each with the side it named, if it named one.
+
+        A bare command with no wrapper round it named no side, which is what
+        every utterance was before the room had two shows to aim at.
+        """
+        if isinstance(matched, ShelfCommand):
+            self._play_shelf_aloud(matched)
+        elif isinstance(matched, ShowControl):
+            self._run_show_command(matched.command, matched.side)
+        elif isinstance(matched, SurfaceCommand):
+            if isinstance(matched.command, AppCommand):
+                self._run_app_command(matched.command, matched.side)
+            else:
+                self._on_picture_command(matched)
+        elif isinstance(matched, ShowCommand):
             self._run_show_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
         elif isinstance(matched, DialSetting):
             self._set_stroke_dial(matched)
         else:
-            self._on_picture_command(matched)
+            self._on_picture_command(SurfaceCommand(matched))
 
     def _answer_command(self, message: str):
         """Say what a spoken command did, where the speaker is looking — the
@@ -3478,8 +3819,9 @@ class GalleryView(QWidget):
         else:
             self._show_voice_status(message, transient=True)
 
-    def _run_show_command(self, command: ShowCommand):
-        """Get the show going, hold it, or close it.
+    def _run_show_command(self, command: ShowCommand, side: str | None = None):
+        """Get the show going, hold it, or close it — on *side*'s region when
+        the utterance named one, else on the show that is up.
 
         Pausing is a pace of nought and starting is that pace back at the
         standard number, because a show that never moves on is exactly what a
@@ -3490,7 +3832,7 @@ class GalleryView(QWidget):
         reads four would get no word of a change that never happened, and would
         stay frozen through the very command meant to start it.
         """
-        show = self._slideshow
+        show = self._voice_surface(side)
         if command is ShowCommand.STOP:
             if show is None:
                 self._show_voice_status("🎤 no slideshow to close", transient=True)
@@ -3504,7 +3846,7 @@ class GalleryView(QWidget):
             if command is ShowCommand.PAUSE:
                 self._show_voice_status("🎤 no slideshow to pause", transient=True)
                 return
-            self._start_slideshow()
+            self._start_slideshow(side=side)
             if self._slideshow is None:
                 self._show_voice_status("🎤 nothing here to play", transient=True)
             return
@@ -3516,7 +3858,7 @@ class GalleryView(QWidget):
 
     # --- the bare vocabulary: a shelf, a switch, a knob, or the slide --------
 
-    def _run_app_command(self, command: AppCommand):
+    def _run_app_command(self, command: AppCommand, side: str | None = None):
         """One bare spoken word.
 
         Four kinds, and which it is decides where it lands: a shelf name stands
@@ -3526,7 +3868,7 @@ class GalleryView(QWidget):
         show while one is up and the gallery otherwise.
         """
         if command in _VOICE_SHELVES:
-            self._go_to_shelf(command)
+            self._go_to_shelf(command, side)
         elif command in _VOICE_SWITCHES:
             self._flip_switch(command)
         elif command in _VOICE_STROKE:
@@ -3536,17 +3878,21 @@ class GalleryView(QWidget):
         else:
             self._run_in_gallery(command)
 
-    def _go_to_shelf(self, command: AppCommand):
+    def _go_to_shelf(self, command: AppCommand, side: str | None = None):
         """Stand in the shelf a spoken name asks for, exactly as clicking its
         row does.
 
         Said over a show it still moves — the tree is behind the show, and the
         move is what the show leaves you standing in — so the answer says which
         shelf rather than refusing a command whose whole effect is out of sight.
+
+        Every shelf has two rows now, one per side, so the utterance's own side
+        picks which; unsided, _tree_item_for takes the tree's own answer for
+        the folder — the same row a click would have landed on.
         """
         key = _VOICE_SHELVES[command]
         label = _SHELF_LABELS[key]
-        item = self._item_by_key.get(key)
+        item = self._tree_item_for(oriented_key(key, side) if side else key)
         if item is None:  # Recents and Starred appear only once there is one
             self._answer_command(f"🎤 no {label} shelf yet")
             return
@@ -3565,6 +3911,9 @@ class GalleryView(QWidget):
         """
         attribute, want, name = _VOICE_SWITCHES[command]
         button = getattr(self, attribute)
+        if button is None:  # hosted: the session owns the audio bed and the mic
+            self._answer_command(f"🎤 {name} is the session's here")
+            return
         if not button.isEnabled():
             self._answer_command(f"🎤 {name} can't be switched here")
             return
@@ -3655,14 +4004,17 @@ class GalleryView(QWidget):
         (or several parts, or "fix all"), "enhance" for the better version of
         it, or "genau it" to animate it as a Genau clip.
 
+        A named side takes that region's show — hosted, two shows run at once
+        and neither is the active window, so naming one is the only way to say
+        which picture is meant.  Unnamed, it goes to whichever show is up.
         Answered out of the show's own note — the speaker is looking at it, not
         at this pane. Said with no show up, "enhance" falls to the bank button of
         the same name; the other two have no "on screen" to act on, and the
         utterance has already been claimed as a command by the time it gets here,
         so the caption says so rather than letting it vanish."""
-        show = self._slideshow
+        show = self._voice_surface(command.side)
         if show is None:
-            if command == gallery.ENHANCE_COMMAND:
+            if command.command == gallery.ENHANCE_COMMAND:
                 # The word names a bank button too, and with no picture filling
                 # the screen the button is what it means — aimed the way a click
                 # aims it, at the picked thumbnails else the folder's unenhanced
@@ -3670,18 +4022,184 @@ class GalleryView(QWidget):
                 # perfectly good thing to do.
                 self._press_bank_button(self._enhance_btn, self._enhance_selection)
                 return
-            wants = _VOICE_WANTS.get(command) or f"a {gallery.name_parts(command)} fix"
+            wants = (_VOICE_WANTS.get(command.command)
+                     or f"a {gallery.name_parts(command.command)} fix")
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)
             return
         target = show.voice_target()
-        if command == gallery.GENAU_COMMAND:
+        if command.command == gallery.GENAU_COMMAND:
             prompt_id, message = self._genau_it(target)
-        elif command == gallery.ENHANCE_COMMAND:
+        elif command.command == gallery.ENHANCE_COMMAND:
             prompt_id, message = self._enhance_it(target)
         else:
-            prompt_id, message = self._fix_parts(target, command)
+            prompt_id, message = self._fix_parts(target, command.command)
         show.note_voice_run(prompt_id, message)
+
+    def _voice_surface(self, side: str | None):
+        """The show a spoken command means: *side*'s region show when it named
+        one, else the show that is up.
+
+        Hosted, a named side that holds nothing is an answer in itself —
+        falling back to the other region's show would act on the picture the
+        speaker did not name."""
+        if side is not None and self._fun_time is not None:
+            return self.region_show(side)
+        return self._slideshow
+
+    def region_base_location(self, side: str) -> str:
+        """Where a region plays from with nothing else asked for: the whole
+        library, narrowed to that region's shape.
+
+        The base state of origenerator mode, and what its reset goes back to.
+        It is what the satellite players do in player mode — each shuffles the
+        whole library of its own orientation — and this side is meant to read
+        the same way.
+        """
+        return oriented_key(gallery.ALL_KEY, side)
+
+    def fill_the_regions(self) -> None:
+        """Put a show on each region: the whole library, shuffled, one shape each.
+
+        What entering origenerator mode means — the session's own mode opens
+        with both players playing, so this one opens with both regions playing
+        rather than with two empty rectangles and a mode that has to be started
+        by hand.  Each side gets the shape it can show, and a region already
+        holding a show is left alone: the switch is no reason to interrupt
+        something already up.
+        """
+        self._regions_wanted = True
+        for side in ("portrait", "landscape"):
+            if self.region_show(side) is not None:
+                continue
+            key = self.region_base_location(side)
+            items = self._slideshow_items(self._rows_at(key))
+            if not items:
+                # Not a dead end: the tree this reads is built by the first
+                # refresh, and the session's OPEN_SHOWS can arrive before it
+                # (the launch races the boot).  A region owed its base state
+                # gets it on the next refresh -- see :meth:`refresh` -- because
+                # a black rectangle is what this mode's base state exists to
+                # not be.
+                logger.info("Nothing of %s shape to open on the %s region yet",
+                            side, side)
+                continue
+            logger.info("The %s region opens on the library of its shape: %d items",
+                        side, len(items))
+            self._open_slideshow(items, location=key, side=side, looping=False,
+                                 starred_ids=self._starred_prompt_ids())
+
+    def close_the_regions(self) -> None:
+        """Give both regions back -- the session leaving origenerator mode.
+
+        The wanting is dropped first: a show closing while the mode still wants
+        its regions is refilled with the base state, and these closes must not
+        be.
+        """
+        self._regions_wanted = False
+        for side in ("portrait", "landscape"):
+            show = self.region_show(side)
+            if show is not None:
+                show.close()
+
+    def _refill_region(self, side: str) -> None:
+        """Put *side* back on its base state, if the mode still wants it there.
+
+        What a region does when the show covering it ends -- the loop button
+        pressed off, an Escape, a set culled empty.  In origenerator mode the
+        player underneath is blacked for the whole mode, so a region left empty
+        is a black rectangle rather than a fallback.
+        """
+        if not self._regions_wanted or self.region_show(side) is not None:
+            return
+        key = self.region_base_location(side)
+        items = self._slideshow_items(self._rows_at(key))
+        if not items:
+            return
+        self._open_slideshow(items, location=key, side=side, looping=False,
+                             starred_ids=self._starred_prompt_ids())
+
+    def _side_of(self, show) -> str | None:
+        """Which satellite region *show* is holding, if it holds one."""
+        return next((side for side, held in self._region_shows.items()
+                     if held is show), None)
+
+    def reset_region(self, show) -> None:
+        """A region's reset: back to the base state, not to the top of whatever
+        that region happens to be playing.
+
+        The players' own meaning of the button — reset drops the narrowing and
+        leaves the satellite shuffling its whole library again — so a show
+        started on one folder goes back to the library of its shape.  A region
+        with nothing to play there, and a show holding no region at all, fall
+        back to the show's own reset rather than emptying the screen.
+        """
+        side = self._side_of(show)
+        if side is None:
+            show.reset_in_place()
+            return
+        key = self.region_base_location(side)
+        items = self._slideshow_items(self._rows_at(key))
+        if not items:
+            show.reset_in_place()
+            return
+        # The show is being re-pointed, so what feeds it has to move with it:
+        # a generation landing in the library must reach a reset region.
+        self._live_shows = [(held, key if held is show else where)
+                            for held, where in self._live_shows]
+        show.retune(items, order_label="Shuffle", looping=False)
+
+    def _play_shelf_aloud(self, command) -> None:
+        """A spoken shelf name, on the named side.
+
+        "Favorites" is the exception, and it is the players' own meaning: on a
+        player that word is F-mode — narrow what is playing to the favorites —
+        so on a show it is the same switch, the one its HUD draws.  Opening the
+        shelf as a fresh show instead would answer a word the HUD already has a
+        button for with something else entirely.
+
+        The rest play: every shelf belongs to one side, so a named side picks
+        that side's copy and what lands on a region is homogeneous — exactly as
+        it is when that shelf's own slideshow button opens it — and Latest plays
+        newest-first the way that shelf's own show does.  Standalone, and hosted
+        with no side named, it is the shelf on the side being browsed: there is
+        no shelf spanning both to fall back to, and the half you are looking at
+        is the half the word meant.  The browser is left where it is: this
+        starts a show, it does not go browsing."""
+        if command.shelf_key == _STARRED_KEY:
+            self._toggle_f_mode_aloud(command.side)
+            return
+        orientation = (command.side if command.side and self._fun_time is not None
+                       else self._current_side())
+        key = oriented_key(command.shelf_key, orientation)
+        rows = self._browser.rows_for_shelf(key) or []
+        items = self._slideshow_items(rows)
+        if not items:
+            self._show_voice_status("🎤 nothing there to play", transient=True)
+            return
+        latest = command.shelf_key == _RECENTS_KEY
+        self._open_slideshow(
+            items, location=key, side=command.side,
+            shuffle=(lambda order: None) if latest else None,
+            order_label="Latest" if latest else "Shuffle",
+            starred_ids=self._starred_prompt_ids(),
+        )
+
+    def _toggle_f_mode_aloud(self, side) -> None:
+        """The spoken "favorites": the show's own F-mode switch, flipped.
+
+        The same thing its HUD button does and the same thing the word does on
+        a player, so the readout — the lit button and the status line — says so
+        without anything here having to draw it."""
+        show = self._voice_surface(side)
+        if show is None or not hasattr(show, "toggle_f_mode"):
+            self._show_voice_status(
+                "🎤 F-mode needs a show to narrow", transient=True)
+            return
+        show.toggle_f_mode()
+        self._show_voice_status(
+            "🎤 F-mode on" if getattr(show, "hud_f_mode", False) else "🎤 F-mode off",
+            transient=True)
 
     def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
         """Enhance the picture on screen: the id it launched on (``None`` when it
@@ -3752,15 +4270,21 @@ class GalleryView(QWidget):
 
     # --- spoken requests: "Request … over" over whatever is on screen ---------
 
-    def _on_spoken_request(self, spoken):
-        """One step of a spoken request, from the mic's dictation.
+    def _on_spoken_request(self, spoken, side: str | None = None):
+        """One step of a spoken request — from the mic's dictation, or from the
+        hosting session's channel with the region it was said to.
 
         While it is still being said the show holds and the corner says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
         the picture that prompted it, not whatever is up when the words run out.
+
+        Hosted, *side* is what makes "the picture" a picture at all: two shows
+        run at once on the satellite regions and neither is the active window,
+        so the region named is the only thing that says which one the words are
+        about.
         """
-        show = self._slideshow
+        show = self._voice_surface(side)
         if self._request_target is None:
             # Taken at the first step of the request, whichever step that is —
             # "Request, no hat, over" is a whole one in a single breath.
@@ -3774,7 +4298,7 @@ class GalleryView(QWidget):
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(show, "🎤 request dropped — never heard “over”")
             return
-        self._begin_request(target, spoken)
+        self._begin_request(target, spoken, side)
 
     def _voice_request_target(self, show) -> str | None:
         """What a request just opened is about: the slide filling the screen
@@ -3800,7 +4324,7 @@ class GalleryView(QWidget):
         else:
             self._show_voice_status(message, transient=True)
 
-    def _begin_request(self, prompt_id: str | None, spoken):
+    def _begin_request(self, prompt_id: str | None, spoken, side: str | None = None):
         """Start working out what a finished request changes.
 
         The working-out goes to the pool because it may have to ask the local
@@ -3809,9 +4333,13 @@ class GalleryView(QWidget):
         moment the app must not stutter. Whatever can be answered without that
         (nothing on screen, a recipe this app can't rebuild) is answered here,
         so a request that was never going to run doesn't wait on a model.
+
+        The side rides the pool's context so the answer comes back to the same
+        region the request was said to — seconds later, with two shows running,
+        it is the only thing that still says which.
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
-        show = self._slideshow
+        show = self._voice_surface(side)
         if row is None:
             self._answer_request(show, "🎤 nothing on screen to request a change to")
             return
@@ -3823,7 +4351,7 @@ class GalleryView(QWidget):
         params = filled_params(row, workflow)
         self._answer_request(show, f"🎤 working out “{spoken.text}”…")
         QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken),
+            self._revision, (row, workflow, params, spoken, side),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
             spoken.text,
         ))
@@ -3832,10 +4360,11 @@ class GalleryView(QWidget):
         """The revision came back from the pool: queue it, and say what it did.
 
         The show is looked up now rather than remembered, so an answer that took
-        a couple of seconds still lands wherever the speaker is looking.
+        a couple of seconds still lands wherever the speaker is looking — on
+        the region the request named, hosted, since two of them are up.
         """
-        row, workflow, params, spoken = context
-        show = self._slideshow
+        row, workflow, params, spoken, side = context
+        show = self._voice_surface(side)
         if revision is None:
             self._answer_request(show, f"🎤 didn't catch what to change in “{spoken.text}”")
             return
@@ -3872,22 +4401,24 @@ class GalleryView(QWidget):
         return f"🎤 {revision.describe()} — generating"
 
     def _feed_slideshow_enhanced(self, row: dict | None):
-        """Hand a landed enhancement to an open show, so the item becomes the
-        better version there rather than the version it was made from. A show
-        ignores an id it isn't holding.
+        """Hand a landed enhancement to every open show, so the item becomes
+        the better version there rather than the version it was made from.
+        Every one is told; each ignores an id it isn't holding — hosted, two
+        run at once on the satellite regions.
 
         Not only while that item is the one on screen: an enhancement asked for
         from a show lands minutes later, by which time it has long paged on, so an
         upgrade it doesn't take here it never takes at all. The show also draws
         each item small as a neighbor, so it takes the new thumbnail with the file.
         """
-        if row is None or self._slideshow is None:
+        if row is None:
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
-        self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1],
-                                      still=row.get("thumbnail_path"))
+        for surface in self._open_surfaces():
+            surface.note_enhanced(row["prompt_id"], preview[0], preview[1],
+                                  still=row.get("thumbnail_path"))
 
     def enhancing_run(self, row: dict) -> EnhancingRun | None:
         """The standalone enhance being made of this image right now, or ``None``.
@@ -4073,34 +4604,231 @@ class GalleryView(QWidget):
         if awaiting:
             self._enqueue_enhancements(awaiting)
 
-    def _start_slideshow(self):
-        """Open what's on screen — a folder, or the Recents/Starred shelf — as a
-        fullscreen slideshow, shuffled and running at the app-wide pace, and
-        standing where the last show was closed when that slide is in here."""
+    def _start_slideshow(self, *, side: str | None = None):
+        """Open what's on screen — a folder, or the Latest/Favorites shelf —
+        as a fullscreen slideshow, shuffled and running at the app-wide pace,
+        and standing where the last show was closed when that slide is in
+        here."""
         items = self._slideshow_items(self._slideshow_rows())
         if not items:
             return
-        show = self._open_slideshow(items, resume=self._show_state)
-        logger.info("Slideshow of %s: %d items, shuffled order[:10]=%s",
+        location = self._show_location()
+        # Recents is Latest, exactly as on a Fun Time player: the shelf lists
+        # newest first and its slideshow plays that order, where every other
+        # set shuffles — and the show's HUD status line says which.
+        base, orientation = _split_shelf_key(location)
+        latest = base == _RECENTS_KEY
+        show = self._open_slideshow(
+            items, location=location, side=side or orientation,
+            resume=self._show_state,
+            shuffle=(lambda order: None) if latest else None,
+            order_label="Latest" if latest else "Shuffle",
+            starred_ids=self._starred_prompt_ids(),
+        )
+        logger.info("Slideshow of %s: %d items, %s order[:10]=%s",
                     self._slideshow_subject(), len(items),
-                    show._playlist.order[:10])
+                    "latest" if latest else "shuffled", show._playlist.order[:10])
 
-    def _on_slideshow_closed(self):
-        """The show was dismissed (however): note where it had got to, let it go
-        with the hold it put on videos, and hand the OSR2 back to whatever the
-        toggle was driving. The mic is untouched — it answers to its own button,
-        and "start slideshow" has to still be heard now there is no show to hear
-        it over.
+    def _on_slideshow_closed(self, show=None):
+        """A show was dismissed (however): let it go, with the hold it put on
+        videos, and hand the OSR2 back to whatever the toggle was driving. The
+        mic is untouched — it answers to its own button, and "start slideshow"
+        has to still be heard now there is no show to hear it over.
 
-        Noted because closing a show is rarely being done with it: the next one
-        opens back on the slide this one ended on, so the look at the folder
-        behind a picture doesn't cost the place among them.
+        Named rather than assumed, because inside Fun Time two shows run at
+        once: closing the portrait one must not forget the landscape one — and
+        the videos stay held while the other one is still playing them.
         """
-        if self._slideshow is not None:
-            self._show_state = self._slideshow.state()
-        self._slideshow = None
-        self._reroll.hold_videos(False)
+        # Where it had got to, so the next one opens back on that slide: the
+        # look at the folder behind a picture doesn't cost the place among them.
+        if show is not None and hasattr(show, "state"):
+            self._show_state = show.state()
+        self._live_shows = [entry for entry in self._live_shows
+                            if entry[0] is not show]
+        side = self._side_of(show) if show is not None else None
+        if show is None or self._slideshow is show:
+            self._slideshow = next((s for s, _loc in reversed(self._live_shows)), None)
+        if self._slideshow is None:
+            self._reroll.hold_videos(False)
         self._reconcile_osr2()
+        if side is not None:
+            # Whatever ended it -- the loop button pressed off, an Escape, a set
+            # culled empty -- the region goes back to browsing its library.  The
+            # player under it is blacked for the whole mode, so an empty region
+            # is a black rectangle, which is the one thing the base state is for.
+            self._region_shows[side] = None
+            self._refill_region(side)
+
+    def _show_location(self):
+        """Where the view on screen is playing FROM, as something re-askable:
+        a shelf key on a shelf, else the open folder's key.
+
+        A key rather than the rows themselves, because the point of holding it
+        is to ask again later — after a generation lands in that folder, when
+        the rows are new objects and the browser is somewhere else entirely.
+        """
+        shelf = self._current_shelf_key()
+        if shelf is not None:
+            return shelf
+        # The row's own key, not the folder's: which side the folder is being
+        # looked at from is what decides the screen a show of it goes to.
+        return (self._selected_folder_key()
+                if self._current_group() is not None else None)
+
+    def _rows_at(self, location) -> list[dict]:
+        """What a show opened at *location* would play if it opened now.
+
+        Every key names a shape as well as a place: the shelves narrow
+        themselves (``rows_for_shelf`` splits the key it is handed), and a
+        folder row was built from one side's rows to begin with.  That is what
+        lets a region's base state be "the whole library, this side's shape"
+        and still be re-askable as the library grows.
+        """
+        if not location:
+            return []
+        rows = self._browser.rows_for_shelf(location)
+        if rows is not None:
+            return rows
+        group = self._group_for_key(location)
+        return gallery.rows_under(group) if group is not None else []
+
+    def _open_generate_tab_for(self, prompt_id: str) -> None:
+        """A lock on a hosted show: go to the held item, in the browser and in
+        the tabs — the way the RFB answers a lock by opening the video's tab.
+
+        The item itself, not one of its siblings.  Asking the pane to reveal a
+        config brings forward whichever tab is already on that SETTINGS folder,
+        and every seed of one recipe shares that folder — so the tab that came
+        up was a sibling of the held picture rather than the picture, which is
+        the "wrong item, a similar one" this used to open.  So the browser is
+        navigated to the item first (its own folder, its own tile picked), and
+        the tab is then loaded from the row that navigation selected.
+        """
+        row = self._row_for(prompt_id)
+        if row is None:
+            return
+        self._on_source_link(prompt_id)  # its folder, its tile, out of any search
+        self._info_tabs.load_selection(row, self._image_rows)
+
+
+    def _starred_prompt_ids(self) -> set[str]:
+        """Which generations are favorites (starred), for the shows' HUD: the
+        star readout on the current item, and the F-mode narrowing — the same
+        concepts the players' HUD wears, over the same collection the
+        Favorites shelf lists."""
+        return {row["prompt_id"] for row in self._db.list_generations()
+                if row.get("starred")}
+
+    def _present_surface(self, view, side: str):
+        """Put a full-screen surface on screen: over the whole monitor
+        standalone, or — inside Fun Time — on the satellite region *side*,
+        replacing whatever show currently holds it.
+
+        A region show is frameless (the region IS the window, like every
+        managed player) and topmost, since the satellite player it covers is
+        topmost itself; Fun Time restacks the band as its modes change.
+
+        Either way it ends up wearing the players' HUD (:meth:`_wear_the_hud`):
+        the panel is about the show, and a show is a show wherever it is.
+        """
+        if self._fun_time is None:
+            view.showFullScreen()
+            self._wear_the_hud(view, side)
+            return
+        occupant = self._region_shows.get(side)
+        if occupant is not None and occupant.isVisible():
+            occupant.close()
+        view.setWindowTitle(SHOW_TITLES[side])
+        view.setWindowFlags(
+            view.windowFlags()
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        # Silent like every satellite: the session's main player owns the
+        # room's audio, and this surface is landing on a satellite's region.
+        # Standalone the same view is the deliberate foreground and plays sound.
+        if hasattr(view, "set_audio_muted"):
+            view.set_audio_muted(True)
+        rect = self._fun_time.region_rect(side)
+        view.setGeometry(rect.x, rect.y, rect.width, rect.height)
+        view.show()
+        # The show answers its own keys (a slideshow's arrows, a fullscreen
+        # view's paging), so it takes the keyboard the moment it opens —
+        # left unfocused, those keys land in the main window and the view
+        # reads as dead.  raise_() first: activation alone does not lift a
+        # window over the topmost players it shares the region with.
+        view.raise_()
+        view.activateWindow()
+        self._region_shows[side] = view
+        # A show opened while the hosting session is frozen opens frozen: the
+        # room's OmniPause holds everything, this surface included, from its
+        # first frame — not from whenever the flag next changes.
+        if self._session_paused and hasattr(view, "set_session_paused"):
+            view.set_session_paused(True)
+        self._wear_the_hud(view, side)
+
+    def _wear_the_hud(self, view, side: str) -> None:
+        """Put the players' own HUD on *view* — the same panel, rendered by the
+        same shared code: the status line, this side's transport, and the nav
+        map speaking the set as a seed family.  The view's own furnishings come
+        off with it, because the map says all of it.
+
+        Hosted, the show covers a satellite player's HUD and has to BE that
+        HUD: its session commands go out on the session's channel and the mode
+        pair leads the panel.  Standalone the panel is the same panel minus
+        those two — no channel to post on, so the transport lands on the show
+        itself, and no session to switch modes on, so no mode row.
+
+        A player_core with no shared HUD in it leaves the show as it was, with
+        its own stills and plate still on — see :func:`_shared_hud_widget`.
+        """
+        hud = _shared_hud_widget()
+        if hud is None or not hasattr(view, "adopt_hud"):
+            return
+        view.adopt_hud()
+        hud(view, side=side,
+            dashboard_cmd_file=(None if self._fun_time is None
+                                else self._fun_time.dashboard_cmd_file))
+
+    def set_session_paused(self, paused: bool) -> None:
+        """The hosting session's OmniPause, applied to every open show and
+        remembered for the ones not opened yet (see :meth:`_present_surface`).
+        The bridge calls this on the flag's edges; the memory is what makes
+        the freeze cover a show the user opens mid-pause.
+
+        And to this window's own moving pictures — OmniPause means the room
+        stops, not the shows stop.  Two kinds, held in the two places that
+        build them rather than widget by widget here: every looping WebP
+        thumbnail, wherever it is drawn (the grid, the shelves, a tab's history
+        strip, the "Animated in" strip), through
+        :mod:`origenerator.gui.looping_preview`; and the real video a generate
+        tab plays, through the tabs.  Wiring each widget separately is how a
+        strip nobody remembered went on playing through a frozen room.
+
+        The shows come first and the rest cannot be skipped if one of them
+        raises, so each is its own step: a freeze that stopped at the first
+        show left the thumbnails running with no sign of why.
+        """
+        self._session_paused = paused
+        # Every show this window has open, taken from the list it keeps of them
+        # rather than from the region map: that map answers only for a show it
+        # considers VISIBLE, and a show the session has covered or parked is
+        # still a show that must not go on playing through a frozen room.
+        for show, _where in list(self._live_shows):
+            if not hasattr(show, "set_session_paused"):
+                continue
+            try:
+                show.set_session_paused(paused)
+            except Exception:
+                logger.exception("Freezing a show failed")
+        set_previews_paused(paused)
+        self._info_tabs.set_previews_paused(paused)
+
+    def region_show(self, side: str):
+        """The show occupying satellite region *side*, or None — a closed
+        window is no occupant, however recently it was one."""
+        show = self._region_shows.get(side)
+        return show if show is not None and show.isVisible() else None
 
     def _slideshow_items(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
@@ -4122,22 +4850,26 @@ class GalleryView(QWidget):
         return items
 
     def _feed_slideshow_finished(self, row: dict | None):
-        """A generation landed: it joins an open slideshow if that show would be
-        playing it had it opened now.
+        """A generation landed: it joins every open show that would be playing
+        it had that show opened now.
 
         Which is the whole point of watching a folder that is auto-generating —
         the playlist is otherwise the fixed set the show opened with, so the
         items the loop makes while it runs are exactly the ones it never reaches.
-        Asked of the rows on screen rather than of a folder key remembered at
-        open time, so a shelf's show and a parent folder's answer it the same way
-        their tiles would.
+        Asked of each show's OWN location, remembered when it opened, rather
+        than of the view on screen: inside Fun Time the shows play on the
+        satellite regions while the main window goes on being used, so by the
+        time a generation lands the browser is usually somewhere else — and
+        there may be two shows, of two different folders, both keeping up.
         """
-        if self._slideshow is None or row is None:
+        if row is None:
             return
-        if not any(r["prompt_id"] == row["prompt_id"] for r in self._slideshow_rows()):
-            return
-        for item in self._slideshow_items([row]):
-            self._slideshow.note_added(*item)
+        for show, location in list(self._live_shows):
+            if not any(r["prompt_id"] == row["prompt_id"]
+                       for r in self._rows_at(location)):
+                continue
+            for item in self._slideshow_items([row]):
+                show.note_added(*item)
 
     def _feed_slideshow_generating(self, prompt_id: str, frame: bytes):
         """A run streamed a frame: an open show playing its folder takes it in as
@@ -4906,13 +5638,24 @@ class GalleryView(QWidget):
         combination with no folder yet, so park on Recents — where its in-flight
         card shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
-        item = self._item_by_key.get(key)
+        item = self._tree_item_for(key)
         if item is not None:
             self._tree.setCurrentItem(item)  # existing folder: watch the live tile
             self._select_reroll(key)
-        elif self._recents_item is not None:
+        elif (recents := self._shelf_item(_RECENTS_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
-            self._tree.setCurrentItem(self._recents_item)
+            self._tree.setCurrentItem(recents)
+
+    def _launched_side(self, key: str) -> str:
+        """Which side a job just launched in folder ``key`` will land on.
+
+        Read off the size it asked for, since it has no picture to measure yet —
+        the same thing that puts its in-flight card on one Recents shelf rather
+        than the other. With no job to ask, the side being browsed.
+        """
+        job = self._reroll.job_for(key)
+        asked = requested_orientation(job.params) if job is not None else None
+        return asked or self._current_side()
 
     # --- re-roll as the info-pane source ----------------------------------
 
@@ -4936,7 +5679,10 @@ class GalleryView(QWidget):
         video stage warms up) rather than the fresh video job's empty preview.
         A no-op unless that re-roll is still running in the folder now on screen.
         """
-        if key is None or key not in self._reroll_jobs or self._tree_view.selected_folder_key() != key:
+        # ``key`` is the folder the job is filed under, so what it is checked
+        # against is the folder on screen rather than the row showing it.
+        if (key is None or key not in self._reroll_jobs
+                or getattr(self._current_group(), "key", None) != key):
             return
         self._last_reroll_frame = frame
         self._enter_reroll_selection(key)
@@ -5110,7 +5856,7 @@ class GalleryView(QWidget):
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
-            item = self._item_by_key.get(self._pending_auto_key)
+            item = self._tree_item_for(self._pending_auto_key)
             if item is not None:
                 self._pending_auto_key = None
                 self._tree.setCurrentItem(item)
@@ -5118,7 +5864,7 @@ class GalleryView(QWidget):
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:
             self._pending_combine_key = None
-            item = self._item_by_key.get(key)
+            item = self._tree_item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
         self._enhance_frames.pop(key, None)   # this run's frames are spent
@@ -5212,6 +5958,10 @@ class GalleryView(QWidget):
         search index are all built from the same narrowed set."""
         self._browser.restart_recents_listing()  # a new filter is a new listing
         self.refresh()
+        # A filter that empties the gallery leaves the tree with no row to
+        # select, so the folder-selected signal that normally re-syncs this
+        # button never fires — and it went on offering a show of nothing.
+        self._sync_slideshow_button()
 
     def _drill_into(self, key: str):
         self._browser._drill_into(key)
@@ -5587,21 +6337,23 @@ class GalleryView(QWidget):
         for key in reversed(self._folder_history):
             if key not in doomed and (item := self._item_by_key.get(key)) is not None:
                 return item
-        item = self._item_by_key.get(group.key)
+        item = self._tree_item_for(group.key)
         return item.parent() if item is not None else None
 
     def _keys_under(self, group) -> set[str]:
-        """``group``'s key plus every folder key nested under it in the tree — the
-        folders a delete of ``group`` removes, so a return target can avoid them."""
-        item = self._item_by_key.get(group.key)
-        if item is None:
-            return {group.key}
-        keys, stack = set(), [item]
+        """The tree keys of every row drawing ``group``, and of every row nested
+        under those — what a delete of ``group`` takes off the tree, so a return
+        target can avoid them.
+
+        Both sides, because a folder holding both shapes is drawn twice and the
+        delete takes both copies.
+        """
+        keys, stack = set(), [self._item_by_key[key] for key
+                              in self._tree_view.keys_for_folder(group.key)]
         while stack:
             node = stack.pop()
-            node_group = node.data(0, _GROUP_ROLE)
-            if node_group is not None:
-                keys.add(node_group.key)
+            if node.data(0, _GROUP_ROLE) is not None:
+                keys.add(node.data(0, _TREE_KEY_ROLE))
             stack.extend(node.child(i) for i in range(node.childCount()))
         return keys
 
@@ -5617,8 +6369,8 @@ class GalleryView(QWidget):
         something else keep it.
         """
         self._info_tabs.release_media(paths)
-        if self._slideshow is not None:
-            self._slideshow.release_media(paths)
+        for surface in self._open_surfaces():
+            surface.release_media(paths)
 
     def _cancel_enhancements_of(self, rows):
         """Stop every standalone enhance still being made of ``rows`` — the items
@@ -5711,9 +6463,7 @@ class GalleryView(QWidget):
 
     # --- rename & star -----------------------------------------------------
 
-    def _on_tree_context_menu(self, pos: QPoint):
-        global_pos = self._tree.viewport().mapToGlobal(pos)
-        item = self._tree.itemAt(pos)
+    def _on_tree_context_menu(self, item, global_pos: QPoint):
         if item is None:
             self._empty_tree_context_menu(global_pos)
             return
@@ -5726,9 +6476,10 @@ class GalleryView(QWidget):
             ):
                 self._selection_context_menu(global_pos)
                 return
-        group = item.data(0, _GROUP_ROLE)
-        if group is not None:
-            self._folder_context_menu(group.key, global_pos)
+        if item.data(0, _GROUP_ROLE) is not None:
+            # The row under the cursor, not the folder it draws: the same folder
+            # on the other side is a different row with its own menu.
+            self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos)
 
     def _empty_tree_context_menu(self, global_pos: QPoint):
         """Below the last row there is no folder to act on, so the only thing on
@@ -5747,10 +6498,9 @@ class GalleryView(QWidget):
             self._group_selection()
 
     def _folder_context_menu(self, key: str, global_pos: QPoint):
-        item = self._item_by_key.get(key)
-        if item is None:
+        group = self._group_for_key(key)
+        if group is None:
             return
-        group = item.data(0, _GROUP_ROLE)
         if isinstance(group, gallery.CustomGroup):
             self._custom_folder_context_menu(group, global_pos)
             return
@@ -5765,7 +6515,7 @@ class GalleryView(QWidget):
         open_custom = self._current_group()
         remove_action = None
         if isinstance(open_custom, gallery.CustomGroup) and open_custom.folder_id is not None \
-                and any(m.key == key for m in gallery.child_groups(open_custom)):
+                and any(m.key == group.key for m in gallery.child_groups(open_custom)):
             remove_action = menu.addAction(f"Remove from “{open_custom.label}”")
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
@@ -5778,7 +6528,7 @@ class GalleryView(QWidget):
         elif chosen == star_action:
             self._toggle_star(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(open_custom, key)
+            self._remove_from_custom_folder(open_custom, group.key)
         elif chosen in add_menu:
             self._on_folders_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
@@ -5790,7 +6540,7 @@ class GalleryView(QWidget):
         a folder scrolled out of sight). Returns ``{action: custom folder key}``,
         empty when there are no folders of the user's own yet."""
         targets = [f for f in self._custom_folders
-                   if not any(m.key == key for m in gallery.child_groups(f))]
+                   if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
         submenu = menu.addMenu("Add to folder")
@@ -5811,8 +6561,8 @@ class GalleryView(QWidget):
             self._remove_custom_folder(group)
 
     def _rename_folder(self, key: str):
-        item = self._item_by_key.get(key)
-        current = item.data(0, _GROUP_ROLE).label if item else ""
+        group = self._group_for_key(key)
+        current = group.label if group is not None else ""
         # A derived folder's name is an overlay over the one its settings produce,
         # so blank resets it; a custom folder's name is all it has, so it can't.
         prompt = ("Folder name:" if gallery.is_custom_key(key)
@@ -5822,7 +6572,9 @@ class GalleryView(QWidget):
             self._apply_rename(key, text)
 
     def _apply_rename(self, key: str, name: str):
-        self._actions.rename_folder(key, name.strip() or None)
+        # The name belongs to the folder, so it is saved against the folder's own
+        # key — both sides draw the renamed folder.
+        self._actions.rename_folder(_base_of(key), name.strip() or None)
         self.refresh()
         self._sync_history_buttons()
 
@@ -5864,10 +6616,10 @@ class GalleryView(QWidget):
             self._title.begin_edit(group.label)
 
     def _commit_title_rename(self, name: str):
-        key = self._tree_view.selected_folder_key()
-        if key is None:
+        group = self._current_group()
+        if group is None:
             return
-        self._actions.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(group.key, name.strip() or None)
         self._sync_history_buttons()
         # Rebuild on the next turn of the event loop rather than here. What
         # usually ends this edit is a click somewhere else in the window, and
@@ -5878,15 +6630,15 @@ class GalleryView(QWidget):
         QTimer.singleShot(0, self.refresh)
 
     def _toggle_star(self, key: str):
-        item = self._item_by_key.get(key)
-        starred = bool(item and item.data(0, _GROUP_ROLE).starred)
-        self._db.set_folder_starred(key, not starred)
+        # A star is the folder's, not the row's: both sides draw the same folder,
+        # so starring it on one is starring it.
+        group = self._group_for_key(key)
+        self._db.set_folder_starred(_base_of(key), not bool(group and group.starred))
         self.refresh()
 
     def _delete_folder_by_key(self, key: str):
         """Delete the folder a hover-row trash click names."""
-        item = self._item_by_key.get(key)
-        group = item.data(0, _GROUP_ROLE) if item else None
+        group = self._group_for_key(key)
         if group is not None:
             self._delete_folder(group)
 
@@ -5988,9 +6740,11 @@ class GalleryView(QWidget):
             self._suppress_history = False
 
     def _current_shelf_key(self) -> str | None:
-        """The key of the shelf on screen (Recents/Starred), or ``None`` off them."""
+        """The key of the shelf on screen — one side's Latest, Favorites,
+        Experiments, Requests or Trash — or ``None`` off them."""
         key = self._selected_folder_key()
-        return key if key in _SHELF_KEYS else None
+        base, _orientation = _split_shelf_key(key)
+        return key if base in _SHELF_KEYS else None
 
     def _current_location(self) -> Location | None:
         """What the middle pane is showing right now, as a history stop: the tree
@@ -6072,7 +6826,10 @@ class GalleryView(QWidget):
         self._suppress_history = True
         try:
             self._restore_query(location.query)
-            row = self._item_by_key.get(location.view)
+            # _tree_item_for rather than a bare lookup: a stop recorded before the
+            # tree grew sides names a folder key with no side on it, and that key
+            # still has to find its row.
+            row = self._tree_item_for(location.view)
             if row is None:
                 if location.item is not None:
                     self._show_generation(location.item)

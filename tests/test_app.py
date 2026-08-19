@@ -205,7 +205,7 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         with pytest.raises(SystemExit):
-            main()
+            main([])
 
     # Splash is visible for the whole boot and dismissed once the window shows.
     assert events == ["loading.show", "window.show", "loading.close"]
@@ -243,7 +243,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         with pytest.raises(SystemExit):
-            main()
+            main([])
 
     assert events == [
         "front:loading",  # the splash leads the launch too, not just the window
@@ -274,7 +274,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         with pytest.raises(SystemExit):
-            main()
+            main([])
 
     assert calls[:2] == ["reconcile", "import"]
 
@@ -298,7 +298,7 @@ def test_main_ages_out_the_recovery_bin_on_startup(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         with pytest.raises(SystemExit):
-            main()
+            main([])
 
     sweep.assert_called_once()
     assert sweep.call_args.args[1] is trash
@@ -324,6 +324,77 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient") as mock_client, \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         with pytest.raises(SystemExit):
-            main()
+            main([])
 
     assert mock_client.call_args.kwargs["client_id"] == "persisted-id"
+
+
+def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
+    # Fun Time hands its own AUMID so the hosted window groups with the session;
+    # the pinned Origenerator shortcut keeps the standalone identity, so it is
+    # left unstamped.
+    with patch("origenerator.app.sys.platform", "win32"), \
+         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+        _init_windows_taskbar_identity("FunTime.App")
+
+    mock_set_id.assert_called_once_with("FunTime.App")
+    mock_stamp.assert_not_called()
+
+
+def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
+    window = MagicMock()
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow",
+               return_value=window) as mock_window, \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
+         patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("origenerator.gui.fun_time_bridge.FunTimeBridge") as mock_bridge, \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main(["--fun-time", "--x", "5", "--y", "6",
+                  "--width", "700", "--height", "900"])
+
+    session = mock_window.call_args.kwargs["fun_time"]
+    assert (session.main_rect.x, session.main_rect.y) == (5, 6)
+    # The session's channels are wired up on the gallery.
+    assert mock_bridge.call_args.args[0] is session
+    # Parked until the session's own mode switch restores it: the session may be
+    # in player mode, where popping over the Random Favs Browser is wrong.
+    window.showMinimized.assert_called_once()
+    window.show.assert_not_called()
+
+
+def test_main_in_fun_time_mode_shows_no_splash(qapp):
+    """Hosted, the app boots with no splash at all: the session's own loading
+    screen owns the boot's feedback, and an always-on-top splash of ours can
+    outlive the session's reveal and sit over one of its players — reported
+    as 'the landscape player is behind other windows on startup', and the
+    covering window a z-order walk named was exactly this splash."""
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen") as mock_loading, \
+         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.app_state.AppState"), \
+         patch("origenerator.db.Database"), \
+         patch("origenerator.trash.Trash"), \
+         patch("origenerator.importer.import_comfyui_output", return_value=0), \
+         patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
+         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("origenerator.gui.fun_time_bridge.FunTimeBridge"), \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main(["--fun-time", "--x", "5", "--y", "6",
+                  "--width", "700", "--height", "900"])
+
+    mock_loading.assert_not_called()

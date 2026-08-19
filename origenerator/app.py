@@ -51,12 +51,17 @@ def _name_this_process() -> None:
         pass  # Cosmetic: costs a name in the task list, never a launch.
 
 
-def _init_windows_taskbar_identity() -> None:
+def _init_windows_taskbar_identity(identity: str | None = None) -> None:
     """Give Origenerator its own taskbar identity so the pinned launcher icon
     activates this window instead of spawning a second taskbar button.
 
     Sets the process AppUserModelID and stamps the matching ID onto the pinned
     shortcut, which is what lets Windows group them as one app. No-op off Windows.
+
+    With *identity* (Fun Time hands its own), the process joins that identity
+    instead so the hosted window groups with the session's taskbar button — and
+    the pinned shortcut is left unstamped, since it belongs to the standalone
+    launch and must keep activating that one.
     """
     if sys.platform != "win32":
         return
@@ -66,10 +71,11 @@ def _init_windows_taskbar_identity() -> None:
         stamp_pinned_shortcuts,
     )
     try:
-        set_app_user_model_id(APP_USER_MODEL_ID)
+        set_app_user_model_id(identity or APP_USER_MODEL_ID)
     except OSError:
         pass  # Non-fatal — still try to stamp the shortcut below.
-    stamp_pinned_shortcuts(APP_USER_MODEL_ID, include="origenerator")
+    if identity is None:
+        stamp_pinned_shortcuts(APP_USER_MODEL_ID, include="origenerator")
 
 
 def _bring_to_front(window) -> None:
@@ -166,9 +172,13 @@ def _warm_voice_runtimes() -> None:
             pass  # no voice extra (or a broken one): the app still boots
 
 
-def main():
+def main(argv: list[str] | None = None):
+    from origenerator.fun_time_mode import parse_app_args
+
+    app_args = parse_app_args(sys.argv[1:] if argv is None else argv)
+    fun_time = app_args.fun_time
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
-    _init_windows_taskbar_identity()
+    _init_windows_taskbar_identity(app_args.taskbar_identity)
     _name_this_process()
 
     import logging
@@ -199,7 +209,9 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("BUILD MARKERS: slideshow=random, voice=always-listening (Auto = voice on)")
 
-    app = QApplication.instance() or QApplication(sys.argv)
+    # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
+    # above, and letting Qt re-read those flags would only invite collisions.
+    app = QApplication.instance() or QApplication(sys.argv[:1])
 
     # The one place the stylesheet is applied, and it must be the application:
     # QToolTip popups are top-level widgets a window-level sheet never reaches,
@@ -211,13 +223,25 @@ def main():
     # Show the splash before the slow imports/boot work below so the user gets
     # immediate feedback. Each phase updates its status line; app.processEvents
     # keeps the busy sweep animating while the main thread is blocked.
-    loading = LoadingScreen()
-    loading.show()
-    _bring_to_front(loading)
-    app.processEvents()
+    #
+    # Hosted by Fun Time there is NO splash at all: the session's own loading
+    # screen owns the boot experience and this app boots parked, so a splash
+    # here has no audience — and it is an always-on-top window whose lifetime
+    # is the boot, which on a slow boot left it sitting over a satellite
+    # region after the session revealed ("the landscape player is behind other
+    # windows on startup": the covering window was this splash).  The boot
+    # phases still land in the log.
+    loading = LoadingScreen() if fun_time is None else None
+    if loading is not None:
+        loading.show()
+        _bring_to_front(loading)
+        app.processEvents()
 
     def status(message: str) -> None:
-        loading.set_status(message)
+        if loading is not None:
+            loading.set_status(message)
+        else:
+            logger.info("Boot: %s", message)
         app.processEvents()
 
     status("Starting ComfyUI server...")
@@ -437,15 +461,31 @@ def main():
 
     status("Building the interface...")
     from origenerator.gui.main_window import OrigeneratorWindow
-    window = OrigeneratorWindow(client, db, app_state)
-    window.show()
+    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
+    if fun_time is not None:
+        # The session's channels: its verbs onto the region shows, the paused
+        # flag over them, and the occupancy status back.  Parented to the
+        # window so it lives exactly as long as the app.
+        from origenerator.gui.fun_time_bridge import FunTimeBridge
+        FunTimeBridge(fun_time, window._gallery_view, parent=window)
+        # Parked until the session's own mode switch restores it: the session
+        # may be in player mode, where popping over the RFB would be wrong.
+        window.showMinimized()
+    else:
+        window.show()
 
-    loading.close()
-    # Let the splash's closing settle before asking for the foreground: Windows
-    # hands activation on from a closing window to whatever is next in the
-    # Z-order, and unpumped that lands *after* the request below and undoes it.
-    app.processEvents()
-    _bring_to_front(window)
+    if loading is not None:
+        loading.close()
+        # Let the splash's closing settle before asking for the foreground:
+        # Windows hands activation on from a closing window to whatever is next
+        # in the Z-order, and unpumped that lands *after* the request below and
+        # undoes it.
+        app.processEvents()
+    if fun_time is None:
+        # Hosted, the session decides what is in front — this window is parked
+        # until the satellites switch to origenerator mode, and asking for the
+        # foreground here would pull it over the room mid-boot.
+        _bring_to_front(window)
 
     exit_code = app.exec()
     client.stop()

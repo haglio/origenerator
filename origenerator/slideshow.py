@@ -124,6 +124,31 @@ class SlideshowPlaylist:
         """The shuffled play order (item indices) — exposed for diagnostics."""
         return list(self._order)
 
+    @property
+    def items(self) -> list:
+        """The set in its stable order — what a hosting session's HUD maps as
+        the seed row, whatever order this pass happens to play them in."""
+        return list(self._items)
+
+    def restart(self) -> None:
+        """Back to the top of the pass — the reset gesture's "start it again".
+
+        The top of the PASS, not of the set: a shuffled show's first slide is
+        wherever its shuffle put it, and coming back to that is what starting
+        over looks like from the outside.  The order itself is left as it is,
+        so a reset pressed twice does not keep dealing a different show.
+        """
+        self._pos = 0
+
+    def jump_to(self, item_index: int) -> bool:
+        """Move the pass onto the item at stable position *item_index* — a
+        thumbnail click on the hosting session's HUD map, the same jump a
+        satellite's map makes.  Returns whether the index named an item."""
+        if not 0 <= item_index < len(self._items):
+            return False
+        self._pos = self._order.index(item_index)
+        return True
+
     def in_play_order(self) -> list:
         """The items in the order this pass is playing them, rather than the order
         the set was handed over in — so a playlist built from these, in order,

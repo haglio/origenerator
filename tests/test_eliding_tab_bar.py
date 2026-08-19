@@ -1,7 +1,11 @@
-from PyQt6.QtCore import Qt
+import pytest
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication, QTabWidget, QWidget
 
-from origenerator.gui.eliding_tab_bar import ElidingTabBar
+from origenerator.gui.eliding_tab_bar import (
+    EDGE, MARK, MARK_CANVAS, ElidingTabBar, tab_mark,
+)
 
 
 def _tabs_with(qtbot, n, width=600):
@@ -249,3 +253,66 @@ def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
     first.click()
 
     assert asked == [2]
+
+
+# --- the mark a tab wears, and the space around it ---------------------------
+
+def _picture(width, height, color=Qt.GlobalColor.red) -> QIcon:
+    pixmap = QPixmap(width, height)
+    pixmap.fill(color)
+    return QIcon(pixmap)
+
+
+@pytest.mark.parametrize("shape", [(256, 144), (144, 256), (200, 200)])
+def test_a_mark_is_the_same_width_whatever_shape_the_picture_is(shape):
+    # The row's spacing is built on the mark's width, so a portrait thumbnail
+    # must not push the label further out than a landscape one does.
+    mark = tab_mark(_picture(*shape))
+    assert mark.actualSize(MARK_CANVAS) == MARK_CANVAS
+
+
+def test_a_mark_trails_the_gap_its_label_needs(qtbot):
+    # Qt's own tab layout puts the text a fixed 4px after whatever the icon
+    # measures, so the rest of the gap rides on the canvas as transparency.
+    canvas = tab_mark(_picture(256, 144)).pixmap(MARK_CANVAS).toImage()
+    assert canvas.width() == MARK + EDGE - 4
+    assert canvas.pixelColor(MARK - 1, MARK // 2).alpha() == 255   # picture
+    assert canvas.pixelColor(MARK, MARK // 2).alpha() == 0         # its gap
+
+
+def test_a_tab_with_nothing_to_show_wears_nothing(qtbot):
+    assert tab_mark(QIcon()).isNull()
+
+
+def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
+    # The whole point of the arithmetic above: painted under the real stylesheet,
+    # a tab's mark starts EDGE in from the tab's left edge — the same inset the ✕
+    # keeps at the other end.
+    from origenerator.gui.stylesheet import build_stylesheet
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    try:
+        app.setStyleSheet(build_stylesheet())  # before the widget: it styles on build
+        tabs = QTabWidget()
+        tabs.setTabBar(ElidingTabBar())
+        qtbot.addWidget(tabs)
+        tabs.setTabsClosable(True)
+        tabs.setIconSize(MARK_CANVAS)
+        tabs.addTab(QWidget(), tab_mark(_picture(256, 144)), "a tab")
+        tabs.resize(600, 400)
+        tabs.show()
+        QApplication.processEvents()
+        image = tabs.tabBar().grab().toImage()
+    finally:
+        app.setStyleSheet(prior)
+
+    def is_mark(x, y):
+        color = image.pixelColor(x, y)
+        return color.red() > 180 and color.green() < 80 and color.blue() < 80
+
+    columns = [x for x in range(image.width())
+               if any(is_mark(x, y) for y in range(image.height()))]
+    rect = tabs.tabBar().tabRect(0)
+    assert columns[0] - rect.left() == EDGE
+    assert columns[-1] - columns[0] + 1 == MARK

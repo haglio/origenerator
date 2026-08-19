@@ -1010,10 +1010,9 @@ class GalleryView(QWidget):
         # Picking a different workflow builds a whole new form, so an open find
         # has to let go of the fields it was holding before they're destroyed.
         panel.form_replaced.connect(self._retarget_find)
-        # A tab's title is recomputed from its prompt on every keystroke, so this
-        # is also the signal that the text an open find is marking up has moved
-        # under it — re-run rather than leave highlights on words that shifted.
-        panel.title_changed.connect(self._refresh_find)
+        # Every keystroke in a tab's form moves the text an open find is marking
+        # up — re-run rather than leave highlights on words that shifted.
+        panel.form_edited.connect(self._refresh_find)
 
     # --- Drive OSR2: one switch, the app picking funscript or stroke ----------
 

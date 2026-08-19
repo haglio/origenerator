@@ -224,6 +224,18 @@ def media_type_badge(media_type: str) -> QPixmap:
 
 
 @lru_cache(maxsize=None)
+def media_type_icon(media_type: str) -> QIcon:
+    """The same play/photo mark as :func:`media_type_badge`, bare.
+
+    The badge sits over a thumbnail, so it needs its dark chip to read against
+    any picture; this one sits in a row of text — a config tab's label, where it
+    stands in for the thumbnail a tab has no result to show yet — so the chip
+    would be a black square among words.
+    """
+    return glyph_icon("play" if media_type == "video" else "photo", size=_SIZE)
+
+
+@lru_cache(maxsize=None)
 def star_badge() -> QPixmap:
     """A corner badge marking a starred image or video.
 

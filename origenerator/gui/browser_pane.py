@@ -131,6 +131,11 @@ def _inflight_signature(items) -> tuple:
 # their folder holds (:func:`gallery.job_kind_label`).
 SOURCE_FRAME_KINDS = ("I2V", "Enhance")
 
+# What that same function calls a standalone enhance — the kind the Recents shelf
+# draws no card for. Asked of the function rather than spelled "Enhance" here, so
+# the shelf keeps agreeing with the queue if the queue ever renames the kind.
+ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
+
 
 class BrowserPane:
     """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
@@ -539,11 +544,22 @@ class BrowserPane:
         return tw
 
     def _visible_inflight_items(self) -> list:
-        """The in-flight items the shelf's media-type filter keeps on screen. The
-        full set still decides whether the shelf exists at all (so its filter stays
-        reachable); this narrows only what the shelf draws."""
+        """The in-flight items the shelf draws: what its media-type filter keeps,
+        less the enhancements. The full set still decides whether the shelf exists
+        at all (so its filter stays reachable); this narrows only what is drawn.
+
+        A standalone enhance never earns a card of its own here, for the reason it
+        never earns a folder in the tree: it is not a result, it is an upgrade of
+        one, and the image it upgrades is already on this shelf wearing the
+        "Enhancing…" scrim and streaming the run's frames. A card beside that tile
+        says a second thing is being made, and clicking it goes nowhere — the
+        folder it would open is the one the tree declines to grow. The bottom
+        strip's queue still lists the job, which is where a run that has the GPU
+        belongs.
+        """
         media_types = self._v._recents_media_types()
-        return [it for it in self._inflight_items() if it.media_type in media_types]
+        return [it for it in self._inflight_items()
+                if it.media_type in media_types and it.job_kind != ENHANCE_KIND]
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —

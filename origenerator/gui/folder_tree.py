@@ -8,10 +8,11 @@ the starred indicator: filled and always shown for a starred leaf, an outline
 offered on hover otherwise, so clicking it to star a folder just leaves the star
 in place. Clicking an icon emits ``star_clicked`` / ``delete_clicked`` with the
 folder's key instead of selecting the row; the tree hit-tests clicks against the
-same rects it paints. A row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the
-Starred and Recents shelves) draws that icon in its caret column so its label
-lines up with the sibling folders'. Which group a row holds is injected, so this
-stays free of the gallery model.
+same rects it paints. Only a left click ever works the caret: a right one just
+picks the row it lands on, so opening a folder's menu never shuts the folder. A
+row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the Starred and Recents shelves)
+draws that icon in its caret column so its label lines up with the siblings'.
+Which group a row holds is injected, so this stays free of the gallery model.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
@@ -152,17 +153,27 @@ class FolderTree(QTreeWidget):
         super().drawBranches(painter, rect, index)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            index = self.indexAt(event.pos())
-            group = self._leaf_group(index)
-            if group is not None:
-                star_rect, delete_rect = _action_rects(self.visualRect(index))
-                if delete_rect.contains(event.pos()):
-                    self.delete_clicked.emit(group.key)
-                    return
-                if star_rect.contains(event.pos()):
-                    self.star_clicked.emit(group.key)
-                    return
+        if event.button() != Qt.MouseButton.LeftButton:
+            # QTreeView toggles the caret under the cursor on a press of *any*
+            # button, so a right-click landing in the caret column shuts the row
+            # it is opening a menu for. A folder with sub-folders carries no star
+            # of its own (the row's actions are a leaf's), so that menu is the
+            # only way to star one — and the menu pops over the tree, hiding the
+            # collapse until it closes, which reads as something the star did.
+            # QAbstractItemView's press is the rest of what QTreeView would have
+            # done here: pick the row under the cursor, and nothing else.
+            QAbstractItemView.mousePressEvent(self, event)
+            return
+        index = self.indexAt(event.pos())
+        group = self._leaf_group(index)
+        if group is not None:
+            star_rect, delete_rect = _action_rects(self.visualRect(index))
+            if delete_rect.contains(event.pos()):
+                self.delete_clicked.emit(group.key)
+                return
+            if star_rect.contains(event.pos()):
+                self.star_clicked.emit(group.key)
+                return
         super().mousePressEvent(event)
 
     # --- dragging folders onto a collecting row ----------------------------

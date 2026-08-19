@@ -128,6 +128,34 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
         assert not over, f"at {width}px: {over[:3]}"
 
 
+def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(blank_panel):
+    """Its floor is what its contents need, so the scroll bar never has to appear.
+
+    Squeezing a form and scrolling it sideways is a bad trade for the drag it
+    allows, so the pane refuses to go there at all: the floor is read live off the
+    scroll's contents, which is why it rises when a wider workflow is chosen.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    panel = blank_panel
+    blank_floor = panel._contents_floor()
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)
+    panel.show()
+    QApplication.processEvents()
+
+    # A wider workflow is a wider floor: it is read off the contents, not fixed.
+    assert panel._contents_floor() > blank_floor
+    floor = panel.minimumSizeHint().width()
+    assert floor >= panel._contents_floor()
+
+    panel.resize(floor, 800)
+    QApplication.processEvents()
+    assert not panel._scroll.horizontalScrollBar().isVisible()
+    assert panel._scroll.viewport().width() >= panel._scroll.widget().minimumSizeHint().width()
+
+
 def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     """Narrowed, the buttons drop onto further lines, each still at its full width.
 

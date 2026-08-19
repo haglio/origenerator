@@ -880,3 +880,36 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     versions.set_collapsed(True)
     versions.show_levels(_items(_levels(2)), add=("2x", None))
     assert versions.is_collapsed()
+
+
+def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
+    """The widest thing in the tab wraps rather than set the pane's floor.
+
+    A picture beside a file's facts and buttons wants some 450px side by side,
+    which is wider than a tiling-narrow info pane can be — so the pane would have
+    had to choose between refusing to fit a monitor third and scrolling its
+    settings sideways. Stacked, the row asks for the wider of the two rather than
+    their sum, and neither has to give.
+    """
+    from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+
+    (level,) = _levels(1)[:1]
+    row = _LevelRow(level, 0, None)
+    host = QWidget()
+    box = QVBoxLayout(host)
+    box.setContentsMargins(0, 0, 0, 0)
+    box.addWidget(row)
+    qtbot.addWidget(host)
+    host.show()
+
+    side_by_side = row._picture.sizeHint().width() + row._facts.minimumSize().width()
+    assert row.minimumSizeHint().width() < side_by_side
+
+    host.resize(side_by_side + 60, 400)          # room for both
+    QApplication.processEvents()
+    assert row._title.x() > row._picture.x() + row._picture.width()
+    assert row._title.y() < row._picture.y() + row._picture.height()
+
+    host.resize(row.minimumSizeHint().width(), 400)   # room for one
+    QApplication.processEvents()
+    assert row._title.y() >= row._picture.y() + row._picture.height()

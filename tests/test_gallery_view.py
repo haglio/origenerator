@@ -3375,11 +3375,12 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
 def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # Long metadata values wrap rather than scroll sideways, so this floor keeps
-    # the info pane readable without a sideways scrollbar. It's lower than it once
-    # was so the whole window can still tile into a narrow monitor slot, but it
-    # must never collapse to a cramped strip.
-    assert view._panes.widget(1).minimumWidth() >= 280
+    # The floor is the config tab's own now (GenerateConfigPanel.minimumSizeHint),
+    # since only the tab knows what its settings need — the pane carries no
+    # explicit minimum, which would replace that number rather than join it. It
+    # still must never collapse to a cramped strip, and stays low enough that the
+    # whole window can tile into a narrow monitor slot.
+    assert view._panes.widget(1).minimumSizeHint().width() >= 280
 
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):

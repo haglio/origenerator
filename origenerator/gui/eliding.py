@@ -92,11 +92,21 @@ class ElidingLabel(QLabel):
     tooltip a form puts on it — only what is *drawn* is shortened.
     """
 
-    def __init__(self, text: str = "", parent=None):
+    def __init__(self, text: str = "", parent=None, *, preferred_width: int = 0):
         super().__init__(text, parent)
+        # A column of keys lines up by asking for the same width — the widest key
+        # in the group — while each label stays free to shrink below it. Asking
+        # through the size *hint* rather than a minimum is what allows both: a
+        # minimum would line the keys up and then refuse to give the width back.
+        self._preferred_width = preferred_width
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
         self.setSizePolicy(policy)
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setWidth(max(hint.width(), self._preferred_width))
+        return hint
 
     def minimumSizeHint(self):
         hint = super().minimumSizeHint()

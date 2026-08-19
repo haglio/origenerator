@@ -57,6 +57,17 @@ _RANDOM_SEED_TIP = (
 # bar beside it — enough that nothing reads as jammed into a corner, small
 # enough that a narrow pane still spends its width on the fields.
 _PANE_MARGIN = 8
+# How far the "never narrower than its contents" floor below is allowed to go.
+# One thing in the tab is wider than a tiling-narrow window can give the info pane
+# — an image's list of versions, a picture beside a file's facts and buttons — and
+# a floor that insisted on it would take the whole window out of the monitor-third
+# slot it has to fit (see tests/test_main_window.py). Past this the settings scroll
+# sideways after all, which is the smaller of the two losses.
+_FLOOR_CAP = 330
+# ...and how narrow it is allowed to get when its contents would fit in less: a
+# tab that can be dragged down to its picker and a button is a cramped strip, not
+# a pane, whatever fits in it.
+_COMFORTABLE_FLOOR = 280
 
 # What the preview says once the form has been edited away from the generation
 # on it: that picture was generated, these settings have not been.
@@ -302,14 +313,42 @@ class GenerateConfigPanel(QWidget):
         btn_row.addWidget(self._generate_btn)
         layout.addLayout(btn_row)
 
-        # A low floor so the whole window can still tile into a monitor third or a
-        # portrait half; the column grows with the window from there.
-        self.setMinimumWidth(230)
 
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
         # Generate with nothing to run — and everything below the picker once a
         # workflow is chosen.
         self._on_workflow_changed()
+
+    def minimumSizeHint(self):
+        """Never narrower than the settings can be squeezed into.
+
+        The pane refuses to be dragged past what its contents fit in, rather than
+        going there and scrolling them sideways: a horizontal scroll bar under a
+        form is a bad trade for the drag it allows. Read live from the scroll's
+        contents, which is what makes the floor follow the workflow on show — a
+        form with more fields, or an image with a list of versions under it, is a
+        wider thing and says so.
+
+        No explicit ``setMinimumWidth`` here, and none on the wrapper this sits in
+        (see :mod:`origenerator.gui.gallery_view`): an explicit minimum *replaces*
+        this hint rather than joining it, so one would pin the floor at its own
+        number and put the scroll bar back. Capped at ``_FLOOR_CAP``, which is
+        where holding the floor would cost the window its tiling slot.
+        """
+        floor = max(_COMFORTABLE_FLOOR, min(self._contents_floor(), _FLOOR_CAP))
+        hint = super().minimumSizeHint()
+        hint.setWidth(max(hint.width(), floor))
+        return hint
+
+    def _contents_floor(self) -> int:
+        """The narrowest the tab can be with its settings still whole: what the
+        scroll's contents need, plus the vertical scroll bar beside them, the
+        scroll's own frame, and the pane's margins."""
+        body = self._scroll.widget()
+        return (body.minimumSizeHint().width()
+                + self._scroll.verticalScrollBar().sizeHint().width()
+                + 2 * self._scroll.frameWidth()
+                + 2 * _PANE_MARGIN)
 
     def _connect_signals(self):
         if self._client is None:

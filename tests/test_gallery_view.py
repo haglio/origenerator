@@ -4248,6 +4248,71 @@ def test_changing_folders_clears_the_selection(qtbot):
     assert view.selected_prompt_ids() == []
 
 
+def test_clicking_the_pane_background_drops_the_selection(qtbot):
+    """Click off and nothing is picked — the way out of a selection that would
+    otherwise keep Enhance/Star/Delete aimed at one tile instead of the folder."""
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+    assert view.selected_prompt_ids() == ["i1"]
+
+    pane = view._scroll.widget()
+    pane.resize(600, 600)  # room under the tiles for a press to land on nothing
+    qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
+
+    assert view.selected_prompt_ids() == []
+    # And the buttons re-aimed with it: Enhance is the folder's again.
+    assert "folder" in view._enhance_btn.toolTip()
+
+
+def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
+    """Dropping the pick is not a rebuild — the folder stays open, unhighlighted."""
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+
+    pane = view._scroll.widget()
+    pane.resize(600, 600)
+    qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
+
+    assert set(view.visible_prompt_ids()) == {"i1", "i2"}
+    assert not any(w.is_selected() for w in view._thumb_widgets.values())
+
+
+def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
+    """A tile answers its own click, so the pane behind it never sees one — else
+    picking a thumbnail would select it and deselect it in the same press."""
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+
+    qtbot.mouseClick(view._thumb_widgets["i1"], Qt.MouseButton.LeftButton)
+    assert view.selected_prompt_ids() == ["i1"]
+
+
+def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
+    """Only a left press means "nothing" — a right one is on its way to a menu."""
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._apply_selection("i1", _NO_MOD)
+
+    pane = view._scroll.widget()
+    pane.resize(600, 600)
+    qtbot.mouseClick(pane, Qt.MouseButton.RightButton, pos=QPoint(560, 560))
+
+    assert view.selected_prompt_ids() == ["i1"]
+
+
 def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(qtbot):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]

@@ -6,7 +6,7 @@ from functools import partial
 
 from PyQt6.QtWidgets import (
     QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel,
-    QScrollArea, QToolButton, QSplitter,
+    QToolButton, QSplitter,
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
@@ -84,7 +84,7 @@ from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.browser_pane import (
-    BrowserPane, SEARCH_DRAW_LIMIT, SearchTile,
+    BrowserPane, BrowserScrollArea, SEARCH_DRAW_LIMIT, SearchTile,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -1233,8 +1233,14 @@ class GalleryView(QWidget):
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
         browser_box.addWidget(self._avg_label)
-        self._scroll = QScrollArea()
+        self._scroll = BrowserScrollArea()
         self._scroll.setWidgetResizable(True)
+        # A click on the background between the tiles puts the selection down,
+        # as it does in a file browser — and here it is also the only way back
+        # to aiming Star / Enhance / Delete at the whole folder once a tile has
+        # been picked.
+        self._scroll.background_clicked.connect(
+            self._browser.clear_thumbnail_selection)
         # The Recents shelf has no end: reaching the bottom of what it has drawn
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)

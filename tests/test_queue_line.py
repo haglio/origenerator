@@ -5,8 +5,9 @@ from types import SimpleNamespace
 from origenerator import queue_line
 
 
-def _job(media_type="image", source="generated", name=""):
-    return SimpleNamespace(media_type=media_type, source=source, name=name)
+def _job(media_type="image", source="generated", name="", run=None):
+    return SimpleNamespace(media_type=media_type, source=source, name=name,
+                           run_media_type=run or media_type)
 
 
 def _image(name=""):
@@ -15,6 +16,11 @@ def _image(name=""):
 
 def _video(name=""):
     return _job("video", name=name)
+
+
+def _video_frame(name=""):
+    """A chained i2v's start frame: an image prompt opening a video run."""
+    return _job("image", name=name, run="video")
 
 
 # --- joining the line ---------------------------------------------------------
@@ -27,6 +33,21 @@ def test_an_image_joins_the_front():
 def test_a_video_joins_the_back():
     line = [_image(), _video()]
     assert queue_line.insertion_index(line, _video()) == 2
+
+
+def test_a_videos_start_frame_joins_the_back_though_it_draws_a_still():
+    # Asking for a video is asking for minutes of GPU whichever prompt goes
+    # first. Placed by what its own prompt makes, the frame would take the very
+    # front and land the whole run ahead of every picture already waiting.
+    line = [_image(), _image()]
+    assert queue_line.is_video(_video_frame()) is True
+    assert queue_line.insertion_index(line, _video_frame()) == 2
+
+
+def test_a_show_holds_a_video_run_from_its_start_frame():
+    # The frame is seconds of GPU, but the video behind it cannot start while the
+    # show plays, so drawing it in front of the show buys nothing.
+    assert queue_line.next_ready([_video_frame()], videos_held=True) is None
 
 
 def test_images_stack_newest_first():

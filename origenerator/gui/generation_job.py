@@ -98,6 +98,12 @@ class GenerationJob(QObject):
         # i2v is two prompts that are one run to whoever asked for it, so the
         # second stage is given the first's id (see RerollController._launch).
         self.origin = self.prompt_id
+        # What the run this job belongs to will produce, which is not always what
+        # this prompt outputs: a chained i2v's first stage draws a still, and that
+        # still is the opening of a video. The queue places a job by this, so
+        # asking for a video never jumps the pictures already waiting (see
+        # RerollController._launch and :mod:`origenerator.queue_line`).
+        self.run_media_type = self.media_type
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir
         self._state = "idle"  # idle -> queued -> running -> finished/failed/canceled
@@ -122,13 +128,17 @@ class GenerationJob(QObject):
 
     @property
     def media_type(self) -> str:
-        """What this run will produce — ``"image"`` or ``"video"``.
+        """What this prompt will output — ``"image"`` or ``"video"``.
 
         Read off the workflow rather than off any file, since the whole point of
         knowing it is to place the job in the line *before* it has run. A
         workflow that declares nothing counts as an image: the queue's images go
         first and start sooner, so an unfamiliar one being made promptly is the
         harmless way to be wrong (see :mod:`origenerator.queue_line`).
+
+        What the *run* makes is :attr:`run_media_type`, and the two differ for a
+        chained i2v's start frame — an image prompt opening a video. The queue
+        reads that one; this is what the prompt itself puts on disk.
         """
         return getattr(self.workflow, "output_type", None) or "image"
 

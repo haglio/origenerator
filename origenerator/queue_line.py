@@ -16,7 +16,10 @@ Two rules, and both are about what the user is doing while the GPU works:
 * **A video joins the back.** Minutes of GPU, and asking for one means "later":
   it waits behind every image, and behind every video asked for before it. That
   is what keeps a handful of queued videos from taking the machine away from the
-  work in front of the user.
+  work in front of the user. A chained i2v's start frame counts as the video it
+  opens, not as the picture it draws: placed by what its own prompt makes, it
+  would take the very front, and asking for a video would land it ahead of every
+  picture already waiting.
 
 Work nobody asked for — a background experiment, a base re-render — never joins
 the front whatever it makes, because putting one in front of the user's own work
@@ -29,8 +32,9 @@ passed over — every image behind it goes first — and with nothing but videos
 left the line simply holds until an image is asked for or the show ends.
 
 Pure ordering, no Qt and no server: it works on anything carrying a
-``media_type`` ("image"/"video") and a ``source``, which is what makes the queue's
-behavior testable without a running ComfyUI.
+``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose
+run makes something other than what it makes itself, and a ``source`` — which is
+what makes the queue's behavior testable without a running ComfyUI.
 """
 
 # The ``source`` of work the user asked for, as opposed to a background
@@ -39,8 +43,15 @@ USER_SOURCE = "generated"
 
 
 def is_video(job) -> bool:
-    """Whether this job will produce a video — minutes of GPU rather than seconds."""
-    return getattr(job, "media_type", None) == "video"
+    """Whether this job belongs to a video run — minutes of GPU rather than seconds.
+
+    ``run_media_type`` is what the *run* will produce, which is not always what
+    this prompt outputs: a chained i2v draws its start frame first, and that
+    still is the opening of a video. A job that declares no run type is read by
+    what it makes itself.
+    """
+    return (getattr(job, "run_media_type", None)
+            or getattr(job, "media_type", None)) == "video"
 
 
 def joins_the_front(job) -> bool:

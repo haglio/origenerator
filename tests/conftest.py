@@ -5,6 +5,18 @@ git-ignored content.local.json, so a run here matches a public checkout.
 pytest imports this before any test module, and the app loads its content at
 import, so the pin has to happen here.
 """
+# Before anything that can pull PyQt6 in: the voice stack's native DLLs
+# (whisper's engine, its VAD, and torch where installed) die with a plain
+# access violation when first loaded AFTER Qt — the same crash
+# app._warm_voice_runtimes preloads its way past for the app, which took a
+# whole pytest run down mid-suite on a machine carrying the voice extra.
+# Guarded per module: none is required, and CI has none of them.
+for _voice_module in ("onnxruntime", "ctranslate2", "torch"):
+    try:
+        __import__(_voice_module)
+    except Exception:
+        pass  # no voice extra (or a broken one): the suite still runs
+
 from origenerator import content as _content
 
 _content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT
@@ -155,11 +167,17 @@ class FakeVoiceSteering(QObject):
             if bare is not None:
                 self._execute(bare)
                 return bare
-        spoken = self._dictation.push(text) if self._dictation is not None else None
+        spoken = self.push_dictation(text)
         if spoken is not None:
             self.request.emit(spoken)
             return spoken
         return self.speak_command(text)
+
+    def push_dictation(self, text):
+        """The same dictation, fed from somewhere other than the mic — the
+        hosting session's channel, which is where the words of a request arrive
+        while this app is hosted and its own mic is shut."""
+        return self._dictation.push(text) if self._dictation is not None else None
 
 
 @pytest.fixture(autouse=True)
@@ -239,3 +257,19 @@ def _recipe_match_runs_inline(monkeypatch):
     # The same deal for the beat the combine's Generate waits out so its stand-in
     # queue row reaches the screen before the launch blocks the thread.
     monkeypatch.setattr(GalleryView, "_after_painting", lambda self, work: work())
+
+
+@pytest.fixture(autouse=True)
+def _previews_start_running():
+    """Leave the app-wide preview freeze off between tests.
+
+    The freeze is module state (origenerator.gui.looping_preview), which is
+    exactly what makes it reach a preview built after it was set — and exactly
+    what would otherwise let a test that pauses hand the next test a gallery of
+    still thumbnails it never asked for.
+    """
+    from origenerator.gui.looping_preview import set_previews_paused
+
+    set_previews_paused(False)
+    yield
+    set_previews_paused(False)

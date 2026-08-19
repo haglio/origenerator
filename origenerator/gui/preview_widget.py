@@ -6,6 +6,10 @@ static images are scaled to fit (and rescaled on resize), animated images
 default, so selecting one gives an immediate moving preview without stealing audio,
 while the fullscreen slideshow opts in to sound.
 
+A still can also be drawn part-way into itself (:meth:`PreviewWidget.set_zoom`),
+which is how the fullscreen show creeps into each picture while it holds the
+screen; every other pane leaves that at the whole picture.
+
 A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
 three controls a gallery thumbnail of the same generation wears in its corners,
 and offers the same right-click menu over the picture — because it IS the same
@@ -22,8 +26,10 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
-from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
-from PyQt6.QtCore import Qt, QUrl, QPoint, QRect, QSize, QEvent, pyqtSignal
+from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag, QPainter
+from PyQt6.QtCore import (
+    Qt, QUrl, QPoint, QRect, QRectF, QSize, QEvent, pyqtSignal,
+)
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -36,6 +42,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.ken_burns import ZOOM_SPAN, crop_box
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -55,6 +62,9 @@ def _path_key(path) -> str:
 
 class PreviewWidget(QWidget):
     video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
+    # This backend cannot open the clip at all — a different thing from ending,
+    # and the one a show has to be told about (see _on_media_status).
+    video_unplayable = pyqtSignal()
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
     drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
@@ -95,6 +105,20 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self._drag_origin: QPoint | None = None
+        # How far into the still this pane is drawn — the fullscreen show's slow
+        # push (see set_zoom). 1.0, the whole picture, for every other pane:
+        # nothing but a show ever moves it, and a pane that is never pushed into
+        # keeps the plain fit it always had rather than going through the
+        # painter below.
+        self._zoom = 1.0
+        self._pushing = False
+        # What the push is drawn FROM and AT, prepared once per picture: see
+        # _ready_the_push. The key is what they were prepared for, so a new
+        # picture or a resized pane rebuilds them and nothing else does.
+        self._push_key: tuple | None = None
+        self._push_source: QPixmap | None = None
+        self._push_size = QSize()
+
         # The shown generation's prompt_id when the owner has armed the corner
         # controls and the right-click menu over it, else None. Armed separately
         # from the drag because they answer different questions: a drag needs
@@ -136,6 +160,9 @@ class PreviewWidget(QWidget):
         self._audio.setMuted(mute_audio)
         # The player is injectable so unit tests can drive playback intent
         # without spinning up the real (WMF) backend, which deadlocks at exit.
+        # A hosting session's OmniPause over this pane, held rather than edged:
+        # the pane is re-pointed constantly and each new media starts playing.
+        self._playback_paused = False
         self._player = player if player is not None else QMediaPlayer(self)
         self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video)
@@ -145,6 +172,8 @@ class PreviewWidget(QWidget):
             QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
         )
         self._player.mediaStatusChanged.connect(self._on_media_status)
+        self._player.errorOccurred.connect(self._on_media_error)
+
         # Until a clip's resolution arrives, media_rect can only answer "the whole
         # pane"; the corners have to move to the real picture once it can.
         self._player.metaDataChanged.connect(self._place_controls)
@@ -242,6 +271,8 @@ class PreviewWidget(QWidget):
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
         self._player.play()
+        if self._playback_paused:
+            self._player.pause()  # a clip loaded into a frozen room opens held
         self._update_strip(path)
 
     def show_frame(self, data: bytes, *, keep_notice: bool = False) -> None:
@@ -487,6 +518,73 @@ class PreviewWidget(QWidget):
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
+    def set_zoom(self, zoom: float) -> None:
+        """Draw the still *zoom* deep into itself — the show's Ken Burns push.
+
+        Every frame of the push is drawn at ONE size, the size the whole picture
+        was fitted to, and what moves is a real-valued window sampled out of the
+        picture (:func:`~origenerator.ken_burns.crop_box`). Both halves of that
+        matter and each was learned the hard way:
+
+        * a frame whose size changes by a pixel is re-centered by the label, so
+          the picture hops sideways — several times a second, in whichever
+          direction the fit happened to round;
+        * a window snapped to whole pixels does not creep at all at this speed,
+          it holds and then steps, and its two axes step at different moments.
+
+        Together those made a still picture twitch rather than drift. Drawn
+        through a painter at a fixed size from a real-valued window, the
+        sampling grid slides between source pixels and the motion is continuous
+        — and :meth:`media_rect` is genuinely constant, which is what the
+        neighbor stills and the HUD map are placed against.
+
+        Stills only. An animated image is already moving and a video is its own
+        motion, so both take the number inertly — as does every pane but a
+        show's, none of which ever calls this.
+        """
+        zoom = max(1.0, float(zoom))
+        was_pushing, self._pushing = self._pushing, True
+        if zoom == self._zoom and was_pushing:
+            return
+        self._zoom = zoom
+        self._rescale()
+
+    def set_audio_muted(self, muted: bool) -> None:
+        """Silence (or voice) this pane's playback outright."""
+        self._audio.setMuted(muted)
+
+    def audio_muted(self) -> bool:
+        return self._audio.isMuted()
+
+    def set_playback_paused(self, paused: bool) -> None:
+        """Freeze or resume whatever is moving here (a hosted session's
+        OmniPause): a playing video, or an animated image's own movie.
+
+        Remembered rather than only applied, because this pane is re-pointed
+        constantly — a click, a landing generation, a tab change — and each of
+        those starts the new media playing.  A pane frozen once has to stay
+        frozen through every one of them until the room resumes.  A still takes
+        the flag inertly; its advance is the owning view's dwell timer, not
+        this pane's.
+        """
+        self._playback_paused = paused
+        self._apply_playback_pause()
+
+    def _apply_playback_pause(self) -> None:
+        """Hold what is on screen now, if the freeze is on."""
+        if self._movie is not None:
+            self._movie.setPaused(self._playback_paused)
+        if not self.is_showing_video():
+            return
+        if self._playback_paused:
+            self._player.pause()
+        else:
+            self._player.play()
+
+    def current_media_path(self) -> str:
+        """The file on screen, or "" while showing a placeholder or live frame."""
+        return str(self._media[0]) if self._media is not None else ""
+
     def set_actions(self, prompt_id: str | None, *, starred: bool = False,
                     enhance: str | None = None) -> None:
         """Arm the corner controls and the right-click menu over the shown media.
@@ -652,9 +750,25 @@ class PreviewWidget(QWidget):
         return self._fullscreen
 
     def _on_media_status(self, status) -> None:
-        """Report a finished (non-looping) video so a slideshow can advance."""
+        """Report a finished video so a slideshow can advance — and separately,
+        one this backend cannot open at all.
+
+        The second is not a kind of ending, and treating it as one is what left
+        a show on a black rectangle: a clip with no codec here never reports
+        EndOfMedia, and a video carries no dwell timer (its own length is its
+        dwell), so nothing was ever going to move the show off it again.  A
+        browse of the whole library is exactly where such a clip turns up.
+        """
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.video_ended.emit()
+        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
+            self.video_unplayable.emit()
+
+    def _on_media_error(self, error, _message: str = "") -> None:
+        """Same report, from the other direction: the backend can raise the
+        error without ever moving the status to InvalidMedia."""
+        if error != QMediaPlayer.Error.NoError and self.is_showing_video():
+            self.video_unplayable.emit()
 
     def _release(self) -> None:
         """Tear down the media pipeline so shutdown can't deadlock the backend."""
@@ -686,6 +800,7 @@ class PreviewWidget(QWidget):
             self._image_label.setMovie(movie)
             self._scale_movie()
             movie.start()
+            movie.setPaused(self._playback_paused)  # an animated still, in a frozen room
 
     def _scale_movie(self) -> None:
         if self._movie is None or self._movie_native is None or not self._movie_native.isValid():
@@ -702,6 +817,9 @@ class PreviewWidget(QWidget):
         if self._pixmap is None or self._pixmap.isNull():
             self._image_label.setText("No preview available")
             return
+        if self._pushing:
+            self._image_label.setPixmap(self._push_frame())
+            return
         self._image_label.setPixmap(
             self._pixmap.scaled(
                 self._image_label.size(),
@@ -709,6 +827,62 @@ class PreviewWidget(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
+
+    # --- the push, drawn ----------------------------------------------------
+
+    def _ready_the_push(self) -> None:
+        """Fix the size every frame of this picture is drawn at, and prepare the
+        picture the frames are sampled from. Once per picture, not per frame.
+
+        The frames are drawn at the size the WHOLE picture fits the pane at, so
+        the drawn rect is the same at every point of the push — see
+        :meth:`set_zoom` for what a changing one does.
+
+        The source is shrunk once, with the good filter, to the resolution the
+        deepest point of the push actually needs. That leaves every frame a
+        near-1:1 draw. Sampling a much larger picture afresh each frame would
+        instead minify it thirty times a second with a grid that has crawled a
+        fraction of a pixel since the last one, and a fine texture under that
+        shimmers. A picture already smaller than that is left alone rather than
+        blown up to meet it.
+        """
+        key = (self._pixmap.cacheKey(),
+               self._image_label.width(), self._image_label.height())
+        if key == self._push_key:
+            return
+        self._push_key = key
+        self._push_size = self._pixmap.size().scaled(
+            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio)
+        deepest = QSize(max(1, round(self._push_size.width() * ZOOM_SPAN)),
+                        max(1, round(self._push_size.height() * ZOOM_SPAN)))
+        oversized = (self._pixmap.width() > deepest.width()
+                     or self._pixmap.height() > deepest.height())
+        self._push_source = (
+            self._pixmap.scaled(deepest, Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation)
+            if oversized else self._pixmap
+        )
+
+    def _push_frame(self) -> QPixmap:
+        """This picture at the push's current depth, drawn at the fixed size."""
+        self._ready_the_push()
+        if self._push_size.isEmpty() or self._push_source.isNull():
+            return QPixmap()
+        frame = QPixmap(self._push_size)
+        frame.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(frame)
+        # The one render hint that matters here: without it the window's
+        # fractional offset is thrown away and the push snaps pixel to pixel,
+        # which is the twitch this whole approach exists to remove.
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(
+            QRectF(0, 0, self._push_size.width(), self._push_size.height()),
+            self._push_source,
+            QRectF(*crop_box(self._push_source.width(),
+                             self._push_source.height(), self._zoom)),
+        )
+        painter.end()
+        return frame
 
     def eventFilter(self, obj, event):
         # Refit the media to the label's *own* size whenever the label resizes, rather

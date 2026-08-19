@@ -17,11 +17,23 @@ class LoadingScreen(QDialog):
     boot sequence updates through its phases, and a busy progress bar. The
     caller is responsible for pumping the event loop while the main thread
     works (see ``app.processEvents``) so the sweep keeps animating.
+
+    Standalone launches only.  Hosted by Fun Time the app boots with no splash
+    at all: the session's own loading screen owns that boot's feedback, and an
+    always-on-top splash of ours could outlive the reveal and sit over one of
+    the session's players (it did — reported as "the landscape player is
+    behind other windows on startup").
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Origenerator")
+        # Deliberately NOT "Origenerator": a hosting Fun Time session resolves
+        # the main window by that exact caption, and a window of some OTHER
+        # process wearing it (a standalone app booting beside a session) must
+        # never be mistaken for the hosted one.  The same trick fun_time's own
+        # loading screen uses ("Fun Time Loading", not the dashboard's
+        # "Fun Time").
+        self.setWindowTitle("Origenerator Loading")
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setFixedWidth(420)
         self.setWindowFlags(

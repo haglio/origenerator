@@ -9,8 +9,11 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
+
+from tests.test_gallery_view import _selected_folder, _shelf
 
 
 def _window(qtbot, tmp_path, app_state=None):
@@ -353,7 +356,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is view._recents_item
+    assert view._tree.currentItem() is _shelf(view, RECENTS_KEY)
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
@@ -629,11 +632,11 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     (folder_key,) = list(gv._reroll_jobs)
     pid = gv._reroll_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(gv._recents_item)
+    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert pid in gv._inflight_cards   # the running generation shows as a card
 
     gv._on_inflight_clicked(pid)       # click that card
-    assert gv._selected_folder_key() == folder_key  # reveal opened the re-roll's folder
+    assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
 def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
@@ -659,7 +662,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(gv._recents_item)
+    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert "vid_run" in gv._inflight_cards
 
 
@@ -718,3 +721,43 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     assert reopened._gallery_view._combine.image_slot.current_id() == "img"
     assert reopened._gallery_view._combine.video_slot.current_id() == "vid"
+
+
+def _fun_time_session(main=(10, 20, 800, 600)):
+    from origenerator.fun_time_mode import FunTimeSession, Rect
+    return FunTimeSession(
+        main_rect=Rect(*main),
+        portrait_rect=Rect(2560, 0, 1440, 1870),
+        landscape_rect=Rect(853, 0, 1707, 1400),
+        command_file=None, paused_file=None, status_file=None,
+        dashboard_cmd_file=None,
+    )
+
+
+def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_fun_time_session(),
+    )
+    qtbot.addWidget(win)
+    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert win._gallery_view._fun_time is not None
+
+
+def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
+    # A Fun Time session's window sits at the session's rect, so the geometry it
+    # would save is meaningless to the standalone launch that reads it back.
+    path = tmp_path / "ui.json"
+    state = AppState(path)
+    state.set("window_geometry", "c3RhbmRhbG9uZQ==")
+    state.save()
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), state,
+        fun_time=_fun_time_session(),
+    )
+    qtbot.addWidget(win)
+    win.close()
+    assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="

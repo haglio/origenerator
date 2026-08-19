@@ -40,6 +40,11 @@ BRANCH_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
 # folder). Rows without it refuse a drop, so a folder can never be dragged into
 # the derived hierarchy, whose shape belongs to the generations' settings.
 DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
+# A row's own key in the tree: its folder's key with the side it is drawn on
+# appended, so the two copies of one folder are tellable apart (see
+# origenerator.gui.orientation). What a folder key alone can't say is which of
+# them you picked, hovered, or dragged.
+TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 
 # The dragged folders' keys, newline-joined. A private type, so a drag out of the
 # tree lands nowhere except on a row that collects folders.
@@ -117,8 +122,11 @@ class FolderTree(QTreeWidget):
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        group = self._leaf_group(self.indexAt(event.pos()))
-        self._set_hover(group.key if group is not None else None)
+        index = self.indexAt(event.pos())
+        # The row's key, not the folder's: both sides draw the folder, and only
+        # the row under the mouse should light up.
+        hovered = index.data(TREE_KEY_ROLE) if self._leaf_group(index) else None
+        self._set_hover(hovered)
 
     def leaveEvent(self, event):
         super().leaveEvent(event)
@@ -130,7 +138,7 @@ class FolderTree(QTreeWidget):
         if group is None:
             return
         starred = bool(getattr(group, "starred", False))
-        hovered = group.key == self._hover_key
+        hovered = index.data(TREE_KEY_ROLE) == self._hover_key
         if not (starred or hovered):
             return
         star_rect, delete_rect = _action_rects(self.visualRect(index))
@@ -179,13 +187,18 @@ class FolderTree(QTreeWidget):
     # --- dragging folders onto a collecting row ----------------------------
 
     def selected_folder_keys(self) -> list[str]:
-        """The keys of the picked folder rows, top-down. Shelf rows that hold no
-        folder of their own (Recents, Experiments) contribute nothing."""
+        """The tree keys of the picked folder rows, top-down. Shelf rows that hold
+        no folder of their own (Recents, Experiments) contribute nothing.
+
+        Tree keys rather than folder keys so a set picked across both sides
+        stays two distinct folders: composing one out of a folder key alone
+        would resolve every member onto whichever side happened to be open, and
+        a grouping of mixed shapes is the one thing the split exists to stop.
+        """
         keys = []
         for item in self.selectedItems():
-            group = item.data(0, self._role)
-            if group is not None:
-                keys.append(group.key)
+            if item.data(0, self._role) is not None:
+                keys.append(item.data(0, TREE_KEY_ROLE))
         return keys
 
     def startDrag(self, supported_actions):
@@ -196,9 +209,10 @@ class FolderTree(QTreeWidget):
         group = pressed.data(0, self._role) if pressed is not None else None
         if group is None:
             return
+        pressed_key = pressed.data(0, TREE_KEY_ROLE)
         keys = self.selected_folder_keys()
-        if group.key not in keys:
-            keys = [group.key]
+        if pressed_key not in keys:
+            keys = [pressed_key]
         mime = QMimeData()
         mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
         drag = QDrag(self)

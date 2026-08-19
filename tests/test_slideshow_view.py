@@ -10,6 +10,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
+from pytest import approx
 from PyQt6.QtCore import Qt, QEvent, QSize, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
@@ -17,7 +18,9 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.slideshow import LIVE
+from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
+from origenerator.ken_burns import TICK_MS, ZOOM_SPAN
+from origenerator.slideshow import LIVE, in_order
 from origenerator.stroke_engine import Stroke
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -522,15 +525,17 @@ def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
     assert view._note.isHidden()
 
 
-def test_the_enhancing_note_sits_above_the_counter_not_over_the_console(qtbot):
-    # genau's console holds the top-left corner of this view too.
+def test_the_enhancing_note_is_a_toast_across_the_top(qtbot):
+    # Where Fun Time flashes the same kind of line over a player, and in the
+    # same shape: this surface wears the players' own HUD, so what it says for
+    # itself is said in the players' own toast rather than in a second dialect
+    # at the far end of the screen.
     view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
     view.resize(800, 600)
     _press(view, Qt.Key.Key_Down)
 
-    note, counter = view._note.geometry(), view._counter.geometry()
-    assert note.top() > view.height() // 2      # bottom half, clear of the console
-    assert note.bottom() <= counter.top()       # stacked with it, not over it
+    note = view._note.geometry()
+    assert note.top() == TOAST_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
 
 
@@ -816,6 +821,121 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
     view = _view(qtbot, start=2)
     assert view._playlist.current() == ("c.png", "image")
     assert view._counter.text().startswith("3 / 3")
+
+
+# --- the slow push into the still on screen ----------------------------------
+
+# A whole tick of the standard dwell — what any of these can be out by, since a
+# tick count is a whole number and a stretch of milliseconds need not divide by
+# one.  Far below anything an eye reads off the screen.
+_ONE_TICK = (ZOOM_SPAN - 1) * TICK_MS / 4000
+
+
+def _push_for(view, ms):
+    """Tick the push as if *ms* of the slide's dwell had gone by."""
+    for _ in range(round(ms / TICK_MS)):
+        view._zoom_tick()
+
+
+def test_a_dwelling_slide_creeps_into_the_picture(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    assert view._zoom_timer.isActive()
+    assert view._preview._zoom == 1.0        # it opens on the whole picture
+
+    _push_for(view, 4000)
+
+    assert view._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
+
+
+def test_a_longer_pace_creeps_more_slowly_rather_than_further(qtbot):
+    # The whole of what a longer dwell changes: the same ground, a third of the
+    # speed.  Covering three times the ground instead would end on a crop.
+    slow = _view(qtbot, image_dwell_ms=12000)
+
+    _push_for(slow, 4000)
+    assert slow._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 3, abs=_ONE_TICK)
+
+    _push_for(slow, 8000)
+    assert slow._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
+
+
+def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
+    # The pace is app-wide and moves under a running show, so the creep reads it
+    # every tick: turned up mid-slide it slows from that moment, rather than
+    # recomputing the whole move and jumping the picture back out.
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 2000)
+    halfway = view._preview._zoom
+
+    view._playlist.image_dwell_ms = 8000  # the number set_dwell_s hands down
+    _push_for(view, 2000)
+
+    assert view._preview._zoom == approx(halfway + (ZOOM_SPAN - 1) / 4, abs=_ONE_TICK)
+
+
+def test_a_pace_of_nought_holds_the_whole_picture(qtbot):
+    # Nought holds one picture until an arrow moves it, and a picture being held
+    # is not a shot being made.
+    view = _view(qtbot, image_dwell_ms=0)
+    assert not view._zoom_timer.isActive()
+
+    _push_for(view, 10_000)
+
+    assert view._preview._zoom == 1.0
+
+
+def test_a_clip_is_its_own_motion(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Right)          # -> the video
+    assert not view._zoom_timer.isActive()
+
+
+def test_holding_a_slide_stops_the_push_where_it_got_to(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _push_for(view, 1000)
+    reached = view._preview._zoom
+
+    _press(view, Qt.Key.Key_Down)           # hold it
+
+    assert not view._zoom_timer.isActive()
+    assert view._preview._zoom == reached
+
+
+def test_a_released_request_carries_the_push_on_from_there(qtbot):
+    # Not back out to the whole picture: the slide never left the screen, so
+    # neither should the move that was running over it.
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 1000)
+    reached = view._preview._zoom
+
+    view.hold_for_request(True, "🎤 listening…")
+    assert not view._zoom_timer.isActive()
+
+    view.hold_for_request(False)
+    assert view._zoom_timer.isActive()
+    assert view._preview._zoom == reached
+
+
+def test_the_rooms_freeze_stops_the_push_too(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+
+    view.set_session_paused(True)
+    assert not view._zoom_timer.isActive()
+
+    view.set_session_paused(False)
+    assert view._zoom_timer.isActive()
+
+
+def test_each_slide_opens_on_the_whole_picture(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 2000)
+    assert view._preview._zoom > 1.0
+
+    _press(view, Qt.Key.Key_Right)          # -> the video
+    _press(view, Qt.Key.Key_Right)          # -> the next picture
+
+    assert view._preview._zoom == 1.0
+    assert view._zoom_timer.isActive()
 
 
 # --- re-seeding the set after it opened -------------------------------------
@@ -1171,6 +1291,52 @@ def test_a_finished_request_answers_in_the_corner(qtbot):
     view = _view(qtbot, _KEYED)
     view.note_request("🎤 dropped “a hat” — generating")
     assert "dropped" in view._note.text()
+
+
+def test_a_clip_the_backend_cannot_open_does_not_park_the_show(qtbot, tmp_path):
+    """A video carries no dwell timer — its own length is its dwell — so a clip
+    that never reports an end is a black screen for the rest of the session.
+    One this backend has no codec for is exactly that, and browsing the whole
+    library is where it turns up.  It gets stepped past instead."""
+    from PyQt6.QtMultimedia import QMediaPlayer
+
+    first, second = tmp_path / "a.png", tmp_path / "b.png"
+    for path in (first, second):
+        Image.new("RGB", (40, 30)).save(path)
+    clip = tmp_path / "broken.mp4"
+    clip.write_bytes(b"not a video")
+    items = [(str(clip), "video", "v-1", None),
+             (str(first), "image", "i-1", None),
+             (str(second), "image", "i-2", None)]
+    view = SlideshowView(items, shuffle=in_order)
+    qtbot.addWidget(view)
+    assert view._playlist.current()[2] == "v-1"
+
+    view._preview._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
+
+    assert view._playlist.current()[2] == "i-1"
+
+
+def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
+    """A lock replays the clip it holds, and a pace of nought never moves on —
+    both of which would hold a clip that cannot play forever.  So this one step
+    happens regardless: the item stays in the set, but the screen does not stay
+    black."""
+    from PyQt6.QtMultimedia import QMediaPlayer
+
+    still = tmp_path / "a.png"
+    Image.new("RGB", (40, 30)).save(still)
+    clip = tmp_path / "broken.mp4"
+    clip.write_bytes(b"not a video")
+    view = SlideshowView([(str(clip), "video", "v-1", None),
+                          (str(still), "image", "i-1", None)],
+                         shuffle=in_order)
+    qtbot.addWidget(view)
+    view._playlist.toggle_lock()
+
+    view._preview.video_unplayable.emit()
+
+    assert view._playlist.current()[2] == "i-1"
 
 
 # --- picking a closed show back up ------------------------------------------

@@ -33,11 +33,15 @@ GENAU_COMMAND = "genau"
 # What the recognizer is actually listening for. "Genau" is not English and no
 # recognizer in this suite hears it: Fun Time settled on the sound-alike "go now"
 # for every one of its Genau commands, and displays it back as "genau" — so this
-# listens for the same sound and answers in the same word. The spelling and a
-# couple of near renderings ride alongside for whisper's benefit, which is a
-# looser transcriber than Fun Time's vosk grammar.
+# listens for the same sound and answers in the same word. The spelling and the
+# renderings whisper has actually come back with ride alongside, because it is a
+# looser transcriber than Fun Time's vosk grammar; each was heard off this mic
+# rather than guessed at. A trailing "it" is all any of them may carry
+# (:data:`_MAX_TRAILING_WORDS`), which is what keeps the two that are ordinary
+# English — "good now", "can now" — from claiming a sentence.
 GENAU_PHRASES: tuple[str, ...] = (
     "go now", "genau", "gunow", "genow", "ganau",
+    "good now", "can now", "canow",
 )
 
 # The enhance command, the same shape: what to enhance is the picture on screen.

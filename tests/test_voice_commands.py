@@ -18,9 +18,19 @@ def test_the_sound_alike_fun_time_settled_on_is_what_it_listens_for():
 
 def test_the_word_itself_and_its_near_misses_also_count():
     # Whisper is a looser transcriber than Fun Time's vosk grammar, so the spelling
-    # and a couple of renderings ride alongside the sound-alike.
-    for heard in ("genau it", "genow it", "ganau", "gunow it"):
+    # and every rendering it has actually come back with ride alongside the
+    # sound-alike — each of these was heard off this mic.
+    for heard in ("genau it", "genow it", "ganau", "gunow it",
+                  "good now it", "can now it", "canow it"):
         assert voice_commands.match_genau_command(heard) == voice_commands.GENAU_COMMAND
+
+
+def test_the_renderings_that_are_ordinary_english_claim_nothing_longer():
+    # "good now" and "can now" are things someone might say to an image
+    # generator, so the trailing-word limit is what keeps them commands rather
+    # than a claim on a sentence.
+    assert voice_commands.match_genau_command("good now make her hair longer") is None
+    assert voice_commands.match_genau_command("can now be a windy day") is None
 
 
 def test_a_sentence_merely_mentioning_it_is_not_a_command():
@@ -92,7 +102,8 @@ def test_a_mangled_command_is_said_back_in_the_word_the_app_knows_it_by():
     # The whole complaint: a caption printed "gunow it" and then went and made a
     # Genau clip, so the spelling on screen was the one thing that had not been
     # understood.
-    for heard in ("gunow it", "go now it", "genow it", "Genau it!"):
+    for heard in ("gunow it", "go now it", "genow it", "Genau it!",
+                  "Good now it.", "can now it", "canow it"):
         assert voice_commands.recognized_spelling(heard) == "Genau it"
     assert voice_commands.recognized_spelling("ganau") == "Genau"
 

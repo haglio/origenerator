@@ -55,6 +55,7 @@ from origenerator.gallery.labels import (
 )
 from origenerator.gallery.output import (
     animated_preview_path,
+    is_in_progress,
     media_type_of_row,
     output_disk_files,
     output_file_path,

@@ -3465,11 +3465,24 @@ class GalleryView(QWidget):
             self._slideshow.note_added(*item)
 
     def _open_from_slideshow(self, prompt_id: str):
-        """Enter in a slideshow: land in the item's own folder with it selected —
-        the same jump a shelf tile's double-click makes. The slideshow has already
-        closed itself, so this arrives on the gallery."""
+        """A slideshow handed its item over on the way out — Enter, or a show
+        ended while that slide was locked. Land in the item's own folder with it
+        selected, the same jump a shelf tile's double-click makes, and open the
+        item itself in a config tab.
+
+        The tab matters as much as the folder: leaving a show *for* an item is a
+        decision to work on it, and a folder open behind a form still holding
+        whatever was there before the show is not that. Following a link only
+        refreshes the front tab's preview, which is right for a link and wrong
+        here. The slideshow has already closed itself, so this arrives on the
+        gallery.
+        """
         self._slideshow = None
         self._browser.open_in_containing_folder(prompt_id)
+        row = self._row_for(prompt_id)
+        if row is not None:
+            self._info_tabs.load_selection(row, self._image_rows,
+                                           self._request_for(prompt_id))
 
     def _star_generation(self, prompt_id: str):
         """Bookmark a generation from a fullscreen show (its Down key) — the same

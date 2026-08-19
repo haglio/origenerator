@@ -209,6 +209,80 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     assert not view.isVisible()   # and the slideshow is out of the way
 
 
+def _shelf_view(qtbot):
+    """A two-item show whose handovers are recorded — the ways out of a show."""
+    items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
+    view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None)
+    qtbot.addWidget(view)
+    view.show()
+    opened = []
+    view.open_requested.connect(opened.append)
+    return view, opened
+
+
+def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
+    # Locking says "this is the one", so ending the show there means the same
+    # thing Enter does: the gallery lands on that item rather than back wherever
+    # it was when the show started.
+    view, opened = _shelf_view(qtbot)
+    _press(view, Qt.Key.Key_Right)  # onto the second slide
+    _press(view, Qt.Key.Key_Down)   # hold it
+
+    _press(view, Qt.Key.Key_Escape)
+
+    assert opened == ["id-b"]
+    assert not view.isVisible()
+
+
+def test_ending_a_show_on_an_unheld_slide_hands_nothing_over(qtbot):
+    # Every other way out is just leaving: the gallery stays where it was.
+    view, opened = _shelf_view(qtbot)
+
+    _press(view, Qt.Key.Key_Escape)
+
+    assert opened == []
+
+
+def test_enter_on_a_held_slide_hands_it_over_once(qtbot):
+    # Enter and the lock name the same item, and the handover is closeEvent's, so
+    # the gallery is asked to go there once rather than twice.
+    view, opened = _shelf_view(qtbot)
+    _press(view, Qt.Key.Key_Down)
+
+    _press(view, Qt.Key.Key_Return)
+
+    assert opened == ["id-a"]
+
+
+def test_closing_a_show_twice_hands_over_once(qtbot):
+    # Qt sends a close event to an already-closed window too.
+    view, opened = _shelf_view(qtbot)
+    _press(view, Qt.Key.Key_Down)
+
+    view.close()
+    view.close()
+
+    assert opened == ["id-a"]
+
+
+def test_culling_the_last_slide_hands_nothing_over(qtbot):
+    # The show empties and closes itself, and the item it ended on is in the bin —
+    # nowhere to land.
+    deleted = []
+    view = SlideshowView([("a.png", "image", "id-a")], player=MagicMock(),
+                         shuffle=lambda order: None, on_delete=deleted.append)
+    qtbot.addWidget(view)
+    view.show()
+    opened = []
+    view.open_requested.connect(opened.append)
+    _press(view, Qt.Key.Key_Down)  # held, then condemned anyway
+
+    _press(view, Qt.Key.Key_Up)
+
+    assert deleted == ["id-a"]
+    assert opened == []
+
+
 def test_the_items_either_side_ride_along_as_stills(qtbot, tmp_path):
     items = [(_png(tmp_path / f"{name}.png"), "image", f"id-{name}")
              for name in ("a", "b", "c")]

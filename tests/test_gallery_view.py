@@ -5354,6 +5354,49 @@ def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeyp
     assert view._slideshow is None                  # out of the slideshow...
     assert shown in view.visible_prompt_ids()       # ...into the folder holding it
     assert view._browser.selected_ids == {shown}    # with that item picked
+    # And the item open in a tab: leaving a show for an item is a decision to
+    # work on it, which a folder behind a stale form isn't.
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
+
+
+def test_a_show_ended_on_a_locked_slide_lands_on_that_item(qtbot, monkeypatch):
+    # Locking a slide is the user saying this is the one, so ending the show there
+    # opens it — the same landing Enter makes, rather than leaving the gallery
+    # back where the show was started from.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    slideshow = view._slideshow
+    qtbot.addWidget(slideshow)
+    held = slideshow._playlist.current()[2]
+    slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+
+    slideshow.close()   # Escape, the spoken "close", a double-click: all this
+
+    assert view._slideshow is None
+    assert held in view.visible_prompt_ids()       # its own folder in the pane...
+    assert view._browser.selected_ids == {held}    # ...with it picked...
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
+
+
+def test_a_show_ended_on_an_unheld_slide_leaves_the_gallery_alone(qtbot, monkeypatch):
+    # Nothing was held, so nothing was chosen: closing is just leaving, and the
+    # shelf the show was started from is still what's on screen.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    slideshow = view._slideshow
+    qtbot.addWidget(slideshow)
+
+    slideshow.close()
+
+    assert view._tree.currentItem() is view._recents_item
 
 
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):

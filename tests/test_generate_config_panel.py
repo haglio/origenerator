@@ -930,7 +930,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     panel._preview.show_media.reset_mock()
 
     panel.set_pending_enhancement(("running", b"\x89PNG-ish", "2x"))
-    panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish")
+    panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", keep_notice=True)
 
     # ...and when the run ends the pane goes back to the image itself.
     panel.set_pending_enhancement(None)
@@ -1559,6 +1559,38 @@ def test_switching_workflow_leaves_no_stale_mark(saved_panel):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
     assert _notice(panel) == ""
+
+
+def _frame_bytes(tmp_path, size: int = 8) -> bytes:
+    """One encoded preview frame, as ComfyUI streams them over the websocket.
+    ``size`` only varies the picture, so two calls make two distinct frames."""
+    path = tmp_path / f"frame{size}.png"
+    pixmap = QPixmap(size, 6)
+    pixmap.fill()
+    pixmap.save(str(path), "PNG")
+    return path.read_bytes()
+
+
+def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_path):
+    # An enhancement is not a run of these settings — it is the coming state of
+    # the very picture they are being edited away from — so the mark holds over
+    # its frames, message and dim together. Clearing it per frame left the two
+    # trading places several times a second while the form was typed in.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+    assert not panel._preview._notice_dim.isHidden()
+
+    # ...and it goes on standing as the run streams, rather than blinking off
+    # with every frame that arrives.
+    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path, 10), "2x"))
+
+    assert _notice(panel) == "(not yet generated with modifications)"
 
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):

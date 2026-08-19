@@ -978,6 +978,15 @@ class GenerateConfigPanel(QWidget):
         shows you what is being made. It was the one surface that stayed on the
         old picture while the little row beside it streamed. When the run ends,
         the preview goes back to the image itself (by then the enhanced one).
+
+        These frames keep whatever the pane is saying about the picture rather
+        than clearing it, which every other live frame does. An enhancement is
+        not a run of the settings beside it — it is the coming state of the very
+        image those settings are being edited away from — so a mark that the form
+        has moved off it is as true of the version being made. Clearing it here
+        left the mark and the frames trading places several times a second while
+        the form was typed in: each frame took the mark off, each keystroke put
+        it back.
         """
         if pending == self._pending_enhancement:
             return
@@ -986,7 +995,7 @@ class GenerateConfigPanel(QWidget):
         if pending is not None:
             frame = pending[1]
             if frame:
-                self._preview.show_frame(frame)
+                self._preview.show_frame(frame, keep_notice=True)
         elif was_running:
             self._restore_preview()
         if self._versions.update_pending(pending):

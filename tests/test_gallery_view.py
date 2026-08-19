@@ -2869,6 +2869,9 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     assert groups[1] == (view._undo_btn, view._redo_btn)
     assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
     assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
+    # The mic has a space of its own: the group beside it is what Esc turns off,
+    # and the mic is the one switch it leaves listening.
+    assert groups[5] == (view._mic_btn,) and view._mic_btn not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -8978,6 +8981,95 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     qtbot.addWidget(other)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
+
+
+def _stoppable_view(qtbot, tmp_path, monkeypatch):
+    """A gallery with everything Esc is meant to stop actually running: a loop,
+    the audio bed, and a fullscreen show — plus the mic, which it is meant to
+    leave alone."""
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    bed = _FakeAmbientAudio()
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), ambient_audio=bed)
+    qtbot.addWidget(view)
+    _keys_are_the_gallerys(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._audio_btn.setChecked(True)
+    view._mic_btn.setChecked(True)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    return view, bed, key
+
+
+def test_esc_turns_off_everything_the_app_is_doing(qtbot, tmp_path, monkeypatch):
+    # One key for the whole room: the loop, the sound, and the show all stop
+    # together, so there is no second thing still going after the panic-stop.
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    assert view._auto.is_active(key) and bed.starts == 1 and view._slideshow is not None
+
+    handled = _press_escape(view)
+
+    assert handled is True
+    assert not view._auto.is_active(key)
+    assert not view._audio_btn.isChecked() and bed.stops == 1
+    assert view._slideshow is None
+
+
+def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
+    # The one switch it never touches: speaking is how anything it just stopped
+    # gets going again without reaching for the keyboard.
+    view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    assert view._mic_btn.isChecked() and view._voice.commands_on
+
+    _press_escape(view)
+
+    assert view._mic_btn.isChecked() and view._voice.commands_on
+
+
+def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
+                                                           monkeypatch):
+    # The show is a window of ours, and Esc closes it — but on its own that left
+    # the loop and the sound running behind it, which is the opposite of what
+    # the key means. So this one window doesn't take the key away.
+    from PyQt6.QtWidgets import QApplication
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    show = view._slideshow
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: show))
+    view._other_window_owns_keys = lambda: True  # the show is up and active
+
+    handled = _press_escape(view)
+
+    assert handled is True
+    assert view._slideshow is None and not view._auto.is_active(key) and bed.stops == 1
+
+
+def test_esc_over_the_show_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
+                                                                 monkeypatch):
+    # A dropdown or dialog opened over the show owns Esc, as it does everywhere.
+    from PyQt6.QtWidgets import QApplication, QWidget
+    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    show = view._slideshow
+    popup = QWidget()
+    qtbot.addWidget(popup)
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: show))
+    monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: popup))
+    view._other_window_owns_keys = lambda: True
+
+    assert _press_escape(view) is False
+    assert view._slideshow is show and view._auto.is_active(key) and bed.stops == 0
+    show.close()
+
+
+def test_esc_stops_the_audio_bed_on_its_own(qtbot):
+    # Nothing else running: the switch alone is enough for Esc to have acted.
+    view, bed = _audio_view(qtbot)
+    _keys_are_the_gallerys(view)
+    view._audio_btn.setChecked(True)
+
+    assert _press_escape(view) is True
+    assert not view._audio_btn.isChecked() and bed.stops == 1
 
 
 # --- folders the user composes: multi-select, group, drop, rename, remove -----

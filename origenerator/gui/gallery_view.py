@@ -500,12 +500,22 @@ class GalleryView(QWidget):
         return super().eventFilter(obj, event)
 
     def _handle_escape(self) -> bool:
-        """Esc stops the physical device and any running loop, wherever focus is: it
-        turns off OSR2 driving and ends auto-generate. It yields, though, when
-        another window owns the keystroke — an open dialog/popup, so Esc still closes
-        a combo dropdown, or an active fullscreen slideshow, which closes on
-        Esc themselves. Returns whether it acted."""
-        if self._other_window_owns_keys():
+        """Esc turns off everything the app is doing, wherever focus is: the OSR2
+        drive (a funscript or the genau stroke), the auto-generate loop, the
+        fullscreen slideshow, and the audio bed.
+
+        Everything except the microphone, which is why that switch stands on its
+        own in the bank. A stop that closed the mic too would take with it the
+        one way of starting anything again without reaching for the keyboard —
+        and the room is usually mid-something when Esc is pressed.
+
+        It yields when a dialog or popup owns the keystroke, so Esc still closes
+        a combo dropdown, and when some other window is up. Our own slideshow is
+        not that: it closes itself on Esc, but closing only the show would leave
+        the loop, the device and the sound running behind it, which is the
+        opposite of what the key means. Returns whether it acted.
+        """
+        if self._other_window_owns_keys() and not self._our_show_is_in_front():
             return False
         handled = False
         if self._osr2_enabled:
@@ -519,7 +529,23 @@ class GalleryView(QWidget):
         if self._auto.any_active():
             self._auto.stop_all()
             handled = True
+        if self._slideshow is not None:
+            self._slideshow.close()  # _on_slideshow_closed lets it go
+            handled = True
+        if self._audio_btn.isChecked():
+            self._audio_btn.setChecked(False)  # drives _on_audio_toggle → silence
+            handled = True
         return handled
+
+    def _our_show_is_in_front(self) -> bool:
+        """True when the window ahead of the gallery is our own fullscreen
+        slideshow — one of the things Esc turns off, rather than a window to hand
+        the key back to. A dialog or popup over the show still owns it."""
+        if self._slideshow is None:
+            return False
+        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
+            return False
+        return QApplication.activeWindow() is self._slideshow
 
     def _other_window_owns_keys(self) -> bool:
         """True when a keystroke belongs to something other than the gallery: an open
@@ -741,16 +767,22 @@ class GalleryView(QWidget):
         self._audio_btn.setStyleSheet(
             "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
         )
-        # The microphone, beside the other app-global switches: on is listening,
-        # off is not, and that is the whole of it. Nothing opens or closes the mic
-        # on its own any more — it used to come on with the Auto loop and with a
-        # fullscreen show, which meant the answer to "is it listening?" was a
-        # thing to work out rather than a thing to look at.
+        # The microphone, standing apart from the switches above: those are what
+        # the app is doing, and Esc turns all of them off at once — the mic is
+        # the one thing it leaves alone, since speaking is how any of them get
+        # going again without the keyboard. On is listening, off is not, and that
+        # is the whole of it. Nothing opens or closes the mic on its own — it used
+        # to come on with the Auto loop and with a fullscreen show, which meant
+        # the answer to "is it listening?" was a thing to work out rather than a
+        # thing to look at. The app opens with it on (see :meth:`set_mic_enabled`):
+        # the commands are worth nothing unheard, and a switch the user has to
+        # remember to flip before speaking is one they find out about by talking
+        # to an app that wasn't listening.
         self._mic_btn = self._tool_button(
             icons.mic_icon(),
             "Listen: spoken slideshow commands, orders over a show (“enhance”, "
             "“fix hands”, “genau it”), and prompt steering while a folder is "
-            "auto-generating",
+            "auto-generating (left listening by Esc, which stops everything else)",
             self._on_mic_toggle, checkable=True,
         )
         self._mic_btn.setStyleSheet(
@@ -794,8 +826,9 @@ class GalleryView(QWidget):
             (self._undo_btn, self._redo_btn),                       # what you did
             (self._group_btn,),                                     # …to the picked folders
             (self._star_btn, self._enhance_btn, self._delete_btn),  # …to what's in front
-            (self._slideshow_btn, self._auto_btn,                   # what the app is doing
-             self._mic_btn, self._audio_btn, self._osr2_btn),
+            (self._slideshow_btn, self._auto_btn,                   # what the app is
+             self._audio_btn, self._osr2_btn),                      # doing, and Esc stops
+            (self._mic_btn,),                                       # what it hears with
         ):
             gap = _toolbar_gap()
             toolbar.addWidget(gap)
@@ -1264,6 +1297,23 @@ class GalleryView(QWidget):
     def set_audio_enabled(self, enabled):
         """Restore the audio bed's switch from a saved session."""
         self._audio_btn.setChecked(bool(enabled))  # drives _on_audio_toggle → start
+
+    # --- the microphone: the one switch Esc leaves alone ---------------------
+
+    def mic_enabled(self) -> bool:
+        """Whether the mic switch is on (for session persistence)."""
+        return self._mic_btn.isChecked()
+
+    def set_mic_enabled(self, enabled):
+        """Restore the mic switch from a saved session — on when the session has
+        nothing to say, which is where the app opens.
+
+        The other switches default off because each of them spends something: the
+        GPU, the device, the room's sound. Listening spends nothing until it hears
+        something, and it is the only way back in after Esc has stopped everything
+        else — so off is a state to be chosen, not one to be arrived at.
+        """
+        self._mic_btn.setChecked(True if enabled is None else bool(enabled))
 
     # --- background experiments: the closing batch and the shelf's controls ---
 

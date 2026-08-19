@@ -9,7 +9,7 @@ into the sections defined in :mod:`origenerator.gui.param_sections`.
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from origenerator.gui.eliding_button import ElidingButton
+from origenerator.gui.eliding import ElidingButton
 
 # Prefixed to the header title so the fold state reads at a glance: a down
 # triangle when open, a right-pointing one when shut.
@@ -57,11 +57,6 @@ class CollapsibleSection(QWidget):
         self._form.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
-        # Squeezed past what a label and its field can share, put the field on its
-        # own line under the label rather than making the pane scroll sideways.
-        # At any comfortable width this changes nothing: rows only wrap once the
-        # pair no longer fits.
-        self._form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         outer.addWidget(self._content)
 
         self._apply_state()

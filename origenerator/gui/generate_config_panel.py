@@ -26,6 +26,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
@@ -190,7 +191,6 @@ class GenerateConfigPanel(QWidget):
         header.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
-        header.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self._workflow_combo = NoWheelComboBox()
         # Machinery workflows (the standalone image enhancer) stay out of the
         # picker: they're launched by gallery buttons, and their results fold
@@ -208,7 +208,7 @@ class GenerateConfigPanel(QWidget):
         # It shrinks to a short floor when the pane is narrow rather than holding
         # the width of the longest workflow name — see NoWheelComboBox, which every
         # picker in the app inherits that from. It still expands to fill the row.
-        header.addRow("Workflow", self._workflow_combo)
+        header.addRow(ElidingLabel("Workflow"), self._workflow_combo)
         body.addLayout(header)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")

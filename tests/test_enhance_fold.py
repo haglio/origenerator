@@ -141,14 +141,12 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
     _add_enhance(db, "running", "image/sdxl_t2i_src.png [output]", "x.png",
                  status="running")
     tree = gallery.build_gallery_tree(db.list_generations())
-    workflows = [w.workflow_name for m in tree for w in m.workflow_groups]
-    assert workflows == ["sdxl_t2i"]
+    assert [w.workflow_name for w in tree] == ["sdxl_t2i"]
 
     _add_enhance(db, "orphan", "image/sdxl_t2i_gone.png [output]",
                  "image_enhance_o.png")
     tree = gallery.build_gallery_tree(db.list_generations())
-    workflows = [w.workflow_name for m in tree for w in m.workflow_groups]
-    assert sorted(workflows) == ["image_enhance", "sdxl_t2i"]
+    assert sorted(w.workflow_name for w in tree) == ["image_enhance", "sdxl_t2i"]
 
 
 def test_original_files_survives_capture_and_restore(tmp_path):

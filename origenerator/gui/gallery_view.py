@@ -624,6 +624,29 @@ class GalleryView(QWidget):
         self._search_edit.setClearButtonEnabled(True)
         self._search_edit.textChanged.connect(self._on_search_changed)
         toc_box.addWidget(self._search_edit)
+        # The gallery's image/video filter: two boxes saying which kinds of
+        # generation the gallery is made of at all, both on so it opens showing
+        # everything. It sits between the search box and the tree because it
+        # prunes the tree: a gallery with videos switched off has no video folders
+        # in it, and no video tiles in the pane beside them either. (It replaces a
+        # pair that filtered the Recents shelf alone, which could only ever answer
+        # "which of these do I want to look at" for one shelf.)
+        self._image_cb = CheckBox("Images")
+        self._video_cb = CheckBox("Videos")
+        for checkbox in (self._image_cb, self._video_cb):
+            checkbox.setChecked(True)
+            checkbox.setToolTip(
+                "Which kinds of generation the gallery lists — the folders below "
+                "as well as the items in the pane beside them"
+            )
+            checkbox.toggled.connect(self._on_media_filter_changed)
+        media_filter = QWidget()
+        media_row = QHBoxLayout(media_filter)
+        media_row.setContentsMargins(0, 0, 0, 0)
+        media_row.addWidget(self._image_cb)
+        media_row.addWidget(self._video_cb)
+        media_row.addStretch(1)
+        toc_box.addWidget(media_filter)
         toc_box.addWidget(self._tree, 1)  # the tree takes the height; combine sits below
         # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
         # on the image. Needs a client to generate, so it hides without one.
@@ -777,25 +800,8 @@ class GalleryView(QWidget):
             self._toolbar_groups.append((gap, buttons))
         self._sync_toolbar_gaps()
         browser_box.addWidget(self._toolbar_host)
-        # The Recents shelf's image/video filter: two checkboxes choosing which
-        # media types it lists, both on so the shelf opens showing everything. The
-        # bar rides just under the header and appears only while that shelf is open.
-        self._recents_image_cb = CheckBox("Images")
-        self._recents_video_cb = CheckBox("Videos")
-        for checkbox in (self._recents_image_cb, self._recents_video_cb):
-            checkbox.setChecked(True)
-            checkbox.toggled.connect(self._on_recents_filter_changed)
-        self._recents_filter_bar = QWidget()
-        filter_row = QHBoxLayout(self._recents_filter_bar)
-        filter_row.setContentsMargins(0, 0, 0, 0)
-        filter_row.addWidget(QLabel("Show:"))
-        filter_row.addWidget(self._recents_image_cb)
-        filter_row.addWidget(self._recents_video_cb)
-        filter_row.addStretch(1)
-        self._recents_filter_bar.hide()  # shown only on the Recents shelf
-        browser_box.addWidget(self._recents_filter_bar)
-        # The search results' own controls, riding under the header like the
-        # Recents filter and appearing only while a query is running: how many
+        # The search results' own controls, riding under the header and appearing
+        # only while a query is running: how many
         # items answered it, and the order they are laid out in. Recency is one
         # question ("the one I made recently"); model + LoRA is the other ("which
         # recipe was that"), and picking it cuts the results into a labelled band
@@ -821,8 +827,8 @@ class GalleryView(QWidget):
         search_row.addWidget(self._search_sort_box)
         self._search_bar.hide()  # shown only while a search is running
         # The Experiments shelf's controls: the background experimenter's on/off
-        # switch and a one-line status. Rides under the header like the Recents
-        # filter, and appears only while that shelf is open.
+        # switch and a one-line status. Rides under the header, and appears only
+        # while that shelf is open.
         self._experiments_cb = CheckBox("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         # Scheduling an absence is the live install's alone, so a branch session
@@ -1605,9 +1611,19 @@ class GalleryView(QWidget):
                 self._rebuildable_videos(rows), self._combine.selected_intent()
             )
         )
-        tree_model = gallery.build_gallery_tree(rows, meta)
-        unreviewed = self._review_queue(rows)
-        held = self._held_rows = recovery.bin_items(self._bin_records())
+        # The Images/Videos boxes narrow everything the gallery shows: which
+        # folders the tree grows, which items each shelf lists, and what a search
+        # can turn up. The tree takes the filter itself rather than pre-filtered
+        # rows, because the start-frame index behind a video's source-image
+        # folders has to see every image whichever way the boxes stand.
+        media_types = self._media_types()
+        listed = gallery.rows_of_media_types(rows, media_types)
+        tree_model = gallery.build_gallery_tree(rows, meta, media_types)
+        unreviewed = self._review_queue(listed)
+        # The bin holds every kind, so a restore can still resolve a row of a type
+        # the boxes are hiding; only what the Trash shelf lists is narrowed.
+        self._held_rows = recovery.bin_items(self._bin_records())
+        held = gallery.rows_of_media_types(self._held_rows, media_types)
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
@@ -1627,19 +1643,23 @@ class GalleryView(QWidget):
         # a deleted row is out of ``list_generations`` and lives only in the bin.
         # They are reachable only from that shelf: every other scope is a set of
         # ids drawn from the live tree (see :meth:`_search_scope`).
-        self._search.update(rows + held, gallery.named_folders_by_row(
+        self._search.update(listed + held, gallery.named_folders_by_row(
             tree_model, meta, self._custom_folders))
-        requested = gallery.requested_generations(self._db.list_requests(), rows)  # the Requests shelf
+        requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
         self._browser.set_model(
-            gallery.recent_generations(rows, self._recents_media_types()),
+            gallery.recent_generations(listed),
             gallery.starred_folders(tree_model),
-            gallery.starred_generations(rows),
+            gallery.starred_generations(listed),
             unreviewed,
             held,
             requested,
         )
+        # The Recents shelf stays up when it is the media filter that emptied the
+        # gallery — unchecking both boxes leaves no folders at all, and a pane
+        # with nothing in it and no shelf to explain it says nothing about why.
         self._tree_view.populate(tree_model, expanded,
-                                 show_recents=bool(tree_model or self._browser._inflight_items()),
+                                 show_recents=bool(tree_model or rows
+                                                   or self._browser._inflight_items()),
                                  experiment_count=len(unreviewed),
                                  trash_count=len(held),
                                  request_count=len(requested),
@@ -1806,7 +1826,7 @@ class GalleryView(QWidget):
         The tree's selection is the scope, whatever kind of row it is. A shelf
         counts: Recents, Starred, Experiments and Trash are each a collection of
         generations, and standing on one and searching it is the obvious thing to
-        try. The All row above Images and Videos is what covers the library
+        try. The All row over the workflow folders is what covers the library
         entire, since every other folder narrows the answer before the query does.
 
         ``path`` is the row's breadcrumb — what the box, the header and the
@@ -1854,7 +1874,6 @@ class GalleryView(QWidget):
         self._title.set_display(f"Search: “{self._search_query}” in {scope.path}")
         self._title.setToolTip("")  # the header is the query now, not a folder
         self._avg_label.setText("")
-        self._recents_filter_bar.hide()
         self._experiments_bar.hide()
         self._search_count.setText(self._search_count_text())
         self._search_bar.show()
@@ -2022,9 +2041,7 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
         self._sync_enhance_button()  # enhance-all fits a folder with plain images
         self._sync_group_button()      # grouping fits only a multi-selection
-        # The image/video filter belongs to the Recents shelf alone; the
-        # experimenter's switch to the Experiments shelf alone.
-        self._recents_filter_bar.setVisible(current is self._recents_item)
+        # The experimenter's switch belongs to the Experiments shelf alone.
         self._experiments_bar.setVisible(current is self._experiments_item)
         if current is None:
             self._title.set_display("")
@@ -2107,7 +2124,6 @@ class GalleryView(QWidget):
         """Render the picked folders as the folder they would make: their tiles in
         the browser pane, and the toolbar offering to save the grouping."""
         group = self._selection_group
-        self._recents_filter_bar.hide()
         self._experiments_bar.hide()
         self._title.set_display(group.label)
         self._title.setToolTip("")  # a count of folders, with no one folder behind it
@@ -4222,24 +4238,26 @@ class GalleryView(QWidget):
     def _showing_recents(self) -> bool:
         return self._browser.showing_recents()
 
-    def _recents_media_types(self) -> set[str]:
-        """The media types the Recents shelf's checkboxes currently include —
-        the filter :func:`gallery.recent_generations` and the in-flight cards honor.
-        Both on (the default) means every type; both off means none."""
+    def _media_types(self) -> set[str]:
+        """The media types the gallery's two checkboxes currently include — what
+        the folder tree, every shelf, the in-flight cards and the search index are
+        all built from. Both on (the default) means every type; both off means
+        none."""
         types = set()
-        if self._recents_image_cb.isChecked():
+        if self._image_cb.isChecked():
             types.add("image")
-        if self._recents_video_cb.isChecked():
+        if self._video_cb.isChecked():
             types.add("video")
         return types
 
-    def _on_recents_filter_changed(self, _checked=False):
-        """A media-type checkbox toggled: re-list the shelf under the new filter.
-        Lightweight — re-derives the recent rows and redraws, with no tree rebuild."""
-        self._browser.set_recent_rows(gallery.recent_generations(
-            self._db.list_generations(), self._recents_media_types()
-        ))
-        self._sync_slideshow_button()  # a filter that empties the shelf retires it
+    def _on_media_filter_changed(self, _checked=False):
+        """A media-type checkbox toggled: rebuild the gallery under the new filter.
+
+        A full rebuild rather than a re-list, because the boxes decide which
+        *folders* exist as well as which items do — the tree, the shelves and the
+        search index are all built from the same narrowed set."""
+        self._browser.restart_recents_listing()  # a new filter is a new listing
+        self.refresh()
 
     def _drill_into(self, key: str):
         self._browser._drill_into(key)
@@ -4688,8 +4706,8 @@ class GalleryView(QWidget):
             self._custom_folder_context_menu(group, global_pos)
             return
         menu = QMenu(self)
-        # No rename for a folder named after what it holds — a model, a LoRA, a
-        # workflow, a media root (see :func:`gallery.is_renamable`).
+        # No rename for a folder named after what it holds — a workflow, a model,
+        # a LoRA, a source image (see :func:`gallery.is_renamable`).
         rename_action = menu.addAction("Rename…") if gallery.is_renamable(group) else None
         star_action = menu.addAction("Unstar" if group.starred else "Star")
         # Inside a folder the user made, a member tile can also be dropped from it.
@@ -5110,8 +5128,8 @@ class GalleryView(QWidget):
 
 def _group_workflow(group) -> str | None:
     """The single workflow a folder belongs to, or ``None`` if it spans several
-    (a media-type folder) and so has no one workflow time to fall back on."""
-    if isinstance(group, gallery.MediaGroup):
+    (the All row) and so has no one workflow time to fall back on."""
+    if isinstance(group, gallery.AllGroup):
         return None
     if isinstance(group, gallery.WorkflowGroup):
         return group.workflow_name

@@ -30,9 +30,9 @@ def _tree(rows):
 
 
 def _lora_folder(tree):
-    """The "(no LoRA)" folder these rows all land under: media -> workflow ->
-    model -> LoRA, whose children are the settings leaves."""
-    return gallery.child_groups(gallery.child_groups(gallery.child_groups(tree[0])[0])[0])[0]
+    """The "(no LoRA)" folder these rows all land under: workflow -> model ->
+    LoRA, whose children are the settings leaves."""
+    return gallery.child_groups(gallery.child_groups(tree[0])[0])[0]
 
 
 # --- keys --------------------------------------------------------------------
@@ -77,12 +77,14 @@ def test_a_member_whose_folder_is_gone_is_skipped_not_dropped():
     # renders without it rather than forgetting it was ever a member.
     rows = [_row("i1", "a cat")]
     tree = _tree(rows)
-    record = {"id": 1, "name": "Mixed", "members": ["image/sdxl_t2i/deadbeef", "image"]}
+    record = {"id": 1, "name": "Mixed",
+              "members": ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]}
 
     (folder,) = gallery.build_custom_folders(tree, [record])
 
-    assert [g.key for g in gallery.child_groups(folder)] == ["image"]
-    assert record["members"] == ["image/sdxl_t2i/deadbeef", "image"]  # untouched
+    assert [g.key for g in gallery.child_groups(folder)] == ["image/sdxl_t2i"]
+    # untouched
+    assert record["members"] == ["image/sdxl_t2i/deadbeef", "image/sdxl_t2i"]
 
 
 def test_an_empty_custom_folder_still_appears():

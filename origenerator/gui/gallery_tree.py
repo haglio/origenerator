@@ -1,7 +1,7 @@
 """Builds and queries the gallery's folder-tree widget — the left TOC pane.
 
 Renders the Recents, Starred, Experiments, Requests and Trash shelves atop the
-media → workflow → model → LoRA → [source image] → settings folders, and keeps the
+workflow → model → LoRA → [source image] → settings folders, and keeps the
 key→item and prompt-id→item maps the view navigates by. Pure tree rendering and lookups over a ``FolderTree`` the
 GalleryView owns and lays out; it has no database or refresh concerns — folder
 rename/star/delete live in the view, which rebuilds the tree through :meth:`populate`.
@@ -77,7 +77,7 @@ class GalleryTree:
         ``trash_count`` (deleted items still recoverable) show in their shelves'
         labels so waiting work is visible from anywhere. ``custom_folders`` are
         the user's own groupings, each getting a row of its own between the
-        shelves and the media roots. ``folder_meta`` is the same label/star
+        shelves and the workflow folders. ``folder_meta`` is the same label/star
         overlay the tree model was built with, so the All row it wraps around
         that model can be renamed and starred like any folder under it."""
         self._tree.blockSignals(True)
@@ -130,10 +130,10 @@ class GalleryTree:
         )
         for custom in custom_folders:
             self.custom_items[custom.key] = self._add_custom_folder(root, custom)
-        # One root over the media folders, standing for the library entire. It is
-        # what the search means by "everywhere": the tree selection scopes a query,
-        # so without a row above Images and Videos there is nowhere to stand that
-        # doesn't already narrow the answer by half.
+        # One root over the workflow folders, standing for the library entire. It
+        # is what the search means by "everywhere": the tree selection scopes a
+        # query, so without a row over them there is nowhere to stand that doesn't
+        # already narrow the answer to a single recipe.
         if tree_model:
             self._add_node(gallery.all_group(tree_model, folder_meta), root)
         # Folders default to collapsed; only restore folders the user had open.
@@ -149,7 +149,7 @@ class GalleryTree:
         """Open the All row on a gallery's first build.
 
         Every other folder defaults shut, but All shut is a tree with nothing in
-        it — Images and Videos are where the gallery starts. Only on the first
+        it — the workflow folders are where the gallery starts. Only on the first
         build: after that its state is the user's, saved and restored with every
         other folder's, so collapsing it sticks.
         """
@@ -191,10 +191,10 @@ class GalleryTree:
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
         # A workflow / model / LoRA / source-image row wears a lettered chip
-        # naming its recipe level, and a media root the glyph its own items wear,
-        # so a row's place in the hierarchy reads at a glance rather than by
-        # counting indentation; the level joins the tooltip too. The All row and
-        # the settings leaves get neither (folder_level returns None).
+        # naming its level, so a row's place in the hierarchy reads at a glance
+        # rather than by counting indentation; the level joins the tooltip too.
+        # The All row and the settings leaves get neither (folder_level returns
+        # None).
         #
         # It is the row's *icon*, so it sits right of the caret and reads as the
         # first character of the folder's name — which is what it is. What that
@@ -205,11 +205,7 @@ class GalleryTree:
         level = gallery.folder_level(group)
         if level is not None:
             item.setIcon(0, icons.level_badge_icon(level))
-            named = icons.LEVEL_LABELS[level]
-            # A media root is named after its own level ("Videos" at the video
-            # level), so joining the two would just say it twice.
-            item.setToolTip(0, group.label if named == group.label
-                            else f"{group.label} · {named}")
+            item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
         else:
             # A settings leaf is named by a code, so its tooltip is where the
             # prompt and the settings that set it apart from its siblings are

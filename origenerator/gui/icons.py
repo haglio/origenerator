@@ -29,28 +29,24 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    TEXT_PRIMARY, BG_PRIMARY, BORDER_PANEL, BLUE, PINK, AMBER, GREEN, RED,
+    TEXT_PRIMARY, BG_PRIMARY, BLUE, PINK, AMBER, GREEN, RED,
 )
 from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
 # Hierarchy level badges. Every gallery folder above a settings leaf sits at one
-# of these levels, and a small chip names which, so a tree row or a browser tile
-# is self-describing without the reader counting indentation. The recipe levels
-# take a lettered chip in their own color; the two media roots take the play and
-# photo glyphs their own items wear, on a neutral chip — they are the shape of
-# the library rather than a step of a recipe, and the color says so.
+# of these levels, and a small lettered chip in the level's own color names
+# which, so a tree row or a browser tile is self-describing without the reader
+# counting indentation.
 LEVEL_LABELS = {
     "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
-    "image": "Images", "video": "Videos",
 }
 _LEVEL_BADGES = {
     "workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER),
     "source_image": ("I", GREEN),
 }
-_MEDIA_LEVEL_CHIP = BORDER_PANEL  # Images / Videos: the library's shape, not a recipe's
 
 # The Recents shelf mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark chip,
@@ -333,19 +329,12 @@ def tab_close_icon(widget=None) -> QIcon:
 def level_badge_icon(level: str) -> QIcon:
     """The chip marking a folder's place in the hierarchy (see LEVEL_LABELS).
 
-    A lettered chip in its own color for the recipe levels; for the two media
-    roots, the play / photo glyph their own items already wear, on a neutral
-    chip — same shape and size as the letters, so the roots read as part of the
-    same system, but plainly not a fifth step of a recipe.
+    Its level's letter, in that level's own color.
 
     Cached: the same few chips decorate many tree rows and tiles, so they're
     rendered once and shared rather than re-drawn per folder.
     """
     icon = QIcon()
-    glyph = {"video": "play", "image": "photo"}.get(level)
-    if glyph is not None:
-        icon.addPixmap(_render_chip(_MEDIA_LEVEL_CHIP, glyph, _BADGE_GLYPH))
-        return icon
     letter, color = _LEVEL_BADGES[level]
     icon.addPixmap(_render_badge(letter, color))
     return icon

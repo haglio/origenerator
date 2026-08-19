@@ -12,7 +12,7 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.output` — what a generation produced on disk: media type, preview, files.
 * :mod:`.labels` — the human-facing folder and Generate-tab names.
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
-* :mod:`.tree` — nesting rows into the media -> workflow -> model -> LoRA ->
+* :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
 
 This package re-exports the public surface below, so ``from origenerator.gallery
@@ -32,7 +32,6 @@ from origenerator.gallery.groups import (
     AllGroup,
     CustomGroup,
     LoraGroup,
-    MediaGroup,
     ModelGroup,
     SettingsGroup,
     SourceImageGroup,
@@ -63,6 +62,7 @@ from origenerator.gallery.output import (
     produced_output,
     resolve_preview,
     row_output_files,
+    rows_of_media_types,
 )
 from origenerator.workflows.detail_parts import (
     match_fix_command,

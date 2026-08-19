@@ -207,7 +207,7 @@ def _source_image_label(params: dict, image_index: dict) -> str:
 
     The frame's own filename leads, then the code of the image generation's own
     folder — so a video's source folder names *which* picture it animates, and
-    reads as the same folder that picture sits in over in the Images tree. The
+    reads as the same folder that picture sits in over among the images. The
     filename comes first because the tier is one frame per folder, and two draws
     of one prompt land in one settings folder, so they would otherwise wear the
     same code. Falls back to the bare filename when the frame isn't a known

@@ -53,6 +53,55 @@ def test_keeps_its_slot_when_idle(queue):
     assert queue.rows() == []
 
 
+def test_an_empty_line_says_what_it_is_for(queue):
+    # The strip keeps its slot with nothing queued, so this side of it is blank
+    # most of the time — and a blank half of a laid-out strip reads as something
+    # that failed to draw. Dim letters, so it is a note about the space rather
+    # than a row sitting in it.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([])
+    QApplication.processEvents()
+
+    assert queue._hint.isVisible()
+    assert queue._hint.text() == "(queued jobs show up here)"
+    assert queue._hint.objectName() == "estimateLabel"  # the app's muted text
+
+
+def test_the_hint_sits_in_the_middle_of_the_space_it_explains(queue):
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([])
+    QApplication.processEvents()
+    hint, viewport = queue._hint, queue._scroll.viewport()
+    center = hint.mapTo(viewport, hint.rect().center())
+
+    assert abs(center.x() - viewport.width() // 2) <= 1
+    assert abs(center.y() - viewport.height() // 2) <= 1
+
+
+def test_the_first_job_takes_the_space_back_from_the_hint(queue):
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([])
+    queue.set_items([_item(key="a")])
+    QApplication.processEvents()
+
+    assert not queue._hint.isVisible()
+    assert queue.keys() == ["a"]  # and it was never a row of the line itself
+
+
+def test_the_hint_comes_back_when_the_queue_drains(queue):
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(key="a")])
+    queue.set_items([])
+    QApplication.processEvents()
+
+    assert queue._hint.isVisible()
+    assert queue.rows() == []
+
+
 def test_a_queue_of_any_length_is_one_progress_bar_tall(queue):
     queue.set_items([])
     idle = queue.sizeHint().height()

@@ -48,6 +48,7 @@ from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.drag_thumbnail import fit_thumbnail, set_drag_thumbnail
 from origenerator.gui.metadata_block import label_column_width, meta_cells
 
 # A dragged enhancement level carries the params that produced it under this
@@ -214,6 +215,10 @@ class _LevelRow(_Row):
         self._press_pos = None
         self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
+        # The picture that trails the cursor when this row is dragged, cut once
+        # from the file rather than from the 96px tile — the same box every other
+        # drag in the app trails.
+        self._drag_picture = fit_thumbnail(pixmap)
         if not pixmap.isNull():
             self._show_picture(pixmap)
         else:
@@ -274,9 +279,7 @@ class _LevelRow(_Row):
         self._press_pos = None
         drag = QDrag(self)
         drag.setMimeData(enhance_level_mime(self._params))
-        pixmap = self._picture.pixmap()
-        if pixmap is not None and not pixmap.isNull():
-            drag.setPixmap(pixmap)  # the version's image trails the cursor
+        set_drag_thumbnail(drag, self._drag_picture)  # the version's image trails the cursor
         drag.exec(Qt.DropAction.CopyAction)
 
     def mouseReleaseEvent(self, event):

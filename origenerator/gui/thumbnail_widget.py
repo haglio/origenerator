@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplicat
 from PyQt6.QtGui import QPixmap, QDrag, QCursor
 from PyQt6.QtCore import Qt, QPoint, QSize, QEvent, pyqtSignal
 
+from origenerator.gui.drag_thumbnail import label_thumbnail, set_drag_thumbnail
 from origenerator.gui.enhanced_badge import EnhancedBadge
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.looping_preview import looping_movie
@@ -285,9 +286,9 @@ class ThumbnailWidget(QWidget):
         self._press_pos = None
         drag = QDrag(self)
         drag.setMimeData(generation_mime(self.prompt_id))
-        pixmap = self._image_label.pixmap()
-        if pixmap is not None and not pixmap.isNull():
-            drag.setPixmap(pixmap)  # the tile's image trails the cursor
+        # The tile's picture trails the cursor — the frame a video tile's looping
+        # WebP is on, as much as a still image's pixmap.
+        set_drag_thumbnail(drag, label_thumbnail(self._image_label))
         # Announce the drag so a combine slot can light up the moment it starts —
         # QDrag.exec is modal, so the highlight is on for the whole gesture.
         self.drag_started.emit(self.prompt_id)

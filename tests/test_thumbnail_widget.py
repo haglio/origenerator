@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import icons
+from origenerator.gui import icons, thumbnail_widget
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
@@ -50,6 +50,76 @@ def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
     qtbot.addWidget(tw)
     assert tw.findChildren(QMovie) == []  # the WebP is gone; show the still instead
     assert not tw._image_label.pixmap().isNull()
+
+
+class _RecordingDrag:
+    """Stands in for QDrag, remembering the picture hung under the cursor."""
+
+    last = None
+
+    def __init__(self, source):
+        self.pixmap = None
+        _RecordingDrag.last = self
+
+    def setMimeData(self, mime):
+        self.mime = mime
+
+    def setPixmap(self, pixmap):
+        self.pixmap = pixmap
+
+    def exec(self, _action):
+        return None
+
+
+def _drag_out(qtbot, tw):
+    """Press then travel far enough past the threshold to start a drag."""
+    qtbot.mousePress(tw, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tw, QPoint(120, 120))
+
+
+def test_a_dragged_still_trails_its_picture(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    still = tmp_path / "i1.jpg"
+    Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
+    tw = ThumbnailWidget("i1", str(still), "label")
+    qtbot.addWidget(tw)
+
+    _drag_out(qtbot, tw)
+
+    assert _RecordingDrag.last.pixmap is not None
+    assert not _RecordingDrag.last.pixmap.isNull()
+
+
+def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeypatch):
+    # A video tile shows a looping WebP, so its label has no pixmap of its own;
+    # asked only for that, the drag used to trail nothing at all while an image
+    # dragged from the tile beside it trailed a picture.
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    tw = ThumbnailWidget("v1", None, "label", movie_path=str(webp))
+    qtbot.addWidget(tw)
+
+    _drag_out(qtbot, tw)
+
+    assert _RecordingDrag.last.pixmap is not None
+    assert not _RecordingDrag.last.pixmap.isNull()
+
+
+def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
+    # No picture is the one case with nothing to show; the drag still goes.
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    tw = ThumbnailWidget("p1", None, "label")  # "No preview"
+    qtbot.addWidget(tw)
+    started = []
+    tw.drag_started.connect(started.append)
+
+    _drag_out(qtbot, tw)
+
+    assert started == ["p1"]
+    assert _RecordingDrag.last.pixmap is None
 
 
 def test_left_click_emits_clicked_but_right_click_does_not(qtbot):

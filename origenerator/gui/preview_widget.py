@@ -21,6 +21,9 @@ from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
+from origenerator.gui.drag_thumbnail import (
+    fit_thumbnail, label_thumbnail, set_drag_thumbnail,
+)
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
 
@@ -360,9 +363,7 @@ class PreviewWidget(QWidget):
         slot can read its prompt_id — the same payload a gallery thumbnail drags."""
         drag = QDrag(self)
         drag.setMimeData(generation_mime(prompt_id))
-        pixmap = self._image_label.pixmap()
-        if pixmap is not None and not pixmap.isNull():
-            drag.setPixmap(pixmap)  # the shown still trails the cursor
+        set_drag_thumbnail(drag, self._drag_picture())  # what is shown trails the cursor
         # Announce the drag so a combine slot can light the moment it starts —
         # QDrag.exec is modal, so the highlight is on for the whole gesture.
         self.drag_started.emit(prompt_id)
@@ -370,6 +371,23 @@ class PreviewWidget(QWidget):
             drag.exec(Qt.DropAction.CopyAction)
         finally:
             self.drag_ended.emit()
+
+    def _drag_picture(self) -> QPixmap:
+        """The thumbnail that trails the cursor while this pane's media is dragged.
+
+        Everything the pane can show has a picture, but not in the same place: a
+        still is the label's pixmap, an animated image is the frame its movie is
+        on, and a video is on the player's own surface with no pixmap anywhere —
+        the last frame it handed its sink is the only handle on it. Reaching
+        only for the label's pixmap is why a dragged video used to trail nothing.
+        """
+        if self.is_showing_video():
+            sink = self._video.videoSink()
+            frame = sink.videoFrame() if sink is not None else None
+            if frame is None or not frame.isValid():
+                return QPixmap()
+            return fit_thumbnail(QPixmap.fromImage(frame.toImage()))
+        return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:
         """Wire what a double-click here opens: ``make(media, frame)`` returns a

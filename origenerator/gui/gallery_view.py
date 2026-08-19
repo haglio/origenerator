@@ -1174,10 +1174,16 @@ class GalleryView(QWidget):
         # stretch when nobody is waiting on a video. The queue holds them until it
         # closes and keeps making images.
         self._reroll.hold_videos(True)
-        # And say so at once rather than a poll later: the hold is this opening's
-        # own doing, so the corner comes up already saying what is waiting on it
-        # rather than blank for a second and a half.
-        self._slideshow.set_queue(self._inflight_items())
+        # The queue it floats in its corner is the same widget as the bottom
+        # strip and asks for the same things, so it goes to the same handlers:
+        # a row dragged there re-lines the queue, and its Clear drops another
+        # app's work off ComfyUI.
+        self._slideshow.queue().reorder_requested.connect(self._reroll.reorder)
+        self._slideshow.queue().clear_queue_requested.connect(self._clear_foreign_queue)
+        # And fill it at once rather than a poll later: the hold on videos is
+        # this opening's own doing, so the corner comes up already saying what
+        # is waiting on it rather than blank for a second and a half.
+        self._slideshow.set_queue(self._inflight_items(), self._foreign_queue.total)
         return self._slideshow
 
     def _folder_level_playlists(self) -> dict:
@@ -4382,7 +4388,7 @@ class GalleryView(QWidget):
         items = self._inflight_items()
         self._queue.set_items(items, self._foreign_queue.total)
         if self._slideshow is not None:
-            self._slideshow.set_queue(items)
+            self._slideshow.set_queue(items, self._foreign_queue.total)
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.

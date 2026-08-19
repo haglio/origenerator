@@ -1,160 +1,126 @@
-"""The line of work in flight, floated in the fullscreen show's bottom-left corner.
+"""The bottom strip's queue itself, floated into the fullscreen show's corner.
 
-A show covers the window, and with it the bottom strip that says what is being
-made (:mod:`origenerator.gui.generation_queue`) — which is a worse loss here than
-anywhere else, for two reasons at once. A show is the one stretch where the queue
-deliberately stops moving: every video in it is held until the show closes
-(:mod:`origenerator.queue_line`), so a line that isn't moving is the app's own
-doing and needs saying. And a show is when the user keeps *adding* to it, since
-holding a slide stars it and asks for the better version of that picture — work
-launched without a form, at a moment when nothing on screen would otherwise
-report it.
+Not a summary of the queue — the queue: :class:`GenerationQueue` as the main
+window lays it out, with the running job's live frame filling its bottom-left,
+the fat progress bar with the clock written across it, and every waiting job as
+a row of its own carrying its Cancel, its picture and its drag to reorder. This
+is that widget, parented to the show and given a corner to sit in, so nothing
+about what the queue says or does has to be said twice or kept in step.
 
-So the line rides along, in the one corner this view leaves empty: the console is
-top-left (:mod:`origenerator.gui.stroke_panel`), the position counter
-bottom-center, the neighbor stills up the two side edges.
+The show covers the strip, and a show is the worst moment to lose it. It is the
+one stretch where the line deliberately stops moving — every video in it is held
+until the show closes (:mod:`origenerator.queue_line`) — and it is when the user
+keeps *adding* to it, since holding a slide stars it and asks for the better
+version of that picture. So the strip comes along, into the one region this view
+leaves empty: the console is top-left, the position counter bottom-center, the
+neighbor stills up the two side edges.
 
-One line per job, the one being rendered first, in the readings and the words the
-strip already uses (:mod:`origenerator.gui.inflight`) — the same run watched from
-a different surface is still the same run. What it leaves behind is the strip's
-machinery: no Cancel, no pictures, no drag to reorder. This is a keyboard view
-over a picture, and a plate with something to click on it would be a plate that
-had to be aimed at; it takes no mouse events at all.
+Three things it does differently from the one in the main window, all of them
+about being a floating plate rather than a docked pane:
 
-With nothing in flight it takes itself off the screen. Over a full-screen picture
-an empty plate is not information, it is furniture.
+* It paints its own background. The strip in the main window is transparent and
+  shows the pane behind it; over a full-screen picture that would be rows of
+  text lying on the media. Here it wears the app's own surface and a hairline
+  border, so it reads as the strip lifted onto the show.
+* Nothing in it takes the keyboard. Its buttons are still pressable, but a press
+  that stole focus would leave the arrows no longer stepping the slides — the
+  show is a keyboard view, and its keys must survive a click on a Cancel.
+* With nothing in flight it leaves the screen. The docked strip holds its slot
+  and says what it is for, because a pane that came and went would shift
+  everything above it; a plate over a picture has nothing to hold still for, and
+  an empty one is furniture.
+
+It opens about four rows tall — the strip's own height plus the couple of rows
+the main window gets by dragging its handle, which is not a gesture there is
+anywhere to make here.
 """
 
-import time
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, QRect
 
-from PyQt6.QtWidgets import QLabel, QWidget
-from PyQt6.QtCore import Qt, QTimer
+from origenerator.gui.generation_queue import GenerationQueue, QueueRow
+from origenerator.paths import ensure_shared_ui_on_path
 
-from origenerator.gui.inflight import queue_lead_text, queue_wait_text
-from origenerator.timing import progress_status_label
+ensure_shared_ui_on_path()
+from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE
 
-# Where the plate sits: the bottom margin is the position counter's, so the two
-# read as one row of chrome across the foot of the screen rather than two plates
-# that happen to be near each other.
-LEFT_MARGIN = 24
-BOTTOM_MARGIN = 24
-# How many jobs get a line of their own before the rest become a count. A show is
-# for looking at pictures; a folder auto-generating can have a dozen jobs queued,
-# and a plate that tall would be a second thing on screen rather than a note in
-# the corner.
-MAX_LINES = 4
-# How often the running job's clock is re-read. Its own timer rather than the
-# gallery's 1.5s poll, for the reason the strip's running half keeps one: a
-# seconds count driven off that poll skips every other tick.
-_TICK_MS = 1000
-# What a row waiting on the show itself says, in the width a line here has. The
-# strip's :func:`inflight.held_row_text` spells out that the show is what ends it,
-# which is worth a row's width in the main window and is not worth one here — the
-# show is what the reader is looking at.
-_HELD = "held"
-
-
-def job_line(item, *, now: float | None = None) -> str:
-    """The one line this plate gives ``item``.
-
-    A job ComfyUI is rendering says how far along it is; one still waiting says
-    what it will cost and what it is, which is what the wait is measured in. A
-    job that has been handed over but not started has no reading to give — the
-    line falls back to what it would have said while queued, rather than sitting
-    blank in the corner — and where another app is what it is waiting on, that is
-    the more useful thing to say and it says that instead.
-    """
-    if item.status == "running":
-        started = item.started_at
-        clock = time.time() if now is None else now
-        elapsed = None if started is None else max(0.0, clock - started)
-        reading = progress_status_label(elapsed, item.progress, item.typical_seconds)
-        if reading:
-            return reading
-        return queue_wait_text(item.foreign_ahead) or queue_lead_text(item)
-    line = queue_lead_text(item)
-    return f"{line} · {_HELD}" if item.held else line
+# How far the plate floats off the screen's left and bottom edges — the position
+# counter's own margin, so the two sit on one baseline across the foot of the
+# show rather than at two heights that happen to be close.
+MARGIN = 24
+# How much of the show's width it takes, and the least it may shrink to: below
+# about four hundred the live frame and its bar alone fill the plate and the
+# rows have nothing left to be read in.
+WIDTH_FRACTION = 0.45
+MIN_WIDTH = 400
+# The clearance kept from anything it is asked to stay off — the counter, which
+# owns the middle of the same edge.
+GAP = 12
+# How many rows tall it opens: the strip's docked height is about two, and the
+# main window's answer to wanting more is a drag of the splitter above it, which
+# there is nowhere to do here. The extra height all goes to the line — the live
+# frame stops growing at the strip's own height (see ``RunningPreview``).
+ROWS = 4
 
 
-def queue_lines(items, *, now: float | None = None,
-                limit: int = MAX_LINES) -> list[str]:
-    """Every line the plate shows for ``items``, the job being rendered first.
-
-    Past ``limit`` the rest become one count. A queue too long to list is still
-    worth a number: "four more waiting" is the answer to how long this goes on
-    for, where four more lines of it would be the corner taking over the screen.
-    """
-    lines = [job_line(item, now=now) for item in items[:limit]]
-    remaining = len(items) - len(lines)
-    if remaining > 0:
-        lines.append(f"+{remaining} more")
-    return lines
-
-
-class SlideshowQueue(QLabel):
-    """The in-flight line as one translucent plate in the show's bottom-left."""
+class SlideshowQueue(GenerationQueue):
+    """The generation queue, floated over a fullscreen show's bottom-left."""
 
     def __init__(self, host: QWidget):
         super().__init__(host)
-        # The plate the position counter and the neighbor stills wear, so
-        # everything floated over a show looks like one set of things.
+        # The strip is transparent where it is docked, taking the pane's surface
+        # behind it; floated over a picture it has to bring its own, or its rows
+        # are text lying on the media.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(
-            "color: white; background: rgba(0, 0, 0, 140);"
-            " padding: 6px 12px; border-radius: 4px;"
+            f"#generationQueue {{"
+            f" background-color: {BG_PRIMARY.name()};"
+            f" border: 1px solid {BORDER_SUBTLE.name()};"
+            f" border-radius: 6px; }}"
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         # Native, because a video surface is a native window on Windows and a
         # plain sibling widget cannot paint over one however it is stacked —
         # which is what made the position counter vanish over a clip until it
         # was made native too.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-        self._items: list = []
-        self._tick = QTimer(self)
-        self._tick.setInterval(_TICK_MS)
-        self._tick.timeout.connect(self._render)
         self.hide()  # nothing in flight yet, and an empty plate would claim there was
 
-    def set_items(self, items) -> None:
-        """Take the queue as the gallery has it — every in-flight job, the one
-        being rendered first, which is the order the strip lists them in too."""
-        self._items = list(items)
-        self._render()
+    def set_items(self, items, foreign_queued: int = 0):
+        """Show the line, or leave the screen when there is none to show."""
+        super().set_items(items, foreign_queued)
+        self._refuse_the_keyboard()
+        self.setVisible(bool(items) or bool(foreign_queued))
 
-    def lines(self) -> list[str]:
-        """What the plate is saying, line by line."""
-        return self.text().split("\n") if self.text() else []
+    def _refuse_the_keyboard(self):
+        """Take no focus, here or on any control inside.
 
-    def _render(self) -> None:
-        lines = queue_lines(self._items)
-        if not lines:
-            self.clear()
-            self.hide()
-            self._tick.stop()
-            return
-        self.setText("\n".join(lines))
-        self.show()
-        self.reposition()
-        # Only a job ComfyUI is rendering has a reading that moves on its own; a
-        # line of waiting work says the same thing until the queue itself
-        # changes, and a clock over it would be a timer running for nothing.
-        if any(item.status == "running" for item in self._items):
-            self._tick.start()
-        else:
-            self._tick.stop()
+        A Cancel pressed in the main window is welcome to the keyboard; pressed
+        here it would take the arrows away from the slides, and the show would
+        stop stepping with nothing on screen to say why. The rows are rebuilt
+        whenever the set of jobs changes, so this is re-applied with them.
+        """
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        for child in self.findChildren(QWidget):
+            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def reposition(self) -> None:
-        """The host's bottom-left corner. Grows upward as the line does, so its
-        first line — the job with the GPU — stays where the eye last found it."""
+    def reposition(self, avoid: QRect | None = None) -> None:
+        """Put the plate in the host's bottom-left corner.
+
+        ``avoid`` is a rectangle to stay clear of — the position counter, which
+        owns the middle of the same edge. The plate gives up width rather than
+        move: it is the bottom-left corner's, and a strip that slid up or along
+        to dodge a caption would be somewhere different every time the caption's
+        text changed length.
+        """
         host = self.parentWidget()
         if host is None:
             return
-        self.adjustSize()
-        self.move(LEFT_MARGIN, max(0, host.height() - self.height() - BOTTOM_MARGIN))
+        height = min(max(self.minimumHeight(), ROWS * QueueRow.HEIGHT),
+                     max(0, host.height() - 2 * MARGIN))
+        room = max(0, host.width() - 2 * MARGIN)
+        width = min(max(int(host.width() * WIDTH_FRACTION), min(MIN_WIDTH, room)), room)
+        top = max(0, host.height() - height - MARGIN)
+        if avoid is not None and not avoid.isEmpty() and avoid.bottom() >= top:
+            width = min(width, max(0, avoid.left() - GAP - MARGIN))
+        self.setGeometry(MARGIN, top, width, height)
         self.raise_()  # over the media, video surface included
-
-    def hideEvent(self, event):
-        """Stop counting when the plate leaves the screen — including when the
-        show around it closes, which hides its children without draining the
-        queue they were listing."""
-        super().hideEvent(event)
-        self._tick.stop()

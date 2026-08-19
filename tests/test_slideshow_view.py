@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 from PIL import Image
 from PyQt6.QtCore import Qt, QEvent, QSize, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -547,23 +547,24 @@ def _inflight(**kw):
 
 
 def test_the_queue_rides_along_in_the_shows_bottom_left(qtbot):
-    # The bottom strip that normally says what is being made is behind this view,
-    # and a show is when the queue stops moving: its videos are held until it ends.
+    # The bottom strip that normally carries it is behind this view, and a show
+    # is when the queue stops moving: its videos are held until it ends.
     view = _view(qtbot)
-    view.resize(800, 600)
-    QApplication.sendEvent(view, QResizeEvent(QSize(800, 600), QSize(640, 480)))
-    view.set_queue([_inflight(typical_seconds=30, job_kind="Image"),
+    view.resize(1920, 1080)
+    QApplication.sendEvent(view, QResizeEvent(QSize(1920, 1080), QSize(640, 480)))
+    view.set_queue([_inflight(status="running", typical_seconds=30, job_kind="Image"),
                     _inflight(key="j2", typical_seconds=600, job_kind="T2V",
                               held=True)])
 
     plate = view._queue.geometry()
-    assert view._queue.lines() == ["~30 sec · Image", "~10 min · T2V · held"]
+    assert view._queue.keys() == ["j1", "j2"]        # the rows themselves
+    assert view._queue.running_preview().key == "j1"  # and the live half
     assert plate.left() < view.width() // 2      # left…
     assert plate.top() > view.height() // 2      # …and low, clear of the console
     assert not plate.intersects(view._counter.geometry())  # beside it, not over it
 
 
-def test_a_show_with_nothing_in_flight_says_nothing_in_the_corner(qtbot):
+def test_a_show_with_nothing_in_flight_shows_no_queue_at_all(qtbot):
     view = _view(qtbot)
     view.set_queue([])
     assert view._queue.isHidden()
@@ -577,7 +578,16 @@ def test_the_queue_follows_the_shows_bottom_edge_on_a_resize(qtbot):
     view.resize(1200, 900)
     QApplication.sendEvent(view, QResizeEvent(QSize(1200, 900), QSize(800, 600)))
 
-    assert view._queue.geometry().bottom() > 600
+    assert view._queue.y() + view._queue.height() == 900 - 24
+
+
+def test_a_press_in_the_queue_leaves_the_arrows_stepping_the_show(qtbot):
+    # A Cancel that took focus would stop the show responding to its own keys.
+    view = _view(qtbot)
+    view.set_queue([_inflight(status="running", typical_seconds=30,
+                              cancel=lambda: None)])
+    assert all(child.focusPolicy() == Qt.FocusPolicy.NoFocus
+               for child in view._queue.findChildren(QWidget))
 
 
 # --- locking also stars, and a double-click leaves ---------------------------

@@ -22,7 +22,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
-from PyQt6.QtGui import QCursor, QPixmap, QMovie, QImageReader, QDrag
+from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
 from PyQt6.QtCore import Qt, QUrl, QPoint, QRect, QSize, QEvent, pyqtSignal
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -481,18 +481,6 @@ class PreviewWidget(QWidget):
     def resizeEvent(self, event) -> None:
         self._place_controls()
         super().resizeEvent(event)
-
-    def enterEvent(self, event) -> None:
-        self._controls.set_revealed(True)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:
-        # Moving onto a corner control fires this too; the controls are children,
-        # so the cursor is still over the picture and they must not vanish from
-        # under it.
-        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
-            self._controls.set_revealed(False)
-        super().leaveEvent(event)
 
     def set_draggable_id(self, prompt_id: str | None) -> None:
         """Arm (or disarm) dragging the shown media out as a generation.

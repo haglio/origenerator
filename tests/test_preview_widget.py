@@ -881,12 +881,7 @@ def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
 
     w.set_actions("p1", starred=True, enhance=icons.ENHANCE_HELD)
 
-    star, trash, plus = _corners(w)
-    assert not star.isHidden()   # the bookmark reports itself, cursor or no cursor
-    assert not plus.isHidden()
-    assert trash.isHidden()      # the offers wait for one
-    w._controls.set_revealed(True)
-    assert not trash.isHidden()
+    assert all(not b.isHidden() for b in _corners(w))
 
 
 def test_a_new_picture_takes_the_last_one_s_corners_away(make_preview, tmp_path):

@@ -24,8 +24,8 @@ _TICK_MS = 1000                # how often the bar's clock re-reads itself
 
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
 # shelf's keep/reject): the same translucent chip the corner controls sit on, blue
-# on hover, laid along the top of the tile after the star. They begin one slot in
-# because the star owns the corner itself — see :meth:`_corner_action_x`.
+# on hover, laid along the tile's top-left edge — the one edge the three corner
+# controls leave alone.
 _CORNER_BUTTON_CSS = (
     CHIP_CSS + "QPushButton:hover { background: rgba(48,128,224,0.9); }"
 )
@@ -126,11 +126,12 @@ class ThumbnailWidget(QWidget):
         if media_type:
             MediaBadge(media_type, self)
 
-        # Star, trash and plus in the other three corners of the picture: what the
-        # item is (bookmarked, enhanced) and what can be done to it, as one mark
-        # each. A Trash-shelf tile passes controls=False — its item is already
-        # deleted, so there is nothing here to bookmark, bin or enhance, and its
-        # own restore/purge controls are the two acts left.
+        # Star, trash and plus in the tile's other three corners: what the item is
+        # (bookmarked, enhanced) and what can be done to it, as one mark each, all
+        # of them up whenever there is an item under them. A Trash-shelf tile
+        # passes controls=False — its item is already deleted, so there is nothing
+        # here to bookmark, bin or enhance, and its own restore/purge controls are
+        # the two acts left.
         layout.activate()  # so the picture has a rectangle for the controls to sit in
         self._controls = CornerControls(self) if controls else None
         if self._controls is not None:
@@ -159,8 +160,8 @@ class ThumbnailWidget(QWidget):
         self._place_enhancing_bar()
         self._show_enhancing_run()
 
-        # An i2v folder's tiles carry hover controls to re-roll one seed on its
-        # own, in a row beside the star; other tiles pass none and grow no buttons.
+        # An i2v folder's tiles carry top-left hover controls to re-roll one seed
+        # on its own; other tiles pass none and grow no buttons.
         self._build_corner_actions(corner_actions or [])
 
     def is_selected(self) -> bool:
@@ -321,7 +322,7 @@ class ThumbnailWidget(QWidget):
 
     def _build_corner_actions(self, actions: list):
         """Lay out one hidden button per ``(action_id, icon, tooltip)`` along the
-        top of the tile.
+        tile's top-left edge.
 
         Each fires :attr:`corner_action_triggered` with this tile's prompt_id and
         its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
@@ -336,28 +337,16 @@ class ThumbnailWidget(QWidget):
             button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setStyleSheet(_CORNER_BUTTON_CSS)
-            button.move(self._corner_action_x(i), self._image_label.y() + CORNER_INSET)
+            button.move(self._image_label.x() + CORNER_INSET + i * (CORNER_SIZE + CORNER_GAP),
+                        self._image_label.y() + CORNER_INSET)
             button.setVisible(False)
             button.installEventFilter(self)  # keep the set up while hovering a button
             button.clicked.connect(lambda _=False, a=action_id: self.corner_action_triggered.emit(self.prompt_id, a))
             self._corner_buttons.append(button)
 
-    def _corner_action_x(self, index: int) -> int:
-        """Where the ``index``-th shelf action sits along the tile's top edge.
-
-        After the star, where the tile has one: the star owns the corner itself,
-        so a shelf's own controls queue up to its right rather than landing on
-        top of it. Where there is no star (a Trash-shelf tile) they start in the
-        corner, since nothing else is claiming it.
-        """
-        slot = index + (1 if self._controls is not None else 0)
-        return self._image_label.x() + CORNER_INSET + slot * (CORNER_SIZE + CORNER_GAP)
-
     def _set_corner_actions_visible(self, visible: bool):
         for button in self._corner_buttons:
             button.setVisible(visible)
-        if self._controls is not None:
-            self._controls.set_revealed(visible)
 
     def _cursor_over_tile(self) -> bool:
         """Whether the pointer is still anywhere within the tile — including over a

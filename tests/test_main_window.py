@@ -9,8 +9,11 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
+
+from tests.test_gallery_view import _selected_folder, _shelf
 
 
 def _window(qtbot, tmp_path, app_state=None):
@@ -326,7 +329,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is view._recents_item
+    assert view._tree.currentItem() is _shelf(view, RECENTS_KEY)
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
@@ -599,11 +602,11 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     (folder_key,) = list(gv._reroll_jobs)
     pid = gv._reroll_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(gv._recents_item)
+    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert pid in gv._inflight_cards   # the running generation shows as a card
 
     gv._on_inflight_clicked(pid)       # click that card
-    assert gv._selected_folder_key() == folder_key  # reveal opened the re-roll's folder
+    assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
 def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
@@ -629,7 +632,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(gv._recents_item)
+    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert "vid_run" in gv._inflight_cards
 
 

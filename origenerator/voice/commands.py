@@ -30,7 +30,7 @@ from origenerator.gui.gallery_tree import (
     REQUESTS_KEY, REQUESTS_LABEL, STARRED_KEY, STARRED_LABEL,
     TRASH_KEY, TRASH_LABEL,
 )
-from origenerator.gui.shelf_orientation import LANDSCAPE, PORTRAIT
+from origenerator.gui.orientation import LANDSCAPE, PORTRAIT
 from origenerator.voice.show_commands import (
     ShowCommand, match_show_command, show_command_bias,
 )

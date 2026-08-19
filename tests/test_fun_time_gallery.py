@@ -710,10 +710,12 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
     view = _fun_time_view(qtbot, rows)
     view.refresh()
 
-    everything = {row["prompt_id"] for row in view._rows_at("__all__")}
-    assert everything == {"p-1", "l-1"}
-    assert [row["prompt_id"] for row in view._rows_at("__all__::portrait")] == ["p-1"]
-    assert [row["prompt_id"] for row in view._rows_at("__all__::landscape")] == ["l-1"]
+    portrait = [row["prompt_id"] for row in view._rows_at("__all__::portrait")]
+    landscape = [row["prompt_id"] for row in view._rows_at("__all__::landscape")]
+    assert portrait == ["p-1"]
+    assert landscape == ["l-1"]
+    # And the two halves are the whole of it — there is no un-sided All to ask.
+    assert set(portrait) | set(landscape) == {"p-1", "l-1"}
 
 
 def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(

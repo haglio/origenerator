@@ -41,8 +41,8 @@ from origenerator.gui.gallery_tree import (
     STARRED_KEY, STARRED_LABEL,
     TRASH_KEY, TRASH_LABEL,
 )
-from origenerator.gui.shelf_orientation import (
-    ORIENTATION_LABELS, filter_rows, split_key,
+from origenerator.gui.orientation import (
+    ORIENTATION_LABELS, filter_rows, row_orientation, split_key,
 )
 from origenerator.recovery import RETENTION_DAYS
 
@@ -153,21 +153,28 @@ class BrowserPane:
         self._recent_rows: list[dict] = []  # every generated row, newest first
         self._recents_flow = None           # the open shelf's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
-        self._starred_groups: list = []     # folders the Starred shelf collects
+        # Each side's bookmarked folders, keyed by orientation — a Favorites
+        # shelf collects the copies of them its own side holds.
+        self._starred_groups: dict = {}
         self._starred_rows: list[dict] = [] # starred items the Favorites shelf collects
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
         self._request_items: list[dict] = []  # spoken requests + what they made
-        # Which shape the open shelf view is narrowed to ("portrait" /
-        # "landscape"), or None on a parent shelf and off the shelves — set by
-        # each show_*_overview, read by the renderers and shelf_rows.
+        # Which side's shelf is open ("portrait" / "landscape"), or None off the
+        # shelves — set by each show_*_overview, read by the renderers and
+        # shelf_rows. Every shelf belongs to one side, so on one it is never None.
         self._shelf_orientation: str | None = None
 
     def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
                   trash_rows, request_items=()):
-        """Take the newly rebuilt gallery model the shelves render from."""
+        """Take the newly rebuilt gallery model the shelves render from.
+
+        ``starred_groups`` is per side (``{orientation: [groups]}``): a folder is
+        drawn on whichever sides hold rows of that shape, so each Favorites shelf
+        collects the copies of the bookmarks its own side has.
+        """
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
         self._starred_rows = starred_rows
@@ -277,7 +284,7 @@ class BrowserPane:
         members = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
         for member in members:
-            item = self._v._item_by_key.get(member.key)
+            item = self._v._tree_item_for(member.key)
             context = (self._v._tree_view.breadcrumb(item.parent())
                        if item is not None and item.parent() is not None else "")
             self._add_folder_tile(flow, member, starred=member.starred, context=context)
@@ -409,7 +416,7 @@ class BrowserPane:
         than the order the search scored them.
         """
         if tile.group is not None:
-            item = self._v._item_by_key.get(tile.group.key)
+            item = self._v._tree_item_for(tile.group.key)
             context = (self._v._tree_view.breadcrumb(item.parent())
                        if item is not None and item.parent() is not None else "")
             self._add_folder_tile(flow, tile.group, starred=tile.group.starred,
@@ -435,23 +442,26 @@ class BrowserPane:
         folder. Opens with the info pane cleared, so it shows nothing until an
         item is picked.
 
-        With an *orientation*, this is the shelf's Portrait or Landscape
-        subfolder: the same listing narrowed to that shape (in-flight cards
-        sit only on the parent — a job has no shape until it lands)."""
+        *orientation* is the side whose shelf this is. A job that has produced
+        nothing yet still has a side — the shape it was asked to come out — so
+        its card sits on the shelf its picture will land on rather than moving
+        there once it has."""
         self._shelf_orientation = orientation
         self._v._title.set_display(self._oriented_title(RECENTS_LABEL, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_recents()
         self._v._sync_action_buttons()
-        # So Back can return to the shelf — the subfolder itself, when on one.
+        # So Back can return to this side's shelf, not the other side's.
         self._v._record_location(self._v._tree_view.selected_folder_key() or RECENTS_KEY)
 
     @staticmethod
     def _oriented_title(label: str, orientation: str | None) -> str:
+        """A shelf's header: its side, then its name — the path shape a folder's
+        breadcrumb has, since a shelf belongs to one side like everything else."""
         if orientation is None:
             return label
-        return f"{label} · {ORIENTATION_LABELS[orientation]}"
+        return f"{ORIENTATION_LABELS[orientation]}  ›  {label}"
 
     def _render_recents(self):
         """Draw the shelf: in-flight cards first (the newest, still-cooking work),
@@ -467,7 +477,7 @@ class BrowserPane:
         drawn = self._recents_drawn
         offset = self._scroll_bar().value() if self._recents_flow is not None else 0
         container, flow = self._new_tile_pane()  # which clears both of those
-        items = [] if self._shelf_orientation else self._visible_inflight_items()
+        items = self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
@@ -487,8 +497,7 @@ class BrowserPane:
         self._restore_scroll(offset)  # a no-op at 0: a shelf opened fresh starts on top
 
     def _filtered_recent_rows(self) -> list[dict]:
-        """The listing the open Recents view draws: the whole shelf, or the one
-        shape its Portrait/Landscape subfolder keeps."""
+        """The listing the open Recents shelf draws: its own side's shape of it."""
         return filter_rows(self._recent_rows, self._shelf_orientation)
 
     def _draw_recents_page(self, count: int):
@@ -567,9 +576,19 @@ class BrowserPane:
     def _visible_inflight_items(self) -> list:
         """The in-flight items the shelf's media-type filter keeps on screen. The
         full set still decides whether the shelf exists at all (so its filter stays
-        reachable); this narrows only what the shelf draws."""
+        reachable); this narrows only what the shelf draws — as does the side the
+        open shelf belongs to."""
         media_types = self._v._recents_media_types()
-        return [it for it in self._inflight_items() if it.media_type in media_types]
+        side = self._shelf_orientation
+        return [it for it in self._inflight_items()
+                if it.media_type in media_types
+                and (side is None or it.orientation == side)]
+
+    def inflight_orientations(self) -> set[str]:
+        """Which sides have work in flight — what keeps a Recents shelf up on a
+        side with no folders yet, so a first-ever generation of that shape is
+        visible while it runs."""
+        return {item.orientation for item in self._inflight_items()}
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —
@@ -654,6 +673,7 @@ class BrowserPane:
                 frame=frame,
                 reveal=lambda k=folder_key: self._reveal_reroll(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
+                orientation=row_orientation(row),  # the side its picture will land on
                 progress=progress,
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
@@ -688,13 +708,13 @@ class BrowserPane:
         up, which reads as the click doing nothing at all.
         """
         self._v._leave_search()
-        item = self._v._item_by_key.get(key)
+        item = self._v._tree_item_for(key)
         if item is None:
             # A folder the tree has not drawn yet: the first run in a brand-new
             # settings folder makes the node, and this click can land in the
             # gap.  Rebuild and ask once more rather than dropping the gesture.
             self._v.refresh()
-            item = self._v._item_by_key.get(key)
+            item = self._v._tree_item_for(key)
         if item is None:
             logger.info("Nothing to reveal for %s: no folder row", key)
             return
@@ -779,7 +799,7 @@ class BrowserPane:
 
     # --- the Requests shelf: what you asked for out loud ---------------------
 
-    def show_requests_overview(self):
+    def show_requests_overview(self, orientation: str | None = None):
         """Render the Requests shelf: what your spoken requests made, newest
         first — ordinary tiles, since what a request produced is an ordinary
         generation that happens to have been asked for out loud. What was heard
@@ -789,17 +809,22 @@ class BrowserPane:
         One still generating shows as the live card the Recents shelf gives
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
-        self._v._title.set_display(REQUESTS_LABEL)
+        self._shelf_orientation = orientation
+        self._v._title.set_display(self._oriented_title(REQUESTS_LABEL, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
         self._render_requests()
         self._v._sync_delete_button()
-        self._v._record_location(REQUESTS_KEY)  # so Back can return to the shelf
+        self._v._record_location(
+            self._v._tree_view.selected_folder_key() or REQUESTS_KEY)
 
     def _render_requests(self):
         container, flow = self._new_tile_pane()
         cooking = {item.key: item for item in self._inflight_items()}
-        for item in self._request_items:
+        shown = [item for item in self._request_items
+                 if self._shelf_orientation is None
+                 or row_orientation(item["row"]) == self._shelf_orientation]
+        for item in shown:
             row = item["row"]
             live = cooking.get(row["prompt_id"])
             if live is not None:
@@ -810,12 +835,12 @@ class BrowserPane:
                 self._inflight_by_key[live.key] = live
             elif gallery.produced_output(row):
                 self._add_shelf_thumbnail(flow, row)
-        self.show_widget(container if self._request_items
+        self.show_widget(container if shown
                          else self._empty_state(self._requests_empty_hint()))
 
     def showing_requests(self) -> bool:
-        return (self._v._requests_item is not None
-                and self._v._tree.currentItem() is self._v._requests_item)
+        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        return base == REQUESTS_KEY
 
     @staticmethod
     def _requests_empty_hint() -> str:
@@ -826,20 +851,21 @@ class BrowserPane:
 
     # --- the Trash shelf: deleted items, still recoverable -------------------
 
-    def show_trash_overview(self):
+    def show_trash_overview(self, orientation: str | None = None):
         """Render the Trash shelf: every deleted item the recovery bin is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
         returns to its own folder, files and all; a purged one is gone for good,
         which is what the whole shelf exists to make deliberate rather than
         automatic."""
-        self._shelf_orientation = None
-        self._v._title.set_display(TRASH_LABEL)
+        self._shelf_orientation = orientation
+        self._v._title.set_display(self._oriented_title(TRASH_LABEL, orientation))
         self._v._avg_label.setText(self._trash_note())
         self._v._clear_metadata()
         self._render_trash()
         self._v._sync_action_buttons()
-        self._v._record_location(TRASH_KEY)  # so Back can return to the shelf
+        self._v._record_location(
+            self._v._tree_view.selected_folder_key() or TRASH_KEY)
 
     def _render_trash(self):
         container, flow = self._new_tile_pane()
@@ -849,10 +875,11 @@ class BrowserPane:
             ("purge", icons.recovery_action_icon("purge"),
              "Delete permanently — end it now, without waiting out its window"),
         ]
-        for row in self._trash_rows:
+        rows = filter_rows(self._trash_rows, self._shelf_orientation)
+        for row in rows:
             tile = self._add_trash_thumbnail(flow, row, list(actions))
             tile.corner_action_triggered.connect(self._v._on_trash_action)
-        self.show_widget(container if self._trash_rows
+        self.show_widget(container if rows
                          else self._empty_state(self._trash_empty_hint()))
 
     def _add_trash_thumbnail(self, flow, row, corner_actions):
@@ -921,7 +948,7 @@ class BrowserPane:
     def _trash_note(self) -> str:
         """The line under the header stating the retention promise — shown only
         with something on the shelf, since the empty state already says it."""
-        if not self._trash_rows:
+        if not filter_rows(self._trash_rows, self._shelf_orientation):
             return ""
         return (f"Deleted items are held here for {RETENTION_DAYS} days, then "
                 "removed for good.")
@@ -938,8 +965,8 @@ class BrowserPane:
                 "they're removed for good.")
 
     def showing_trash(self) -> bool:
-        return (self._v._trash_item is not None
-                and self._v._tree.currentItem() is self._v._trash_item)
+        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        return base == TRASH_KEY
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
@@ -953,21 +980,18 @@ class BrowserPane:
         self._v._title.set_display(self._oriented_title(_STARRED_TITLE, orientation))
         self._v._avg_label.setText("")
         self._v._clear_metadata()
-        if orientation is None:
-            self._show_starred(self._starred_groups, self._starred_rows)
-        else:
-            # The subfolder plays the shelf's whole collection (folder tiles
-            # stand for their folders' items), one shape of it — so it LISTS
-            # exactly that: the combined items, filtered, as thumbnails.
-            self._show_starred((), filter_rows(self._combined_starred_rows(),
-                                               orientation))
+        self._show_starred(self._starred_groups.get(orientation, ()),
+                           filter_rows(self._starred_rows, orientation))
         self._v._sync_action_buttons()
         self._v._record_location(
             self._v._tree_view.selected_folder_key() or STARRED_KEY)
 
-    def _combined_starred_rows(self) -> list[dict]:
-        return _unique_rows(self._starred_rows + [
-            row for group in self._starred_groups for row in gallery.rows_under(group)
+    def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
+        """Everything one side's Favorites shelf stands for: its starred items,
+        plus the items inside the folders it has bookmarked."""
+        return _unique_rows(filter_rows(self._starred_rows, orientation) + [
+            row for group in self._starred_groups.get(orientation, ())
+            for row in gallery.rows_under(group)
         ])
 
     def _show_starred(self, groups, rows):
@@ -975,7 +999,7 @@ class BrowserPane:
         for row in rows:
             self._add_shelf_thumbnail(flow, row)
         for group in groups:
-            item = self._v._item_by_key.get(group.key)
+            item = self._v._tree_item_for(group.key)
             context = self._v._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
             self._add_folder_tile(flow, group, starred=False, context=context)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
@@ -1039,13 +1063,14 @@ class BrowserPane:
         if self.showing_recents():
             return self._filtered_recent_rows()
         if self.showing_starred():
-            return filter_rows(self._combined_starred_rows(), self._shelf_orientation)
+            return self._combined_starred_rows(self._shelf_orientation)
         if self.showing_experiments():
             return filter_rows(self._experiment_rows, self._shelf_orientation)
         if self.showing_requests():
-            return [item["row"] for item in self._request_items]
+            return filter_rows([item["row"] for item in self._request_items],
+                               self._shelf_orientation)
         if self.showing_trash():
-            return list(self._trash_rows)
+            return filter_rows(self._trash_rows, self._shelf_orientation)
         return None
 
     def rows_for_shelf(self, key: str | None) -> list[dict] | None:
@@ -1062,13 +1087,14 @@ class BrowserPane:
         if base == RECENTS_KEY:
             return filter_rows(self._recent_rows, orientation)
         if base == STARRED_KEY:
-            return filter_rows(self._combined_starred_rows(), orientation)
+            return self._combined_starred_rows(orientation)
         if base == EXPERIMENTS_KEY:
             return filter_rows(self._experiment_rows, orientation)
         if base == REQUESTS_KEY:
-            return [item["row"] for item in self._request_items]
+            return filter_rows([item["row"] for item in self._request_items],
+                               orientation)
         if base == TRASH_KEY:
-            return list(self._trash_rows)
+            return filter_rows(self._trash_rows, orientation)
         return None
 
     # --- the thumbnail grid: a settings leaf's generations ------------------
@@ -1141,7 +1167,7 @@ class BrowserPane:
         it puts a running search away first — a search's results are folder tiles
         too, and this is how they open; without it the box would still be full
         while the pane shows the folder it drilled into."""
-        item = self._v._item_by_key.get(key)
+        item = self._v._tree_item_for(key)
         if item is not None:
             self._v._leave_search()
             self._v._tree.setCurrentItem(item)

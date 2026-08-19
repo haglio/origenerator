@@ -3,8 +3,9 @@ from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QTreeWidgetItem
 
 from origenerator.gui.folder_tree import (
-    DROP_KEY_ROLE, FOLDER_KEYS_MIME, FolderTree, _action_rects,
+    DROP_KEY_ROLE, FOLDER_KEYS_MIME, TREE_KEY_ROLE, FolderTree, _action_rects,
 )
+from origenerator.gui.orientation import LANDSCAPE, oriented_key
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -13,6 +14,16 @@ class _Group:
     def __init__(self, key, starred=False):
         self.key = key
         self.starred = starred
+
+
+def _folder_row(label, key, starred=False):
+    """A folder row as the tree draws one: the folder it holds, and its own key —
+    that folder's, plus the side this copy of it is drawn on. The two differ
+    because both sides draw the same folder (see origenerator.gui.orientation)."""
+    item = QTreeWidgetItem([label])
+    item.setData(0, _ROLE, _Group(key, starred))
+    item.setData(0, TREE_KEY_ROLE, oriented_key(key, LANDSCAPE))
+    return item
 
 
 def test_action_rects_sit_left_of_the_label_star_nearest():
@@ -28,10 +39,10 @@ def _tree_with_leaf(qtbot, *, starred=False):
     qtbot.addWidget(tree)
     # Nest the leaf a few levels deep, as real folders are, so its indentation has
     # room for the icons to its left.
-    media = QTreeWidgetItem(["Media"]); media.setData(0, _ROLE, _Group("m"))
-    wf = QTreeWidgetItem(["Workflow"]); wf.setData(0, _ROLE, _Group("m/w"))
-    model = QTreeWidgetItem(["Model"]); model.setData(0, _ROLE, _Group("m/w/mo"))
-    leaf = QTreeWidgetItem(["A folder"]); leaf.setData(0, _ROLE, _Group("m/w/mo/key", starred=starred))
+    media = _folder_row("Media", "m")
+    wf = _folder_row("Workflow", "m/w")
+    model = _folder_row("Model", "m/w/mo")
+    leaf = _folder_row("A folder", "m/w/mo/key", starred=starred)
     media.addChild(wf)
     wf.addChild(model)
     model.addChild(leaf)
@@ -85,7 +96,8 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
 
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
-    assert tree._hover_key == "m/w/mo/key"  # the hovered leaf, so its delete is drawn
+    # The hovered ROW, so its delete is drawn — and only that copy of the folder.
+    assert tree._hover_key == oriented_key("m/w/mo/key", LANDSCAPE)
 
     parent = leaf.parent()
     qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(parent)).center())
@@ -114,8 +126,8 @@ def _collecting_tree(qtbot):
     qtbot.addWidget(tree)
     shelf = QTreeWidgetItem(["Starred"])
     shelf.setData(0, DROP_KEY_ROLE, "__starred__")
-    a = QTreeWidgetItem(["A"]); a.setData(0, _ROLE, _Group("k/a"))
-    b = QTreeWidgetItem(["B"]); b.setData(0, _ROLE, _Group("k/b"))
+    a = _folder_row("A", "k/a")
+    b = _folder_row("B", "k/b")
     for item in (shelf, a, b):
         tree.addTopLevelItem(item)
     tree.resize(320, 200)
@@ -155,7 +167,8 @@ def test_several_folders_can_be_picked_at_once(qtbot):
     a.setSelected(True)
     b.setSelected(True)
 
-    assert tree.selected_folder_keys() == ["k/a", "k/b"]
+    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE),
+                                           oriented_key("k/b", LANDSCAPE)]
 
 
 def test_a_shelf_row_holding_no_folder_contributes_no_key(qtbot):
@@ -164,7 +177,7 @@ def test_a_shelf_row_holding_no_folder_contributes_no_key(qtbot):
     shelf.setSelected(True)
     a.setSelected(True)
 
-    assert tree.selected_folder_keys() == ["k/a"]
+    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
 
 
 def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
@@ -176,7 +189,7 @@ def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
 
     tree.setCurrentItem(a)
 
-    assert tree.selected_folder_keys() == ["k/a"]
+    assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):

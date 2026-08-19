@@ -39,7 +39,7 @@ from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tree import FolderTree
+from origenerator.gui.folder_tree import FolderTree, TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
@@ -78,6 +78,7 @@ from origenerator.gui.browser_pane import (
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
+    SideModel,
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
     GROUP_ROLE as _GROUP_ROLE,
@@ -90,11 +91,18 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
     TRASH_LABEL as _TRASH_LABEL,
 )
-from origenerator.gui.shelf_orientation import (
+from origenerator.gui.orientation import (
+    ORIENTATIONS as _ORIENTATIONS,
     ORIENTATION_LABELS as _ORIENTATION_LABELS,
+    LANDSCAPE as _LANDSCAPE,
+    ROOT_KEY as _SIDE_ROOT_KEY,
+    base_of as _base_of,
     filter_rows,
     oriented_key,
+    orientation_of as _orientation_of,
+    requested_orientation,
     split_key as _split_shelf_key,
+    split_rows,
 )
 from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.navigation import NavigationHistory
@@ -1345,7 +1353,8 @@ class GalleryView(QWidget):
 
 
     def _group_for_key(self, key: str):
-        item = self._item_by_key.get(key)
+        """The folder ``key`` names, as the side it is being looked at holds it."""
+        item = self._tree_item_for(key)
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
@@ -1669,7 +1678,7 @@ class GalleryView(QWidget):
         rebuilds, then drills into that folder and points the info pane at the tile.
         """
         self.refresh()
-        item = self._item_by_key.get(key)
+        item = self._tree_item_for(key)
         if item is not None:
             self._tree.setCurrentItem(item)
             self._select_reroll(key)
@@ -1775,26 +1784,25 @@ class GalleryView(QWidget):
         self._search.update(rows + held, gallery.named_folders_by_row(
             tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), rows)  # the Requests shelf
+        sides, starred_by_side = self._build_sides(rows, meta, unreviewed, held, requested)
         self._browser.set_model(
             gallery.recent_generations(rows, self._recents_media_types()),
-            gallery.starred_folders(tree_model),
+            starred_by_side,
             gallery.starred_generations(rows),
             unreviewed,
             held,
             requested,
         )
-        self._tree_view.populate(tree_model, expanded,
-                                 show_recents=bool(tree_model or self._browser._inflight_items()),
-                                 experiment_count=len(unreviewed),
-                                 trash_count=len(held),
-                                 request_count=len(requested),
-                                 custom_folders=self._custom_folders,
-                                 folder_meta=meta)
+        self._tree_view.populate(sides, expanded, folder_meta=meta)
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None
         self._clear_metadata()
-        target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
+        # _tree_item_for rather than a bare lookup, so a restore target saved as
+        # a folder key — a session from before the tree grew sides — still lands
+        # on that folder instead of falling back to the default.
+        target = (self._tree_item_for(selected_key) if selected_key
+                  else None) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
         self._suppress_history = True
@@ -1828,6 +1836,37 @@ class GalleryView(QWidget):
         # light its tab's button after a restart: at reconnect time the view's image
         # rows aren't built yet, so an i2v folder key wouldn't match then; here it does.
         self._reconcile_generating()
+
+    def _build_sides(self, rows, meta, unreviewed, held, requested):
+        """The two sides of the tree, and the starred folders each one holds.
+
+        A side is the whole table of contents over one shape's rows: its own
+        media/workflow/model/LoRA/settings hierarchy, its own copies of the
+        folders the user composed, and shelves whose counts are its own — a
+        number covering both sides would send you to a shelf that then showed
+        you nothing.  Built from a single deal of the rows, because measuring
+        each row's shape is the expensive part and a rebuild runs on every poll.
+        """
+        dealt = split_rows(rows)
+        custom_records = self._db.list_custom_folders()
+        request_rows = [item["row"] for item in requested]
+        inflight = self._browser.inflight_orientations()
+        sides, starred = [], {}
+        for orientation in _ORIENTATIONS:
+            model = gallery.build_gallery_tree(dealt[orientation], meta)
+            starred[orientation] = gallery.starred_folders(model)
+            sides.append(SideModel(
+                orientation=orientation,
+                tree_model=model,
+                custom_folders=gallery.build_custom_folders(model, custom_records),
+                # Recents keeps a side up with no folders yet, so a first-ever
+                # generation of that shape is visible while it runs.
+                show_recents=bool(model) or orientation in inflight,
+                experiment_count=len(filter_rows(unreviewed, orientation)),
+                request_count=len(filter_rows(request_rows, orientation)),
+                trash_count=len(filter_rows(held, orientation)),
+            ))
+        return sides, starred
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""
@@ -1951,16 +1990,18 @@ class GalleryView(QWidget):
             base, orientation = _split_shelf_key(shelf)
             name = _SHELF_LABELS[base]
             if orientation:
-                name = f"{name} · {_ORIENTATION_LABELS[orientation]}"
+                # The same path shape a folder's breadcrumb has, since a shelf is
+                # one side's now: which half of the library is being searched has
+                # to read the same way wherever you are standing.
+                name = f"{_ORIENTATION_LABELS[orientation]}  ›  {name}"
             rows = self._browser.selected_shelf_rows() or []
             return _SearchScope(name, {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
+            # Nothing selected, or the caret resting on a side's header row: the
+            # whole gallery, since neither names a folder to narrow to. The
+            # trash's held rows share the index but belong to their shelf alone.
             return _SearchScope(gallery.ALL_LABEL, self._live_ids)
-        if isinstance(group, gallery.AllGroup):
-            # Everything the *gallery* holds — the trash's held rows share the
-            # index but belong to their shelf alone.
-            return _SearchScope(group.label, self._live_ids)
         return _SearchScope(self._tree_view.breadcrumb(item),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
@@ -2136,10 +2177,13 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
         self._sync_enhance_button()  # enhance-all fits a folder with plain images
         self._sync_group_button()      # grouping fits only a multi-selection
+        # Every shelf is one side's, so which one is showing is read off the key
+        # rather than off an item identity — there are two of each row now.
+        base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
         # The image/video filter belongs to the Recents shelf alone; the
         # experimenter's switch to the Experiments shelf alone.
-        self._recents_filter_bar.setVisible(current is self._recents_item)
-        self._experiments_bar.setVisible(current is self._experiments_item)
+        self._recents_filter_bar.setVisible(base == _RECENTS_KEY)
+        self._experiments_bar.setVisible(base == _EXPERIMENTS_KEY)
         if current is None:
             self._title.set_display("")
             self._title.setToolTip("")
@@ -2147,9 +2191,6 @@ class GalleryView(QWidget):
             self._browser.show_empty()
             self._sync_action_buttons()
             return
-        # A shelf, or one of its Portrait/Landscape subfolders — the same
-        # listing narrowed to one shape, so what it plays lands on one region.
-        base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
         if base == _RECENTS_KEY:
             self._browser.show_recents_overview(orientation)
             return
@@ -2160,21 +2201,27 @@ class GalleryView(QWidget):
             self._sync_experiments_bar()
             self._browser.show_experiments_overview(orientation)
             return
+        if base == _REQUESTS_KEY:
+            self._browser.show_requests_overview(orientation)
+            return
         if base == _TRASH_KEY:
-            self._browser.show_trash_overview()
+            self._browser.show_trash_overview(orientation)
             return
-        if current is self._requests_item:
-            self._browser.show_requests_overview()
-            return
-        if current is self._trash_item:
-            self._browser.show_trash_overview()
+        if base == _SIDE_ROOT_KEY:
+            # A header naming the split, not a place: it is unselectable, so the
+            # only way here is the caret passing over it on its way between two
+            # rows, and the panes belong to whichever of those you land on.
             return
         group = current.data(0, _GROUP_ROLE)
-        self._note_folder_visit(group.key if group is not None else None)
+        # A folder's place in the tree is where the user is standing, side and
+        # all, so that — not the folder's own key — is what history and the
+        # return-after-delete trail record.
+        here = self._tree_view.selected_folder_key()
+        self._note_folder_visit(here if group is not None else None)
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
             # so leaving a shelf for one is a step Back can undo at all.
-            self._record_location(group.key)
+            self._record_location(here)
         self._title.set_display(self._tree_view.breadcrumb(current))
         # The path ends in a code, so what the folder holds — the prompt its
         # generations ran, and the settings that set it apart from its siblings —
@@ -2294,7 +2341,7 @@ class GalleryView(QWidget):
         self._selection_group = None
         self.refresh()
         self._sync_history_buttons()
-        item = self._item_by_key.get(gallery.custom_folder_key(folder_id))
+        item = self._tree_item_for(gallery.custom_folder_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
 
@@ -2430,29 +2477,47 @@ class GalleryView(QWidget):
     def _leaf_by_id(self) -> dict:
         return self._tree_view.leaf_by_id
 
-    @property
-    def _recents_item(self):
-        return self._tree_view.recents_item
-
-    @property
-    def _starred_item(self):
-        return self._tree_view.starred_item
-
-    @property
-    def _experiments_item(self):
-        return self._tree_view.experiments_item
-
-    @property
-    def _requests_item(self):
-        return self._tree_view.requests_item
-
-    @property
-    def _trash_item(self):
-        return self._tree_view.trash_item
-
     def _selected_folder_key(self) -> str | None:
-        """The selected folder's key (or a shelf's), from the tree renderer."""
+        """The selected row's tree key (or a shelf's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
+
+    def _current_side(self) -> str:
+        """Which of the two sides the tree is standing on.
+
+        Every row lives under one, so this is only ever a fallback: nothing
+        selected at all (a fresh window, a rebuild that found no target) reads
+        as Landscape, the roomier side and the one an unmeasurable item files
+        under everywhere else.
+        """
+        return _orientation_of(self._selected_folder_key()) or _LANDSCAPE
+
+    def _tree_item_for(self, key: str):
+        """The tree row for ``key`` — a tree key resolves to its own row, and a
+        folder's own key to the copy of it on the side being browsed.
+
+        A folder key names a folder, not a place: a re-roll, a combine, a folder
+        tile and a delete's return target all hold one, and each side draws its
+        own row for it. Staying on the side already open is the answer that
+        doesn't teleport the user across the tree; a folder only the other side
+        holds is followed there rather than dropped.
+
+        A key that already names a side is answered by that side alone. Falling
+        back across the split would hand a portrait region a landscape library
+        the moment the portrait one happened to be empty, which is the whole of
+        what the split exists to prevent.
+        """
+        item = self._item_by_key.get(key)
+        if item is not None or _orientation_of(key):
+            return item
+        drawn = self._tree_view.keys_for_folder(key)
+        if not drawn:
+            return None
+        here = oriented_key(key, self._current_side())
+        return self._item_by_key[here if here in drawn else drawn[0]]
+
+    def _shelf_item(self, shelf_key: str, orientation: str | None = None):
+        """One side's copy of a shelf row — the side being browsed by default."""
+        return self._tree_view.shelf_item(shelf_key, orientation or self._current_side())
 
     def _current_group(self):
         """The folder on screen, or ``None`` (a shelf, a search, or an empty
@@ -2517,9 +2582,7 @@ class GalleryView(QWidget):
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
             self._reroll.start_prepared(key, working["workflow"], params)
         else:
-            item = self._item_by_key.get(key)
-            group = item.data(0, _GROUP_ROLE) if item else None
-            self._reroll.start(key, group, self._image_rows)
+            self._reroll.start(key, self._group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         self._select_reroll(key)  # a no-op if the launch above failed to register
         return self._reroll.has(key)
@@ -2536,11 +2599,13 @@ class GalleryView(QWidget):
         prompt to steer, so an open mic starts steering when one begins — but the
         mic itself is the button's, and only the button's.
         """
-        key = self._selected_folder_key()
+        # The folder's own key, not the row's: a loop is filed with the jobs it
+        # launches, and those are keyed by folder wherever it is being watched from.
+        group = self._current_group()
         if not checked:
             self._auto.stop_all()
-        elif key is not None:
-            self._begin_auto(key)
+        elif group is not None:
+            self._begin_auto(group.key)
         self._sync_auto_button()  # reflect the real state — a start may not take
         self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
@@ -2672,7 +2737,7 @@ class GalleryView(QWidget):
         group = self._current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
         looping = self._auto.active_key()
-        elsewhere = looping is not None and looping != self._selected_folder_key()
+        elsewhere = looping is not None and looping != getattr(group, "key", None)
         self._auto_btn.setEnabled(available or looping is not None)
         self._auto_btn.setToolTip("" if elsewhere else self._auto_tooltip(available, looping))
         self._auto_tip.set_html(_AUTO_ELSEWHERE_TIP if elsewhere else "")
@@ -2732,12 +2797,11 @@ class GalleryView(QWidget):
         if self._showing_search():
             return "these results"
         base, orientation = _split_shelf_key(self._current_shelf_key())
-        label = {_RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
-                 _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL,
-                 _REQUESTS_KEY: _REQUESTS_LABEL,
-                 _TRASH_KEY: _TRASH_LABEL}.get(base, "this folder")
-        if orientation:
-            label = f"{label} · {_ORIENTATION_LABELS[orientation]}"
+        label = _SHELF_LABELS.get(base, "this folder")
+        if orientation and base in _SHELF_LABELS:
+            # The side leads, as it does in the shelf's own header and in a
+            # folder's breadcrumb — one wording for where you are standing.
+            label = f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
         return label
 
     # --- standalone enhance: the bank button, the selection action, the queue ---
@@ -3278,19 +3342,20 @@ class GalleryView(QWidget):
         shelf as a fresh show instead would answer a word the HUD already has a
         button for with something else entirely.
 
-        The rest play: the listing is the side's own shape (that shelf's
-        Portrait or Landscape subfolder), so what lands on a region is
-        homogeneous exactly as it is when the subfolder's own slideshow button
-        opens it, and Latest plays newest-first the way that shelf's own show
-        does.  Standalone — and hosted with no side named — it is the whole
-        shelf, routed by its shape like any other show.  The browser is left
-        where it is: this starts a show, it does not go browsing."""
+        The rest play: every shelf belongs to one side, so a named side picks
+        that side's copy and what lands on a region is homogeneous — exactly as
+        it is when that shelf's own slideshow button opens it — and Latest plays
+        newest-first the way that shelf's own show does.  Standalone, and hosted
+        with no side named, it is the shelf on the side being browsed: there is
+        no shelf spanning both to fall back to, and the half you are looking at
+        is the half the word meant.  The browser is left where it is: this
+        starts a show, it does not go browsing."""
         if command.shelf_key == _STARRED_KEY:
             self._toggle_f_mode_aloud(command.side)
             return
-        orientation = command.side if self._fun_time is not None else None
-        key = (oriented_key(command.shelf_key, orientation) if orientation
-               else command.shelf_key)
+        orientation = (command.side if command.side and self._fun_time is not None
+                       else self._current_side())
+        key = oriented_key(command.shelf_key, orientation)
         rows = self._browser.rows_for_shelf(key) or []
         items = self._slideshow_items(rows)
         if not items:
@@ -3635,10 +3700,10 @@ class GalleryView(QWidget):
         # Recents is Latest, exactly as on a Fun Time player: the shelf lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the show's HUD status line says which.
-        base, _orientation = _split_shelf_key(location)
+        base, orientation = _split_shelf_key(location)
         latest = base == _RECENTS_KEY
         show = self._open_slideshow(
-            items, location=location, side=side,
+            items, location=location, side=side or orientation,
             shuffle=(lambda order: None) if latest else None,
             order_label="Latest" if latest else "Shuffle",
             starred_ids=self._starred_prompt_ids(),
@@ -3684,15 +3749,17 @@ class GalleryView(QWidget):
         shelf = self._current_shelf_key()
         if shelf is not None:
             return shelf
-        group = self._current_group()
-        return getattr(group, "key", None)
+        # The row's own key, not the folder's: which side the folder is being
+        # looked at from is what decides the screen a show of it goes to.
+        return (self._selected_folder_key()
+                if self._current_group() is not None else None)
 
     def _rows_at(self, location) -> list[dict]:
         """What a show opened at *location* would play if it opened now.
 
-        A key can name a shape as well as a place: the shelves narrow
+        Every key names a shape as well as a place: the shelves narrow
         themselves (``rows_for_shelf`` splits the key it is handed), and a
-        folder key is resolved from its base and narrowed here.  That is what
+        folder row was built from one side's rows to begin with.  That is what
         lets a region's base state be "the whole library, this side's shape"
         and still be re-askable as the library grows.
         """
@@ -3701,11 +3768,8 @@ class GalleryView(QWidget):
         rows = self._browser.rows_for_shelf(location)
         if rows is not None:
             return rows
-        base, orientation = _split_shelf_key(location)
-        group = self._group_for_key(base)
-        if group is None:
-            return []
-        return filter_rows(gallery.rows_under(group), orientation)
+        group = self._group_for_key(location)
+        return gallery.rows_under(group) if group is not None else []
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
         """A lock on a hosted show: go to the held item, in the browser and in
@@ -4333,13 +4397,24 @@ class GalleryView(QWidget):
         combination with no folder yet, so park on Recents — where its in-flight
         card shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
-        item = self._item_by_key.get(key)
+        item = self._tree_item_for(key)
         if item is not None:
             self._tree.setCurrentItem(item)  # existing folder: watch the live tile
             self._select_reroll(key)
-        elif self._recents_item is not None:
+        elif (recents := self._shelf_item(_RECENTS_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
-            self._tree.setCurrentItem(self._recents_item)
+            self._tree.setCurrentItem(recents)
+
+    def _launched_side(self, key: str) -> str:
+        """Which side a job just launched in folder ``key`` will land on.
+
+        Read off the size it asked for, since it has no picture to measure yet —
+        the same thing that puts its in-flight card on one Recents shelf rather
+        than the other. With no job to ask, the side being browsed.
+        """
+        job = self._reroll.job_for(key)
+        asked = requested_orientation(job.params) if job is not None else None
+        return asked or self._current_side()
 
     # --- re-roll as the info-pane source ----------------------------------
 
@@ -4363,7 +4438,10 @@ class GalleryView(QWidget):
         video stage warms up) rather than the fresh video job's empty preview.
         A no-op unless that re-roll is still running in the folder now on screen.
         """
-        if key is None or key not in self._reroll_jobs or self._tree_view.selected_folder_key() != key:
+        # ``key`` is the folder the job is filed under, so what it is checked
+        # against is the folder on screen rather than the row showing it.
+        if (key is None or key not in self._reroll_jobs
+                or getattr(self._current_group(), "key", None) != key):
             return
         self._last_reroll_frame = frame
         self._enter_reroll_selection(key)
@@ -4509,7 +4587,7 @@ class GalleryView(QWidget):
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
-            item = self._item_by_key.get(self._pending_auto_key)
+            item = self._tree_item_for(self._pending_auto_key)
             if item is not None:
                 self._pending_auto_key = None
                 self._tree.setCurrentItem(item)
@@ -4517,7 +4595,7 @@ class GalleryView(QWidget):
         # finished row, so the rebuild above gave that folder a node: drill in.
         if key == self._pending_combine_key:
             self._pending_combine_key = None
-            item = self._item_by_key.get(key)
+            item = self._tree_item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
         self._enhance_frames.pop(key, None)   # this run's frames are spent
@@ -4869,21 +4947,23 @@ class GalleryView(QWidget):
         for key in reversed(self._folder_history):
             if key not in doomed and (item := self._item_by_key.get(key)) is not None:
                 return item
-        item = self._item_by_key.get(group.key)
+        item = self._tree_item_for(group.key)
         return item.parent() if item is not None else None
 
     def _keys_under(self, group) -> set[str]:
-        """``group``'s key plus every folder key nested under it in the tree — the
-        folders a delete of ``group`` removes, so a return target can avoid them."""
-        item = self._item_by_key.get(group.key)
-        if item is None:
-            return {group.key}
-        keys, stack = set(), [item]
+        """The tree keys of every row drawing ``group``, and of every row nested
+        under those — what a delete of ``group`` takes off the tree, so a return
+        target can avoid them.
+
+        Both sides, because a folder holding both shapes is drawn twice and the
+        delete takes both copies.
+        """
+        keys, stack = set(), [self._item_by_key[key] for key
+                              in self._tree_view.keys_for_folder(group.key)]
         while stack:
             node = stack.pop()
-            node_group = node.data(0, _GROUP_ROLE)
-            if node_group is not None:
-                keys.add(node_group.key)
+            if node.data(0, _GROUP_ROLE) is not None:
+                keys.add(node.data(0, _TREE_KEY_ROLE))
             stack.extend(node.child(i) for i in range(node.childCount()))
         return keys
 
@@ -5008,9 +5088,10 @@ class GalleryView(QWidget):
             ):
                 self._selection_context_menu(global_pos)
                 return
-        group = item.data(0, _GROUP_ROLE)
-        if group is not None:
-            self._folder_context_menu(group.key, global_pos)
+        if item.data(0, _GROUP_ROLE) is not None:
+            # The row under the cursor, not the folder it draws: the same folder
+            # on the other side is a different row with its own menu.
+            self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos)
 
     def _empty_tree_context_menu(self, global_pos: QPoint):
         """Below the last row there is no folder to act on, so the only thing on
@@ -5029,10 +5110,9 @@ class GalleryView(QWidget):
             self._group_selection()
 
     def _folder_context_menu(self, key: str, global_pos: QPoint):
-        item = self._item_by_key.get(key)
-        if item is None:
+        group = self._group_for_key(key)
+        if group is None:
             return
-        group = item.data(0, _GROUP_ROLE)
         if isinstance(group, gallery.CustomGroup):
             self._custom_folder_context_menu(group, global_pos)
             return
@@ -5047,7 +5127,7 @@ class GalleryView(QWidget):
         open_custom = self._current_group()
         remove_action = None
         if isinstance(open_custom, gallery.CustomGroup) and open_custom.folder_id is not None \
-                and any(m.key == key for m in gallery.child_groups(open_custom)):
+                and any(m.key == group.key for m in gallery.child_groups(open_custom)):
             remove_action = menu.addAction(f"Remove from “{open_custom.label}”")
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
@@ -5060,7 +5140,7 @@ class GalleryView(QWidget):
         elif chosen == star_action:
             self._toggle_star(key)
         elif remove_action is not None and chosen == remove_action:
-            self._remove_from_custom_folder(open_custom, key)
+            self._remove_from_custom_folder(open_custom, group.key)
         elif chosen in add_menu:
             self._on_folders_dropped(add_menu[chosen], [key])
         elif delete_action is not None and chosen == delete_action:
@@ -5072,7 +5152,7 @@ class GalleryView(QWidget):
         a folder scrolled out of sight). Returns ``{action: custom folder key}``,
         empty when there are no folders of the user's own yet."""
         targets = [f for f in self._custom_folders
-                   if not any(m.key == key for m in gallery.child_groups(f))]
+                   if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
         submenu = menu.addMenu("Add to folder")
@@ -5093,8 +5173,8 @@ class GalleryView(QWidget):
             self._remove_custom_folder(group)
 
     def _rename_folder(self, key: str):
-        item = self._item_by_key.get(key)
-        current = item.data(0, _GROUP_ROLE).label if item else ""
+        group = self._group_for_key(key)
+        current = group.label if group is not None else ""
         # A derived folder's name is an overlay over the one its settings produce,
         # so blank resets it; a custom folder's name is all it has, so it can't.
         prompt = ("Folder name:" if gallery.is_custom_key(key)
@@ -5104,7 +5184,9 @@ class GalleryView(QWidget):
             self._apply_rename(key, text)
 
     def _apply_rename(self, key: str, name: str):
-        self._actions.rename_folder(key, name.strip() or None)
+        # The name belongs to the folder, so it is saved against the folder's own
+        # key — both sides draw the renamed folder.
+        self._actions.rename_folder(_base_of(key), name.strip() or None)
         self.refresh()
         self._sync_history_buttons()
 
@@ -5146,10 +5228,10 @@ class GalleryView(QWidget):
             self._title.begin_edit(group.label)
 
     def _commit_title_rename(self, name: str):
-        key = self._tree_view.selected_folder_key()
-        if key is None:
+        group = self._current_group()
+        if group is None:
             return
-        self._actions.rename_folder(key, name.strip() or None)
+        self._actions.rename_folder(group.key, name.strip() or None)
         self._sync_history_buttons()
         # Rebuild on the next turn of the event loop rather than here. What
         # usually ends this edit is a click somewhere else in the window, and
@@ -5160,15 +5242,15 @@ class GalleryView(QWidget):
         QTimer.singleShot(0, self.refresh)
 
     def _toggle_star(self, key: str):
-        item = self._item_by_key.get(key)
-        starred = bool(item and item.data(0, _GROUP_ROLE).starred)
-        self._db.set_folder_starred(key, not starred)
+        # A star is the folder's, not the row's: both sides draw the same folder,
+        # so starring it on one is starring it.
+        group = self._group_for_key(key)
+        self._db.set_folder_starred(_base_of(key), not bool(group and group.starred))
         self.refresh()
 
     def _delete_folder_by_key(self, key: str):
         """Delete the folder a hover-row trash click names."""
-        item = self._item_by_key.get(key)
-        group = item.data(0, _GROUP_ROLE) if item else None
+        group = self._group_for_key(key)
         if group is not None:
             self._delete_folder(group)
 
@@ -5275,12 +5357,11 @@ class GalleryView(QWidget):
             self._suppress_history = False
 
     def _current_shelf_key(self) -> str | None:
-        """The key of the shelf on screen — a parent shelf or one of its
-        Portrait/Landscape subfolders — or ``None`` off them."""
+        """The key of the shelf on screen — one side's Latest, Favorites,
+        Experiments, Requests or Trash — or ``None`` off them."""
         key = self._selected_folder_key()
         base, _orientation = _split_shelf_key(key)
-        return key if base in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY,
-                               _TRASH_KEY) else None
+        return key if base in _SHELF_KEYS else None
 
     def _current_location(self) -> str | None:
         """The history key for the view on screen — a shelf key on a shelf, the
@@ -5314,11 +5395,10 @@ class GalleryView(QWidget):
         self._sync_nav_buttons()
 
     def _restore_location(self, location: str):
-        """Re-show a history location without recording the move — a shelf overview
-        (a parent shelf or one of its orientation subfolders) or a generation
-        in its folder."""
+        """Re-show a history location without recording the move — one side's
+        shelf overview, or a generation in its folder."""
         base, _orientation = _split_shelf_key(location)
-        if base in (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _TRASH_KEY):
+        if base in _SHELF_KEYS:
             self._return_to_shelf(location)
         elif location in self._item_by_key:
             self._return_to_folder(location)

@@ -100,6 +100,23 @@ def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
         ["sdxl_t2i_src.png"]
 
 
+def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
+    # The transient row is deleted here, and with it the only thing that said
+    # when this enhancement happened. Its id rides onto the level instead, which
+    # is what lifts the image up the Recents shelf to where the run belongs
+    # rather than leaving it where it was generated.
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
+                           "image_enhance_00001_.png")
+
+    fold_enhancement(db, enhance)
+
+    (level,) = json.loads(db.get_generation("src")["enhance_history"])
+    assert level["run_id"] == enhance["id"]
+    assert gallery.recent_generations(db.list_generations())[0]["prompt_id"] == "src"
+
+
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
     # The enhanced image's source was deleted: nothing to fold onto, so the row
     # stays as it is (visible and deletable) rather than half-migrated.

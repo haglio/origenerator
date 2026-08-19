@@ -1410,6 +1410,74 @@ def test_recent_generations_with_no_media_types_selected_is_empty():
     assert recent_generations(rows, set()) == []
 
 
+def _shelf(*ids_and_seeds):
+    """Finished images newest-first, ids ascending with age — the shape the DB
+    hands the shelf (``ORDER BY id DESC``)."""
+    return [_img(pid, "a cat", 50, n, id=n) for pid, n in ids_and_seeds]
+
+
+def _enhance_run(prompt_id, source_file, row_id, *, done=None):
+    """A standalone enhance of ``source_file``: in flight (no output) unless
+    ``done`` names the file it produced."""
+    return _row(prompt_id=prompt_id, workflow_name="image_enhance", id=row_id,
+                params_json=json.dumps({"input_image": f"image/{source_file} [output]"}),
+                output_files=json.dumps([{"filename": done}]) if done else None)
+
+
+def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
+    # An enhancement gets no card of its own on the shelf — it is a version of an
+    # image, not an item beside one — so the image itself has to move, or the run
+    # is listed nowhere and the picture being worked on stays buried under
+    # everything made since.
+    running = _enhance_run("e1", "sdxl_t2i_i1.png", 4)
+    rows = [running] + _shelf(("i3", 3), ("i2", 2), ("i1", 1))
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
+
+
+def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():
+    # The transient row is deleted by the fold, so the level it left behind is
+    # what remembers where the run fell in the library's order: the image stays
+    # lifted after it completes rather than dropping back to where it was made.
+    i1, = _shelf(("i1", 1))
+    i1["enhance_history"] = json.dumps(
+        [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 4}])
+    rows = _shelf(("i3", 3), ("i2", 2)) + [i1]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
+
+
+def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():
+    # The lift is a place in the order, not a pin to the top: something made
+    # since the enhancement is still the newer thing.
+    i1, = _shelf(("i1", 1))
+    i1["enhance_history"] = json.dumps(
+        [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
+    rows = _shelf(("i4", 4)) + [i1] + _shelf(("i2", 2))
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i4", "i1", "i2"]
+
+
+def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place():
+    # A level folded before the run's id was recorded has nothing to sort by, and
+    # keeps the image where it was made — an enhancement older than the record of
+    # it is an enhancement from long ago.
+    i1, = _shelf(("i1", 1))
+    i1["enhance_history"] = json.dumps(
+        [{"filename": "image_enhance_e1.png", "params": {}}])
+    rows = _shelf(("i3", 3), ("i2", 2)) + [i1]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
+
+
+def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():
+    # A re-enhance runs on the pre-enhance file, still listed behind the enhanced
+    # one: the row it belongs to is the same image, so it is that image that moves.
+    i1, = _shelf(("i1", 1))
+    i1["output_files"] = json.dumps([{"filename": "image_enhance_e1.png"},
+                                     {"filename": "sdxl_t2i_i1.png"}])
+    i1["original_files"] = json.dumps([{"filename": "sdxl_t2i_i1.png"}])
+    running = _enhance_run("e2", "sdxl_t2i_i1.png", 4)
+    rows = [running] + _shelf(("i3", 3), ("i2", 2)) + [i1]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
+
+
 def test_child_groups_and_rows_under_walk_the_tree():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a cat", 50, 2),
             _img("i3", "a dog", 50, 1)]

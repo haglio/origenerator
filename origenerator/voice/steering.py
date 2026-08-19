@@ -22,6 +22,14 @@ While one is open it swallows what it hears — which is exactly what keeps the
 words of a request from steering the prompt or matching a command — and each
 step of it is re-emitted as :attr:`VoiceSteering.request`.
 
+One thing outranks even that, and only while no request is open: an injected
+``bare_matcher``, the strict whole-utterance vocabulary
+(:mod:`origenerator.voice.app_commands`). A word that IS a command, whole and
+alone, is a command — which is what lets "requests" reach the Requests shelf
+though "request" is the word a dictation opens on. Once one is open the
+dictation is back in front, because a command word said mid-sentence belongs to
+the sentence.
+
 """
 
 import logging
@@ -47,7 +55,8 @@ class VoiceSteering(QObject):
     request = pyqtSignal(object)  # a SpokenRequest: one step of "Request … over"
 
     def __init__(self, *, listener=None, worker=None, command_matcher=None,
-                 dictation=None, transcribe_bias=None, parent=None):
+                 bare_matcher=None, dictation=None, transcribe_bias=None,
+                 parent=None):
         super().__init__(parent)
         self._listener = listener if listener is not None else Listener(
             floor=config.VOICE_VAD_THRESHOLD
@@ -59,6 +68,9 @@ class VoiceSteering(QObject):
         self._get_prompts = None
         self._set_prompts = None
         self._matcher = command_matcher  # recognizes a spoken command in a transcription
+        # The whole-utterance half of that vocabulary, which is strict enough to
+        # be asked before a request can open (see the module docstring).
+        self._bare_matcher = bare_matcher
         self._execute_command = None     # runs one, while a surface is listening for them
         self._dictation = dictation      # collects "Request … over" across utterances
         # Utterances are transcribed on the pool, so two can finish at once; the
@@ -146,18 +158,31 @@ class VoiceSteering(QObject):
     def _interpret(self, text: str):
         """What one transcription meant, or ``None`` to let it steer the prompt.
 
-        An open request dictation has first refusal — it is collecting a
-        sentence, and half of one landing in the prompt would be worse than
-        either use alone — then the command matcher, which only answers while a
-        surface is listening for commands.
+        An utterance that is nothing but a command word is that command, so long
+        as no request is already being said — that is the one thing ahead of the
+        dictation, and it is what keeps a shelf named by the dictation's own
+        opening word reachable. Then the open dictation, which has first refusal
+        over everything else because it is collecting a sentence and half of one
+        landing in the prompt would be worse than either use alone. Then the
+        general command matcher, which only answers while a surface is listening
+        for commands.
         """
         with self._lock:
+            collecting = self._dictation is not None and self._dictation.listening
+            if not collecting and self._listening_for_commands():
+                bare = self._bare_matcher(text) if self._bare_matcher is not None else None
+                if bare is not None:
+                    return bare
             spoken = self._dictation.push(text) if self._dictation is not None else None
         if spoken is not None:
             return spoken
-        if self._execute_command is not None and self._matcher is not None:
+        if self._listening_for_commands() and self._matcher is not None:
             return self._matcher(text)
         return None
+
+    def _listening_for_commands(self) -> bool:
+        """Whether a surface is up that spoken commands run against."""
+        return self._execute_command is not None
 
     def _on_command(self, matched) -> None:
         if isinstance(matched, SpokenRequest):

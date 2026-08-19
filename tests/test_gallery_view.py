@@ -7743,10 +7743,16 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
 class _VoiceSurface:
     """A show standing in for the one being spoken over."""
 
-    def __init__(self, prompt_id):
+    def __init__(self, prompt_id, *, starrable=True):
         self._prompt_id = prompt_id
+        self._starrable = starrable
         self.noted = None
         self.enhancing = {}
+        self.said = None    # what a spoken command was answered with
+        self.steps = []     # the transport moves it was asked for, in order
+        self.culled = 0
+        self.starred = 0
+        self.held = False
 
     def isActiveWindow(self):
         return True
@@ -7759,6 +7765,27 @@ class _VoiceSurface:
 
     def note_enhancing(self, statuses):
         self.enhancing = statuses
+
+    def note_voice_command(self, message):
+        self.said = message
+
+    def step(self, delta):
+        self.steps.append(delta)
+
+    def cull(self):
+        self.culled += 1
+
+    def star(self):
+        if not self._starrable:
+            return False
+        self.starred += 1
+        return True
+
+    def set_held(self, held):
+        if held == self.held:
+            return False
+        self.held = held
+        return True
 
 
 def _enhanceable_db(tmp_path, count=2):
@@ -10700,22 +10727,41 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     assert view._reroll_jobs == {}
 
 
-def test_a_spoken_enhance_with_no_show_up_says_what_it_wanted(qtbot, tmp_path):
+def test_a_spoken_enhance_with_no_show_up_presses_the_bank_button(qtbot, tmp_path):
+    # The word names a bank button as well as the picture on screen, and with no
+    # picture filling the screen it is the button — aimed the way a click aims
+    # it, at the folder's images that have never been enhanced.
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _set_enhance(view, params={"enhance_steps": 29})
+    _select_first_leaf(view)
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_steps"] == 29
+
+
+def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
     # The utterance has already been claimed as a command by the time it gets
-    # here, so it is answered in this pane rather than vanishing.
+    # here, so it is answered in this pane rather than vanishing — in the
+    # button's own words, which is what a speaker not looking at it needs.
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
     view._on_voice_command(gallery.ENHANCE_COMMAND)
 
-    assert view._voice_status.text() == "🎤 an enhancement needs a picture on screen"
+    assert view._voice_status.text() == "🎤 Nothing here to enhance"
     assert view._reroll_jobs == {}
 
 
 def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
-    # One matcher reaches the mic, so a verb added to the vocabulary lands there
-    # without this module listing the parts a second time and drifting from it.
+    # One matcher reaches the mic for everything that tolerates a filler word, so
+    # a verb added to the vocabulary lands there without this module listing the
+    # parts a second time and drifting from it.
     match = gallery_view_module._match_voice_command
 
     assert match("enhance") == gallery.ENHANCE_COMMAND
@@ -10723,6 +10769,9 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert [part.name for part in match("fix teeth")] == ["teeth"]
     assert match("start slideshow") is not None
     assert match("make her hair longer") is None    # steering, not a command
+    # The bare words are not in this one: they match whole utterances only,
+    # which is what lets them be asked ahead of an opening request instead.
+    assert match("weird") is None
 
 
 def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
@@ -10798,3 +10847,217 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     qtbot.waitUntil(lambda: bool(view._reroll_jobs), timeout=5000)
     assert asked_on["thread"] != threading.main_thread().name
     assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+
+
+# --- the bare vocabulary: a shelf, a bank button, a word over the show --------
+
+
+def _listening(qtbot, tmp_path, db=None):
+    """A gallery with the mic armed — the one switch that opens it — and its
+    tree drawn, so a shelf name has a row to land on."""
+    view = GalleryView(db if db is not None else _seeded_db(tmp_path),
+                       client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._mic_btn.setChecked(True)
+    return view
+
+
+@pytest.mark.parametrize("said, key", [
+    ("experiments", gallery_view_module._EXPERIMENTS_KEY),
+    ("trash", gallery_view_module._TRASH_KEY),
+    ("recents", gallery_view_module._RECENTS_KEY),
+    ("starred", gallery_view_module._STARRED_KEY),
+    ("go to experiments", gallery_view_module._EXPERIMENTS_KEY),
+])
+def test_a_spoken_shelf_name_stands_you_in_that_shelf(qtbot, tmp_path, said, key):
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak(said)
+
+    assert view._selected_folder_key() == key
+
+
+def test_the_requests_shelf_answers_the_plural_and_the_singular_still_dictates(
+        qtbot, tmp_path):
+    # "request" opens a spoken request and "requests" is a shelf; one word
+    # cannot do both, so the plural navigates and the singular still opens.
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("requests")
+    assert view._selected_folder_key() == gallery_view_module._REQUESTS_KEY
+    assert not view._voice._dictation.listening   # no request opened
+
+    view._voice.speak("Request.")
+    assert view._voice._dictation.listening       # the singular still opens one
+
+
+def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(
+        qtbot, tmp_path):
+    # Starred appears only once there are folders; a word for a row that isn't
+    # there must not vanish, having already been claimed as a command.
+    db = Database(tmp_path / "empty.db")
+    view = _listening(qtbot, tmp_path, db=db)
+
+    view._voice.speak("starred")
+
+    assert view._voice_status.text() == "🎤 no Starred shelf yet"
+
+
+def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
+    # "weird" condemns what is on screen and a lock holds it — the two rooms are
+    # one room to whoever is speaking.
+    view = _listening(qtbot, tmp_path)
+    surface = _VoiceSurface("orig")
+    view._slideshow = surface
+
+    view._voice.speak("weird")
+    assert surface.culled == 1
+
+    view._voice.speak("lock")
+    assert surface.held and surface.said == "🎤 holding this one"
+
+    view._voice.speak("lock")
+    assert surface.said == "🎤 already holding it"  # asked for a state, not a flip
+
+    view._voice.speak("unlock")
+    assert not surface.held and surface.said == "🎤 let go"
+
+
+def test_the_transport_words_step_the_show_they_are_said_over(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+    surface = _VoiceSurface("orig")
+    view._slideshow = surface
+
+    for said in ("next", "skip", "back", "previous"):
+        view._voice.speak(said)
+
+    assert surface.steps == [1, 1, -1, -1]
+
+
+def test_a_spoken_star_over_a_show_bookmarks_the_slide(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+    surface = _VoiceSurface("orig")
+    view._slideshow = surface
+
+    view._voice.speak("star")
+
+    assert surface.starred == 1 and surface.said == "🎤 starred"
+
+
+def test_the_same_two_words_walk_the_history_with_no_show_up(qtbot, tmp_path):
+    # The active side, with two sides: over a show "back" is the slide before,
+    # and in the gallery it is the stop before — both are the one before.
+    view = _listening(qtbot, tmp_path)
+    first = _select_first_leaf(view)
+    view._voice.speak("trash")            # a second stop to come back from
+
+    view._voice.speak("back")
+
+    assert view._selected_folder_key() == first
+
+
+def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
+    # Back and Forward wear bare labels, so they carry their own refusal rather
+    # than reading their tooltip back.
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("forward")
+
+    assert view._voice_status.text() == "🎤 nowhere forward"
+
+
+def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
+        qtbot, tmp_path):
+    # The tip already names the target it is aimed at, which is exactly what a
+    # speaker who is not looking at the bank needs told back.
+    view = _listening(qtbot, tmp_path)
+    _select_first_leaf(view)
+    aimed = view._star_btn.toolTip()
+    assert aimed.startswith("Star folder")
+
+    view._voice.speak("star")
+
+    assert view._voice_status.text() == f"🎤 {aimed}"
+    assert view._star_btn.toolTip().startswith("Unstar folder")
+
+
+def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("undo")
+
+    assert view._voice_status.text() == "🎤 Nothing to undo"
+
+
+def test_holding_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("lock")
+
+    assert view._voice_status.text() == "🎤 lock is a slideshow's — none is up"
+
+
+def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
+    # Set through the button rather than around it, so a spoken switch and a
+    # clicked one are the same event and the bank lights the same way.
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("drive on")
+    assert view._osr2_btn.isChecked()
+    assert view._voice_status.text() == "🎤 the OSR2 on"
+
+    view._voice.speak("drive")           # bare: flips whichever way it stands
+    assert not view._osr2_btn.isChecked()
+
+    view._voice.speak("drive off")       # already off: still ends up off
+    assert not view._osr2_btn.isChecked()
+
+
+def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
+    # And only shut: a mic that hears nothing cannot hear "mic on", so the
+    # toolbar switch is the only way back.
+    view = _listening(qtbot, tmp_path)
+    assert view._voice.commands_on
+
+    view._voice.speak("mic off")
+
+    assert not view._mic_btn.isChecked()
+    assert not view._voice.commands_on
+
+
+def test_a_spoken_knob_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+    knobs = view._osr2_stroke.state.state
+    amplitude, center = knobs.amplitude, knobs.center
+
+    view._voice.speak("amp down")   # travel opens at its widest, so down from there
+    view._voice.speak("center up")
+
+    assert knobs.amplitude == amplitude - 10
+    assert knobs.center == center + 5
+    # Answered with what the device now reads, which is the panel's own line.
+    assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
+
+
+def test_a_stroke_knob_answers_from_a_show_too(qtbot, tmp_path):
+    # The driver is app-wide, so its words belong to no surface — but the answer
+    # goes where the speaker is looking.
+    view = _listening(qtbot, tmp_path)
+    surface = _VoiceSurface("orig")
+    view._slideshow = surface
+
+    view._voice.speak("next shape")
+
+    assert surface.said == f"🎤 {view._osr2_stroke.status_text()}"
+
+
+def test_a_sentence_holding_a_command_word_still_steers_the_prompt(qtbot, tmp_path):
+    # Every miss falls through to a prompt rewrite, which is why nothing in the
+    # bare vocabulary may match anything but the whole utterance.
+    view = _listening(qtbot, tmp_path)
+    surface = _VoiceSurface("orig")
+    view._slideshow = surface
+
+    assert view._voice.speak("a lock of hair over her eye") is None
+    assert surface.said is None and surface.steps == []

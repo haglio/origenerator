@@ -623,6 +623,87 @@ def test_a_slideshow_without_a_starrer_still_locks(qtbot):
     assert view._playlist.locked
 
 
+# --- the transport a spoken word drives, saying which way rather than flipping
+
+def test_asking_for_a_hold_holds_and_asking_again_changes_nothing(qtbot):
+    # Someone talking to a picture is asking for a state, not for the other one,
+    # and cannot see the counter's padlock to know which the flip would give.
+    starred = []
+    items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
+    view = _view(qtbot, items=items, on_star=starred.append)
+
+    assert view.set_held(True) is True
+    assert view.locked and starred == ["gen-a"]
+
+    assert view.set_held(True) is False   # already holding: nothing moved
+    assert view.locked and starred == ["gen-a"]
+
+
+def test_a_spoken_hold_stars_the_slide_like_a_pressed_one(qtbot):
+    # Holding is Down's whole gesture here; a spoken hold must not quietly mean
+    # less than a pressed one.
+    starred = []
+    items = [("a.png", "image", "gen-a", None)]
+    view = _view(qtbot, items=items, on_star=starred.append)
+
+    view.set_held(True)
+
+    assert starred == ["gen-a"]
+
+
+def test_asking_to_let_go_releases_only_what_was_held(qtbot):
+    view = _view(qtbot)
+
+    assert view.set_held(False) is False   # nothing was held
+    view.set_held(True)
+    assert view.set_held(False) is True
+    assert not view.locked
+
+
+def test_starring_the_slide_on_screen_without_holding_it(qtbot):
+    starred = []
+    items = [("a.png", "image", "gen-a", None)]
+    view = _view(qtbot, items=items, on_star=starred.append)
+
+    assert view.star() is True
+
+    assert starred == ["gen-a"]
+    assert not view.locked  # bookmarked, still moving on
+
+
+def test_starring_says_no_when_there_is_nothing_to_star(qtbot):
+    # A show whose items carry no generation id — or a live one with no row of
+    # its own yet — has nothing to bookmark, and says so rather than seeming to.
+    assert _view(qtbot).star() is False
+
+
+def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):
+    culled = []
+    items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None),
+             ("c.png", "image", "gen-c", None)]
+    view = _view(qtbot, items=items, on_delete=culled.append)
+
+    view.step(1)
+    assert view._playlist.current()[2] == "gen-b"
+    view.step(-1)
+    assert view._playlist.current()[2] == "gen-a"
+
+    view.cull()
+    assert culled == ["gen-a"]
+    assert view._playlist.current()[2] == "gen-b"
+
+
+def test_stepping_off_a_held_slide_releases_it(qtbot):
+    # The same rule the arrows follow: a lock holds the slide it was set on, not
+    # wherever the user wanders to.
+    view = _view(qtbot)
+    view.set_held(True)
+
+    view.step(1)
+
+    assert not view.locked
+
+
 def test_double_clicking_leaves_the_slideshow(qtbot):
     # The way out of every other fullscreen view here, and the way it used to work.
     view = _view(qtbot)

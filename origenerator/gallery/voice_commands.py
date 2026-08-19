@@ -1,7 +1,7 @@
 """What a spoken utterance over a fullscreen picture can ask for.
 
 Three commands share one mic. "fix <part>" aims a targeted detail pass at what's
-on screen (:mod:`~origenerator.gallery.detail_parts` owns the parts and the
+on screen (:mod:`~origenerator.workflows.detail_parts` owns the parts and the
 match); "genau it" animates the picture as a Genau clip; "enhance" asks for the
 better version of it. :func:`match_command` is the one matcher the voice surface
 is given, so adding a verb here is all it takes to teach it — and
@@ -15,7 +15,7 @@ command on rewriting a prompt.
 
 import re
 
-from origenerator.gallery.detail_parts import (
+from origenerator.workflows.detail_parts import (
     fix_command_bias, match_fix_command,
 )
 
@@ -80,7 +80,7 @@ def match_enhance_command(text: str) -> str | None:
 def match_command(text: str):
     """The command an utterance asks for, or ``None`` when it asks for none.
 
-    A :class:`~origenerator.gallery.detail_parts.DetailPart` for a targeted fix,
+    A :class:`~origenerator.workflows.detail_parts.DetailPart` for a targeted fix,
     :data:`GENAU_COMMAND`, or :data:`ENHANCE_COMMAND`. Fixes are tried first:
     they are the oldest and most tightly-shaped of the three, and none of the
     three vocabularies overlaps another.

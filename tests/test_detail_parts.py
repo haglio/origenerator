@@ -1,5 +1,6 @@
-"""The spoken-fix vocabulary: "fix teeth" resolved to a part, a part to the
-installed detector that finds it, and a recorded detector back to its word.
+"""The fix vocabulary: "fix teeth" resolved to a part, a part to the installed
+detector that finds it, a recorded detector back to its word, and one
+enhancement's settings to the passes it runs.
 
 Overlay-fed parts are exercised with the same fabricated placeholders the
 committed content example uses — the real vocabulary is library content and
@@ -8,8 +9,10 @@ never appears in these repos.
 
 import pytest
 
-from origenerator.gallery import detail_parts
-from origenerator.gallery.detail_parts import (
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import (
+    detail_fix_passes,
+    detail_fixes_of,
     detector_for_part,
     detector_part_label,
     match_fix_command,
@@ -142,3 +145,84 @@ def test_the_whisper_bias_names_every_spoken_word_once(monkeypatch):
     for word in ("fix", "fixed", "teeth", "hands", "eyes", "zeta", "zetas"):
         assert word in bias
     assert bias.count("fix,") == 1  # each word once, not once per part
+
+
+# --- the passes one enhancement's settings ask for ---------------------------
+
+
+def test_a_part_at_zero_or_absent_asks_for_no_pass():
+    # Zero is how the panel says "leave this part alone", and a part it has
+    # never been given a number for reads the same way.
+    assert detail_fixes_of({"enhance_detail_fixes": {}}) == {}
+    assert detail_fixes_of({"enhance_detail_fixes": {"teeth": 0}}) == {}
+    assert detail_fixes_of({}) == {}
+
+
+def test_each_part_carries_its_own_denoise():
+    assert detail_fixes_of({"enhance_detail_fixes": {"teeth": 0.5, "hands": 0.6}})         == {"teeth": 0.5, "hands": 0.6}
+
+
+def test_junk_where_a_number_should_be_asks_for_no_pass():
+    # These come back through JSON, where a hand edit or an older version can
+    # leave anything at all — and a pass is better dropped than submitted with
+    # a denoise the sampler will reject.
+    assert detail_fixes_of({"enhance_detail_fixes": {"teeth": "lots"}}) == {}
+    assert detail_fixes_of({"enhance_detail_fixes": "all of them"}) == {}
+
+
+def test_an_enhancement_recorded_the_old_way_reads_as_the_parts_it_fixed():
+    # Every enhancement in the library predates the per-part numbers: one tick,
+    # one denoise, two detector slots. What that ran is a fix on each part those
+    # detectors find, all at that denoise — and it must go on saying so.
+    assert detail_fixes_of({
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
+        "enhance_face_detector": "face_yolov8m.pt",
+        "enhance_hand_detector": "hand_yolov8s.pt",
+    }) == {"faces": 0.45, "hands": 0.45}
+    assert detail_fixes_of({
+        "enhance_detail_fix": True, "enhance_detail_denoise": 0.5,
+        "enhance_face_detector": "Teeth_v1.pt", "enhance_hand_detector": "",
+    }) == {"teeth": 0.5}
+    assert detail_fixes_of({"enhance_detail_fix": False,
+                            "enhance_detail_denoise": 0.45}) == {}
+
+
+def test_an_old_pass_that_named_no_detector_ran_the_generic_pair():
+    # Levels recorded before the detectors were: the pass was faces and hands.
+    assert detail_fixes_of({"enhance_detail_fix": True}) == {
+        "faces": detail_parts.DEFAULT_FIX_DENOISE,
+        "hands": detail_parts.DEFAULT_FIX_DENOISE,
+    }
+
+
+def test_the_passes_are_the_installed_detector_for_each_part_asked_for(monkeypatch):
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["Teeth_v1.pt", "face_yolov8m.pt"])
+    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [("face_yolov8m.pt", 0.4), ("Teeth_v1.pt", 0.5)]
+
+
+def test_the_passes_come_in_the_tables_order_however_they_were_asked_for(monkeypatch):
+    # The same fixes must build the same graph, whichever order they were set
+    # in — otherwise a re-run of one enhancement is a different one.
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["Teeth_v1.pt", "face_yolov8m.pt"])
+    asked = {"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}}
+    backwards = {"enhance_detail_fixes": {"faces": 0.4, "teeth": 0.5}}
+    assert detail_fix_passes(asked) == detail_fix_passes(backwards)
+
+
+def test_a_part_with_no_installed_detector_is_dropped_rather_than_submitted(monkeypatch):
+    # ComfyUI validates the model name and rejects the whole prompt over one it
+    # cannot find — which would take every other pass down with it. Settings
+    # outlive the file they named, so this is an ordinary state, not an error.
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["face_yolov8m.pt"])
+    assert detail_fix_passes({"enhance_detail_fixes": {"teeth": 0.5, "faces": 0.4}})         == [("face_yolov8m.pt", 0.4)]
+
+
+def test_a_part_the_vocabulary_no_longer_lists_is_dropped(monkeypatch):
+    # An overlay entry removed after a folder was configured with it: the
+    # settings still name the part, and nothing in the table answers to it.
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["omega_yolov8n.pt"])
+    assert detail_fix_passes({"enhance_detail_fixes": {"omega": 0.5}}) == []

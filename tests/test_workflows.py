@@ -430,9 +430,9 @@ def test_image_enhance_honors_an_unlocked_size_override():
     assert _find_node(payload, "VAEEncode")["inputs"]["pixels"] == [scale_id, 0]
 
 
-# ---- The detail pass (faces and hands, re-sampled where they are) ----
+# ---- The detail pass (each part re-sampled where it is) ----
 
-_FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
+_FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt", "teeth_finder.pt")
 
 
 def _nodes_of(payload: dict, class_type: str) -> list[dict]:
@@ -442,10 +442,10 @@ def _nodes_of(payload: dict, class_type: str) -> list[dict]:
 def _enhance_payload(installed=_FOUND_DETECTORS, **params):
     """An enhance payload built against a stated set of installed detectors.
 
-    Stated rather than read off this machine's ComfyUI: the pass drops any half
+    Stated rather than read off this machine's ComfyUI: the pass drops any part
     whose model isn't there, so what is installed decides what the graph holds.
     """
-    import origenerator.workflows.image_enhance as module
+    import origenerator.workflows.detail_parts as module
 
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
@@ -454,25 +454,24 @@ def _enhance_payload(installed=_FOUND_DETECTORS, **params):
                                          **params))
 
 
-def test_the_detail_pass_is_off_by_default_and_adds_nothing():
+def test_every_part_is_at_zero_by_default_and_adds_nothing():
     # The whole-frame tail is what an enhance is; the detail pass is a second
-    # opinion on two small regions, and it costs another sampling run each.
+    # opinion on a few small regions, and it costs another sampling run each.
     wf = WORKFLOW_REGISTRY["image_enhance"]
-    assert wf.default_params()["enhance_detail_fix"] is False
+    assert wf.default_params()["enhance_detail_fixes"] == {}
     payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png"))
     assert _nodes_of(payload, "UltralyticsDetectorProvider") == []
     assert _nodes_of(payload, "DetailerForEach") == []
 
 
-def test_the_detail_pass_re_samples_each_found_face_and_hand_in_place():
+def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
     # What the whole-frame tail cannot do: 0.15 denoise over the full picture
     # refines texture and leaves a six-fingered hand six-fingered, while the
     # denoise that could redraw it wrecks everything else. So the regions are
-    # found, cropped, re-sampled hard, and pasted back — faces first, then hands
-    # over that result, so an image with both gets both.
+    # found, cropped, re-sampled hard, and pasted back — one part over the last
+    # one's result, so an image with a face and hands gets both.
     payload = _enhance_payload(
-        seed=5, enhance_detail_fix=True, enhance_detail_denoise=0.45,
-        enhance_face_detector="face_finder.pt", enhance_hand_detector="hand_finder.pt",
+        seed=5, enhance_detail_fixes={"faces": 0.45, "hands": 0.6},
     )
 
     providers = {nid: n for nid, n in payload.items()
@@ -485,6 +484,7 @@ def test_the_detail_pass_re_samples_each_found_face_and_hand_in_place():
     detailers = {nid: n for nid, n in payload.items()
                  if n["class_type"] == "DetailerForEach"}
     assert len(detailers) == 2
+    denoises = {}
     for node in detailers.values():
         segs = payload[node["inputs"]["segs"][0]]
         assert segs["class_type"] == "BboxDetectorSEGS"
@@ -492,8 +492,11 @@ def test_the_detail_pass_re_samples_each_found_face_and_hand_in_place():
         # Each detector reads the very image its detailer repaints, so the boxes
         # it found land where it found them.
         assert segs["inputs"]["image"] == node["inputs"]["image"]
-        assert node["inputs"]["denoise"] == 0.45
         assert node["inputs"]["seed"] == 5
+        model = payload[segs["inputs"]["bbox_detector"][0]]["inputs"]["model_name"]
+        denoises[model] = node["inputs"]["denoise"]
+    # Each part at the number it was given, not one shared between them.
+    assert denoises == {"bbox/face_finder.pt": 0.45, "bbox/hand_finder.pt": 0.6}
 
     # Chained, and the save takes the end of the chain rather than the tail's
     # decode — otherwise the pass would run and be thrown away.
@@ -505,14 +508,23 @@ def test_the_detail_pass_re_samples_each_found_face_and_hand_in_place():
     assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0]
 
 
+def test_a_third_part_is_a_third_pass_on_the_chain():
+    # Two detector slots was the old shape's ceiling; a part is a pass of its
+    # own now, so asking for three redraws three.
+    payload = _enhance_payload(
+        enhance_detail_fixes={"faces": 0.4, "hands": 0.5, "teeth": 0.6})
+    assert len(_nodes_of(payload, "DetailerForEach")) == 3
+    assert len(_nodes_of(payload, "UltralyticsDetectorProvider")) == 3
+
+
 def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
     # It is the same enhancement, spent where it matters: the checkpoint
     # refining the picture refines its faces too, steered by the same prompts,
     # so a redrawn mouth stays in the picture's own style rather than the
     # sampler's idea of a mouth.
     payload = _enhance_payload(
-        enhance_detail_fix=True, positive_prompt="a lantern on a jetty",
-        enhance_face_detector="face_finder.pt", enhance_hand_detector="hand_finder.pt",
+        positive_prompt="a lantern on a jetty",
+        enhance_detail_fixes={"faces": 0.45, "hands": 0.45},
     )
     sampler = _find_node(payload, "KSampler")["inputs"]
     detailer = _nodes_of(payload, "DetailerForEach")[0]["inputs"]
@@ -528,13 +540,13 @@ def test_the_detail_pass_borrows_the_enhances_model_prompts_and_vae():
     assert detailer["scheduler"] == sampler["scheduler"]
 
 
-def test_a_detector_comfyui_hasnt_got_drops_its_half_rather_than_failing_the_submit():
+def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_submit():
     # Having only the face model is an ordinary install, and ComfyUI validates
     # the name — so carrying the missing one anyway would get the whole prompt
-    # rejected, taking the half that could have run down with it.
+    # rejected, taking the part that could have run down with it.
     payload = _enhance_payload(
-        installed=["face_finder.pt"], enhance_detail_fix=True,
-        enhance_face_detector="face_finder.pt", enhance_hand_detector="hand_finder.pt",
+        installed=["face_finder.pt"],
+        enhance_detail_fixes={"faces": 0.45, "hands": 0.45},
     )
     (provider,) = _nodes_of(payload, "UltralyticsDetectorProvider")
     assert provider["inputs"]["model_name"] == "bbox/face_finder.pt"
@@ -544,32 +556,28 @@ def test_a_detector_comfyui_hasnt_got_drops_its_half_rather_than_failing_the_sub
     assert save["inputs"]["images"] == [_node_id(payload, "DetailerForEach"), 0]
 
 
-def test_asking_for_the_pass_with_nothing_installed_builds_none_of_it():
-    # The panel dims the tick for this, but settings stored while a detector was
-    # installed outlive it being removed, and that must not fail every enhance.
-    payload = _enhance_payload(installed=[], enhance_detail_fix=True)
+def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
+    # The panel greys those numbers for this, but settings stored while a
+    # detector was installed outlive it being removed, and that must not fail
+    # every enhance.
+    payload = _enhance_payload(installed=[],
+                               enhance_detail_fixes={"faces": 0.45})
     assert _nodes_of(payload, "DetailerForEach") == []
     save = payload[_node_id(payload, "SaveImage")]
     assert save["inputs"]["images"] == [_node_id(payload, "VAEDecode"), 0]
 
 
-def test_the_detail_passs_knobs_are_defined_and_its_detectors_are_the_installed_ones():
-    # The Enhance panel builds its fields from these, so the ranges and the
-    # option lists live with the workflow rather than being retyped beside it.
-    import origenerator.workflows.image_enhance as module
+def test_the_detail_passs_knob_is_defined_with_the_range_its_boxes_take():
+    # The Enhance panel builds its per-part spin boxes from this, so the range
+    # lives with the workflow rather than being retyped beside it.
+    defs = {pd.key: pd
+            for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}
 
-    wf = WORKFLOW_REGISTRY["image_enhance"]
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(module, "list_detector_files", lambda: list(_FOUND_DETECTORS))
-        defs = {pd.key: pd for pd in wf.param_definitions()}
-
-    assert defs["enhance_detail_fix"].type == "bool"
-    assert defs["enhance_detail_fix"].default is False
-    # A pass at zero denoise repaints nothing, and the detailer node rejects it.
-    assert defs["enhance_detail_denoise"].min_val > 0
-    assert defs["enhance_detail_denoise"].max_val == 1.0
-    assert defs["enhance_face_detector"].options == list(_FOUND_DETECTORS)
-    assert defs["enhance_hand_detector"].options == list(_FOUND_DETECTORS)
+    assert defs["enhance_detail_fixes"].default == {}
+    # Zero is a part left alone rather than a pass that repaints nothing (which
+    # the detailer node rejects outright), so the floor is 0 and not above it.
+    assert defs["enhance_detail_fixes"].min_val == 0.0
+    assert defs["enhance_detail_fixes"].max_val == 1.0
 
 
 # ---- The SDXL upscale/enhance tail (shared by both SDXL workflows) ----

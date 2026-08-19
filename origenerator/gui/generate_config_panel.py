@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton, QScrollArea, QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
@@ -30,7 +30,6 @@ from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.source_image_tile import SourceImageTile
-from origenerator.gui.thumbnail_strip import ThumbnailStrip
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import (
@@ -47,17 +46,14 @@ class GenerateConfigPanel(QWidget):
 
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
     for the gallery to launch as a re-roll of this config's settings folder. The
-    panel lays out two resizable panes itself — a main column beside this tab's own
-    slim strip of past runs. The main column stacks a fixed preview on top, then one
-    scroll holding the File/Created block above the editable form and, at its bottom,
-    the displayed generation's related media, then a single button bank
+    panel is one column: a fixed preview on top, then one scroll holding the
+    File/Created block above the editable form and, at its bottom, the displayed
+    generation's related media, then a single button bank
     (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
     There's no status line —
-    Generate itself doubles as the progress bar, filling as a run advances. Clicking a
-    strip thumbnail re-emits its prompt id via ``strip_activated`` so a container can
-    open (or reuse) a tab for it. The preview is driven from outside: a browsed
-    selection's output, a running re-roll's live frames, or this config's newest
-    matching result when idle.
+    Generate itself doubles as the progress bar, filling as a run advances. The
+    preview is driven from outside: a browsed selection's output, a running
+    re-roll's live frames, or this config's newest matching result when idle.
 
     The info appears only while the tab is displaying a saved generation
     (:meth:`show_saved_generation`): a File/Created block above the form, and at the
@@ -76,7 +72,6 @@ class GenerateConfigPanel(QWidget):
 
     title_changed = pyqtSignal(str)     # current tab title
     form_replaced = pyqtSignal()        # a new workflow swapped the param form out
-    strip_activated = pyqtSignal(str)   # a strip thumbnail was clicked (prompt_id)
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
     containing_folder_requested = pyqtSignal(str)  # "Go to folder" clicked (prompt_id)
@@ -93,7 +88,6 @@ class GenerateConfigPanel(QWidget):
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._custom_title: str | None = None        # user-set name; overrides the auto title
-        self._strip_ids: list[str] = []               # this tab's strip: seeded folder + its own runs, newest first
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
@@ -109,23 +103,12 @@ class GenerateConfigPanel(QWidget):
         self._connect_signals()
 
     def _build_ui(self):
+        # One column: the preview over the settings form and the Generate button.
+        # The preview leads (a running re-roll's frames, then the finished output);
+        # the button bank sits at the bottom, under the settings.
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
-        # Two resizable panes, the divider doubling as a drag handle: a main column
-        # (preview on top, then the settings and Generate) and this tab's own slim
-        # strip of past runs on the right.
-        self._panes = QSplitter(Qt.Orientation.Horizontal)
-        self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
-        self._panes.setHandleWidth(6)
-
-        # Main pane: the preview over the settings form and the Generate button. The
-        # preview leads (a running re-roll's frames, then the finished output); the
-        # status bar and button sit at the bottom, under the settings.
-        main = QWidget()
-        main_box = QVBoxLayout(main)
-        main_box.setContentsMargins(0, 0, 0, 0)
-        main_box.setSpacing(8)
+        layout.setSpacing(8)
         # The preview leads the column: it mirrors a running re-roll's frames (driven
         # from outside), shows the browsed generation's output when one is loaded, and
         # the newest matching result otherwise.
@@ -134,7 +117,7 @@ class GenerateConfigPanel(QWidget):
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
         self._preview.drag_started.connect(self.preview_drag_started)
         self._preview.drag_ended.connect(self.preview_drag_ended)
-        main_box.addWidget(self._preview, 3)
+        layout.addWidget(self._preview, 3)
         # One scroll under the preview holds everything else: the read-only info on
         # top, the editable form below it, so they scroll together. This replaces the
         # old split — a cramped form-only scroll above a separate, non-scrolling info
@@ -225,7 +208,7 @@ class GenerateConfigPanel(QWidget):
         body.addStretch(1)
 
         self._scroll.setWidget(body_host)
-        main_box.addWidget(self._scroll, 4)
+        layout.addWidget(self._scroll, 4)
 
         # One button bank, fixed under the scroll so Generate is always reachable.
         # Go-to-folder and Send-to-Evolver show only while displaying a saved
@@ -265,23 +248,11 @@ class GenerateConfigPanel(QWidget):
         btn_row.addWidget(self._genau_btn)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
-        main_box.addLayout(btn_row)
+        layout.addLayout(btn_row)
 
-        self._panes.addWidget(main)
-
-        # Right pane: this tab's own accumulating strip of past runs, kept slim so
-        # the whole window can still tile into a monitor third or a portrait half.
-        self._strip = ThumbnailStrip(self._db)
-        self._strip.thumbnail_activated.connect(self.strip_activated)
-        self._panes.addWidget(self._strip)
-        # The main column grows with the window; the strip holds its width. The
-        # floor stays low enough that the window can still tile narrow.
-        main.setMinimumWidth(230)
-        self._panes.setStretchFactor(0, 1)
-        self._panes.setStretchFactor(1, 0)
-        self._panes.setSizes([500, 150])
-
-        layout.addWidget(self._panes)
+        # A low floor so the whole window can still tile into a monitor third or a
+        # portrait half; the column grows with the window from there.
+        self.setMinimumWidth(230)
 
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
         # Generate with nothing to run — and everything below the picker once a
@@ -583,16 +554,6 @@ class GenerateConfigPanel(QWidget):
         index = build_image_config_index([r for r in rows if media_type_of_row(r) == "image"])
         matching = rows_in_settings(rows, self.settings_key(), index)
         return matching[0] if matching else None
-
-    def seed_strip(self, prompt_ids):
-        """Seed this tab's strip with a settings folder when it opens from one.
-
-        An accumulating history: whatever folder the tab was seeded with plus
-        every generation it produces after — including runs whose settings no
-        longer match the current form, so tweak-and-regenerate stays visible.
-        """
-        self._strip_ids = list(prompt_ids)
-        self._strip.show_generations(self._strip_ids)
 
     def current_config(self) -> ConfigSnapshot:
         """Snapshot the live settings for comparison (without randomizing the seed)."""

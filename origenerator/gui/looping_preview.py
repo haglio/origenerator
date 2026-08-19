@@ -1,11 +1,11 @@
 """Play a looping WebP preview inside a QLabel via ``QMovie``.
 
-Video thumbnails across the gallery — the grid tiles, the Recents shelf, a
-Generate tab's history strip, and the "Animated in" strip — all show a short
-looping WebP rather than a static frame. ``QMovie`` plays them cheaply, with no
-video player per tile. The one shared subtlety is scaling: ``QMovie``'s own
-scaling stretches a non-square clip to fill the target, so we scale the native
-frame size into the target with ``KeepAspectRatio`` instead.
+Video thumbnails across the gallery — the grid tiles, the Recents shelf, and the
+"Animated in" strip — all show a short looping WebP rather than a static frame.
+``QMovie`` plays them cheaply, with no video player per tile. The one shared
+subtlety is scaling: ``QMovie``'s own scaling stretches a non-square clip to fill
+the target, so we scale the native frame size into the target with
+``KeepAspectRatio`` instead.
 """
 
 from PyQt6.QtGui import QMovie, QImageReader

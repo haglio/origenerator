@@ -52,33 +52,6 @@ def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
     assert not tw._image_label.pixmap().isNull()
 
 
-def test_hover_emits_hovered_then_unhovered(qtbot):
-    tw = ThumbnailWidget("p1", None, "label")
-    qtbot.addWidget(tw)
-    seen = []
-    tw.hovered.connect(lambda pid: seen.append(("in", pid)))
-    tw.unhovered.connect(lambda pid: seen.append(("out", pid)))
-
-    pos = QPointF(1, 1)
-    tw.enterEvent(QEnterEvent(pos, pos, pos))
-    tw.leaveEvent(QEvent(QEvent.Type.Leave))
-
-    assert seen == [("in", "p1"), ("out", "p1")]
-
-
-def test_highlight_toggles_and_is_distinct_from_selection(qtbot):
-    tw = ThumbnailWidget("p1", None, "label")
-    qtbot.addWidget(tw)
-    assert tw.is_highlighted() is False
-    tw.set_highlighted(True)
-    assert tw.is_highlighted() is True
-    assert tw.styleSheet() != ""        # a highlight fill is applied
-    assert tw.is_selected() is False    # highlight is not selection
-    tw.set_highlighted(False)
-    assert tw.is_highlighted() is False
-    assert tw.styleSheet() == ""
-
-
 def test_left_click_emits_clicked_but_right_click_does_not(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)

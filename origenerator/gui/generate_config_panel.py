@@ -757,6 +757,25 @@ class GenerateConfigPanel(QWidget):
         """
         self._display_result(row, image_rows)
 
+    def refresh_displayed(self, row: dict, image_rows: list[dict]):
+        """``row`` has changed under this tab: re-show it if it is what the tab
+        is displaying, else leave the tab alone.
+
+        A tab holds the row it was given, not a live view of the database, so a
+        change made to that row elsewhere — an enhancement folding in a new
+        level — leaves the tab describing the image as it was. The version list
+        is where that shows: it is built from the row, so without this the level
+        only appears the next time the tab is opened.
+
+        The form is left exactly as the user has it, the same deal
+        :meth:`show_completed_result` makes: nothing about the settings changed,
+        only what the image now holds.
+        """
+        shown = self._displayed_row
+        if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
+            return
+        self._display_result(row, image_rows)
+
     def show_finished_media(self, row: dict):
         """Put a finished run's saved output in the preview alone — no footer, no
         form, and not as this tab's displayed generation.

@@ -353,23 +353,55 @@ def test_clicking_cancel_does_not_also_reveal_the_folder(queue):
 
 # --- waiting on another app ---------------------------------------------------
 
-def test_a_row_says_how_many_jobs_another_app_has_ahead(queue):
+def test_the_left_half_says_what_the_bar_is_sweeping_behind(queue):
+    # A job ComfyUI hasn't started leaves the bar's reading slot empty and the bar
+    # sweeping, which is precisely when a sweeping bar is owed a reason.
     queue.set_items([_item(status="queued", foreign_ahead=3)])
-    assert queue.rows()[0].note() == "Waiting behind 3 jobs from another app"
+    assert _timing(queue) == "Waiting behind 3 jobs from another app"
 
 
 def test_one_job_ahead_reads_in_the_singular(queue):
     queue.set_items([_item(status="queued", foreign_ahead=1)])
-    assert queue.rows()[0].note() == "Waiting behind 1 job from another app"
+    assert _timing(queue) == "Waiting behind 1 job from another app"
+
+
+def test_the_row_does_not_repeat_the_wait(queue):
+    # A row is about its own job. The shared server being busy is the whole
+    # line's business, and belongs to the half that carries the bar it is holding
+    # up — repeated down every row it says nothing about any of them.
+    queue.set_items([_item(status="queued", foreign_ahead=3)])
+    assert queue.rows()[0].note() == ""
+
+
+def test_the_wait_is_written_under_the_bar_it_explains(queue):
+    # Under the sweeping bar, not in place of it: the bar is the thing being
+    # explained, and it goes on sweeping while the explanation sits beneath it.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(status="queued", foreign_ahead=3)])
+    QApplication.processEvents()
+    half = queue.running_preview()
+
+    assert half._progress.isVisible() and half._progress.maximum() == 0  # sweeping
+    assert half._caption.isVisible()
+    assert half._caption.y() > half._progress.y()
+
+
+def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
+    # Nothing is holding this one up, so there is nothing to explain and the line
+    # under the bar stands down rather than sitting there empty.
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
+    assert not queue.running_preview()._caption.isVisible()
 
 
 def test_the_users_own_queue_needs_no_explaining(queue):
     # His own jobs are the rows of this very list, so there is nothing left for a
-    # wait note to tell him — the line itself is the answer, and the row says
-    # only what it always says.
+    # wait note to tell him — the line itself is the answer, and neither half
+    # says more than it always says.
     queue.set_items([_item(key="a", foreign_ahead=0),
                      _item(key="b", status="queued", foreign_ahead=0)])
     assert [row.note() for row in queue.rows()] == ["", ""]
+    assert _timing(queue) == ""
 
 
 # --- a queue holding work back for a slideshow --------------------------------
@@ -846,12 +878,12 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
     from PyQt6.QtWidgets import QApplication
 
     queue.resize(300, 60)  # the strip squeezed narrow, as a tiled window does
-    queue.set_items([_item(status="queued", foreign_ahead=3)])
+    queue.set_items([_item(status="queued", held=True)])
     QApplication.processEvents()
     row = queue.rows()[0]
 
     assert row._note.text().endswith("…")
-    assert row.note() == "Waiting behind 3 jobs from another app"
+    assert row.note() == "Held until the slideshow closes"
     assert row._note.toolTip() == row.note()
 
 
@@ -861,7 +893,7 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     # runs long can never carry one off the far end.
     from PyQt6.QtWidgets import QApplication
 
-    queue.set_items([_item(job_kind="Image", foreign_ahead=2,
+    queue.set_items([_item(job_kind="Image", status="queued", held=True,
                            folder_thumbnails=(_picture(tmp_path / "m.png"),))])
     QApplication.processEvents()
     row = queue.rows()[0]

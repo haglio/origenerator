@@ -4,8 +4,13 @@ Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering, filling the strip's height out of its
 bottom-left corner, and beside it a column no wider than a bar needs to be — the
 job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
-bar it measures. With nothing of ours in flight the same half says what
-the shared server is busy with instead, and offers a Clear for it.
+bar it measures. A job ComfyUI hasn't started has no reading to write and that bar
+only sweeps, so where another app's work is what it is stuck behind, the line
+under the bar says so: a bar sweeping with nothing said about it is exactly the
+thing a user is owed an explanation for. Whatever is true of the shared *server*
+is this half's to say — a row on the right is about one job of ours and nothing
+else. With nothing of ours in flight the same half says what that server is busy
+with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click, and each draggable to a new place in the line. A
@@ -86,7 +91,14 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 class RunningPreview(QWidget):
     """What is being made: its live frame, and beside it a fat bar with the clock
-    written across it."""
+    written across it — and, under the bar, what is holding the whole line up.
+
+    That second line is the strip's one place for a fact about the shared server
+    rather than about a job: another app's backlog, or a hold of this queue's own.
+    While the head of the line is stuck behind another app's work its bar has no
+    reading to write and only sweeps, and the line under it is the explanation
+    that sweeping is owed.
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -118,9 +130,13 @@ class RunningPreview(QWidget):
         self._progress.setFixedHeight(_BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)
-        # With nothing of ours being made, the same slot says what the shared
-        # server is busy with instead — plain text, since there is no run of ours
-        # for a bar to be measuring.
+        # What the shared server is doing to us: the backlog our job is stuck
+        # behind, under its own sweeping bar — or, with nothing of ours in flight
+        # at all, what that server is busy with instead, in the bar's own place.
+        # Plain text either way, being about the server rather than about a run of
+        # ours that a bar could be measuring. It wraps rather than eliding: the
+        # width here is the bar's, chosen for a line of readings that is shorter
+        # than a sentence, and a truncated explanation explains nothing.
         self._caption = QLabel()
         self._caption.setObjectName("estimateLabel")  # muted secondary text
         self._caption.setWordWrap(True)
@@ -138,15 +154,24 @@ class RunningPreview(QWidget):
         self.show_item(None)
 
     def show_foreign(self, text: str):
-        """Say what another app has on ComfyUI — only while this half is free."""
+        """Say what the shared server is holding us up with — under our own job's
+        bar while it is stuck behind that work, or in the bar's own slot while
+        nothing of ours is in flight at all.
+
+        Hidden with nothing to say, so a job of ours actually being made keeps the
+        slot for its bar alone; an empty half keeps it up regardless, holding the
+        space its bar has stood down from.
+        """
         self._caption.setText(text)
+        self._caption.setVisible(bool(text) or self._item is None)
 
     def status_text(self) -> str:
-        """Whatever this half is saying: the running job's line, or — with nothing
-        of ours in flight — its note about the shared server."""
-        if self._item is not None:
-            return self._progress.caption()
-        return self._caption.text()
+        """Whatever this half is saying about the head of the line: what the shared
+        server is holding it up with, if anything is, else its bar's own reading —
+        and, with nothing of ours in flight, that note about the server alone."""
+        return self._caption.text() or (
+            self._progress.caption() if self._item is not None else ""
+        )
 
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
@@ -158,7 +183,10 @@ class RunningPreview(QWidget):
             self._caption.show()
             self._tick.stop()
             return
-        self._caption.hide()  # a job of ours takes the slot back for its own bar
+        # A job of ours takes the slot back for its own bar — except while another
+        # app's work is what is holding it up, which is the one thing that bar
+        # cannot say for itself, and the reason it is sweeping rather than filling.
+        self.show_foreign(queue_wait_text(item.foreign_ahead) or "")
         self._progress.show()
         self._render_frame(item.frame)
         self._render_timing()
@@ -169,10 +197,11 @@ class RunningPreview(QWidget):
         much longer it has — written across its bar.
 
         Read off the clock rather than off the feed. A job ComfyUI hasn't started
-        has no elapsed time to report and the line stays empty — its wait is the
-        queue beside it to explain, not a zero counting up over a bar that has
-        not moved. A job with no step counts to show leaves the bar indeterminate
-        rather than parked at 0%.
+        has no elapsed time to report and the line stays empty — what its bar is
+        sweeping behind is said under the bar (:meth:`show_foreign`), not on it,
+        being about the server rather than a run of ours that a bar could measure.
+        A job with no step counts to show leaves the bar indeterminate rather than
+        parked at 0%.
         """
         if self._item is None:
             return
@@ -228,9 +257,12 @@ class QueueRow(QWidget):
     recipe video beside it, where one was dropped), or four out of the folder the
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
 
-    Only a wait worth explaining puts more text on the row — a video the queue is
-    holding for a slideshow, or a job behind another app's work — and that note
-    takes the rest of the width, after everything the row always says.
+    Only a wait worth explaining puts more text on the row, and only one this job
+    is in on its own — a video the queue is holding for a slideshow, or a press of
+    Generate not yet submitted — and that note takes the rest of the width, after
+    everything the row always says. A wait behind another app is not one of them:
+    that is the whole line's, and is said once, under the bar in the left half —
+    the bar it is holding up, and the thing it is there to explain.
 
     The picture block is one width whether it holds one picture or four, so the
     line of text behind it starts at the same place on every row.
@@ -313,13 +345,14 @@ class QueueRow(QWidget):
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The recipe is worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
-        # Three waits are worth explaining in a row's own width: the stretch
-        # before a pressed Generate is a job at all, one this queue is imposing
-        # (a video, while a slideshow plays), and another app's hold. The user's own
-        # place in the line is the line itself, and needs no words.
+        # Two waits are worth explaining in a row's own width, both of them this
+        # job's alone: the stretch before a pressed Generate is a job at all, and
+        # one this queue is imposing (a video, while a slideshow plays). The
+        # user's own place in the line is the line itself and needs no words, and
+        # a wait behind another app is about the server, not this job — the left
+        # half says that one, under the bar that wait is holding up.
         self._note_text = (
-            starting_row_text(item.starting) or held_row_text(item.held)
-            or queue_wait_text(item.foreign_ahead) or ""
+            starting_row_text(item.starting) or held_row_text(item.held) or ""
         )
         self._render_note()
         self._cancel.setText(discard_run_text(item.auto_generating))

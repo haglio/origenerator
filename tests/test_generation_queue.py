@@ -312,7 +312,7 @@ def test_shows_the_elapsed_time_and_what_is_left(queue):
     # time the test itself takes can't tip either one.
     queue.set_items([_item(status="running", progress=(10, 20),
                            started_at=time.time() - 90.5, typical_seconds=725.0)])
-    assert _timing(queue) == "1:30 elapsed · ~10:34 left"
+    assert _timing(queue) == "1:30 elapsed · ~6:02 left"
 
 
 def test_shows_the_elapsed_time_alone_with_no_estimate(queue):

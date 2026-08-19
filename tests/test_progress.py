@@ -20,10 +20,22 @@ def test_expected_steps_sums_the_base_and_enhance_passes():
 
 def test_expected_steps_dual_sampler_sums_the_two_passes():
     # WAN i2v splits the step schedule across a high- and low-noise sampler; the
-    # two passes together run `steps`, which is what ComfyUI reports in total.
+    # two passes together run `steps`. On top of that comes the 50-step audio
+    # pass that scores the video — the larger half of the run, and the half a
+    # total of 20 used to leave the bar pinned at 100% for.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     payload = wf.build_api_payload({**wf.default_params(), "steps": 20})
-    assert expected_progress_steps(payload) == 20
+    assert expected_progress_steps(payload) == 70
+
+
+def test_expected_steps_counts_the_audio_pass_of_every_video_workflow():
+    # The bug this guards: the audio sampler's 50 steps are a fixed cost, so the
+    # shorter the video schedule the more of the run the bar was blind to. A
+    # 4-step loop spent 93% of its reported steps outside its own total.
+    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+        wf = WORKFLOW_REGISTRY[name]
+        payload = wf.build_api_payload({**wf.default_params(), "steps": 4})
+        assert expected_progress_steps(payload) == 54, name
 
 
 def test_tracker_single_stage_reports_value_over_total():
@@ -43,13 +55,16 @@ def test_tracker_second_stage_continues_instead_of_resetting():
     assert tracker.update(10, 10) == (20, 20)   # and finishes at 100%
 
 
-def test_tracker_clamps_progress_past_the_total_to_100_percent():
-    # A post-sampling node (e.g. video encoding) can emit its own progress after
-    # the samplers are done. Rather than overshoot, the bar sits pinned at 100%.
+def test_tracker_widens_the_total_for_a_pass_it_could_not_budget():
+    # Some passes can't be counted up front — a detailer samples once per region
+    # it detects, a tiled upscale is sized off the image. Pinning the bar at 100%
+    # for the length of one says the job is done when it isn't; the total widens
+    # to admit it instead, so the bar keeps moving.
     tracker = ProgressTracker(20)
-    tracker.update(10, 10)          # only pass finishes
-    assert tracker.update(1, 200) == (11, 20)   # encoding starts, still climbing
-    assert tracker.update(200, 200) == (20, 20)  # clamped, never past total
+    tracker.update(10, 10)                        # only budgeted pass finishes
+    assert tracker.update(1, 200) == (11, 210)    # a 200-step pass turns up
+    assert tracker.update(100, 200) == (110, 210)  # and the bar tracks it
+    assert tracker.update(200, 200) == (210, 210)  # ending, correctly, at 100%
 
 
 def test_tracker_unknown_total_passes_raw_numbers_through():
@@ -64,9 +79,14 @@ def test_tracker_for_payload_sizes_itself_from_the_workflow():
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     payload = wf.build_api_payload({**wf.default_params(), "steps": 20})
     tracker = ProgressTracker.for_payload(payload)
-    # Second pass continues from 10, proving it measured the full 20-step run.
+    # Second pass continues from 10, proving it measured the full 20-step run...
     tracker.update(10, 10)
-    assert tracker.update(1, 10) == (11, 20)
+    assert tracker.update(1, 10) == (11, 70)
+    # ...and the audio pass that follows has its own 50 steps of the bar to climb
+    # rather than a bar already full.
+    tracker.update(10, 10)
+    assert tracker.update(1, 50) == (21, 70)
+    assert tracker.update(50, 50) == (70, 70)
 
 
 def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():

@@ -6298,7 +6298,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     assert item.typical_seconds == 724.0   # the median of the three timed runs
 
     view._update_queue()
-    assert view._queue.running_preview()._caption.text() == "1:30 elapsed · ~10:33 left"
+    assert view._queue.running_preview()._caption.text() == "1:30 elapsed · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):

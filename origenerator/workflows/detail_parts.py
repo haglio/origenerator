@@ -1,8 +1,8 @@
 """The parts a detail fix can be aimed at by name — "fix teeth" resolved to the
 installed detector that finds teeth.
 
-An enhancement's detail pass is a fix per part: each one names how hard its own
-regions are redrawn, and a part left at zero simply builds no nodes
+An enhancement's detail pass is a fix per part: each part it names says how hard
+its own regions are redrawn, and a part it doesn't name builds no nodes at all
 (:meth:`~origenerator.workflows.base.WorkflowTemplate.detail_fix_nodes`). What
 this module owns is the naming that makes that possible — a table of the parts
 worth asking for, each carrying the words a spoken command may call it and the
@@ -32,10 +32,10 @@ from pathlib import PureWindowsPath
 from origenerator.content import load_content
 from origenerator.workflows.model_files import list_detector_files
 
-# What a fix asked for without a number of its own runs at — a spoken "fix
-# teeth" on a folder whose panel has that part at zero. Bold enough to actually
-# re-form the part, which is the whole point of a pass that touches nothing
-# outside the regions it found.
+# What a fix runs at unless it is given a number of its own — the Enhance
+# panel's fields start here, and a spoken "fix teeth" over a folder that has
+# that part switched off uses it. Bold enough to actually re-form the part,
+# which is the whole point of a pass that touches nothing outside what it found.
 DEFAULT_FIX_DENOISE = 0.45
 
 
@@ -197,8 +197,10 @@ def _denoise(value) -> float | None:
 def detail_fixes_of(params: dict) -> dict:
     """The parts an enhancement redraws and how hard, as ``{part: denoise}``.
 
-    ``enhance_detail_fixes`` is where that lives now — one number per part, and
-    absent or zero means the part is left alone. The older shape is translated
+    ``enhance_detail_fixes`` is where that lives now — one number per part it
+    fixes, and a part it doesn't name is a part left alone (zero counts as not
+    named too, which is what a stored setting from before the panel had a box
+    per part looks like). The older shape is translated
     rather than ignored: a tick, a single denoise and up to two detector files
     named is exactly a fix on whichever parts those files find, all at that one
     denoise. Every enhancement this library already carries was recorded that

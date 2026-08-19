@@ -103,9 +103,10 @@ class DropSlot(QWidget):
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
             self._label.setText("")
+            # A video loops its clip; looping_movie runs it (held, under a
+            # session's OmniPause).
             self._movie = looping_movie(movie_path, QSize(_PREVIEW_SIZE, _PREVIEW_SIZE), self._label)
             self._label.setMovie(self._movie)
-            self._movie.start()  # a video loops its clip
         elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
             self._label.setText("")
             self._label.setPixmap(QPixmap(str(thumb_path)).scaled(

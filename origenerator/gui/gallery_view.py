@@ -96,6 +96,7 @@ from origenerator.gui.shelf_orientation import (
     oriented_key,
     split_key as _split_shelf_key,
 )
+from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.navigation import NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -3738,17 +3739,28 @@ class GalleryView(QWidget):
         The bridge calls this on the flag's edges; the memory is what makes
         the freeze cover a show the user opens mid-pause.
 
-        And to this window's own moving pictures — every video tile in the
-        browser loops a little WebP of itself, and the generate tabs play the
-        real thing — so a paused room with the gallery in it was a wall of
-        clips still going.  OmniPause means the room stops, not the shows stop.
+        And to this window's own moving pictures — OmniPause means the room
+        stops, not the shows stop.  Two kinds, held in the two places that
+        build them rather than widget by widget here: every looping WebP
+        thumbnail, wherever it is drawn (the grid, the shelves, a tab's history
+        strip, the "Animated in" strip), through
+        :mod:`origenerator.gui.looping_preview`; and the real video a generate
+        tab plays, through the tabs.  Wiring each widget separately is how a
+        strip nobody remembered went on playing through a frozen room.
+
+        The shows come first and the rest cannot be skipped if one of them
+        raises, so each is its own step: a freeze that stopped at the first
+        show left the thumbnails running with no sign of why.
         """
         self._session_paused = paused
         for side in ("portrait", "landscape"):
             show = self.region_show(side)
             if show is not None and hasattr(show, "set_session_paused"):
-                show.set_session_paused(paused)
-        self._browser.set_previews_paused(paused)
+                try:
+                    show.set_session_paused(paused)
+                except Exception:
+                    logger.exception("Freezing the %s show failed", side)
+        set_previews_paused(paused)
         self._info_tabs.set_previews_paused(paused)
 
     def region_show(self, side: str):

@@ -224,3 +224,19 @@ def _recipe_match_runs_inline(monkeypatch):
 
     monkeypatch.setattr(GalleryView, "_run_off_thread",
                         lambda self, work, done: done(work()))
+
+
+@pytest.fixture(autouse=True)
+def _previews_start_running():
+    """Leave the app-wide preview freeze off between tests.
+
+    The freeze is module state (origenerator.gui.looping_preview), which is
+    exactly what makes it reach a preview built after it was set — and exactly
+    what would otherwise let a test that pauses hand the next test a gallery of
+    still thumbnails it never asked for.
+    """
+    from origenerator.gui.looping_preview import set_previews_paused
+
+    set_previews_paused(False)
+    yield
+    set_previews_paused(False)

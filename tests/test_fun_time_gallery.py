@@ -454,7 +454,13 @@ def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, 
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
 
-    assert show_hud_model("portrait", show).active_loop == "seed"
+    model = show_hud_model("portrait", show)
+    assert model.active_loop == "seed"
+    # And the line says what the light says, in the satellite's own words: the
+    # two HUDs are one HUD in two places.  It also drops "Unlocked", exactly as
+    # a looping satellite's does — a set playing through holds nothing.
+    assert model.lock_label.startswith("Looping seeds")
+    assert "Unlocked" not in model.lock_label
 
     hud._deliver("portrait_no_loop")
 
@@ -693,3 +699,50 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
     assert show._playlist.index == 0
     assert show._playlist.locked is False
     assert len(show.hud_items()[0]) == 3
+
+
+def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
+    """Swept rather than listed: after the freeze, no movie under this window is
+    running — the grid tiles, the shelves, a tab's history strip, the "Animated
+    in" strip, the info pane's own animated still.
+
+    Written this way because the listed version was wrong three times over: the
+    tiles were wired to OmniPause and the other three kinds of looping preview
+    were not, so a frozen room went on playing and nothing in the suite noticed.
+    A sweep cannot miss the fourth one, and it fails the moment someone adds a
+    fifth that does not go through looping_movie.
+    """
+    from PyQt6.QtGui import QMovie
+    from PyQt6.QtWidgets import QLabel
+    from tests.test_gallery_view import _row
+
+    webp = tmp_path / "loop.webp"
+    frames = [Image.new("RGB", (64, 32), shade) for shade in ((10, 10, 10), (220, 220, 220))]
+    frames[0].save(webp, save_all=True, append_images=frames[1:], duration=100, loop=0)
+    still = tmp_path / "still.png"
+    Image.new("RGB", (64, 32)).save(still)
+    rows = [_row("v-1", "wan22_i2v",
+                 {"positive_prompt": "a clip", "seed": 1,
+                  "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors"},
+                 "wan22_i2v_v1.mp4", thumbnail_path=str(still))]
+
+    view = _fun_time_view(qtbot, rows)
+    view._animated_preview = lambda row: str(webp)
+    view.refresh()
+    view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
+    running = [label for label in view.findChildren(QLabel)
+               if label.movie() is not None
+               and label.movie().state() == QMovie.MovieState.Running]
+    assert running, "nothing was moving, so the sweep would prove nothing"
+
+    view.set_session_paused(True)
+
+    still_moving = [label for label in view.findChildren(QLabel)
+                    if label.movie() is not None
+                    and label.movie().state() == QMovie.MovieState.Running]
+    assert still_moving == []
+
+    view.set_session_paused(False)
+    assert [label for label in view.findChildren(QLabel)
+            if label.movie() is not None
+            and label.movie().state() == QMovie.MovieState.Running]

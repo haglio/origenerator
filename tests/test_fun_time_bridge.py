@@ -162,11 +162,13 @@ def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monke
 def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
     """Every video tile loops a little clip of itself and the generate tabs
     play the real thing, so a paused room with the gallery in it was a wall of
-    clips still going.  OmniPause stops the room, not only its shows — and a
-    rebuild during the pause draws tiles that are already still."""
+    clips still going.  OmniPause stops the room, not only its shows — the
+    looping previews app-wide, wherever they are drawn, and the tabs' videos
+    through the tabs."""
+    import origenerator.gui.gallery_view as gallery_view_module
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     tiles, tabs = [], []
-    monkeypatch.setattr(view._browser, "set_previews_paused", tiles.append)
+    monkeypatch.setattr(gallery_view_module, "set_previews_paused", tiles.append)
     monkeypatch.setattr(view._info_tabs, "set_previews_paused", tabs.append)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")

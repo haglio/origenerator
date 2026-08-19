@@ -240,24 +240,39 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
 
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     """The hosting session's OmniPause reaches these: a paused room with the
-    gallery in it must not be a wall of clips still playing."""
+    gallery in it must not be a wall of clips still playing.
+
+    Held app-wide rather than tile by tile — the tile has no switch of its own,
+    because a switch per widget is how three of the four kinds of looping
+    preview were missed (see origenerator.gui.looping_preview).
+    """
+    from origenerator.gui.looping_preview import set_previews_paused
     webp = tmp_path / "loop.webp"
     Image.new("RGB", (40, 30)).save(webp)
     tile = ThumbnailWidget("p1", None, "a clip", movie_path=str(webp))
     qtbot.addWidget(tile)
-    assert tile._movie is not None
+    movie = tile._image_label.movie()
+    assert movie is not None
 
-    tile.set_preview_paused(True)
-    assert tile._movie.state() == QMovie.MovieState.Paused
+    set_previews_paused(True)
+    assert movie.state() == QMovie.MovieState.Paused
 
-    tile.set_preview_paused(False)
-    assert tile._movie.state() == QMovie.MovieState.Running
+    # And a tile BUILT during the freeze comes up already held: the grid is
+    # rebuilt constantly, and a rebuild mid-pause used to start it moving again.
+    later = ThumbnailWidget("p3", None, "a clip", movie_path=str(webp))
+    qtbot.addWidget(later)
+    assert later._image_label.movie().state() == QMovie.MovieState.Paused
+
+    set_previews_paused(False)
+    assert movie.state() == QMovie.MovieState.Running
+    assert later._image_label.movie().state() == QMovie.MovieState.Running
 
 
 def test_a_still_tile_takes_the_freeze_inertly(qtbot, tmp_path):
+    from origenerator.gui.looping_preview import set_previews_paused
     still = tmp_path / "still.png"
     Image.new("RGB", (40, 30)).save(still)
     tile = ThumbnailWidget("p2", str(still), "a picture")
     qtbot.addWidget(tile)
 
-    tile.set_preview_paused(True)  # nothing was moving; nothing to stop
+    set_previews_paused(True)  # nothing was moving; nothing to stop

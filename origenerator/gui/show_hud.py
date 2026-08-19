@@ -34,7 +34,7 @@ from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
 from player_core.file_channel import append_command
-from player_core.hud_status import SHUFFLE_LABEL, status_line
+from player_core.hud_status import SHUFFLE_LABEL, looping_label, status_line
 from player_core.satellite_hud import (
     MARGIN,
     HudCell,
@@ -65,7 +65,12 @@ def show_hud_model(side: str, host) -> HudModel | None:
     return HudModel(
         side=side,
         locked=locked,
-        lock_label=status_line(locked=locked, order=order_label, f_mode=f_mode),
+        # A show IS a seed row played round and round, which is why the map's
+        # loop button below is lit -- so the line says the same thing the light
+        # does, in the words a satellite says it in.  The two HUDs are one HUD
+        # in two places; a reader glancing between them reads one sentence.
+        lock_label=status_line(playing_set=looping_label("seed"), locked=locked,
+                               order=order_label, f_mode=f_mode),
         # The players' favorite star and F-mode, over the same collection the
         # Favorites shelf lists: the star lights when the item on screen is a
         # favorite, and F-mode narrows the set to them.

@@ -80,6 +80,9 @@ class InfoPaneTabs(QTabWidget):
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
+        # A hosting session's OmniPause, held so a tab opened during it opens
+        # held rather than starting its video into a frozen room.
+        self._previews_paused = False
         self._add_subtab()  # the pane's resting tab
 
     # --- config tabs -------------------------------------------------------
@@ -114,6 +117,7 @@ class InfoPaneTabs(QTabWidget):
             lambda name, params, p=panel: self._on_panel_generate(p, name, params)
         )
         panel.strip_activated.connect(self._on_strip_activated)
+        panel.set_preview_paused(self._previews_paused)  # a tab opened mid-freeze stays still
         self.setCurrentIndex(index)
         if preview:
             self._set_preview_panel(panel)
@@ -381,11 +385,23 @@ class InfoPaneTabs(QTabWidget):
             panel.show_completed_result(row, image_rows)
 
     def set_previews_paused(self, paused: bool) -> None:
-        """Freeze (or resume) every tab's preview — the hosting session's
+        """Freeze (or resume) every tab's playing video — the hosting session's
         OmniPause, which stops the room rather than only its shows.  A tab
-        showing a still takes it inertly; one showing a video stops."""
+        showing a still takes it inertly; one showing a video stops.
+
+        Remembered, not just applied: a tab opened (or re-pointed at a video)
+        while the room is frozen has to open frozen too, which is why
+        :meth:`preview_paused` exists for a panel to ask on the way up.  The
+        looping thumbnails around these previews are held elsewhere and
+        app-wide — see :mod:`origenerator.gui.looping_preview`.
+        """
+        self._previews_paused = paused
         for panel in self._config_panels():
             panel.set_preview_paused(paused)
+
+    def preview_paused(self) -> bool:
+        """Whether a preview built now should open held."""
+        return self._previews_paused
 
     def show_selection_preview(self, preview, prompt_id: str):
         """Point the current tab's preview at ``preview`` (a resolved

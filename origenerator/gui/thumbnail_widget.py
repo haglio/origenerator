@@ -87,15 +87,12 @@ class ThumbnailWidget(QWidget):
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # A video tile loops its short WebP preview; an image (or a video whose
-        # WebP couldn't be built) shows its static frame.
-        # The looping preview, kept so a hosting session's OmniPause can stop
-        # it: a paused room with moving thumbnails in it is not paused.
-        self._movie = None
+        # WebP couldn't be built) shows its static frame.  The preview runs (and
+        # holds, under a session's OmniPause) from looping_movie, which is where
+        # every one of these lives.
         if movie_path and Path(movie_path).exists():
-            movie = looping_movie(movie_path, _IMAGE_SIZE, self._image_label)
-            self._image_label.setMovie(movie)
-            movie.start()
-            self._movie = movie
+            self._image_label.setMovie(
+                looping_movie(movie_path, _IMAGE_SIZE, self._image_label))
         elif thumb_path and Path(thumb_path).exists():
             pm = QPixmap(str(thumb_path))
             self._image_label.setPixmap(
@@ -282,13 +279,6 @@ class ThumbnailWidget(QWidget):
             if not self._cursor_over_tile():
                 self._set_corner_actions_visible(False)
         return super().eventFilter(obj, event)
-
-    def set_preview_paused(self, paused: bool) -> None:
-        """Stop or resume this tile's looping preview — the hosting session's
-        OmniPause, which stops the room rather than only its shows.  A no-op on
-        a still, which was never moving."""
-        if self._movie is not None:
-            self._movie.setPaused(paused)
 
     def enterEvent(self, event):
         self.hovered.emit(self.prompt_id)

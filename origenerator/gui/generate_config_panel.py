@@ -26,6 +26,7 @@ from origenerator.generation_config import (
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
@@ -51,6 +52,10 @@ _RANDOM_SEED_TIP = (
     "Generate draws a fresh one rather than re-creating the same file. "
     "Change a setting to generate something else instead."
 )
+# Breathing room round the tab's contents, and between the form and the scroll
+# bar beside it — enough that nothing reads as jammed into a corner, small
+# enough that a narrow pane still spends its width on the fields.
+_PANE_MARGIN = 8
 
 # What the preview says once the form has been edited away from the generation
 # on it: that picture was generated, these settings have not been.
@@ -136,7 +141,9 @@ class GenerateConfigPanel(QWidget):
         # The preview leads (a running re-roll's frames, then the finished output);
         # the button bank sits at the bottom, under the settings.
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # A margin round the whole tab, so nothing in it — the preview, the form's
+        # headings, the button bank — sits flush against the pane's edge.
+        layout.setContentsMargins(_PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN)
         layout.setSpacing(8)
         # The preview leads the column: it mirrors a running re-roll's frames (driven
         # from outside), shows the browsed generation's output when one is loaded, and
@@ -155,7 +162,9 @@ class GenerateConfigPanel(QWidget):
         self._scroll.setWidgetResizable(True)
         body_host = QWidget()
         body = QVBoxLayout(body_host)
-        body.setContentsMargins(0, 0, 0, 0)
+        # A gap on the right so the fields stop short of the scroll bar rather than
+        # running under it; the pane's own margin covers the other three sides.
+        body.setContentsMargins(0, 0, _PANE_MARGIN, 0)
         body.setSpacing(8)
 
         # The output file + when it was made, at the top of the scroll (shown only
@@ -258,7 +267,11 @@ class GenerateConfigPanel(QWidget):
         # "Cancel", or "Next seed" while that folder is auto-generating. Generate
         # itself doubles as the progress bar — it fills as the run advances — so
         # there's no status line.
-        btn_row = QHBoxLayout()
+        # A flow rather than a row: the bank wraps onto a second line when the pane
+        # is too narrow to hold it, instead of squeezing every label down to an
+        # unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
+        # the corner it has always sat in.
+        btn_row = FlowLayout(spacing=6, align_right=True)
         self._folder_btn = QPushButton("Go to folder")
         self._folder_btn.setToolTip("Open this generation's folder in the gallery.")
         self._folder_btn.clicked.connect(self._on_go_to_folder)
@@ -282,7 +295,6 @@ class GenerateConfigPanel(QWidget):
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        btn_row.addStretch()
         btn_row.addWidget(self._folder_btn)
         btn_row.addWidget(self._evolver_btn)
         btn_row.addWidget(self._genau_btn)

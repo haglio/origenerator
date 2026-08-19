@@ -62,3 +62,39 @@ def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
     host = QWidget()
     qtbot.addWidget(host)
     assert FlowLayout(host, spacing=7)._row_spacing == 7
+
+
+def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
+    # What a QHBoxLayout does instead: squeeze past the minimum and clip, which is
+    # how a bank of buttons came out reading "o fo", "to E", "ner".
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host, spacing=6)
+    for _ in range(3):
+        tile = QWidget()
+        tile.setFixedSize(120, 30)
+        layout.addWidget(tile)
+    host.resize(150, 200)          # room for one across, not three
+    host.show()
+
+    assert [w.width() for w in host.findChildren(QWidget)] == [120, 120, 120]
+
+
+def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
+    # A button bank sits in the bottom-right corner, and has to stay there as it
+    # wraps rather than walk off to the left.
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host, spacing=6, align_right=True)
+    tiles = []
+    for width in (120, 80):
+        tile = QWidget()
+        tile.setFixedSize(width, 30)
+        layout.addWidget(tile)
+        tiles.append(tile)
+    host.resize(150, 200)          # only one fits across: two rows
+    host.show()
+
+    assert tiles[0].y() < tiles[1].y()                       # it wrapped
+    for tile in tiles:
+        assert tile.x() + tile.width() == host.width()       # ...against the edge

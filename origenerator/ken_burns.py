@@ -14,9 +14,17 @@ against the dwell as it stands right now (:func:`progress_step`), which is also
 what lets the app-wide pace be turned up under a running show and be obeyed
 from that moment rather than at the next slide.
 
+**Nothing here rounds.** A move this slow advances well under a pixel per tick,
+so a window rounded to whole pixels does not creep — it sits still and then
+jumps, several times a second, in whichever direction rounding happened to
+break. On a picture that is otherwise perfectly still that reads as the frame
+twitching rather than as a camera moving, which is worse than no move at all.
+:func:`crop_box` therefore hands back a real-valued window for the painter to
+sample between pixels, and the pane draws every frame of one slide at ONE fixed
+size so the picture cannot re-center itself under the same rounding.
+
 Kept Qt-free, like :mod:`origenerator.slideshow`, so the arithmetic tests
-without a window or a clock. The widget that owns the pixels does the one Qt
-thing there is to do: draw :func:`crop_box` of what it is holding.
+without a window or a clock.
 """
 
 # How much closer the picture is by the time its dwell runs out. Small on
@@ -25,10 +33,10 @@ thing there is to do: draw :func:`crop_box` of what it is holding.
 # already a tenth of the frame in four seconds.
 ZOOM_SPAN = 1.10
 
-# How often the push is stepped. Twenty a second: the move covers a tenth of the
-# frame across a whole dwell, so even the shortest pace advances it by a pixel
-# or two per tick, and a rescale of the picture on screen is not free.
-TICK_MS = 50
+# How often the push is stepped. Thirty a second: each frame is one near-1:1
+# blit of a picture prepared once for the slide, so the cost of a smooth
+# cadence is small, and the eye reads anything slower as steps.
+TICK_MS = 33
 
 
 def progress_step(tick_ms: int, dwell_ms: int) -> float:
@@ -52,18 +60,26 @@ def zoom_at(progress: float, span: float = ZOOM_SPAN) -> float:
     return 1.0 + (span - 1.0) * max(0.0, min(1.0, progress))
 
 
-def crop_box(width: int, height: int, zoom: float) -> tuple[int, int, int, int]:
+def crop_box(width: float, height: float,
+             zoom: float) -> tuple[float, float, float, float]:
     """The centered ``(x, y, w, h)`` of a *width* x *height* picture that fills
-    the frame at *zoom*.
+    the frame at *zoom*, in real numbers rather than whole pixels.
 
-    The crop is what moves, not the frame: 1/*zoom* of each side, scaled back up
-    to the size the whole picture was drawn at. Growing the drawn picture
-    instead would be the same move to look at and a different thing to build
-    against — the neighbor stills and the HUD are placed against the rect the
-    media occupies, and that rect has to stay where it is while the push runs.
+    Real numbers because the alternative is visibly worse: a tenth of the frame
+    spread over four seconds moves each edge by a fraction of a pixel per tick,
+    so a window snapped to integers holds still for several ticks and then steps
+    a whole pixel — and the two axes step at different moments, which is what
+    turns a creep into a twitch. Handed to a painter as-is, the sampling grid
+    slides smoothly between source pixels and the motion is continuous.
+
+    The window is what moves, not the frame the picture is drawn in: 1/*zoom* of
+    each side of the same picture. The frame stays the size the whole picture
+    was drawn at, so the media keeps exactly the rect the neighbor stills and
+    the HUD map were placed against — and, just as importantly, cannot be
+    re-centered by a frame that grew or shrank by a pixel.
     """
     if zoom <= 1.0:
-        return (0, 0, width, height)
-    kept_w = max(1, round(width / zoom))
-    kept_h = max(1, round(height / zoom))
-    return ((width - kept_w) // 2, (height - kept_h) // 2, kept_w, kept_h)
+        return (0.0, 0.0, float(width), float(height))
+    kept_w = width / zoom
+    kept_h = height / zoom
+    return ((width - kept_w) / 2, (height - kept_h) / 2, kept_w, kept_h)

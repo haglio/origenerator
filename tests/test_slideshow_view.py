@@ -551,9 +551,15 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
 
 # --- the slow push into the still on screen ----------------------------------
 
+# A whole tick of the standard dwell — what any of these can be out by, since a
+# tick count is a whole number and a stretch of milliseconds need not divide by
+# one.  Far below anything an eye reads off the screen.
+_ONE_TICK = (ZOOM_SPAN - 1) * TICK_MS / 4000
+
+
 def _push_for(view, ms):
     """Tick the push as if *ms* of the slide's dwell had gone by."""
-    for _ in range(ms // TICK_MS):
+    for _ in range(round(ms / TICK_MS)):
         view._zoom_tick()
 
 
@@ -564,7 +570,7 @@ def test_a_dwelling_slide_creeps_into_the_picture(qtbot):
 
     _push_for(view, 4000)
 
-    assert view._preview._zoom == approx(ZOOM_SPAN)
+    assert view._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
 
 
 def test_a_longer_pace_creeps_more_slowly_rather_than_further(qtbot):
@@ -573,10 +579,10 @@ def test_a_longer_pace_creeps_more_slowly_rather_than_further(qtbot):
     slow = _view(qtbot, image_dwell_ms=12000)
 
     _push_for(slow, 4000)
-    assert slow._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 3)
+    assert slow._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 3, abs=_ONE_TICK)
 
     _push_for(slow, 8000)
-    assert slow._preview._zoom == approx(ZOOM_SPAN)
+    assert slow._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
 
 
 def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
@@ -590,7 +596,7 @@ def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
     view._playlist.image_dwell_ms = 8000  # the number set_dwell_s hands down
     _push_for(view, 2000)
 
-    assert view._preview._zoom == approx(halfway + (ZOOM_SPAN - 1) / 4)
+    assert view._preview._zoom == approx(halfway + (ZOOM_SPAN - 1) / 4, abs=_ONE_TICK)
 
 
 def test_a_pace_of_nought_holds_the_whole_picture(qtbot):

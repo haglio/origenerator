@@ -34,7 +34,7 @@ _PLACEHOLDER = "Select a generation to preview"
 _NOTICE_DIM = "background: rgba(0, 0, 0, 130);"
 _NOTICE_PLATE = ("color: white; background: rgba(0, 0, 0, 200);"
                  " padding: 6px 12px; border-radius: 4px;")
-_NOTICE_MARGIN = 12  # how far the plate floats from the media's top edge
+_NOTICE_MARGIN = 12  # how far the plate floats from the media's top-left corner
 
 
 def _path_key(path) -> str:
@@ -142,7 +142,7 @@ class PreviewWidget(QWidget):
         self._notice_dim.hide()
         self._notice = QLabel(media_host)
         self._notice.setStyleSheet(_NOTICE_PLATE)
-        self._notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._notice.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self._notice.hide()
@@ -268,7 +268,7 @@ class PreviewWidget(QWidget):
 
     def _place_notice(self) -> None:
         """Spread the dim over the whole media area and float the message plate
-        centered against its top edge.
+        in its top-left corner.
 
         The plate stays one line wherever the pane is wide enough for it, and
         wraps only where it isn't: ``adjustSize`` on a wrapping label picks a
@@ -282,8 +282,7 @@ class PreviewWidget(QWidget):
         if self._notice.width() > limit:
             self._notice.setWordWrap(True)
             self._notice.resize(limit, self._notice.heightForWidth(limit))
-        self._notice.move(max(0, (host.width() - self._notice.width()) // 2),
-                          _NOTICE_MARGIN)
+        self._notice.move(_NOTICE_MARGIN, _NOTICE_MARGIN)
 
     def _end_live(self, media: tuple | None) -> None:
         """Stop mirroring a running generation, handing ``media`` — the file it

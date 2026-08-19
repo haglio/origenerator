@@ -273,13 +273,17 @@ class GalleryView(QWidget):
         self._reroll.failed.connect(self._on_reroll_failed)
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
-        self._auto = AutoGenerateController(self._start_reroll)
+        self._auto = AutoGenerateController(self._start_auto_reroll)
         self._auto.stopped.connect(self._on_auto_stopped)
         # Auto-generate holds a mutable copy of a folder's params per active loop so
         # voice can steer the prompt mid-loop; turning Auto on is voice's "on" and
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
+        # The runs the loop launched, by the id each began under. A loop is left
+        # running while the user works, so what it makes is the gallery's, not any
+        # tab's: no tab shows its frames or its result (see :meth:`_start_auto_reroll`).
+        self._auto_origins: set[str] = set()
         # The matcher rides along so a spoken "fix teeth" or "start slideshow" is
         # executed as a command rather than steering a prompt; the dictation
         # collects "Request … over" across as many utterances as it takes. The
@@ -1645,7 +1649,14 @@ class GalleryView(QWidget):
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None
-        self._clear_metadata()
+        # The gallery's own selection is dropped and re-picked below. The tabs are
+        # not: a rebuild used to empty the front tab's preview outright and count on
+        # that re-pick to paint it back, so a tab showing anything the gallery
+        # wasn't pointed at went blank every time a generation landed — once per
+        # variation of a running loop. Only what has actually gone (a deleted or
+        # trashed item) is taken off a tab now.
+        self._selected_row = None
+        self._info_tabs.drop_previews_of_gone_rows(self._live_ids)
         target = self._item_by_key.get(selected_key) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
@@ -2348,7 +2359,20 @@ class GalleryView(QWidget):
         flow.addWidget(tile)
         self._reroll_tile = tile
 
-    def _start_reroll(self, key: str) -> bool:
+    def _start_auto_reroll(self, key: str) -> bool:
+        """The loop's own launch: the variation the tile's "+" would start, except
+        that nothing about it reaches a config tab.
+
+        A loop is left running while the user works, so what it is making is not
+        what they are looking at. Its frames used to fill the info pane — that is,
+        the preview of whichever tab was open, over the picture the user had put
+        there — and its results landed in a tab too. Both belong to the folder's
+        own live tile in the middle column, which streams the run whether or not
+        the pane is pointed at it.
+        """
+        return self._start_reroll(key, from_auto=True)
+
+    def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
         """Start a fresh variation for the folder ``key`` names and select it, so
         its live preview fills the info pane at once. Returns whether a variation
         is now running for the folder — the auto-generate loop's cue that a launch
@@ -2358,6 +2382,11 @@ class GalleryView(QWidget):
         pressed a tab's Generate, so the run is offered to the tab showing that
         folder (:meth:`_claim_launch`) — otherwise it would run with no tab
         showing its progress or offering to discard it.
+
+        ``from_auto`` is the loop's launch (:meth:`_start_auto_reroll`), which takes
+        the info pane only where the user already had it on this folder's loop —
+        watching one variation is watching the next. Otherwise the pane keeps
+        whatever the user put there.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
@@ -2386,8 +2415,26 @@ class GalleryView(QWidget):
             group = item.data(0, _GROUP_ROLE) if item else None
             self._reroll.start(key, group, self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
-        self._select_reroll(key)  # a no-op if the launch above failed to register
+        if from_auto:
+            self._note_auto_launch(key)  # its result is the loop's, not a tab's
+        if not from_auto or self._selected_reroll_key == key:
+            self._select_reroll(key)  # a no-op if the launch above failed to register
         return self._reroll.has(key)
+
+    def _note_auto_launch(self, key: str):
+        """Remember that the loop, not a tab, asked for the run just launched — so
+        no tab shows its result when it lands (:meth:`_on_reroll_finished`).
+
+        Recorded by the id the run began under, the same name a tab knows its own
+        runs by, and pruned to what is still in flight as it goes: only a live run
+        can still finish, so a cancelled variation leaves nothing behind.
+        """
+        job = self._reroll.newest_job_for(key)
+        if job is None:
+            return  # the launch didn't take
+        self._auto_origins = {origin for origin in self._auto_origins
+                              if self._reroll.job_for_origin(origin) is not None}
+        self._auto_origins.add(job.origin)
 
     def _toggle_auto(self, checked: bool):
         """Start or stop auto-generating fresh variations.
@@ -2456,6 +2503,10 @@ class GalleryView(QWidget):
         being steered, leave voice with nothing to steer. The mic stays as the
         button has it."""
         self._auto_working.pop(key, None)
+        if key == self._selected_reroll_key and key not in self._reroll_jobs:
+            # The pane was following this loop between variations; there is no next
+            # one to wait for now.
+            self._clear_reroll_selection()
         if key == self._voice_target_key:
             self._voice_target_key = None
             self._pending_auto_key = None
@@ -3983,9 +4034,13 @@ class GalleryView(QWidget):
         placeholder."""
         # Which tab that is, read now: the rebuild below reconciles the finish, and
         # a tab lets go of its runs as they end. A launch no tab made — the folder
-        # tile's "+", the auto-generate loop — has no owner unless a tab on that
-        # very folder claimed it, and then no tab is touched at all.
-        launcher = self._info_tabs.panel_that_launched(origin or prompt_id)
+        # tile's "+" — has no owner unless a tab on that very folder claimed it, and
+        # a variation the loop made has none at all: it is not what the user is
+        # working on, so it never takes a tab's preview over.
+        run = origin or prompt_id
+        launcher = (None if run in self._auto_origins
+                    else self._info_tabs.panel_that_launched(run))
+        self._auto_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is not None and finished_row.get("source") == "experiment":
             # A background experiment landed: it waits on the Experiments shelf
@@ -4006,7 +4061,11 @@ class GalleryView(QWidget):
                 self._feed_slideshow_enhanced(finished_row)
         self._send_to_genau_if_requested(finished_row)
         was_mirrored = key == self._selected_reroll_key  # the pane held its live frames
-        if was_mirrored:
+        # Let go of it — unless a loop is running here and the pane was pointed at
+        # it, where the key stands for the loop rather than for this one variation:
+        # someone watching it churn is watching what it does next, so the selection
+        # waits for the variation after this one (see :meth:`_start_reroll`).
+        if was_mirrored and not self._auto.is_active(key):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_slideshow_finished(finished_row)  # a show of its folder gains it

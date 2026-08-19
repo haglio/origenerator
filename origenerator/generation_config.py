@@ -86,6 +86,20 @@ def _params_identical(a: dict, b: dict) -> bool:
     return a.keys() == b.keys() and all(_values_equal(a[k], b[k]) for k in a)
 
 
+def configs_match(a: ConfigSnapshot, b: ConfigSnapshot) -> bool:
+    """True when two snapshots would run the same generation.
+
+    Everything that decides the output: the workflow, every parameter, and
+    whether the seed is pinned or re-rolled — a config that draws a fresh seed
+    reproduces nothing, so it never matches one that pins it, even at the same
+    seed value. Used to tell whether an editable form still describes the
+    generation whose output it was seeded from.
+    """
+    return (a.workflow_name == b.workflow_name
+            and a.seed_is_random == b.seed_is_random
+            and _params_identical(a.params, b.params))
+
+
 def _recorded_an_output(row: dict) -> bool:
     """True when a row has at least one output file recorded against it.
 

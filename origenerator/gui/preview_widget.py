@@ -29,6 +29,13 @@ from origenerator.gui.generation_drag import generation_mime
 
 _PLACEHOLDER = "Select a generation to preview"
 
+# The notice laid over media that no longer matches the settings beside it: a
+# plate carrying the message, over a dimmed picture (see set_notice).
+_NOTICE_DIM = "background: rgba(0, 0, 0, 130);"
+_NOTICE_PLATE = ("color: white; background: rgba(0, 0, 0, 200);"
+                 " padding: 6px 12px; border-radius: 4px;")
+_NOTICE_MARGIN = 12  # how far the plate floats from the media's top edge
+
 
 def _path_key(path) -> str:
     """One comparable form for a file path, so two spellings of the same file —
@@ -122,6 +129,24 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
+        # The notice's two pieces, over the media host so they cover the picture
+        # and leave the funscript strip below it clear. Two, because a video
+        # surface is a native window that a plain sibling cannot paint over: the
+        # dim is an ordinary sibling, so it blends into a still or an animation
+        # and simply stays under a clip, while the message itself is native and
+        # rides over either. Both hidden until set_notice says otherwise.
+        self._media_host = media_host
+        self._notice_dim = QLabel(media_host)
+        self._notice_dim.setStyleSheet(_NOTICE_DIM)
+        self._notice_dim.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._notice_dim.hide()
+        self._notice = QLabel(media_host)
+        self._notice.setStyleSheet(_NOTICE_PLATE)
+        self._notice.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._notice.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        self._notice.hide()
+
         # Opt-in funscript heatmap along the bottom edge (the info-pane and fullscreen
         # previews use it); hidden until a scripted video is shown.
         self._strip = FunscriptStrip() if show_funscript_strip else None
@@ -146,6 +171,7 @@ class PreviewWidget(QWidget):
 
     def show_image(self, path) -> None:
         self._player.stop()
+        self.set_notice(None)  # a new picture, so any notice about the last one goes
         self._media = (path, "image")
         self._end_live(self._media)
         reader = QImageReader(str(path))
@@ -161,6 +187,7 @@ class PreviewWidget(QWidget):
 
     def show_video(self, path) -> None:
         self._set_movie(None)
+        self.set_notice(None)  # a new clip, so any notice about the last one goes
         self._media = (path, "video")
         self._end_live(self._media)
         self._pixmap = None
@@ -182,6 +209,7 @@ class PreviewWidget(QWidget):
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
         self._player.stop()
+        self.set_notice(None)  # the run on screen is what these settings are making
         self._media = None  # a transient live frame, not a file to open fullscreen
         self._live, self._live_frame = True, data  # …but a running generation to watch
         self._draggable_id = None  # nor a saved generation to drag out
@@ -205,6 +233,7 @@ class PreviewWidget(QWidget):
         generating and fills in as the frames arrive.
         """
         self._player.stop()
+        self.set_notice(None)  # no picture left for a notice to be about
         self._media = None  # a message, not a file to open fullscreen
         self._end_live(None)  # a message is no result to hand a following view
         self._live = live
@@ -214,6 +243,47 @@ class PreviewWidget(QWidget):
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
         self._hide_strip()
+
+    def set_notice(self, text: str | None) -> None:
+        """Dim the media behind ``text``, or take the notice away (``None``).
+
+        For a pane whose picture no longer answers the settings beside it: the
+        media stays on screen — it is still the last thing generated — but is
+        plainly marked as not what those settings would now make. Anything that
+        changes what's on screen clears it, so a notice can never outlive the
+        picture it was about; the owner re-asserts it if it still applies.
+        """
+        if not text:
+            self._notice.hide()
+            self._notice_dim.hide()
+            return
+        if not self._notice.isHidden() and self._notice.text() == text:
+            return  # already saying exactly this — don't re-raise it mid-typing
+        self._notice.setText(text)
+        self._notice_dim.show()
+        self._notice.show()
+        self._place_notice()
+        self._notice_dim.raise_()
+        self._notice.raise_()  # over the media, video surface included
+
+    def _place_notice(self) -> None:
+        """Spread the dim over the whole media area and float the message plate
+        centered against its top edge.
+
+        The plate stays one line wherever the pane is wide enough for it, and
+        wraps only where it isn't: ``adjustSize`` on a wrapping label picks a
+        squarish block instead, which turns a one-line message into a slab.
+        """
+        host = self._media_host
+        self._notice_dim.setGeometry(host.rect())
+        limit = max(1, host.width() - 2 * _NOTICE_MARGIN)
+        self._notice.setWordWrap(False)
+        self._notice.adjustSize()
+        if self._notice.width() > limit:
+            self._notice.setWordWrap(True)
+            self._notice.resize(limit, self._notice.heightForWidth(limit))
+        self._notice.move(max(0, (host.width() - self._notice.width()) // 2),
+                          _NOTICE_MARGIN)
 
     def _end_live(self, media: tuple | None) -> None:
         """Stop mirroring a running generation, handing ``media`` — the file it
@@ -486,6 +556,8 @@ class PreviewWidget(QWidget):
                 self._scale_movie()
             elif self._pixmap is not None:
                 self._rescale()
+            if not self._notice.isHidden():
+                self._place_notice()
             # The label lags this widget going fullscreen, so anything placed
             # against the media's rect has to re-place when the refit lands.
             self.media_resized.emit()

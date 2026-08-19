@@ -731,3 +731,81 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch)
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
 
     assert _FakeDrag.last is None
+
+
+# --- the notice: this picture isn't what the settings beside it would make ---
+
+def test_a_preview_starts_with_no_notice(make_preview):
+    w = make_preview()
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    w.set_notice("(not yet generated with modifications)")
+
+    assert not w._notice.isHidden()
+    assert w._notice.text() == "(not yet generated with modifications)"
+    assert not w._notice_dim.isHidden()  # the picture behind it is dimmed
+
+
+def test_the_dim_covers_the_media_and_the_plate_rides_its_top(make_preview, tmp_path):
+    w = make_preview()
+    w._media_host.resize(300, 200)
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    w.set_notice("modified")
+
+    assert w._notice_dim.geometry() == w._media_host.rect()   # the whole picture
+    assert w._notice.y() < w._media_host.height() // 2        # ...and the message on top
+    assert w._notice.width() <= w._media_host.width()
+
+
+def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+
+    w.set_notice(None)
+
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+@pytest.mark.parametrize("show", [
+    lambda w, tmp: w.show_image(_make_png(tmp / "q.png")),
+    lambda w, tmp: w.show_video(tmp / "clip.mp4"),
+    lambda w, tmp: w.show_frame(_png_bytes()),
+    lambda w, tmp: w.show_message("Waiting for preview…"),
+    lambda w, tmp: w.clear(),
+])
+def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
+    # A notice is about the picture it was set over, so it can never outlive it —
+    # least of all over the live frames of the run that answers it.
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+
+    show(w, tmp_path)
+
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+def test_resizing_re_places_the_notice(make_preview, tmp_path):
+    w = make_preview()
+    w._media_host.resize(300, 200)
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+    old = w._image_label.size()
+
+    w._media_host.resize(500, 400)
+    w._image_label.resize(500, 400)
+    # The label's resize is what the pane's refit rides on (see eventFilter).
+    QApplication.sendEvent(w._image_label, QResizeEvent(QSize(500, 400), old))
+
+    assert w._notice_dim.geometry() == w._media_host.rect()
+

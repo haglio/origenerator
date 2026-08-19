@@ -1367,3 +1367,111 @@ def test_send_to_genau_does_not_re_export_an_already_sent_clip(saved_panel, monk
     panel._on_send_to_genau()
 
     export.assert_not_called()
+
+
+# --- the modified notice: the preview no longer answers the form -------------
+
+def _notice(panel):
+    """What the preview is saying over its picture, or "" when it says nothing."""
+    return "" if panel._preview._notice.isHidden() else panel._preview._notice.text()
+
+
+def _set_prompt(panel, text):
+    panel._param_form._widgets["positive_prompt"].setPlainText(text)
+
+
+def test_a_browsed_generation_arrives_unmarked(saved_panel):
+    # The form was just seeded from this row, so the picture is exactly what
+    # these settings make: nothing to warn about.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    assert _notice(panel) == ""
+
+
+def test_editing_a_setting_marks_the_picture_as_not_generated_yet(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    _set_prompt(panel, "a dog")
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_putting_the_setting_back_clears_the_mark(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    _set_prompt(panel, "a cat")
+
+    assert _notice(panel) == ""
+
+
+def test_re_rolling_the_seed_marks_it_too(saved_panel):
+    # Same prompt, but the run would draw a different seed — so the picture on
+    # screen is not what Generate would make either.
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+
+    panel._param_form.set_seed_random(True)
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_tab_with_nothing_on_display_is_never_marked(panel):
+    # No picture, nothing to be modified away from — a fresh tab's form is
+    # edited constantly and must not carry a warning about an empty pane.
+    _set_prompt(panel, "a dog")
+    assert panel._displayed_row is None
+    assert _notice(panel) == ""
+
+
+def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
+    saved_panel, monkeypatch, tmp_path
+):
+    # The pane's resting picture is this config's newest result, so it stops
+    # matching the moment the settings do.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    ipath = tmp_path / "sdxl_img1.png"
+    ipath.write_bytes(b"p")
+    monkeypatch.setattr(panel, "_recent_matching_row", lambda: image)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (ipath, "image"))
+
+    panel.show_recent_preview()
+    assert panel._displayed_row is not None and _notice(panel) == ""
+
+    _set_prompt(panel, "a dog")
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_switching_workflow_leaves_no_stale_mark(saved_panel):
+    # The new workflow re-shows its own newest result (or nothing), so the mark
+    # doesn't carry over from the settings that were replaced wholesale.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+
+    assert _notice(panel) == ""
+
+
+def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
+    # Pressing Generate on modified settings streams the run into this pane; the
+    # frames are the answer, so the warning about the old picture goes with them.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    panel._preview.show_message("Waiting for preview…", live=True)
+
+    assert _notice(panel) == ""
+

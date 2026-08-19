@@ -529,10 +529,12 @@ class GalleryView(QWidget):
     def _handle_escape(self) -> bool:
         """Esc turns off everything the app is doing, wherever focus is: the OSR2
         drive (a funscript or the genau stroke), the auto-generate loop, the
-        fullscreen slideshow, and the audio bed. Pressed again with all of it
-        off, it puts back exactly what it took away — the same folder looping,
-        the same show on the same picture, the sound, the device — the way
-        leaving an OmniPause hands the room back.
+        fullscreen slideshow, and the audio bed. Pressed with all of it off, it
+        starts the room instead: what the last press took away — the same folder
+        looping, the same show on the same picture, the sound, the device — or,
+        with nothing to put back, all four from a standing start. So the key is
+        the one thing to reach for either way, on a freshly opened app as much
+        as on a running one, the way leaving an OmniPause hands the room back.
 
         Everything except the microphone, which is why that switch stands on its
         own in the bank. A stop that closed the mic too would take with it the
@@ -555,11 +557,24 @@ class GalleryView(QWidget):
             self._stopped_by_escape = running
             self._stop_running(running)
             return True
-        if self._stopped_by_escape is None:
-            return False  # nothing running and nothing to put back: not ours
-        self._resume(self._stopped_by_escape)
+        if self._escape_cancels_something():
+            return False
+        self._resume(self._stopped_by_escape or self._all_of_it())
         self._stopped_by_escape = None
         return True
+
+    def _escape_cancels_something(self) -> bool:
+        """Whether Esc means "not that" to something on screen: an open find, or a
+        text field being typed in — a folder being renamed, a prompt being
+        written. Both are keystrokes away from the key's other meaning, and
+        starting the whole room up out of one that meant "cancel this" is the one
+        way this could be worse than the key doing nothing at all."""
+        if self._find_bar.isVisible():
+            return True
+        focus = QApplication.focusWidget()
+        return isinstance(
+            focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
+        )
 
     def _running_now(self) -> _Running:
         """Everything the app is doing under its own steam right now."""
@@ -575,6 +590,18 @@ class GalleryView(QWidget):
             show=show is not None,
             show_pass=show.playing_now() if show is not None else None,
         )
+
+    def _all_of_it(self) -> _Running:
+        """Everything on, for an Esc pressed with nothing running and nothing held
+        back — a freshly opened app, or a session that has not been stopped yet.
+
+        The same four switches, aimed at whatever is in front: the folder on
+        screen loops, the folder on screen plays, the sound comes up, the device
+        drives. Each one is only what its own button does, so a folder that can't
+        be looped or has nothing to show simply doesn't start.
+        """
+        return _Running(osr2=True, auto=self._selected_folder_key(),
+                        audio=True, show=True)
 
     def _stop_running(self, running: _Running) -> None:
         """Take all of ``running`` off."""
@@ -600,9 +627,12 @@ class GalleryView(QWidget):
 
         A loop resumes in the folder it was running in rather than the one on
         screen — the gallery is somewhere else by now as often as not, and the
-        loop was never about where the user is looking. A show that was
-        following a generation in flight is the one thing not put back: it has
-        no pass to take up, and what it was watching has landed or gone.
+        loop was never about where the user is looking.
+
+        A show with no pass behind it opens on what is in front instead, which is
+        both the standing start and the show that was following a generation in
+        flight: that one has no pass to take up, and what it was watching has
+        landed or gone by now.
         """
         if stopped.audio:
             self._audio_btn.setChecked(True)
@@ -610,6 +640,8 @@ class GalleryView(QWidget):
             items, index, dwell_ms = stopped.show_pass
             self._open_slideshow(items, start=index, image_dwell_ms=dwell_ms,
                                  shuffle=in_order)
+        elif stopped.show:
+            self._start_slideshow()
         if stopped.auto:
             self._begin_auto(stopped.auto)
             self._sync_auto_button()      # a resumed loop lights its switch again

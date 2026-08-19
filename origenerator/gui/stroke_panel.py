@@ -86,7 +86,8 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
+def console_hud(stroke, host, *, device_on: bool = True,
+                enhanced_filter=None) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated stroke over
@@ -103,6 +104,13 @@ def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
     on stroking — it cannot see the device either way — so this is the only
     thing standing between a switched-off OSR2 and a console animating a blue
     wave nothing is riding.
+
+    ``enhanced_filter`` is this app's
+    :class:`~origenerator.gui.enhanced_filter.EnhancedFilter`, or ``None`` where
+    whoever built the panel has none to offer. The console draws that button
+    only where there is one behind it — an enhancement is a thing this app
+    makes, so Genau's own console has no such set to narrow — and says
+    "Enhanceds" in its status line while it is on.
     """
     driving = stroke.active and device_on
     return ConsoleHud(
@@ -113,15 +121,23 @@ def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
             cruise=stroke.state.cruise.active,
             shape=stroke.state.state.shape.value,
             advance_interval=host.dwell_s,
+            enhanced_filter=(None if enhanced_filter is None
+                             else enhanced_filter.active),
         ),
         drive=drive_hud(stroke.state, driving, host.dwell_s),
         modes_row=False,
     )
 
 
-def panel_size(stroke, host) -> tuple[int, int]:
-    """How big the console draws, which is what the widget has to be."""
-    return ConsolePainter().rgba(console_hud(stroke, host))[1]
+def panel_size(stroke, host, enhanced_filter=None) -> tuple[int, int]:
+    """How big the console draws, which is what the widget has to be.
+
+    Told about the filter the way the drawing is: its button widens the
+    transport row, and a widget built one button short would show a cropped
+    console until the first repaint resized it.
+    """
+    return ConsolePainter().rgba(
+        console_hud(stroke, host, enhanced_filter=enhanced_filter))[1]
 
 
 class StrokePanel(QWidget):
@@ -138,9 +154,13 @@ class StrokePanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None):
+    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None,
+                 enhanced_filter=None):
         super().__init__(parent)
         self._stroke = stroke
+        # The enhanced-only switch this console carries, or None where the
+        # surface that built the panel has none — see console_hud.
+        self._enhanced_filter = enhanced_filter
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -151,7 +171,7 @@ class StrokePanel(QWidget):
         self._painter = ConsolePainter()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(stroke, self._host))
+        self.setFixedSize(*panel_size(stroke, self._host, enhanced_filter))
         # The trace scrolls with the phase, so repaint on a beat while shown.
         self._repaint = QTimer(self)
         self._repaint.setInterval(_REPAINT_MS)
@@ -249,6 +269,10 @@ class StrokePanel(QWidget):
             host.stroke_toggle_hold()
         elif action == "genau_weird_clip":
             host.stroke_cull()
+        elif action == "genau_filter_enhanced" and self._enhanced_filter is not None:
+            # The console draws this button only where there is a filter behind
+            # it, so the guard is against a stale press rather than a real one.
+            self._enhanced_filter.toggle()
         elif action in ("genau_advance_up", "genau_advance_down"):
             delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
             host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
@@ -261,7 +285,8 @@ class StrokePanel(QWidget):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         return self._painter.rgba(
-            console_hud(self._stroke, self._host, device_on=self._device_on()))
+            console_hud(self._stroke, self._host, device_on=self._device_on(),
+                        enhanced_filter=self._enhanced_filter))
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device

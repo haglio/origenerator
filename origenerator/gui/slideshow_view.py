@@ -118,8 +118,9 @@ class SlideshowView(QWidget):
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
                  on_lock=None, player=None, stroke=None, pace=None,
-                 on_drive_toggle=None, parent=None, order_label="Shuffle",
-                 starred_ids=None, on_reset=None, looping=True):
+                 on_drive_toggle=None, enhanced_filter=None, parent=None,
+                 order_label="Shuffle", starred_ids=None, on_reset=None,
+                 looping=True):
         super().__init__(parent)
         self._on_delete = on_delete
         # Where reset means something bigger than this show: hosted, a region
@@ -191,6 +192,11 @@ class SlideshowView(QWidget):
         self._dwell_s = image_dwell_ms // 1000
         self._pace.changed.connect(self._on_pace_changed)
         playlist_kwargs = {"image_dwell_ms": image_dwell_ms, "start": start}
+        # Kept so a re-seeded pass is laid out the way this show's was: a
+        # double-clicked picture's show reads its folder in order, and a filter
+        # applied over one must not quietly shuffle it. None means the
+        # playlist's own random shuffle, here and on the way back in.
+        self._shuffle = shuffle
         if shuffle is not None:  # else the playlist uses its own random shuffle
             playlist_kwargs["shuffle"] = shuffle
         self._playlist = SlideshowPlaylist(items, **playlist_kwargs)
@@ -243,7 +249,12 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        self._stroke_panel = StrokePanel(stroke, self, host=self) if stroke is not None else None
+        # The console carries the enhanced-only switch, so it has to be handed
+        # the one the gallery owns: the same switch on both surfaces, the way
+        # the pace is the same number on both.
+        self._stroke_panel = StrokePanel(
+            stroke, self, host=self, enhanced_filter=enhanced_filter,
+        ) if stroke is not None else None
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -356,6 +367,35 @@ class SlideshowView(QWidget):
             self._update_neighbors()
         else:
             self._show_current()
+
+    def refilter(self, items) -> None:
+        """Re-seed the running pass from ``items`` — what a filter turned on or
+        off over an open show leaves it playing.
+
+        The slide on screen stays when it survives the change: a filter is a
+        narrowing of what you are looking through, not a new show, and taking
+        the picture away as well would make the switch impossible to try. The
+        rest is a fresh pass, the set being a different set — shuffled, as one
+        opened now would be.
+
+        A show still following a running generation is left alone: it has no set
+        of its own to narrow, and the frames it is watching are one item.
+        """
+        if self._live:
+            return
+        current = self._playlist.current()
+        held = current[2] if current is not None and len(current) > 2 else None
+        start = next((index for index, item in enumerate(items)
+                      if held is not None and len(item) > 2 and item[2] == held), None)
+        kwargs = {"image_dwell_ms": self._dwell_s * 1000, "start": start}
+        if self._shuffle is not None:
+            kwargs["shuffle"] = self._shuffle
+        self._playlist = SlideshowPlaylist(items, **kwargs)
+        if start is None:
+            self._show_current()  # what it was on is gone; show what is here now
+        else:
+            self._update_counter()
+            self._update_neighbors()
 
     def playing_now(self):
         """This pass as another show could take it up — its items in the order it

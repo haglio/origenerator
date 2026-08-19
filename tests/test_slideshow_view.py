@@ -45,6 +45,44 @@ def _view(qtbot, items=_ITEMS, **kw):
     return view
 
 
+def test_a_filter_narrows_the_running_pass_and_keeps_the_slide_showing(qtbot, tmp_path):
+    # A filter is a narrowing of what you are looking through, not a new show:
+    # taking the picture away as well would make the switch impossible to try.
+    items = [(_png(tmp_path / f"{name}.png"), "image", name, None)
+             for name in ("a", "b", "c")]
+    view = _view(qtbot, items)
+    view.step(1)
+    assert view._playlist.current()[2] == "b"
+
+    view.refilter([items[1], items[2]])
+
+    assert [item[2] for item in view._playlist._items] == ["b", "c"]
+    assert view._playlist.current()[2] == "b"     # still the one on screen
+    assert view._counter.text().startswith("1 / 2")
+
+
+def test_a_filter_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_path):
+    items = [(_png(tmp_path / f"{name}.png"), "image", name, None)
+             for name in ("a", "b", "c")]
+    view = _view(qtbot, items)
+    assert view._playlist.current()[2] == "a"
+
+    view.refilter([items[1], items[2]])
+
+    assert view._playlist.current()[2] == "b"
+
+
+def test_a_show_following_a_running_generation_has_no_set_to_narrow(qtbot, tmp_path):
+    # It is watching one thing being made; the frames are not a set.
+    view = _view(qtbot, [], frame=_png_bytes())
+    assert view.is_live()
+
+    view.refilter([(_png(tmp_path / "a.png"), "image", "a", None)])
+
+    assert view.is_live()
+    assert len(view._playlist) == 0
+
+
 def _press(view, key):
     view.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier))
 

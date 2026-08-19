@@ -78,6 +78,13 @@ class AppCommand(Enum):
     # back — the toolbar's switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
 
+    # What a show may play. Said either way round rather than as one toggle: a
+    # speaker mid-show is not looking at the console to see which way it is set,
+    # and "filter enhanced" that turned the filter OFF half the time would be a
+    # command nobody could rely on.
+    FILTER_ENHANCED = "filter_enhanced"
+    FILTER_OFF = "filter_off"
+
     # The OSR2 stroke's knobs, in Fun Time's own words. The driver is app-wide,
     # so these answer from the gallery and from a show alike.
     SPEED_UP = "speed_up"
@@ -189,6 +196,14 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
+
+# The show's own narrowing filter, in Fun Time's own grammar: "filter <what to
+# keep>" turns one on, and "clear filter" is the way back to all of it — the
+# very phrase the satellites answer, so one gesture has one wording in both
+# rooms.
+_say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
+     "filter enhanced only", "enhanced only")
+_say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
 # The stroke's knobs, said the way Fun Time says them, so the muscle memory
 # carries between the two apps the way the keys already do.

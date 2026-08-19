@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QComboBox, QPushButton, QScrollArea, QMessageBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
+    QPushButton, QScrollArea, QMessageBox,
 )
-from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 
 from origenerator import evolver_export
@@ -168,8 +168,20 @@ class GenerateConfigPanel(QWidget):
         # Editable: the workflow picker, its typical-time estimate, and the param
         # form (swapped into _form_host whenever the workflow changes).
         self._form_workflow_key = None  # which workflow the installed form belongs to
-        header = QHBoxLayout()
-        header.addWidget(QLabel("Workflow"))
+        # A form row rather than a plain side-by-side pair, so that squeezed past
+        # what the word and the picker can share, the picker drops onto its own
+        # line — the same wrap the sections below it do — instead of holding the
+        # pane open and putting a horizontal scroll bar under the whole form.
+        header = QFormLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setHorizontalSpacing(8)
+        header.setLabelAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        header.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        header.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self._workflow_combo = NoWheelComboBox()
         # Machinery workflows (the standalone image enhancer) stay out of the
         # picker: they're launched by gallery buttons, and their results fold
@@ -184,17 +196,16 @@ class GenerateConfigPanel(QWidget):
         self._workflow_combo.setPlaceholderText("Select a workflow…")
         self._workflow_combo.setCurrentIndex(-1)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
-        # Elide to a short floor when the window is narrow instead of holding the
-        # width of the longest workflow name, which would set the tab's whole
-        # minimum width and block tiling. It still expands to fill (stretch=1).
-        self._workflow_combo.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-        )
-        self._workflow_combo.setMinimumContentsLength(12)
-        header.addWidget(self._workflow_combo, 1)
+        # It shrinks to a short floor when the pane is narrow rather than holding
+        # the width of the longest workflow name — see NoWheelComboBox, which every
+        # picker in the app inherits that from. It still expands to fill the row.
+        header.addRow("Workflow", self._workflow_combo)
         body.addLayout(header)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
+        # A sentence, so it wraps rather than holding the pane open at its own
+        # length — the form below it shrinks, and this has to shrink with it.
+        self._estimate_label.setWordWrap(True)
         body.addWidget(self._estimate_label)
         self._form_host = QWidget()
         self._form_host_box = QVBoxLayout(self._form_host)

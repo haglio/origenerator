@@ -20,6 +20,7 @@ from PyQt6.QtGui import QFontMetrics
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
+from origenerator.gui.eliding_button import ElidingButton
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
 
@@ -147,8 +148,12 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
 def _reveal_button(target: str) -> QPushButton:
     """A "Show in Explorer" button revealing the output file selected in the OS
     file manager. Greyed out (with a hint) when the file is no longer on disk —
-    trashed or moved — so it never opens the wrong place."""
-    btn = QPushButton("Show in Explorer")
+    trashed or moved — so it never opens the wrong place.
+
+    The longest label on any file row, so it is the one that decides how narrow a
+    pane holding file rows can be squeezed: it elides rather than hold that width
+    (see :mod:`origenerator.gui.eliding_button`)."""
+    btn = ElidingButton("Show in Explorer")
     btn.setObjectName("revealButton")
     btn.setStyleSheet("padding: 2px 6px;")
     btn.setCursor(Qt.CursorShape.PointingHandCursor)

@@ -2976,10 +2976,16 @@ def test_history_spans_folder_navigation(qtbot):
     view._thumbnail_clicked("i1")                      # view its item
     assert view._selected["prompt_id"] == "i1"
 
-    view._go_back()                                    # the image folder
-    view._go_back()                                    # the video folder
-    view._go_back()
+    view._go_back()                                    # the image folder, nothing picked
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]
+    assert view._selected is None
+
+    view._go_back()                                    # the video folder, on its item
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
+
+    view._go_back()                                    # the video folder, nothing picked
+    assert view._tree.currentItem() is view._leaf_by_id["v1"]
+    assert view._selected is None
 
 
 def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
@@ -3092,23 +3098,171 @@ def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
     assert view._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
 
 
-def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
-    # Selecting items on the shelf is shelf state, not navigation: Back leaves the
-    # shelf for wherever you came from, rather than stepping through each preview.
+def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
+    # The reported bug: previews on a shelf were shelf state rather than stops, so
+    # Back walked out of the shelf entirely instead of to the one looked at before.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
+            _image("i3", "a bird", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    for pid in ("i1", "i2", "i3"):
+        view._thumb_widgets[pid].clicked.emit(pid)       # browse a few previews
+
+    view._go_back()
+    assert view._showing_recents()                       # still on the shelf...
+    assert view.selected_generation() == "i2"            # ...on the one before
+
+    view._go_back()
+    assert view.selected_generation() == "i1"
+
+    view._go_forward()
+    assert view.selected_generation() == "i2"
+
+
+def test_back_to_a_shelf_item_re_highlights_its_tile(qtbot):
+    # Landing means landing: the item previewed and its tile lit, so which of the
+    # shelf's items Back returned to is visible in the pane and not just the panel.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # land on a folder's item
-    view._thumbnail_clicked("i1")
-    landing = view.selected_generation()
     view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
-    view._thumb_widgets["i1"].clicked.emit("i1")         # browse a couple of previews
+    view._thumb_widgets["i1"].clicked.emit("i1")
     view._thumb_widgets["i2"].clicked.emit("i2")
 
     view._go_back()
-    assert view._showing_recents() is False              # Back leaves the shelf...
-    assert view.selected_generation() == landing         # ...to where we came from
+
+    assert view._thumb_widgets["i1"].is_selected()
+    assert not view._thumb_widgets["i2"].is_selected()
+
+
+def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._thumbnail_clicked("i1")
+    view._thumbnail_clicked("i2")
+
+    view._go_back()
+
+    assert view.selected_generation() == "i1"
+    assert view._thumb_widgets["i1"].is_selected()
+
+
+def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
+    # The results pane redraws for things that are not navigations — a rebuild, a
+    # sort, a widening landing — and a stop per redraw would fill history with the
+    # pane already on screen.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    view._thumb_widgets["i1"].clicked.emit("i1")   # a hit picked among the results
+    depth = len(view._history._stack)
+
+    view.refresh()
+    view._poll()
+    view._on_search_sort_changed()
+
+    assert len(view._history._stack) == depth
+
+
+def test_back_onto_the_folder_itself_drops_the_pick(qtbot):
+    # The folder was opened with nothing picked in it, so that is what returning to
+    # it shows — a pane still lit on the item Back just left looks like a dead press.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._thumbnail_clicked("i1")
+
+    view._go_back()
+
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]  # the same folder...
+    assert view._selected is None                              # ...showing nothing
+    assert not view._thumb_widgets["i1"].is_selected()
+
+
+def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
+    # A stop is a view, not just an item: the same generation sits in its own
+    # folder too, and Back has to return to the pane it was actually picked in.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Recents"])
+    view._thumb_widgets["i1"].clicked.emit("i1")         # previewed on the shelf
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
+
+    view._go_back()
+
+    assert view._showing_recents()
+    assert view.selected_generation() == "i1"
+
+
+def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
+    # A search owns the middle pane while it runs, so it is a view Back returns
+    # to — with the query still in the box and the hits still drawn.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    assert view.visible_prompt_ids() == ["i1"]
+    view._thumb_widgets["i1"].double_clicked.emit("i1")  # open the hit in its folder
+    assert view._browser.showing_search() is False
+
+    view._go_back()
+
+    assert view._browser.showing_search()
+    assert view._search_edit.text() == "cat"
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
+    # Clicking a result previews it without leaving the results, so Back returns
+    # to the results themselves rather than to the hit's own folder.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    view._thumb_widgets["i1"].clicked.emit("i1")
+
+    view._go_back()
+
+    assert view._browser.showing_search()
+    assert view._search_edit.text() == "cat"
+
+
+def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
+    # One search box, one view: a query being narrowed re-draws the same pane, so
+    # Back leaves the search rather than replaying every word on the way in.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(_children_by_detail(lora)["a cat"])
+    depth = len(view._history._stack)
+
+    _search_for(view, "cat")
+    _search_for(view, "cat h")
+    _search_for(view, "cat hat")
+
+    assert len(view._history._stack) == depth + 1
+
+    view._go_back()
+    assert view._browser.showing_search() is False
 
 
 def _animated_strip(view):

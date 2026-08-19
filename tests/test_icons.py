@@ -66,18 +66,81 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     assert image_badge.toImage() != video_badge.toImage()
 
 
-def test_corner_badges_wear_the_star_green_and_the_enhance_yellow(qtbot):
+def _corner_image(icon):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+
+    return icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
+
+
+def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     from shared_ui.colors import AMBER, GREEN
 
     # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
     # the value its HUD paints), so one color means "bookmarked" in both apps —
-    # which leaves the enhanced tile's plus this palette's yellow, since the two
-    # badges can sit on one tile and blue is genau's across this family. Both
-    # marks are solid at their center, so the middle pixel is the color.
-    star = icons.star_badge().toImage()
-    plus = icons.enhance_badge().toImage()
-    assert star.pixelColor(star.width() // 2, star.height() // 2) == GREEN
-    assert plus.pixelColor(plus.width() // 2, plus.height() // 2) == AMBER
+    # which leaves the enhanced picture's plus this palette's yellow, since the
+    # two can sit on one tile and blue is genau's across this family. Both marks
+    # are solid at their center, so the middle pixel is the color.
+    star = _corner_image(icons.corner_star_icon(starred=True, armed=False))
+    plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False))
+    assert star.pixelColor(24, 25) == GREEN
+    assert plus.pixelColor(24, 24) == AMBER
+
+
+def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
+    # The mark is the badge and the button at once, so what is filled says what
+    # is true: an unstarred item's star is an outline with nothing in the middle,
+    # and an image with no enhancement yet wears the hollow plus.
+    unstarred = _corner_image(icons.corner_star_icon(starred=False, armed=False))
+    assert unstarred.pixelColor(24, 25).alpha() < 32
+    open_plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_OPEN,
+                                                        armed=False))
+    assert open_plus.pixelColor(24, 24).alpha() < 32
+
+
+def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
+    from shared_ui.colors import AMBER
+
+    # A hollow plus with the one it already holds as a yellow shadow behind it:
+    # the middle stays empty like the plain hollow one, and the amber shows out
+    # from under it down and to the right.
+    more = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_MORE, armed=False))
+    assert more.pixelColor(24, 24).alpha() < 32          # still hollow
+    ambers = [
+        (x, y)
+        for y in range(48) for x in range(48)
+        if more.pixelColor(x, y) == AMBER
+    ]
+    assert ambers, "the enhancement it already holds never showed"
+    assert max(x for x, _y in ambers) > 24 + 12          # …out to the right
+    assert max(y for _x, y in ambers) > 24 + 12          # …and below
+
+
+def test_arming_a_corner_control_changes_its_mark(qtbot):
+    from shared_ui.colors import RED
+
+    # Hovering says "this is a button" — the trash can in the red every delete in
+    # this app wears, the others in the light gray that only means "armed".
+    rest = _corner_image(icons.corner_trash_icon(armed=False))
+    armed = _corner_image(icons.corner_trash_icon(armed=True))
+    assert rest != armed
+    assert any(armed.pixelColor(x, y) == RED
+               for y in range(48) for x in range(48))
+    star_rest = _corner_image(icons.corner_star_icon(starred=False, armed=False))
+    star_armed = _corner_image(icons.corner_star_icon(starred=False, armed=True))
+    assert star_rest != star_armed
+
+
+def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
+    from PyQt6.QtCore import QSize
+    from PyQt6.QtGui import QIcon
+
+    # It is dead because it is a finished statement — this image already holds the
+    # version you would be asking for — so Qt's usual fade would read as a fault.
+    icon = icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False)
+    normal = icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
+    disabled = icon.pixmap(QSize(48, 48), QIcon.Mode.Disabled).toImage()
+    assert normal == disabled
 
 
 def test_a_starred_folders_star_is_the_same_green(qtbot):

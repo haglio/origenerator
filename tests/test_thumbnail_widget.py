@@ -5,12 +5,18 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import icons, thumbnail_widget
+from origenerator.gui import corner_controls, icons, thumbnail_widget
+from origenerator.gui.corner_controls import CORNER_SIZE
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
+
+
+def _corners(tile):
+    """A tile's three corner controls, in the order they are laid out: the star,
+    the trash can, the plus."""
+    return tile._controls.buttons()
 
 
 def _corner_actions():
@@ -226,29 +232,169 @@ def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
     assert fired == [("p1", "image")]  # carries the tile's id and the chosen action
 
 
-def test_star_badge_shows_only_when_starred(qtbot):
-    # An unstarred tile carries the badge widget but keeps it hidden...
-    plain = ThumbnailWidget("p1", None, "label")
-    qtbot.addWidget(plain)
-    assert plain.is_starred() is False
-    assert all(b.isHidden() for b in plain.findChildren(StarBadge))
-    # ...a starred one reveals it (a green star in the corner).
-    starred = ThumbnailWidget("p2", None, "label", starred=True)
-    qtbot.addWidget(starred)
-    assert starred.is_starred() is True
-    badges = starred.findChildren(StarBadge)
-    assert len(badges) == 1 and not badges[0].isHidden()
+# --- the three corner controls ------------------------------------------------
+
+def test_a_resting_tile_shows_no_corner_controls(qtbot):
+    # Nothing bookmarked, nothing enhanced, no cursor on it: a wall of thumbnails
+    # is pictures rather than chrome.
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    qtbot.addWidget(tw)
+    assert all(b.isHidden() for b in _corners(tw))
 
 
-def test_set_starred_toggles_the_badge_live(qtbot):
+def test_a_starred_tile_keeps_its_star_up_with_nothing_hovering(qtbot):
+    # The star IS the bookmark badge now, so it has to say so at rest — a shelf
+    # that showed which items were starred only under the cursor would be useless.
+    tw = ThumbnailWidget("p1", None, "label", starred=True)
+    qtbot.addWidget(tw)
+    star, trash, _plus = _corners(tw)
+    assert tw.is_starred() is True
+    assert not star.isHidden()
+    assert trash.isHidden()  # the offers stay put until the cursor arrives
+
+
+def test_an_enhanced_tile_keeps_its_plus_up_and_says_it_is_spent(qtbot):
+    # Holding the very version the panel describes is a finished statement, not
+    # an offer: pressing would spend a generation arriving at the picture already
+    # there, so the plus reports and does not act.
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_HELD)
+    qtbot.addWidget(tw)
+    _star, _trash, plus = _corners(tw)
+    assert not plus.isHidden()
+    assert not plus.isEnabled()
+
+
+def test_an_enhanced_tile_that_could_take_another_offers_one(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_MORE)
+    qtbot.addWidget(tw)
+    _star, _trash, plus = _corners(tw)
+    assert not plus.isHidden() and plus.isEnabled()
+
+
+def test_a_video_tile_grows_no_plus_at_all(qtbot):
+    # There is no video enhancer, so the corner has nothing to offer or report.
+    tw = ThumbnailWidget("v1", None, "label", enhance=None)
+    qtbot.addWidget(tw)
+    _star, _trash, plus = _corners(tw)
+    assert plus.isHidden()
+
+
+def test_hovering_a_tile_offers_every_corner_it_has(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    qtbot.addWidget(tw)
+    pos = QPointF(1, 1)
+
+    tw.enterEvent(QEnterEvent(pos, pos, pos))
+    assert all(not b.isHidden() for b in _corners(tw))
+
+    tw._cursor_over_tile = lambda: False
+    tw.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert all(b.isHidden() for b in _corners(tw))
+
+
+def test_the_corners_stay_up_while_the_cursor_is_on_one_of_them(qtbot):
+    # A control is a child of the tile, so moving onto it fires the tile's
+    # leaveEvent — and the set must not vanish out from under the pointer.
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    qtbot.addWidget(tw)
+    pos = QPointF(1, 1)
+    tw.enterEvent(QEnterEvent(pos, pos, pos))
+
+    tw._cursor_over_tile = lambda: True
+    tw.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert all(not b.isHidden() for b in _corners(tw))
+
+
+def test_set_starred_fills_the_corner_star_live(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
-    (badge,) = tw.findChildren(StarBadge)
-    assert badge.isHidden()
+    star = _corners(tw)[0]
+    assert star.isHidden()
     tw.set_starred(True)
-    assert tw.is_starred() is True and not badge.isHidden()
+    assert tw.is_starred() is True and not star.isHidden()
     tw.set_starred(False)
-    assert tw.is_starred() is False and badge.isHidden()
+    assert tw.is_starred() is False and star.isHidden()
+
+
+def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
+    # A knob turned on the Enhance panel changes what every picture on screen
+    # would get from a press, and none of those tiles were touched.
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_HELD)
+    qtbot.addWidget(tw)
+    plus = _corners(tw)[2]
+    assert not plus.isEnabled()
+
+    tw.set_enhance(icons.ENHANCE_MORE)
+
+    assert tw.enhance_state() == icons.ENHANCE_MORE
+    assert plus.isEnabled()
+
+
+def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN)
+    qtbot.addWidget(tw)
+    fired = []
+    tw.control_triggered.connect(lambda pid, action: fired.append((pid, action)))
+
+    for button in _corners(tw):
+        button.click()
+
+    assert fired == [("p1", corner_controls.STAR), ("p1", corner_controls.TRASH),
+                     ("p1", corner_controls.ENHANCE)]
+
+
+def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
+    # Star top-left, trash bottom-left, plus bottom-right — and the media badge
+    # in the one corner none of them claims, so all four can coexist.
+    tw = ThumbnailWidget("p1", None, "label", starred=True,
+                         enhance=icons.ENHANCE_HELD, media_type="image")
+    qtbot.addWidget(tw)
+    star, trash, plus = (b.geometry() for b in _corners(tw))
+    picture = tw._image_label.geometry()
+    for corner in (star, trash, plus):
+        assert picture.contains(corner)
+    assert star.left() < picture.center().x() and star.top() < picture.center().y()
+    assert trash.left() < picture.center().x() and trash.top() > picture.center().y()
+    assert plus.left() > picture.center().x() and plus.top() > picture.center().y()
+    (badge,) = tw.findChildren(MediaBadge)
+    assert badge.x() > tw.width() // 2 and badge.y() < tw.height() // 2
+    for corner in (star, trash, plus):
+        assert badge.geometry().intersected(corner).isEmpty()
+
+
+def test_a_tile_with_a_run_cooking_on_it_drops_its_corners(qtbot):
+    # The progress bar is laid along the picture's foot, right over two of them —
+    # a control there would be a button nobody can see and everybody can press.
+    tw = ThumbnailWidget("p1", None, "label", starred=True,
+                         enhance=icons.ENHANCE_HELD, enhancing=_run())
+    qtbot.addWidget(tw)
+    assert all(b.isHidden() for b in _corners(tw))
+
+    tw.set_enhancing(None)  # the run ends and the tile is an item again
+
+    star, _trash, plus = _corners(tw)
+    assert not star.isHidden() and not plus.isHidden()
+
+
+def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
+    # The Trash shelf's tiles: their item is already deleted, so there is nothing
+    # to bookmark, bin or enhance, and their own two acts take the corners.
+    tw = ThumbnailWidget("p1", None, "label", controls=False,
+                         corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    assert tw._controls is None
+    assert tw._corner_buttons[0].x() == tw._image_label.x() + 2  # right in the corner
+
+
+def test_a_shelfs_own_actions_queue_up_beside_the_star(qtbot):
+    # The star owns the corner itself, so keep/reject (or the per-seed re-rolls)
+    # start one slot in rather than landing on top of it.
+    tw = ThumbnailWidget("p1", None, "label", corner_actions=_corner_actions())
+    qtbot.addWidget(tw)
+    star = _corners(tw)[0]
+    assert tw._corner_buttons[0].x() >= star.x() + CORNER_SIZE
+    for button in tw._corner_buttons:
+        assert star.geometry().intersected(button.geometry()).isEmpty()
 
 
 def test_thumbnail_starts_unselected(qtbot):

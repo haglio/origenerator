@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QPixmap
 
 from origenerator import evolver_export, gallery
@@ -12,7 +12,7 @@ from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
-from origenerator.gui import icons
+from origenerator.gui import corner_controls, icons
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -164,7 +164,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     """
     from PyQt6.QtWidgets import QApplication
 
-    buttons = [panel._folder_btn, panel._evolver_btn, panel._genau_btn,
+    buttons = [panel._evolver_btn, panel._genau_btn,
                panel._cancel_btn, panel._generate_btn]
     for button in buttons:
         button.show()          # the busiest the bank ever is: every button on
@@ -237,7 +237,6 @@ def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     # same row as Cancel and Generate.
     bank = _layout_containing(panel.layout(), panel._generate_btn)
     assert bank is not None
-    assert bank.indexOf(panel._folder_btn) != -1
     assert bank.indexOf(panel._evolver_btn) != -1
     assert bank.indexOf(panel._cancel_btn) != -1
 
@@ -800,7 +799,6 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert panel._versions.isHidden()
     assert panel._animated_strip.isHidden()
     assert panel._source_tile.isHidden()
-    assert panel._folder_btn.isHidden()
     assert panel._evolver_btn.isHidden()
 
 
@@ -981,28 +979,35 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     assert panel._displayed_row["prompt_id"] == "img1"
 
 
-def test_go_to_folder_shows_for_a_saved_generation_and_emits_its_id(saved_panel):
+def test_the_preview_carries_the_shown_generations_corner_controls(saved_panel):
+    # The acts on a generation belong on its picture, not in a bank under the
+    # settings — the same three corners a gallery thumbnail of it wears.
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
-    panel.show_saved_generation(image, [image])
-    assert not panel._folder_btn.isHidden()   # any saved gen has a folder to open
-    got = []
-    panel.containing_folder_requested.connect(got.append)
 
-    panel._folder_btn.click()
+    panel.show_saved_generation(image, [image])
+
+    assert panel._preview._actions_id == "img1"
+
+
+def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
+    panel, _db = saved_panel
+    got = []
+    panel.item_action_requested.connect(lambda pid, action: got.append((pid, action)))
+
+    panel._preview.action_triggered.emit("img1", corner_controls.STAR)
+
+    assert got == [("img1", corner_controls.STAR)]
+
+
+def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):
+    panel, _db = saved_panel
+    got = []
+    panel.context_menu_requested.connect(lambda pid, pos: got.append(pid))
+
+    panel._preview.context_requested.emit("img1", QPoint(4, 4))
 
     assert got == ["img1"]
-
-
-def test_go_to_folder_stays_hidden_for_a_deleted_generation(saved_panel):
-    # A Trash tile opens here like any other generation, but its folder is the one
-    # thing it hasn't got — its row left the gallery when it was deleted.
-    panel, db = saved_panel
-    image = dict(_image_row(db, "img1"), deleted_at="2026-08-10 03:00:00")
-
-    panel.show_saved_generation(image, [image])
-
-    assert panel._folder_btn.isHidden()
 
 
 def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_panel):

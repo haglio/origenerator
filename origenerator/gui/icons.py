@@ -13,6 +13,12 @@ of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
+The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
+:func:`corner_enhance_icon`) are the marks a generation's picture wears in its
+own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
+with the cursor on it -- because each is a badge and a button at once: the mark
+says which state the item is in, and pressing it is what changes that state.
+
 :func:`tab_close_icon` is the one mark that is neither drawn nor shared: it is
 borrowed from the live style, so a button that closes tabs wears the very ✕ the
 tabs themselves do.
@@ -29,7 +35,8 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    TEXT_PRIMARY, BG_PRIMARY, BLUE, PINK, AMBER, GREEN, RED,
+    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER,
+    GREEN, RED,
 )
 from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
 
@@ -118,10 +125,10 @@ def slideshow_icon() -> QIcon:
 def enhance_icon() -> QIcon:
     """A bold plus — enhance (upscale + re-sample) images.
 
-    Yellow, the very plus an enhanced tile wears in its corner
-    (:func:`enhance_badge`), so the button and the mark it leaves behind are one
-    symbol in one color — and so it can't be read as a star, which is what green
-    means across this family (:data:`_STAR_GLYPH`)."""
+    Yellow, the very plus a picture wears in its enhance corner once it holds one
+    (:func:`corner_enhance_icon`), so the button and the mark it leaves behind are
+    one symbol in one color — and so it can't be read as a star, which is what
+    green means across this family (:data:`_STAR_GLYPH`)."""
     return glyph_icon("plus", color=AMBER, size=_SIZE)
 
 
@@ -233,31 +240,133 @@ def media_type_icon(media_type: str) -> QIcon:
     return glyph_icon("play" if media_type == "video" else "photo", size=_SIZE)
 
 
+# --- the controls a picture wears in its corners --------------------------
+
+# What the plus in a picture's bottom-right corner is saying. The three are the
+# whole of what the enhancer can be up to about one image; a picture it cannot
+# take at all (a video, or a run with no file) shows no plus.
+ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
+ENHANCE_HELD = "held"   # it already holds the very version these settings make
+ENHANCE_MORE = "more"   # it holds one, and these settings would make another
+
+# A corner control at rest is there without shouting; under the cursor it goes
+# the light gray that says "this is a button" — whatever it is filled with, so
+# the arming and the state it reports stay two separate readings of one mark.
+_CORNER_REST = TEXT_MUTED
+_CORNER_ARMED = TEXT_SECONDARY
+# The mark is drawn a little inside its box rather than filling it, which is what
+# leaves the enhance corner room to shift a second copy of itself down and right
+# without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
+# show as a shadow at the size a corner is drawn at, and no further, since past
+# the margin it stops being behind the mark and starts being beside it.
+_CORNER_MARK = 40.0
+_CORNER_MARK_AT = 4.0
+_ENHANCE_SHADOW = 5.0
+
+
 @lru_cache(maxsize=None)
-def star_badge() -> QPixmap:
-    """A corner badge marking a starred image or video.
+def corner_star_icon(*, starred: bool, armed: bool) -> QIcon:
+    """The star in a picture's top-left corner: bookmark it, or take the
+    bookmark away.
 
-    A filled green star on the translucent dark chip the media-type badges use,
-    so a bookmarked item reads at a glance over a thumbnail of any color. Cached
-    and pre-scaled — the one badge decorates every starred tile."""
-    return _display_size(_render_chip(_BADGE_CHIP, "star", _STAR_GLYPH))
+    Filled and green once it is bookmarked — the green Fun Time paints its
+    favorite ★ with, so one color means one thing across both apps — and a
+    hollow outline while it is not. The mark is therefore the state and the
+    button at once, which is why a starred picture keeps it up with nothing
+    hovering: there is no separate badge left to disagree with it.
+    """
+    return _corner_icon("star" if starred else "star_outline",
+                        _STAR_GLYPH if starred else _CORNER_REST, armed)
 
 
 @lru_cache(maxsize=None)
-def enhance_badge() -> QPixmap:
-    """A corner badge marking an enhanced image: a yellow plus on the translucent
-    chip the other badges use, so an upscaled/re-sampled result reads at a
-    glance over a thumbnail of any color. Yellow because green is the star's
-    (see :data:`_STAR_GLYPH`) and the two badges share a tile, and because blue
-    belongs to genau across this family. Cached and pre-scaled — the one badge
-    decorates every enhanced tile."""
-    return _display_size(_render_chip(_BADGE_CHIP, "plus", AMBER))
+def corner_trash_icon(*, armed: bool) -> QIcon:
+    """The trash can in a picture's bottom-left corner: delete this item.
+
+    Red under the cursor rather than the other two's light gray — it is the one
+    corner whose act takes something away, and it wears the very can, in the very
+    red, that the button bank's Delete does."""
+    return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 
 
-def _display_size(pixmap: QPixmap) -> QPixmap:
+@lru_cache(maxsize=None)
+def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
+    """The plus in a picture's bottom-right corner, reading ``state``.
+
+    :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
+    and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow
+    one: it already holds exactly the version the Enhance settings describe, so
+    there is nothing here to press and the mark is a badge alone.
+
+    :data:`ENHANCE_MORE` is both at once, which is the state that needs saying:
+    the image holds an enhancement AND the settings on the panel would make a
+    different one. So the solid yellow plus goes down first, shifted a little,
+    and is then cleared back out under the hollow one — leaving the enhancement
+    it has as a yellow shadow behind the offer of another. The clear is safe here
+    in the one way it is anywhere: this pixmap is ours and the only thing under
+    the mark is the shadow just drawn, so what shows through the hollow is the
+    chip the button paints behind it.
+    """
+    if state == ENHANCE_HELD:
+        return _corner_icon("plus", AMBER, armed=False)
+    ink = _CORNER_ARMED if armed else _CORNER_REST
+    shifted = _CORNER_MARK_AT + _ENHANCE_SHADOW
+
+    def draw(painter: QPainter):
+        if state == ENHANCE_MORE:
+            draw_glyph(painter, "plus", AMBER, size=_CORNER_MARK, x=shifted, y=shifted)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+            _mark(painter, "plus", AMBER)  # the color is spent: a clear ignores it
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        _mark(painter, "plus_outline", ink)
+
+    return _same_when_dead(_painted(draw))
+
+
+def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
+    """One corner control's mark, at rest or armed — bare line art, since the
+    button paints the translucent chip behind it that the badges draw into
+    themselves."""
+    color = (arm_color or _CORNER_ARMED) if armed else ink
+    return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
+
+
+def _mark(painter: QPainter, glyph: str, ink):
+    """Paint one corner control's glyph where every corner control's glyph goes."""
+    draw_glyph(painter, glyph, ink, size=_CORNER_MARK,
+               x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
+
+
+def _painted(draw) -> QPixmap:
+    """A transparent canvas with ``draw`` painting into it."""
+    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    draw(painter)
+    painter.end()
+    return pixmap
+
+
+def _same_when_dead(pixmap: QPixmap) -> QIcon:
+    """``pixmap`` as an icon that keeps its own look when the button is disabled.
+
+    Qt fades a disabled button's icon by default, which is right for a control
+    that is temporarily out of reach and wrong for the enhance corner's solid
+    yellow plus: that one is disabled precisely because it is a finished
+    statement — this image already holds the version you would be asking for — so
+    a faded rendering of it would read as a fault rather than as an answer.
+    """
+    icon = QIcon()
+    icon.addPixmap(pixmap, QIcon.Mode.Normal)
+    icon.addPixmap(pixmap, QIcon.Mode.Disabled)
+    return icon
+
+
+def _display_size(pixmap: QPixmap, size: int = _BADGE_DISPLAY) -> QPixmap:
     """A rendered chip scaled down to the size a tile shows it at."""
     return pixmap.scaled(
-        _BADGE_DISPLAY, _BADGE_DISPLAY,
+        size, size,
         Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
     )
 

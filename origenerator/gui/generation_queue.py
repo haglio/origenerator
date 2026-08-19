@@ -3,13 +3,24 @@
 Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering, filling the strip's height out of its
 bottom-left corner, and beside it a column no wider than a bar needs to be — the
-job's clock, "1:30 elapsed · ~10:34 left", reading directly above the fat
-progress bar it measures. With nothing of ours in flight the same half says what
+job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
+bar it measures. With nothing of ours in flight the same half says what
 the shared server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
-opening its folder on a click, and each draggable to a new place in the line. Only
-the top row is fixed: nothing can be moved in front of what is already rendering.
+opening its folder on a click, and each draggable to a new place in the line. A
+row says what the job will cost and what kind of thing it is, and nothing else
+("~2 min · I2V · Auto · Request"): a line of waiting work is read to find out how
+long the wait is, and the workflow-and-prompt name that used to be here is the
+same on every row of a folder being re-rolled. Beside that, a picture — the frame
+an image-to-video animates, or a four-up of the folder the run will land in —
+because the one picture a queued job cannot show is its own.
+Only the top row is fixed: nothing can be moved in front of what is already
+rendering.
+With nothing queued at all, the strip says so in dim letters across the middle of
+the whole of itself, rather than sitting blank: the left half has no frame, no
+bar and (barring another app's backlog to report) nothing to say, so it stands
+down and the line takes the strip's whole width to be centered in.
 
 It opens one progress bar tall — about two rows, the rest a scroll away — and its
 top edge is a splitter handle, so a long queue can be dragged open to as many rows
@@ -33,18 +44,21 @@ the thing a user goes hunting for an explanation of.
 import time
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QProgressBar, QPushButton,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QScrollArea, QApplication, QFrame, QSizePolicy,
 )
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
-from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QMimeData, QSize, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
-    held_row_text, queue_held_text, queue_wait_text,
+    held_row_text, queue_held_text, queue_lead_text, queue_lead_tooltip,
+    queue_wait_text,
 )
+from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.timing import progress_time_label
+from origenerator.timing import progress_status_label
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
@@ -55,10 +69,12 @@ from shared_ui.colors import BORDER_SUBTLE, BLUE
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
 _STRIP_HEIGHT = 88
-# The clock and the bar beneath it share one column, wide enough to read a line
-# of the clock and for the bar to read as a bar. The queue's names are long, so
-# the rest of the strip goes to the line.
-_BAR_WIDTH = 200
+# The bar the clock is written across, sized off the line it carries — "45% ·
+# 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
+# narrower than its caption elides the countdown away. The queue's names are
+# long, so the rest of the strip still goes to the line.
+_BAR_WIDTH = 290
+_BAR_HEIGHT = 26  # a line of that font, with room to read as a bar around it
 # How often the running half re-reads the clock. Its own timer rather than the
 # gallery's 1.5s poll, which would make a seconds count skip every other tick.
 _TICK_MS = 1000
@@ -68,7 +84,8 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
 class RunningPreview(QWidget):
-    """What is being made: its live frame, and beside it a clock over a fat bar."""
+    """What is being made: its live frame, and beside it a fat bar with the clock
+    written across it."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -91,21 +108,23 @@ class RunningPreview(QWidget):
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(3)
         column.addStretch(1)
-        # Above the bar: how long this run has been going and how much longer it
-        # has, so a bar creeping along has something to be measured against. It
-        # reads over the bar rather than beside it — two readings of the one run,
-        # neither made to give up width to the other. With nothing of ours being
-        # made the same line is free to say what the shared server is busy with.
+        # How far along the run is, how long it has been going and how much longer
+        # it has — written across the bar those numbers measure, so the reading and
+        # the thing read are one object rather than a line of text with a separate
+        # stripe under it. The same line, in the same words, as the browser pane's
+        # in-flight cards carry.
+        self._progress = ProgressCaption()
+        self._progress.setFixedHeight(_BAR_HEIGHT)
+        self._progress.setFixedWidth(_BAR_WIDTH)
+        column.addWidget(self._progress)
+        # With nothing of ours being made, the same slot says what the shared
+        # server is busy with instead — plain text, since there is no run of ours
+        # for a bar to be measuring.
         self._caption = QLabel()
         self._caption.setObjectName("estimateLabel")  # muted secondary text
         self._caption.setWordWrap(True)
         self._caption.setFixedWidth(_BAR_WIDTH)  # a long line wraps, not widens
         column.addWidget(self._caption)
-        self._progress = QProgressBar()
-        self._progress.setTextVisible(False)
-        self._progress.setFixedHeight(16)  # the fat, important one
-        self._progress.setFixedWidth(_BAR_WIDTH)
-        column.addWidget(self._progress)
         column.addStretch(1)
         layout.addLayout(column)
 
@@ -121,6 +140,13 @@ class RunningPreview(QWidget):
         """Say what another app has on ComfyUI — only while this half is free."""
         self._caption.setText(text)
 
+    def status_text(self) -> str:
+        """Whatever this half is saying: the running job's line, or — with nothing
+        of ours in flight — its note about the shared server."""
+        if self._item is not None:
+            return self._progress.caption()
+        return self._caption.text()
+
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
         self.key = item.key if item is not None else None
@@ -128,35 +154,34 @@ class RunningPreview(QWidget):
         if item is None:
             self._frame.clear()
             self._progress.hide()
+            self._caption.show()
             self._tick.stop()
             return
+        self._caption.hide()  # a job of ours takes the slot back for its own bar
         self._progress.show()
         self._render_frame(item.frame)
-        self._render_timing()  # a job of ours takes the caption back for its clock
+        self._render_timing()
         self._tick.start()
-        if item.status == "running" and item.progress and item.progress[1] > 0:
-            cumulative, total = item.progress
-            self._progress.setRange(0, total)
-            self._progress.setValue(cumulative)
-        else:
-            self._progress.setRange(0, 0)  # queued, or no step counts yet: indeterminate
 
     def _render_timing(self):
-        """How long the running job has been going, and how much longer it has.
+        """How far along the running job is, how long it has been going and how
+        much longer it has — written across its bar.
 
         Read off the clock rather than off the feed. A job ComfyUI hasn't started
         has no elapsed time to report and the line stays empty — its wait is the
-        queue beside it to explain, not a zero counting up under a bar that has
-        not moved.
+        queue beside it to explain, not a zero counting up over a bar that has
+        not moved. A job with no step counts to show leaves the bar indeterminate
+        rather than parked at 0%.
         """
         if self._item is None:
-            self._caption.clear()
             return
         started = self._item.started_at
         elapsed = None if started is None else max(0.0, time.time() - started)
-        self._caption.setText(progress_time_label(
-            elapsed, self._item.progress, self._item.typical_seconds
-        ))
+        self._progress.show_progress(
+            progress_status_label(elapsed, self._item.progress,
+                                  self._item.typical_seconds),
+            self._item.progress if self._item.status == "running" else None,
+        )
 
     def _render_frame(self, frame):
         side = self._frame.width()
@@ -186,9 +211,29 @@ class RunningPreview(QWidget):
 
 
 class QueueRow(QWidget):
-    """One job in the line: its caption and the button that throws it away.
+    """One job in the line: what it costs, what it is, what it is made from, and
+    the button that throws it away.
 
-    That button reads "Cancel", or "Next seed" for a job whose folder is
+    Read left to right: the button, then the job's picture, then what it is —
+    ``"~2 min · I2V · Auto"`` (:func:`inflight.queue_lead_text`). That line is the
+    whole of what the row says about the job. The workflow-and-prompt name a
+    Generate tab is titled with used to be here and is not: it answers "which
+    recipe", and every row of a folder being re-rolled carries the same one, so a
+    strip of eight said one thing eight times and none of them said which was the
+    ten-minute one. It is still a hover away.
+
+    The picture is second because that is where it lines up into a column and
+    where the eye lands: the frame an image-to-video animates, or four out of the
+    folder the run will land in (:mod:`origenerator.gui.queue_thumbs`).
+
+    Only a wait worth explaining puts more text on the row — a video the queue is
+    holding for a slideshow, or a job behind another app's work — and that note
+    takes the rest of the width, after everything the row always says.
+
+    The picture block is one width whether it holds one picture or four, so the
+    line of text behind it starts at the same place on every row.
+
+    The button reads "Cancel", or "Next seed" for a job whose folder is
     auto-generating — where the press discards the seed and the loop starts
     another (:func:`inflight.discard_run_text`).
 
@@ -197,7 +242,11 @@ class QueueRow(QWidget):
     the line and does not move.
     """
 
-    HEIGHT = 26  # about two of these fit beside the progress bar
+    HEIGHT = 34  # about two of these fit beside the progress bar
+    # The side of one cell of the picture block: the row's height less its
+    # margins, so the pictures are as big as a row that still reads as a row can
+    # make them. The block itself is four of these across.
+    THUMB = HEIGHT - 6
 
     def __init__(self, item, *, movable=True, parent=None):
         super().__init__(parent)
@@ -211,39 +260,101 @@ class QueueRow(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 1, 6, 1)
+        layout.setContentsMargins(4, 3, 6, 3)
         layout.setSpacing(6)
-        # It leads the row: the names run long and elide, and a button behind one
-        # of those was pushed out of sight at the right-hand end.
+        # It leads the row: a button anywhere behind a line that can elide was
+        # pushed out of sight at the right-hand end.
         self._cancel = QPushButton()
         self._cancel.setObjectName("queueCancelBtn")
         self._cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._cancel.setFixedHeight(self.HEIGHT - 6)
+        self._cancel.setFixedHeight(self.HEIGHT - 12)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
-        self._caption = QLabel()
-        self._caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        layout.addWidget(self._caption, 1)
+        # Straight after the button, so the blocks stack into a column at the
+        # near edge of the line rather than out at the far end of the text.
+        self._thumbs = QueueThumbs(self.THUMB)
+        layout.addWidget(self._thumbs)
+        # What the row says about the job, in the type the rows always used —
+        # this is the row's text now, not an annotation on some other text.
+        self._lead = QLabel()
+        self._lead.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(self._lead)
+        # Only a wait needs explaining, so most rows leave this empty. It asks
+        # for no width of its own and is elided into whatever is left
+        # (:meth:`_render_note`): a label that demands its full text instead can
+        # widen the row past the strip and carry everything behind it off the
+        # end — the disappearance the button was moved to the front to escape.
+        self._note = QLabel()
+        self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._note.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                 QSizePolicy.Policy.Preferred)
+        layout.addWidget(self._note, 1)
 
         self.update_item(item)
 
-    def caption(self) -> str:
-        return self._caption.text()
+    def lead(self) -> str:
+        """What the row says about the job: its price, its kind, and who asked."""
+        return self._lead.text()
+
+    def note(self) -> str:
+        """The wait this row is explaining, before any elision — ``""`` if none."""
+        return self._note_text
+
+    def thumbs(self) -> QueueThumbs:
+        return self._thumbs
 
     def update_item(self, item):
-        """Re-render this row in place — a queued→running flip, a fresh caption,
+        """Re-render this row in place — a queued→running flip, a fresh estimate,
         or an Auto toggle that changed what the button gets you."""
         self._item = item
-        # Two waits are worth naming over the job's own name: one this queue is
+        self._lead.setText(queue_lead_text(item))
+        # The name the row no longer spends its width on, plus what the shorthand
+        # in front of it means. The recipe is worth an answer, just not the row.
+        self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
+        # Two waits are worth explaining in a row's own width: one this queue is
         # imposing (a video, while a slideshow plays), and another app's hold.
-        # The user's own place in the line is the line itself.
-        self._caption.setText(
-            held_row_text(item.held) or queue_wait_text(item.foreign_ahead) or item.caption
+        # The user's own place in the line is the line itself, and needs no words.
+        self._note_text = (
+            held_row_text(item.held) or queue_wait_text(item.foreign_ahead) or ""
         )
-        self._caption.setToolTip(item.caption)
+        self._render_note()
         self._cancel.setText(discard_run_text(item.auto_generating))
         self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
         self._cancel.setVisible(item.cancel is not None)
+        self._render_thumbs(item)
+
+    def _render_note(self):
+        """Fit the wait note to the width the row has left for it.
+
+        Elided rather than clipped: clipped, the last word is cut mid-letter and
+        reads as something that failed to draw, where an ellipsis says outright
+        that there is more.
+        """
+        self._note.setText(self._note.fontMetrics().elidedText(
+            self._note_text, Qt.TextElideMode.ElideRight, self._note.width()
+        ))
+        self._note.setToolTip(self._note_text)
+
+    def resizeEvent(self, event):
+        """Re-fit the note — the strip's width follows the window's."""
+        super().resizeEvent(event)
+        self._render_note()
+
+    def _render_thumbs(self, item):
+        """The row's picture: what the job is made from, else what its folder holds.
+
+        The start frame wins whenever there is one, being about *this* run rather
+        than about where it will land — and being the only thing separating two
+        i2v rows off one recipe. A run with no frame, or one whose frame isn't on
+        disk yet, falls back to the folder view; a folder with nothing in it yet
+        leaves the block off the row rather than draw an empty grid.
+        """
+        if item.source_image and self._thumbs.show_source(item.source_image):
+            return
+        if item.folder_thumbnails:
+            self._thumbs.show_folder(item.folder_thumbnails)
+            return
+        self._thumbs.clear_block()
 
     def set_dragging(self, dragging: bool):
         """Dim this row while it is the one being dragged, so the gesture reads."""
@@ -342,6 +453,16 @@ class GenerationQueue(QWidget):
         self._rows_box.setContentsMargins(0, 0, 0, 0)
         self._rows_box.setSpacing(0)
         self._rows_box.addStretch(1)  # rows stack from the top
+        # What the empty line is for. The strip holds its space whether or not
+        # anything is queued, so this side spends most of its life with nothing
+        # in it, and a blank half of a laid-out strip reads as something that
+        # failed to draw. It sits between two stretches, so it centers in the
+        # space it is explaining while nothing is listed, and the rows still
+        # stack from the top once it has given way to them.
+        self._hint = QLabel("(queued jobs show up here)")
+        self._hint.setObjectName("estimateLabel")  # muted secondary text
+        self._rows_box.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._rows_box.addStretch(1)
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
 
@@ -353,11 +474,26 @@ class GenerationQueue(QWidget):
         """The live half. Its ``key`` is ``None`` when nothing is being made."""
         return self._running
 
+    def sizeHint(self) -> QSize:
+        """One progress bar tall, whatever is or isn't in it.
+
+        Read off the strip's own opening height rather than added up from its
+        children, whose number changes: an idle strip, whose live half has stood
+        down to leave the hint the full width, asks for exactly the room a busy
+        one does, so the splitter above it doesn't shift as the queue drains.
+        """
+        return QSize(super().sizeHint().width(), _STRIP_HEIGHT + 1)  # and its rule
+
     def rows(self) -> list[QueueRow]:
-        """Every job in the line, top to bottom — the one being made first."""
+        """Every job in the line, top to bottom — the one being made first.
+
+        Jobs only: the hint that fills an empty line shares the same box, and it
+        is no row — nothing may be dropped in front of it, reordered against it,
+        or throw it away with the others on a rebuild.
+        """
         return [self._rows_box.itemAt(i).widget()
                 for i in range(self._rows_box.count())
-                if self._rows_box.itemAt(i).widget() is not None]
+                if isinstance(self._rows_box.itemAt(i).widget(), QueueRow)]
 
     def keys(self) -> list[str]:
         return [row.key for row in self.rows()]
@@ -385,11 +521,18 @@ class GenerationQueue(QWidget):
             f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"
             " another app has queued on ComfyUI"
         )
+        free_half = ""
         if leader is None:
-            self._running.show_foreign(
-                queue_held_text(sum(1 for item in items if item.held))
-                or foreign_queue_text(foreign_queued) or ""
-            )
+            free_half = (queue_held_text(sum(1 for item in items if item.held))
+                         or foreign_queue_text(foreign_queued) or "")
+            self._running.show_foreign(free_half)
+        # Nothing of ours in flight at all: the line has no rows to show, so it
+        # says what it is for instead. The left half stands down with it unless
+        # it has something to report — with no frame, no bar and nothing to say
+        # about another app it is an empty third of the strip, and the hint would
+        # be centered in the sliver beside it rather than in the strip itself.
+        self._hint.setVisible(not items)
+        self._running.setVisible(bool(items) or bool(free_half))
         if self.keys() != [item.key for item in items]:
             self._rebuild(items)
             return

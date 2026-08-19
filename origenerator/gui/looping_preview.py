@@ -1,18 +1,18 @@
 """Play a looping WebP preview inside a QLabel via ``QMovie``.
 
-Video thumbnails across the gallery — the grid tiles, the Recents shelf, a
-Generate tab's history strip, and the "Animated in" strip — all show a short
-looping WebP rather than a static frame. ``QMovie`` plays them cheaply, with no
-video player per tile. The one shared subtlety is scaling: ``QMovie``'s own
-scaling stretches a non-square clip to fill the target, so we scale the native
-frame size into the target with ``KeepAspectRatio`` instead.
+Video thumbnails across the gallery — the grid tiles, the Recents shelf, the
+"Animated in" strip and a combine slot — all show a short looping WebP rather
+than a static frame. ``QMovie`` plays them cheaply, with no video player per
+tile. The one shared subtlety is scaling: ``QMovie``'s own scaling stretches a
+non-square clip to fill the target, so we scale the native frame size into the
+target with ``KeepAspectRatio`` instead.
 
 Every one of them is built here, which is why the app-wide freeze lives here
 too: a hosting Fun Time session's OmniPause stops the room, and a room with
-looping thumbnails in four different widgets is not stopped.  Wiring each
-widget to the flag separately is how three of the four were missed — a strip
-nobody remembered kept playing — so the switch is on the one function they all
-call, and a preview built while the freeze is on comes up already held.
+looping thumbnails still going in it is not stopped.  Wiring each widget to the
+flag separately is how all but the tiles were missed — a strip nobody
+remembered kept playing — so the switch is on the one function they all call,
+and a preview built while the freeze is on comes up already held.
 """
 
 from __future__ import annotations

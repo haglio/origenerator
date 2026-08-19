@@ -35,6 +35,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
     RECENTS_KEY, RECENTS_LABEL, REQUESTS_KEY, REQUESTS_LABEL,
@@ -132,6 +133,16 @@ def _inflight_signature(items) -> tuple:
     return tuple(sorted(it.key for it in items))
 
 
+# The job kinds whose queue row shows what they are made from rather than what
+# their folder holds (:func:`gallery.job_kind_label`).
+SOURCE_FRAME_KINDS = ("I2V", "Enhance")
+
+# What that same function calls a standalone enhance — the kind the Recents shelf
+# draws no card for. Asked of the function rather than spelled "Enhance" here, so
+# the shelf keeps agreeing with the queue if the queue ever renames the kind.
+ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
+
+
 class BrowserPane:
     """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
     owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
@@ -182,20 +193,18 @@ class BrowserPane:
         self._trash_rows = trash_rows
         self._request_items = list(request_items)
 
-    def show_enhancing(self, frames: dict):
-        """Mark every visible tile whose image is being enhanced, and stream the
-        run's latest frame onto it.
+    def show_enhancing(self, runs: dict):
+        """Hand every visible tile the enhancement being made of its image.
 
-        ``frames`` is ``{prompt_id: latest frame or None}`` for the enhances
-        running right now. The tile keeps its own picture until a frame arrives
-        — the base render is out and worth looking at, which is the point of
+        ``runs`` is ``{prompt_id: EnhancingRun}`` for the enhances in flight
+        right now — the latest frame, how far along the run is, and how long it
+        has been going. A tile not named there is handed ``None`` and goes back
+        to resting. The tile keeps its own picture until a frame arrives — the
+        base render is out and worth looking at, which is the point of
         generating it first — and gets it back when the run ends.
         """
         for prompt_id, tile in self._thumb_widgets.items():
-            frame = frames.get(prompt_id)
-            tile.set_enhancing(prompt_id in frames)
-            if frame:
-                tile.show_enhancing_frame(frame)
+            tile.set_enhancing(runs.get(prompt_id))
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
@@ -452,8 +461,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_recents()
         self._v._sync_action_buttons()
-        # So Back can return to this side's shelf, not the other side's.
-        self._v._record_location(self._v._tree_view.selected_folder_key() or RECENTS_KEY)
+        self._v._record_location()  # so Back can return to the shelf
 
     @staticmethod
     def _oriented_title(label: str, orientation: str | None) -> str:
@@ -559,7 +567,7 @@ class BrowserPane:
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
-            enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
+            enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -574,14 +582,25 @@ class BrowserPane:
         return tw
 
     def _visible_inflight_items(self) -> list:
-        """The in-flight items the shelf's media-type filter keeps on screen. The
-        full set still decides whether the shelf exists at all (so its filter stays
-        reachable); this narrows only what the shelf draws — as does the side the
-        open shelf belongs to."""
+        """The in-flight items the shelf draws: what its media-type filter keeps
+        and the side it belongs to, less the enhancements. The full set still
+        decides whether the shelf exists at all (so its filter stays reachable);
+        this narrows only what is drawn.
+
+        A standalone enhance never earns a card of its own here, for the reason it
+        never earns a folder in the tree: it is not a result, it is an upgrade of
+        one, and the image it upgrades is already on this shelf wearing the
+        "Enhancing…" scrim and streaming the run's frames. A card beside that tile
+        says a second thing is being made, and clicking it goes nowhere — the
+        folder it would open is the one the tree declines to grow. The bottom
+        strip's queue still lists the job, which is where a run that has the GPU
+        belongs.
+        """
         media_types = self._v._recents_media_types()
         side = self._shelf_orientation
         return [it for it in self._inflight_items()
                 if it.media_type in media_types
+                and it.job_kind != ENHANCE_KIND
                 and (side is None or it.orientation == side)]
 
     def inflight_orientations(self) -> set[str]:
@@ -637,6 +656,11 @@ class BrowserPane:
         whether a drag moved one. A row the line holds no job for — one a restart
         hasn't re-adopted — sorts to the back rather than jumping the queue on
         screen.
+
+        The strip's rows carry more than the shelf's cards do — a price, a kind, a
+        picture of what the job is made from or of the folder it will land in —
+        and all of it is read off the row and the tree already in hand, so a poll
+        costs one listing whatever the queue is showing.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._v._reroll.jobs_by_folder.items()
@@ -644,8 +668,12 @@ class BrowserPane:
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
         held = {job.prompt_id for job in self._v._reroll.held_jobs()}
+        # Which of these the user asked for out loud. One listing rather than a
+        # lookup per job: the table is small and the queue rarely is.
+        requested = {r["prompt_id"] for r in self._v._db.list_requests()}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
+        stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
         items = []
         for row in self._v._db.list_generations():
             if row.get("status") not in ("running", "pending"):
@@ -664,11 +692,11 @@ class BrowserPane:
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
             workflow_name = row.get("workflow_name") or ""
+            params = gallery.parse_params(row.get("params_json"))
+            kind = gallery.job_kind_label(workflow_name)
             items.append(InFlightItem(
                 key=pid,
-                caption=gallery.config_tab_title(
-                    workflow_name, gallery.parse_params(row.get("params_json"))
-                ),
+                caption=gallery.config_tab_title(workflow_name, params),
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
                 reveal=lambda k=folder_key: self._reveal_reroll(k),
@@ -683,11 +711,49 @@ class BrowserPane:
                 held=pid in held,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),
+                job_kind=kind,
+                requested=pid in requested,
+                # Only where the start frame is what the run is *of*: a video
+                # animating a picture, and an enhancement of one. An image
+                # workflow that happens to take an input (the pose transfer's
+                # structure image) is still an image being made, and its row is
+                # placed the way every other image's is — by the folder it joins.
+                source_image=(params.get("input_image")
+                              if kind in SOURCE_FRAME_KINDS else None),
+                folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
         place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    it.status != "running"))
         return items
+
+    def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
+        """A few thumbnails already in the folder a queued job is headed for.
+
+        What a queued job with no picture of its own can be recognized by: its
+        output doesn't exist yet, but the folder it will join is full of what the
+        same settings made last time. Newest first, since ``list_generations``
+        hands them back that way and the newest are what the user was just looking
+        at.
+
+        Read off the folder tree the gallery already built rather than by keying
+        every row again — the tree is rebuilt when the rows change, and this runs
+        on every poll. A folder with nothing in it yet (the first run of a new
+        recipe, or an enhancement, whose product folds into the row it enhanced
+        rather than landing anywhere) has no node in the tree at all and answers
+        with nothing, which the row draws as no block rather than an empty grid.
+        ``cache`` memoizes for the length of one pass, since an auto-generate loop
+        fills the line with jobs from a single folder.
+        """
+        if folder_key not in cache:
+            group = self._v._group_for_key(folder_key)
+            rows = gallery.rows_under(group) if group is not None else []
+            # Only what is finished and has a picture — the job asking, and
+            # every other row still in the line, is exactly what has none.
+            cache[folder_key] = tuple(
+                row["thumbnail_path"] for row in rows if row.get("thumbnail_path")
+            )[:FOLDER_CELLS]
+        return cache[folder_key]
 
     def _typical_seconds(self, workflow_name: str, cache: dict):
         """What a whole run of ``workflow_name`` usually takes, for the running
@@ -759,8 +825,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_experiments()
         self._v._sync_action_buttons()
-        self._v._record_location(
-            self._v._tree_view.selected_folder_key() or EXPERIMENTS_KEY)
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_experiments(self):
         container, flow = self._new_tile_pane()
@@ -815,8 +880,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_requests()
         self._v._sync_delete_button()
-        self._v._record_location(
-            self._v._tree_view.selected_folder_key() or REQUESTS_KEY)
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_requests(self):
         container, flow = self._new_tile_pane()
@@ -864,8 +928,7 @@ class BrowserPane:
         self._v._clear_metadata()
         self._render_trash()
         self._v._sync_action_buttons()
-        self._v._record_location(
-            self._v._tree_view.selected_folder_key() or TRASH_KEY)
+        self._v._record_location()  # so Back can return to the shelf
 
     def _render_trash(self):
         container, flow = self._new_tile_pane()
@@ -983,8 +1046,7 @@ class BrowserPane:
         self._show_starred(self._starred_groups.get(orientation, ()),
                            filter_rows(self._starred_rows, orientation))
         self._v._sync_action_buttons()
-        self._v._record_location(
-            self._v._tree_view.selected_folder_key() or STARRED_KEY)
+        self._v._record_location()  # so Back can return to the shelf
 
     def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
         """Everything one side's Favorites shelf stands for: its starred items,
@@ -1123,7 +1185,7 @@ class BrowserPane:
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
                 enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
-                enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
+                enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)

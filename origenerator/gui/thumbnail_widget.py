@@ -1,16 +1,25 @@
+import time
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
 from PyQt6.QtGui import QPixmap, QDrag, QCursor
-from PyQt6.QtCore import Qt, QPoint, QSize, QEvent, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QEvent, QTimer, pyqtSignal
 
+from origenerator.gui.drag_thumbnail import label_thumbnail, set_drag_thumbnail
 from origenerator.gui.enhanced_badge import EnhancedBadge
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.stage_scrim import StageScrim
 from origenerator.gui.star_badge import StarBadge
+from origenerator.timing import progress_status_label
 
 _IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
+_BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
+_BAR_HEIGHT = 26               # the enhancement's bar, along the picture's foot
+_TICK_MS = 1000                # how often the bar's clock re-reads itself
 
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls): a small
 # translucent chip in the top-left, blue on hover, sized to sit over the thumbnail.
@@ -35,19 +44,12 @@ _SELECTED_BG = "#3a3a3a"
 _SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
 _BORDER_UNSELECTED = "2px solid #3f3f3f"
 _BORDER_SELECTED = "2px solid #8a8a8a"
-# Hover highlight: a blue accent marking every thumbnail that shares the hovered
-# one's settings — a preview of the folder a click would carry into a new tab.
-_HIGHLIGHT_BG = "#24405e"
-_HIGHLIGHT_TILE_CSS = f"#thumbnailTile {{ background-color: {_HIGHLIGHT_BG}; border-radius: 4px; }}"
-_BORDER_HIGHLIGHT = "2px solid #3080e0"
 
 
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str)  # prompt_id
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
-    hovered = pyqtSignal(str)    # prompt_id — mouse entered the tile
-    unhovered = pyqtSignal(str)  # prompt_id — mouse left the tile
     drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
     drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
@@ -55,14 +57,14 @@ class ThumbnailWidget(QWidget):
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, starred: bool = False,
-                 enhanced: bool = False, enhancing: bool = False,
+                 enhanced: bool = False,
+                 enhancing: EnhancingRun | None = None,
                  corner_actions: list | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
-        self._highlighted = False
         self._starred = starred
-        self._enhancing = enhancing
+        self._enhancing = enhancing   # the run being made of this image, if any
         # The tile's own picture, held aside while a running enhancement streams
         # its frames over the top, so the end of the run restores it.
         self._resting_pixmap: QPixmap | None = None
@@ -135,20 +137,25 @@ class ThumbnailWidget(QWidget):
             image_bottom = layout.contentsMargins().top() + _IMAGE_SIZE.height()
             self._enhanced_badge = EnhancedBadge(self, image_bottom)
 
-        # While an enhancement of this image is cooking, a scrim over the picture
-        # says so without hiding it: the base render is out and worth looking at
-        # — that is the point of generating it first — and only the caption tells
-        # you a better version is coming.
-        self._enhancing_overlay = QLabel("Enhancing…", self)
-        self._enhancing_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._enhancing_overlay.setStyleSheet(
-            "background-color: rgba(0, 0, 0, 0.45); color: white;"
-            " font-weight: 600; border-radius: 3px;"
-        )
-        self._enhancing_overlay.setAttribute(
+        # While an enhancement of this image is cooking, the tile wears the same
+        # two overlays an in-flight card does, so work in progress reads the same
+        # whichever kind of work it is: a scrim naming the stage, and a bar along
+        # the picture's foot saying how far along the run is. The scrim dims the
+        # picture rather than replacing it — the base render is out and worth
+        # looking at, which is the point of generating it first.
+        self._enhancing_overlay = StageScrim(self)
+        self._enhancing_bar = ProgressCaption(self)
+        self._enhancing_bar.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._enhancing_overlay.setGeometry(self._image_label.geometry())
-        self._enhancing_overlay.setVisible(self._enhancing)
+        self._enhancing_bar.hide()
+        # Its own clock rather than the gallery's poll, so the countdown advances
+        # a second at a time whether or not a refresh has landed.
+        self._enhancing_tick = QTimer(self)
+        self._enhancing_tick.setInterval(_TICK_MS)
+        self._enhancing_tick.timeout.connect(self._render_enhancing_timing)
+        layout.activate()  # or the frame has no place yet, and the overlays take 0,0
+        self._place_enhancing_bar()
+        self._show_enhancing_run()
 
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.
@@ -175,31 +182,34 @@ class ThumbnailWidget(QWidget):
         self._star_badge.setVisible(starred)
 
     def is_enhancing(self) -> bool:
-        return self._enhancing
+        return self._enhancing is not None
 
-    def set_enhancing(self, enhancing: bool):
-        """Show or clear the "Enhancing…" scrim as a run starts and lands.
+    def set_enhancing(self, run: EnhancingRun | None):
+        """Show the enhancement being made of this image, or clear it away.
+
+        Fed on every reconcile, so a fresh frame and another step of progress
+        arrive the same way: the picture takes the run's latest frame, the scrim
+        names the stage over it, and the bar at its foot carries how far along
+        the run is and how much longer it has.
 
         A run that ends puts the tile's own picture back: the streamed frames
         are a partial render of a file that doesn't exist yet, so once the run
         is over they are no longer of anything. (A landed enhancement folds onto
         the row and the rebuild redraws the tile from the new file; a cancelled
         one leaves the base render, which is what was there before.)"""
-        if enhancing == self._enhancing:
-            return
-        self._enhancing = enhancing
-        if not enhancing and self._resting_pixmap is not None:
+        self._enhancing = run
+        if run is None and self._resting_pixmap is not None:
             self._image_label.setPixmap(self._resting_pixmap)
             self._resting_pixmap = None
-        self._enhancing_overlay.setGeometry(self._image_label.geometry())
-        self._enhancing_overlay.setVisible(enhancing)
-        self._enhancing_overlay.raise_()
+        if run is not None and run.frame:
+            self._paint_enhancing_frame(run.frame)
+        self._show_enhancing_run()
 
-    def show_enhancing_frame(self, frame: bytes):
+    def _paint_enhancing_frame(self, frame: bytes):
         """Paint the latest frame of the enhancement being made of this image.
 
         The tile is where the user is looking while a folder enhances itself, so
-        the run streams here as well as in the info pane — the scrim stays over
+        the run streams here as well as in the info pane — the overlays stay over
         the top, because what is on the tile is still not the finished file."""
         pixmap = QPixmap()
         if not pixmap.loadFromData(frame) or pixmap.isNull():
@@ -210,25 +220,61 @@ class ThumbnailWidget(QWidget):
             pixmap.scaled(_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
                           Qt.TransformationMode.SmoothTransformation)
         )
-        self._enhancing_overlay.setGeometry(self._image_label.geometry())
-        self._enhancing_overlay.raise_()
 
-    def is_highlighted(self) -> bool:
-        return self._highlighted
+    def _show_enhancing_run(self):
+        """Put the scrim and the bar up over the picture, or take them away.
 
-    def set_highlighted(self, highlighted: bool):
-        """Mark the tile as part of the hovered settings group (blue accent)."""
-        if highlighted == self._highlighted:
+        The scrim's place is re-read each time: the streamed frames leave the
+        picture where it was, but a tile built before its layout ran has none yet.
+        """
+        run = self._enhancing
+        self._enhancing_overlay.cover(
+            self._image_label, "Enhancing…" if run is not None else None,
+            inset=_BORDER_PX)
+        self._enhancing_bar.setVisible(run is not None)
+        if run is None:
+            self._enhancing_tick.stop()
             return
-        self._highlighted = highlighted
-        self._apply_styles()
+        self._enhancing_bar.raise_()  # over the scrim just raised, and the badge
+        self._render_enhancing_timing()
+        # Only a run ComfyUI has actually started has a clock to advance; ticking
+        # a queued one would redraw a line that cannot change.
+        if run.started_at is None:
+            self._enhancing_tick.stop()
+        else:
+            self._enhancing_tick.start()
+
+    def _render_enhancing_timing(self):
+        """Write the run's reading across the bar at the picture's foot — the
+        compact one, since a tile is a third of the bottom strip's width."""
+        run = self._enhancing
+        if run is None:
+            return
+        elapsed = (None if run.started_at is None
+                   else max(0.0, time.time() - run.started_at))
+        self._enhancing_bar.show_progress(
+            progress_status_label(elapsed, run.progress, run.typical_seconds,
+                                  compact=True),
+            run.progress if run.status == "running" else None,
+        )
+
+    def _place_enhancing_bar(self):
+        """Lay the bar along the picture's foot, inside the picture's own border.
+
+        It covers the enhanced badge while it is up, which is the right way
+        round: the badge says this image has an enhancement, and the bar says
+        another is being made right now.
+        """
+        picture = self._image_label.geometry()
+        self._enhancing_bar.setGeometry(QRect(
+            picture.x() + _BORDER_PX,
+            picture.y() + picture.height() - _BORDER_PX - _BAR_HEIGHT,
+            picture.width() - 2 * _BORDER_PX,
+            _BAR_HEIGHT,
+        ))
 
     def _apply_styles(self):
-        # Hover-highlight takes visual priority over a resting selection.
-        if self._highlighted:
-            self.setStyleSheet(_HIGHLIGHT_TILE_CSS)
-            border = _BORDER_HIGHLIGHT
-        elif self._selected:
+        if self._selected:
             self.setStyleSheet(_SELECTED_TILE_CSS)
             border = _BORDER_SELECTED
         else:
@@ -281,12 +327,10 @@ class ThumbnailWidget(QWidget):
         return super().eventFilter(obj, event)
 
     def enterEvent(self, event):
-        self.hovered.emit(self.prompt_id)
         self._set_corner_actions_visible(True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self.unhovered.emit(self.prompt_id)
         if not self._cursor_over_tile():  # moving onto a button isn't leaving the tile
             self._set_corner_actions_visible(False)
         super().leaveEvent(event)
@@ -310,9 +354,9 @@ class ThumbnailWidget(QWidget):
         self._press_pos = None
         drag = QDrag(self)
         drag.setMimeData(generation_mime(self.prompt_id))
-        pixmap = self._image_label.pixmap()
-        if pixmap is not None and not pixmap.isNull():
-            drag.setPixmap(pixmap)  # the tile's image trails the cursor
+        # The tile's picture trails the cursor — the frame a video tile's looping
+        # WebP is on, as much as a still image's pixmap.
+        set_drag_thumbnail(drag, label_thumbnail(self._image_label))
         # Announce the drag so a combine slot can light up the moment it starts —
         # QDrag.exec is modal, so the highlight is on for the whole gesture.
         self.drag_started.emit(self.prompt_id)

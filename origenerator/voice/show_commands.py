@@ -17,7 +17,7 @@ Whisper's own renderings are what these are matched against, so "slide show"
 arrives as two words about as often as one, and punctuation and case are its to
 choose. :func:`show_command_bias` hands the vocabulary to the transcriber up
 front for the same reason the fix commands do it (see
-:mod:`origenerator.gallery.detail_parts`): off a quiet mic a short imperative
+:mod:`origenerator.workflows.detail_parts`): off a quiet mic a short imperative
 comes back mangled, and telling whisper what to expect is what makes it land.
 """
 

@@ -1,5 +1,4 @@
 import json
-from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -60,20 +59,6 @@ def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
     return db.get_generation(prompt_id)
 
 
-def _strip_ids(tabs):
-    strip = tabs.currentWidget()._strip
-    return [strip._list.itemAt(i).widget().prompt_id for i in range(strip._list.count())]
-
-
-def _has_ancestor(widget, ancestor) -> bool:
-    node = widget.parent()
-    while node is not None:
-        if node is ancestor:
-            return True
-        node = node.parent()
-    return False
-
-
 # --- every tab is a plain editable config tab -------------------------------
 
 def test_starts_with_one_editable_config_tab(tabs):
@@ -116,22 +101,22 @@ def test_closing_the_last_tab_leaves_a_fresh_blank_one(tabs):
     assert tabs.widget(0).is_blank()
 
 
-def test_the_first_tab_is_renamable(tabs, monkeypatch):
+def test_a_double_click_on_a_tab_never_asks_for_a_name(tabs, monkeypatch):
+    # The gesture used to open a rename box. A tab is named after what it shows
+    # now, so nothing should be asking the user for one.
     from PyQt6.QtWidgets import QInputDialog
-    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("Renamed", True))
-    tabs._rename_subtab(0)
-    assert tabs.widget(0)._custom_title == "Renamed"
-    assert tabs.tabText(0) == "Renamed"
+    asked = []
+    monkeypatch.setattr(QInputDialog, "getText",
+                        lambda *a, **k: asked.append(True) or ("X", True))
+
+    tabs.tabBarDoubleClicked.emit(0)
+
+    assert asked == []
 
 
 def test_config_panels_includes_the_first_tab(tabs):
     tabs._add_subtab()
     assert len(tabs._config_panels()) == 2
-
-
-def test_thumbnail_strip_sits_within_the_tabbed_content(tabs):
-    panel = tabs._add_subtab()
-    assert _has_ancestor(panel._strip, tabs)
 
 
 def test_add_subtab_increases_count_and_focuses_new(tabs):
@@ -140,11 +125,9 @@ def test_add_subtab_increases_count_and_focuses_new(tabs):
     assert tabs.currentIndex() == 1
 
 
-def test_close_subtab_removes_and_tears_down(tabs):
+def test_close_subtab_removes_the_panel(tabs):
     panel = tabs._add_subtab()
-    with patch.object(panel, "teardown", wraps=panel.teardown) as spy:
-        tabs._close_subtab(tabs.indexOf(panel))
-    spy.assert_called_once()
+    tabs._close_subtab(tabs.indexOf(panel))
     assert tabs._config_panels() == [tabs.widget(0)]
 
 
@@ -172,20 +155,6 @@ def test_the_tab_menu_closes_the_others(tabs):
     assert tabs.widget(0) is keep
 
 
-def test_closing_the_others_tears_each_one_down(tabs):
-    # A tab closed in bulk must release what it holds, exactly as its own ✕ does.
-    keep = tabs.widget(0)
-    doomed = [tabs._add_subtab(), tabs._add_subtab()]
-    with ExitStack() as stack:
-        spies = [
-            stack.enter_context(patch.object(p, "teardown", wraps=p.teardown))
-            for p in doomed
-        ]
-        tabs._close_other_subtabs(tabs.indexOf(keep))
-        for spy in spies:
-            spy.assert_called_once()
-
-
 def test_the_tab_menu_closes_everything_to_the_right(tabs):
     first, second = tabs.widget(0), tabs._add_subtab()
     tabs._add_subtab()
@@ -196,17 +165,31 @@ def test_the_tab_menu_closes_everything_to_the_right(tabs):
     assert tabs._config_panels() == [first, second]  # the ones at or before it
 
 
-def test_the_tab_menu_offers_exactly_those_two_closes(tabs):
+def test_the_tab_menu_offers_exactly_those_three_closes(tabs):
     tabs._add_subtab()
-    tabs._add_subtab()  # three open, so the first tab can do both
+    tabs._add_subtab()  # three open, so the first tab can do all of them
     menu = tabs._tab_menu(0)
-    assert [a.text() for a in menu.actions()] == ["Close others", "Close to the right"]
+    assert [a.text() for a in menu.actions()] == [
+        "Close others", "Close to the right", "Close all",
+    ]
 
 
 def test_the_tab_menu_leaves_out_what_would_close_nothing(tabs):
-    # An entry that can't do anything isn't listed dead — it isn't listed.
+    # An entry that can't do anything isn't listed dead — it isn't listed. The
+    # last tab of two has nothing to its right, but there is still an "all".
     tabs._add_subtab()
-    assert [a.text() for a in tabs._tab_menu(1).actions()] == ["Close others"]
+    assert [a.text() for a in tabs._tab_menu(1).actions()] == ["Close others", "Close all"]
+
+
+def test_close_all_leaves_the_pane_on_its_resting_tab(tabs):
+    tabs.currentWidget().prefill("sdxl_t2i", {})
+    tabs._add_subtab()
+    tabs._add_subtab()  # three open
+
+    tabs._close_all_subtabs()
+
+    assert tabs.count() == 1
+    assert tabs.currentWidget().is_blank()  # a fresh one, not a survivor
 
 
 def test_the_only_tab_has_no_menu_at_all(tabs):
@@ -248,97 +231,53 @@ def test_open_config_is_a_no_op_without_a_client(qtbot, tmp_path):
 
 # --- opening / reusing config tabs -----------------------------------------
 
-def test_open_config_adds_and_prefills_tab(tabs):
+def test_open_config_takes_over_the_blank_resting_tab(tabs):
+    # Nothing has been done in the pane's "New generation" tab, so the opened
+    # configuration lands in it rather than beside it.
+    resting = tabs.currentWidget()
+
     tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+
+    assert tabs.count() == 1
+    panel = tabs.currentWidget()
+    assert panel is resting
+    assert panel._workflow_combo.currentData() == "wan22_i2v"
+    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+
+
+def test_open_config_adds_and_prefills_a_tab_beside_a_used_one(tabs):
+    tabs.currentWidget().prefill("sdxl_t2i", {})  # the resting tab is now someone's work
+
+    tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+
     assert tabs.count() == 2
     panel = tabs.currentWidget()
     assert panel._workflow_combo.currentData() == "wan22_i2v"
     assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
 
 
-def test_open_config_seeds_the_new_tab_strip(tabs):
-    _insert_gen(tabs._db, "x1", _sdxl_full(positive_prompt="cat"))
-    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="cat"))
-    assert _strip_ids(tabs) == ["x1"]
-
-
-def test_tab_text_follows_gallery_folder_name(tabs):
+def test_tab_text_is_the_folder_a_config_would_land_in(tabs):
     tabs.open_config("sdxl_t2i", {"positive_prompt": "a dragon"})
     idx = tabs.currentIndex()
-    assert tabs.tabText(idx) == "SDXL Text-to-Image › a dragon"
+    assert tabs.tabText(idx) == tabs.current_config_panel().title()  # its folder
+    assert tabs.tabText(idx) != "New generation"
 
 
-def test_strip_click_opens_new_tab_when_settings_differ(tabs):
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="cat", seed=5))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # the current tab is a different folder
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == 2  # the current tab + a new one for g1
-    panel = tabs.currentWidget()
-    assert panel._workflow_combo.currentData() == "sdxl_t2i"
-    assert panel._param_form.get_values_static()["seed"] == 5
+def test_tab_text_and_mark_follow_the_item_a_click_shows(tabs):
+    row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
+                        "sdxl_g1.png")
+    tabs.currentWidget()._preview.show_media = MagicMock()
+
+    tabs.load_selection(row, [row])
+
+    idx = tabs.currentIndex()
+    assert tabs.tabText(idx) == "sdxl_g1.png"    # the item, by its file
+    assert not tabs.tabIcon(idx).isNull()        # and wearing its kind's mark
 
 
-def test_strip_click_does_nothing_when_settings_match(tabs):
-    params = _sdxl_full(positive_prompt="cat", seed=5)
-    _insert_gen(tabs._db, "g1", params)
-    tabs.currentWidget().prefill("sdxl_t2i", params)  # active tab now has g1's settings
-    count = tabs.count()
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == count
-
-
-def test_strip_click_matching_settings_ignores_random_seed(tabs):
-    # The reported bug: a tab generated g1 and still has its seed on Random.
-    panel = _pick_workflow(tabs.currentWidget())
-    panel._param_form.set_values({"positive_prompt": "cat"})  # leaves Random checked
-    assert panel._param_form.seed_is_random() is True
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="cat", seed=777))
-    count = tabs.count()
-    tabs._on_strip_activated("g1")
-    assert tabs.count() == count  # same settings folder -> no duplicate
-
-
-def test_opening_tab_from_a_thumbnail_populates_strip_with_its_folder(tabs):
-    _insert_gen(tabs._db, "cat1", _sdxl_full(positive_prompt="cat", seed=1))
-    _insert_gen(tabs._db, "cat2", _sdxl_full(positive_prompt="cat", seed=2))
-    _insert_gen(tabs._db, "dog1", _sdxl_full(positive_prompt="dog", seed=1))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # a different folder so the click opens a new tab
-    tabs._on_strip_activated("cat1")
-    assert isinstance(tabs.currentWidget(), GenerateConfigPanel)
-    assert _strip_ids(tabs) == ["cat2", "cat1"]  # the whole cat folder, newest first
-
-
-# --- bringing a generation's own tab forward -------------------------------
-
-def test_reveal_config_opens_a_tab_for_a_generation_with_none(tabs):
-    _insert_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4))
-    tabs.currentWidget().prefill("wan22_i2v", {})  # the open tab is a different folder
-
-    tabs.reveal_config("g1")
-
-    assert tabs.count() == 2
-    assert tabs.currentWidget()._param_form.get_values_static()["positive_prompt"] == "a heron"
-
-
-def test_reveal_config_brings_forward_a_tab_that_already_has_it(tabs):
-    # A queued job's row is clicked while its own tab sits behind another: that
-    # tab comes forward rather than a duplicate of it opening.
-    params = _sdxl_full(positive_prompt="a heron", seed=4)
-    _insert_gen(tabs._db, "g1", params)
-    tabs.currentWidget().prefill("sdxl_t2i", params)
-    its_tab = tabs.currentWidget()
-    tabs._add_subtab()  # some other tab is in front now
-
-    tabs.reveal_config("g1")
-
-    assert tabs.count() == 2  # no third tab
-    assert tabs.currentWidget() is its_tab
-
-
-def test_reveal_config_ignores_a_generation_that_is_gone(tabs):
-    count = tabs.count()
-    tabs.reveal_config("never-existed")
-    assert tabs.count() == count
+def test_the_resting_tab_is_named_for_what_it_is_and_wears_no_mark(tabs):
+    assert tabs.tabText(0) == "New generation"
+    assert tabs.tabIcon(0).isNull()
 
 
 # --- load_selection: single-click a browser thumbnail ----------------------
@@ -434,22 +373,88 @@ def test_only_one_tab_is_ever_the_preview_tab(tabs):
 
 
 def test_pinning_a_tab_that_was_never_the_preview_one_is_harmless(tabs):
+    cat, _dog = _two_generations(tabs)
+    kept = tabs.current_config_panel()
+    kept.prefill("wan22_i2v", {})    # a tab of its own, never the italic one
+    tabs.load_selection(cat, [cat])  # which opens beside it
+    preview = tabs.current_config_panel()
+
+    tabs.setCurrentWidget(kept)
     tabs.pin_current_tab()
-    assert tabs._preview_panel is None
+
+    assert tabs._preview_panel is preview  # the italic stayed where it was
+
+
+def test_the_resting_tab_opens_italic(tabs):
+    # Nothing has been done in it, so the next open takes it over — which is
+    # what the slant says.
+    assert tabs.tabBar().preview_index() == tabs.indexOf(tabs.currentWidget())
+
+
+def test_picking_a_workflow_in_the_resting_tab_takes_its_italic_off(tabs):
+    # It stops being the tab an open may throw away the moment it holds a choice
+    # someone made.
+    _pick_workflow(tabs.currentWidget())
+
     assert tabs.tabBar().preview_index() == -1
 
 
-def test_a_deliberately_opened_tab_is_not_a_preview_tab(tabs):
+def test_an_opened_tab_wears_the_italic_mark_too(tabs):
     # open_config is someone asking for this configuration by name — a strip
-    # click, a queue row, a combine handoff — not a browse.
-    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
-    assert tabs._preview_panel is None
-    assert tabs.tabBar().preview_index() == -1
+    # click, a queue row, a combine handoff. Still "show me this", so it lands in
+    # the preview tab and is drawn slanted like a browsed one.
+    tabs.currentWidget().prefill("sdxl_t2i", {})  # so the open forks a tab of its own
+
+    opened = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+
+    assert tabs._preview_panel is opened
+    assert tabs.tabBar().preview_index() == tabs.indexOf(opened)
+
+
+def test_an_open_takes_over_a_blank_tab_that_is_not_in_front(tabs):
+    # The rule is about the tab, not about which one is selected: an untouched
+    # "New generation" is taken over wherever in the row it sits.
+    blank = tabs.currentWidget()
+    front = tabs._add_subtab()
+    front.prefill("sdxl_t2i", {})
+
+    opened = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+
+    assert opened is blank
+    assert tabs.count() == 2  # the blank one was used up, not added to
+
+
+def test_open_config_replaces_the_preview_tab_rather_than_forking(tabs):
+    # A second "Open in generator" costs no more tabs than the first: it lands in
+    # the italic tab the last one left.
+    tabs.currentWidget().prefill("sdxl_t2i", {})
+    first = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+    count = tabs.count()
+
+    second = tabs.open_config("wan22_i2v", {"positive_prompt": "a heron"})
+
+    assert second is first
+    assert tabs.count() == count
+    assert tabs.current_config_panel() is first
+
+
+def test_open_config_keeps_a_pinned_tab_and_opens_beside_it(tabs):
+    # Generating from a tab pins it, so the next open can't take it over.
+    tabs.currentWidget().prefill("sdxl_t2i", {})
+    kept = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
+    tabs._on_panel_generate(kept, "wan22_i2v", {})  # its Generate pins it upright
+
+    opened = tabs.open_config("wan22_i2v", {"positive_prompt": "a heron"})
+
+    assert opened is not kept
+    assert kept._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert tabs._preview_panel is opened
 
 
 def test_closing_the_preview_tab_leaves_no_tab_marked(tabs):
     cat, _dog = _two_generations(tabs)
-    tabs.load_selection(cat, [cat])
+    tabs.current_config_panel().prefill("wan22_i2v", {})  # a tab that stays
+    tabs.load_selection(cat, [cat])                       # the italic one beside it
 
     tabs._close_subtab(tabs.currentIndex())
 
@@ -492,7 +497,7 @@ def test_current_config_panel_is_the_front_tab(tabs):
 
 
 def test_show_selection_preview_updates_only_the_current_preview(tabs):
-    panel = tabs.currentWidget()
+    panel = _pick_workflow(tabs.currentWidget())  # a tab in use, not the resting one
     panel._preview.show_media = MagicMock()
     panel.prefill = MagicMock()
 
@@ -501,6 +506,20 @@ def test_show_selection_preview_updates_only_the_current_preview(tabs):
     panel._preview.show_media.assert_called_once_with("x.png", "image")
     panel.prefill.assert_not_called()  # no form change
     assert panel._preview._draggable_id == "g1"  # its preview drags onto combine
+
+
+def test_show_selection_preview_leaves_the_resting_tab_empty(tabs):
+    # The resting tab holds no generation at all, so a re-selection has nothing to
+    # refresh in it: filling its preview would show a picture over a form still
+    # asking which workflow to run. Only a tab in use follows the selection.
+    panel = tabs.currentWidget()
+    assert panel.is_blank()
+    panel._preview.show_media = MagicMock()
+
+    tabs.show_selection_preview(("x.png", "image"), "g1")
+
+    panel._preview.show_media.assert_not_called()
+    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
 
 
 def test_show_selection_preview_of_nothing_disarms_the_drag(tabs):
@@ -544,66 +563,78 @@ def test_clear_current_preview_clears_the_front_tab(tabs):
     panel._preview.clear.assert_called_once()
 
 
-def test_show_result_in_current_tab_keeps_a_prompt_typed_while_it_ran(tabs):
-    # A Generate finishing in the front tab lands its result there, but must not
-    # wipe a prompt the user has since typed into that same tab's form.
+def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
+    # A Generate finishing in the tab that launched it lands its result there, but
+    # must not wipe a prompt the user has since typed into that same tab's form.
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a cat", seed=1),
                         "sdxl_g1.png")
     panel = _pick_workflow(tabs.current_config_panel())
     panel._preview.show_media = MagicMock()
+    panel.note_launched("g1")  # this tab's own Generate started it
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
-    tabs.show_result_in_current_tab(row, [row])
+    tabs.panel_that_launched("g1").show_completed_result(row, [row])
 
     assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
     assert panel._displayed_row is row  # the finished result is on display
 
 
-# --- rename ----------------------------------------------------------------
-
-def test_double_click_renames_config_tab(tabs, monkeypatch):
-    from PyQt6.QtWidgets import QInputDialog
-    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("Renamed", True))
-    panel = tabs._add_subtab()
-    idx = tabs.indexOf(panel)
-    tabs._rename_subtab(idx)
-    assert panel._custom_title == "Renamed"
-    assert tabs.tabText(idx) == "Renamed"
+def test_a_run_no_tab_launched_belongs_to_no_tab(tabs):
+    # The gallery's own launches — the folder tile's "+", the auto-generate loop —
+    # are nobody's Generate. Their results must not land in whatever tab happens to
+    # be in front: filling the pane's blank resting tab with a picture stopped it
+    # being the tab a click loads into, so the next click opened one beside it.
+    assert tabs.panel_that_launched("never-launched-here") is None
+    assert tabs.panel_that_launched(None) is None
 
 
-def test_rename_cancelled_leaves_title(tabs, monkeypatch):
-    from PyQt6.QtWidgets import QInputDialog
-    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("", False))
-    panel = tabs._add_subtab()
-    idx = tabs.indexOf(panel)
-    before = panel.title()
-    tabs._rename_subtab(idx)
-    assert panel._custom_title is None
-    assert tabs.tabText(idx) == before
+# --- double-clicking a tab keeps it ----------------------------------------
+
+def test_double_clicking_a_tab_takes_its_italic_off(tabs):
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+
+    tabs._pin_subtab(tabs.indexOf(preview))
+
+    assert tabs._preview_panel is None
+    assert tabs.tabBar().preview_index() == -1
 
 
-def test_double_clicking_close_does_not_open_rename(tabs, monkeypatch):
-    # Double-clicking the ✕ closes a config tab on its first click; the remaining
-    # tabs shift left and the completing double-click lands on the neighbor, firing
-    # tabBarDoubleClicked. That stray click must not open the rename dialog.
-    from PyQt6.QtWidgets import QInputDialog
-    tabs._add_subtab()
-    tabs._add_subtab()  # three tabs, so a neighbor slides under the cursor
-    opened = []
-    monkeypatch.setattr(QInputDialog, "getText",
-                        lambda *a, **k: opened.append(True) or ("X", True))
-    tabs._close_subtab(1)   # first click of the double-click removes the tab at 1
-    tabs._rename_subtab(1)  # completing double-click, now over the shifted neighbor
-    assert opened == []
+def test_double_clicking_a_tab_that_was_never_italic_is_harmless(tabs):
+    cat, _dog = _two_generations(tabs)
+    kept = tabs.current_config_panel()
+    kept.prefill("wan22_i2v", {})    # a tab of someone's own, not the resting one
+    tabs.load_selection(cat, [cat])  # the italic one opens beside it
+    preview = tabs.current_config_panel()
+
+    tabs._pin_subtab(tabs.indexOf(kept))
+
+    assert tabs._preview_panel is preview  # the italic stayed where it was
+
+
+def test_double_clicking_close_does_not_pin_the_neighbor(tabs):
+    # Double-clicking the ✕ closes a config tab on its first click; the
+    # remaining tabs shift left and the completing double-click lands on the
+    # neighbor, firing tabBarDoubleClicked. That stray click must not keep a tab
+    # the user never meant to keep.
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+    tabs._add_subtab()  # a tab after it, closed out from under the cursor
+
+    tabs._close_subtab(tabs.indexOf(preview) + 1)
+    tabs._pin_subtab(tabs.indexOf(preview))  # the completing click, now over it
+
+    assert tabs._preview_panel is preview
 
 
 # --- session capture / restore ---------------------------------------------
 
-def _config_tab(workflow_name, params=None, seed_is_random=True, title=None):
+def _config_tab(workflow_name, params=None, seed_is_random=True):
     return {
         "config": {"workflow_name": workflow_name,
                    "params": params or {}, "seed_is_random": seed_is_random},
-        "title": title,
     }
 
 
@@ -722,10 +753,9 @@ def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
     assert front._preview.is_showing_any([kept])         # the other one kept its item
 
 
-def test_capture_restore_round_trips_config_and_custom_title(tabs, qtbot):
+def test_capture_restore_round_trips_config(tabs, qtbot):
     tabs.currentWidget().prefill("sdxl_t2i", {})  # a plain sdxl tab
     tabs.open_config("wan22_i2v", {"positive_prompt": "a fox", "seed": 7})  # current
-    tabs._config_panels()[1].set_custom_title("My Fox")
     captured = tabs.capture_state()
 
     fresh = InfoPaneTabs(tabs._client, tabs._db)
@@ -735,7 +765,6 @@ def test_capture_restore_round_trips_config_and_custom_title(tabs, qtbot):
     panels = fresh._config_panels()
     assert [p._workflow_combo.currentData() for p in panels] == ["sdxl_t2i", "wan22_i2v"]
     assert panels[1]._param_form.get_values_static()["seed"] == 7
-    # A renamed tab comes back named, not reset to its auto gallery-folder label.
-    assert panels[1].custom_title() == "My Fox"
-    assert fresh.tabText(fresh.indexOf(panels[1])) == "My Fox"
+    # A tab is named by what it shows, so its name comes back with its config.
+    assert fresh.tabText(fresh.indexOf(panels[1])) == panels[1].title()
     assert fresh.currentIndex() == captured["current"]

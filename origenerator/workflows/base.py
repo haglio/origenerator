@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from origenerator.workflows.derived_size import measure_derived_size, override_size
+from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.model_files import is_no_lora
 
 # ComfyUI's KSampler vocabulary, for workflows that expose sampler/scheduler
@@ -311,44 +312,39 @@ class WorkflowTemplate(ABC):
         return nodes, [decode_id, 0]
 
     @staticmethod
-    def detail_fix_nodes(face_ids: tuple[str, str, str],
-                         hand_ids: tuple[str, str, str], *,
+    def detail_fix_nodes(first_id: int, *,
                          image_ref, model_ref, clip_ref, vae_ref,
                          positive_ref, negative_ref, params: dict):
-        """The face/hand detail pass appended after the enhance tail, and the
+        """The per-part detail pass appended after the enhance tail, and the
         IMAGE ref the save node should store.
 
         The tail refines the whole frame at once, and that is exactly why it
         cannot fix anatomy: at ``enhance_denoise`` it only re-textures, and the
         denoise that could redraw a hand (0.3+) applies to the sky and the
         floorboards too — which is how creases became wounds. This pass spends
-        that denoise where it is wanted instead. A YOLO detector finds the faces
-        (then the hands), each box is cropped out and enlarged to the sampler's
-        own working size, re-sampled at ``enhance_detail_denoise``, and composited back
-        through a feathered mask — so a mouth or a finger is redrawn at real
-        resolution while every pixel outside the boxes is left untouched.
+        that denoise where it is wanted instead. A YOLO detector finds the part,
+        each box is cropped out and enlarged to the sampler's own working size,
+        re-sampled at that part's own denoise, and composited back through a
+        feathered mask — so a mouth or a finger is redrawn at real resolution
+        while every pixel outside the boxes is left untouched.
 
-        Two independent detectors, run one after the other on each other's
-        output, rather than one merged box list: they are different models, and
-        an image with a face and two hands must get all three. Each ``*_ids``
-        triple names that half's provider, detector and detailer nodes; a half
-        whose detector param is empty builds no nodes at all — the same bypass
-        :meth:`lora_model_input` does, since ComfyUI validates the model name
-        and rejects the whole submit for one it cannot find.
+        One pass per part asked for (:func:`~origenerator.workflows.detail_parts.
+        detail_fix_passes` reads ``enhance_detail_fixes`` and drops what isn't
+        installed), each running over the last one's output rather than on a
+        merged box list: they are different models found by different detectors,
+        and an image with a face and two hands must get all three. Each pass
+        takes three consecutive node ids from ``first_id``; a part left at zero
+        builds no nodes at all, the same bypass :meth:`lora_model_input` does.
 
         Returns ``(nodes, image_ref)`` — the dict to merge into the payload, and
-        the end of the chain. With ``enhance_detail_fix`` off (or no detector named)
-        that is ``image_ref`` unchanged, so the caller saves the tail's output.
+        the end of the chain. With no part asked for (or no detector installed
+        for any of them) that is ``image_ref`` unchanged, so the caller saves
+        the tail's output.
         """
-        if not params.get("enhance_detail_fix"):
-            return {}, image_ref
         nodes: dict = {}
-        for ids, key in ((face_ids, "enhance_face_detector"),
-                         (hand_ids, "enhance_hand_detector")):
-            detector = params.get(key)
-            if not detector:
-                continue
-            provider_id, segs_id, detailer_id = ids
+        for index, (detector, denoise) in enumerate(detail_fix_passes(params)):
+            provider_id, segs_id, detailer_id = (
+                str(first_id + index * 3 + offset) for offset in range(3))
             nodes[provider_id] = {
                 "class_type": "UltralyticsDetectorProvider",
                 # The provider's own picker prefixes its bounding-box models
@@ -387,7 +383,7 @@ class WorkflowTemplate(ABC):
                     "scheduler": params["scheduler"],
                     "positive": positive_ref,
                     "negative": negative_ref,
-                    "denoise": params["enhance_detail_denoise"],
+                    "denoise": denoise,
                     "feather": _DETAIL_FEATHER,
                     "noise_mask": True,
                     "force_inpaint": True,

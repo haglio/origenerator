@@ -46,7 +46,10 @@ from origenerator.gallery.groups import (
 )
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
+    config_folder_name,
     config_tab_title,
+    item_label,
+    job_kind_label,
     lora_label,
     model_label,
 )
@@ -61,12 +64,15 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
-from origenerator.gallery.detail_parts import fix_command_bias, match_fix_command
+from origenerator.workflows.detail_parts import (
+    match_fix_command,
+    name_parts,
+)
 from origenerator.gallery.voice_commands import (
+    ENHANCE_COMMAND,
     GENAU_COMMAND,
     command_bias,
     match_command,
-    match_genau_command,
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
@@ -82,7 +88,7 @@ from origenerator.gallery.enhance import (
     enhance_levels,
     enhance_params_for,
     enhance_targets_row,
-    fix_part_params,
+    fix_params_for,
     level_matching_params,
     level_matching_settings,
     original_files_of,

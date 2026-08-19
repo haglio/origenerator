@@ -24,10 +24,11 @@ a particular row. The thumbnail badge, the folder's Enhance All button, and the
 selection's Enhance action all decide off the helpers here, so "enhanced" means
 one thing everywhere: the row went through the upscale + low-denoise re-sample
 tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
-run. ``enhance_detail_fix`` adds a second stage past that tail, re-sampling the
-faces and hands alone at a denoise the whole-frame pass could never survive; it
-is one of the knobs a level records, so an image can carry both a plain
-enhancement and a detail-fixed one and show which is which.
+run. ``enhance_detail_fixes`` adds a second stage past that tail, re-sampling
+one named part at a time — the faces, the hands, the teeth — each at its own
+denoise, one the whole-frame pass could never survive; it is one of the knobs a
+level records, so an image can carry both a plain enhancement and a detail-fixed
+one and show which is which.
 """
 
 import json
@@ -41,11 +42,13 @@ from origenerator.gallery.output import (
     produced_output,
     row_output_files,
 )
-from origenerator.gallery.detail_parts import detector_for_part, detector_part_label
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
+from origenerator.workflows.detail_parts import (
+    DEFAULT_FIX_DENOISE, detail_fixes_of, detector_part_label, fixable_parts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,17 +70,15 @@ _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
 # being enhanced, and the seed is re-rolled per launch like any variation.
 ENHANCE_SETTING_KEYS = (
     "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-    "enhance_denoise", "enhance_detail_fix", "enhance_detail_denoise",
+    "enhance_denoise", "enhance_detail_fixes",
 )
 
-# Everything a finished level is identified by: the panel's knobs plus the
-# detail pass's detectors. The detectors are not a folder setting — the panel
-# never offers them — but a level made by a spoken "fix teeth" and one made by
-# the generic faces-&-hands pass differ by nothing else, so a level records
-# them and a duplicate is judged over them.
-ENHANCE_LEVEL_KEYS = ENHANCE_SETTING_KEYS + (
-    "enhance_face_detector", "enhance_hand_detector",
-)
+# Everything a finished level is identified by. This used to carry the detail
+# pass's two detector files on top of the panel's knobs, because a level made by
+# a spoken "fix teeth" and one made by the generic faces-&-hands pass differed
+# by nothing else; ``enhance_detail_fixes`` names the parts itself, so the
+# panel's knobs are now the whole identity.
+ENHANCE_LEVEL_KEYS = ENHANCE_SETTING_KEYS
 
 # What a folder's settings leave to the source image rather than pinning: the
 # refining checkpoint, which by default is whichever one made the image, so an
@@ -94,6 +95,26 @@ def default_enhance_params() -> dict:
     params = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
     params["checkpoint"] = MATCH_SOURCE_MODEL
     return params
+
+
+def _level_knobs(params: dict) -> dict:
+    """The knobs one enhancement is remembered by, out of whatever it recorded.
+
+    :data:`ENHANCE_LEVEL_KEYS` filtered off ``params``, with the detail pass
+    read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
+    so a level recorded under the old tick-and-two-detectors shape comes back as
+    the parts it fixed, and captions, re-runs and duplicate checks all see one
+    thing. A level that recorded no pass keeps none rather than an empty dict:
+    an enhancement whose knobs are unknown must stay indistinguishable from one
+    that recorded nothing at all, which is what an empty ``params`` means.
+    """
+    knobs = {k: v for k, v in params.items() if k in ENHANCE_LEVEL_KEYS}
+    fixes = detail_fixes_of(params)
+    if fixes:
+        knobs["enhance_detail_fixes"] = fixes
+    else:
+        knobs.pop("enhance_detail_fixes", None)
+    return knobs
 
 
 @dataclass(frozen=True)
@@ -114,7 +135,15 @@ class EnhanceSettings:
     @classmethod
     def parse(cls, raw: str | None) -> "EnhanceSettings":
         """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
-        an unconfigured folder is simply the defaults, box off."""
+        an unconfigured folder is simply the defaults, box off.
+
+        A folder configured before the detail pass became a number per part is
+        read as what it asked for (:func:`~origenerator.workflows.detail_parts.
+        detail_fixes_of`) rather than as a key this no longer knows: dropping it
+        would quietly switch that folder's fix off, and a setting that stops
+        applying without saying so is the one thing a stored configuration must
+        never do.
+        """
         try:
             data = json.loads(raw) if raw else {}
         except (json.JSONDecodeError, TypeError):
@@ -125,6 +154,7 @@ class EnhanceSettings:
         params = default_enhance_params()
         if isinstance(stored, dict):
             params.update({k: v for k, v in stored.items() if k in ENHANCE_SETTING_KEYS})
+            params["enhance_detail_fixes"] = detail_fixes_of(stored)
         return cls(auto=bool(data.get("auto")), params=params)
 
     def to_json(self) -> str:
@@ -135,10 +165,10 @@ def describe_enhance_params(params: dict) -> str:
     """A one-line summary of an enhancement's knobs, for the levels list.
 
     Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
-    distinguish one experiment from another, then the detail pass at its own
-    denoise when it ran. A pinned model is named after them; the default
-    (source-matched) one says nothing, since it is not a choice — and neither
-    does a detail pass left off, for the same reason.
+    distinguish one experiment from another, then each part the detail pass
+    redrew at the denoise it redrew it at. A pinned model is named after them;
+    the default (source-matched) one says nothing, since it is not a choice —
+    and neither does a part left at zero, for the same reason.
     """
     bits = []
     scale = params.get("enhance_scale")
@@ -150,16 +180,12 @@ def describe_enhance_params(params: dict) -> str:
     denoise = params.get("enhance_denoise")
     if denoise is not None:
         bits.append(f"{float(denoise):g} denoise")
-    if params.get("enhance_detail_fix"):
-        detail = params.get("enhance_detail_denoise")
-        # Named by what its detectors actually find — "teeth" for a targeted
-        # fix, "faces & hands" for the generic pair (and for levels recorded
-        # before the detectors were, which is what that pair ran).
-        named = [detector_part_label(params[key])
-                 for key in ("enhance_face_detector", "enhance_hand_detector")
-                 if params.get(key)]
-        bits.append((" & ".join(named) or "faces & hands")
-                    + (f" {float(detail):g}" if detail is not None else ""))
+    # Each part the pass redrew, at its own denoise — "teeth 0.5", or
+    # "faces 0.45 & hands 0.6" where several ran.
+    fixes = detail_fixes_of(params)
+    if fixes:
+        bits.append(" & ".join(f"{name} {value:g}"
+                               for name, value in fixes.items()))
     checkpoint = params.get("checkpoint")
     if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
         bits.append(str(checkpoint))
@@ -249,18 +275,13 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     # A row's own params describe its enhancement only when the tail ran inline;
     # a folded standalone enhance ran at its own settings, which live in the
     # history, and the source row's knobs would be a plausible-looking lie.
-    inline = {} if row.get("original_files") else {
-        k: v for k, v in parse_params(row.get("params_json")).items()
-        if k in ENHANCE_LEVEL_KEYS
-    }
+    inline = ({} if row.get("original_files")
+              else _level_knobs(parse_params(row.get("params_json"))))
 
     def level(index: int, f: dict) -> EnhanceLevel:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceLevel(
-            index, f"Enhance {index}", f,
-            {k: v for k, v in params.items() if k in ENHANCE_LEVEL_KEYS},
-        )
+        return EnhanceLevel(index, f"Enhance {index}", f, _level_knobs(params))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):
@@ -395,12 +416,12 @@ def enhanced_source_names(rows) -> set[str]:
 
 def _knobs(params: dict) -> dict:
     """One enhancement's identity as every recorded knob, defaults filling the
-    gaps — the detail pass's detectors included, since a targeted fix and the
-    generic pair differ by nothing else."""
+    gaps — the parts its detail pass redrew included, since a targeted fix and
+    a plain enhancement differ by nothing else."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
     base = {k: defaults[k] for k in ENHANCE_LEVEL_KEYS if k in defaults}
     base["checkpoint"] = MATCH_SOURCE_MODEL
-    base.update({k: v for k, v in params.items() if k in ENHANCE_LEVEL_KEYS})
+    base.update(_level_knobs(params))
     return base
 
 
@@ -507,28 +528,38 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     return params
 
 
-def fix_part_params(row: dict, part, settings: EnhanceSettings | None = None) -> dict | None:
+def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) -> dict | None:
     """The ``image_enhance`` params for a spoken "fix <part>": the row's latest
-    enhancement done again, with the detail pass aimed at that part.
+    enhancement done again, with a detail pass aimed at each part named.
 
     The base is the newest level's own recorded knobs — the ask is "the same
     enhancement, plus the fix", so it must not quietly change the scale or
     model the image was finished at. An image never enhanced runs at
     ``settings`` the way any first enhance would.
 
-    "Plus" is cumulative: the passes the newest level already ran ride along,
-    so a "fix eyes" after a "fix teeth" redraws both rather than trading the
-    mended teeth away — every enhance re-derives from the original, so a pass
-    left out is a fix undone on screen. Asking for a part again replaces its
-    earlier pass instead of doubling it (which is also what lets the duplicate
-    check read a repeat as a repeat). The graph holds two detector slots, so
-    the two most recent asks win; a slot left empty builds no nodes (see
-    :meth:`~origenerator.workflows.base.WorkflowTemplate.detail_fix_nodes`).
-    ``None`` when no installed detector finds the part, or the row has nothing
-    to enhance; the caller says which out loud.
+    **The passes are what was asked for and what the picture already carries —
+    never what the panel happens to have ticked.** A spoken fix is a targeted
+    act made with no view of the Enhance panel, so a folder configured to fix
+    every part must not turn "fix teeth" into a pass over all of them: that is
+    a redraw of the whole picture in answer to a command about one part of it.
+    The panel is still read for the *number* each part runs at, since nobody
+    says a denoise out loud —
+    :data:`~origenerator.workflows.detail_parts.DEFAULT_FIX_DENOISE` where it
+    has none.
+
+    What the picture already carries does ride along: a "fix eyes" after a "fix
+    teeth" redraws both rather than trading the mended teeth away — every
+    enhance re-derives from the original, so a pass left out is a fix undone on
+    screen. Asking for a part again replaces its earlier pass instead of
+    doubling it (which is also what lets the duplicate check read a repeat as a
+    repeat).
+
+    ``None`` when nothing installed can find any part asked for
+    (:func:`~origenerator.workflows.detail_parts.fixable_parts`), or the row has
+    nothing to enhance; the caller says which out loud.
     """
-    detector = detector_for_part(part)
-    if detector is None:
+    wanted = fixable_parts(parts)
+    if not wanted:
         return None
     newest = next((lvl for lvl in enhance_levels(row)
                    if not lvl.is_original and lvl.params), None)
@@ -536,15 +567,13 @@ def fix_part_params(row: dict, part, settings: EnhanceSettings | None = None) ->
     params = enhance_params_for(row, base)
     if params is None:
         return None
-    kept = []
-    if newest is not None and newest.params.get("enhance_detail_fix"):
-        kept = [d for d in (newest.params.get("enhance_face_detector"),
-                            newest.params.get("enhance_hand_detector"))
-                if d and detector_part_label(d) != part.name]
-    lineup = (kept + [detector])[-2:]
-    params["enhance_detail_fix"] = True
-    params["enhance_face_detector"] = lineup[0]
-    params["enhance_hand_detector"] = lineup[1] if len(lineup) > 1 else ""
+    configured = detail_fixes_of(settings.params if settings else {})
+    already = detail_fixes_of(newest.params) if newest is not None else {}
+    params["enhance_detail_fixes"] = dict(
+        already,
+        **{part.name: configured.get(part.name, DEFAULT_FIX_DENOISE)
+           for part in wanted},
+    )
     return params
 
 
@@ -619,7 +648,7 @@ def _graph_level_params(row: dict) -> dict:
     if not isinstance(graph, dict):
         return {}
     found: dict = {}
-    detectors: list[tuple[int, str]] = []
+    detailers: list[tuple[int, dict]] = []
     for node_id, node in graph.items():
         if not isinstance(node, dict):
             continue
@@ -639,20 +668,35 @@ def _graph_level_params(row: dict) -> dict:
             found["enhance_steps"] = inputs.get("steps")
             found["enhance_denoise"] = inputs.get("denoise")
         elif node_type == "DetailerForEach":
-            found["enhance_detail_denoise"] = inputs.get("denoise")
-        elif node_type == "UltralyticsDetectorProvider":
-            name = inputs.get("model_name")
-            if isinstance(name, str):
-                # Sorted by node id below: the workflow lays the face half out
-                # before the hand half, so the ids say which is which where the
-                # graph's own key order only happens to.
-                detectors.append((_node_order(node_id), name.rsplit("/", 1)[-1]))
-    if detectors:
-        named = [name for _, name in sorted(detectors)]
-        found["enhance_detail_fix"] = True
-        found["enhance_face_detector"] = named[0]
-        found["enhance_hand_detector"] = named[1] if len(named) > 1 else ""
+            # Sorted by node id below: the passes are laid out in the order they
+            # run, which the graph's own key order only happens to keep.
+            detailers.append((_node_order(node_id), inputs))
+    fixes = {}
+    for _, inputs in sorted(detailers, key=lambda pair: pair[0]):
+        # Each pass says which part it redrew only by way of the detector two
+        # nodes back, so the part is read off the model that found the regions.
+        segs = _linked_inputs(graph, inputs.get("segs"))
+        model = _linked_inputs(graph, segs.get("bbox_detector")).get("model_name")
+        denoise = inputs.get("denoise")
+        if isinstance(model, str) and isinstance(denoise, (int, float)):
+            fixes[detector_part_label(model.rsplit("/", 1)[-1])] = denoise
+    if fixes:
+        found["enhance_detail_fixes"] = fixes
     return {k: v for k, v in found.items() if v is not None and k in ENHANCE_LEVEL_KEYS}
+
+
+def _linked_inputs(graph: dict, ref) -> dict:
+    """The inputs of the node one input links to, or ``{}`` where there is none.
+
+    A ComfyUI link is ``[node_id, output_index]``; anything else on an input is
+    a literal. Every step is guarded because this reads a graph off a file —
+    written by an older version of this app, or by ComfyUI itself.
+    """
+    if not (isinstance(ref, (list, tuple)) and ref and isinstance(ref[0], (str, int))):
+        return {}
+    node = graph.get(str(ref[0]))
+    inputs = node.get("inputs") if isinstance(node, dict) else None
+    return inputs if isinstance(inputs, dict) else {}
 
 
 def enhance_level_params(row: dict) -> dict:
@@ -663,7 +707,7 @@ def enhance_level_params(row: dict) -> dict:
     everything but the sampler numbers on a row the import scan reconstructed.
     """
     params = parse_params(row.get("params_json"))
-    level = {k: params[k] for k in ENHANCE_LEVEL_KEYS if k in params}
+    level = _level_knobs(params)
     for key, value in _graph_level_params(row).items():
         level.setdefault(key, value)
     return level
@@ -673,7 +717,7 @@ def _history_entries(files: list[dict], params: dict) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
     name and the knobs that made it, so a level can name its own settings even
     after the transient job row is gone."""
-    settings = {k: params[k] for k in ENHANCE_LEVEL_KEYS if k in params}
+    settings = _level_knobs(params)
     return [
         {"filename": f.get("filename"), "params": settings}
         for f in files if f.get("filename")

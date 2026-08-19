@@ -20,6 +20,7 @@ from PyQt6.QtGui import QFontMetrics
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
+from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
 
@@ -147,8 +148,12 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
 def _reveal_button(target: str) -> QPushButton:
     """A "Show in Explorer" button revealing the output file selected in the OS
     file manager. Greyed out (with a hint) when the file is no longer on disk —
-    trashed or moved — so it never opens the wrong place."""
-    btn = QPushButton("Show in Explorer")
+    trashed or moved — so it never opens the wrong place.
+
+    The longest label on any file row, so it is the one that decides how narrow a
+    pane holding file rows can be squeezed: it elides rather than hold that width
+    (see :mod:`origenerator.gui.eliding`)."""
+    btn = ElidingButton("Show in Explorer")
     btn.setObjectName("revealButton")
     btn.setStyleSheet("padding: 2px 6px;")
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -160,8 +165,11 @@ def _reveal_button(target: str) -> QPushButton:
 
 
 def _label_widget(text: str, width: int) -> QLabel:
-    label = QLabel(text)
-    label.setMinimumWidth(width)
+    # ``width`` lines this key up with the others in its group by asking for that
+    # much, not by demanding it: squeezed, the key gives way and elides, so a file
+    # row can be read in a narrow pane instead of setting its floor. See
+    # :class:`~origenerator.gui.eliding.ElidingLabel`.
+    label = ElidingLabel(text, preferred_width=width)
     label.setStyleSheet(f"color: {_h(TEXT_MUTED)};")
     label.setAlignment(Qt.AlignmentFlag.AlignTop)
     return label

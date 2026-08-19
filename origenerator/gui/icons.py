@@ -103,13 +103,15 @@ def redo_icon() -> QIcon:
 
 
 def autoloop_icon() -> QIcon:
-    """A die — auto-generate: re-roll this folder, and keep re-rolling it.
+    """A lightning bolt bursting out of a ring — auto-generate: re-roll this
+    folder, and keep re-rolling it.
 
-    Deliberately not another circular arrow. It sat one group away from undo
-    wearing the same arc, and the two were near-indistinguishable at button
-    size; a filled square of pips shares its silhouette with nothing else here.
+    The ring is the "keep going" and the bolt is the "by itself". It sits three
+    buttons from undo, which is a ring too, so the bolt has to be what the eye
+    lands on: it is a solid where undo and redo are open arcs, and it breaks out
+    of its ring at both ends where theirs merely stops short of an arrowhead.
     """
-    return glyph_icon("die", size=_SIZE)
+    return glyph_icon("bolt_ring", size=_SIZE)
 
 
 def slideshow_icon() -> QIcon:
@@ -221,6 +223,18 @@ def media_type_badge(media_type: str) -> QPixmap:
     """
     glyph = "play" if media_type == "video" else "photo"
     return _display_size(_render_chip(_BADGE_CHIP, glyph, _BADGE_GLYPH))
+
+
+@lru_cache(maxsize=None)
+def media_type_icon(media_type: str) -> QIcon:
+    """The same play/photo mark as :func:`media_type_badge`, bare.
+
+    The badge sits over a thumbnail, so it needs its dark chip to read against
+    any picture; this one sits in a row of text — a config tab's label, where it
+    stands in for the thumbnail a tab has no result to show yet — so the chip
+    would be a black square among words.
+    """
+    return glyph_icon("play" if media_type == "video" else "photo", size=_SIZE)
 
 
 @lru_cache(maxsize=None)

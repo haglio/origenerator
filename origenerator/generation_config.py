@@ -86,6 +86,20 @@ def _params_identical(a: dict, b: dict) -> bool:
     return a.keys() == b.keys() and all(_values_equal(a[k], b[k]) for k in a)
 
 
+def configs_match(a: ConfigSnapshot, b: ConfigSnapshot) -> bool:
+    """True when two snapshots would run the same generation.
+
+    Everything that decides the output: the workflow, every parameter, and
+    whether the seed is pinned or re-rolled — a config that draws a fresh seed
+    reproduces nothing, so it never matches one that pins it, even at the same
+    seed value. Used to tell whether an editable form still describes the
+    generation whose output it was seeded from.
+    """
+    return (a.workflow_name == b.workflow_name
+            and a.seed_is_random == b.seed_is_random
+            and _params_identical(a.params, b.params))
+
+
 def _recorded_an_output(row: dict) -> bool:
     """True when a row has at least one output file recorded against it.
 
@@ -137,6 +151,28 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
         if _params_identical(snapshot.params, merge_denormalized(row)):
             return row
     return None
+
+
+def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
+                                   seed_is_random: bool = False) -> bool:
+    """True when launching ``workflow`` with ``params`` would re-create a
+    byte-identical past generation among ``rows``.
+
+    The question behind both the "already generated" guard the gallery runs at
+    launch and the caption the Generate button wears while a press would do it —
+    one function, so the button can never promise a fresh seed the launch doesn't
+    draw (or stay silent about one it does).
+
+    ``params`` is filled from the workflow's defaults first: a stored row carries
+    every param, and :func:`find_duplicate_generation` matches only on identical
+    key sets, so a caller passing just the fields it edited would otherwise never
+    match. ``seed_is_random`` is the form's Random box — a seed drawn per run
+    reproduces nothing, whatever the field it was last pinned to says.
+    """
+    snapshot = ConfigSnapshot(workflow.name,
+                              {**workflow.default_params(), **params},
+                              seed_is_random)
+    return find_duplicate_generation(rows, snapshot) is not None
 
 
 def randomize_seeds(params: dict, seed_keys) -> dict:

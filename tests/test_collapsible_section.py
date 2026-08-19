@@ -68,3 +68,16 @@ def test_rows_added_to_the_content_form_live_under_the_section(qtbot):
     assert isinstance(section.content_form(), QFormLayout)
     assert section.content_form().rowCount() == 1
     assert field.parent() is section.content()
+
+
+def test_a_long_title_does_not_hold_the_form_open(qtbot):
+    # A header names the rows below it; it has no business deciding how narrow the
+    # pane can be squeezed. Its title elides instead — without this, "Enhancement
+    # levels" alone was enough to put a horizontal scroll bar under the form.
+    title = "Enhancement levels"
+    section = CollapsibleSection(title, collapsed=True)
+    qtbot.addWidget(section)
+
+    whole = section._header.fontMetrics().horizontalAdvance(title)
+    assert section.minimumSizeHint().width() < whole
+    assert section._header.display_text(whole // 3).endswith("…")

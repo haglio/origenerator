@@ -12,15 +12,20 @@ name, which the tree and the folder tiles show on hover.
 
 import json
 
+from origenerator.gallery.enhance import ENHANCE_WORKFLOW
+from origenerator.gallery.keys import folder_id, settings_key
+from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
     _basename,
     _frame_name,
     _named_loras,
     _registered,
     _unannotated,
+    is_image_conditioned,
     settings_only,
     workflow_lora_keys,
     workflow_model_keys,
+    workflow_output_type,
 )
 
 # File extensions stripped from a model filename to make a tidy folder label.
@@ -94,6 +99,61 @@ def config_tab_title(workflow_name: str | None, params: dict) -> str:
     headline = _prompt_headline(settings_only(params))
     model = workflow_label(workflow_name)
     return f"{model} › {headline}" if headline else model
+
+
+def item_label(row: dict | None) -> str:
+    """The name one generation wears where a single item has to be named — a
+    Generate tab's, say. The file it produced, which is what the info block
+    calls it by too, so an item reads the same wherever it is named.
+
+    ``""`` for a row with nothing on disk — a run still in flight, or one whose
+    files are gone — leaving the caller to name it by the folder it sits in
+    instead (:func:`config_folder_name`).
+    """
+    for file in row_output_files(row or {}):
+        name = _basename(file.get("filename") or "")
+        if name:
+            return name
+    return ""
+
+
+def config_folder_name(workflow_name: str, signature: str,
+                       folder_meta: dict | None = None) -> str:
+    """The gallery folder a config would generate into, by the name it wears
+    there: the one the user typed onto it, else its short code.
+
+    Takes the ``(workflow, signature)`` pair a config tab holds rather than a
+    row, since a tab that has never run has no row to key off — but keys the
+    same folder the tree does, so a tab and its folder wear one name.
+    """
+    key = settings_key(workflow_output_type(workflow_name) or "image",
+                       workflow_name, signature)
+    meta = (folder_meta or {}).get(key) or {}
+    return meta.get("custom_name") or folder_id(key)
+
+
+def job_kind_label(workflow_name: str | None) -> str:
+    """What kind of work a run of ``workflow_name`` is, in the queue's vocabulary.
+
+    Four answers, because they are what a queued job costs and what it needs
+    before it can start: an "Image" is seconds, a "T2V" is minutes out of words
+    alone, an "I2V" is minutes out of a picture that has to exist first, and an
+    "Enhance" is a second pass over something already made. The workflow's own
+    display name is beside this in the row and answers none of them — "WAN 2.2
+    FLF2V Loop" and "WAN 2.2 I2V" are the same kind of ask, at the same price.
+
+    ``""`` for a workflow this build doesn't have registered — an old import,
+    say. A row that says nothing about its kind is read as unknown; one that
+    guesses "Image" at a video is read, wrongly, as seconds away.
+    """
+    if workflow_name == ENHANCE_WORKFLOW:
+        return "Enhance"
+    output_type = workflow_output_type(workflow_name)
+    if output_type is None:
+        return ""
+    if output_type == "video":
+        return "I2V" if is_image_conditioned(workflow_name) else "T2V"
+    return "Image"
 
 
 def _short_value(value) -> str:

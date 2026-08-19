@@ -51,14 +51,14 @@ def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
     assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
 
 
-def test_opening_a_config_adds_a_tab(qtbot, tmp_path):
+def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     tabs = win._gallery_view._info_tabs
     assert tabs.count() == 1  # the pane's resting tab to start
 
     tabs.open_config("wan22_i2v", {"positive_prompt": "hi"})
 
-    assert tabs.count() == 2
+    assert tabs.count() == 1  # taken over, not opened beside
     panel = tabs.currentWidget()
     assert panel._workflow_combo.currentData() == "wan22_i2v"
     assert panel._param_form.get_values_static()["positive_prompt"] == "hi"
@@ -449,17 +449,17 @@ def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):
 def test_close_event_persists_session(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
-    win._gallery_view._info_tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
+    tabs = win._gallery_view._info_tabs
+    tabs.currentWidget().prefill("sdxl_t2i", {})              # the resting tab, used
+    tabs.open_config("wan22_i2v", {"positive_prompt": "x"})   # a second one beside it
     win._gallery_view.select_folder("image/sdxl_t2i")
 
     win.close()  # fires closeEvent
 
     reloaded = AppState(path)
-    tabs = reloaded.get("generate_tabs")["tabs"]
-    # Every tab is captured (no special/permanent tab). The resting tab is here
-    # too, carrying no workflow — restoring skips it and opens a fresh one, which
-    # is the same tab in every way that matters.
-    assert [t["config"]["workflow_name"] for t in tabs] == [None, "wan22_i2v"]
+    saved = reloaded.get("generate_tabs")["tabs"]
+    # Every tab is captured; there is no special or permanent tab left out.
+    assert [t["config"]["workflow_name"] for t in saved] == ["sdxl_t2i", "wan22_i2v"]
     assert reloaded.get("gallery_folder") == "image/sdxl_t2i"
 
 
@@ -542,6 +542,7 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     its longest item) — that makes the window refuse to fit and breaks
     monitor-to-monitor tiling."""
     win = _window(qtbot, tmp_path)
+    win.show()   # an unshown window has never laid out, and answers from nothing
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704
 
@@ -570,6 +571,7 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
                                                 "enhance_steps": 20}}]),
     )
     row = db.get_generation("img1")
+    win.show()   # an unshown window has never laid out, and answers from nothing
     win._gallery_view._info_tabs.current_config_panel().show_saved_generation(row, [row])
 
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
@@ -581,6 +583,7 @@ def test_window_still_tiles_with_a_config_tab_open(qtbot, tmp_path):
     # governs the info pane's floor. Even with one open, the window must still fit a
     # narrow tiling slot — its form scrolls rather than widening the window.
     win = _window(qtbot, tmp_path)
+    win.show()   # an unshown window has never laid out, and answers from nothing
     win._gallery_view._info_tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
     assert effective_min_width <= 704

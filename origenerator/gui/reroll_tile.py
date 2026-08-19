@@ -2,19 +2,29 @@
 
 Idle, it is a ``+`` box that asks for a fresh generation of the folder's
 settings with a new seed. Bound to a running :class:`GenerationJob`, it shows
-that job's live state — waiting in the queue, then a progress percentage and
-ComfyUI's in-progress preview — with a button that throws that run away, reading
-"Cancel" or, while the folder is auto-generating, "Next seed" (see
-:func:`inflight.discard_run_text`). The tile is rebuilt whenever the gallery
-re-renders, so it reads the job's cached state on construction rather than
-relying solely on future signals.
+that job's live state the way every other in-flight surface does: ComfyUI's
+in-progress preview with a dimming scrim over it naming the stage
+("Waiting…", then "Generating…"), and a bar along the picture's foot carrying
+how far along the run is and how long that has taken
+(:func:`origenerator.timing.progress_status_label`) — the same reading, in the
+same words, as the bottom strip's queue and the Recents shelf's cards. Beside
+them a button throws that run away, reading "Cancel" or, while the folder is
+auto-generating, "Next seed" (see :func:`inflight.discard_run_text`).
+
+The tile is rebuilt whenever the gallery re-renders, so it reads the job's
+cached state on construction rather than relying solely on future signals.
 """
+
+import time
 
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QRect, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
+from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.stage_scrim import StageScrim
+from origenerator.timing import progress_status_label
 
 # Idle/active resting look (a dashed "+" box) versus the solid border that marks
 # the tile as the selected item driving the info pane, mirroring a thumbnail.
@@ -24,16 +34,27 @@ _IDLE_FRAME_CSS = (
 )
 _SELECTED_FRAME_CSS = "#rerollTile { border: 2px solid #8a8a8a; border-radius: 4px; }"
 
+_IMAGE_SIZE = (166, 150)
+_BAR_HEIGHT = 26  # the bar laid along the frame's foot, the way a player's is
+# How often the tile re-reads the clock. Its own timer rather than the gallery's
+# poll, which would make a seconds count skip every other tick.
+_TICK_MS = 1000
+
 
 class RerollTile(QFrame):
     add_requested = pyqtSignal()
     cancel_requested = pyqtSignal()
     selected = pyqtSignal()  # a running tile was clicked to drive the info pane
 
-    def __init__(self, job=None, parent=None, *, auto_generating=False):
+    def __init__(self, job=None, parent=None, *, auto_generating=False,
+                 typical_seconds=None):
+        """``typical_seconds`` is what this folder's workflow usually takes, so a
+        bound job's bar can say how much of its run is left; ``None`` where there
+        is no history to say it from."""
         super().__init__(parent)
         self._job = job
         self._selected = False
+        self._typical_seconds = typical_seconds
         self.setObjectName("rerollTile")
         self.setFixedSize(180, 200)
         self.set_selected(False)
@@ -43,10 +64,13 @@ class RerollTile(QFrame):
         layout.setSpacing(4)
 
         self._image = QLabel()
-        self._image.setFixedSize(166, 150)
+        self._image.setFixedSize(*_IMAGE_SIZE)
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._image)
 
+        # What the idle tile offers. A bound job says its stage on the scrim over
+        # the picture instead, so this stands down rather than repeating it in
+        # smaller letters underneath.
         self._status = QLabel()
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status.setWordWrap(True)
@@ -57,6 +81,19 @@ class RerollTile(QFrame):
         self._cancel.setToolTip(discard_run_tooltip(auto_generating))
         self._cancel.clicked.connect(lambda: self.cancel_requested.emit())
         layout.addWidget(self._cancel)
+
+        # Both ride over the picture rather than taking a row of their own, so a
+        # running tile is the same size and shape as the idle one it replaced.
+        self._scrim = StageScrim(self)
+        self._bar = ProgressCaption(self)
+        self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._bar.hide()
+
+        # Its own clock rather than the gallery's poll, so the count advances a
+        # second at a time whether or not a refresh has landed.
+        self._tick = QTimer(self)
+        self._tick.setInterval(_TICK_MS)
+        self._tick.timeout.connect(self._render_timing)
 
         if job is None:
             self._show_idle()
@@ -77,17 +114,18 @@ class RerollTile(QFrame):
         self._image.setStyleSheet(
             "background: #2a2a2a; border-radius: 3px; color: #8a8a8a;"
         )
+        self._status.hide()  # the scrim over the picture says the stage now
         self._cancel.show()
+        self._bar.show()
+        self._place_overlays()
         job.started.connect(self._on_started)
         job.progress.connect(self._on_progress)
         job.preview.connect(self._on_preview)
 
         if job.last_preview:
             self._on_preview(job.last_preview)
-        if job.state == "running":
-            self._render_running(*job.last_progress)
-        else:
-            self._render_waiting()
+        self._render_state()
+        self._tick.start()
 
     # --- selection ---------------------------------------------------------
 
@@ -102,25 +140,54 @@ class RerollTile(QFrame):
 
     # --- state rendering ---------------------------------------------------
 
-    def _has_image(self) -> bool:
-        return not self._image.pixmap().isNull()
+    def _render_state(self):
+        """Name the stage on the scrim and write the run's reading on the bar."""
+        self._scrim.cover(
+            self._image,
+            "Generating…" if self._job.state == "running" else "Waiting…",
+        )
+        self._bar.raise_()  # the scrim it sits on was just raised over everything
+        self._render_timing()
 
-    def _render_waiting(self):
-        self._status.setText("Waiting…")
-        if not self._has_image():
-            self._image.setText("Queued")
+    def _render_timing(self):
+        """How far along the bound run is, how long it has been going and how much
+        longer it has — written across the bar at the picture's foot.
 
-    def _render_running(self, value: int = 0, max_val: int = 0):
-        pct = f" {int(value * 100 / max_val)}%" if max_val else ""
-        self._status.setText(f"Generating…{pct}")
-        if not self._has_image():
-            self._image.setText("Generating…")
+        A job ComfyUI hasn't started has no elapsed time and no steps to report, so
+        the bar stays indeterminate with nothing written on it: its wait is the
+        strip's queue to explain, not a zero counting up over a bar that hasn't
+        moved.
+        """
+        started = self._job.started_at
+        elapsed = None if started is None else max(0.0, time.time() - started)
+        progress = self._job.last_progress
+        self._bar.show_progress(
+            # A tile's width takes the compact reading: how far along, and how
+            # much longer. The strip's queue has the room for the elapsed count.
+            progress_status_label(elapsed, progress, self._typical_seconds,
+                                  compact=True),
+            progress if self._job.state == "running" else None,
+        )
+
+    def _place_overlays(self):
+        """Lay the bar along the picture's foot. The picture is only positioned
+        once the tile's layout has run, so that is forced here rather than waited
+        for — an overlay placed before it sits in the tile's top-left corner."""
+        self.layout().activate()
+        frame = self._image.geometry()
+        self._bar.setGeometry(QRect(
+            frame.x(), frame.y() + frame.height() - _BAR_HEIGHT,
+            frame.width(), _BAR_HEIGHT,
+        ))
 
     def _on_started(self):
-        self._render_running(*self._job.last_progress)
+        self._render_state()
 
-    def _on_progress(self, value: int, max_val: int):
-        self._render_running(value, max_val)
+    def _on_progress(self, *_):
+        # The numbers are read back off the job rather than taken from the signal:
+        # the tile's own clock re-renders on a tick that carries none, and both
+        # paths must draw the same line.
+        self._render_state()
 
     def _on_preview(self, data: bytes):
         pixmap = QPixmap()

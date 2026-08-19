@@ -92,6 +92,37 @@ def test_a_parent_row_offers_no_actions(qtbot):
     assert tree.currentItem() is parent
 
 
+def _caret_pos(tree, item):
+    """A point in ``item``'s own disclosure column, where its caret is drawn."""
+    row = tree.visualRect(tree.indexFromItem(item))
+    return QPoint(row.left() - tree.indentation() // 2, row.center().y())
+
+
+def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
+    # QTreeView toggles the caret on a press of any button. A folder with
+    # sub-folders wears no star of its own, so its right-click menu is the only
+    # way to star it — and the menu covers the tree, so a collapse on the way in
+    # is only seen once the menu closes, reading as something the star did.
+    tree, leaf = _tree_with_leaf(qtbot)
+    parent = leaf.parent()
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton,
+                     pos=_caret_pos(tree, parent))
+
+    assert parent.isExpanded()
+    assert tree.currentItem() is parent  # still picked, so the menu acts on it
+
+
+def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot)
+    parent = leaf.parent()
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton,
+                     pos=_caret_pos(tree, parent))
+
+    assert not parent.isExpanded()
+
+
 def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
 

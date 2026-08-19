@@ -2,11 +2,13 @@ import json
 
 from origenerator.generation_config import (
     ConfigSnapshot,
+    configs_match,
     filled_params,
     find_duplicate_generation,
     merge_denormalized,
     prepared_params,
     randomize_seeds,
+    would_reproduce_a_completed_run,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -198,3 +200,65 @@ def test_find_duplicate_ignores_imported_rows():
     rows = [_row(params={"seed": 7, "steps": 20}, source="imported")]
     snap = _snapshot(params={"seed": 7, "steps": 20})
     assert find_duplicate_generation(rows, snap) is None
+
+
+# --- configs_match: does a form still describe the generation it was seeded from? --
+
+def test_configs_match_when_every_setting_is_the_same():
+    assert configs_match(_snapshot(params={"positive_prompt": "a cat", "seed": 5}),
+                         _snapshot(params={"positive_prompt": "a cat", "seed": 5}))
+
+
+def test_configs_differ_on_any_changed_param():
+    assert not configs_match(_snapshot(params={"positive_prompt": "a cat"}),
+                             _snapshot(params={"positive_prompt": "a dog"}))
+
+
+def test_configs_differ_on_a_changed_seed():
+    # A different seed is a different picture, so it counts as a modification
+    # even though it lands the run in the same gallery folder.
+    assert not configs_match(_snapshot(params={"seed": 5}),
+                             _snapshot(params={"seed": 6}))
+
+
+def test_configs_differ_on_a_changed_workflow():
+    assert not configs_match(_snapshot(workflow="sdxl_t2i", params={"seed": 5}),
+                             _snapshot(workflow="wan22_i2v", params={"seed": 5}))
+
+
+def test_configs_differ_once_the_seed_is_set_to_random():
+    # Same seed in the field, but one of them re-rolls it on Generate — so they
+    # would not make the same picture.
+    assert not configs_match(_snapshot(params={"seed": 5}),
+                             _snapshot(params={"seed": 5}, seed_is_random=True))
+
+
+def test_configs_differ_when_one_carries_a_param_the_other_lacks():
+    assert not configs_match(_snapshot(params={"seed": 5}),
+                             _snapshot(params={"seed": 5, "steps": 20}))
+
+
+def test_configs_match_across_int_and_float_spellings_of_a_number():
+    # A form reads 1.5 back as a float where a stored row may hold it as an int;
+    # equal values are equal settings.
+    assert configs_match(_snapshot(params={"cfg": 8}), _snapshot(params={"cfg": 8.0}))
+
+
+def test_would_reproduce_fills_defaults_before_comparing():
+    # The one question both the gallery's launch and the Generate button's caption
+    # ask. A caller carrying only the fields it edited must still match a stored
+    # row, which holds every param — so the defaults are filled in first.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    rows = [_row(params=dict(wf.default_params(), positive_prompt="a cat", seed=7))]
+    assert would_reproduce_a_completed_run(
+        rows, wf, {"positive_prompt": "a cat", "seed": 7}) is True
+
+
+def test_would_reproduce_is_false_while_the_seed_is_random():
+    # The same settings under a Random seed reproduce nothing, so the button that
+    # would offer a fresh seed has nothing to offer — it just reads "Generate".
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=7)
+    rows = [_row(params=params)]
+    assert would_reproduce_a_completed_run(
+        rows, wf, params, seed_is_random=True) is False

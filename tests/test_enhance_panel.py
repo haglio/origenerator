@@ -19,28 +19,21 @@ from origenerator.gui.enhance_versions import (
     params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, DETAIL_PARTS
 
 
-def _wanted_detectors() -> tuple[str, str]:
-    """The face and hand models the detail pass looks for, read off the workflow
-    rather than retyped — the panel offers the pass only when one is installed,
-    so a test that named its own files would be measuring the wrong thing."""
-    defaults = WORKFLOW_REGISTRY["image_enhance"].default_params()
-    return (defaults["enhance_face_detector"], defaults["enhance_hand_detector"])
+_FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
 
-def _panel(qtbot, detectors=None):
-    """A panel built against a stated set of installed face/hand detectors —
-    the one thing on it that can be missing, and so the one thing a test must
-    not read off whatever this machine happens to have in its ComfyUI."""
-    import origenerator.workflows.image_enhance as enhancer
+def _panel(qtbot, detectors=_FOUND_DETECTORS):
+    """A panel built against a stated set of installed detectors — the one thing
+    on it that can be missing, and so the one thing a test must not read off
+    whatever this machine happens to have in its ComfyUI."""
+    import origenerator.workflows.detail_parts as parts
 
-    if detectors is None:
-        detectors = _wanted_detectors()
     edits = []
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(enhancer, "list_detector_files", lambda: list(detectors))
+        mp.setattr(parts, "list_detector_files", lambda: list(detectors))
         panel = EnhancePanel(edits.append)
     qtbot.addWidget(panel)
     return panel, edits
@@ -142,50 +135,107 @@ def test_every_knob_reports_its_edit(qtbot):
     assert latest.params["enhance_denoise"] == 0.4
 
 
-def test_the_detail_pass_is_a_check_and_a_denoise_of_its_own(qtbot):
-    # The pass is bolder than the enhance around it precisely because it only
-    # touches the regions it found, so it carries its own denoise rather than
-    # sharing the one above it.
+def test_every_fixable_part_gets_a_box_and_a_number_of_its_own(qtbot):
+    # One of each per part the app can aim a detail pass at: the box says
+    # whether that part is fixed, the number how hard — a mouth wants a harder
+    # redraw than a face, and one shared number could never say so.
     panel, edits = _panel(qtbot)
-    assert panel._detail.isEnabled()
-    assert panel.settings().params["enhance_detail_fix"] is False
+    assert list(panel._fixes) == [part.name for part in DETAIL_PARTS]
+    # Nothing ticked, so nothing pays for a pass it didn't ask for — while the
+    # numbers already read as what a fix runs at.
+    assert panel.settings().params["enhance_detail_fixes"] == {}
+    assert panel._fixes["faces"].value() == DEFAULT_FIX_DENOISE
 
-    panel._detail.setChecked(True)
-    panel._detail_denoise.setValue(0.5)
+    panel._fix_checks["faces"].setChecked(True)
+    panel._fix_checks["hands"].setChecked(True)
+    panel._fixes["hands"].setValue(0.6)
 
-    assert edits[-1].params["enhance_detail_fix"] is True
-    assert edits[-1].params["enhance_detail_denoise"] == 0.5
-    assert panel._detail.toolTip() and panel._detail_denoise.toolTip()
+    assert edits[-1].params["enhance_detail_fixes"] == {
+        "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
+    assert panel._fixes["faces"].toolTip() and panel._fix_checks["faces"].toolTip()
 
 
-def test_the_detail_pass_dims_itself_when_no_detector_is_installed(qtbot):
-    # The one setting here that can be unavailable: the models that find the
-    # faces and hands are a separate install, and a run without one is rejected
-    # on submit. Better a control that says why than a tick that quietly fails.
-    panel, _ = _panel(qtbot, detectors=())
-    assert not panel._detail.isEnabled()
-    assert not panel._detail_denoise.isEnabled()
+def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
+    # Seven parts share one line only if none of them is padded out: Qt's own
+    # hint for a spin box is far wider than "0.00", and a field given a floor
+    # and a share of the slack (as the three numbers above have) costs another
+    # part its place on the line.
+    panel, _ = _panel(qtbot)
+    box = panel._fixes["faces"]
+    digits = box.fontMetrics().horizontalAdvance("0.00")
+
+    assert digits < box.minimumWidth() <= digits + 30   # its own chrome, no more
+    assert box.minimumWidth() == box.maximumWidth()     # fixed, so a wide pane
+    assert box.minimumWidth() < box.sizeHint().width()  # doesn't stretch it
+
+
+def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
+    # The window tiles into a third of a monitor, so no row of fields may set
+    # the floor for it — and a line too long to fit has to wrap, since a
+    # clipped part is a setting that silently isn't there.
+    panel, _ = _panel(qtbot)
+    host = panel._fixes["faces"].parent().parent()
+    flow = host.layout()
+    pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
+
+    assert flow.heightForWidth(120) > flow.heightForWidth(4000)   # it wraps
+    assert host.hasHeightForWidth()   # or the wrapped rows are cut off the bottom
+    # Its floor is one part, not the whole line.
+    assert host.minimumSizeHint().width() <= max(
+        pair.sizeHint().width() for pair in pairs) + 8
+
+
+def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
+    # The tick is the on/off, so unticking must leave the settings — and leave
+    # the number where it was, since the next tick means the same fix again.
+    panel, edits = _panel(qtbot)
+    panel._fix_checks["faces"].setChecked(True)
+    panel._fixes["faces"].setValue(0.7)
+
+    panel._fix_checks["faces"].setChecked(False)
+
+    assert edits[-1].params["enhance_detail_fixes"] == {}
+    assert panel._fixes["faces"].value() == 0.7
+    # And off, the part reads as off rather than as a live setting.
+    assert not panel._fixes["faces"].isEnabled()
+
+
+def test_an_unticked_parts_name_and_number_grey_out(qtbot):
+    # Which parts are on has to be readable down the line at a glance, not
+    # worked out box by box.
+    panel, _ = _panel(qtbot)
+    label = panel._label_for(panel._fixes["faces"])
+
+    assert not label.isEnabled() and not panel._fixes["faces"].isEnabled()
+
+    panel._fix_checks["faces"].setChecked(True)
+
+    assert label.isEnabled() and panel._fixes["faces"].isEnabled()
+
+
+def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
+    # The settings here that can be unavailable rather than merely unset: the
+    # model that finds a part is a separate install, and a run naming one
+    # ComfyUI hasn't got is rejected on submit. Better a box that says why than
+    # one that quietly fails.
+    panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
+    assert panel._fix_checks["faces"].isEnabled()
+    assert not panel._fix_checks["hands"].isEnabled()
     # The whole setup, in the one place someone reads carefully: the node pack
-    # that runs the detectors as well as the folder the models go in.
-    assert "models/ultralytics/bbox" in panel._detail.toolTip()
-    assert "Impact Subpack" in panel._detail.toolTip()
+    # that runs the detectors, the folder the models go in, and what the file
+    # this part needs is called.
+    tooltip = panel._fix_checks["hands"].toolTip()
+    assert "models/ultralytics/bbox" in tooltip
+    assert "Impact Subpack" in tooltip
+    assert "hand" in tooltip
+    assert panel._label_for(panel._fixes["hands"]).toolTip() == tooltip
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
-    # The pass names the two models it looks for, so some other detector sitting
-    # in that folder would leave the box tickable and the pass finding nothing.
-    # Dimmed names the file to add; enabled-but-inert says nothing at all.
+    # Some other detector sitting in that folder would leave every box tickable
+    # and every pass finding nothing. Unavailable says which file to add.
     panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not panel._detail.isEnabled()
-    assert all(name in panel._detail.toolTip() for name in _wanted_detectors())
-
-
-def test_one_of_the_two_detectors_is_enough_to_offer_the_pass(qtbot):
-    # Faces and hands are found by different models, and having only one is an
-    # ordinary install — the half that can run still should.
-    panel, _ = _panel(qtbot, detectors=_wanted_detectors()[:1])
-    assert panel._detail.isEnabled()
-    assert panel._detail_denoise.isEnabled()
+    assert not any(box.isEnabled() for box in panel._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
@@ -236,11 +286,11 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
     # Switching the panel off and on again must not hand back a knob that was
-    # grayed in its own right: the pass still has no model to run.
+    # grayed in its own right: the part still has no model to find it.
     panel, _ = _panel(qtbot, detectors=())
     panel.set_applicable(False, "nope")
     panel.set_applicable(True)
-    assert panel.isEnabled() and not panel._detail.isEnabled()
+    assert panel.isEnabled() and not panel._fix_checks["faces"].isEnabled()
 
 
 def test_a_disabled_toggle_switch_dims(qtbot):
@@ -675,6 +725,42 @@ def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, monkeypatch):
     assert params_from_mime(dragged["mime"]) == {"enhance_scale": 2.0}
 
 
+def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, monkeypatch):
+    # An enhancement is an upscale, so the file behind a version can be huge; the
+    # picture under the cursor is the same thumbnail every other drag trails.
+    from PIL import Image
+
+    from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
+
+    image = tmp_path / "big.png"
+    Image.new("RGB", (1024, 768), (60, 90, 200)).save(image)
+
+    dragged = {}
+
+    class _RecordingDrag:
+        def __init__(self, source):
+            pass
+
+        def setMimeData(self, mime):
+            pass
+
+        def setPixmap(self, pixmap):
+            dragged["pixmap"] = pixmap
+
+        def exec(self, _action):
+            return None
+
+    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
+
+    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, image)
+    qtbot.addWidget(tile)
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tile, QPoint(90, 90))
+
+    picture = dragged["pixmap"]
+    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+
+
 def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
     # A level whose file is gone still carries its settings; there is simply no
     # image to trail, and that must not stop the drag.
@@ -794,3 +880,36 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     versions.set_collapsed(True)
     versions.show_levels(_items(_levels(2)), add=("2x", None))
     assert versions.is_collapsed()
+
+
+def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
+    """The widest thing in the tab wraps rather than set the pane's floor.
+
+    A picture beside a file's facts and buttons wants some 450px side by side,
+    which is wider than a tiling-narrow info pane can be — so the pane would have
+    had to choose between refusing to fit a monitor third and scrolling its
+    settings sideways. Stacked, the row asks for the wider of the two rather than
+    their sum, and neither has to give.
+    """
+    from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+
+    (level,) = _levels(1)[:1]
+    row = _LevelRow(level, 0, None)
+    host = QWidget()
+    box = QVBoxLayout(host)
+    box.setContentsMargins(0, 0, 0, 0)
+    box.addWidget(row)
+    qtbot.addWidget(host)
+    host.show()
+
+    side_by_side = row._picture.sizeHint().width() + row._facts.minimumSize().width()
+    assert row.minimumSizeHint().width() < side_by_side
+
+    host.resize(side_by_side + 60, 400)          # room for both
+    QApplication.processEvents()
+    assert row._title.x() > row._picture.x() + row._picture.width()
+    assert row._title.y() < row._picture.y() + row._picture.height()
+
+    host.resize(row.minimumSizeHint().width(), 400)   # room for one
+    QApplication.processEvents()
+    assert row._title.y() >= row._picture.y() + row._picture.height()

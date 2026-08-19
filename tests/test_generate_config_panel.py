@@ -3,6 +3,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QPixmap
 
 from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -10,6 +12,7 @@ from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import icons
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -48,29 +51,154 @@ def _is_descendant(widget, ancestor) -> bool:
     return False
 
 
-# --- layout: preview-over-form beside a slim history strip -----------------
+# --- layout: one preview-over-form column ----------------------------------
 
-def test_panel_lays_out_two_resizable_panes(panel):
+def test_the_panel_is_one_column_with_no_side_pane(panel):
+    # The tab is a single column now — no splitter, no second pane beside it.
     from PyQt6.QtWidgets import QSplitter
-    assert isinstance(panel._panes, QSplitter)
-    assert panel._panes.count() == 2
+    assert panel.findChildren(QSplitter) == []
 
 
-def test_thumbnail_history_is_the_right_pane(panel):
-    from origenerator.gui.thumbnail_strip import ThumbnailStrip
-    right = panel._panes.widget(1)
-    assert right is panel._strip
-    assert isinstance(right, ThumbnailStrip)
+def test_preview_leads_the_column_over_the_form_and_generate(panel):
+    # Preview-over-form: the preview sits on top of the settings, with the
+    # Generate button under them, all in the panel's own column.
+    column = panel.layout()
+    assert column.indexOf(panel._preview) == 0
+    assert column.indexOf(panel._preview) < column.indexOf(panel._scroll)
+    assert _is_descendant(panel._generate_btn, panel)
 
 
-def test_preview_over_form_share_the_main_pane(panel):
-    # Preview-over-form: the preview sits on top of the settings in the left "main"
-    # pane, with the status bar and the Generate button under it — beside the slim
-    # history strip. The preview is no longer its own splitter pane.
-    main = panel._panes.widget(0)
-    assert _is_descendant(panel._preview, main)
-    assert _is_descendant(panel._generate_btn, main)
-    assert panel._preview is not main  # nested inside the pane, not the pane itself
+def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
+    """The settings scroll never grows a horizontal bar: squeezed, the form gives
+    up width — the pickers elide, the labels wrap, a row drops its field onto its
+    own line — rather than push the whole column out of view sideways.
+
+    The failure this exists for: a model picker asked for its longest file name,
+    a section header for its whole title and the workflow picker for its
+    placeholder, so the pane could not be narrowed without a sideways scroll.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)   # every field on show: the widest the form gets
+    panel.show()
+
+    for width in (600, 420, 300):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        assert not panel._scroll.horizontalScrollBar().isVisible(), f"at {width}px"
+
+
+def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel):
+    """Squeezed, the settings shorten — none of them runs off the side.
+
+    The failure this exists for: QFormLayout's WrapLongRows lays a wrapped label
+    out at its own full-line size hint without clamping it to the row, so a label
+    like "Noise Seed (Stage 1)" ran 50px past the edge of the column it was in.
+    Nothing on screen said what had been cut: not an ellipsis, and not the scroll
+    bar, which stayed away because the layout's stated minimum still fit.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    panel = blank_panel
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)
+    panel.show()
+
+    host = panel._scroll.widget()
+    for width in (600, 420, 320, 260, 240):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        over = []
+
+        def walk(widget):
+            if not widget.isVisible():
+                return
+            right = widget.mapTo(host, widget.rect().topRight()).x()
+            if right >= host.width():
+                over.append((type(widget).__name__,
+                             getattr(widget, "text", lambda: "")(),
+                             right - host.width()))
+            for child in widget.children():
+                if child.isWidgetType():
+                    walk(child)
+
+        walk(host)
+        assert not over, f"at {width}px: {over[:3]}"
+
+
+def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(blank_panel):
+    """Its floor is what its contents need, so the scroll bar never has to appear.
+
+    Squeezing a form and scrolling it sideways is a bad trade for the drag it
+    allows, so the pane refuses to go there at all: the floor is read live off the
+    scroll's contents, which is why it rises when a wider workflow is chosen.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    panel = blank_panel
+    blank_floor = panel._contents_floor()
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)
+    panel.show()
+    QApplication.processEvents()
+
+    # A wider workflow is a wider floor: it is read off the contents, not fixed.
+    assert panel._contents_floor() > blank_floor
+    floor = panel.minimumSizeHint().width()
+    assert floor >= panel._contents_floor()
+
+    panel.resize(floor, 800)
+    QApplication.processEvents()
+    assert not panel._scroll.horizontalScrollBar().isVisible()
+    assert panel._scroll.viewport().width() >= panel._scroll.widget().minimumSizeHint().width()
+
+
+def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
+    """Narrowed, the buttons drop onto further lines, each still at its full width.
+
+    The failure this exists for: a row layout squeezed them past their minimum and
+    clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    buttons = [panel._folder_btn, panel._evolver_btn, panel._genau_btn,
+               panel._cancel_btn, panel._generate_btn]
+    for button in buttons:
+        button.show()          # the busiest the bank ever is: every button on
+    panel.show()
+
+    panel.resize(340, 800)
+    QApplication.processEvents()
+
+    for button in buttons:
+        assert button.width() == button.sizeHint().width(), button.text()
+    assert len({button.y() for button in buttons}) > 1        # it wrapped
+    # ...and every line still ends in the corner the bank sits in.
+    lines = {}
+    for button in buttons:
+        lines[button.y()] = max(lines.get(button.y(), 0), button.x() + button.width())
+    assert len(set(lines.values())) == 1
+
+
+def test_the_pane_keeps_a_margin_round_its_contents(panel):
+    # Nothing sits flush against the tab's edge — not the preview at the top, not
+    # the settings down either side, not the button bank at the bottom.
+    from origenerator.gui.generate_config_panel import _PANE_MARGIN
+
+    panel.show()
+    panel.resize(700, 800)
+
+    top_left = panel._preview.mapTo(panel, panel._preview.rect().topLeft())
+    assert top_left.x() == _PANE_MARGIN
+    assert top_left.y() == _PANE_MARGIN
+    scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
+    assert panel.width() - scroll_right - 1 == _PANE_MARGIN
+    generate = panel._generate_btn
+    bottom = generate.mapTo(panel, generate.rect().bottomLeft()).y()
+    assert panel.height() - bottom - 1 == _PANE_MARGIN
 
 
 def _layout_containing(root, widget):
@@ -107,8 +235,7 @@ def test_file_info_above_form_related_media_below(panel):
 def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
     # same row as Cancel and Generate.
-    main = panel._panes.widget(0)
-    bank = _layout_containing(main.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn)
     assert bank is not None
     assert bank.indexOf(panel._folder_btn) != -1
     assert bank.indexOf(panel._evolver_btn) != -1
@@ -202,7 +329,6 @@ def test_tolerates_a_missing_client(qtbot, tmp_path):
     qtbot.addWidget(p)
     assert p._generate_btn.isEnabled() is False
     p._on_generate()                      # no-op, no crash
-    p.teardown()                          # never connected, so a no-op too
 
 
 # --- Cancel the in-flight run from the tab -----------------------------------
@@ -213,7 +339,7 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     # gallery marks the tab generating.
     from PyQt6.QtWidgets import QPushButton
     assert isinstance(panel._cancel_btn, QPushButton)
-    assert _is_descendant(panel._cancel_btn, panel._panes.widget(0))  # the main pane
+    assert _is_descendant(panel._cancel_btn, panel)  # in the tab's own column
     assert panel._cancel_btn.parent() is panel._generate_btn.parent()  # same button row host
     assert panel._cancel_btn.isHidden()
 
@@ -233,10 +359,10 @@ def test_set_generating_offers_cancel_beside_a_still_pressable_generate(panel):
 def test_the_discard_button_says_next_seed_while_the_folder_auto_generates(panel):
     # Same button, honest label: with the folder looping, the press discards this
     # seed and the loop starts another — nothing stops.
-    panel.set_generating(True, "p1", auto_generating=True)
+    panel.set_generating(True, auto_generating=True)
     assert panel._cancel_btn.text() == "Next seed"
 
-    panel.set_generating(True, "p1")  # Auto switched off mid-run: a plain cancel
+    panel.set_generating(True)  # Auto switched off mid-run: a plain cancel
     assert panel._cancel_btn.text() == "Cancel"
 
 
@@ -497,29 +623,71 @@ def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
     assert fired == []
 
 
-# --- title ------------------------------------------------------------------
+# --- title and mark ---------------------------------------------------------
 
-def test_title_is_workflow_name_for_blank_config(panel):
-    assert panel.title() == "SDXL Text-to-Image"
-
-
-def test_title_leads_with_model_then_prompt(panel):
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a cat in a hat"})
-    assert panel.title() == "SDXL Text-to-Image › a cat in a hat"
+def _folder_name(panel):
+    """The name the gallery folder this config maps to wears in the tree."""
+    return gallery.config_folder_name(*panel.settings_key(),
+                                      panel._db.folder_meta_map())
 
 
-def test_title_changed_emitted_when_prompt_edited(panel):
+def test_a_config_with_no_result_is_named_by_its_folder(panel):
+    # Nothing has been generated with these settings, so there is no item to name
+    # the tab: it wears the name of the folder its output would land in — the
+    # same short code the tree shows over there.
+    assert panel.title() == _folder_name(panel)
+    assert panel.title() != "New generation"
+
+
+def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
+    from origenerator.gallery.keys import settings_key
+    panel._db.rename_folder(settings_key("image", *panel.settings_key()), "Wizards")
+
+    assert panel.title() == "Wizards"
+
+
+def test_a_displayed_item_names_the_tab_by_its_file(panel, tmp_path):
+    row = _image_row(panel._db, filename="sdxl_img1.png")
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(row, [row])
+
+    assert panel.title() == "sdxl_img1.png"
+
+
+def test_title_changed_when_the_shown_item_changes(panel):
+    row = _image_row(panel._db, filename="sdxl_img1.png")
+    panel._preview.show_media = MagicMock()
     titles = []
     panel.title_changed.connect(titles.append)
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert titles and titles[-1] == "SDXL Text-to-Image › a fox"
+
+    panel.show_saved_generation(row, [row])
+
+    assert titles and titles[-1] == "sdxl_img1.png"
 
 
-def test_custom_title_overrides_and_sticks(panel):
-    panel.set_custom_title("My experiments")
-    assert panel.title() == "My experiments"
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert panel.title() == "My experiments"  # rename survives config changes
+def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
+    pixmap = QPixmap(4, 4)
+    pixmap.fill(Qt.GlobalColor.red)
+    thumb = tmp_path / "thumb.png"
+    pixmap.save(str(thumb))
+    row = dict(_image_row(panel._db), thumbnail_path=str(thumb))
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(row, [row])
+
+    # The item's own picture, at its own size — not one of the drawn glyphs.
+    assert panel.tab_icon().availableSizes() == [QSize(4, 4)]
+
+
+def test_the_mark_falls_back_to_what_the_config_makes(panel):
+    # No result yet, so no thumbnail: the plain photo/play mark says which kind
+    # of thing this tab would produce.
+    assert panel.tab_icon().cacheKey() == icons.media_type_icon("image").cacheKey()
+
+
+def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
+    assert blank_panel.tab_icon().isNull()
 
 
 # --- estimate label ---------------------------------------------------------
@@ -528,7 +696,8 @@ class SpyDB:
     """A minimal stand-in returning canned recent durations and no rows.
 
     ``list_generations`` returns ``[]`` (the strip and recent-preview stay empty,
-    which these duration tests don't inspect) and ``recent_durations`` feeds the
+    which these duration tests don't inspect), ``folder_meta_map`` no names (the
+    tab falls back to its folder's code), and ``recent_durations`` feeds the
     estimate label.
     """
 
@@ -540,6 +709,9 @@ class SpyDB:
 
     def list_generations(self):
         return []
+
+    def folder_meta_map(self):
+        return {}
 
 
 def _spy_panel(qtbot, db):
@@ -882,54 +1054,15 @@ def test_panel_forwards_the_preview_drag_signals(panel):
     assert ended == [True]
 
 
-def test_generate_button_fills_with_run_progress_only_while_generating(panel):
+def test_the_tab_watches_no_run_of_its_own(panel):
+    # Generate submits and is done with it. It used to fill with the tracked run's
+    # steps, which took a third telling of one run — differently worded from the
+    # strip's queue and the shelf's card — and wired the control that starts work
+    # to the state of work already going.
     panel.set_generating(True)
-    panel._on_progress("pid", 3, 12)
-    assert panel._generate_btn._fraction == 0.25   # the run's step progress
-
-    panel.set_generating(False)                    # run ended: back to the idle button
-    panel._on_progress("pid", 9, 12)               # a stray later event is ignored
-    assert panel._generate_btn._fraction is None
-
-
-def test_set_generating_true_again_keeps_the_fill(panel):
-    # The gallery re-asserts the generating state on every rebuild, so re-marking an
-    # already-running tab must NOT snap its filling button back to empty — otherwise
-    # a reconnected run's bar would reset to 0 on each poll instead of advancing.
-    panel.set_generating(True)
-    panel._on_progress("pid", 6, 12)               # filled to halfway
-    assert panel._generate_btn._fraction == 0.5
-
-    panel.set_generating(True)                     # redundant re-assert on a rebuild
-    assert panel._generate_btn._fraction == 0.5    # still halfway, not reset to 0
-
-
-def test_generate_button_ignores_another_jobs_progress(panel):
-    # The client's progress is multiplexed across every job on the server; while a
-    # background experiment executes, its steps must not fill this tab's button —
-    # only the tracked run's own progress counts once the tab knows its prompt id.
-    panel.set_generating(True, prompt_id="mine")
-
-    panel._on_progress("experiment", 6, 12)        # someone else's run
-    assert panel._generate_btn._fraction == 0.0    # untouched (progress mode starts at 0)
-
-    panel._on_progress("mine", 3, 12)              # this tab's own run
-    assert panel._generate_btn._fraction == 0.25
-
-
-def test_reasserting_generating_retargets_the_tracked_prompt(panel):
-    # A chained i2v swaps to a new prompt mid-flight (image stage, then video
-    # stage) without leaving the generating state; the re-assert must adopt the
-    # new prompt id so the second stage's progress still drives the button.
-    panel.set_generating(True, prompt_id="image-stage")
-    panel._on_progress("image-stage", 6, 12)
-    assert panel._generate_btn._fraction == 0.5
-
-    panel.set_generating(True, prompt_id="video-stage")  # stage swap, still generating
-    panel._on_progress("image-stage", 9, 12)       # stale stage: ignored now
-    assert panel._generate_btn._fraction == 0.5
-    panel._on_progress("video-stage", 3, 12)
-    assert panel._generate_btn._fraction == 0.25
+    assert panel._generate_btn.text() == "Generate"
+    assert not hasattr(panel, "_on_progress")
+    assert not hasattr(panel, "_generating_prompt_id")
 
 
 def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
@@ -1253,8 +1386,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
 
 
 def test_send_to_genau_shares_the_one_button_bank(panel):
-    main = panel._panes.widget(0)
-    bank = _layout_containing(main.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn)
     assert bank.indexOf(panel._genau_btn) != -1
 
 
@@ -1328,3 +1460,155 @@ def test_send_to_genau_does_not_re_export_an_already_sent_clip(saved_panel, monk
     panel._on_send_to_genau()
 
     export.assert_not_called()
+
+
+# --- the modified notice: the preview no longer answers the form -------------
+
+def _notice(panel):
+    """What the preview is saying over its picture, or "" when it says nothing."""
+    return "" if panel._preview._notice.isHidden() else panel._preview._notice.text()
+
+
+def _set_prompt(panel, text):
+    panel._param_form._widgets["positive_prompt"].setPlainText(text)
+
+
+def test_a_browsed_generation_arrives_unmarked(saved_panel):
+    # The form was just seeded from this row, so the picture is exactly what
+    # these settings make: nothing to warn about.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    assert _notice(panel) == ""
+
+
+def test_editing_a_setting_marks_the_picture_as_not_generated_yet(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+
+    _set_prompt(panel, "a dog")
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_putting_the_setting_back_clears_the_mark(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    _set_prompt(panel, "a cat")
+
+    assert _notice(panel) == ""
+
+
+def test_re_rolling_the_seed_marks_it_too(saved_panel):
+    # Same prompt, but the run would draw a different seed — so the picture on
+    # screen is not what Generate would make either.
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+
+    panel._param_form.set_seed_random(True)
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_a_tab_with_nothing_on_display_is_never_marked(panel):
+    # No picture, nothing to be modified away from — a fresh tab's form is
+    # edited constantly and must not carry a warning about an empty pane.
+    _set_prompt(panel, "a dog")
+    assert panel._displayed_row is None
+    assert _notice(panel) == ""
+
+
+def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
+    saved_panel, monkeypatch, tmp_path
+):
+    # The pane's resting picture is this config's newest result, so it stops
+    # matching the moment the settings do.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    ipath = tmp_path / "sdxl_img1.png"
+    ipath.write_bytes(b"p")
+    monkeypatch.setattr(panel, "_recent_matching_row", lambda: image)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (ipath, "image"))
+
+    panel.show_recent_preview()
+    assert panel._displayed_row is not None and _notice(panel) == ""
+
+    _set_prompt(panel, "a dog")
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_switching_workflow_leaves_no_stale_mark(saved_panel):
+    # The new workflow re-shows its own newest result (or nothing), so the mark
+    # doesn't carry over from the settings that were replaced wholesale.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+
+    assert _notice(panel) == ""
+
+
+def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
+    # Pressing Generate on modified settings streams the run into this pane; the
+    # frames are the answer, so the warning about the old picture goes with them.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    _set_prompt(panel, "a dog")
+
+    panel._preview.show_message("Waiting for preview…", live=True)
+
+    assert _notice(panel) == ""
+
+
+# --- Generate says when it will draw a fresh seed ---------------------------
+
+def _completed_generation(db, workflow_name, params):
+    """Record ``params`` as a finished generation of ``workflow_name``, output and
+    all — the past run a matching config would reproduce."""
+    db.insert_generation(
+        prompt_id="done", workflow_name=workflow_name,
+        workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
+        positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
+        seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("done", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_t2i_done.png", "subfolder": "image"}]))
+
+
+def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(panel, qtbot):
+    # Generating settings already generated, seed and all, would only re-create
+    # that same file — so the press draws a fresh seed instead, and the button says
+    # so before it's pressed rather than a dialog asking after it.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
+    _completed_generation(panel._db, "sdxl_t2i", params)
+
+    panel.prefill("sdxl_t2i", params)
+
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+    assert "already been generated" in panel._generate_btn.toolTip()  # and why
+
+
+def test_editing_the_settings_takes_the_random_seed_caption_back_off(panel, qtbot):
+    # The caption follows the form: edit anything and these are no longer the
+    # settings already generated, so the button goes back to a plain Generate —
+    # a promise of a fresh seed it would no longer keep.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
+    _completed_generation(panel._db, "sdxl_t2i", params)
+    panel.prefill("sdxl_t2i", params)
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+
+    panel._param_form.set_values({"positive_prompt": "a dog"})
+
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate")
+    assert panel._generate_btn.toolTip() == ""

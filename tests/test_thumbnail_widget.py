@@ -1,9 +1,12 @@
+import time
+
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import icons
+from origenerator.gui import icons, thumbnail_widget
+from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.star_badge import StarBadge
 from origenerator.gui.stylesheet import build_stylesheet
@@ -53,31 +56,74 @@ def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
     assert not tw._image_label.pixmap().isNull()
 
 
-def test_hover_emits_hovered_then_unhovered(qtbot):
-    tw = ThumbnailWidget("p1", None, "label")
+class _RecordingDrag:
+    """Stands in for QDrag, remembering the picture hung under the cursor."""
+
+    last = None
+
+    def __init__(self, source):
+        self.pixmap = None
+        _RecordingDrag.last = self
+
+    def setMimeData(self, mime):
+        self.mime = mime
+
+    def setPixmap(self, pixmap):
+        self.pixmap = pixmap
+
+    def exec(self, _action):
+        return None
+
+
+def _drag_out(qtbot, tw):
+    """Press then travel far enough past the threshold to start a drag."""
+    qtbot.mousePress(tw, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tw, QPoint(120, 120))
+
+
+def test_a_dragged_still_trails_its_picture(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    still = tmp_path / "i1.jpg"
+    Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
+    tw = ThumbnailWidget("i1", str(still), "label")
     qtbot.addWidget(tw)
-    seen = []
-    tw.hovered.connect(lambda pid: seen.append(("in", pid)))
-    tw.unhovered.connect(lambda pid: seen.append(("out", pid)))
 
-    pos = QPointF(1, 1)
-    tw.enterEvent(QEnterEvent(pos, pos, pos))
-    tw.leaveEvent(QEvent(QEvent.Type.Leave))
+    _drag_out(qtbot, tw)
 
-    assert seen == [("in", "p1"), ("out", "p1")]
+    assert _RecordingDrag.last.pixmap is not None
+    assert not _RecordingDrag.last.pixmap.isNull()
 
 
-def test_highlight_toggles_and_is_distinct_from_selection(qtbot):
-    tw = ThumbnailWidget("p1", None, "label")
+def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeypatch):
+    # A video tile shows a looping WebP, so its label has no pixmap of its own;
+    # asked only for that, the drag used to trail nothing at all while an image
+    # dragged from the tile beside it trailed a picture.
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    tw = ThumbnailWidget("v1", None, "label", movie_path=str(webp))
     qtbot.addWidget(tw)
-    assert tw.is_highlighted() is False
-    tw.set_highlighted(True)
-    assert tw.is_highlighted() is True
-    assert tw.styleSheet() != ""        # a highlight fill is applied
-    assert tw.is_selected() is False    # highlight is not selection
-    tw.set_highlighted(False)
-    assert tw.is_highlighted() is False
-    assert tw.styleSheet() == ""
+
+    _drag_out(qtbot, tw)
+
+    assert _RecordingDrag.last.pixmap is not None
+    assert not _RecordingDrag.last.pixmap.isNull()
+
+
+def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
+    # No picture is the one case with nothing to show; the drag still goes.
+    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    _RecordingDrag.last = None
+    tw = ThumbnailWidget("p1", None, "label")  # "No preview"
+    qtbot.addWidget(tw)
+    started = []
+    tw.drag_started.connect(started.append)
+
+    _drag_out(qtbot, tw)
+
+    assert started == ["p1"]
+    assert _RecordingDrag.last.pixmap is None
 
 
 def test_left_click_emits_clicked_but_right_click_does_not(qtbot):
@@ -276,3 +322,112 @@ def test_a_still_tile_takes_the_freeze_inertly(qtbot, tmp_path):
     qtbot.addWidget(tile)
 
     set_previews_paused(True)  # nothing was moving; nothing to stop
+
+# --- the enhancement being made of this image --------------------------------
+
+def _run(**kw):
+    base = dict(status="running", frame=None)
+    base.update(kw)
+    return EnhancingRun(**base)
+
+
+def _png_bytes(color=(30, 90, 160)):
+    from io import BytesIO
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_a_resting_tile_wears_neither_overlay(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    assert tw.is_enhancing() is False
+    assert tw._enhancing_overlay.isHidden()
+    assert tw._enhancing_bar.isHidden()
+
+
+def test_an_enhancing_tile_says_so_over_the_picture_and_on_a_bar(qtbot):
+    # The same pair an in-flight card wears: the stage on a dimming scrim, and
+    # how far along the run is on a bar at the picture's foot. The tile used to
+    # get the scrim alone, so the one thing it couldn't say was how long.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(
+        progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0))
+    qtbot.addWidget(tw)
+
+    assert tw.is_enhancing() is True
+    assert tw._enhancing_overlay.text() == "Enhancing…"
+    assert tw._enhancing_bar.caption() == "50% · ~6:02 left"
+    assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
+
+
+def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
+    # Overlaid rather than laid out beneath, so an enhancing tile is the same
+    # size and shape as a resting one and still flows with them.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
+    qtbot.addWidget(tw)
+    picture, bar = tw._image_label.geometry(), tw._enhancing_bar.geometry()
+
+    assert picture.contains(bar)
+    assert bar.top() > picture.center().y()
+    assert tw.size() == ThumbnailWidget("p2", None, "label").size()
+
+
+def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
+    # Nothing has begun, so there is no percentage and no clock: a determinate
+    # bar parked at 0% would say it had started and gone nowhere.
+    tw = ThumbnailWidget("p1", None, "label",
+                         enhancing=_run(status="queued", progress=(0, 0)))
+    qtbot.addWidget(tw)
+
+    assert tw._enhancing_bar.caption() == ""
+    assert tw._enhancing_bar.maximum() == 0
+    assert not tw._enhancing_tick.isActive()
+
+
+def test_a_fresh_run_updates_the_overlays_in_place(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(status="queued"))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(progress=(5, 20), started_at=time.time() - 30.5,
+                          typical_seconds=100.0))
+
+    assert tw._enhancing_bar.caption().startswith("25% · ")
+    assert tw._enhancing_tick.isActive()
+
+
+def test_the_clock_advances_between_polls(qtbot):
+    # The gallery reconciles on its own schedule, which would make a countdown
+    # skip; the tile re-reads the clock itself so it moves a second at a time.
+    tw = ThumbnailWidget("p1", None, "label",
+                         enhancing=_run(started_at=time.time() - 5.5,
+                                        typical_seconds=100.0))
+    qtbot.addWidget(tw)
+    assert tw._enhancing_bar.caption() == "~1:34 left"
+
+    tw._enhancing.started_at -= 3  # as if three seconds had gone by
+    tw._enhancing_tick.timeout.emit()
+    assert tw._enhancing_bar.caption() == "~1:31 left"
+
+
+def test_a_streamed_frame_paints_the_picture_under_the_overlays(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run())
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(frame=_png_bytes()))
+
+    assert not tw._image_label.pixmap().isNull()
+    assert tw._enhancing_overlay.text() == "Enhancing…"  # still not the finished file
+    assert not tw._enhancing_bar.isHidden()
+
+
+def test_the_run_ending_takes_both_overlays_away(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(frame=_png_bytes()))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(None)
+
+    assert tw.is_enhancing() is False
+    assert tw._enhancing_overlay.isHidden()
+    assert tw._enhancing_bar.isHidden()
+    assert not tw._enhancing_tick.isActive()

@@ -4,12 +4,13 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QUrl, QSize, QPointF, QEvent
-from PyQt6.QtGui import QResizeEvent, QMouseEvent
+from PyQt6.QtGui import QResizeEvent, QMouseEvent, QImage
 from PyQt6.QtWidgets import QWidget, QApplication
-from PyQt6.QtMultimedia import QMediaPlayer
+from PyQt6.QtMultimedia import QMediaPlayer, QVideoFrame
 
 import origenerator.gui.preview_widget as preview_widget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.ken_burns import TICK_MS, ZOOM_SPAN, progress_step, zoom_at
@@ -33,6 +34,14 @@ def _make_tall_png(path):
     """A tall image whose aspect ratio doesn't match a wide pane, so a correct
     fit touches the short edges and leaves the long ones letterboxed."""
     Image.new("RGB", (24, 60), (10, 120, 200)).save(path, "PNG")
+    return path
+
+
+def _animated_webp(path):
+    """A tiny two-frame looping WebP — an animated image, played by QMovie."""
+    frames = [Image.new("RGB", (32, 24), c) for c in ((255, 0, 0), (0, 255, 0))]
+    frames[0].save(path, format="WEBP", save_all=True,
+                   append_images=frames[1:], duration=100, loop=0)
     return path
 
 
@@ -629,6 +638,75 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
     assert bytes(_FakeDrag.last.mime.data(GENERATION_MIME)).decode() == "gen1"
 
 
+def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
+        qtbot, make_preview, tmp_path, monkeypatch):
+    # The pane fits its picture to its own size, which is far bigger than a drop
+    # slot; under the cursor it travels as a thumbnail like every other drag.
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    w = make_preview()
+    w.show()
+    w.resize(600, 480)
+    qtbot.waitUntil(lambda: w._image_label.width() > THUMBNAIL_BOX)
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_draggable_id("gen1")
+
+    shown = w._image_label.pixmap()
+    assert max(shown.width(), shown.height()) > THUMBNAIL_BOX  # the pane fits it big
+
+    _drag_out(w)
+
+    picture = _FakeDrag.last.pixmap
+    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+
+
+def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, monkeypatch):
+    # An animated WebP plays through a QMovie, so the label holds no pixmap.
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    w = make_preview()
+    w.show_image(_animated_webp(tmp_path / "a.webp"))
+    w.set_draggable_id("gen1")
+
+    _drag_out(w)
+
+    assert w._image_label.pixmap().isNull()  # nothing there to reach for
+    assert not _FakeDrag.last.pixmap.isNull()  # the movie's frame all the same
+
+
+def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, monkeypatch):
+    # A video's picture is on the player's surface, in no label at all — the last
+    # frame handed to the sink is the only hold on it, and without it a dragged
+    # video was the one drag in the app that showed nothing.
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")
+    w.set_draggable_id("gen1")
+    frame = QImage(160, 120, QImage.Format.Format_RGB32)
+    frame.fill(0x2288FF)
+    w._video.videoSink().setVideoFrame(QVideoFrame(frame))
+
+    _drag_out(w)
+
+    picture = _FakeDrag.last.pixmap
+    assert picture is not None and not picture.isNull()
+    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+
+
+def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, monkeypatch):
+    # Dragged before the first frame arrives there is genuinely nothing to show,
+    # and that must not stop the drag.
+    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")
+    w.set_draggable_id("gen1")
+    started = []
+    w.drag_started.connect(started.append)
+
+    _drag_out(w)
+
+    assert started == ["gen1"]
+    assert _FakeDrag.last.pixmap is None
+
+
 def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, monkeypatch):
     monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
     _FakeDrag.last = None
@@ -751,3 +829,82 @@ def test_the_zoom_never_backs_out_past_the_whole_picture(make_preview, tmp_path)
     w.set_zoom(0.5)
 
     assert w._zoom == 1.0
+
+# --- the notice: this picture isn't what the settings beside it would make ---
+
+def test_a_preview_starts_with_no_notice(make_preview):
+    w = make_preview()
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    w.set_notice("(not yet generated with modifications)")
+
+    assert not w._notice.isHidden()
+    assert w._notice.text() == "(not yet generated with modifications)"
+    assert not w._notice_dim.isHidden()  # the picture behind it is dimmed
+
+
+def test_the_dim_covers_the_media_and_the_plate_sits_top_left(make_preview, tmp_path):
+    w = make_preview()
+    w._media_host.resize(300, 200)
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    w.set_notice("modified")
+
+    assert w._notice_dim.geometry() == w._media_host.rect()   # the whole picture
+    # ...and the message in its top-left corner, clear of both edges.
+    assert 0 < w._notice.x() < w._media_host.width() // 2
+    assert 0 < w._notice.y() < w._media_host.height() // 2
+    assert w._notice.width() <= w._media_host.width()
+
+
+def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+
+    w.set_notice(None)
+
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+@pytest.mark.parametrize("show", [
+    lambda w, tmp: w.show_image(_make_png(tmp / "q.png")),
+    lambda w, tmp: w.show_video(tmp / "clip.mp4"),
+    lambda w, tmp: w.show_frame(_png_bytes()),
+    lambda w, tmp: w.show_message("Waiting for preview…"),
+    lambda w, tmp: w.clear(),
+])
+def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
+    # A notice is about the picture it was set over, so it can never outlive it —
+    # least of all over the live frames of the run that answers it.
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+
+    show(w, tmp_path)
+
+    assert w._notice.isHidden()
+    assert w._notice_dim.isHidden()
+
+
+def test_resizing_re_places_the_notice(make_preview, tmp_path):
+    w = make_preview()
+    w._media_host.resize(300, 200)
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+    old = w._image_label.size()
+
+    w._media_host.resize(500, 400)
+    w._image_label.resize(500, 400)
+    # The label's resize is what the pane's refit rides on (see eventFilter).
+    QApplication.sendEvent(w._image_label, QResizeEvent(QSize(500, 400), old))
+
+    assert w._notice_dim.geometry() == w._media_host.rect()
+

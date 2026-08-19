@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
 
 from origenerator import evolver_export, gallery, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
-from origenerator.gallery import detail_parts
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -1311,6 +1312,42 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     assert not lora.child(1).text(0).startswith("★")
 
 
+def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
+    # A folder with sub-folders wears no star of its own (the row's actions are a
+    # leaf's), so its right-click menu is the only way to star it — and the menu
+    # covers the tree, so a right-click that shut the folder on the way in is only
+    # seen once the menu closes, and reads as something the star did.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.resize(600, 600)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+
+    tree = view._tree
+    _top_level(tree)["All"].setExpanded(True)
+    images = _media_roots(tree)["Images"]
+    images.setExpanded(True)
+    key = _key(images)
+    # The half that holds the row: the tree is two of them now, and the pixel
+    # geometry belongs to whichever one the row is in.
+    half = _side(tree, LANDSCAPE)
+    row = half.visualRect(half.indexFromItem(images))
+    caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
+
+    qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: next(act for act in menu.actions() if act.text() == "Star"),
+    )
+    view._on_tree_context_menu(images, caret)
+
+    assert db.folder_meta_map()[key]["starred"] is True
+    assert _media_roots(view._tree)["Images"].isExpanded()
+
+
 def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
@@ -1443,7 +1480,8 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
     qtbot.addWidget(view)
     view.refresh()
     shown = []
-    monkeypatch.setattr(view, "_show_reroll_result_in_tab", shown.append)
+    monkeypatch.setattr(view, "_show_reroll_result_in_tab",
+                        lambda row, launcher: shown.append(row))
 
     view._on_reroll_finished("some-key", "e1")   # a background experiment landing
     assert shown == []                           # the user's tab is left alone
@@ -2985,10 +3023,16 @@ def test_history_spans_folder_navigation(qtbot):
     view._thumbnail_clicked("i1")                      # view its item
     assert view._selected["prompt_id"] == "i1"
 
-    view._go_back()                                    # the image folder
-    view._go_back()                                    # the video folder
-    view._go_back()
+    view._go_back()                                    # the image folder, nothing picked
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]
+    assert view._selected is None
+
+    view._go_back()                                    # the video folder, on its item
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
+
+    view._go_back()                                    # the video folder, nothing picked
+    assert view._tree.currentItem() is view._leaf_by_id["v1"]
+    assert view._selected is None
 
 
 def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
@@ -3101,23 +3145,171 @@ def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
     assert view._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
 
 
-def test_previewing_on_the_shelf_is_not_its_own_history_step(qtbot):
-    # Selecting items on the shelf is shelf state, not navigation: Back leaves the
-    # shelf for wherever you came from, rather than stepping through each preview.
+def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
+    # The reported bug: previews on a shelf were shelf state rather than stops, so
+    # Back walked out of the shelf entirely instead of to the one looked at before.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
+            _image("i3", "a bird", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    for pid in ("i1", "i2", "i3"):
+        view._thumb_widgets[pid].clicked.emit(pid)       # browse a few previews
+
+    view._go_back()
+    assert view._showing_recents()                       # still on the shelf...
+    assert view.selected_generation() == "i2"            # ...on the one before
+
+    view._go_back()
+    assert view.selected_generation() == "i1"
+
+    view._go_forward()
+    assert view.selected_generation() == "i2"
+
+
+def test_back_to_a_shelf_item_re_highlights_its_tile(qtbot):
+    # Landing means landing: the item previewed and its tile lit, so which of the
+    # shelf's items Back returned to is visible in the pane and not just the panel.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # land on a folder's item
-    view._thumbnail_clicked("i1")
-    landing = view.selected_generation()
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
-    view._thumb_widgets["i1"].clicked.emit("i1")         # browse a couple of previews
+    view._thumb_widgets["i1"].clicked.emit("i1")
     view._thumb_widgets["i2"].clicked.emit("i2")
 
     view._go_back()
-    assert view._showing_recents() is False              # Back leaves the shelf...
-    assert view.selected_generation() == landing         # ...to where we came from
+
+    assert view._thumb_widgets["i1"].is_selected()
+    assert not view._thumb_widgets["i2"].is_selected()
+
+
+def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._thumbnail_clicked("i1")
+    view._thumbnail_clicked("i2")
+
+    view._go_back()
+
+    assert view.selected_generation() == "i1"
+    assert view._thumb_widgets["i1"].is_selected()
+
+
+def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
+    # The results pane redraws for things that are not navigations — a rebuild, a
+    # sort, a widening landing — and a stop per redraw would fill history with the
+    # pane already on screen.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    view._thumb_widgets["i1"].clicked.emit("i1")   # a hit picked among the results
+    depth = len(view._history._stack)
+
+    view.refresh()
+    view._poll()
+    view._on_search_sort_changed()
+
+    assert len(view._history._stack) == depth
+
+
+def test_back_onto_the_folder_itself_drops_the_pick(qtbot):
+    # The folder was opened with nothing picked in it, so that is what returning to
+    # it shows — a pane still lit on the item Back just left looks like a dead press.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._thumbnail_clicked("i1")
+
+    view._go_back()
+
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]  # the same folder...
+    assert view._selected is None                              # ...showing nothing
+    assert not view._thumb_widgets["i1"].is_selected()
+
+
+def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
+    # A stop is a view, not just an item: the same generation sits in its own
+    # folder too, and Back has to return to the pane it was actually picked in.
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._thumb_widgets["i1"].clicked.emit("i1")         # previewed on the shelf
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
+
+    view._go_back()
+
+    assert view._showing_recents()
+    assert view.selected_generation() == "i1"
+
+
+def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
+    # A search owns the middle pane while it runs, so it is a view Back returns
+    # to — with the query still in the box and the hits still drawn.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    assert view.visible_prompt_ids() == ["i1"]
+    view._thumb_widgets["i1"].double_clicked.emit("i1")  # open the hit in its folder
+    assert view._browser.showing_search() is False
+
+    view._go_back()
+
+    assert view._browser.showing_search()
+    assert view._search_edit.text() == "cat"
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
+    # Clicking a result previews it without leaving the results, so Back returns
+    # to the results themselves rather than to the hit's own folder.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "cat")
+    view._thumb_widgets["i1"].clicked.emit("i1")
+
+    view._go_back()
+
+    assert view._browser.showing_search()
+    assert view._search_edit.text() == "cat"
+
+
+def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
+    # One search box, one view: a query being narrowed re-draws the same pane, so
+    # Back leaves the search rather than replaying every word on the way in.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _media_roots(view._tree)["Images"].child(0).child(0).child(0)
+    view._tree.setCurrentItem(_children_by_detail(lora)["a cat"])
+    depth = len(view._history._stack)
+
+    _search_for(view, "cat")
+    _search_for(view, "cat h")
+    _search_for(view, "cat hat")
+
+    assert len(view._history._stack) == depth + 1
+
+    view._go_back()
+    assert view._browser.showing_search() is False
 
 
 def _animated_strip(view):
@@ -3225,14 +3417,18 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert not view._panes.widget(1).isAncestorOf(view._queue)
 
 
-def test_info_pane_keeps_a_comfortable_minimum_width(qtbot):
+def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    # Long metadata values wrap rather than scroll sideways, so this floor keeps
-    # the info pane readable without a sideways scrollbar. It's lower than it once
-    # was so the whole window can still tile into a narrow monitor slot, but it
-    # must never collapse to a cramped strip.
-    assert view._panes.widget(1).minimumWidth() >= 280
+    # Only the tab knows how narrow it can go — what its settings fit in — so the
+    # floor is its (GenerateConfigPanel.minimumSizeHint) and the pane carries none
+    # of its own. An explicit minimum here would *replace* that number rather than
+    # join it: too high and the drag stops while there is still room to give, too
+    # low and the settings scroll sideways.
+    panel = view._info_tabs.current_config_panel()
+    assert view._panes.widget(1).minimumWidth() == 0
+    assert view._panes.widget(1).minimumSizeHint().width() >= panel.minimumSizeHint().width()
+    assert panel.minimumSizeHint().width() == panel._contents_floor()
 
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
@@ -3463,6 +3659,40 @@ def test_select_generation_missing_id_is_dropped(qtbot):
     # Quietly dropped (not restored) without crashing; the view falls back to
     # the folder's own default selection rather than the stale id.
     assert view.selected_generation() != "ghost"
+
+
+def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
+    """Reopening the app must not drop the last selection's image into a tab that
+    holds no generation.
+
+    A session saved with the pane's resting tab in front reopens on that tab —
+    "New generation", no workflow picked — while the gallery restores the
+    generation that was selected. The restore re-selects it with history
+    suppressed, which refreshes the front tab's preview; the resting tab has
+    nothing to refresh, so it must stay empty rather than come up as a blank
+    generate form under someone else's picture.
+    """
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    probe = GalleryView(db)
+    qtbot.addWidget(probe)
+    probe.refresh()
+    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    folder_key = probe.selected_folder()
+
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._preview.show_media = MagicMock()  # don't start WMF playback
+    view.select_folder(folder_key)
+    view.select_generation("i2")  # what the last session was looking at
+    view.refresh()
+
+    assert view.selected_generation() == "i2"  # the selection itself is restored
+    panel = view._info_tabs.current_config_panel()
+    assert panel.is_blank()  # ...into a tab still asking which workflow to run
+    panel._preview.show_media.assert_not_called()
 
 
 def _make_db(tmp_path):
@@ -4633,9 +4863,9 @@ def test_turning_auto_off_says_cancel_again_with_the_run_still_cooking(qtbot, tm
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     # Reported: pressing the tile's "New (random seed)" left the tab looking at that
-    # very folder with no button to discard the run and an unfilled Generate, while
-    # the pane beside it streamed the frames of the run it had just started. Nothing
-    # had claimed a launch that came from outside a tab.
+    # very folder with no button to discard the run, while the pane beside it
+    # streamed the frames of the run it had just started. Nothing had claimed a
+    # launch that came from outside a tab.
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -4648,8 +4878,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     panel = view._info_tabs.current_config_panel()
     job = next(iter(view._reroll_jobs.values()))
     assert panel._cancel_btn.isHidden() is False
-    assert panel._generating_prompt_id == job.prompt_id
-    assert panel._generate_btn._fraction == 0.0  # in progress mode, filling from 0
+    assert panel.launched_runs() == [job.origin]
 
 
 def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
@@ -4665,13 +4894,111 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
     view._toggle_auto(True)
     first = view._reroll_jobs[key]
-    assert view._info_tabs.current_config_panel()._generating_prompt_id == first.prompt_id
+    assert view._info_tabs.current_config_panel().launched_runs() == [first.origin]
 
     client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # the loop moves on
 
     panel = view._info_tabs.current_config_panel()
     assert panel._cancel_btn.isHidden() is False
-    assert panel._generating_prompt_id == view._reroll_jobs[key].prompt_id
+    assert panel.launched_runs() == [view._reroll_jobs[key].origin]
+
+
+def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
+    # The reported bug: a loop left running while the user browsed grew a row of
+    # tabs, one per image it made. Each finished variation was loaded into whatever
+    # tab was in front — the pane's resting tab, which nothing in it had asked for
+    # the picture, and which then stopped being blank, so the next clicked
+    # generation opened a tab beside it rather than loading into it.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    for _ in range(3):  # three variations land while the user watches
+        client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    assert view._info_tabs.count() == 1
+    panel = view._info_tabs.current_config_panel()
+    assert panel.is_blank()  # the resting tab is still the one a click loads into
+
+    landed = next(r for r in db.list_generations() if r["status"] == "completed")
+    view._on_thumbnail_clicked(landed["prompt_id"])
+
+    assert view._info_tabs.count() == 1  # it filled that tab instead of forking one
+
+
+def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
+    # The reported bug: the loop's live frames filled the preview of whichever tab
+    # was open, over the picture the user had put there, and its results landed
+    # there too. A loop runs while the user works on something else; the folder's
+    # own live tile is where it can be watched. Even a tab on the looping folder —
+    # which does light up with its progress and Next-seed button — keeps showing
+    # what the user opened it on.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    panel = _folder_tab(view, db)
+    showing = panel._displayed_row
+    panel._preview.show_frame = MagicMock()
+    panel._preview.show_media = MagicMock()
+
+    view._toggle_auto(True)
+    job = view._reroll_jobs[key]
+    client.preview_image.emit(job.prompt_id, b"a frame")   # the run streams
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # ...and lands
+
+    panel._preview.show_frame.assert_not_called()
+    panel._preview.show_media.assert_not_called()
+    assert panel._displayed_row is showing  # still the user's own generation
+    assert view._selected_reroll_key is None  # the pane was never taken over
+
+
+def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
+    # Clicking the folder's live tile is how the loop is watched full size, and it
+    # is the one thing that gives the pane to a loop. Watching one variation is
+    # watching what the loop does next, so the tile picked once keeps mirroring
+    # across the hand-off rather than going dark after one.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    _reroll_tile(view).selected.emit()  # the user points the pane at the loop
+    panel = view._info_tabs.current_config_panel()
+    panel._preview.show_frame = MagicMock()
+
+    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+    client.preview_image.emit(view._reroll_jobs[key].prompt_id, b"the next one")
+
+    assert view._selected_reroll_key == key
+    panel._preview.show_frame.assert_called_with(b"the next one")
+
+
+def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
+    # The key stands for the loop while one runs, so the switch going off is what
+    # ends the pane's watch — nothing else is coming to take it.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    _reroll_tile(view).selected.emit()
+    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    view._toggle_auto(False)
+    view._cancel_reroll(key)  # and the variation in flight is thrown away
+
+    assert view._selected_reroll_key is None
 
 
 def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):
@@ -5150,6 +5477,49 @@ def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeyp
     assert view._slideshow is None                  # out of the slideshow...
     assert shown in view.visible_prompt_ids()       # ...into the folder holding it
     assert view._browser.selected_ids == {shown}    # with that item picked
+    # And the item open in a tab: leaving a show for an item is a decision to
+    # work on it, which a folder behind a stale form isn't.
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
+
+
+def test_a_show_ended_on_a_locked_slide_lands_on_that_item(qtbot, monkeypatch):
+    # Locking a slide is the user saying this is the one, so ending the show there
+    # opens it — the same landing Enter makes, rather than leaving the gallery
+    # back where the show was started from.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._start_slideshow()
+    slideshow = view._slideshow
+    qtbot.addWidget(slideshow)
+    held = slideshow._playlist.current()[2]
+    slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+
+    slideshow.close()   # Escape, the spoken "close", a double-click: all this
+
+    assert view._slideshow is None
+    assert held in view.visible_prompt_ids()       # its own folder in the pane...
+    assert view._browser.selected_ids == {held}    # ...with it picked...
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
+
+
+def test_a_show_ended_on_an_unheld_slide_leaves_the_gallery_alone(qtbot, monkeypatch):
+    # Nothing was held, so nothing was chosen: closing is just leaving, and the
+    # shelf the show was started from is still what's on screen.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._start_slideshow()
+    slideshow = view._slideshow
+    qtbot.addWidget(slideshow)
+
+    slideshow.close()
+
+    assert view._tree.currentItem() is _top_level(view._tree)["Latest"]
 
 
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
@@ -5467,33 +5837,54 @@ def test_finishing_a_selected_reroll_clears_the_reroll_selection(qtbot, tmp_path
     assert view._selected_reroll_key is None
 
 
-def test_finishing_a_reroll_loads_its_result_into_the_front_tab(qtbot, tmp_path):
+def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot, tmp_path):
     # Change 4: a Generate ends on its result. When the re-roll it launched finishes,
-    # the just-saved generation loads into the front config tab (show_completed_result),
-    # so the tab shows the finished item — not the live-frame or idle placeholder.
+    # the just-saved generation loads into that tab (show_completed_result), so it
+    # shows the finished item — not the live-frame or idle placeholder.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, job = _running_reroll(view)
+    panel = view._info_tabs.current_config_panel()
+    key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
+    job = view._reroll_jobs[key]
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
 
-    panel = view._info_tabs.current_config_panel()
     assert panel._displayed_row is not None
     assert panel._displayed_row["prompt_id"] == job.prompt_id  # the just-finished result
 
 
-def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
-    # The reported bug, end to end: the user keeps typing the next prompt while a
-    # Generate runs; when it finishes, loading its result into the front tab must
-    # not re-seed the form and wipe what they typed.
+def test_a_run_no_tab_launched_lands_in_no_tab(qtbot, tmp_path):
+    # The folder tile's "+" is the gallery's launch, not a tab's Generate, so its
+    # result belongs to no tab. It used to fill the front one whatever that was —
+    # which left the pane's resting tab holding a picture nothing in it had asked
+    # for, and no longer blank, so the next clicked generation opened a tab beside
+    # it instead of loading into it.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    panel = _tab_with_prompts(view)
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    panel = view._info_tabs.current_config_panel()
+    assert panel._displayed_row is None   # the resting tab was not taken over
+    assert panel.is_blank()               # ...so it is still the tab a click fills
+
+
+def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
+    # The reported bug, end to end: the user keeps typing the next prompt while a
+    # Generate runs; when it finishes, loading its result into that tab must not
+    # re-seed the form and wipe what they typed.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
+    job = view._reroll_jobs[key]
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
@@ -6418,7 +6809,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     assert item.typical_seconds == 724.0   # the median of the three timed runs
 
     view._update_queue()
-    assert view._queue.running_preview()._caption.text() == "1:30 elapsed · ~10:33 left"
+    assert view._queue.running_preview().status_text() == "50% · 1:30 elapsed · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
@@ -6432,7 +6823,133 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     view.refresh()
 
     assert view._inflight_items()[0].started_at is None
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
+
+
+def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
+    # The price and the kind: the two things about a job that are true before it
+    # starts, and what a line of waiting work is read for.
+    db = FakeDB([
+        _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=120.0),
+    ])
+    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = view._inflight_items()[0]
+    assert item.job_kind == "I2V"
+    assert item.typical_seconds == 120.0
+
+
+def test_a_job_a_spoken_request_queued_says_so(qtbot):
+    # The one kind of job launched without looking at a form, and so the one
+    # hardest to recognize later in the line.
+    db = FakeDB([_image("src", "a kite", 50, 1)])
+    db.add(_running_row("asked", prompt="a kite, no string"))
+    db.record_request(prompt_id="asked", source_prompt_id="src", heard="no string")
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["asked"].requested
+
+
+def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
+    db = FakeDB([_image("src", "a kite", 50, 1)])
+    db.add(_running_row("typed", prompt="a kite"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert not view._inflight_items()[0].requested
+
+
+def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
+    # Its row shows that picture: two i2v runs off one recipe are the same
+    # caption and differ only in the frame.
+    db = FakeDB([])
+    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+
+
+def test_an_enhancement_carries_the_picture_it_is_a_second_pass_over(qtbot):
+    # Same relation as a video's start frame: the image it is *of* is the whole
+    # of what one enhancement in the line has to distinguish it from another.
+    db = FakeDB([])
+    db.add(_row("en1", "image_enhance", {"input_image": "kite_00007_.png [output]"},
+                "en1.png", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+
+
+def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
+    # A pose transfer reads a structure image, but what it is making is an image
+    # like any other — so its row is placed the way every image's is.
+    db = FakeDB([])
+    db.add(_row("pt1", "sdxl_pose_transfer", {"input_image": "pose_00002_.png [output]"},
+                "pt1.png", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = view._inflight_items()[0]
+    assert item.job_kind == "Image"
+    assert item.source_image is None
+
+
+def test_a_job_started_from_words_alone_names_no_frame(qtbot):
+    db = FakeDB([_image("done", "a kite", 50, 1)])
+    db.add(_running_row("gen1", prompt="a kite"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["gen1"].source_image is None
+
+
+def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
+    # Its own output is the one picture it cannot show, so its row is placed by
+    # what the same settings made last time — newest first, four at most.
+    settings = {"positive_prompt": "a kite", "steps": 50}
+    db = FakeDB([])
+    for i in range(6):  # oldest first, so the listing hands them back newest first
+        db.add(_row(f"done{i}", "sdxl_t2i", {**settings, "seed": i}, f"done{i}.png",
+                    thumbnail_path=f"thumbs/done{i}.jpg"))
+    db.add(_row("waiting", "sdxl_t2i", {**settings, "seed": 99}, "waiting.png",
+                status="pending", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["waiting"].folder_thumbnails == (
+        "thumbs/done5.jpg", "thumbs/done4.jpg", "thumbs/done3.jpg", "thumbs/done2.jpg",
+    )
+
+
+def test_the_first_run_of_a_new_recipe_has_no_folder_to_show(qtbot):
+    # Nothing has landed there yet, so there is no folder in the tree at all —
+    # and the row draws no block rather than an empty grid.
+    db = FakeDB([_image("elsewhere", "a boat", 50, 1)])
+    db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "a kite", "steps": 12},
+                "waiting.png", status="pending", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["waiting"].folder_thumbnails == ()
 
 
 def _running_folder_key(view):
@@ -6619,6 +7136,23 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     assert config.params["seed"] == 42                               # the video's seed, carried in
 
 
+def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
+    # "Open in generator" is the same "show me this" gesture a thumbnail click is:
+    # it lands in the pane's untouched "New generation" tab rather than beside it,
+    # and wears the slant that says the next open may replace it.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tabs = view._info_tabs
+    before = tabs.count()
+
+    view._open_combination("img", "vid")
+
+    assert tabs.count() == before  # no "New generation" left standing beside it
+    panel = tabs.current_config_panel()
+    assert tabs.tabBar().preview_index() == tabs.indexOf(panel)
+
+
 def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
@@ -6730,32 +7264,16 @@ def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path,
     assert json.loads(view._db.get_generation(job.prompt_id)["params_json"])["seed"] != 1
 
 
-def test_generate_request_duplicate_declined_launches_nothing(qtbot, tmp_path, monkeypatch):
-    # Regression: a tab's Generate with a pinned seed that reproduces a past run
-    # must warn via the shared dialog, not silently re-launch identical copies.
-    # Declining launches nothing — the same guard the re-roll and combine paths use.
+def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_path, monkeypatch):
+    # A pinned seed that would reproduce a past run used to stop the press for a
+    # dialog. The button now says "Generate with Random seed" before it's pressed
+    # (see the panel's caption), so the press just draws one — nothing to ask.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: None)
-
-    view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
-
-    assert view._reroll_jobs == {}              # declined: nothing launched
-    view._client.submit_job.assert_not_called()
-
-
-def test_generate_request_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeypatch):
-    # Accepting the dialog re-rolls the seed, so the config launched is a fresh
-    # variation the folder can run without reproducing the duplicate.
-    db = _seeded_db(tmp_path, seed=42)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
+                        lambda *a, **k: pytest.fail("the button already said so"))
 
     view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
 
@@ -6976,9 +7494,10 @@ def test_canceling_from_the_front_tab_stops_the_reroll(qtbot, tmp_path):
     assert panel._cancel_btn.isHidden() is True
 
 
-def test_duplicate_accepted_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path, monkeypatch):
-    # Accepting the "already generated" dialog doesn't just re-roll this one launch —
-    # it switches the front tab's seed to Random, so the choice sticks on the tab.
+def test_a_duplicate_generate_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path):
+    # Re-rolling over a duplicate doesn't just re-seed this one launch — it switches
+    # the front tab's seed to Random, so the form goes on saying what the next press
+    # will do instead of showing a pinned seed no run will use again.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -6986,38 +7505,59 @@ def test_duplicate_accepted_switches_the_front_tab_to_a_random_seed(qtbot, tmp_p
     panel = _front_panel(view)
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
     assert panel.current_config().seed_is_random is False   # pinned to the duplicate seed
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
 
     panel._on_generate()
 
     assert panel.current_config().seed_is_random is True
 
 
-def test_random_seed_choice_survives_a_cancel_so_re_generate_does_not_re_ask(qtbot, tmp_path, monkeypatch):
-    # The user's scenario: agree to a random seed, cancel that first attempt, then
-    # Generate again — the choice stuck, so there's no second "already generated"
-    # dialog and it launches a fresh variation straight away.
+def test_a_landed_generation_tells_an_open_tab_its_seed_is_now_a_duplicate(qtbot, tmp_path):
+    # Nothing the user touched changed — the run they launched simply finished. A
+    # tab still pinned to that seed would now reproduce the file, so its Generate
+    # says so as the row lands rather than waiting for the form to be edited.
+    db = Database(tmp_path / "test.db")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    params = dict(_SDXL.default_params(), seed=42, positive_prompt="a cat")
+    panel.prefill("sdxl_t2i", params)
+    qtbot.waitUntil(lambda: not panel._caption_timer.isActive())  # let it settle
+    assert panel._generate_btn.text() == "Generate"   # nothing like it generated yet
+
+    db.insert_generation(
+        prompt_id="done", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a cat", negative_prompt="", seed=42,
+        params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("done", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_done.png", "subfolder": ""}]))
+    view.refresh()
+
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+
+
+def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(qtbot, tmp_path):
+    # The user's scenario: Generate over a duplicate, cancel that first attempt,
+    # then Generate again. The tab kept the Random seed, so the second press is
+    # another fresh variation rather than the pinned seed coming back.
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     panel = _front_panel(view)
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
-    prompts = []
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda *a, **k: prompts.append(1) or REROLL_VIDEO)
 
-    panel._on_generate()                 # duplicate → asks once → accept
-    assert prompts == [1]
+    panel._on_generate()                 # duplicate → a fresh seed, no question asked
+    first = next(iter(view._reroll_jobs.values())).params["seed"]
     key = next(iter(view._reroll_jobs))
     view._cancel_reroll(key)             # cancel the first attempt
     assert view._reroll_jobs == {}
 
     panel._on_generate()                 # Generate again
 
-    assert prompts == [1]                # not re-asked — the choice was preserved
-    assert view._reroll_jobs             # a fresh variation launched
+    launched = next(iter(view._reroll_jobs.values())).params["seed"]
+    assert launched not in (42, first)   # another variation, not the pinned seed
 
 
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
@@ -7191,6 +7731,23 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
     {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]}}}
 
 
+class _VoiceSurface:
+    """A show standing in for the one being spoken over."""
+
+    def __init__(self, prompt_id):
+        self._prompt_id = prompt_id
+        self.noted = None
+
+    def isActiveWindow(self):
+        return True
+
+    def voice_target(self):
+        return self._prompt_id
+
+    def note_voice_run(self, prompt_id, message):
+        self.noted = (prompt_id, message)
+
+
 def _enhanceable_db(tmp_path, count=2):
     """A DB whose one SDXL folder holds ``count`` finished, un-enhanced images
     (pre-enhance v002 rows: no enhance params, so nothing marks them)."""
@@ -7270,6 +7827,51 @@ def test_enhance_all_queues_every_member_image(qtbot, tmp_path):
     assert files[0]["filename"] == "image_enhance_00001_.png"   # the new face
     assert files[1]["filename"] == f"sdxl_t2i_{upgraded['prompt_id']}.png"  # still listed
     assert gallery.is_enhanced_row(upgraded)
+
+
+def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_path):
+    # The tab holds the row it was handed, not a live view of the database, so
+    # an enhancement folding a new level onto that row used to reach the list
+    # only when the tab was next opened — a tab away and back.
+    from origenerator.gui.enhance_versions import _LevelRow, _PendingRow
+
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    panel = view._info_tabs.current_config_panel()
+    assert len(panel._versions._host.findChildren(_LevelRow)) == 1  # the original
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    rows = panel._versions._host.findChildren(_LevelRow)
+    assert len(rows) == 2       # the enhancement, and the original behind it
+    # The live row gave way to the level it was making, rather than to nothing.
+    assert not panel._versions._host.findChildren(_PendingRow)
+    assert panel.displayed_row()["prompt_id"] == "g0"   # still the same image
+
+
+def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_path):
+    # Only the tabs actually showing that generation catch up; a tab looking at
+    # another image is not touched by what happened to this one.
+    from origenerator.gui.enhance_versions import _LevelRow
+
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g1")
+    panel = view._info_tabs.current_config_panel()
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    assert panel.displayed_row()["prompt_id"] == "g1"
+    assert len(panel._versions._host.findChildren(_LevelRow)) == 1
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
@@ -7509,7 +8111,8 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._reroll.jobs) == 1
-    assert view.is_enhancing(db.get_generation("g1"))  # the one behind counts too
+    # The one behind counts too — and reads as queued, since it isn't rendering.
+    assert view.enhancing_run(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
     assert first._pending_enhancement == (
@@ -7548,6 +8151,26 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     view._reroll._jobs.clear()
     view._reconcile_pending_enhancements()
     assert not tile.is_enhancing()
+
+
+def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
+    # An enhancement is a version of an image, not an item beside it — so the
+    # shelf shows the run on that image's own tile, under the scrim, and never as
+    # a second card claiming something else is being made. The bottom strip's
+    # queue still lists it: that is what the GPU is doing.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+    view.refresh()          # the launch's transient row is in the DB now
+    _open_recents(view)
+
+    assert job.prompt_id not in view._inflight_cards
+    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._queue.keys() == [job.prompt_id]
 
 
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
@@ -8648,7 +9271,7 @@ def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview()._caption.text() == (
+    assert view._queue.running_preview().status_text() == (
         "3 jobs from another app are queued on ComfyUI")
     assert not view._queue._clear.isHidden()
 
@@ -8658,7 +9281,7 @@ def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
     assert view._queue._clear.isHidden()
 
 
@@ -8742,7 +9365,7 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     client._foreign = ForeignQueue(running=[], pending=[])  # the clear empties it
     view._queue._clear.click()
 
-    assert view._queue.running_preview()._caption.text() == ""
+    assert view._queue.running_preview().status_text() == ""
     assert view._queue._clear.isHidden()
 
 
@@ -8973,12 +9596,13 @@ def test_a_show_with_the_mic_off_hears_nothing(qtbot, tmp_path):
     show.close()
 
 
-def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
-        qtbot, tmp_path, monkeypatch):
+def _fix_show(qtbot, tmp_path, monkeypatch, *detectors):
+    """A gallery playing one image fullscreen with the mic on, and exactly these
+    detectors installed — the state every spoken fix is said into."""
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: ("g0.png", "image"))
     monkeypatch.setattr(detail_parts, "list_detector_files",
-                        lambda: ["teeth_yolov8n.pt"])
+                        lambda: list(detectors))
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -8987,31 +9611,54 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     view._mic_btn.setChecked(True)
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
+    return view
+
+
+def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
+        qtbot, tmp_path, monkeypatch):
+    view = _fix_show(qtbot, tmp_path, monkeypatch, "teeth_yolov8n.pt")
 
     assert view._voice.speak_command("Fix her teeth.") is not None
 
     (job,) = view._reroll_jobs.values()
     assert job.workflow.name == "image_enhance"
-    assert job.params["enhance_detail_fix"] is True
-    assert job.params["enhance_face_detector"] == "teeth_yolov8n.pt"
-    assert job.params["enhance_hand_detector"] == ""
+    assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
     # The show answers where the speaker is looking, then reads Enhancing….
     assert "fixing teeth" in view._slideshow._note.text()
 
 
+def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
+        qtbot, tmp_path, monkeypatch):
+    # Two bad parts in one picture is one command, and one run that fixes both.
+    view = _fix_show(qtbot, tmp_path, monkeypatch,
+                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+
+    view._voice.speak_command("fix hands and mouth")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_detail_fixes"] == {
+        "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
+    assert "fixing hands & teeth" in view._slideshow._note.text()
+
+
+def test_fix_all_goes_over_every_part_something_can_find(
+        qtbot, tmp_path, monkeypatch):
+    # The whole table in a breath — minus the parts nothing installed can find,
+    # which the caption leaves out rather than claiming a pass that can't run.
+    view = _fix_show(qtbot, tmp_path, monkeypatch,
+                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+
+    view._voice.speak_command("fix everything")
+
+    (job,) = view._reroll_jobs.values()
+    assert job.params["enhance_detail_fixes"] == {
+        "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
+    assert "fixing hands & teeth" in view._slideshow._note.text()
+
+
 def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: ("g0.png", "image"))
-    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: [])
-    db = _enhanceable_db(tmp_path, count=1)
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
-    view._start_slideshow()
-    qtbot.addWidget(view._slideshow)
+    view = _fix_show(qtbot, tmp_path, monkeypatch)
 
     view._voice.speak_command("fix teeth")
 
@@ -9553,20 +10200,7 @@ def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
 def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    class _Surface:
-        def __init__(self):
-            self.noted = None
-
-        def isActiveWindow(self):
-            return True
-
-        def voice_fix_target(self):
-            return "img_act"
-
-        def note_voice_fix(self, prompt_id, message):
-            self.noted = (prompt_id, message)
-
-    surface = _Surface()
+    surface = _VoiceSurface("img_act")
     view._slideshow = surface
 
     view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
@@ -9576,6 +10210,108 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     assert surface.noted[0] == "img_act"
     assert "dancing" in surface.noted[1]
     assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+
+
+def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):
+    # The spoken form of the Enhance button, aimed at the picture being watched.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _set_enhance(view, params={"enhance_steps": 29})
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    (job,) = view._reroll_jobs.values()
+    assert job.workflow.name == "image_enhance"
+    assert job.params["enhance_steps"] == 29
+    # Answered in the show's own corner: the speaker is looking at the picture.
+    assert surface.noted == ("g0", "🎤 enhancing…")
+
+
+def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
+    # Said over a show, this is a gesture made with no view of the Enhance panel
+    # — the same reason a hold's Down leaves one alone — so it says so rather
+    # than re-deriving the picture at whatever the knobs happen to read now.
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps([
+        {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
+        {"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"},
+    ]), original_files=json.dumps(
+        [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 this one is enhanced already")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps(
+        [{"filename": "clip.mp4", "subfolder": "video", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 only a finished image can be enhanced")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path):
+    # A row can hold an output entry with no name; it reads as a finished image
+    # everywhere else, and there is nothing to feed the enhancer.
+    db = _enhanceable_db(tmp_path, count=1)
+    db.update_generation("g0", output_files=json.dumps(
+        [{"subfolder": "image", "type": "output"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    surface = _VoiceSurface("g0")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert surface.noted == (None, "🎤 this one has no file to enhance")
+    assert view._reroll_jobs == {}
+
+
+def test_a_spoken_enhance_with_no_show_up_says_what_it_wanted(qtbot, tmp_path):
+    # The utterance has already been claimed as a command by the time it gets
+    # here, so it is answered in this pane rather than vanishing.
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._on_voice_command(gallery.ENHANCE_COMMAND)
+
+    assert view._voice_status.text() == "🎤 an enhancement needs a picture on screen"
+    assert view._reroll_jobs == {}
+
+
+def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
+    # One matcher reaches the mic, so a verb added to the vocabulary lands there
+    # without this module listing the parts a second time and drifting from it.
+    # It wraps what it matches with the side the utterance named, which is how a
+    # room with two shows in it says which picture is meant.
+    from origenerator.voice.commands import match_voice_command as match
+
+    assert match("enhance").command == gallery.ENHANCE_COMMAND
+    assert match("go now").command == gallery.GENAU_COMMAND
+    assert [part.name for part in match("fix teeth").command] == ["teeth"]
+    assert match("start slideshow") is not None
+    assert match("make her hair longer") is None    # steering, not a command
 
 
 def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):

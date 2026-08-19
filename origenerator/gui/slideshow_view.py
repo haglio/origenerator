@@ -9,7 +9,10 @@ Images advance on a dwell timer; videos play once and advance when they end
 enhancement levels of the picture on screen, Up culls, Down locks the slide
 against the advance (a locked clip replays, and the hold both stars the slide and
 asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
-for the shown item's own folder (``open_requested``), and Escape closes.
+for the shown item's own folder (``open_requested``), and Escape closes. Ending
+a show on a locked slide leaves for that slide's folder too: holding one is the
+user saying this is the one, so the gallery lands there rather than back where
+it was when the show started.
 
 **Double-clicking a picture opens this same view at a pace of nought** — its
 folder in the browser's own order, starting on the picture that was clicked,
@@ -136,6 +139,11 @@ class SlideshowView(QWidget):
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
         self._frame = frame  # the frame the double-click landed on, if any
+        # The item to hand the gallery on the way out, once there is one: Enter
+        # names it outright, and a lock names it by being the slide the show
+        # ended on. Read in :meth:`closeEvent`, which is where every way out of
+        # the show meets.
+        self._land_on: str | None = None
         # The enhancement levels of each item that has any, keyed by the file the
         # set lists it under, so Shift+Left/Right steps the versions of whatever
         # is on screen. The base path is remembered separately: once you have
@@ -735,16 +743,13 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         return str(item[0]) if item is not None else ""
 
-    def voice_fix_target(self):
-        """The generation a spoken "fix …" lands on: the slide on screen."""
+    def voice_target(self):
+        """The generation a spoken order or request is about: the slide on
+        screen — what the speaker is looking at while saying it."""
         return self._current_prompt_id()
 
-    def voice_request_target(self):
-        """The generation a spoken request is about: the slide on screen."""
-        return self._current_prompt_id()
-
-    def note_voice_fix(self, prompt_id, message: str) -> None:
-        """Say what a spoken fix did and, when it launched a run
+    def note_voice_run(self, prompt_id, message: str) -> None:
+        """Say what a spoken order did and, when it launched a run
         (``prompt_id``), keep the note reading Enhancing… once the flash
         fades — the same note a hold's enhance earns."""
         if prompt_id is not None:
@@ -822,10 +827,8 @@ class SlideshowView(QWidget):
         """Enter: leave the slideshow and hand its item to the gallery, which
         opens the folder it lives in — the way out of a shelf's slideshow, where
         what you're watching came from folders all over the tree."""
-        prompt_id = self._current_prompt_id()
-        self.close()
-        if prompt_id is not None:
-            self.open_requested.emit(prompt_id)
+        self._land_on = self._current_prompt_id()
+        self.close()  # the handover is closeEvent's, so it happens exactly once
 
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
@@ -926,7 +929,23 @@ class SlideshowView(QWidget):
             self._stroke_panel.reposition()
 
     def closeEvent(self, event):
+        """Leave, handing the gallery the item the show ended on if there is one.
+
+        Enter names that item; so does a lock, which is the user saying this is
+        the one — so a show ended on a held slide lands on that slide, rather
+        than leaving the gallery wherever it was before the show. Ended on a
+        slide nobody held (Escape, a double-click, the spoken "close", the last
+        item culled), it hands nothing over and leaves the gallery alone.
+        """
         self._disarm_dwell()
         self._preview.clear()  # release any held video file so it can be deleted
+        landing = self._land_on
+        if landing is None and self._playlist.locked:
+            landing = self._current_prompt_id()
+        # Cleared before the signals go out, so a second close hands over nothing.
+        self._land_on = None
+        self._playlist.unlock()
         self.closed.emit()
+        if landing is not None:
+            self.open_requested.emit(landing)
         super().closeEvent(event)

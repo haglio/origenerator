@@ -3,7 +3,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_KEYCAP,
+    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_BUTTON_ACTIVE, BG_KEYCAP,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
     BORDER_SUBTLE, BORDER_PANEL, BLUE,
 )
@@ -173,6 +173,9 @@ def build_stylesheet() -> str:
     QPushButton:hover {{
         background-color: {_h(BG_TERTIARY)};
     }}
+    QPushButton:checked {{
+        background-color: {_h(BG_BUTTON_ACTIVE)};
+    }}
     QPushButton:pressed {{
         background-color: {_h(BLUE)};
     }}
@@ -194,14 +197,6 @@ def build_stylesheet() -> str:
     QPushButton#generateBtn:disabled {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
-    }}
-    /* In progress mode the face IS the progress bar, so its resting colour steps
-       back to neutral and the blue fill has something to read against: primary blue
-       under a blue wash showed a blue edge creeping across an already-blue button.
-       It can't lean on the :disabled rule for that any more — the button stays
-       pressable now, since a press while a run is in flight queues another. */
-    QPushButton#generateBtn[generating="true"] {{
-        background-color: {_h(BG_SECONDARY)};
     }}
     /* A collapsible param-form section header: a flat, full-width divider row,
        not a raised button. Left-aligned with its fold arrow, and it must not
@@ -232,6 +227,13 @@ def build_stylesheet() -> str:
     }}
     QToolButton:hover {{
         background-color: {_h(BG_TERTIARY)};
+    }}
+    /* A control that is ON sits on a lighter ground than one at rest -- one rule
+       across the family, so a toggled button reads the same whichever app it is
+       in. The blue below is the one exception, for a state that means more than
+       "engaged". */
+    QToolButton:checked {{
+        background-color: {_h(BG_BUTTON_ACTIVE)};
     }}
     QToolButton#iconButton {{
         padding: 4px;
@@ -282,7 +284,11 @@ def build_stylesheet() -> str:
     QTabBar::tab {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
-        padding: 8px 20px;
+        /* The horizontal padding is where a tab's contents begin, so it is what
+           sets the gap in front of its mark. It matches the one the ✕ leaves at
+           the other end (eliding_tab_bar.EDGE), or a tab reads as two separate
+           decisions rather than one row. */
+        padding: 8px 10px;
         border: none;
         /* A hairline between tabs, so it reads which ✕ belongs to which. */
         border-right: 1px solid {_h(BORDER_SUBTLE)};

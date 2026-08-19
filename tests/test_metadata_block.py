@@ -102,3 +102,16 @@ def test_an_image_renders_no_block(block):
     block.show_row(_row(workflow_name="sdxl_t2i", output_files=json.dumps(
         [{"filename": "out.png", "subfolder": "image"}])))
     assert _texts(block) == []
+
+
+def test_the_reveal_button_does_not_hold_the_pane_open(block):
+    # "Show in Explorer" is the longest label on any file row, so it decided how
+    # narrow a pane holding one could be squeezed — and the settings scroll grew a
+    # horizontal bar rather than let the row shrink. It elides instead.
+    block.show_row(_row(output_files=json.dumps(
+        [{"filename": "out.mp4", "subfolder": ""}])))
+    btn, = _reveal_btns(block)
+
+    whole = btn.fontMetrics().horizontalAdvance("Show in Explorer")
+    assert btn.minimumSizeHint().width() < whole
+    assert btn.display_text(whole // 3).endswith("…")

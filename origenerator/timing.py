@@ -73,42 +73,69 @@ _PACE_MIN_FRACTION = 0.25
 _PACE_MIN_STEPS = 2
 
 
-def _pace_remaining(elapsed: float, progress: tuple[int, int] | None) -> float | None:
-    """Seconds left at the pace this run has been sampling at.
+def _pace_projection(elapsed: float, progress: tuple[int, int] | None) -> float | None:
+    """How long this run is on course to take, at the pace it has been going.
 
-    ``None`` while it's too early for that pace to mean anything, and once the
-    last step is done — past there the step count has nothing left to say.
+    The whole run rather than the part left, so it can be weighed against the
+    workflow's typical time, which is also a whole run. ``None`` while it's too
+    early for the pace to mean anything.
     """
     if not progress or elapsed <= 0:
         return None
     done, total = progress
-    if total <= 0 or done <= 0 or done >= total:
+    if total <= 0 or done <= 0:
         return None
     if done < max(_PACE_MIN_STEPS, total * _PACE_MIN_FRACTION):
         return None
-    return elapsed * (total - done) / done
+    return elapsed * total / done
 
 
 def remaining_seconds(elapsed: float, progress: tuple[int, int] | None,
                       typical: float | None) -> float | None:
     """How much longer a running generation has to go, from two readings.
 
-    Whichever says more is left wins. The run's own sampling pace is what catches
-    a run going slower than usual, but it only measures sampling — a video job
-    still has a VAE decode and an audio pass after its last step, and the step
-    count knows nothing about those. The workflow's typical time covers that
-    tail, so taking the larger keeps the number from sitting at zero through it.
+    The workflow's typical time is a weak prior: it is the median of that
+    workflow's last ten runs whatever length, resolution and step count each was
+    asked for, and those differ by a factor of ten. So it opens the estimate,
+    while the run is too new to have a pace worth reading, and then hands over to
+    the run's own pace in proportion to how much of the run has actually gone by.
+    A prior that never hands over is what left a five-and-a-half minute run
+    claiming four minutes still to come as it finished.
 
-    ``0.0`` once both readings are spent — the run is over its time, which is
-    worth saying — against ``None`` when there was never anything to go on.
+    A run that has already outlasted the typical time takes it out of the blend
+    altogether rather than blending against a number it has disproved: past there
+    the prior can only drag the estimate below what the run says about itself,
+    which is the one thing still worth believing.
+
+    ``0.0`` once both readings are spent — the run is over its time, or into a
+    tail too short to report steps for, which is worth saying — against ``None``
+    when there was never anything to go on.
     """
-    readings = [r for r in (
-        None if typical is None else typical - elapsed,
-        _pace_remaining(elapsed, progress),
-    ) if r is not None]
-    if not readings:
-        return None
-    return max(max(readings), 0.0)
+    pace = _pace_projection(elapsed, progress)
+    if pace is None:
+        return None if typical is None else max(typical - elapsed, 0.0)
+    if typical is None or elapsed >= typical:
+        return max(pace - elapsed, 0.0)
+    done, total = progress
+    settled = min(1.0, done / total)
+    projected = settled * pace + (1.0 - settled) * typical
+    return max(projected - elapsed, 0.0)
+
+
+def remaining_label(elapsed: float | None, progress: tuple[int, int] | None,
+                    typical: float | None) -> str:
+    """The countdown on its own: ``"~4:10 left"``, or ``"finishing"`` for a run
+    with nothing left to count.
+
+    ``""`` when there is nothing to count down from — a job that hasn't started,
+    or a first run of a workflow too early to have a pace worth reading.
+    """
+    if elapsed is None:
+        return ""
+    remaining = remaining_seconds(elapsed, progress, typical)
+    if remaining is None:
+        return ""
+    return "finishing" if remaining < 1 else f"~{clock_duration(remaining)} left"
 
 
 def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,
@@ -121,12 +148,47 @@ def progress_time_label(elapsed: float | None, progress: tuple[int, int] | None,
     if elapsed is None:
         return ""
     label = f"{clock_duration(elapsed)} elapsed"
-    remaining = remaining_seconds(elapsed, progress, typical)
-    if remaining is None:
-        return label
-    if remaining < 1:
-        return f"{label} · finishing"
-    return f"{label} · ~{clock_duration(remaining)} left"
+    remaining = remaining_label(elapsed, progress, typical)
+    return f"{label} · {remaining}" if remaining else label
+
+
+def percent_label(progress: tuple[int, int] | None) -> str:
+    """How far through its sampling a run is, as a whole percent.
+
+    ``""`` when there is nothing to read it off — a job ComfyUI hasn't started,
+    or one whose workflow reports no step counts — so the caller joins what it
+    has rather than showing a 0% that never moved.
+    """
+    if not progress:
+        return ""
+    done, total = progress
+    if total <= 0:
+        return ""
+    return f"{int(done * 100 / total)}%"
+
+
+def progress_status_label(elapsed: float | None, progress: tuple[int, int] | None,
+                          typical: float | None, *, compact: bool = False) -> str:
+    """The one line every surface writes across a running job's bar:
+    ``"45% · 1:23 elapsed · ~4:10 left"``.
+
+    One wording, shared by the bottom strip's queue, the shelf's in-flight cards
+    and a folder's re-roll tile, so the same run reads the same wherever it is
+    being watched — three surfaces used to each say a different half of it in
+    different words.
+
+    ``compact`` is that line in a gallery tile's width, which is a third of the
+    strip's: it drops the elapsed count and keeps the two readings that answer
+    "how much longer" — ``"45% · ~4:10 left"``. The full line is a good half wider
+    than a 180px tile at the app's own font, so a tile carrying it would elide the
+    countdown away on exactly the long runs worth counting down.
+
+    Whichever readings are unknown drop out, down to ``""`` for a job that has
+    neither started nor reported a step.
+    """
+    clock = (remaining_label(elapsed, progress, typical) if compact
+             else progress_time_label(elapsed, progress, typical))
+    return " · ".join(part for part in (percent_label(progress), clock) if part)
 
 
 def _coarse_duration(seconds: float) -> str:
@@ -140,6 +202,21 @@ def _coarse_duration(seconds: float) -> str:
     if minutes == 60:
         hours, minutes = hours + 1, 0
     return f"{hours} hr {minutes} min" if minutes else f"{hours} hr"
+
+
+def queue_estimate_label(seconds: float | None) -> str:
+    """What a job still waiting in the line is expected to cost, in a row's width.
+
+    Coarse on purpose, like every resting estimate here: the figure behind it is
+    the median of that workflow's recent runs whatever length and resolution each
+    was asked for, so "~2 min" claims exactly as much as it can back up. ``"~?"``
+    when the workflow has never been timed — a first run has to happen before
+    anything can be said about the next one, and a made-up number in that slot is
+    worse than an admitted blank.
+    """
+    if seconds is None:
+        return "~?"
+    return f"~{_coarse_duration(seconds)}"
 
 
 def estimate_label(durations: list[float]) -> str:

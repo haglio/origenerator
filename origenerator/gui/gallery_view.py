@@ -31,13 +31,14 @@ from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    ConfigSnapshot, filled_params, find_duplicate_generation, randomize_seeds,
+    filled_params, randomize_seeds, would_reproduce_a_completed_run,
 )
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
 from origenerator.gui.find_bar import FindBar
+from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.split_folder_tree import SplitFolderTree
@@ -105,13 +106,14 @@ from origenerator.gui.orientation import (
     split_rows,
 )
 from origenerator.gui.looping_preview import set_previews_paused
-from origenerator.navigation import NavigationHistory
+from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
 from shared_ui.colors import BORDER_SUBTLE
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +161,7 @@ _SEARCH_DELAY_MS = 300
 _SEARCH_MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
 _SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
-_TOOL_ICON_PX = 24  # the button bank's icons — see GalleryView._tool_button
+_TOOL_ICON_PX = BUTTON_ICON  # the family's icon size — see GalleryView._tool_button
 _TOOLBAR_GROUP_GAP = 14  # the space that separates one group of the button bank from the next
 # Said the same way by the button and by the settings panel it would run, because
 # both go dark together the moment what's in front of you is a video.
@@ -254,6 +256,14 @@ def _is_deletable_folder(group) -> bool:
     )
 
 
+# What a spoken command about the picture is asking for, in the words its "no
+# picture on screen" answer names it by. A fix names its own parts instead.
+_VOICE_WANTS = {
+    gallery.GENAU_COMMAND: "a Genau clip",
+    gallery.ENHANCE_COMMAND: "an enhancement",
+}
+
+
 class GalleryView(QWidget):
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
@@ -305,13 +315,17 @@ class GalleryView(QWidget):
         self._reroll.failed.connect(self._on_reroll_failed)
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
-        self._auto = AutoGenerateController(self._start_reroll)
+        self._auto = AutoGenerateController(self._start_auto_reroll)
         self._auto.stopped.connect(self._on_auto_stopped)
         # Auto-generate holds a mutable copy of a folder's params per active loop so
         # voice can steer the prompt mid-loop; turning Auto on is voice's "on" and
         # begins always-listening steering of the current folder.
         self._auto_working: dict = {}
         self._pending_auto_key: str | None = None  # a re-homed loop's folder to open once it exists
+        # The runs the loop launched, by the id each began under. A loop is left
+        # running while the user works, so what it makes is the gallery's, not any
+        # tab's: no tab shows its frames or its result (see :meth:`_start_auto_reroll`).
+        self._auto_origins: set[str] = set()
         # The matcher rides along so a spoken "fix teeth" or "start slideshow" is
         # executed as a command rather than steering a prompt; the dictation
         # collects "Request … over" across as many utterances as it takes. The
@@ -438,7 +452,6 @@ class GalleryView(QWidget):
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards.
         self._browser = BrowserPane(self)
-        self._shelf_selection: dict[str, str] = {}  # last item previewed on each shelf
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
@@ -798,8 +811,9 @@ class GalleryView(QWidget):
             # out rather than a thing to look at.
             self._mic_btn = self._tool_button(
                 icons.mic_icon(),
-                "Listen: spoken slideshow commands, targeted fixes over a show, "
-                "and prompt steering while a folder is auto-generating",
+                "Listen: spoken slideshow commands, orders over a show (“enhance”, "
+                "“fix hands”, “genau it”), and prompt steering while a folder is "
+                "auto-generating",
                 self._on_mic_toggle, checkable=True,
             )
             self._mic_btn.setStyleSheet(
@@ -838,7 +852,11 @@ class GalleryView(QWidget):
         policy = self._toolbar_host.sizePolicy()
         policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
         self._toolbar_host.setSizePolicy(policy)
-        toolbar = FlowLayout(self._toolbar_host, spacing=2)
+        # The family's own gap along a row, and its wider one between wrapped
+        # rows -- at the single small gap this used, a bank that wrapped had its
+        # two rows all but touching.
+        toolbar = FlowLayout(self._toolbar_host, spacing=BUTTON_GAP,
+                             row_spacing=BUTTON_ROW_GAP)
         self._toolbar_groups = []
         for buttons in (
             (self._toc_toggle,),                                    # the tree itself
@@ -1063,8 +1081,11 @@ class GalleryView(QWidget):
             # half.
             toc.setMinimumWidth(120)
             browser.setMinimumWidth(210)
-            self._info_tabs.setMinimumWidth(300)
-            info_pane.setMinimumWidth(300)  # the pane in the splitter is the wrapper now
+            # No floor of its own on the info pane: the config tab inside it
+            # reports what its settings need (GenerateConfigPanel.minimumSizeHint),
+            # and an explicit minimum here would replace that number rather than
+            # join it — pinning the pane narrower than its contents and putting a
+            # horizontal scroll bar back under the form.
             self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
             self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
             self._folder_panes.setSizes([220, 560])
@@ -1155,10 +1176,9 @@ class GalleryView(QWidget):
         # Picking a different workflow builds a whole new form, so an open find
         # has to let go of the fields it was holding before they're destroyed.
         panel.form_replaced.connect(self._retarget_find)
-        # A tab's title is recomputed from its prompt on every keystroke, so this
-        # is also the signal that the text an open find is marking up has moved
-        # under it — re-run rather than leave highlights on words that shifted.
-        panel.title_changed.connect(self._refresh_find)
+        # Every keystroke in a tab's form moves the text an open find is marking
+        # up — re-run rather than leave highlights on words that shifted.
+        panel.form_edited.connect(self._refresh_find)
 
     # --- Drive OSR2: one switch, the app picking funscript or stroke ----------
 
@@ -1578,17 +1598,16 @@ class GalleryView(QWidget):
         return self._folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every config tab's discard button and progress fill at the run *it*
-        launched.
+        """Point every config tab's discard button at the run *it* launched.
 
         A tab tracks its own Generates, not its settings folder: a folder can have
         several runs queued at once (two pictures of one recipe, both wanted), and
         a tab showing one of them must not claim the others. Of its own it follows
         the *oldest still alive* — the one nearest to being made, and so the one
-        whose progress the bar shows and whose run its button discards. A press
-        that stopped the job queued behind the one on screen was the reported dead
-        click. A chained i2v is two prompts but one run, so a tab follows its
-        origin across the hand-off, and runs that have ended are let go here.
+        its button discards. A press that stopped the job queued behind the one on
+        screen was the reported dead click. A chained i2v is two prompts but one
+        run, so a tab follows its origin across the hand-off, and runs that have
+        ended are let go here.
         Launches from outside a tab — the folder tile's "+", the auto loop — are
         claimed by the tab looking at that same folder (:meth:`_claim_launch`), so
         they light it up too.
@@ -1604,7 +1623,6 @@ class GalleryView(QWidget):
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
-                                 job.prompt_id if job is not None else None,
                                  auto_generating=self._auto_generating(job))
 
     def _auto_generating(self, job) -> bool:
@@ -1654,14 +1672,14 @@ class GalleryView(QWidget):
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
-        byte-identical past generation — the cue to warn before wasting a slot.
+        byte-identical past generation — the cue to re-roll rather than waste a slot.
 
         Callers pass params whose seed is already concrete (the form randomizes a
         Random seed before emitting; a combine reads the stored one), so the seed
         is taken as pinned here; a genuinely random seed would simply never match.
         """
-        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
-        return find_duplicate_generation(self._db.list_generations(), snapshot) is not None
+        return would_reproduce_a_completed_run(
+            self._db.list_generations(), workflow, params)
 
     def _on_generate_requested(self, workflow_name: str, params: dict):
         """A tab's Generate: launch it as a re-roll of its settings folder and land
@@ -1684,15 +1702,12 @@ class GalleryView(QWidget):
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
         key = self._folder_key_for(workflow_name, params)
-        # A pinned seed that would reproduce a past run gets the shared "already
-        # generated" dialog rather than silently launching a copy — the guard the
-        # re-roll "+" and combine paths (see :meth:`_generate_combination`) use too.
-        # Declining launches nothing; accepting re-rolls the seed into a fresh
-        # variation and switches the front tab to a Random seed, so the choice
-        # sticks — a re-Generate (even after cancelling this one) won't re-ask.
+        # A pinned seed that would reproduce a past run draws a fresh one instead of
+        # launching a copy — the press was made against a button already reading
+        # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
+        # so this is what it said it would do, not a question worth stopping for.
+        # The tab keeps the Random seed, so its form goes on saying the same thing.
         if self._would_reproduce_a_completed_run(wf, params):
-            if offer_reroll(self, wf, can_reroll_image=False) is None:
-                return  # let the user change something rather than duplicate it
             params = randomize_seeds(params, wf.seed_keys())
             panel = self._info_tabs.current_config_panel()
             if panel is not None:
@@ -1831,7 +1846,14 @@ class GalleryView(QWidget):
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None
-        self._clear_metadata()
+        # The gallery's own selection is dropped and re-picked below. The tabs are
+        # not: a rebuild used to empty the front tab's preview outright and count on
+        # that re-pick to paint it back, so a tab showing anything the gallery
+        # wasn't pointed at went blank every time a generation landed — once per
+        # variation of a running loop. Only what has actually gone (a deleted or
+        # trashed item) is taken off a tab now.
+        self._selected_row = None
+        self._info_tabs.drop_previews_of_gone_rows(self._live_ids)
         # _tree_item_for rather than a bare lookup, so a restore target saved as
         # a folder key — a session from before the tree grew sides — still lands
         # on that folder instead of falling back to the default.
@@ -1853,12 +1875,13 @@ class GalleryView(QWidget):
             self._restore_reroll_selection(reroll_key, reroll_frame)
         finally:
             self._suppress_history = False
-        # Seed history once with wherever the gallery first lands — a generation or
-        # a shelf — so Back works even if the user's very first move leaves it.
+        # Seed history once with wherever the gallery first lands, so Back works
+        # even if the user's very first move leaves it.
         if self._history.current() is None:
             location = self._current_location()
             if location is not None:
-                self._record_visit(location)
+                self._history.visit(location)
+                self._sync_nav_buttons()
         # A search running through the rebuild takes the pane back off the folder
         # the restore above just re-drew, and re-runs against the new index — so a
         # generation that lands while a query is open joins its results.
@@ -1870,6 +1893,11 @@ class GalleryView(QWidget):
         # light its tab's button after a restart: at reconnect time the view's image
         # rows aren't built yet, so an i2v folder key wouldn't match then; here it does.
         self._reconcile_generating()
+        # A generation landing or leaving can make an open tab's pinned seed one that
+        # would reproduce it — or stop it being one — with nothing on the form having
+        # moved, so every tab re-reads what its Generate would now do.
+        for panel in self._info_tabs._config_panels():
+            panel.refresh_generate_caption()
 
     def _build_sides(self, rows, meta, unreviewed, held, requested):
         """The two sides of the tree, and the starred folders each one holds.
@@ -2078,6 +2106,9 @@ class GalleryView(QWidget):
         self._sync_auto_button()
         self._sync_enhance_button()
         self._sync_delete_button()
+        # Results are what the pane is showing, so they are somewhere Back returns
+        # to — including from a hit that was opened out of them.
+        self._record_location()
 
     def _collapse_to_folders(self, results) -> list:
         """The hits as tiles: a folder wherever one answered with several items.
@@ -2129,6 +2160,14 @@ class GalleryView(QWidget):
 
     def _exit_search(self):
         """Put the search away and give the pane back to the selected folder."""
+        self._clear_search_state()
+        self._on_folder_selected(self._tree.currentItem(), None)
+
+    def _clear_search_state(self):
+        """Forget the running query, its results and its bar — the state half of
+        leaving a search, with nothing drawn. Split out because a Back onto a stop
+        that had no search must clear the same state without redrawing the pane
+        twice: :meth:`_restore_location` fills it itself."""
         self._search_query = ""
         self._search_expansions = None
         self._search_outcome = search.SearchOutcome((), ())
@@ -2136,7 +2175,6 @@ class GalleryView(QWidget):
         self._search_timer.stop()
         self._search_expand_timer.stop()
         self._search_bar.hide()
-        self._on_folder_selected(self._tree.currentItem(), None)
 
     def _leave_search(self, *_args):
         """Clear the box, if a search is running — what navigating away means.
@@ -2149,9 +2187,20 @@ class GalleryView(QWidget):
         to those gestures. Clearing the box is what actually ends the search: its
         ``textChanged`` runs :meth:`_exit_search`, so there is one path out
         rather than two.
+
+        Off the history, because the folder the box hands the pane back to is a
+        step on the way rather than anywhere the user went: the caller records the
+        result it is opening. Recorded, it would sit between the results and that
+        result, and Back out of a hit would land on a folder instead of on the
+        hits it came from.
         """
-        if self._search_query:
+        if not self._search_query:
+            return
+        self._suppress_history = True
+        try:
             self._search_edit.clear()
+        finally:
+            self._suppress_history = False
 
     def _on_search_sort_changed(self, _index=0):
         """Re-lay the results in the newly picked order (a no-op off a search)."""
@@ -2250,7 +2299,7 @@ class GalleryView(QWidget):
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
             # so leaving a shelf for one is a step Back can undo at all.
-            self._record_location(here)
+            self._record_location()
         self._title.set_display(self._tree_view.breadcrumb(current))
         # The path ends in a code, so what the folder holds — the prompt its
         # generations ran, and the settings that set it apart from its siblings —
@@ -2568,8 +2617,10 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item else None
 
     def _add_reroll_tile(self, flow, group):
-        tile = RerollTile(self._reroll.job_for(group.key),
-                          auto_generating=self._auto.is_active(group.key))
+        job = self._reroll.job_for(group.key)
+        tile = RerollTile(job,
+                          auto_generating=self._auto.is_active(group.key),
+                          typical_seconds=self._typical_run_seconds(job))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
@@ -2577,7 +2628,28 @@ class GalleryView(QWidget):
         flow.addWidget(tile)
         self._reroll_tile = tile
 
-    def _start_reroll(self, key: str) -> bool:
+    def _typical_run_seconds(self, job) -> float | None:
+        """What a whole run of ``job``'s workflow usually takes — the prior the
+        tile's countdown opens on, before the run has a pace of its own worth
+        reading. ``None`` for an idle tile, or a workflow with no history yet."""
+        if job is None:
+            return None
+        return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
+
+    def _start_auto_reroll(self, key: str) -> bool:
+        """The loop's own launch: the variation the tile's "+" would start, except
+        that nothing about it reaches a config tab.
+
+        A loop is left running while the user works, so what it is making is not
+        what they are looking at. Its frames used to fill the info pane — that is,
+        the preview of whichever tab was open, over the picture the user had put
+        there — and its results landed in a tab too. Both belong to the folder's
+        own live tile in the middle column, which streams the run whether or not
+        the pane is pointed at it.
+        """
+        return self._start_reroll(key, from_auto=True)
+
+    def _start_reroll(self, key: str, *, from_auto: bool = False) -> bool:
         """Start a fresh variation for the folder ``key`` names and select it, so
         its live preview fills the info pane at once. Returns whether a variation
         is now running for the folder — the auto-generate loop's cue that a launch
@@ -2587,6 +2659,11 @@ class GalleryView(QWidget):
         pressed a tab's Generate, so the run is offered to the tab showing that
         folder (:meth:`_claim_launch`) — otherwise it would run with no tab
         showing its progress or offering to discard it.
+
+        ``from_auto`` is the loop's launch (:meth:`_start_auto_reroll`), which takes
+        the info pane only where the user already had it on this folder's loop —
+        watching one variation is watching the next. Otherwise the pane keeps
+        whatever the user put there.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
@@ -2613,8 +2690,26 @@ class GalleryView(QWidget):
         else:
             self._reroll.start(key, self._group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
-        self._select_reroll(key)  # a no-op if the launch above failed to register
+        if from_auto:
+            self._note_auto_launch(key)  # its result is the loop's, not a tab's
+        if not from_auto or self._selected_reroll_key == key:
+            self._select_reroll(key)  # a no-op if the launch above failed to register
         return self._reroll.has(key)
+
+    def _note_auto_launch(self, key: str):
+        """Remember that the loop, not a tab, asked for the run just launched — so
+        no tab shows its result when it lands (:meth:`_on_reroll_finished`).
+
+        Recorded by the id the run began under, the same name a tab knows its own
+        runs by, and pruned to what is still in flight as it goes: only a live run
+        can still finish, so a cancelled variation leaves nothing behind.
+        """
+        job = self._reroll.newest_job_for(key)
+        if job is None:
+            return  # the launch didn't take
+        self._auto_origins = {origin for origin in self._auto_origins
+                              if self._reroll.job_for_origin(origin) is not None}
+        self._auto_origins.add(job.origin)
 
     def _toggle_auto(self, checked: bool):
         """Start or stop auto-generating fresh variations.
@@ -2685,6 +2780,10 @@ class GalleryView(QWidget):
         being steered, leave voice with nothing to steer. The mic stays as the
         button has it."""
         self._auto_working.pop(key, None)
+        if key == self._selected_reroll_key and key not in self._reroll_jobs:
+            # The pane was following this loop between variations; there is no next
+            # one to wait for now.
+            self._clear_reroll_selection()
         if key == self._voice_target_key:
             self._voice_target_key = None
             self._pending_auto_key = None
@@ -3097,28 +3196,14 @@ class GalleryView(QWidget):
         """Holding a slide asked for it to be enhanced. Returns whether a run
         started — the slideshow shows its corner note only if one did.
 
-        Only an image that has received NO enhancement gets one, the same gate
-        Enhance All and the Auto switch use. A hold is a glance-speed gesture
-        made with no view of the Enhance panel, so an image already carrying an
-        enhancement someone chose must not be re-derived at whatever the knobs
-        happen to say now: that spends a run and hangs a level nobody asked for
-        beside the one they did. Re-enhancing stays a deliberate act — the
-        thumbnail menu's Enhance, or the info pane's ``+ Enhance`` card, both of
-        which are pressed while looking at the settings they will use.
+        The same ask as a spoken "enhance" over the same picture, so the same
+        decision makes it (:meth:`_enhance_it`); a hold has no corner line to
+        fill, so its answer is dropped. The decision is on this side rather than
+        in the slideshow because it is this side that holds the levels — and a
+        video has none to receive."""
+        return self._enhance_it(prompt_id)[0] is not None
 
-        The decision is here rather than in the slideshow because it is this
-        side that holds the levels — and a video has none to receive."""
-        row = self._db.get_generation(prompt_id)
-        if row is None or not gallery.is_enhanceable_row(row):
-            return False
-        if gallery.is_enhanced_row(row):
-            return False
-        if self.is_enhancing(row):
-            return False
-        self._enqueue_enhancements([row])
-        return True
-
-    # --- spoken commands: "fix teeth" over a show, "start slideshow" for one ---
+    # --- spoken commands: "enhance" over a show, "start slideshow" for one ---
 
     def _listening(self) -> bool:
         """Whether this app is listening on its own mic.
@@ -3178,14 +3263,22 @@ class GalleryView(QWidget):
         return True
 
     def _on_voice_command(self, matched):
-        """One recognized utterance: a shelf to play, a show command, or a
-        targeted fix — each with the side it named, if it named one."""
+        """One recognized utterance: a shelf to play, a show command, or an
+        order about the picture on screen — each with the side it named, if it
+        named one.
+
+        A bare command with no wrapper round it is an order about the picture
+        that named no side, which is what every utterance was before the room
+        had two shows to aim at.
+        """
+        if not isinstance(matched, (ShelfCommand, ShowControl, SurfaceCommand)):
+            matched = SurfaceCommand(matched)
         if isinstance(matched, ShelfCommand):
             self._play_shelf_aloud(matched)
         elif isinstance(matched, ShowControl):
             self._run_show_command(matched.command, matched.side)
         elif isinstance(matched, SurfaceCommand):
-            self._on_voice_fix(matched)
+            self._on_picture_command(matched)
 
     def _run_show_command(self, command: ShowCommand, side: str | None = None):
         """Get the show going, hold it, or close it — on *side*'s region when
@@ -3224,9 +3317,10 @@ class GalleryView(QWidget):
             else f"🎤 slideshow at {seconds}s"
         )
 
-    def _on_voice_fix(self, command):
-        """A spoken command about the picture on screen: a targeted "fix <part>",
-        or "genau it" to animate it as a Genau clip.
+    def _on_picture_command(self, command):
+        """A spoken command about the picture on screen: a targeted "fix <part>"
+        (or several parts, or "fix all"), "enhance" for the better version of
+        it, or "genau it" to animate it as a Genau clip.
 
         A named side takes that region's show — hosted, two shows run at once
         and neither is the active window, so naming one is the only way to say
@@ -3237,17 +3331,19 @@ class GalleryView(QWidget):
         here, so the caption says so rather than letting it vanish."""
         show = self._voice_surface(command.side)
         if show is None:
-            wants = ("a Genau clip" if command.command == gallery.GENAU_COMMAND
-                     else f"a {command.command.name} fix")
+            wants = (_VOICE_WANTS.get(command.command)
+                     or f"a {gallery.name_parts(command.command)} fix")
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)
             return
-        target = show.voice_fix_target()
+        target = show.voice_target()
         if command.command == gallery.GENAU_COMMAND:
             prompt_id, message = self._genau_it(target)
+        elif command.command == gallery.ENHANCE_COMMAND:
+            prompt_id, message = self._enhance_it(target)
         else:
-            prompt_id, message = self._fix_part(target, command.command)
-        show.note_voice_fix(prompt_id, message)
+            prompt_id, message = self._fix_parts(target, command.command)
+        show.note_voice_run(prompt_id, message)
 
     def _voice_surface(self, side: str | None):
         """The show a spoken command means: *side*'s region show when it named
@@ -3414,30 +3510,72 @@ class GalleryView(QWidget):
             "🎤 F-mode on" if getattr(show, "hud_f_mode", False) else "🎤 F-mode off",
             transient=True)
 
-    def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
+    def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+        """Enhance the picture on screen: the id it launched on (``None`` when it
+        didn't) and the line the speaking surface should say.
+
+        Only an image that has received no enhancement gets one, the same gate a
+        fullscreen hold's Down uses — spoken over a show, this is a gesture made
+        with no view of the Enhance panel, and an image already carrying an
+        enhancement someone chose must not be re-derived at whatever the knobs
+        happen to say now. Re-enhancing stays a deliberate act made in front of
+        the settings it will use (the thumbnail menu, the ``+ Enhance`` card).
+        """
+        row = self._db.get_generation(prompt_id) if prompt_id else None
+        if row is None or not gallery.is_enhanceable_row(row):
+            return None, "🎤 only a finished image can be enhanced"
+        if gallery.is_enhanced_row(row):
+            return None, "🎤 this one is enhanced already"
+        params = gallery.enhance_params_for(row, self._enhance_settings)
+        if params is None:
+            return None, "🎤 this one has no file to enhance"
+        return self._launch_spoken_enhance(row, params, "enhance", "enhancing…")
+
+    def _fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
         (``None`` when it didn't) and the line the surface should say about it.
 
-        The run is the image's latest enhancement done again with the detail
-        pass aimed at the named part (:func:`~origenerator.gallery.enhance.
-        fix_part_params`) — so the answer to a bad hand on an already-enhanced
-        image is the same image, same settings, hand redrawn."""
+        The run is the image's latest enhancement done again with a detail pass
+        aimed at each part named (:func:`~origenerator.gallery.enhance.
+        fix_params_for`) — so the answer to a bad hand on an already-enhanced
+        image is the same image, same settings, hand redrawn.
+
+        Said back in the parts it is actually redrawing, which is not always the
+        parts asked for: one with nothing installed to find it is dropped rather
+        than taking the rest of the command down with it, and the caption is
+        where that shows. Refused outright only when none of them can run."""
+        asked = gallery.name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, f"🎤 only a finished image can get a {part.name} fix"
-        params = gallery.fix_part_params(row, part, self._enhance_settings)
+            return None, f"🎤 only a finished image can get a {asked} fix"
+        params = gallery.fix_params_for(row, parts, self._enhance_settings)
         if params is None:
-            return None, (f"🎤 no {part.name} detector installed "
+            return None, (f"🎤 no {asked} detector installed "
                           "(ComfyUI models/ultralytics/bbox)")
         if gallery.level_matching_params(row, params) is not None:
-            return None, f"🎤 already has this {part.name} fix"
-        if self.is_enhancing(row):
+            return None, f"🎤 already has this {asked} fix"
+        fixing = gallery.name_parts(
+            [part for part in parts if part.name in params["enhance_detail_fixes"]])
+        return self._launch_spoken_enhance(row, params, f"{fixing} fix",
+                                           f"fixing {fixing}…")
+
+    def _launch_spoken_enhance(self, row: dict, params: dict, what: str,
+                               doing: str) -> tuple[str | None, str]:
+        """The tail both spoken enhancements share: refuse one already cooking,
+        else launch and say so.
+
+        A targeted fix and a plain "enhance" differ in what they refuse and in
+        what they run; from here on they are one act. ``what`` names the run in
+        a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
+        while it runs.
+        """
+        if self.enhancing_run(row) is not None:
             return None, "🎤 an enhance of this image is already running"
-        logger.info("Voice fix: %s on %s at %s", part.name, row.get("prompt_id"),
+        logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
                     gallery.describe_enhance_params(params))
         if not self._launch_enhance(row, params):
-            return None, f"🎤 couldn't launch the {part.name} fix — see the log"
-        return row["prompt_id"], f"🎤 fixing {part.name}…"
+            return None, f"🎤 couldn't launch the {what} — see the log"
+        return row["prompt_id"], f"🎤 {doing}"
 
     # --- spoken requests: "Request … over" over whatever is on screen ---------
 
@@ -3469,7 +3607,7 @@ class GalleryView(QWidget):
         """What a request just opened is about: the slide filling the screen
         when a show is up, else the generation picked in the gallery."""
         if show is not None:
-            return show.voice_request_target()
+            return show.voice_target()
         return self.selected_generation()
 
     def _hold_for_request(self, show, spoken):
@@ -3580,21 +3718,47 @@ class GalleryView(QWidget):
             surface.note_enhanced(row["prompt_id"], preview[0], preview[1],
                                   still=row.get("thumbnail_path"))
 
-    def is_enhancing(self, row: dict) -> bool:
-        """Whether a standalone enhance of this image is running right now.
+    def enhancing_run(self, row: dict) -> EnhancingRun | None:
+        """The standalone enhance being made of this image right now, or ``None``.
 
-        The browser pane's tiles ask, so a folder generating with the Auto
-        switch on reads honestly: the base render is out, on screen, and
-        something better is on the way. Without it the folder looks like it is
-        turning out plain images and ignoring the switch.
+        The browser pane's tiles ask as they are built, so a folder generating
+        with the Auto switch on reads honestly: the base render is out, on
+        screen, and something better is on the way. Without it the folder looks
+        like it is turning out plain images and ignoring the switch.
 
         Every live job is searched, not each folder's leading one: a batch of
         enhances goes out whole and its members share a settings key, so all but
         the first would read as not-cooking off the folder-facing view."""
-        return any(
-            job.workflow.name == gallery.ENHANCE_WORKFLOW
-            and gallery.enhance_targets_row(job.params.get("input_image"), row)
-            for job in self._reroll.all_jobs
+        for key, job in self._enhance_jobs():
+            if gallery.enhance_targets_row(job.params.get("input_image"), row):
+                return self._enhancing_run(key, job)
+        return None
+
+    def _enhance_jobs(self) -> list:
+        """Every standalone enhance in flight, as ``(folder key, job)``.
+
+        The key comes along because the frames are held per folder
+        (:attr:`_enhance_frames`), and a job on its own can't say which slot is
+        its own."""
+        return [(key, job)
+                for key, jobs in self._reroll.jobs_by_folder.items()
+                for job in jobs
+                if job.workflow.name == gallery.ENHANCE_WORKFLOW]
+
+    def _enhancing_run(self, key: str, job) -> EnhancingRun:
+        """One enhance in flight, as the tile of the image it improves sees it.
+
+        The frame goes only to a job actually rendering, for the reason
+        :meth:`_pending_enhancement_for` spells out: a batch shares one folder
+        and so one frame slot, and lending it to the ones queued behind would
+        show each of those tiles a picture of a different image."""
+        rendering = job.state == "running"
+        return EnhancingRun(
+            status="running" if rendering else "queued",
+            frame=self._enhance_frames.get(key) if rendering else None,
+            progress=job.last_progress,
+            started_at=job.started_at,
+            typical_seconds=self._typical_run_seconds(job),
         )
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
@@ -3632,16 +3796,12 @@ class GalleryView(QWidget):
         enhance against every tab's displayed row. Cheap enough to re-run on
         each frame; the panel updates its row in place.
 
-        Every job of every folder, for the same reason :meth:`is_enhancing` reads
-        them all: a batch of enhances shares one settings key, and a tab showing
-        the third image of it must find its own run rather than the first.
+        Every job of every folder, for the same reason :meth:`enhancing_run`
+        reads them all: a batch of enhances shares one settings key, and a tab
+        showing the third image of it must find its own run rather than the
+        first.
         """
-        running = [
-            (key, job)
-            for key, jobs in self._reroll.jobs_by_folder.items()
-            for job in jobs
-            if job.workflow.name == gallery.ENHANCE_WORKFLOW
-        ]
+        running = self._enhance_jobs()
         for panel in self._info_tabs._config_panels():
             row = panel.displayed_row()
             panel.set_pending_enhancement(
@@ -3673,8 +3833,7 @@ class GalleryView(QWidget):
                 if gallery.enhance_targets_row(job.params.get("input_image"), row)
             }
         self._browser.show_enhancing({
-            prompt_id: (self._enhance_frames.get(key)
-                        if job.state == "running" else None)
+            prompt_id: self._enhancing_run(key, job)
             for prompt_id, (key, job) in self._enhancing_by_prompt.items()
         })
 
@@ -3980,10 +4139,24 @@ class GalleryView(QWidget):
                 show.note_added(*item)
 
     def _open_from_slideshow(self, prompt_id: str):
-        """Enter in a slideshow: land in the item's own folder with it selected —
-        the same jump a shelf tile's double-click makes. The slideshow has already
-        closed itself, so this arrives on the gallery."""
+        """A slideshow handed its item over on the way out — Enter, or a show
+        ended while that slide was locked. Land in the item's own folder with it
+        selected, the same jump a shelf tile's double-click makes, and open the
+        item itself in a config tab.
+
+        The tab matters as much as the folder: leaving a show *for* an item is a
+        decision to work on it, and a folder open behind a form still holding
+        whatever was there before the show is not that. Following a link only
+        refreshes the front tab's preview, which is right for a link and wrong
+        here. The slideshow has already closed itself, so this arrives on the
+        gallery.
+        """
+        self._slideshow = None
         self._browser.open_in_containing_folder(prompt_id)
+        row = self._row_for(prompt_id)
+        if row is not None:
+            self._info_tabs.load_selection(row, self._image_rows,
+                                           self._request_for(prompt_id))
 
     def _star_generation(self, prompt_id: str):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
@@ -4267,7 +4440,7 @@ class GalleryView(QWidget):
         what = ("looping “%s” clip" % category if intent == recipe_match.GENAU
                 else "“%s” video" % category)
         if self._slideshow is not None:
-            self._slideshow.note_voice_fix(
+            self._slideshow.note_voice_run(
                 None, f"🎤 no past {what} to base a recipe on yet")
             return
         QMessageBox.information(
@@ -4406,7 +4579,7 @@ class GalleryView(QWidget):
         """Animate an image as a Genau clip: the act read off its own prompt.
 
         Returns the id it launched on (``None`` when it didn't) and the line the
-        speaking surface should say — the same shape as :meth:`_fix_part`, because
+        speaking surface should say — the same shape as :meth:`_fix_parts`, because
         the speaker is looking at the picture, not at this pane.
 
         Nothing is picked and nothing is dropped: the act comes from the image's
@@ -4598,10 +4771,20 @@ class GalleryView(QWidget):
         if show is not None and show.is_live():
             show.close()
 
-    def _on_reroll_finished(self, key: str, prompt_id: str):
+    def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         """A re-roll saved its result (finalized by the controller): drop it as the
         info-pane source, rebuild so it shows as a normal thumbnail, and load it into
-        the front tab so a Generate ends on its finished output, not the placeholder."""
+        the tab that launched it so a Generate ends on its finished output, not the
+        placeholder."""
+        # Which tab that is, read now: the rebuild below reconciles the finish, and
+        # a tab lets go of its runs as they end. A launch no tab made — the folder
+        # tile's "+" — has no owner unless a tab on that very folder claimed it, and
+        # a variation the loop made has none at all: it is not what the user is
+        # working on, so it never takes a tab's preview over.
+        run = origin or prompt_id
+        launcher = (None if run in self._auto_origins
+                    else self._info_tabs.panel_that_launched(run))
+        self._auto_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is not None and finished_row.get("source") == "experiment":
             # A background experiment landed: it waits on the Experiments shelf
@@ -4609,6 +4792,7 @@ class GalleryView(QWidget):
             # no slideshow feed, no auto-loop or combine bookkeeping.
             self.refresh()
             return
+        folded = False
         if finished_row is not None \
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             # A standalone enhance is an upgrade, not a generation: fold its
@@ -4617,15 +4801,30 @@ class GalleryView(QWidget):
             # upgraded image be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
+                folded = True
                 finished_row = self._db.get_generation(source_id)
                 # A slideshow that asked for this one swaps the slide for it.
                 self._feed_slideshow_enhanced(finished_row)
         self._send_to_genau_if_requested(finished_row)
-        if key == self._selected_reroll_key:
+        was_mirrored = key == self._selected_reroll_key  # the pane held its live frames
+        # Let go of it — unless a loop is running here and the pane was pointed at
+        # it, where the key stands for the loop rather than for this one variation:
+        # someone watching it churn is watching what it does next, so the selection
+        # waits for the variation after this one (see :meth:`_start_reroll`).
+        if was_mirrored and not self._auto.is_active(key):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_slideshow_finished(finished_row)  # a show of its folder gains it
-        self._show_reroll_result_in_tab(finished_row)
+        self._show_reroll_result_in_tab(finished_row, launcher)
+        if folded:
+            # The image itself changed — it now holds a level it did not a
+            # moment ago — and a tab holds the row it was handed, not a live
+            # view of the database. Without this the new version reaches the
+            # list only when the tab is next opened, which is a tab away and
+            # back.
+            self._info_tabs.refresh_displayed(finished_row, self._image_rows)
+        if was_mirrored:
+            self._show_mirrored_result(finished_row, launcher)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
@@ -4647,8 +4846,9 @@ class GalleryView(QWidget):
         self._sync_enhance_button()  # a landed enhance may retire the button
         self._reconcile_pending_enhancements()  # the live tile gives way to the level
 
-    def _show_reroll_result_in_tab(self, finished_row: dict | None):
-        """After a re-roll finishes, load its result into the front config tab.
+    def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
+        """After a re-roll finishes, load its result into the tab that launched it
+        — and into no other, ``launcher`` being ``None`` when no tab did.
 
         The finished row is handed over directly rather than resolved through the
         folder the job was keyed under: a re-roll of an old-generation folder
@@ -4657,8 +4857,27 @@ class GalleryView(QWidget):
         newest row is not this result. Loading it leaves the tab showing the
         finished image/video and its footer — the completed end-state of a
         Generate — instead of the live-frame placeholder it held while running."""
-        if finished_row is not None and gallery.produced_output(finished_row):
-            self._info_tabs.show_result_in_current_tab(finished_row, self._image_rows)
+        if launcher is not None and finished_row is not None \
+                and gallery.produced_output(finished_row):
+            launcher.show_completed_result(finished_row, self._image_rows)
+
+    def _show_mirrored_result(self, finished_row: dict | None, launcher):
+        """The run the info pane was mirroring has landed: put its picture where its
+        live frames were, in the tab in front.
+
+        The frames were streaming there whoever launched the run (see
+        :meth:`InfoPaneTabs.show_reroll_frame`), so without this a pane watching a
+        loop — or a fullscreen show opened over those frames — would sit on the
+        last partial frame of a run that has finished. Only the preview changes:
+        the tab holds no more of a run it didn't ask for. Skipped when the tab in
+        front is the one that launched it, which has just been given the whole
+        end-state instead.
+        """
+        if finished_row is None or not gallery.produced_output(finished_row):
+            return
+        if launcher is not None and launcher is self._info_tabs.current_config_panel():
+            return
+        self._info_tabs.show_reroll_result(finished_row)
 
     def _on_reroll_failed(self, key: str):
         """A re-roll failed (recorded by the controller): release the info pane if
@@ -5032,7 +5251,7 @@ class GalleryView(QWidget):
         for every delete there is: a picked tile, a whole folder, a rejected
         experiment, a slideshow's Up key. The jobs are the gallery's, so the
         match is made here — the same "is this run an enhance of this image?"
-        question :meth:`is_enhancing` asks, over every live job of every folder
+        question :meth:`enhancing_run` asks, over every live job of every folder
         (a batch of enhances shares one settings key, so all but its leader
         would be missed by the folder-facing view).
 
@@ -5347,16 +5566,11 @@ class GalleryView(QWidget):
             self._info_tabs.show_selection_preview(
                 gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR), prompt_id
             )
-        shelf_key = self._current_shelf_key()
-        if shelf_key is not None:
-            # Previewing an item on a shelf is shelf state, not a navigation: it's
-            # remembered so Back can restore it, but the shelf stays the one history
-            # stop (stepping through each preview would bury where you came from).
-            self._shelf_selection[shelf_key] = prompt_id
-        else:
-            # In a folder, each viewed generation — a click or a followed link —
-            # is its own browsing step.
-            self._record_location(prompt_id)
+        # Each generation looked at is its own browsing step, wherever it was
+        # looked at: in a folder, on a shelf, or among a search's hits. The view it
+        # was picked in goes on the stack with it, so Back returns to the item AND
+        # to the pane it was one of — not to some other folder that also holds it.
+        self._record_location(prompt_id)
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
@@ -5376,7 +5590,7 @@ class GalleryView(QWidget):
         makes, and the folder it opens has to be what ends up on screen."""
         self._leave_search()
         self._show_generation(prompt_id)
-        self._record_visit(prompt_id)
+        self._record_location(prompt_id)
         # After the navigation, which renders the folder's tiles fresh.
         self._browser.reveal_tile(prompt_id)
 
@@ -5403,24 +5617,61 @@ class GalleryView(QWidget):
         base, _orientation = _split_shelf_key(key)
         return key if base in _SHELF_KEYS else None
 
-    def _current_location(self) -> str | None:
-        """The history key for the view on screen — a shelf key on a shelf, the
-        selected generation's id in a folder, else the open folder's own key
-        (``None`` with nothing open at all)."""
-        return self._current_shelf_key() or (
-            self._selected["prompt_id"] if self._selected else self._selected_folder_key()
-        )
+    def _current_location(self) -> Location | None:
+        """What the middle pane is showing right now, as a history stop: the tree
+        row it is drawn from, any query running over it, and the item picked in it
+        (``None`` with nothing open at all).
 
-    def _record_location(self, location: str):
-        """Record a visit to a location — a generation id or a shelf key — unless a
-        rebuild or Back/Forward is re-showing it (those move within history, not
-        onto it)."""
-        if not self._suppress_history:
-            self._record_visit(location)
+        Only for seeding history at startup, where there is no gesture to ask.
+        Every stop after that is recorded by the gesture that made it, which knows
+        which item it picked — see :meth:`_record_location`.
+        """
+        view = self._selected_folder_key()
+        if view is None:
+            return None
+        item = self._selected["prompt_id"] if self._selected else None
+        if item is not None and item not in self._browser.visible_prompt_ids():
+            item = None  # left behind by the pane this one replaced
+        return Location(view, self._search_query, item)
 
-    def _record_visit(self, location: str):
-        self._history.visit(location)
+    def _record_location(self, item: str | None = None):
+        """Record what the middle pane now shows: the folder or shelf the tree has
+        selected, the query running over it, and ``item`` if the gesture picked one.
+
+        Skipped while a rebuild or Back/Forward is what put it there — those move
+        within history rather than onto it. Everything the pane can show is
+        recorded the same way, so Back returns to the view the user was actually
+        looking at, whatever kind of view it was.
+        """
+        if self._suppress_history:
+            return
+        view = self._selected_folder_key()
+        if view is None:
+            return  # nothing open: no view to come back to
+        location = Location(view, self._search_query, item)
+        current = self._history.current()
+        if self._redrawing_the_same_search(location, current):
+            # A search results pane redraws for reasons that are not navigations —
+            # a sort, a widening landing, a generation finishing under a poll — and
+            # a stop per redraw would fill history with the pane already on screen.
+            if current.query == location.query:
+                return
+            # A query being narrowed is that same pane re-asked rather than another
+            # one opened, so each pause overwrites its stop instead of adding one.
+            self._history.replace(location)
+        else:
+            self._history.visit(location)
         self._sync_nav_buttons()
+
+    @staticmethod
+    def _redrawing_the_same_search(location: Location, current: Location | None) -> bool:
+        """Whether ``location`` is the search stop at ``current`` being drawn again
+        rather than somewhere new: the same folder, a query over it either way, and
+        no item picked (picking a hit is a step within the results, not a redraw of
+        them)."""
+        return bool(location.query and location.item is None
+                    and current is not None and current.query
+                    and current.view == location.view)
 
     def _go_back(self):
         location = self._history.back()
@@ -5434,45 +5685,70 @@ class GalleryView(QWidget):
             self._restore_location(location)
         self._sync_nav_buttons()
 
-    def _restore_location(self, location: str):
-        """Re-show a history location without recording the move — one side's
-        shelf overview, or a generation in its folder."""
-        base, _orientation = _split_shelf_key(location)
-        if base in _SHELF_KEYS:
-            self._return_to_shelf(location)
-        elif location in self._item_by_key:
-            self._return_to_folder(location)
-        else:
-            self._show_generation(location)
+    def _restore_location(self, location: Location):
+        """Re-show a stop as it stood — its folder or shelf, the query that was
+        running over it, and the item that was picked in it — without recording the
+        move (which walks history rather than adding to it).
 
-    def _return_to_folder(self, key: str):
-        """Back/Forward onto a folder: open it without recording the move (so it
-        doesn't pile back onto history)."""
+        A stop whose row the tree no longer has (a folder emptied by a delete)
+        falls back to showing its item wherever it now lives, rather than leaving
+        the press doing nothing at all.
+        """
         self._suppress_history = True
         try:
-            self._tree.setCurrentItem(self._item_by_key[key])
+            self._restore_query(location.query)
+            # _tree_item_for rather than a bare lookup: a stop recorded before the
+            # tree grew sides names a folder key with no side on it, and that key
+            # still has to find its row.
+            row = self._tree_item_for(location.view)
+            if row is None:
+                if location.item is not None:
+                    self._show_generation(location.item)
+                return
+            if self._tree.currentItem() is row:
+                # Already standing on that row, so setting it fires nothing — and
+                # the pane still holds the search results, or the tile highlight,
+                # this stop was recorded without. Draw it again by hand.
+                self._on_folder_selected(row, None)
+            else:
+                self._tree.setCurrentItem(row)  # whose signal draws it
+            if location.query:
+                self._run_search()  # which takes the pane back off the folder again
+            if location.item is not None:
+                self._reveal_in_pane(location.item)
+            else:
+                # Nothing was picked at this stop, so nothing is picked on landing:
+                # a folder still showing the item Back just left would look like the
+                # press had done nothing at all.
+                self._clear_metadata()
         finally:
             self._suppress_history = False
 
-    def _return_to_shelf(self, key: str):
-        """Back/Forward onto a shelf: show it and restore the item that was selected
-        there, all without recording (so the move doesn't pile back onto history)."""
-        item = self._item_by_key.get(key)
-        if item is None:
-            return
-        self._suppress_history = True
-        try:
-            self._tree.setCurrentItem(item)  # shows the shelf, cleared of any selection
-            self._restore_shelf_selection(key)
-        finally:
-            self._suppress_history = False
+    def _restore_query(self, query: str):
+        """Put the search box back to what it held at a history stop.
 
-    def _restore_shelf_selection(self, key: str):
-        """Re-preview the item last selected on this shelf, if it's still listed —
-        so returning to a shelf lands on it, not on a blank shelf."""
-        prompt_id = self._shelf_selection.get(key)
-        if prompt_id is not None and prompt_id in self._browser.visible_prompt_ids():
-            self._apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        Set without its typing signals: those debounce and re-run, which would
+        answer a restore with a search a beat later, over whatever the restore had
+        by then moved on to. The expander's cache is consulted so a query that was
+        widened comes back widened, and one it never answered comes back anyway.
+        """
+        self._search_edit.blockSignals(True)
+        try:
+            self._search_edit.setText(query)
+        finally:
+            self._search_edit.blockSignals(False)
+        self._clear_search_state()
+        self._search_query = query
+        if query:
+            self._search_expansions = self._search_expander.cached(query)
+
+    def _reveal_in_pane(self, prompt_id: str):
+        """Land on an item the pane is already showing: its tile picked and
+        scrolled to, its preview back in the info pane. Silent if the pane has no
+        tile for it — a Recents page not drawn yet, a row since deleted — which
+        leaves the view itself restored rather than jumping somewhere else."""
+        if prompt_id in self._browser.visible_prompt_ids():
+            self._browser.reveal_tile(prompt_id)
             self._on_thumbnail_clicked(prompt_id)
 
     def _sync_nav_buttons(self):

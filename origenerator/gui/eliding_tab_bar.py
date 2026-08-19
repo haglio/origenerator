@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QPalette
+from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
 
 from origenerator.gui.icons import tab_close_icon
@@ -7,6 +7,48 @@ from origenerator.gui.icons import tab_close_icon
 # How much wider than its mark a tab's close button sits, so the ✕ isn't flush
 # against the tab's right edge.
 _CLOSE_PADDING = 12
+
+# How far a tab's marks sit from its edges, and from the label between them.
+# Taken from where the ✕ already lands: half of _CLOSE_PADDING, the pixel Qt
+# insets the button by, and the margin inside the style's own ✕ glyph come to
+# this — so a tab's two ends are one spacing rather than two.
+EDGE = 10
+
+# The square a tab's mark is drawn in, whatever shape the picture is, and the
+# canvas it rides on. The canvas is wider than the square by the gap the label
+# needs, because Qt's own tab layout puts the text a fixed _QT_LABEL_GAP after
+# whatever the icon measures and offers no way to say otherwise — so the mark
+# carries the rest of that gap itself, as transparency.
+MARK = 20
+_QT_LABEL_GAP = 4  # QCommonStylePrivate::tabLayout's, not ours to set
+MARK_CANVAS = QSize(MARK + EDGE - _QT_LABEL_GAP, MARK)
+
+
+def tab_mark(icon: QIcon) -> QIcon:
+    """``icon`` as a tab wears it: square, and trailing the gap its label needs.
+
+    Squared by filling rather than fitting, so every tab's mark is the same
+    width and the row's spacing doesn't shift with a picture's shape — at this
+    size a thumbnail is a swatch, and what the crop takes off its sides is not
+    anything the eye was reading. A null icon stays null: a tab that has nothing
+    to show wears nothing, rather than an empty box where a picture goes.
+    """
+    if icon.isNull():
+        return icon
+    # Ask big, then fill: QIcon won't scale a pixmap up, so this is whatever the
+    # source actually has, at its own shape.
+    source = icon.pixmap(QSize(MARK * 8, MARK * 8))
+    if source.isNull():
+        return icon
+    filled = source.scaled(MARK, MARK, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                           Qt.TransformationMode.SmoothTransformation)
+    canvas = QPixmap(MARK_CANVAS)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    painter.drawPixmap(0, 0, filled, (filled.width() - MARK) // 2,
+                       (filled.height() - MARK) // 2, MARK, MARK)
+    painter.end()
+    return QIcon(canvas)
 
 
 class _PreviewTabStyle(QProxyStyle):

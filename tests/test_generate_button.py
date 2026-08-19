@@ -36,77 +36,63 @@ def styled_button(qtbot):
 
 
 def _face(button):
-    """The button's colour well right of any fill — its resting face."""
+    """The button's color well right of its edge — its resting face."""
     image = button.grab().toImage()
     return image.pixelColor(button.width() - 4, button.height() // 2)
 
 
-def test_idle_reads_generate_with_no_fill(button):
+def test_idle_reads_generate(button):
     assert button.text() == "Generate"
-    assert button._fraction is None
-
-
-def test_start_enters_progress_mode(button):
-    button.start()
-    assert button._fraction == 0.0
 
 
 def test_a_run_in_flight_leaves_the_button_pressable(button):
-    # ComfyUI takes a queue now, so a second press while one run is in flight is
-    # a second job asked for, not a relaunch over the first — and the face keeps
-    # saying so rather than greying out under a "Generating…" label.
-    button.start()
+    # ComfyUI takes a queue, so a second press while one run is in flight is a
+    # second job asked for, not a relaunch over the first.
     assert button.isEnabled()
     assert button.text() == "Generate"
 
 
-def test_progress_mode_drops_the_primary_blue_so_the_fill_can_read(styled_button):
-    # Reported: a blue progress edge crawling across a button that was already
-    # fully blue. The fill is a translucent blue wash, so the face under it steps
-    # back to neutral for the run — it can't grey out via :disabled any more, since
-    # the button stays pressable to queue another.
-    assert _face(styled_button) == BLUE          # idle: the primary blue
-
-    styled_button.start()
-
-    running = _face(styled_button)
-    assert running != BLUE                       # a face the wash can be seen on
-    styled_button.set_progress(1, 1)
-    assert _face(styled_button) != running       # and it is: the fill shows there
-
-
-def test_progress_mode_gives_the_primary_blue_back_when_the_run_ends(styled_button):
-    styled_button.start()
-    styled_button.finish(enabled=True)
+def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
+    # It used to step back to a neutral face and fill with the run's progress,
+    # which put a third account of one run on screen beside the queue's and the
+    # in-flight card's. Submitting is all it does now, so it never changes face.
     assert _face(styled_button) == BLUE
 
 
-def test_set_progress_sets_the_fill_fraction(button):
-    button.start()
-    button.set_progress(3, 12)
-    assert button._fraction == 0.25
-
-
-def test_set_progress_survives_a_zero_maximum(button):
-    button.start()
-    button.set_progress(0, 0)       # ComfyUI can send max=0 before steps start
-    assert button._fraction == 0.0
-
-
-def test_finish_returns_to_the_idle_button(button):
-    button.start()
-    button.finish(enabled=True)
-    assert button.text() == "Generate"
-    assert button._fraction is None
-    assert button.isEnabled()
-
-
-def test_finish_can_leave_it_disabled(button):
-    button.start()
-    button.finish(enabled=False)    # a read-only gallery with no client
-    assert not button.isEnabled()
+def test_the_button_tracks_no_run(button):
+    # Nothing here to feed a run's progress into: the strip's queue and the
+    # browser pane's card are the two places a run in flight is watched.
+    assert not hasattr(button, "set_progress")
+    assert not hasattr(button, "start")
+    assert not hasattr(button, "finish")
 
 
 def test_flash_guard_shows_the_message_on_the_button(button):
     button.flash_guard("Select an input image")
     assert button.text() == "Select an input image"
+
+
+def test_the_caption_is_what_a_flashed_guard_comes_back_to(button):
+    # The resting caption says what a press will do — "Generate with Random seed"
+    # where the settings would otherwise re-create a past generation — so a guard
+    # that has had its moment hands that caption back, not "Generate".
+    button.set_caption("Generate with Random seed")
+    assert button.text() == "Generate with Random seed"
+
+    button.flash_guard("Select an input image")
+    button._guard_timer.timeout.emit()
+
+    assert button.text() == "Generate with Random seed"
+
+
+def test_a_new_caption_waits_for_the_guard_message_to_clear(button):
+    # The caption is recomputed on every form edit, which is exactly what the user
+    # is doing while a guard says what the form still needs — so a caption arriving
+    # mid-guard waits its turn rather than wiping the message being read.
+    button.flash_guard("Select an input image")
+
+    button.set_caption("Generate with Random seed")
+
+    assert button.text() == "Select an input image"
+    button._clear_guard()
+    assert button.text() == "Generate with Random seed"

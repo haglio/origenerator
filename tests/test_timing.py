@@ -5,7 +5,11 @@ from origenerator.timing import (
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
+    percent_label,
+    progress_status_label,
     progress_time_label,
+    queue_estimate_label,
+    remaining_label,
     remaining_seconds,
 )
 
@@ -118,11 +122,23 @@ def test_remaining_uses_the_pace_alone_with_no_history():
     assert remaining_seconds(200.0, (10, 20), None) == 200.0
 
 
-def test_remaining_holds_the_typical_time_through_the_tail():
-    # Every sampler step is done but the VAE decode and audio pass aren't — the
-    # step count can't see those, so the typical time is what carries the number
-    # rather than dropping it to zero while the job visibly keeps working.
-    assert remaining_seconds(600.0, (20, 20), 724.0) == 124.0
+def test_remaining_hands_over_to_the_pace_as_the_run_settles():
+    # The bug this guards. A run half-done in 90s is on course for 180s of its
+    # own, while the workflow's median says 724s — a median over runs of every
+    # length, so a weak claim about this one. Half-way through, the estimate sits
+    # half-way between the two; by the last steps the run's own pace is what
+    # decides, so a run faster than its median stops finishing with minutes still
+    # on its clock.
+    assert remaining_seconds(90.0, (10, 20), 724.0) == 362.0        # 452 projected
+    assert round(remaining_seconds(180.0, (18, 20), 724.0)) == 72   # 252 projected
+    assert remaining_seconds(200.0, (20, 20), 724.0) == 0.0         # 200: the pace
+
+
+def test_remaining_is_zero_through_a_tail_that_reports_no_steps():
+    # Every step ComfyUI reports is done and the job is still saving its output.
+    # Nothing measures that tail, so the honest reading is zero — which the label
+    # says as "finishing" — not the typical time's guess at how long it runs.
+    assert remaining_seconds(600.0, (20, 20), 724.0) == 0.0
 
 
 def test_remaining_is_zero_not_none_once_a_run_is_over_its_time():
@@ -134,8 +150,9 @@ def test_remaining_is_none_with_nothing_to_go_on():
 
 
 def test_progress_time_label_reads_elapsed_and_left():
-    # 724s typical less the 83s already spent, the pace agreeing there's more to go.
-    assert progress_time_label(83.0, (10, 20), 724.0) == "1:23 elapsed · ~10:41 left"
+    # Half the steps done in 83s: the run's own pace is on course for 166s, the
+    # workflow's median for 724s, and half-way through the estimate splits them.
+    assert progress_time_label(83.0, (10, 20), 724.0) == "1:23 elapsed · ~6:02 left"
 
 
 def test_progress_time_label_is_elapsed_alone_with_no_estimate():
@@ -152,3 +169,58 @@ def test_progress_time_label_is_empty_before_a_job_starts():
     # A queued job has no elapsed time; a zero counting up beside an unmoved bar
     # would say it was running.
     assert progress_time_label(None, None, 724.0) == ""
+
+
+def test_a_queued_jobs_estimate_rounds_to_one_unit():
+    # The queue's rows are scanned, not studied: "~2 min" is the whole of what a
+    # median of past runs can back up, and is what a wait gets added up out of.
+    assert queue_estimate_label(126.0) == "~2 min"
+    assert queue_estimate_label(41.0) == "~41 sec"
+
+
+def test_an_untimed_workflow_admits_it_rather_than_guess():
+    # A workflow nobody has run yet has nothing to estimate from, and a number
+    # invented for that slot would be read as one measured.
+    assert queue_estimate_label(None) == "~?"
+
+
+def test_percent_label_rounds_down_to_a_whole_percent():
+    assert percent_label((10, 20)) == "50%"
+    assert percent_label((1, 3)) == "33%"
+    assert percent_label((20, 20)) == "100%"
+
+
+def test_percent_label_is_empty_with_nothing_to_read_it_off():
+    # A workflow reporting no step counts, or a job before its first tick: "0%"
+    # would be a reading, and there isn't one.
+    assert percent_label(None) == ""
+    assert percent_label((0, 0)) == ""
+
+
+def test_progress_status_label_leads_with_how_far_along_it_is():
+    # The one line every in-flight surface writes across its bar — the strip's
+    # queue, the shelf's cards, a folder's re-roll tile — so one run reads the
+    # same wherever it is being watched.
+    assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
+
+
+def test_progress_status_label_drops_whichever_half_is_unknown():
+    assert progress_status_label(83.0, None, None) == "1:23 elapsed"   # no steps reported
+    assert progress_status_label(None, (10, 20), 724.0) == "50%"       # not started yet
+    assert progress_status_label(None, None, 724.0) == ""              # neither
+
+
+def test_the_compact_line_keeps_how_far_along_and_how_much_longer():
+    # A gallery tile is a third of the strip's width, and the full line runs half
+    # again wider than the tile at the app's own font — so a tile carrying it
+    # would elide the countdown away on exactly the long runs worth counting down.
+    assert progress_status_label(83.0, (10, 20), 724.0, compact=True) == "50% · ~6:02 left"
+    assert progress_status_label(900.0, (20, 20), 724.0, compact=True) == "100% · finishing"
+    assert progress_status_label(83.0, None, None, compact=True) == ""
+
+
+def test_remaining_label_is_the_countdown_on_its_own():
+    assert remaining_label(83.0, (10, 20), 724.0) == "~6:02 left"
+    assert remaining_label(900.0, (20, 20), 724.0) == "finishing"
+    assert remaining_label(83.0, None, None) == ""   # nothing to count down from
+    assert remaining_label(None, (10, 20), 724.0) == ""  # not started yet

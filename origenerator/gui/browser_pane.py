@@ -173,20 +173,18 @@ class BrowserPane:
         self._trash_rows = trash_rows
         self._request_items = list(request_items)
 
-    def show_enhancing(self, frames: dict):
-        """Mark every visible tile whose image is being enhanced, and stream the
-        run's latest frame onto it.
+    def show_enhancing(self, runs: dict):
+        """Hand every visible tile the enhancement being made of its image.
 
-        ``frames`` is ``{prompt_id: latest frame or None}`` for the enhances
-        running right now. The tile keeps its own picture until a frame arrives
-        — the base render is out and worth looking at, which is the point of
+        ``runs`` is ``{prompt_id: EnhancingRun}`` for the enhances in flight
+        right now — the latest frame, how far along the run is, and how long it
+        has been going. A tile not named there is handed ``None`` and goes back
+        to resting. The tile keeps its own picture until a frame arrives — the
+        base render is out and worth looking at, which is the point of
         generating it first — and gets it back when the run ends.
         """
         for prompt_id, tile in self._thumb_widgets.items():
-            frame = frames.get(prompt_id)
-            tile.set_enhancing(prompt_id in frames)
-            if frame:
-                tile.show_enhancing_frame(frame)
+            tile.set_enhancing(runs.get(prompt_id))
 
     def set_recent_rows(self, recent_rows):
         """Replace just the finished-items list the Recents shelf lists and, if that
@@ -529,7 +527,7 @@ class BrowserPane:
             movie_path=self._v._animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
-            enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
+            enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -1080,7 +1078,7 @@ class BrowserPane:
                 movie_path=self._v._animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
                 enhanced=gallery.is_enhanced_row(row),      # the yellow-plus corner badge
-                enhancing=self._v.is_enhancing(row),        # a scrim while one cooks
+                enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)

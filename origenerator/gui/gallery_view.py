@@ -37,6 +37,7 @@ from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.find_bar import FindBar
+from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.prompt_find import PromptFind
@@ -1401,17 +1402,16 @@ class GalleryView(QWidget):
         return self._folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every config tab's discard button and progress fill at the run *it*
-        launched.
+        """Point every config tab's discard button at the run *it* launched.
 
         A tab tracks its own Generates, not its settings folder: a folder can have
         several runs queued at once (two pictures of one recipe, both wanted), and
         a tab showing one of them must not claim the others. Of its own it follows
         the *oldest still alive* — the one nearest to being made, and so the one
-        whose progress the bar shows and whose run its button discards. A press
-        that stopped the job queued behind the one on screen was the reported dead
-        click. A chained i2v is two prompts but one run, so a tab follows its
-        origin across the hand-off, and runs that have ended are let go here.
+        its button discards. A press that stopped the job queued behind the one on
+        screen was the reported dead click. A chained i2v is two prompts but one
+        run, so a tab follows its origin across the hand-off, and runs that have
+        ended are let go here.
         Launches from outside a tab — the folder tile's "+", the auto loop — are
         claimed by the tab looking at that same folder (:meth:`_claim_launch`), so
         they light it up too.
@@ -1427,7 +1427,6 @@ class GalleryView(QWidget):
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
-                                 job.prompt_id if job is not None else None,
                                  auto_generating=self._auto_generating(job))
 
     def _auto_generating(self, job) -> bool:
@@ -2355,14 +2354,24 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item else None
 
     def _add_reroll_tile(self, flow, group):
-        tile = RerollTile(self._reroll.job_for(group.key),
-                          auto_generating=self._auto.is_active(group.key))
+        job = self._reroll.job_for(group.key)
+        tile = RerollTile(job,
+                          auto_generating=self._auto.is_active(group.key),
+                          typical_seconds=self._typical_run_seconds(job))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
         tile.selected.connect(lambda k=group.key: self._select_reroll(k))
         flow.addWidget(tile)
         self._reroll_tile = tile
+
+    def _typical_run_seconds(self, job) -> float | None:
+        """What a whole run of ``job``'s workflow usually takes — the prior the
+        tile's countdown opens on, before the run has a pace of its own worth
+        reading. ``None`` for an idle tile, or a workflow with no history yet."""
+        if job is None:
+            return None
+        return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
 
     def _start_auto_reroll(self, key: str) -> bool:
         """The loop's own launch: the variation the tile's "+" would start, except
@@ -3083,7 +3092,7 @@ class GalleryView(QWidget):
         a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
         while it runs.
         """
-        if self.is_enhancing(row):
+        if self.enhancing_run(row) is not None:
             return None, "🎤 an enhance of this image is already running"
         logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
                     gallery.describe_enhance_params(params))
@@ -3230,21 +3239,47 @@ class GalleryView(QWidget):
         self._slideshow.note_enhanced(row["prompt_id"], preview[0], preview[1],
                                       still=row.get("thumbnail_path"))
 
-    def is_enhancing(self, row: dict) -> bool:
-        """Whether a standalone enhance of this image is running right now.
+    def enhancing_run(self, row: dict) -> EnhancingRun | None:
+        """The standalone enhance being made of this image right now, or ``None``.
 
-        The browser pane's tiles ask, so a folder generating with the Auto
-        switch on reads honestly: the base render is out, on screen, and
-        something better is on the way. Without it the folder looks like it is
-        turning out plain images and ignoring the switch.
+        The browser pane's tiles ask as they are built, so a folder generating
+        with the Auto switch on reads honestly: the base render is out, on
+        screen, and something better is on the way. Without it the folder looks
+        like it is turning out plain images and ignoring the switch.
 
         Every live job is searched, not each folder's leading one: a batch of
         enhances goes out whole and its members share a settings key, so all but
         the first would read as not-cooking off the folder-facing view."""
-        return any(
-            job.workflow.name == gallery.ENHANCE_WORKFLOW
-            and gallery.enhance_targets_row(job.params.get("input_image"), row)
-            for job in self._reroll.all_jobs
+        for key, job in self._enhance_jobs():
+            if gallery.enhance_targets_row(job.params.get("input_image"), row):
+                return self._enhancing_run(key, job)
+        return None
+
+    def _enhance_jobs(self) -> list:
+        """Every standalone enhance in flight, as ``(folder key, job)``.
+
+        The key comes along because the frames are held per folder
+        (:attr:`_enhance_frames`), and a job on its own can't say which slot is
+        its own."""
+        return [(key, job)
+                for key, jobs in self._reroll.jobs_by_folder.items()
+                for job in jobs
+                if job.workflow.name == gallery.ENHANCE_WORKFLOW]
+
+    def _enhancing_run(self, key: str, job) -> EnhancingRun:
+        """One enhance in flight, as the tile of the image it improves sees it.
+
+        The frame goes only to a job actually rendering, for the reason
+        :meth:`_pending_enhancement_for` spells out: a batch shares one folder
+        and so one frame slot, and lending it to the ones queued behind would
+        show each of those tiles a picture of a different image."""
+        rendering = job.state == "running"
+        return EnhancingRun(
+            status="running" if rendering else "queued",
+            frame=self._enhance_frames.get(key) if rendering else None,
+            progress=job.last_progress,
+            started_at=job.started_at,
+            typical_seconds=self._typical_run_seconds(job),
         )
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
@@ -3282,16 +3317,12 @@ class GalleryView(QWidget):
         enhance against every tab's displayed row. Cheap enough to re-run on
         each frame; the panel updates its row in place.
 
-        Every job of every folder, for the same reason :meth:`is_enhancing` reads
-        them all: a batch of enhances shares one settings key, and a tab showing
-        the third image of it must find its own run rather than the first.
+        Every job of every folder, for the same reason :meth:`enhancing_run`
+        reads them all: a batch of enhances shares one settings key, and a tab
+        showing the third image of it must find its own run rather than the
+        first.
         """
-        running = [
-            (key, job)
-            for key, jobs in self._reroll.jobs_by_folder.items()
-            for job in jobs
-            if job.workflow.name == gallery.ENHANCE_WORKFLOW
-        ]
+        running = self._enhance_jobs()
         for panel in self._info_tabs._config_panels():
             row = panel.displayed_row()
             panel.set_pending_enhancement(
@@ -3323,8 +3354,7 @@ class GalleryView(QWidget):
                 if gallery.enhance_targets_row(job.params.get("input_image"), row)
             }
         self._browser.show_enhancing({
-            prompt_id: (self._enhance_frames.get(key)
-                        if job.state == "running" else None)
+            prompt_id: self._enhancing_run(key, job)
             for prompt_id, (key, job) in self._enhancing_by_prompt.items()
         })
 
@@ -4501,7 +4531,7 @@ class GalleryView(QWidget):
         for every delete there is: a picked tile, a whole folder, a rejected
         experiment, a slideshow's Up key. The jobs are the gallery's, so the
         match is made here — the same "is this run an enhance of this image?"
-        question :meth:`is_enhancing` asks, over every live job of every folder
+        question :meth:`enhancing_run` asks, over every live job of every folder
         (a batch of enhances shares one settings key, so all but its leader
         would be missed by the folder-facing view).
 

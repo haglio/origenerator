@@ -7,6 +7,11 @@ note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
 builds per job, carrying what to draw, how to stop it, and how to go to it.
 
+:class:`EnhancingRun` is the same idea for the one run that has no card of its
+own: an enhancement is shown on the tile of the image it improves
+(:mod:`origenerator.gui.thumbnail_widget`), which already has a picture, a name
+and a click of its own — so all it needs handed to it is how the run is going.
+
 :func:`queue_wait_text` is here for the same reason: what a wait on another app
 reads like is one wording, shared by every surface that has to say it — as is
 :func:`discard_run_text`, the label on the button that throws the run in flight
@@ -110,6 +115,28 @@ _KIND_TOOLTIPS = {
     "I2V": "A video from a start frame",
     "Enhance": "An enhancement of an image already made",
 }
+
+
+@dataclass
+class EnhancingRun:
+    """An enhancement in flight, as the tile of the image it improves sees it.
+
+    The tile shows it the way every other in-flight surface shows its work: the
+    stage on a dimming scrim over the picture, and how far along it is on a bar
+    along the picture's foot. So it is handed the same readings an
+    :class:`InFlightItem` carries, minus the ones the tile already has — the
+    picture is the image being enhanced, and the name and the click are the
+    tile's own.
+    """
+
+    status: str                              # "running" or "queued"
+    frame: bytes | None                      # latest live frame, if one has arrived
+    progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps
+    # When ComfyUI began executing it (None while it's still queued), and what
+    # this workflow's recent runs say a whole one takes — the two halves of the
+    # countdown on the bar.
+    started_at: float | None = None
+    typical_seconds: float | None = None
 
 
 def discard_run_text(auto_generating: bool) -> str:

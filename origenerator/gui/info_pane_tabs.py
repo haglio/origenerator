@@ -170,14 +170,13 @@ class InfoPaneTabs(QTabWidget):
             self._pin_panel(panel)
 
     def _discard_subtab(self, index: int):
-        """Remove and tear down one config tab."""
+        """Take one config tab out of the row and let go of it."""
         panel = self.widget(index)
         if not isinstance(panel, GenerateConfigPanel):
             return
         if panel is self._preview_panel:
             self._preview_panel = None
         self.removeTab(index)
-        panel.teardown()
         panel.deleteLater()
 
     def _close_subtab(self, index: int):

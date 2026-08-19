@@ -3,8 +3,8 @@
 Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering, filling the strip's height out of its
 bottom-left corner, and beside it a column no wider than a bar needs to be — the
-job's clock, "1:30 elapsed · ~10:34 left", reading directly above the fat
-progress bar it measures. With nothing of ours in flight the same half says what
+job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
+bar it measures. With nothing of ours in flight the same half says what
 the shared server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
@@ -44,7 +44,7 @@ the thing a user goes hunting for an explanation of.
 import time
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QProgressBar, QPushButton,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QScrollArea, QApplication, QFrame, QSizePolicy,
 )
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
@@ -55,9 +55,10 @@ from origenerator.gui.inflight import (
     held_row_text, queue_held_text, queue_lead_text, queue_lead_tooltip,
     queue_wait_text,
 )
+from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.timing import progress_time_label
+from origenerator.timing import progress_status_label
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE, BLUE
@@ -68,10 +69,12 @@ from shared_ui.colors import BORDER_SUBTLE, BLUE
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
 _STRIP_HEIGHT = 88
-# The clock and the bar beneath it share one column, wide enough to read a line
-# of the clock and for the bar to read as a bar. The queue's names are long, so
-# the rest of the strip goes to the line.
-_BAR_WIDTH = 200
+# The bar the clock is written across, sized off the line it carries — "45% ·
+# 12:30 elapsed · ~16:02 left" runs about 270px at the app's own font, and a bar
+# narrower than its caption elides the countdown away. The queue's names are
+# long, so the rest of the strip still goes to the line.
+_BAR_WIDTH = 290
+_BAR_HEIGHT = 26  # a line of that font, with room to read as a bar around it
 # How often the running half re-reads the clock. Its own timer rather than the
 # gallery's 1.5s poll, which would make a seconds count skip every other tick.
 _TICK_MS = 1000
@@ -81,7 +84,8 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
 class RunningPreview(QWidget):
-    """What is being made: its live frame, and beside it a clock over a fat bar."""
+    """What is being made: its live frame, and beside it a fat bar with the clock
+    written across it."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -104,21 +108,23 @@ class RunningPreview(QWidget):
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(3)
         column.addStretch(1)
-        # Above the bar: how long this run has been going and how much longer it
-        # has, so a bar creeping along has something to be measured against. It
-        # reads over the bar rather than beside it — two readings of the one run,
-        # neither made to give up width to the other. With nothing of ours being
-        # made the same line is free to say what the shared server is busy with.
+        # How far along the run is, how long it has been going and how much longer
+        # it has — written across the bar those numbers measure, so the reading and
+        # the thing read are one object rather than a line of text with a separate
+        # stripe under it. The same line, in the same words, as the browser pane's
+        # in-flight cards carry.
+        self._progress = ProgressCaption()
+        self._progress.setFixedHeight(_BAR_HEIGHT)
+        self._progress.setFixedWidth(_BAR_WIDTH)
+        column.addWidget(self._progress)
+        # With nothing of ours being made, the same slot says what the shared
+        # server is busy with instead — plain text, since there is no run of ours
+        # for a bar to be measuring.
         self._caption = QLabel()
         self._caption.setObjectName("estimateLabel")  # muted secondary text
         self._caption.setWordWrap(True)
         self._caption.setFixedWidth(_BAR_WIDTH)  # a long line wraps, not widens
         column.addWidget(self._caption)
-        self._progress = QProgressBar()
-        self._progress.setTextVisible(False)
-        self._progress.setFixedHeight(16)  # the fat, important one
-        self._progress.setFixedWidth(_BAR_WIDTH)
-        column.addWidget(self._progress)
         column.addStretch(1)
         layout.addLayout(column)
 
@@ -134,6 +140,13 @@ class RunningPreview(QWidget):
         """Say what another app has on ComfyUI — only while this half is free."""
         self._caption.setText(text)
 
+    def status_text(self) -> str:
+        """Whatever this half is saying: the running job's line, or — with nothing
+        of ours in flight — its note about the shared server."""
+        if self._item is not None:
+            return self._progress.caption()
+        return self._caption.text()
+
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
         self.key = item.key if item is not None else None
@@ -141,35 +154,34 @@ class RunningPreview(QWidget):
         if item is None:
             self._frame.clear()
             self._progress.hide()
+            self._caption.show()
             self._tick.stop()
             return
+        self._caption.hide()  # a job of ours takes the slot back for its own bar
         self._progress.show()
         self._render_frame(item.frame)
-        self._render_timing()  # a job of ours takes the caption back for its clock
+        self._render_timing()
         self._tick.start()
-        if item.status == "running" and item.progress and item.progress[1] > 0:
-            cumulative, total = item.progress
-            self._progress.setRange(0, total)
-            self._progress.setValue(cumulative)
-        else:
-            self._progress.setRange(0, 0)  # queued, or no step counts yet: indeterminate
 
     def _render_timing(self):
-        """How long the running job has been going, and how much longer it has.
+        """How far along the running job is, how long it has been going and how
+        much longer it has — written across its bar.
 
         Read off the clock rather than off the feed. A job ComfyUI hasn't started
         has no elapsed time to report and the line stays empty — its wait is the
-        queue beside it to explain, not a zero counting up under a bar that has
-        not moved.
+        queue beside it to explain, not a zero counting up over a bar that has
+        not moved. A job with no step counts to show leaves the bar indeterminate
+        rather than parked at 0%.
         """
         if self._item is None:
-            self._caption.clear()
             return
         started = self._item.started_at
         elapsed = None if started is None else max(0.0, time.time() - started)
-        self._caption.setText(progress_time_label(
-            elapsed, self._item.progress, self._item.typical_seconds
-        ))
+        self._progress.show_progress(
+            progress_status_label(elapsed, self._item.progress,
+                                  self._item.typical_seconds),
+            self._item.progress if self._item.status == "running" else None,
+        )
 
     def _render_frame(self, frame):
         side = self._frame.width()

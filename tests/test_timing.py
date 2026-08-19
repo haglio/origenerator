@@ -5,8 +5,11 @@ from origenerator.timing import (
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
+    percent_label,
+    progress_status_label,
     progress_time_label,
     queue_estimate_label,
+    remaining_label,
     remaining_seconds,
 )
 
@@ -179,3 +182,45 @@ def test_an_untimed_workflow_admits_it_rather_than_guess():
     # A workflow nobody has run yet has nothing to estimate from, and a number
     # invented for that slot would be read as one measured.
     assert queue_estimate_label(None) == "~?"
+
+
+def test_percent_label_rounds_down_to_a_whole_percent():
+    assert percent_label((10, 20)) == "50%"
+    assert percent_label((1, 3)) == "33%"
+    assert percent_label((20, 20)) == "100%"
+
+
+def test_percent_label_is_empty_with_nothing_to_read_it_off():
+    # A workflow reporting no step counts, or a job before its first tick: "0%"
+    # would be a reading, and there isn't one.
+    assert percent_label(None) == ""
+    assert percent_label((0, 0)) == ""
+
+
+def test_progress_status_label_leads_with_how_far_along_it_is():
+    # The one line every in-flight surface writes across its bar — the strip's
+    # queue, the shelf's cards, a folder's re-roll tile — so one run reads the
+    # same wherever it is being watched.
+    assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
+
+
+def test_progress_status_label_drops_whichever_half_is_unknown():
+    assert progress_status_label(83.0, None, None) == "1:23 elapsed"   # no steps reported
+    assert progress_status_label(None, (10, 20), 724.0) == "50%"       # not started yet
+    assert progress_status_label(None, None, 724.0) == ""              # neither
+
+
+def test_the_compact_line_keeps_how_far_along_and_how_much_longer():
+    # A gallery tile is a third of the strip's width, and the full line runs half
+    # again wider than the tile at the app's own font — so a tile carrying it
+    # would elide the countdown away on exactly the long runs worth counting down.
+    assert progress_status_label(83.0, (10, 20), 724.0, compact=True) == "50% · ~6:02 left"
+    assert progress_status_label(900.0, (20, 20), 724.0, compact=True) == "100% · finishing"
+    assert progress_status_label(83.0, None, None, compact=True) == ""
+
+
+def test_remaining_label_is_the_countdown_on_its_own():
+    assert remaining_label(83.0, (10, 20), 724.0) == "~6:02 left"
+    assert remaining_label(900.0, (20, 20), 724.0) == "finishing"
+    assert remaining_label(83.0, None, None) == ""   # nothing to count down from
+    assert remaining_label(None, (10, 20), 724.0) == ""  # not started yet

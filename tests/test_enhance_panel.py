@@ -8,7 +8,6 @@ already received.
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
-from PyQt6.QtWidgets import QLabel
 
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL, EnhanceLevel, EnhanceSettings, default_enhance_params,
@@ -20,7 +19,7 @@ from origenerator.gui.enhance_versions import (
     params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
-from origenerator.workflows.detail_parts import DETAIL_PARTS
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, DETAIL_PARTS
 
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
@@ -136,20 +135,24 @@ def test_every_knob_reports_its_edit(qtbot):
     assert latest.params["enhance_denoise"] == 0.4
 
 
-def test_every_fixable_part_gets_a_number_of_its_own(qtbot):
-    # One row per part the app can aim a detail pass at, each its own denoise:
-    # a mouth wants a harder redraw than a face, and one shared number could
-    # never say so.
+def test_every_fixable_part_gets_a_box_and_a_number_of_its_own(qtbot):
+    # One of each per part the app can aim a detail pass at: the box says
+    # whether that part is fixed, the number how hard — a mouth wants a harder
+    # redraw than a face, and one shared number could never say so.
     panel, edits = _panel(qtbot)
     assert list(panel._fixes) == [part.name for part in DETAIL_PARTS]
-    # Every part starts at zero — nothing pays for a pass it didn't ask for.
+    # Nothing ticked, so nothing pays for a pass it didn't ask for — while the
+    # numbers already read as what a fix runs at.
     assert panel.settings().params["enhance_detail_fixes"] == {}
+    assert panel._fixes["faces"].value() == DEFAULT_FIX_DENOISE
 
-    panel._fixes["faces"].setValue(0.45)
+    panel._fix_checks["faces"].setChecked(True)
+    panel._fix_checks["hands"].setChecked(True)
     panel._fixes["hands"].setValue(0.6)
 
-    assert edits[-1].params["enhance_detail_fixes"] == {"faces": 0.45, "hands": 0.6}
-    assert panel._fixes["faces"].toolTip()
+    assert edits[-1].params["enhance_detail_fixes"] == {
+        "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
+    assert panel._fixes["faces"].toolTip() and panel._fix_checks["faces"].toolTip()
 
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
@@ -161,7 +164,7 @@ def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
     box = panel._fixes["faces"]
     digits = box.fontMetrics().horizontalAdvance("0.00")
 
-    assert digits < box.minimumWidth() <= digits + 20   # its own chrome, no more
+    assert digits < box.minimumWidth() <= digits + 30   # its own chrome, no more
     assert box.minimumWidth() == box.maximumWidth()     # fixed, so a wide pane
     assert box.minimumWidth() < box.sizeHint().width()  # doesn't stretch it
 
@@ -182,47 +185,57 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
         pair.sizeHint().width() for pair in pairs) + 8
 
 
-def test_a_part_turned_back_to_zero_stops_being_asked_for(qtbot):
-    # Zero is the panel's way of saying "leave this part alone", so it must
-    # leave the settings rather than ride along as a pass at no denoise.
+def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
+    # The tick is the on/off, so unticking must leave the settings — and leave
+    # the number where it was, since the next tick means the same fix again.
     panel, edits = _panel(qtbot)
-    panel._fixes["faces"].setValue(0.45)
-    panel._fixes["faces"].setValue(0.0)
+    panel._fix_checks["faces"].setChecked(True)
+    panel._fixes["faces"].setValue(0.7)
+
+    panel._fix_checks["faces"].setChecked(False)
+
     assert edits[-1].params["enhance_detail_fixes"] == {}
+    assert panel._fixes["faces"].value() == 0.7
+    # And off, the part reads as off rather than as a live setting.
+    assert not panel._fixes["faces"].isEnabled()
 
 
-def test_a_part_with_no_detector_installed_dims_itself(qtbot):
+def test_an_unticked_parts_name_and_number_grey_out(qtbot):
+    # Which parts are on has to be readable down the line at a glance, not
+    # worked out box by box.
+    panel, _ = _panel(qtbot)
+    label = panel._label_for(panel._fixes["faces"])
+
+    assert not label.isEnabled() and not panel._fixes["faces"].isEnabled()
+
+    panel._fix_checks["faces"].setChecked(True)
+
+    assert label.isEnabled() and panel._fixes["faces"].isEnabled()
+
+
+def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
     # The settings here that can be unavailable rather than merely unset: the
     # model that finds a part is a separate install, and a run naming one
-    # ComfyUI hasn't got is rejected on submit. Better a number that says why
-    # than one that quietly fails.
+    # ComfyUI hasn't got is rejected on submit. Better a box that says why than
+    # one that quietly fails.
     panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
-    assert panel._fixes["faces"].isEnabled()
-    assert not panel._fixes["hands"].isEnabled()
+    assert panel._fix_checks["faces"].isEnabled()
+    assert not panel._fix_checks["hands"].isEnabled()
     # The whole setup, in the one place someone reads carefully: the node pack
     # that runs the detectors, the folder the models go in, and what the file
     # this part needs is called.
-    tooltip = panel._fixes["hands"].toolTip()
+    tooltip = panel._fix_checks["hands"].toolTip()
     assert "models/ultralytics/bbox" in tooltip
     assert "Impact Subpack" in tooltip
     assert "hand" in tooltip
+    assert panel._label_for(panel._fixes["hands"]).toolTip() == tooltip
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
-    # Some other detector sitting in that folder would leave every number live
-    # and every pass finding nothing. Dimmed says which file to add.
+    # Some other detector sitting in that folder would leave every box tickable
+    # and every pass finding nothing. Unavailable says which file to add.
     panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not any(box.isEnabled() for box in panel._fixes.values())
-
-
-def test_the_parts_label_dims_with_its_number(qtbot):
-    # The word is what someone looks at to see whether a part is on offer, so a
-    # live-looking label over a dead box would be the whole failure.
-    panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
-    labels = {label.text().lower(): label
-              for label in panel.findChildren(QLabel)}
-    assert labels["faces"].isEnabled()
-    assert not labels["hands"].isEnabled()
+    assert not any(box.isEnabled() for box in panel._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
@@ -277,7 +290,7 @@ def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
     panel, _ = _panel(qtbot, detectors=())
     panel.set_applicable(False, "nope")
     panel.set_applicable(True)
-    assert panel.isEnabled() and not panel._fixes["faces"].isEnabled()
+    assert panel.isEnabled() and not panel._fix_checks["faces"].isEnabled()
 
 
 def test_a_disabled_toggle_switch_dims(qtbot):

@@ -574,9 +574,9 @@ def test_the_detail_passs_knob_is_defined_with_the_range_its_boxes_take():
             for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}
 
     assert defs["enhance_detail_fixes"].default == {}
-    # Zero is a part left alone rather than a pass that repaints nothing (which
-    # the detailer node rejects outright), so the floor is 0 and not above it.
-    assert defs["enhance_detail_fixes"].min_val == 0.0
+    # A part not named runs no pass at all, so a part that IS named has a real
+    # denoise: the floor sits above zero, which the detailer node rejects.
+    assert defs["enhance_detail_fixes"].min_val > 0
     assert defs["enhance_detail_fixes"].max_val == 1.0
 
 

@@ -18,14 +18,16 @@ An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
-The knobs that can be unavailable rather than merely unset are the detail pass's:
-each part it redraws needs a detector installed in ComfyUI, so a part with none
-is greyed with the file to add on it — the alternative being a number that fails
-on submit.
+Each part the detail pass can redraw is a box to tick and a denoise to run it
+at: the tick is whether that part is fixed at all, so an unticked part greys its
+own name and number rather than making zero mean off. A part whose detector
+isn't installed in ComfyUI can't be ticked at all, and says why — the
+alternative being a run that fails on submit.
 """
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
+    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
 
 from origenerator.gallery import (
@@ -40,8 +42,9 @@ from origenerator.gui.no_wheel import (
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
-    DETAIL_PARTS, detail_fixes_of, detector_for_part,
+    DEFAULT_FIX_DENOISE, DETAIL_PARTS, detail_fixes_of, detector_for_part,
 )
+from shared_ui.check_box import CheckBox
 from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
 
 _AUTO_TOOLTIP = (
@@ -55,10 +58,11 @@ _NO_DETECTOR_TOOLTIP = (
     "models/ultralytics/bbox folder, and restart it."
 )
 # What a fix field costs around its digits: the padding either side below, its
-# 1px border, and the few pixels a spin box keeps for its cursor — measured by
-# rendering one, since a field a hair too narrow clips the last digit of 0.00.
+# 1px border, and the pixels a spin box keeps for its cursor and its own inner
+# margin. Measured by rendering one and looking, since a field a hair too narrow
+# doesn't complain — it clips a digit off 0.45, which still reads as a number.
 _FIX_FIELD_PADDING = 4
-_FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 8
+_FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
 # Disabling a widget is not the same as it looking disabled: the app's sheet
 # colors every label, picker and spin box outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
@@ -205,12 +209,11 @@ class EnhancePanel(QWidget):
             numbers.addWidget(widget, 1)
         form.addRow(numbers)
 
-        # The detail pass: one number per part it can be aimed at, each the
-        # denoise that part is redrawn at and each defaulting to 0 — no fix.
-        # Their denoise is separate from the one above, and from each other's,
-        # because it can afford to be far bolder: nothing outside the regions a
-        # detector finds is touched, and a mouth wants a harder redraw than a
-        # face does.
+        # The detail pass: a box and a number per part it can be aimed at, the
+        # number being the denoise that part is redrawn at. Their denoise is
+        # separate from the one above, and from each other's, because it can
+        # afford to be far bolder: nothing outside the regions a detector finds
+        # is touched, and a mouth wants a harder redraw than a face does.
         fix_heading = QLabel("Fixes")
         fix_heading.setToolTip(param_help("enhance_detail_fixes"))
         form.addRow(fix_heading)
@@ -220,24 +223,32 @@ class EnhancePanel(QWidget):
         box.addStretch(1)
 
     def _fix_row(self) -> QWidget:
-        """Every fixable part on one line: its name, then the denoise it runs at.
+        """Every fixable part on one line: a box to tick over its name and the
+        denoise it runs at.
 
-        Each box is exactly as wide as ``0.00`` and its steppers need — no floor,
-        no share of the leftover — because the point of the line is reading all
-        the parts at once, and a number stretched to fill a pane costs another
-        part its place. (The three numbers above take the opposite deal, a floor
-        each and the slack between them: there are only three, and they are the
+        The tick is what turns a part's fix on, so the number underneath is free
+        to sit at the denoise it would run at whether or not it is running —
+        tick a part and it fixes at that, untick it and the number is still
+        there for next time, greyed along with the name so the line reads at a
+        glance as which parts are on.
+
+        Each number is exactly as wide as its digits need — no floor, no share
+        of the leftover — because the point of the line is reading all the parts
+        at once, and one number stretched to fill a pane costs another part its
+        place. (The three numbers above take the opposite deal, a floor each and
+        the slack between them: there are only three, and they are the
         enhancement itself rather than a list.)
 
         Flowed rather than fixed, so a pane too narrow for the line wraps the
         last parts onto a second one instead of cutting them off — and so the
         line never widens the window, which tiles into a third of a monitor.
-        Each name travels with its own box, so a wrap can't separate them.
+        Each part's box, name and number travel together, so a wrap can't
+        separate them.
 
         Every part the app knows is here, installed detector or not: one with
-        nothing to find it is greyed with the file to add on it, which says more
-        than an absent field (nothing at all to notice) and far more than a live
-        one that would be rejected on submit.
+        nothing to find it can't be ticked, and says which file to add — which
+        tells you more than an absent field (nothing at all to notice) and far
+        more than a live one that would be rejected on submit.
         """
         host = QWidget()
         flow = FlowLayout(host, spacing=4)
@@ -249,23 +260,52 @@ class EnhancePanel(QWidget):
         policy.setHeightForWidth(True)
         host.setSizePolicy(policy)
         self._fixes = {}
+        self._fix_checks = {}
         for part in DETAIL_PARTS:
-            widget = self._fix_number()
-            if detector_for_part(part) is None:
-                widget.setEnabled(False)
-                widget.setToolTip(_NO_DETECTOR_TOOLTIP.format(
-                    part.name, part.matches[0]))
-            label = self._labeled(part.name.capitalize(), widget)
-            label.setEnabled(widget.isEnabled())
-            pair = QWidget()
-            pair_row = QHBoxLayout(pair)
-            pair_row.setContentsMargins(0, 0, 0, 0)
-            pair_row.setSpacing(4)
-            pair_row.addWidget(label)
-            pair_row.addWidget(widget)
-            flow.addWidget(pair)
-            self._fixes[part.name] = widget
+            flow.addWidget(self._fix_field(part))
         return host
+
+    def _fix_field(self, part) -> QWidget:
+        """One part's column: its tick box, over its name and its denoise."""
+        check = CheckBox("")
+        check.setToolTip(param_help("enhance_detail_fixes"))
+        widget = self._fix_number()
+        label = self._labeled(part.name.capitalize(), widget)
+        if detector_for_part(part) is None:
+            reason = _NO_DETECTOR_TOOLTIP.format(part.name, part.matches[0])
+            check.setEnabled(False)
+            for one in (check, widget, label):
+                one.setToolTip(reason)
+        check.toggled.connect(lambda _on, name=part.name: self._fix_toggled(name))
+
+        column = QWidget()
+        grid = QGridLayout(column)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(2)
+        grid.addWidget(check, 0, 1, Qt.AlignmentFlag.AlignCenter)
+        grid.addWidget(label, 1, 0)
+        grid.addWidget(widget, 1, 1)
+
+        self._fixes[part.name] = widget
+        self._fix_checks[part.name] = check
+        self._show_fix_on(part.name)
+        return column
+
+    def _fix_toggled(self, name: str) -> None:
+        """A part switched on or off: grey its name and number to match, and
+        report the settings the panel now reads as."""
+        self._show_fix_on(name)
+        self._emit()
+
+    def _show_fix_on(self, name: str) -> None:
+        """Grey one part's name and number unless its box is ticked."""
+        check = self._fix_checks[name]
+        widget = self._fixes[name]
+        on = check.isChecked() and check.isEnabled()
+        widget.setEnabled(on)
+        label = self._label_for(widget)
+        if label is not None:
+            label.setEnabled(on)
 
     def _fix_number(self) -> NoWheelDoubleSpinBox:
         """One part's denoise box, ranged from the enhancer's own ParamDef so a
@@ -283,7 +323,10 @@ class EnhancePanel(QWidget):
         widget.setMaximum(pd.max_val if pd is not None else 1.0)
         widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
         widget.setDecimals(2)
-        widget.setValue(0.0)
+        # The denoise a fix runs at unless it is given another: the box beside
+        # it is what says whether this part is fixed, so the number never has to
+        # mean off, and a part ticked on runs at something sensible untouched.
+        widget.setValue(DEFAULT_FIX_DENOISE)
         # No steppers: seven pairs of arrows cost more width than the numbers
         # beside them, and a denoise is typed or nudged with the arrow keys.
         widget.setButtonSymbols(NoWheelDoubleSpinBox.ButtonSymbols.NoButtons)
@@ -305,6 +348,23 @@ class EnhancePanel(QWidget):
         """
         self.setEnabled(applicable)
         self.setToolTip("" if applicable else reason)
+
+    def _label_for(self, widget) -> QLabel | None:
+        """The caption sitting beside one field, or ``None`` before it has one.
+
+        Read off the layout rather than kept in a dict of its own: the caption
+        is put there by :meth:`_labeled`, and two records of the same pairing
+        are one more thing to keep in step.
+        """
+        parent = widget.parentWidget()
+        layout = parent.layout() if parent is not None else None
+        if layout is None:
+            return None
+        for index in range(layout.count()):
+            item = layout.itemAt(index).widget()
+            if isinstance(item, QLabel):
+                return item
+        return None
 
     @staticmethod
     def _labeled(text: str, widget) -> QLabel:
@@ -354,7 +414,12 @@ class EnhancePanel(QWidget):
                     _fill(widget, value)
             fixes = detail_fixes_of(settings.params)
             for name, widget in self._fixes.items():
-                widget.setValue(float(fixes.get(name, 0.0)))
+                # A part these settings don't name is off, its number left at
+                # what a fix runs at rather than at some remembered value from
+                # the folder before this one.
+                widget.setValue(float(fixes.get(name, DEFAULT_FIX_DENOISE)))
+                self._fix_checks[name].setChecked(name in fixes)
+                self._show_fix_on(name)
         finally:
             self._loading = False
 
@@ -365,12 +430,12 @@ class EnhancePanel(QWidget):
             widget = self._widgets.get(key)
             if widget is not None:
                 params[key] = _read(widget)
-        # Only the parts actually asked for: a part at zero is one this
-        # enhancement doesn't touch, and carrying it as a zero would make two
-        # identical settings compare as different.
+        # Only the parts ticked on: an unticked part is one this enhancement
+        # doesn't touch, and carrying its number anyway would make two settings
+        # that fix the same parts compare as different.
         params["enhance_detail_fixes"] = {
-            name: widget.value()
-            for name, widget in self._fixes.items() if widget.value() > 0
+            name: widget.value() for name, widget in self._fixes.items()
+            if self._fix_checks[name].isChecked()
         }
         return EnhanceSettings(auto=self._auto.isChecked(), params=params)
 

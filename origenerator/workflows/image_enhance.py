@@ -31,8 +31,8 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     finds one named part at a time — faces, hands, teeth, whatever a detector is
     installed for — and re-samples each found region alone at that part's own
     much higher denoise, leaving every pixel outside those regions exactly as
-    the tail left it. Every part is at zero by default: each one needs its
-    detector installed, and each costs a sampling run per region found.
+    the tail left it. No part is fixed by default: each one needs its detector
+    installed, and each costs a sampling run per region found.
 
     Machinery, not a peer workflow (``selectable`` False): its results are
     upgrades of existing images, not generations with a shared nature, so it
@@ -93,12 +93,13 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
             # One denoise per part fixed, keyed by the part's name — the Enhance
-            # panel's row of numbers, and the range those spin boxes take. Zero
-            # is a part left alone rather than a pass that repaints nothing
-            # (which the detailer node rejects outright), so the floor is 0 and
-            # an absent part reads the same as one set to it.
+            # panel's line of numbers, and the range those spin boxes take. A
+            # part not named here is a part left alone; a part that IS named
+            # runs a real pass, so the floor sits above zero (the detailer node
+            # rejects a zero denoise, and a pass that repaints nothing is a
+            # slower way of not running one).
             ParamDef("enhance_detail_fixes", "Fixes", "fixes", {},
-                     min_val=0.0, max_val=1.0, step=0.05),
+                     min_val=0.05, max_val=1.0, step=0.05),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:

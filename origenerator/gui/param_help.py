@@ -173,8 +173,8 @@ PARAM_HELP: dict[str, str] = {
         "where creases turn into wounds."
     ),
     "enhance_detail_fixes": (
-        "How hard the enhance redraws each part it can find on its own — 0 "
-        "leaves that part alone. This is what mends a mouth melted into its "
+        "Which parts the enhance goes back over and redraws on their own, and "
+        "how hard it redraws each. This is what mends a mouth melted into its "
         "teeth or a finger too many, and it can afford to be bold where the "
         "whole-picture pass cannot, since nothing outside the regions found is "
         "touched: around 0.45 actually re-forms a bad hand, while below 0.3 it "

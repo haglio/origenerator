@@ -153,6 +153,28 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     return None
 
 
+def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
+                                   seed_is_random: bool = False) -> bool:
+    """True when launching ``workflow`` with ``params`` would re-create a
+    byte-identical past generation among ``rows``.
+
+    The question behind both the "already generated" guard the gallery runs at
+    launch and the caption the Generate button wears while a press would do it —
+    one function, so the button can never promise a fresh seed the launch doesn't
+    draw (or stay silent about one it does).
+
+    ``params`` is filled from the workflow's defaults first: a stored row carries
+    every param, and :func:`find_duplicate_generation` matches only on identical
+    key sets, so a caller passing just the fields it edited would otherwise never
+    match. ``seed_is_random`` is the form's Random box — a seed drawn per run
+    reproduces nothing, whatever the field it was last pinned to says.
+    """
+    snapshot = ConfigSnapshot(workflow.name,
+                              {**workflow.default_params(), **params},
+                              seed_is_random)
+    return find_duplicate_generation(rows, snapshot) is not None
+
+
 def randomize_seeds(params: dict, seed_keys) -> dict:
     """Return a copy of ``params`` with every key in ``seed_keys`` re-rolled.
 

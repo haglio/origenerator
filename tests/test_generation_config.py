@@ -8,6 +8,7 @@ from origenerator.generation_config import (
     merge_denormalized,
     prepared_params,
     randomize_seeds,
+    would_reproduce_a_completed_run,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -241,3 +242,23 @@ def test_configs_match_across_int_and_float_spellings_of_a_number():
     # A form reads 1.5 back as a float where a stored row may hold it as an int;
     # equal values are equal settings.
     assert configs_match(_snapshot(params={"cfg": 8}), _snapshot(params={"cfg": 8.0}))
+
+
+def test_would_reproduce_fills_defaults_before_comparing():
+    # The one question both the gallery's launch and the Generate button's caption
+    # ask. A caller carrying only the fields it edited must still match a stored
+    # row, which holds every param — so the defaults are filled in first.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    rows = [_row(params=dict(wf.default_params(), positive_prompt="a cat", seed=7))]
+    assert would_reproduce_a_completed_run(
+        rows, wf, {"positive_prompt": "a cat", "seed": 7}) is True
+
+
+def test_would_reproduce_is_false_while_the_seed_is_random():
+    # The same settings under a Random seed reproduce nothing, so the button that
+    # would offer a fresh seed has nothing to offer — it just reads "Generate".
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=7)
+    rows = [_row(params=params)]
+    assert would_reproduce_a_completed_run(
+        rows, wf, params, seed_is_random=True) is False

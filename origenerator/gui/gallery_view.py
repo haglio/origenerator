@@ -31,7 +31,7 @@ from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    ConfigSnapshot, filled_params, find_duplicate_generation, randomize_seeds,
+    filled_params, randomize_seeds, would_reproduce_a_completed_run,
 )
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
@@ -1470,14 +1470,14 @@ class GalleryView(QWidget):
 
     def _would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
         """True when launching ``workflow`` with ``params`` would re-create a
-        byte-identical past generation — the cue to warn before wasting a slot.
+        byte-identical past generation — the cue to re-roll rather than waste a slot.
 
         Callers pass params whose seed is already concrete (the form randomizes a
         Random seed before emitting; a combine reads the stored one), so the seed
         is taken as pinned here; a genuinely random seed would simply never match.
         """
-        snapshot = ConfigSnapshot(workflow.name, params, seed_is_random=False)
-        return find_duplicate_generation(self._db.list_generations(), snapshot) is not None
+        return would_reproduce_a_completed_run(
+            self._db.list_generations(), workflow, params)
 
     def _on_generate_requested(self, workflow_name: str, params: dict):
         """A tab's Generate: launch it as a re-roll of its settings folder and land
@@ -1500,15 +1500,12 @@ class GalleryView(QWidget):
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
         key = self._folder_key_for(workflow_name, params)
-        # A pinned seed that would reproduce a past run gets the shared "already
-        # generated" dialog rather than silently launching a copy — the guard the
-        # re-roll "+" and combine paths (see :meth:`_generate_combination`) use too.
-        # Declining launches nothing; accepting re-rolls the seed into a fresh
-        # variation and switches the front tab to a Random seed, so the choice
-        # sticks — a re-Generate (even after cancelling this one) won't re-ask.
+        # A pinned seed that would reproduce a past run draws a fresh one instead of
+        # launching a copy — the press was made against a button already reading
+        # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
+        # so this is what it said it would do, not a question worth stopping for.
+        # The tab keeps the Random seed, so its form goes on saying the same thing.
         if self._would_reproduce_a_completed_run(wf, params):
-            if offer_reroll(self, wf, can_reroll_image=False) is None:
-                return  # let the user change something rather than duplicate it
             params = randomize_seeds(params, wf.seed_keys())
             panel = self._info_tabs.current_config_panel()
             if panel is not None:
@@ -1681,6 +1678,11 @@ class GalleryView(QWidget):
         # light its tab's button after a restart: at reconnect time the view's image
         # rows aren't built yet, so an i2v folder key wouldn't match then; here it does.
         self._reconcile_generating()
+        # A generation landing or leaving can make an open tab's pinned seed one that
+        # would reproduce it — or stop it being one — with nothing on the form having
+        # moved, so every tab re-reads what its Generate would now do.
+        for panel in self._info_tabs._config_panels():
+            panel.refresh_generate_caption()
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-highlight a generation after a rebuild, if it's still on screen."""

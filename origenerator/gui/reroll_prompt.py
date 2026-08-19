@@ -1,14 +1,14 @@
-"""The shared "already generated" dialog.
+"""The combine panel's "already generated" dialog.
 
 Re-running a workflow whose seed isn't randomized re-creates a byte-identical
-output, so every place that can launch such a run — the Generate tab and the
-gallery's image+video combine — warns first and offers a fresh seed. One dialog,
-one wording, so the paths stay in step.
-
-An image-to-video carries two seeds — its start frame's and its motion's — so
-when the frame is itself a re-buildable generation the dialog offers each on its
-own (new motion of the same frame, or a new frame with the same motion) as well
-as both. Anything else has a single seed, so it keeps the lone "New Random Seed".
+output. A config tab needs no dialog for that — its Generate button says up front
+that the press will draw a fresh seed (see
+:meth:`GenerateConfigPanel._apply_generate_caption`) — but a combine has a real
+question to ask: an image-to-video carries two seeds, its start frame's and its
+motion's, so when the dropped frame is itself a re-buildable generation the
+dialog offers each on its own (new motion of the same frame, or a new frame with
+the same motion) as well as both. A recipe with one re-rollable seed — a dropped
+frame that was imported rather than generated — keeps the lone "New Random Seed".
 """
 
 from PyQt6.QtWidgets import QMessageBox

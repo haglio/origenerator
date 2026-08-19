@@ -1475,3 +1475,47 @@ def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
 
     assert _notice(panel) == ""
 
+
+# --- Generate says when it will draw a fresh seed ---------------------------
+
+def _completed_generation(db, workflow_name, params):
+    """Record ``params`` as a finished generation of ``workflow_name``, output and
+    all — the past run a matching config would reproduce."""
+    db.insert_generation(
+        prompt_id="done", workflow_name=workflow_name,
+        workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
+        positive_prompt=params.get("positive_prompt", ""), negative_prompt="",
+        seed=params.get("seed"), params_json=json.dumps(params), workflow_json="{}",
+    )
+    db.update_generation("done", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_t2i_done.png", "subfolder": "image"}]))
+
+
+def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(panel, qtbot):
+    # Generating settings already generated, seed and all, would only re-create
+    # that same file — so the press draws a fresh seed instead, and the button says
+    # so before it's pressed rather than a dialog asking after it.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
+    _completed_generation(panel._db, "sdxl_t2i", params)
+
+    panel.prefill("sdxl_t2i", params)
+
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+    assert "already been generated" in panel._generate_btn.toolTip()  # and why
+
+
+def test_editing_the_settings_takes_the_random_seed_caption_back_off(panel, qtbot):
+    # The caption follows the form: edit anything and these are no longer the
+    # settings already generated, so the button goes back to a plain Generate —
+    # a promise of a fresh seed it would no longer keep.
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
+    _completed_generation(panel._db, "sdxl_t2i", params)
+    panel.prefill("sdxl_t2i", params)
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+
+    panel._param_form.set_values({"positive_prompt": "a dog"})
+
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate")
+    assert panel._generate_btn.toolTip() == ""

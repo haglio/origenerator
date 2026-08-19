@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton, QScrollArea, QMessageBox,
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 
 from origenerator import evolver_export
@@ -22,10 +22,11 @@ from origenerator.gallery import (
 )
 from origenerator.generation_config import (
     ConfigSnapshot, configs_match, merge_denormalized,
+    would_reproduce_a_completed_run,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
-from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.metadata_block import MetadataBlock
@@ -43,6 +44,13 @@ from origenerator.config import (
 logger = logging.getLogger(__name__)
 
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
+_CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
+_RANDOM_SEED_CAPTION = "Generate with Random seed"
+_RANDOM_SEED_TIP = (
+    "These settings have already been generated with this exact seed, so "
+    "Generate draws a fresh one rather than re-creating the same file. "
+    "Change a setting to generate something else instead."
+)
 
 # What the preview says once the form has been edited away from the generation
 # on it: that picture was generated, these settings have not been.
@@ -59,7 +67,9 @@ class GenerateConfigPanel(QWidget):
     generation's related media, then a single button bank
     (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
     There's no status line —
-    Generate itself doubles as the progress bar, filling as a run advances. The
+    Generate itself doubles as the progress bar, filling as a run advances, and its
+    caption says when a press will draw a fresh seed rather than re-create a
+    generation these settings have already made. The
     preview is driven from outside: a browsed selection's output, a running
     re-roll's live frames, or this config's newest matching result when idle.
 
@@ -112,6 +122,12 @@ class GenerateConfigPanel(QWidget):
         # preview as no longer showing what a Generate would make; None whenever
         # there's no saved generation on display to be modified away from.
         self._displayed_config: ConfigSnapshot | None = None
+        # Re-reads (shortly) whether Generate would reproduce a past run — see
+        # refresh_generate_caption for why the answer isn't taken on the spot.
+        self._caption_timer = QTimer(self)
+        self._caption_timer.setSingleShot(True)
+        self._caption_timer.setInterval(_CAPTION_DELAY_MS)
+        self._caption_timer.timeout.connect(self._apply_generate_caption)
         self._build_ui()
         self._connect_signals()
 
@@ -341,6 +357,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
+        self.refresh_generate_caption()
         if not self._generating:
             self._generate_btn.setEnabled(self._can_generate())
         self._emit_title()
@@ -393,6 +410,8 @@ class GenerateConfigPanel(QWidget):
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
         self._param_form.changed.connect(self.refresh_modified_notice)
+        # Any edit can make the config match a past generation, or stop matching one.
+        self._param_form.changed.connect(self.refresh_generate_caption)
         self._form_host_box.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -419,6 +438,35 @@ class GenerateConfigPanel(QWidget):
             self._estimate_label.setText(
                 f"Typical time: {estimate_label(self._db.recent_durations(wf.name))}"
             )
+
+    def refresh_generate_caption(self):
+        """Re-read, shortly, whether Generate would reproduce a past run.
+
+        Deferred rather than answered on the spot: the answer needs every stored
+        generation's params, a table read and a JSON parse per row — tens of
+        milliseconds, far too much to spend on each keystroke of a prompt. Every
+        cue restarts the one timer, so a burst of edits costs a single read once
+        the typing stops.
+
+        Public because the gallery has the other cue: a run of these very settings
+        completing is what makes this tab's pinned seed a duplicate.
+        """
+        self._caption_timer.start()
+
+    def _apply_generate_caption(self):
+        """Say on the button what a press will do, and why, or leave it plain."""
+        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
+        config = self.current_config()
+        duplicate = (
+            wf is not None and self._can_generate()
+            and would_reproduce_a_completed_run(
+                self._db.list_generations(), wf, config.params,
+                seed_is_random=config.seed_is_random,
+            )
+        )
+        self._generate_btn.set_caption(
+            _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
+        self._generate_btn.setToolTip(_RANDOM_SEED_TIP if duplicate else "")
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
@@ -513,10 +561,10 @@ class GenerateConfigPanel(QWidget):
     def use_random_seed(self):
         """Switch this config's seed(s) to Random.
 
-        Called when the user accepts the "already generated" dialog's offer of a
-        fresh seed: the choice to stop pinning that seed sticks, so a re-Generate
-        (even after cancelling the first attempt) draws a new seed instead of
-        reproducing the old one and re-asking.
+        Called by the gallery when a press drew a fresh seed rather than reproduce a
+        past run: the form then shows what the next press will do too, and the choice
+        outlives a cancelled first attempt instead of snapping back to the pinned
+        seed that was already generated.
         """
         if self._param_form is not None:
             self._param_form.set_seed_random(True)

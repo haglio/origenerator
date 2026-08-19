@@ -110,3 +110,29 @@ def test_finish_can_leave_it_disabled(button):
 def test_flash_guard_shows_the_message_on_the_button(button):
     button.flash_guard("Select an input image")
     assert button.text() == "Select an input image"
+
+
+def test_the_caption_is_what_a_finished_run_comes_back_to(button):
+    # The resting caption says what a press will do — "Generate with Random seed"
+    # where the settings would otherwise re-create a past generation — so the run
+    # that fills the button hands that caption back when it ends, not "Generate".
+    button.set_caption("Generate with Random seed")
+    assert button.text() == "Generate with Random seed"
+
+    button.start()
+    button.finish(enabled=True)
+
+    assert button.text() == "Generate with Random seed"
+
+
+def test_a_new_caption_waits_for_the_guard_message_to_clear(button):
+    # The caption is recomputed on every form edit, which is exactly what the user
+    # is doing while a guard says what the form still needs — so a caption arriving
+    # mid-guard waits its turn rather than wiping the message being read.
+    button.flash_guard("Select an input image")
+
+    button.set_caption("Generate with Random seed")
+
+    assert button.text() == "Select an input image"
+    button._clear_guard()
+    assert button.text() == "Generate with Random seed"

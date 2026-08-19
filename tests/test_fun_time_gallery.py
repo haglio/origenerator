@@ -70,19 +70,39 @@ def test_fun_time_gallery_restores_osr2_state_as_a_no_op(qtbot):
     assert view.osr2_enabled() is False
 
 
-def test_fun_time_gallery_stacks_generate_tabs_under_the_browser(qtbot):
-    # The RFB rect is an upright column, so the side-by-side panes fold: folder
-    # tree on the left, and the generate tabs UNDER the browser pane.
+def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
+    # The RFB rect is an upright column, so the side-by-side panes fold into one
+    # vertical stack: generate tabs on top, the tree-and-browser row under them,
+    # the queue across the foot.
     view = _fun_time_view(qtbot)
-    assert view._panes.count() == 2
-    stack = view._panes.widget(1)
+    stack = view._stack
     assert isinstance(stack, QSplitter)
     assert stack.orientation() == Qt.Orientation.Vertical
-    assert stack.count() == 2
-    # The stack's upper pane is the folder column (browser over the queue
-    # strip), its lower one the info-pane wrapper (tabs + the find bar).
-    assert stack.widget(0) is view._left_column
-    assert stack.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
+    assert stack.count() == 3
+    # Top floor: the info-pane wrapper (tabs + the find bar).
+    assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
+    # Middle floor: the tree beside the browser.
+    assert stack.widget(1) is view._panes
+    assert view._panes.count() == 2
+    assert view._panes.widget(1) is view._folder_panes
+    # Bottom floor: the queue, spanning the tree's width too.
+    assert stack.widget(2) is view._queue
+
+
+def test_fun_time_gallery_gives_the_bottom_corner_to_the_queue(qtbot):
+    """The tree stops above the queue rather than running the rect's full
+    height, so the corner under it is the queue — where standalone has it."""
+    view = _fun_time_view(qtbot)
+    view.resize(600, 900)
+    view.show()
+    qtbot.waitExposed(view)
+    toc = view._panes.widget(0)
+    corner = view._queue.mapTo(view, view._queue.rect().bottomLeft())
+    tree_foot = toc.mapTo(view, toc.rect().bottomLeft())
+    assert tree_foot.y() < corner.y()  # the tree ends before the rect does
+    assert view._queue.mapTo(view, view._queue.rect().topLeft()).x() <= (
+        toc.mapTo(view, toc.rect().topLeft()).x()
+    )  # and the queue reaches the left edge the tree used to own
 
 
 def test_fun_time_gallery_left_pane_collapses_on_its_toggle(qtbot):

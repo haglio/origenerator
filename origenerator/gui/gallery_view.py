@@ -899,9 +899,11 @@ class GalleryView(QWidget):
         # across their foot would take that height for a queue they can already
         # see next to it.
         #
-        # Hosted by Fun Time the rect is an upright column, so that whole left
-        # column and the info pane stack vertically in _stack instead of sitting
-        # side by side — the TOC pane keeps the left edge either way.
+        # Hosted by Fun Time the rect is an upright column, so the panes fold
+        # into _stack instead of sitting side by side: the info pane on top, the
+        # tree and browser as one row under it, and the queue across the foot of
+        # all three.  _left_column goes unused there — hosted, the queue belongs
+        # to the window rather than to the folder column.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
@@ -1249,10 +1251,17 @@ class GalleryView(QWidget):
         self._queue = GenerationQueue()
         self._queue.reorder_requested.connect(self._reroll.reorder)
         self._queue.clear_queue_requested.connect(self._clear_foreign_queue)
-        self._left_column.addWidget(self._folder_panes)
-        self._left_column.addWidget(self._queue)
-        (self._stack if self._stack is not None else self._panes).addWidget(
-            self._left_column)
+        if self._stack is not None:
+            # Hosted, the queue is not the folder column's strip.  It spans the
+            # whole foot of the rect (added to _stack below), so the corner
+            # under the tree is the queue rather than more tree — which is where
+            # a standalone window's eye finds it, and the upright fold has no
+            # reason to move it.  The folder panes go straight beside the tree.
+            self._panes.addWidget(self._folder_panes)
+        else:
+            self._left_column.addWidget(self._folder_panes)
+            self._left_column.addWidget(self._queue)
+            self._panes.addWidget(self._left_column)
 
 
         # Info pane: a tabbed workspace of identical editable generate panels
@@ -1339,27 +1348,33 @@ class GalleryView(QWidget):
         info_box.addWidget(self._find_bar)
 
         if self._stack is not None:
-            # The upright arrangement: the folder column over the generate tabs
-            # (with the find bar riding under them), the pair beside a
-            # collapsible tree.  The floors shrink with the column — the info
-            # pane spans the stack's whole width, so its side-by-side floor
-            # would only fight the tree for room it no longer shares.
+            # The upright arrangement, top to bottom: the generate tabs (with
+            # the find bar riding under them), then the browser beside a
+            # collapsible tree, then the queue across the foot.  The generator
+            # leads because it is what the user is doing — a tall rect that
+            # opens on a folder listing puts the form they came to fill below
+            # the fold.  The floors shrink with the column: each floor spans the
+            # stack's whole width, so a side-by-side floor would only fight the
+            # tree for room it no longer shares.
             self._stack.addWidget(info_pane)
-            self._panes.addWidget(self._stack)
+            self._stack.addWidget(self._panes)
+            self._stack.addWidget(self._queue)
             self._panes.setCollapsible(0, True)  # the tree may be dragged shut
             toc.setMinimumWidth(120)
             browser.setMinimumWidth(210)
             self._info_tabs.setMinimumWidth(210)
             info_pane.setMinimumWidth(210)
-            self._left_column.setStretchFactor(0, 1)
-            self._left_column.setStretchFactor(1, 0)
-            self._left_column.setSizes([600, self._queue.minimumHeight()])
             self._panes.setStretchFactor(0, 0)
             self._panes.setStretchFactor(1, 1)
             self._panes.setSizes([180, 660])
-            self._stack.setStretchFactor(0, 3)
-            self._stack.setStretchFactor(1, 2)
-            self._stack.setSizes([600, 480])
+            # The strip opens at its own height and stays there, as it does
+            # standalone: a taller rect is more gallery and more form, not more
+            # queue.  The two panes above it split the rest, the browser a
+            # little ahead so the tree it sits beside has room to be read.
+            self._stack.setStretchFactor(0, 2)
+            self._stack.setStretchFactor(1, 3)
+            self._stack.setStretchFactor(2, 0)
+            self._stack.setSizes([440, 640, self._queue.minimumHeight()])
         else:
             self._panes.addWidget(info_pane)
             # The TOC pane holds its width; the browser and info panes both grow
@@ -1389,7 +1404,7 @@ class GalleryView(QWidget):
             self._panes.setStretchFactor(1, 2)
             self._panes.setSizes([780, 440])
 
-        layout.addWidget(self._panes, 1)
+        layout.addWidget(self._stack if self._stack is not None else self._panes, 1)
 
     def _toggle_toc(self):
         """Collapse or restore the folder tree (the Fun Time column's toggle).

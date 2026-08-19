@@ -182,12 +182,13 @@ class Osr2StrokeDriver(QObject):
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:
-            # Cruise control moves the dials before the phase is sampled, so a
-            # tick sends the stroke it just asked for rather than the one before.
-            stroke_engine.tick_cruise_control(
-                self._state.state, self._state.cruise, now)
+            # Carry the stroke to now first: that is what moves its own clock,
+            # and cruise control's ramps are all timed against that clock. Then
+            # let cruise move things, before the phase is sampled, so a tick
+            # sends the stroke it just asked for rather than the one before.
             stroke_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
+            stroke_engine.tick_cruise_control(self._state, now)
             pos = stroke_engine.position_ahead(self._state, lead_ms / 1000.0)
         self._broker.send_position(pos, lead_ms)
         if not self._streaming:
@@ -242,12 +243,16 @@ class Osr2StrokeDriver(QObject):
             stroke_engine.cycle_shape(self._state.state, step)
 
     def toggle_cruise(self) -> None:
-        """Hands off: cruise control varies amplitude, centre, speed and shape
-        for you (genau's ``/``). It only moves the dials while the stroke is
-        actually running, so arming it against a parked device changes nothing
-        until the device is taken."""
+        """Hands off: cruise control takes the stroke over (genau's ``/``).
+
+        What it hands the device is several waves summed — a deep slow one with
+        a quicker ripple riding it, say — with every wave's speed and share of
+        the travel always on its way somewhere else. The dials go on reading the
+        whole stroke's travel, center and pace, so the console still says what is
+        being sent. It only moves while the stroke is actually running, so arming
+        it against a parked device changes nothing until the device is taken."""
         with self._lock:
-            stroke_engine.toggle_cruise_control(self._state.cruise)
+            stroke_engine.toggle_cruise_control(self._state)
 
     def set_cruise(self, on: bool) -> None:
         """Put cruise control the way asked, whichever way it is standing.
@@ -260,9 +265,9 @@ class Osr2StrokeDriver(QObject):
         """
         with self._lock:
             if on:
-                stroke_engine.enable_cruise_control(self._state.cruise)
+                stroke_engine.enable_cruise_control(self._state)
             else:
-                stroke_engine.disable_cruise_control(self._state.cruise)
+                stroke_engine.disable_cruise_control(self._state)
 
     @property
     def cruising(self) -> bool:

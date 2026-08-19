@@ -32,6 +32,7 @@ from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
+from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.voice.dictation import RequestDictation
@@ -4837,6 +4838,193 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
+# --- the folder-wide request: same seeds, changed words ---------------------
+
+
+def _request_card(view):
+    cards = view._scroll.widget().findChildren(FolderRequestTile)
+    return cards[0] if cards else None
+
+
+def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
+    """A DB holding one settings folder with a completed picture per seed — the
+    folder a rewrite re-runs."""
+    db = Database(tmp_path / "folder.db")
+    for seed in seeds:
+        db.insert_generation(
+            prompt_id=f"pic{seed}", workflow_name="sdxl_t2i",
+            workflow_version=_SDXL.version, positive_prompt=prompt,
+            negative_prompt="blurry", seed=seed,
+            params_json=json.dumps(dict(_SDXL.default_params(), seed=seed,
+                                        positive_prompt=prompt,
+                                        negative_prompt="blurry")),
+            workflow_json="{}",
+        )
+        db.update_generation(
+            f"pic{seed}", status="completed",
+            output_files=json.dumps([{"filename": f"sdxl_{seed}.png", "subfolder": ""}]),
+        )
+    return db
+
+
+def _rewritten(view, key, prompt="a dog on a couch"):
+    """Press a rewrite of the folder ``key`` names, saying ``prompt`` instead."""
+    params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
+                  negative_prompt="blurry")
+    view._on_changes_requested(key, "sdxl_t2i", params)
+
+
+def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert _request_card(view) is not None
+    assert _reroll_tile(view) is not None  # the pair: new seed, and new words
+
+
+def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
+    # The rewrite reproduces the folder seed for seed, so a folder whose only row
+    # is still cooking has no picture to say differently yet.
+    rows = [_row("run1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1}, "x.png",
+                 status="running", output_files=json.dumps([]))]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert _request_card(view) is None
+
+
+def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_folder_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _request_card(view).clicked.emit()
+
+    panel = view._info_tabs.current_config_panel()
+    assert panel.requesting_changes() == key
+    assert panel._preview._stack.currentWidget() is panel._preview._sheet
+    client.submit_job.assert_not_called()  # an edit to make, not a run to start
+
+
+def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    jobs = view._reroll.all_jobs
+    assert sorted(job.params["seed"] for job in jobs) == [7, 8, 9]
+    assert {job.params["positive_prompt"] for job in jobs} == {"a dog on a couch"}
+
+
+def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    landing = set(view._reroll.jobs_by_folder)
+    assert len(landing) == 1                 # the seeds don't split it
+    assert landing != {key}                  # ...and it isn't the folder it came from
+
+
+def test_each_rewritten_picture_is_linked_to_the_one_it_came_from(qtbot, tmp_path):
+    # Individually, not folder to folder: the link is what says which picture
+    # this one is the rewrite of, and it shows on the item itself.
+    db = _folder_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    records = db.list_requests()
+    assert {r["source_prompt_id"] for r in records} == {"pic7", "pic8", "pic9"}
+    assert {r["prompt_id"] for r in records} == {job.prompt_id for job in view._reroll.all_jobs}
+    one = records[0]
+    assert one["old_positive"] == "a cat on a couch"
+    assert one["new_positive"] == "a dog on a couch"
+    assert one["heard"] == ""  # typed, so there is nothing it was heard as
+
+
+def test_a_rewrite_of_a_folder_that_has_gone_launches_nothing(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    _rewritten(view, "image/sdxl_t2i/nosuchfolder")
+
+    assert view._reroll.all_jobs == []
+
+
+
+def test_the_folders_live_tile_stands_the_image_it_was_asked_of_behind_the_wait(
+        qtbot, tmp_path):
+    thumb = tmp_path / "asked_of.png"
+    Image.new("RGB", (32, 24), (40, 160, 80)).save(thumb)
+    db = _folder_db(tmp_path, seeds=(7,))
+    db.update_generation("pic7", thumbnail_path=str(thumb))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    # The batch's folder is on screen now; its live tile has no frame of its own
+    # yet, so it shows the image the request was made of.
+    assert not _reroll_tile(view)._image.pixmap().isNull()
+
+
+def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
+    # Every run is being made, so the folder shows every run — not one card the
+    # images then arrive through one at a time.
+    view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    queued = [job.prompt_id for job in view._reroll.all_jobs]
+    # The one in front is the folder's live tile; the rest each get their own card.
+    assert _reroll_tile(view) is not None
+    assert set(view._inflight_cards) == set(queued[1:])
+    assert len(queued) == 3
+
+
+def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, tmp_path):
+    # Not merely "in some consistent order" — the same order, so laying the two
+    # folders side by side is what tells you at a glance that it worked.
+    db = _folder_db(tmp_path, seeds=(7, 8, 9))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    was = [row["seed"] for row in view._item_by_key[key].data(0, _GROUP_ROLE).rows]
+
+    _rewritten(view, key)
+
+    made = {job.prompt_id for job in view._reroll.all_jobs}
+    # The gallery lists rows newest first, which is the order they were written in
+    # reversed — so this is the order the new folder will draw them in.
+    now = [row["seed"] for row in db.list_generations() if row["prompt_id"] in made]
+    assert was == [9, 8, 7]
+    assert now == was
+
+
 # --- auto-generate: the folder re-roll on a loop until stopped --------------
 
 def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
@@ -6858,9 +7046,9 @@ def test_open_folder_shows_a_running_generation_via_the_reroll_tile(qtbot, tmp_p
 
 
 def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
-    # A running row (no output yet) gives its folder a tree node, but must not draw
-    # as a broken, output-less static thumbnail — the folder's live tile stands for
-    # it instead. Only the finished item lists as a thumbnail.
+    # A running row (no output yet) gives its folder a tree node, but must not
+    # draw as a broken, output-less static thumbnail. It draws as a live card
+    # instead — it is the thing the folder is waiting for.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_in_folder("run1", "a cat", 50, 2))  # same folder as i1, still running
     view = GalleryView(db)
@@ -6869,8 +7057,8 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
 
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
-    assert "run1" not in view._inflight_cards       # no separate in-flight card in the folder
-    assert view.visible_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail either
+    assert "run1" in view._inflight_cards           # cooking, and shown as cooking
+    assert view.visible_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail
 
 
 def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path):

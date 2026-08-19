@@ -59,6 +59,7 @@ from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
 )
+from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.inflight import queue_wait_text
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
@@ -93,6 +94,7 @@ from origenerator.gui.gallery_tree import (
 from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
@@ -1185,6 +1187,7 @@ class GalleryView(QWidget):
         # A tab's Generate is a re-roll of its settings folder: launch it in that
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
+        self._info_tabs.changes_requested.connect(self._on_changes_requested)
         # The find strip, at the foot of the info pane where the prompts it
         # searches are. Ctrl+F opens it over the front tab's prompt fields; it
         # takes no room until then, and closing it clears every mark it painted.
@@ -1877,9 +1880,11 @@ class GalleryView(QWidget):
         if fingerprint != self._fingerprint:
             self._fingerprint = fingerprint
             self._rebuild(rows, meta)
-        elif self._browser.showing_recents():
-            # No DB change, but the in-flight cards still need each running re-roll's
-            # live frame pushed in — it advances between rebuilds.
+        else:
+            # No DB change, but the in-flight cards still need each running
+            # re-roll's live frame pushed in — it advances between rebuilds.
+            # Wherever they were drawn: the Recents shelf, or a folder with a
+            # batch of them cooking in it.
             self._browser.refresh_inflight()
         # The bottom strip is always on screen, so refresh it every tick — its
         # rows' live frames and progress advance between rebuilds.
@@ -2678,13 +2683,139 @@ class GalleryView(QWidget):
         job = self._reroll.job_for(group.key)
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
-                          typical_seconds=self._typical_run_seconds(job))
+                          typical_seconds=self._typical_run_seconds(job),
+                          source_picture=self._job_source_picture(job))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
         tile.selected.connect(lambda k=group.key: self._select_reroll(k))
         flow.addWidget(tile)
         self._reroll_tile = tile
+
+    # --- the folder-wide request: same seeds, changed words ----------------
+
+    def _can_request_changes(self, group) -> bool:
+        """True when this folder can be run again with its prompt rewritten.
+
+        Everything a re-roll needs, plus at least one image to rewrite: the
+        request reproduces the folder seed for seed, so a folder holding nothing
+        finished yet has nothing to reproduce.
+        """
+        return self._can_reroll(group) and bool(self._folder_request_rows(group))
+
+    @staticmethod
+    def _folder_request_rows(group) -> list[dict]:
+        """The generations a request over ``group`` would re-run: the ones that
+        actually produced an image.
+
+        A failed or in-flight row is a seed with nothing to compare against — the
+        point of the request is this image said differently, so a row with no
+        image is not part of it. Anything but a settings leaf holds no rows of
+        its own to re-run, so it comes back empty rather than raising.
+        """
+        if not isinstance(group, gallery.SettingsGroup):
+            return []
+        return [row for row in group.rows if gallery.produced_output(row)]
+
+    def _add_folder_request_tile(self, flow, group):
+        tile = FolderRequestTile()
+        tile.clicked.connect(lambda g=group: self._open_folder_request(g))
+        flow.addWidget(tile)
+
+    def _open_folder_request(self, group):
+        """Open this folder's prompt in a tab, ready to be rewritten.
+
+        Nothing is launched: the card is the start of an edit made by hand, which
+        is the whole reason it is typed rather than spoken. The tab carries the
+        folder's settings, its prompts marked against themselves, and its images
+        tiled in the preview — see
+        :meth:`GenerateConfigPanel.open_folder_request`.
+        """
+        rows = self._folder_request_rows(group)
+        workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
+        if workflow is None or self._client is None:
+            return
+        # One entry per run the press will make, thumbnail or not, so the count
+        # in the hover is the number of images and not of readable files.
+        pictures = [row.get("thumbnail_path") for row in rows]
+        self._clear_reroll_selection()  # the tab is about the folder, not a live run
+        self._info_tabs.open_folder_request(group.key, group.label, workflow.name,
+                                      filled_params(rows[0], workflow), pictures)
+
+    def _on_changes_requested(self, folder_key: str, workflow_name: str, params: dict):
+        """A request tab's Generate: run every image of ``folder_key`` again with
+        its own seed and the rewritten prompt, and land on the folder they make.
+
+        One job per image, all of them into the one new settings folder — the
+        seed is not part of what places a row (see
+        :func:`~origenerator.gallery.signatures.canonical_settings`), so the
+        rewrite comes out as this folder's parallel: the same seeds in the same
+        recipe, saying something slightly different.
+
+        Each new generation is linked to the image it was rewritten from, one
+        by one rather than folder to folder — what it says now beside what it
+        said, on the item itself, which is the same record a spoken request
+        leaves (:meth:`Database.record_request`).
+        """
+        wf = WORKFLOW_REGISTRY.get(workflow_name)
+        item = self._item_by_key.get(folder_key)
+        group = item.data(0, _GROUP_ROLE) if item is not None else None
+        rows = self._folder_request_rows(group) if group is not None else []
+        if self._client is None or wf is None or not rows:
+            return
+        params = {**wf.default_params(), **params}  # form values win over defaults
+        key = self._folder_key_for(workflow_name, params)
+        launching = self._info_tabs.current_config_panel()
+        seed_keys = wf.seed_keys()
+        launched = 0
+        # Oldest first. A folder lists newest first, and a row's place in that
+        # list is the order it was made in, so launching in reading order would
+        # build the new folder back to front and its seeds would line up with
+        # the old one's only in reverse — the one thing a glance is checking.
+        for row in reversed(rows):
+            # The row's own settings, filled from the workflow's defaults the way
+            # a re-roll fills them — so a sparsely-recorded import still yields a
+            # seed to keep rather than silently inheriting the open tab's.
+            was = filled_params(row, wf)
+            run = {**params, **{k: was[k] for k in seed_keys if k in was}}
+            prompt_id = self._reroll.start_prepared(key, wf, run)
+            if not prompt_id:
+                continue  # the submit failed; the rest of the folder still goes
+            launched += 1
+            if launching is not None:
+                launching.note_launched(self._reroll.newest_job_for(key).origin)
+            self._db.record_request(
+                prompt_id=prompt_id, source_prompt_id=row["prompt_id"], heard="",
+                old_positive=was.get("positive_prompt", ""),
+                old_negative=was.get("negative_prompt", ""),
+                new_positive=run.get("positive_prompt", ""),
+                new_negative=run.get("negative_prompt", ""),
+            )
+        logger.info("Requested changes to %s: %d of %d images queued into %s",
+                    folder_key, launched, len(rows), key)
+        if launched:
+            self._navigate_to_reroll(key)
+
+    def _job_source_picture(self, job) -> str | None:
+        """A file showing what ``job`` came from, for the tile to stand blurred
+        behind the wait until the run streams a frame of its own.
+
+        The image it was requested of first — a folder-wide request queues a run
+        per image and none of them animates anything, so what it was asked about
+        is the only picture it has — then the start frame an i2v or an enhance is
+        built on. ``None`` for a run that came from nothing, which keeps the
+        plain plate: a queued image looks like every other queued image because
+        it genuinely is.
+        """
+        if job is None:
+            return None
+        record = self._db.get_request(job.prompt_id)
+        source = self._db.get_generation(record["source_prompt_id"]) \
+            if record else None
+        if source is not None and source.get("thumbnail_path"):
+            return source["thumbnail_path"]
+        frame = resolve_input_image_path(job.params.get("input_image"))
+        return str(frame) if frame is not None else None
 
     def _typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the

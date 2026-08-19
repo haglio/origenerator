@@ -73,15 +73,39 @@ def show_diff(edit: QPlainTextEdit, before: str, after: str) -> None:
     edit.installEventFilter(_EditWatcher(edit))
 
 
-def _format_for(kind: str) -> QTextCharFormat:
+def added_format() -> QTextCharFormat:
+    """How arriving words are lit."""
     fmt = QTextCharFormat()
-    if kind == REMOVED:
-        fmt.setFontStrikeOut(True)
-        fmt.setForeground(_REMOVED_COLOR)
-    else:
-        fmt.setBackground(_ADDED_BG)
-        fmt.setForeground(_ADDED_COLOR)
+    fmt.setBackground(_ADDED_BG)
+    fmt.setForeground(_ADDED_COLOR)
     return fmt
+
+
+def removed_format() -> QTextCharFormat:
+    """How departing words are struck through."""
+    fmt = QTextCharFormat()
+    fmt.setFontStrikeOut(True)
+    fmt.setForeground(_REMOVED_COLOR)
+    return fmt
+
+
+# Both are public because a field being rewritten by hand draws the same change
+# as it is typed (:mod:`origenerator.gui.tracked_prompt`), and the two surfaces
+# have to mark the same thing the same way.
+def _format_for(kind: str) -> QTextCharFormat:
+    return added_format() if kind == ADDED else removed_format()
+
+
+def hold_value(edit: QPlainTextEdit, value: str | None) -> None:
+    """Declare what ``edit`` is worth while its document says more than the prompt
+    does — or ``None`` where the two are the same again.
+
+    For a caller painting its own marks rather than going through
+    :func:`show_diff`: the held value is the whole of what
+    :func:`live_text` answers with, so a painter that doesn't set it leaves the
+    form reading the struck-out words as part of the prompt.
+    """
+    edit.setProperty(_VALUE_PROPERTY, value)
 
 
 def showing_diff(edit: QPlainTextEdit) -> bool:

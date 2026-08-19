@@ -10,6 +10,7 @@ from origenerator.gui.corner_controls import (
 )
 from origenerator.gui.drag_thumbnail import label_thumbnail, set_drag_thumbnail
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui import grid_card
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
@@ -17,7 +18,7 @@ from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 from origenerator.timing import progress_status_label
 
-_IMAGE_SIZE = QSize(172, 160)  # the thumbnail image area, inside the 180x200 tile
+_IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
 _BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
 _BAR_HEIGHT = 26               # the enhancement's bar, along the picture's foot
 _TICK_MS = 1000                # how often the bar's clock re-reads itself
@@ -79,11 +80,11 @@ class ThumbnailWidget(QWidget):
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self.prompt_id, self.mapToGlobal(pos))
         )
-        self.setFixedSize(180, 200)
+        self.setFixedSize(*grid_card.card_size())
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
+        layout.setSpacing(grid_card.CARD_SPACING)
 
         self._image_label = QLabel()
         self._image_label.setFixedSize(_IMAGE_SIZE)
@@ -107,7 +108,9 @@ class ThumbnailWidget(QWidget):
         self._text_label = QLabel(label_text)
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
-        self._text_label.setMaximumHeight(30)
+        # A video's seed is twenty digits, which is what most of these captions
+        # are; the family's font is the size that gets one across a card.
+        grid_card.style_caption(self._text_label)
         # Transparent so the tile's fill shows through behind the caption.
         self._text_label.setStyleSheet("background-color: transparent;")
 

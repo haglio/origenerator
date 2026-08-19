@@ -29,6 +29,7 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.combination_view import CombinationView
+from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
 from origenerator.gui.drag_thumbnail import (
     fit_thumbnail, label_thumbnail, set_drag_thumbnail,
@@ -155,6 +156,12 @@ class PreviewWidget(QWidget):
         self._combination = CombinationView()
         self._combination.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._combination)
+
+        # A fourth page, for what is not one generation but a whole folder of
+        # them: every picture in it, tiled to fill (see :meth:`show_folder`).
+        self._sheet = ContactSheet()
+        self._sheet.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._stack.addWidget(self._sheet)
 
         self._stack.setCurrentWidget(self._image_label)
 
@@ -294,6 +301,26 @@ class PreviewWidget(QWidget):
         self._combination.show_pair(image_path, video_path)
         self._stack.setCurrentWidget(self._combination)
         self._hide_strip()  # nothing made yet, so no script to lay under it
+
+    def show_folder(self, paths) -> None:
+        """Show a whole folder at once: every picture in ``paths``, tiled to fill.
+
+        What a tab about a folder rather than a generation puts in the pane —
+        the rewrite a folder's Request card opens. There is no one file on display, so
+        nothing here is draggable, openable fullscreen, or scripted; the wall is
+        the folder, and the folder is what the settings below it are about.
+        """
+        self._player.stop()
+        self.set_notice(None)  # no single picture left for a notice to be about
+        self._media = None     # a folder, not a file to open fullscreen
+        self._end_live(None)
+        self._draggable_id = None
+        self._set_movie(None)
+        self._pixmap = None
+        self._image_label.clear()
+        self._sheet.show_pictures(paths)
+        self._stack.setCurrentWidget(self._sheet)
+        self._hide_strip()  # a wall of pictures has no one script to lay under it
 
     def show_message(self, text: str, *, live: bool = False) -> None:
         """Show a plain text message in place of any media.
@@ -640,12 +667,15 @@ class PreviewWidget(QWidget):
         The movie is parented to this widget so the label's pointer can't dangle
         if Python drops the wrapper before the next paint.
 
-        Every ``show_*`` passes through here, so it is also where a combination on
-        the other page is put down — its clip would otherwise keep looping behind
-        whatever replaced it. :meth:`show_combination` calls this before laying
-        its own pair out, so it is not undoing itself.
+        Every ``show_*`` passes through here, so it is also where the other pages
+        are put down — a combination's clip would otherwise keep looping behind
+        whatever replaced it, and a folder's wall would hold every one of its
+        pictures in memory. Both :meth:`show_combination` and
+        :meth:`show_folder` call this before laying their own out, so neither
+        is undoing itself.
         """
         self._combination.clear()
+        self._sheet.clear()
         if self._movie is not None:
             self._movie.stop()
             self._movie.deleteLater()

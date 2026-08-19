@@ -100,13 +100,20 @@ CREATE TABLE IF NOT EXISTS custom_folder_members (
     PRIMARY KEY (folder_id, folder_key)
 );
 
--- A spoken request ("Request … over") and the generation it queued: the item
--- it was made about, what the mic heard, and the prompt pair before the edit
--- (the pair after it is the queued generation's own params). What the Requests
--- shelf lists, and the only record of why that generation differs from the one
--- it came from. Kept even when its generation goes: a delete here is undoable,
--- and a restored item should come back with the request that made it, so the
--- shelf skips a record it can't resolve rather than the record being dropped.
+-- A request and the generation it queued: the item it was made about, what was
+-- heard, and the prompt pair before the edit (the pair after it is the queued
+-- generation's own params). What the Requests shelf lists, and the only record
+-- of why that generation differs from the one it came from. Kept even when its
+-- generation goes: a delete here is undoable, and a restored item should come
+-- back with the request that made it, so the shelf skips a record it can't
+-- resolve rather than the record being dropped.
+--
+-- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
+-- every picture in a folder at once and records one of these per picture, which
+-- is what links each result to the one it was rewritten from. Such a record has
+-- nothing heard and no single term — it says what it wanted by rewriting the
+-- prompt, which the old/new pair holds — so `heard` is empty there and
+-- `term`/`polarity`/`action` are unset.
 CREATE TABLE IF NOT EXISTS requests (
     prompt_id        TEXT PRIMARY KEY,
     source_prompt_id TEXT NOT NULL,
@@ -500,9 +507,10 @@ class Database:
                        action: str | None = None, old_positive: str = "",
                        old_negative: str = "", new_positive: str = "",
                        new_negative: str = ""):
-        """Record that ``prompt_id`` was queued by a spoken request about
-        ``source_prompt_id``. Replaces any earlier record for the same
-        generation, which only a re-used prompt id could produce."""
+        """Record that ``prompt_id`` was queued by a request about
+        ``source_prompt_id`` — spoken, or typed as one picture of a folder-wide
+        rewrite, which leaves ``heard`` empty. Replaces any earlier record for
+        the same generation, which only a re-used prompt id could produce."""
         with self._connect() as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO requests

@@ -351,8 +351,9 @@ def starred_generations(rows: list[dict]) -> list[dict]:
 
 
 def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
-    """Each spoken request paired with what it made, newest first — the Requests
-    shelf's list.
+    """Each request paired with what it made, newest first — the Requests shelf's
+    list. Spoken, or typed as one picture of a folder-wide rewrite: both leave
+    the same record, and both belong on the shelf of things you asked for.
 
     ``records`` are the rows :meth:`Database.list_requests` returns; each gains
     a ``"row"`` (the generation the request queued) and a ``"source_row"`` (the

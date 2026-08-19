@@ -237,19 +237,27 @@ class PreviewWidget(QWidget):
         self._player.play()
         self._update_strip(path)
 
-    def show_frame(self, data: bytes) -> None:
+    def show_frame(self, data: bytes, *, keep_notice: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
 
         ComfyUI streams live previews as encoded images over the websocket
         rather than writing a file, so this loads straight from memory. Bytes
         that don't decode (a truncated frame) are ignored, leaving the current
         view untouched.
+
+        ``keep_notice`` marks the frames as the coming state of the picture
+        already on display — an enhancement of it — rather than a run of the
+        settings beside it. Whatever a notice says about that picture is just as
+        true of the version being made, so it stays where it is: cleared by each
+        frame and re-asserted by each keystroke, it flickers at the rate the run
+        streams while the form is being typed in.
         """
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
         self._player.stop()
-        self.set_notice(None)  # the run on screen is what these settings are making
+        if not keep_notice:
+            self.set_notice(None)  # the run on screen is what these settings are making
         self._media = None  # a transient live frame, not a file to open fullscreen
         self._live, self._live_frame = True, data  # …but a running generation to watch
         self._draggable_id = None  # nor a saved generation to drag out
@@ -258,6 +266,7 @@ class PreviewWidget(QWidget):
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
+        self._raise_notice()  # a kept notice, back over the frame that just landed
         self._hide_strip()  # a live in-progress frame has no script yet
         win = self._following_fullscreen()
         if win is not None:
@@ -328,8 +337,7 @@ class PreviewWidget(QWidget):
         self._notice_dim.show()
         self._notice.show()
         self._place_notice()
-        self._notice_dim.raise_()
-        self._notice.raise_()  # over the media, video surface included
+        self._raise_notice()
 
     def _place_notice(self) -> None:
         """Spread the dim over the whole media area and float the message plate
@@ -348,6 +356,20 @@ class PreviewWidget(QWidget):
             self._notice.setWordWrap(True)
             self._notice.resize(limit, self._notice.heightForWidth(limit))
         self._notice.move(_NOTICE_MARGIN, _NOTICE_MARGIN)
+
+    def _raise_notice(self) -> None:
+        """Put a showing notice back on top of the media — over a video surface,
+        which is a native window a plain sibling cannot paint over, and over a
+        picture that has just landed under it: a stacked layout raises the widget
+        it switches to above every sibling it has.
+
+        A no-op when no notice is up, so anything putting a new view in the pane
+        can call it without asking first.
+        """
+        if self._notice.isHidden():
+            return
+        self._notice_dim.raise_()
+        self._notice.raise_()
 
     def _end_live(self, media: tuple | None) -> None:
         """Stop mirroring a running generation, handing ``media`` — the file it

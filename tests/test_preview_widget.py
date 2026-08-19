@@ -799,6 +799,37 @@ def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, 
     assert w._notice_dim.isHidden()
 
 
+def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path):
+    # An enhancement streams the coming state of what is already on display —
+    # not a run of the settings beside it — so a notice about that picture is
+    # just as true of the version arriving, and the two belong on screen
+    # together. Cleared by each frame and re-asserted by each keystroke, it
+    # blinked at the rate the run streamed while the form was typed in.
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_notice("modified")
+
+    w.show_frame(_png_bytes(), keep_notice=True)
+
+    assert not w._notice.isHidden()
+    assert w._notice.text() == "modified"
+    assert not w._notice_dim.isHidden()  # dimmed over the frames as well
+
+
+def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
+    # Switching the stacked layout to the picture raises that widget above every
+    # sibling it has, the notice included — so a kept one is lifted back.
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")  # the stack is on the video surface
+    w.set_notice("modified")
+
+    w.show_frame(_png_bytes(), keep_notice=True)
+
+    order = w._media_host.children()
+    assert order.index(w._notice) > order.index(w._image_label)
+    assert order.index(w._notice_dim) > order.index(w._image_label)
+
+
 def test_resizing_re_places_the_notice(make_preview, tmp_path):
     w = make_preview()
     w._media_host.resize(300, 200)

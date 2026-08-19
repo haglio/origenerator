@@ -86,21 +86,26 @@ def _controls(qtbot):
 
 def test_nothing_shows_until_there_is_something_to_act_on(qtbot):
     host, controls = _controls(qtbot)
-    controls.set_revealed(True)  # a cursor over an empty pane is still nothing
     assert all(b.isHidden() for b in controls.buttons())
 
 
-def test_the_offers_wait_for_a_cursor_but_the_reports_do_not(qtbot):
+def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
+    # Not hover-revealed: a corner that comes and goes with the cursor is one you
+    # have to go looking for, and two of these report state as well as offering
+    # an act.
     host, controls = _controls(qtbot)
-    controls.show_for(starred=True, enhance=icons.ENHANCE_HELD)
+    controls.show_for(starred=False, enhance=icons.ENHANCE_OPEN)
+
+    assert all(not b.isHidden() for b in controls.buttons())
+
+
+def test_a_picture_the_enhancer_cannot_take_grows_no_plus(qtbot):
+    host, controls = _controls(qtbot)
+    controls.show_for(starred=False, enhance=None)
     star, trash, plus = controls.buttons()
 
-    assert not star.isHidden()   # a bookmark has to read across a resting wall
-    assert not plus.isHidden()   # so does an enhancement
-    assert trash.isHidden()      # a delete is an offer, and offers wait
-
-    controls.set_revealed(True)
-    assert not trash.isHidden()
+    assert not star.isHidden() and not trash.isHidden()
+    assert plus.isHidden()
 
 
 def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
@@ -116,7 +121,6 @@ def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
 def test_taking_the_picture_away_takes_every_corner_with_it(qtbot):
     host, controls = _controls(qtbot)
     controls.show_for(starred=True, enhance=icons.ENHANCE_HELD)
-    controls.set_revealed(True)
 
     controls.hide_all()
 
@@ -155,7 +159,9 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     for corner in (star, trash, plus):
         assert picture.contains(corner)
         assert corner.size().width() == CORNER_SIZE
-    assert star.left() == trash.left() < picture.center().x()
-    assert star.top() < picture.center().y() < trash.top()
-    assert plus.top() == trash.top()
-    assert plus.left() > picture.center().x()
+    # Top-right, bottom-left, bottom-right — and never top-left, which the
+    # media-type badge has always had.
+    assert star.left() == plus.left() > picture.center().x()
+    assert star.top() < picture.center().y() < plus.top()
+    assert trash.left() < picture.center().x()
+    assert trash.top() == plus.top()

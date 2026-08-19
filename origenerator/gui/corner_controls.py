@@ -2,8 +2,11 @@
 
 A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
-bookmark it (top left), bin it (bottom left), enhance it (bottom right). Learn
+bookmark it (top right), bin it (bottom left), enhance it (bottom right). Learn
 them once and they are in the same places wherever a generation is on screen.
+Top-LEFT is not one of them: the media-type badge has always lived there, and a
+control that landed on it would be a control that moves depending on which shelf
+you happened to open.
 
 Each mark is the state and the button at once. A filled green star IS the
 bookmark, and pressing it is what takes the bookmark away; the yellow plus IS
@@ -11,10 +14,10 @@ the enhancement the image holds. That is why the badges these replaced are gone
 rather than sitting beside them: a picture can no longer carry a badge saying
 one thing next to a control doing another, because there is only the one mark.
 
-Two of them therefore stay up whenever they have something to report — a starred
-item keeps its star and an enhanced one its plus, cursor or no cursor — and the
-rest appear on hover, so a resting wall of thumbnails is pictures rather than
-chrome.
+All three are up whenever there is a generation under them — they are not
+hover-revealed. Each reacts to the cursor on ITSELF and to nothing else, so
+which one you are about to press is answered by the one that lit, not by a set
+that appeared when you crossed the tile.
 """
 
 from PyQt6.QtWidgets import QPushButton, QWidget
@@ -124,10 +127,9 @@ class _CornerButton(QPushButton):
 class CornerControls(QObject):
     """The three controls laid over one host widget's picture.
 
-    Passive about hover: the host says when the cursor is over it
-    (:meth:`set_revealed`) and where the picture currently is (:meth:`place`),
-    because only the host knows — a thumbnail's picture is a fixed rectangle and
-    a preview's moves with every resize and every change of aspect ratio.
+    The host says where the picture currently is (:meth:`place`), because only
+    the host knows — a thumbnail's picture is a fixed rectangle and a preview's
+    moves with every resize and every change of aspect ratio.
     """
 
     triggered = pyqtSignal(str)  # STAR / TRASH / ENHANCE
@@ -135,7 +137,6 @@ class CornerControls(QObject):
     def __init__(self, host: QWidget, *, native: bool = False):
         super().__init__(host)
         self._available = False   # is there a saved generation here to act on?
-        self._revealed = False    # is the cursor over the host?
         self._starred = False
         self._enhance: str | None = None
         self._star = _CornerButton(
@@ -186,21 +187,19 @@ class CornerControls(QObject):
         self._enhance = enhance
         self._redraw()
 
-    def set_revealed(self, revealed: bool):
-        """The cursor arrived over (or left) the host's picture."""
-        if revealed == self._revealed:
-            return
-        self._revealed = revealed
-        self._sync()
-
     def place(self, picture: QRect):
-        """Put each control in its own corner of ``picture``, in host coordinates."""
+        """Put each control in its own corner of ``picture``, in host coordinates.
+
+        Three of the four: top-left belongs to the media-type badge, and to the
+        review controls a shelf lays along that edge.
+        """
         inner = picture.adjusted(CORNER_INSET, CORNER_INSET,
                                  -CORNER_INSET, -CORNER_INSET)
-        self._star.move(inner.left(), inner.top())
-        self._trash.move(inner.left(), inner.bottom() - CORNER_SIZE + 1)
-        self._enhance_button.move(inner.right() - CORNER_SIZE + 1,
-                                  inner.bottom() - CORNER_SIZE + 1)
+        right = inner.right() - CORNER_SIZE + 1
+        bottom = inner.bottom() - CORNER_SIZE + 1
+        self._star.move(right, inner.top())
+        self._trash.move(inner.left(), bottom)
+        self._enhance_button.move(right, bottom)
         for button in self.buttons():
             button.raise_()
 
@@ -217,20 +216,18 @@ class CornerControls(QObject):
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])
 
     def _sync(self):
-        """Show each control per what it has to say and whether the host is hovered.
+        """Show each control there is something for it to act on.
 
-        A control that is reporting a state stays up on its own — that is the
-        whole of what the star and plus badges used to do, and dropping it on
-        mouse-out would make a wall of thumbnails stop saying which of them are
-        bookmarked. The rest are offers, and an offer is only worth the space
-        while the cursor is on the item it's about.
+        Always, not on hover: a corner that comes and goes with the cursor is a
+        corner you have to go looking for, and two of these are reporting state
+        as well as offering an act — a wall of thumbnails has to say which of
+        them are bookmarked without being swept. The plus is the one that can be
+        absent, and only where there is no such act at all: a video, which the
+        enhancer cannot take.
         """
-        self._star.setVisible(self._available and (self._starred or self._revealed))
-        self._trash.setVisible(self._available and self._revealed)
-        holds = self._enhance in (icons.ENHANCE_HELD, icons.ENHANCE_MORE)
-        self._enhance_button.setVisible(
-            self._available and self._enhance is not None
-            and (holds or self._revealed))
+        self._star.setVisible(self._available)
+        self._trash.setVisible(self._available)
+        self._enhance_button.setVisible(self._available and self._enhance is not None)
         # The solid plus is a finished statement rather than an offer: this image
         # already holds the very version the panel describes, so pressing would
         # spend a generation arriving at the picture that is already there. Turn

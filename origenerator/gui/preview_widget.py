@@ -5,6 +5,10 @@ static images are scaled to fit (and rescaled on resize), animated images
 (animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
 default, so selecting one gives an immediate moving preview without stealing audio,
 while the fullscreen slideshow opts in to sound.
+
+A still can also be drawn part-way into itself (:meth:`PreviewWidget.set_zoom`),
+which is how the fullscreen show creeps into each picture while it holds the
+screen; every other pane leaves that at the whole picture.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.ken_burns import crop_box
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -76,6 +81,10 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self._drag_origin: QPoint | None = None
+        # How far into the still this pane is drawn — the fullscreen show's slow
+        # push (see set_zoom). 1.0, the whole picture, for every other pane:
+        # nothing but a show ever moves it.
+        self._zoom = 1.0
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
@@ -310,6 +319,25 @@ class PreviewWidget(QWidget):
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
+    def set_zoom(self, zoom: float) -> None:
+        """Draw the still *zoom* deep into itself — the show's Ken Burns push.
+
+        A centered crop of 1/*zoom*, scaled back up to the size the whole picture
+        was drawn at, so the rect the media occupies stays where it is — within
+        the pixel the crop rounds to. The neighbor stills and the HUD map are
+        placed against :meth:`media_rect`, and a zoom that grew the drawn picture
+        instead would shove them about twenty times a second.
+
+        Stills only. An animated image is already moving and a video is its own
+        motion, so both take the number inertly — as does every pane but a
+        show's, none of which ever calls this.
+        """
+        zoom = max(1.0, float(zoom))
+        if zoom == self._zoom:
+            return
+        self._zoom = zoom
+        self._rescale()
+
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this pane's playback outright."""
         self._audio.setMuted(muted)
@@ -510,8 +538,16 @@ class PreviewWidget(QWidget):
         if self._pixmap is None or self._pixmap.isNull():
             self._image_label.setText("No preview available")
             return
+        drawn = self._pixmap
+        if self._zoom > 1.0:
+            # Crop out of the source and scale that up, rather than scaling the
+            # whole picture up and cropping the result: the source is usually
+            # bigger than the pane, so the pixels the push moves into are real
+            # ones rather than interpolated ones.
+            drawn = drawn.copy(
+                QRect(*crop_box(drawn.width(), drawn.height(), self._zoom)))
         self._image_label.setPixmap(
-            self._pixmap.scaled(
+            drawn.scaled(
                 self._image_label.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,

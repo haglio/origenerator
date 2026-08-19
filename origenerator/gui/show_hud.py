@@ -1,4 +1,4 @@
-"""The satellite lock HUD, worn by a hosted region show — the players' own.
+"""The satellite lock HUD, worn by every fullscreen show — the players' own.
 
 A show covering a satellite region covers that player's HUD, and what replaced
 it used to be a small strip of Qt buttons that only gestured at the real thing.
@@ -7,6 +7,14 @@ their video, rendered by the same shared code (``player_core.satellite_hud`` /
 ``_paint``), so a show's HUD and a player's HUD cannot drift apart — the mode
 row with minimize riding it, the status line, the transport controls, and the
 nav map.
+
+Standalone Origenerator wears it too, over its own fullscreen show.  Nothing
+about a show is different for not being inside a session: it is the same set,
+played the same way, out of the same window, and this is the one panel this
+family of apps has for saying so.  What a standalone show has no counterpart
+for is the pair of things that address a SESSION, and each is answered rather
+than faked — see :func:`show_hud_model` for the mode row and
+:meth:`ShowHud._act_here` for the transport.
 
 The map speaks the players' vocabulary because the show's set IS those
 concepts: the set's first item anchors the corner, the rest run right as the
@@ -17,9 +25,9 @@ click jumps the show to that item, the way a map click switches a player.
 
 Presses that mean something to the session — the mode pair, this side's
 prev/next/lock/trash — post onto the dashboard command file, the channel the
-players' HUDs and the global hotkeys share.  Presses whose concepts a show
-does not have (F-mode, minimize, the loops) are drawn for sameness but
-swallowed here, so they can never reach the blacked player underneath.
+players' HUDs and the global hotkeys share.  Presses whose concepts a hosted
+show does not have (F-mode, minimize, the loops) are drawn for sameness but
+swallowed there, so they can never reach the blacked player underneath.
 """
 
 from __future__ import annotations
@@ -47,9 +55,15 @@ from player_core.satellite_hud_paint import HudRenderer
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
 
-def show_hud_model(side: str, host) -> HudModel | None:
+def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
-    with nothing to map (``hud_items`` empty or unanswered)."""
+    with nothing to map (``hud_items`` empty or unanswered).
+
+    *hosted* is whether a Fun Time session is behind the show, and the only
+    thing it governs is the mode row.  Defaulted to the hosted answer because
+    that is what every reading of a region's model wants; :class:`ShowHud`
+    passes its own.
+    """
     if not hasattr(host, "hud_items"):
         return None
     cells, position, locked = host.hud_items()
@@ -92,7 +106,13 @@ def show_hud_model(side: str, host) -> HudModel | None:
         # meaning the same thing on both, "stop looping this row".  Dark in the
         # base state, where nothing is being looped.
         active_loop="seed" if looping else "",
-        satellites_mode="origenerator",  # a show exists only in this mode
+        # Hosted, a show exists only in this mode, and the pair is the way back
+        # to the player under it.  Standalone there is no player under it and no
+        # session to tell, so the row is not drawn at all — the same "" a
+        # session with no hosted Origenerator publishes.  Drawing a dead pair
+        # would be the one place on this panel where a lit button is a picture
+        # of a button.
+        satellites_mode="origenerator" if hosted else "",
     )
 
 
@@ -103,6 +123,8 @@ class ShowHud(QLabel):
         super().__init__(host)
         self._host = host
         self._side = side
+        # The session's command channel, or ``None`` standalone — which is also
+        # how this HUD knows which of the two it is on (see :meth:`_deliver`).
         self._dashboard_cmd_file = dashboard_cmd_file
         self._renderer = HudRenderer(side)
         self._clicks = HudClicks(side)
@@ -130,7 +152,8 @@ class ShowHud(QLabel):
     # --- model in, pixels out ---------------------------------------------
 
     def _tick(self) -> None:
-        model = show_hud_model(self._side, self._host)
+        model = show_hud_model(self._side, self._host,
+                               hosted=self._dashboard_cmd_file is not None)
         if model != self._model:
             self._model = model
             self._draw()
@@ -192,7 +215,9 @@ class ShowHud(QLabel):
 
     def _deliver(self, command: str) -> None:
         """Route one HUD press: map clicks act on the show itself, session
-        commands go out on the dashboard channel, and the rest are swallowed.
+        commands go out on the dashboard channel — or, with no session behind
+        this show, onto the show as well (:meth:`_act_here`) — and the rest are
+        swallowed.
         """
         verb, _, path = command.partition("|")
         if verb == f"{self._side}_play_video":
@@ -225,16 +250,52 @@ class ShowHud(QLabel):
             self._host.stroke_reset()
             self._tick()
             return
+        if self._dashboard_cmd_file is None:
+            self._act_here(verb)
+            return
         allowed = (
             "players_activate", "origenerator_activate",
             f"{self._side}_prev", f"{self._side}_next",
             f"{self._side}_lock", f"{self._side}_trash",
         )
-        if command in allowed and self._dashboard_cmd_file is not None:
+        if command in allowed:
             append_command(self._dashboard_cmd_file, command)
         # Anything else (minimize, the loops, F-mode on a show without one) is
-        # a player concept this show has no counterpart for: drawn for
-        # sameness, swallowed here.
+        # a player concept a hosted show has no counterpart for: drawn for
+        # sameness, swallowed here so it can never reach the player underneath.
+
+    def _act_here(self, verb: str) -> None:
+        """A press with no session behind it: the show answers it itself.
+
+        Standalone there is no dashboard channel and no player under the show,
+        so the transport cannot take the round trip a hosted press takes — out
+        onto the session's command file, through its dispatch, and back onto
+        this very show.  It lands on the show directly instead, through the same
+        four methods that round trip ends at and that the arrow keys and genau's
+        console already use, so the button does the one thing it is labeled for
+        either way.
+
+        Minimize is the press that means MORE standalone than hosted rather than
+        less: hosted it would hit the blacked player under the show, so it is
+        swallowed there; standalone the show IS the window and the button parks
+        it, exactly as it parks a satellite's.
+        """
+        step = {f"{self._side}_prev": -1, f"{self._side}_next": 1}.get(verb)
+        if step is not None:
+            self._host.stroke_step(step)
+        elif verb == f"{self._side}_lock":
+            self._host.stroke_toggle_hold()
+        elif verb == f"{self._side}_trash":
+            self._host.stroke_cull()
+        elif verb == f"{self._side}_minimize":
+            self._host.window().showMinimized()
+            return  # nothing on the panel changed, and it is off screen anyway
+        else:
+            # Everything a hosted press has no counterpart for either — the
+            # expand button's "more seeds", a mode press this panel does not
+            # even draw — swallowed here as it is swallowed there.
+            return
+        self._tick()  # the readout answers the press without waiting for the beat
 
     def _jump(self, path: str, *, hold: bool) -> None:
         if hasattr(self._host, "show_item"):

@@ -10,6 +10,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
+from pytest import approx
 from PyQt6.QtCore import Qt, QEvent, QSize, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication
@@ -17,6 +18,8 @@ from PyQt6.QtWidgets import QApplication
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
+from origenerator.ken_burns import TICK_MS, ZOOM_SPAN
 from origenerator.slideshow import in_order
 from origenerator.stroke_engine import Stroke
 
@@ -390,15 +393,17 @@ def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
     assert view._note.isHidden()
 
 
-def test_the_enhancing_note_sits_above_the_counter_not_over_the_console(qtbot):
-    # genau's console holds the top-left corner of this view too.
+def test_the_enhancing_note_is_a_toast_across_the_top(qtbot):
+    # Where Fun Time flashes the same kind of line over a player, and in the
+    # same shape: this surface wears the players' own HUD, so what it says for
+    # itself is said in the players' own toast rather than in a second dialect
+    # at the far end of the screen.
     view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
     view.resize(800, 600)
     _press(view, Qt.Key.Key_Down)
 
-    note, counter = view._note.geometry(), view._counter.geometry()
-    assert note.top() > view.height() // 2      # bottom half, clear of the console
-    assert note.bottom() <= counter.top()       # stacked with it, not over it
+    note = view._note.geometry()
+    assert note.top() == TOAST_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
 # --- locking also stars, and a double-click leaves ---------------------------
 
@@ -542,6 +547,115 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
     view = _view(qtbot, start=2)
     assert view._playlist.current() == ("c.png", "image")
     assert view._counter.text().startswith("3 / 3")
+
+
+# --- the slow push into the still on screen ----------------------------------
+
+def _push_for(view, ms):
+    """Tick the push as if *ms* of the slide's dwell had gone by."""
+    for _ in range(ms // TICK_MS):
+        view._zoom_tick()
+
+
+def test_a_dwelling_slide_creeps_into_the_picture(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    assert view._zoom_timer.isActive()
+    assert view._preview._zoom == 1.0        # it opens on the whole picture
+
+    _push_for(view, 4000)
+
+    assert view._preview._zoom == approx(ZOOM_SPAN)
+
+
+def test_a_longer_pace_creeps_more_slowly_rather_than_further(qtbot):
+    # The whole of what a longer dwell changes: the same ground, a third of the
+    # speed.  Covering three times the ground instead would end on a crop.
+    slow = _view(qtbot, image_dwell_ms=12000)
+
+    _push_for(slow, 4000)
+    assert slow._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 3)
+
+    _push_for(slow, 8000)
+    assert slow._preview._zoom == approx(ZOOM_SPAN)
+
+
+def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
+    # The pace is app-wide and moves under a running show, so the creep reads it
+    # every tick: turned up mid-slide it slows from that moment, rather than
+    # recomputing the whole move and jumping the picture back out.
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 2000)
+    halfway = view._preview._zoom
+
+    view._playlist.image_dwell_ms = 8000  # the number set_dwell_s hands down
+    _push_for(view, 2000)
+
+    assert view._preview._zoom == approx(halfway + (ZOOM_SPAN - 1) / 4)
+
+
+def test_a_pace_of_nought_holds_the_whole_picture(qtbot):
+    # Nought holds one picture until an arrow moves it, and a picture being held
+    # is not a shot being made.
+    view = _view(qtbot, image_dwell_ms=0)
+    assert not view._zoom_timer.isActive()
+
+    _push_for(view, 10_000)
+
+    assert view._preview._zoom == 1.0
+
+
+def test_a_clip_is_its_own_motion(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Right)          # -> the video
+    assert not view._zoom_timer.isActive()
+
+
+def test_holding_a_slide_stops_the_push_where_it_got_to(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _push_for(view, 1000)
+    reached = view._preview._zoom
+
+    _press(view, Qt.Key.Key_Down)           # hold it
+
+    assert not view._zoom_timer.isActive()
+    assert view._preview._zoom == reached
+
+
+def test_a_released_request_carries_the_push_on_from_there(qtbot):
+    # Not back out to the whole picture: the slide never left the screen, so
+    # neither should the move that was running over it.
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 1000)
+    reached = view._preview._zoom
+
+    view.hold_for_request(True, "🎤 listening…")
+    assert not view._zoom_timer.isActive()
+
+    view.hold_for_request(False)
+    assert view._zoom_timer.isActive()
+    assert view._preview._zoom == reached
+
+
+def test_the_rooms_freeze_stops_the_push_too(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+
+    view.set_session_paused(True)
+    assert not view._zoom_timer.isActive()
+
+    view.set_session_paused(False)
+    assert view._zoom_timer.isActive()
+
+
+def test_each_slide_opens_on_the_whole_picture(qtbot):
+    view = _view(qtbot, image_dwell_ms=4000)
+    _push_for(view, 2000)
+    assert view._preview._zoom > 1.0
+
+    _press(view, Qt.Key.Key_Right)          # -> the video
+    _press(view, Qt.Key.Key_Right)          # -> the next picture
+
+    assert view._preview._zoom == 1.0
+    assert view._zoom_timer.isActive()
 
 
 # --- re-seeding the set after it opened -------------------------------------

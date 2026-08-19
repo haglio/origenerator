@@ -653,3 +653,75 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch)
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
 
     assert _FakeDrag.last is None
+
+
+# --- the show's slow push into the still -------------------------------------
+
+def _big_png(path):
+    """Big enough that a crop of it still has pixels to spare when scaled up."""
+    Image.new("RGB", (400, 300), (10, 120, 200)).save(path, "PNG")
+    return path
+
+
+def _bordered_png(path):
+    """Blue inside a fat red border, so the crop shows in a corner pixel: the
+    border is the first thing a push into the middle throws away."""
+    image = Image.new("RGB", (400, 300), (200, 0, 0))
+    image.paste(Image.new("RGB", (320, 220), (0, 0, 200)), (40, 40))
+    image.save(path, "PNG")
+    return path
+
+
+def test_the_zoom_draws_the_middle_of_the_picture(make_preview, tmp_path):
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_bordered_png(tmp_path / "p.png"))
+    assert w._image_label.pixmap().toImage().pixelColor(0, 0).red() > 100
+
+    w.set_zoom(1.5)  # far enough in to be past the border on every side
+
+    corner = w._image_label.pixmap().toImage().pixelColor(0, 0)
+    assert corner.blue() > 100 and corner.red() < 100
+
+
+def test_the_zoom_leaves_the_drawn_rect_where_it_was(make_preview, tmp_path):
+    # The one thing the crop exists for: the neighbor stills and the HUD map are
+    # placed against this rect, so a push that grew the drawn picture would shove
+    # them around twenty times a second.
+    w = make_preview()
+    w.resize(200, 150)
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    before = w.media_rect()
+
+    for step in range(1, 11):
+        w.set_zoom(1.0 + 0.10 * step / 10)
+        rect = w.media_rect()
+        # Within a pixel: the crop is rounded to whole source pixels.
+        assert abs(rect.width() - before.width()) <= 1
+        assert abs(rect.height() - before.height()) <= 1
+        assert abs(rect.center().x() - before.center().x()) <= 1
+        assert abs(rect.center().y() - before.center().y()) <= 1
+
+
+def test_a_new_picture_is_drawn_at_whatever_zoom_it_was_told(make_preview, tmp_path):
+    # The show resets the zoom itself when it puts a new slide up; a version of
+    # the SAME picture swapped in under it keeps the push it was part-way through.
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    w.set_zoom(1.08)
+
+    w.show_image(_big_png(tmp_path / "q.png"))
+
+    assert w._zoom == 1.08
+
+
+def test_the_zoom_never_backs_out_past_the_whole_picture(make_preview, tmp_path):
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+
+    w.set_zoom(0.5)
+
+    assert w._zoom == 1.0

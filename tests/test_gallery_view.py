@@ -4873,6 +4873,82 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view._slideshow.close()
 
 
+def _standalone_show(qtbot, monkeypatch):
+    """A fullscreen show of two pictures, opened with no session behind it."""
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+    return view._slideshow
+
+
+def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
+    # Nothing about a show is different for not being inside a session: it is
+    # the same set played the same way, so it wears the same panel a region
+    # show wears — and the view's own furnishings come off, because the map
+    # says all of it.
+    from origenerator.gui.show_hud import ShowHud
+
+    show = _standalone_show(qtbot, monkeypatch)
+
+    hud, = show.findChildren(ShowHud)
+    assert hud._targets is not None
+    assert {"prev", "next", "lock", "trash"} <= {n for _rect, n in hud._targets.control}
+    assert show._counter.isHidden()
+    show.close()
+
+
+def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
+    # The mode pair hands a region back to the player under it.  There is no
+    # player under a standalone show and no session to tell, so the row is not
+    # drawn rather than drawn dead.
+    from origenerator.gui.show_hud import ShowHud
+
+    show = _standalone_show(qtbot, monkeypatch)
+
+    hud, = show.findChildren(ShowHud)
+    assert hud._targets.modes == []
+    assert hud._model.satellites_mode == ""
+    show.close()
+
+
+def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch):
+    # Hosted, prev/next/lock/trash go out on the session's command file and come
+    # back through its dispatch onto this very show.  With no file to post on,
+    # the press reaches the show directly instead of being swallowed.
+    from origenerator.gui.show_hud import ShowHud
+
+    show = _standalone_show(qtbot, monkeypatch)
+    hud, = show.findChildren(ShowHud)
+    side = hud._side
+    opened = show._playlist.current()
+
+    hud._deliver(f"{side}_next")
+    assert show._playlist.current() != opened
+
+    hud._deliver(f"{side}_lock")
+    assert show.locked is True
+    show.close()
+
+
+def test_a_player_core_without_the_shared_hud_still_opens_the_show(qtbot, monkeypatch):
+    # The panel lives in the newest player_core; a plain launch walks up to the
+    # primary checkout, which grows it only when it lands.  Without it the show
+    # is the show it used to be — its own stills and plate — rather than no show.
+    from origenerator.gui.show_hud import ShowHud
+
+    monkeypatch.setattr(gallery_view_module, "_shared_hud_widget", lambda: None)
+    show = _standalone_show(qtbot, monkeypatch)
+
+    assert show.isVisible()
+    assert show.findChildren(ShowHud) == []
+    assert not show._counter.isHidden()   # its own furnishings stayed on
+    show.close()
+
+
 def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
     # A video generation saturates the card the show is being drawn with, and a
     # show is exactly the stretch when nobody is waiting on a video.

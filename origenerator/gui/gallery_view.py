@@ -107,6 +107,32 @@ from shared_ui.colors import BORDER_SUBTLE
 
 logger = logging.getLogger(__name__)
 
+
+def _shared_hud_widget():
+    """The players' HUD widget, or ``None`` where player_core has not got one.
+
+    Reached for here rather than imported at module top, and reached for at all
+    rather than assumed, for the same reason: the panel lives in the newest
+    player_core, while this app's other reaches into that sibling (genau's
+    console, the stroke) resolve against an older checkout perfectly well.  A
+    session names the checkout it wants on PYTHONPATH; a plain launch walks up
+    to the primary one, and that one only grows the panel when it lands.
+
+    So a checkout without it starts, browses and generates exactly as before,
+    and a show opened on it is the show that used to be: its own neighbor
+    stills and position plate, no map.  Losing the panel is a bad afternoon;
+    losing the fullscreen view over the panel would be a dead app.
+    """
+    try:
+        from origenerator.gui.show_hud import ShowHud
+    except ImportError:
+        logger.warning(
+            "This player_core carries no shared HUD, so shows wear none",
+            exc_info=True)
+        return None
+    return ShowHud
+
+
 _POLL_INTERVAL_MS = 1500
 _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 # How long the search waits after the last keystroke before asking the local LLM
@@ -1223,9 +1249,16 @@ class GalleryView(QWidget):
             items, index = [], 0
         elif not items:  # the shown item isn't in the folder listing: play it alone
             items, index = [(media[0], media[1], None, None)], 0
+        # Neither shuffled nor newest-first, and not a loop: this is one folder
+        # in the browser's own order, held on one picture.  Said plainly rather
+        # than left at the defaults, because the HUD reads them now — an order
+        # slot saying "Shuffle" over a folder listed in its own order would be
+        # the panel making something up.
         return self._open_slideshow(items, start=index, frame=frame,
                                     image_dwell_ms=0, shuffle=in_order,
-                                    folder_items=self._folder_media())
+                                    folder_items=self._folder_media(),
+                                    order_label="", looping=False,
+                                    starred_ids=self._starred_prompt_ids())
 
     def _open_slideshow(self, items, *, folder_items=None, location=None,
                         side=None, **kwargs):
@@ -3742,9 +3775,13 @@ class GalleryView(QWidget):
         A region show is frameless (the region IS the window, like every
         managed player) and topmost, since the satellite player it covers is
         topmost itself; Fun Time restacks the band as its modes change.
+
+        Either way it ends up wearing the players' HUD (:meth:`_wear_the_hud`):
+        the panel is about the show, and a show is a show wherever it is.
         """
         if self._fun_time is None:
             view.showFullScreen()
+            self._wear_the_hud(view, side)
             return
         occupant = self._region_shows.get(side)
         if occupant is not None and occupant.isVisible():
@@ -3776,21 +3813,30 @@ class GalleryView(QWidget):
         # first frame — not from whenever the flag next changes.
         if self._session_paused and hasattr(view, "set_session_paused"):
             view.set_session_paused(True)
-        # The show covers the satellite player's HUD, so it wears the players'
-        # own HUD itself — the same panel, rendered by the same shared code:
-        # the mode pair (the way back to player mode), this side's transport,
-        # and the nav map speaking the set as a seed family.  Its session
-        # commands post on the session's own channel; the map clicks jump the
-        # show.  The view's own furnishings come off — the map says all of it.
-        if hasattr(view, "adopt_session_hud"):
-            view.adopt_session_hud()
-        # Imported here, not at module top: the shared HUD lives in
-        # player_core, and a standalone launch against an older player_core
-        # checkout must still come up — only a hosted session (whose launcher
-        # names a player_core that has it) reaches this line.
-        from origenerator.gui.show_hud import ShowHud
-        ShowHud(view, side=side,
-                dashboard_cmd_file=self._fun_time.dashboard_cmd_file)
+        self._wear_the_hud(view, side)
+
+    def _wear_the_hud(self, view, side: str) -> None:
+        """Put the players' own HUD on *view* — the same panel, rendered by the
+        same shared code: the status line, this side's transport, and the nav
+        map speaking the set as a seed family.  The view's own furnishings come
+        off with it, because the map says all of it.
+
+        Hosted, the show covers a satellite player's HUD and has to BE that
+        HUD: its session commands go out on the session's channel and the mode
+        pair leads the panel.  Standalone the panel is the same panel minus
+        those two — no channel to post on, so the transport lands on the show
+        itself, and no session to switch modes on, so no mode row.
+
+        A player_core with no shared HUD in it leaves the show as it was, with
+        its own stills and plate still on — see :func:`_shared_hud_widget`.
+        """
+        hud = _shared_hud_widget()
+        if hud is None or not hasattr(view, "adopt_hud"):
+            return
+        view.adopt_hud()
+        hud(view, side=side,
+            dashboard_cmd_file=(None if self._fun_time is None
+                                else self._fun_time.dashboard_cmd_file))
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and

@@ -1271,6 +1271,39 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     assert not lora.child(1).text(0).startswith("★")
 
 
+def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
+    # A folder with sub-folders wears no star of its own (the row's actions are a
+    # leaf's), so its right-click menu is the only way to star it — and the menu
+    # covers the tree, so a right-click that shut the folder on the way in is only
+    # seen once the menu closes, and reads as something the star did.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.resize(600, 600)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+
+    tree = view._tree
+    _top_level(tree)["All"].setExpanded(True)
+    images = _media_roots(tree)["Images"]
+    images.setExpanded(True)
+    key = _key(images)
+    row = tree.visualRect(tree.indexFromItem(images))
+    caret = QPoint(row.left() - tree.indentation() // 2, row.center().y())
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton, pos=caret)
+    monkeypatch.setattr(
+        "origenerator.gui.gallery_view.QMenu.exec",
+        lambda menu, *a: next(act for act in menu.actions() if act.text() == "Star"),
+    )
+    view._on_tree_context_menu(caret)
+
+    assert db.folder_meta_map()[key]["starred"] is True
+    assert _media_roots(view._tree)["Images"].isExpanded()
+
+
 def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)

@@ -88,12 +88,21 @@ def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
     worktrees_root = Path(worktrees_root)
     if not worktrees_root.is_dir():
         return 0
-    primary_by_file = _rows_by_rel_path(db.list_generations())
+    primary_rows = db.list_generations()
+    primary_by_file = _rows_by_rel_path(primary_rows)
+    # Nearly every row a worktree database holds is one of *these* -- it was
+    # seeded from this database, so its whole library came across. Recognizing
+    # them here, against rows already in hand, is what keeps the pass flat:
+    # asking the database about each one instead cost a query per seeded row per
+    # worktree, and with a worktree open per branch in flight that was ten
+    # thousand round trips and twelve seconds of every launch, growing with both
+    # the library and the number of branches.
+    known = {row["prompt_id"] for row in primary_rows}
     adopted = 0
     for branch_db in sorted(worktrees_root.glob("*/state/origenerator.db")):
         requests = _request_records(branch_db)
         for row in _completed_rows(branch_db):
-            if db.get_generation(row["prompt_id"]) is not None:
+            if row["prompt_id"] in known:
                 continue  # already adopted (or a row the branch merely seeded)
             rel_paths = _rel_paths(row)
             claimed = [primary_by_file[p] for p in rel_paths if p in primary_by_file]
@@ -121,6 +130,7 @@ def adopt_branch_rows(db, worktrees_root: Path, output_dir: Path,
                 db.record_request(**record)
             for path in rel_paths:
                 primary_by_file[path] = row
+            known.add(row["prompt_id"])  # two worktrees can carry the same row
             adopted += 1
     return adopted
 

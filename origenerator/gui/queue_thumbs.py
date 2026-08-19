@@ -5,9 +5,12 @@ only be recognized by a picture of something *else*. Two somethings, and which
 one a row gets is decided by what the job is:
 
 * **What it is made from** — an image-to-video's start frame, an enhancement's
-  original. One cell, the picture itself. Two queued videos off the same recipe
-  are the same job in every respect but the frame they animate, so this is the
-  whole of what tells them apart.
+  original. Two queued videos off the same recipe are the same job in every
+  respect but the frame they animate, so this is the whole of what tells them
+  apart. A combine given a dropped video adds a second cell beside it: that
+  video, in gray (:mod:`origenerator.gui.grayscale`). Gray because it is not
+  what is being made — drawn in full color, and worse drawn alone, the row reads
+  as a job that *is* that clip.
 * **What its folder already holds** — for everything else, up to four of the
   folder's own thumbnails. It says nothing about this run in particular; it says
   which shelf of the gallery the run is headed for, which is what a picture-less
@@ -19,21 +22,25 @@ every line whether the block holds one picture or four. Laid out across rather
 than as a 2×2: stacked, the cells are half the row's height each, which is small
 enough that four of them read as one smudge.
 
-Cover-cropped to square cells rather than fitted into them: at this size a
-letterboxed thumbnail is mostly letterbox, and the middle of a frame is where the
-subject is. A folder view draws its unfilled cells as faint slots, so a folder
-holding one item reads as a folder with room in it rather than as a picture that
-failed to load; a start frame leaves the rest of the block empty, having nothing
-to say about how many pictures there might have been.
+Fitted whole into its square cell rather than cover-cropped to fill it: a crop
+takes the edges off, and a picture whose subject is not dead center comes out as
+a picture of something else. Fitted, every cell shows the whole frame and the
+proportions it was made in, with the rest of the square left clear. A folder view
+draws its unfilled cells as faint slots, so a folder holding one item reads as a
+folder with room in it rather than as a picture that failed to load; a start
+frame leaves the rest of the block empty, having nothing to say about how many
+pictures there might have been.
 
-Every scaled cell is cached by (file, size) for the life of the session — the
-strip re-renders on every poll, and a start frame is a full-size render off disk.
+Every scaled cell is cached by (file, size, gray) for the life of the session —
+the strip re-renders on every poll, and a start frame is a full-size render off
+disk.
 """
 
 from PyQt6.QtWidgets import QLabel
 from PyQt6.QtGui import QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt
 
+from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -54,39 +61,54 @@ def block_width(cell: int) -> int:
     return FOLDER_CELLS * cell + (FOLDER_CELLS - 1) * _GAP
 
 
-# (file, side) -> the cell-sized pixmap, or None for a file that wouldn't load.
-# Unbounded on purpose: an entry is a few kilobytes, and the set of files in
+# (file, side, gray) -> the cell-sized pixmap, or None for a file that wouldn't
+# load. Unbounded on purpose: an entry is a few kilobytes, and the set of files in
 # flight over one session is small — where the cost being avoided is decoding a
 # multi-megabyte render on the UI thread every poll.
-_CELLS: dict[tuple[str, int], QPixmap | None] = {}
+_CELLS: dict[tuple[str, int, bool], QPixmap | None] = {}
 
 
-def _cell(path, side: int) -> QPixmap | None:
+def _cell(path, side: int, gray: bool = False) -> QPixmap | None:
     """``path`` cropped to a ``side``x``side`` square, or ``None`` if unreadable.
 
     A missing or unreadable file is an ordinary case here, not an error: a start
     frame can be a library file that has since moved, and a thumbnail can be
     mid-write. The caller draws an empty slot for it.
+
+    ``gray`` drains the color out for a picture shown only for what it configures;
+    it is part of the cache key, so one file can be held both ways at once.
     """
     if not path:
         return None
-    key = (str(path), side)
+    key = (str(path), side, gray)
     if key not in _CELLS:
-        _CELLS[key] = _crop_to_square(QPixmap(str(path)), side)
+        fitted = _fit_in_square(QPixmap(str(path)), side)
+        _CELLS[key] = (grayscale_pixmap(fitted)
+                       if gray and fitted is not None else fitted)
     return _CELLS[key]
 
 
-def _crop_to_square(pixmap: QPixmap, side: int) -> QPixmap | None:
-    """Fill a ``side``x``side`` square with the middle of ``pixmap``."""
+def _fit_in_square(pixmap: QPixmap, side: int) -> QPixmap | None:
+    """``pixmap`` scaled to fit whole inside a ``side``x``side`` square, centered,
+    the rest of the square left clear — letterboxed, or pillarboxed for a tall one.
+
+    The square itself is always the full ``side``, whatever shape went in, so the
+    cells stay a grid however mixed the pictures in it are.
+    """
     if pixmap.isNull():
         return None
     scaled = pixmap.scaled(
         side, side,
-        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+        Qt.AspectRatioMode.KeepAspectRatio,
         Qt.TransformationMode.SmoothTransformation,
     )
-    return scaled.copy((scaled.width() - side) // 2, (scaled.height() - side) // 2,
-                       side, side)
+    cell = QPixmap(side, side)
+    cell.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(cell)
+    painter.drawPixmap((side - scaled.width()) // 2, (side - scaled.height()) // 2,
+                       scaled)
+    painter.end()
+    return cell
 
 
 def _slot_color() -> QColor:
@@ -103,19 +125,28 @@ def _canvas(cell: int) -> QPixmap:
     return canvas
 
 
-def source_pixmap(path, cell: int) -> QPixmap | None:
-    """A block holding one picture — the file a job is being made from.
+def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
+    """A block holding what a job is being made from: the file at ``path``, and —
+    for a combine's run — the ``recipe`` video whose settings it follows, in gray.
 
-    ``None`` when the file won't load, so the caller can fall back rather than
-    show an empty block. The cells beside it stay empty rather than becoming
-    slots: this is not a folder and there is no second picture missing from it.
+    ``None`` only when neither file loads, so the caller can fall back rather than
+    show an empty block; either alone still draws, each in its own cell, so the
+    two read as one column down the line however few a row has. The cells past
+    them stay empty rather than becoming slots: this is not a folder and there is
+    no third picture missing from it.
+
+    The recipe is drained of color because it is not what is being made. Beside
+    the frame in full color it reads as a second subject, and the row of a job
+    whose frame hasn't rendered yet would read as a job that *is* that clip.
     """
-    picture = _cell(path, cell)
-    if picture is None:
+    parts = (_cell(path, cell), _cell(recipe, cell, gray=True))
+    if all(part is None for part in parts):
         return None
     canvas = _canvas(cell)
     painter = QPainter(canvas)
-    painter.drawPixmap(0, 0, picture)
+    for index, part in enumerate(parts):
+        if part is not None:
+            painter.drawPixmap(index * (cell + _GAP), 0, part)
     painter.end()
     return canvas
 
@@ -162,28 +193,30 @@ class QueueThumbs(QLabel):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.hide()  # nothing to show yet, and an empty block would claim there was
 
-    def show_source(self, image_ref) -> bool:
+    def show_source(self, image_ref, recipe=None) -> bool:
         """Draw what ``image_ref`` names — a job's start frame, as its
         ``LoadImage`` reference rather than a path, which is the form every run
-        records it in.
+        records it in — and beside it the ``recipe`` video's thumbnail, in gray.
 
-        ``False`` when there is nothing to draw: no reference, or a file that has
-        moved or hasn't been rendered yet (a video queued behind the image it
-        animates is exactly that). The caller falls back to the folder view rather
-        than leave a blank block standing where a picture was promised.
+        ``False`` only when neither has anything to draw: no reference and no
+        recipe, or files that have moved or haven't been rendered yet (a video
+        queued behind the image it animates is exactly that). The caller falls
+        back to the folder view rather than leave a blank block standing where a
+        picture was promised — but a frame that hasn't landed no longer costs the
+        row its recipe cell, which is about this run either way.
 
-        Resolved on every call rather than remembered: the answer changes the
-        moment the frame lands, and it is one stat.
+        The frame is resolved on every call rather than remembered: the answer
+        changes the moment it lands, and it is one stat.
         """
         path = resolve_input_image_path(image_ref) if image_ref else None
-        if path is None:
-            return False
-        if self._showing == ("source", str(path)):
+        showing = ("source", str(path) if path else None,
+                   str(recipe) if recipe else None)
+        if self._showing == showing:
             return True
-        pixmap = source_pixmap(path, self._cell)
+        pixmap = source_pixmap(path, self._cell, recipe)
         if pixmap is None:
             return False
-        self._showing = ("source", str(path))
+        self._showing = showing
         self.setPixmap(pixmap)
         self.show()
         return True

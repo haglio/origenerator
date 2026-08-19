@@ -138,6 +138,12 @@ class GenerateConfigPanel(QWidget):
         # preview as no longer showing what a Generate would make; None whenever
         # there's no saved generation on display to be modified away from.
         self._displayed_config: ConfigSnapshot | None = None
+        # Where this tab's settings came from, when the Combine panel opened them
+        # here: the act picked in its dropdown and the video whose recipe they
+        # are, as (category, video_prompt_id). Carried so a run launched from this
+        # tab — the combination as opened, or edited first — says in the queue what
+        # it was asked for. Nothing else on the form remembers either.
+        self._recipe_source: tuple[str, str | None] = ("", None)
         # Re-reads (shortly) whether Generate would reproduce a past run — see
         # refresh_generate_caption for why the answer isn't taken on the spot.
         self._caption_timer = QTimer(self)
@@ -367,6 +373,11 @@ class GenerateConfigPanel(QWidget):
         return self._client is not None and self._workflow_combo.currentData() is not None
 
     def _on_workflow_changed(self):
+        # A different workflow is a different recipe: whatever Combine opened
+        # here no longer describes what this tab would run, so its mark goes
+        # rather than riding onto an unrelated launch. Set again after a prefill,
+        # which is what re-picks the workflow in the first place.
+        self._recipe_source = ("", None)
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
@@ -532,6 +543,27 @@ class GenerateConfigPanel(QWidget):
             )
             return
         self.generate_requested.emit(key, params)
+
+    def set_recipe_source(self, category: str, video_prompt_id: str | None) -> None:
+        """Remember that these settings came out of Combine — the act off its
+        dropdown, and the video whose recipe they are.
+
+        Set after the settings are in (:meth:`prefill` re-picks the workflow,
+        which clears this), so what the tab launches carries the mark whether it
+        is run as opened or edited first.
+        """
+        self._recipe_source = (category or "", video_prompt_id or None)
+
+    def recipe_source(self) -> tuple[str, str | None]:
+        """``(category, video_prompt_id)`` for a tab Combine opened, else
+        ``("", None)`` — what a launch from here stamps on its row."""
+        return self._recipe_source
+
+    def show_combination(self, image_path, video_path) -> None:
+        """Put the combination this tab was opened with in the preview: the frame,
+        a plus, and the gray clip whose settings came with it. Nothing has been
+        made from the pair yet, so there is no result for the pane to show."""
+        self._preview.show_combination(image_path, video_path)
 
     def launched_runs(self) -> list[str]:
         """The runs this tab's Generate started, oldest first.
@@ -735,8 +767,11 @@ class GenerateConfigPanel(QWidget):
         Pointing the tab at someone else's generation ends its claim on the runs
         it launched: the bar would otherwise sit mid-run over a picture that has
         nothing to do with it, and its Cancel would stop something off screen.
+        The same goes for a combination Combine opened here — the tab is about
+        this row now, and a launch from it is not the combination's.
         """
         self.forget_launched()
+        self._recipe_source = ("", None)
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))

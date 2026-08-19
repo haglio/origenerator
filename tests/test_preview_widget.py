@@ -613,6 +613,7 @@ def test_set_draggable_id_arms_the_drag(make_preview, tmp_path):
     lambda w: w.show_frame(_png_bytes()),      # a live in-progress frame
     lambda w: w.show_message("Waiting…"),      # a transient note
     lambda w: w.clear(),                        # back to the placeholder
+    lambda w: w.show_combination(None, None),   # a pair with nothing made from it yet
 ])
 def test_a_transient_view_disarms_the_drag(make_preview, transient):
     w = make_preview()
@@ -783,6 +784,7 @@ def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
     lambda w, tmp: w.show_frame(_png_bytes()),
     lambda w, tmp: w.show_message("Waiting for preview…"),
     lambda w, tmp: w.clear(),
+    lambda w, tmp: w.show_combination(_make_png(tmp / "c.png"), None),
 ])
 def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
     # A notice is about the picture it was set over, so it can never outlive it —
@@ -811,3 +813,55 @@ def test_resizing_re_places_the_notice(make_preview, tmp_path):
 
     assert w._notice_dim.geometry() == w._media_host.rect()
 
+
+
+# --- a combination, before anything has been made from it --------------------
+
+def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, tmp_path):
+    # "Open in generator" hands a tab a picture and a past video's settings. The
+    # idle line ("select a generation to preview") describes a tab pointed at
+    # nothing, which is exactly what this is not.
+    w = make_preview()
+    frame = _make_png(tmp_path / "frame.png")
+    clip = _animated_webp(tmp_path / "recipe.webp")
+
+    w.show_combination(frame, clip)
+
+    assert w._stack.currentWidget() is w._combination
+    assert not w._combination.image_label.pixmap().isNull()
+    assert not w._combination.plus_label.isHidden()
+
+
+def test_the_recipe_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
+    w = make_preview()
+    w.show(); w.resize(400, 200)
+
+    w.show_combination(_make_png(tmp_path / "frame.png"),
+                       _animated_webp(tmp_path / "recipe.webp"))
+
+    color = w._combination.video_label.pixmap().toImage().pixelColor(1, 1)
+    assert color.red() == color.green() == color.blue()  # the recipe, not a result
+
+
+def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, tmp_path):
+    # A curated act is pinned in the content overlay: there is no past video
+    # behind it, so there is no sum to draw a plus in the middle of.
+    w = make_preview()
+
+    w.show_combination(_make_png(tmp_path / "frame.png"), None)
+
+    assert w._stack.currentWidget() is w._combination
+    assert w._combination.plus_label.isHidden()
+    assert w._combination.video_label.isHidden()
+
+
+def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
+    # Its clip would otherwise keep looping behind whatever replaced it.
+    w = make_preview()
+    w.show_combination(_make_png(tmp_path / "frame.png"),
+                       _animated_webp(tmp_path / "recipe.webp"))
+
+    w.show_image(_make_png(tmp_path / "later.png"))
+
+    assert w._stack.currentWidget() is w._image_label
+    assert w._combination._movie is None

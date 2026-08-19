@@ -6,6 +6,10 @@ image, the video slot a rebuildable i2v video), previews the dropped item — a 
 loops its clip, an image shows its still — and wears a corner badge of its own kind
 so it's clear which item belongs where. It knows only prompt_ids; the view supplies
 the predicate and the preview, so the slot stays free of database knowledge.
+
+A slot whose item is held only for its settings is built ``grayscale``, and draws
+whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
+video slot's whole purpose being the recipe rather than the clip.
 """
 
 from collections.abc import Callable
@@ -15,6 +19,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap, QMovie
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 
+from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.generation_drag import GENERATION_MIME
@@ -34,12 +39,16 @@ class DropSlot(QWidget):
         preview: Callable[[str], tuple[str | None, str | None]],
         placeholder: str,
         parent=None,
+        grayscale: bool = False,
     ):
         super().__init__(parent)
         self._kind = kind          # "image"/"video" — which badge this slot wears
         self._accepts = accepts
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
+        # Whether what lands here is held for its settings rather than shown as a
+        # result — drawn gray if so, however it previews.
+        self._grayscale = grayscale
         self._current_id: str | None = None
         self._movie: QMovie | None = None
         self.setAcceptDrops(True)
@@ -104,14 +113,18 @@ class DropSlot(QWidget):
         if movie_path and Path(movie_path).exists():
             self._label.setText("")
             self._movie = looping_movie(movie_path, QSize(_PREVIEW_SIZE, _PREVIEW_SIZE), self._label)
-            self._label.setMovie(self._movie)
-            self._movie.start()  # a video loops its clip
+            if self._grayscale:
+                play_grayscale(self._movie, self._label)  # still loops, just drained
+            else:
+                self._label.setMovie(self._movie)
+                self._movie.start()  # a video loops its clip
         elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
             self._label.setText("")
-            self._label.setPixmap(QPixmap(str(thumb_path)).scaled(
+            picture = QPixmap(str(thumb_path)).scaled(
                 _PREVIEW_SIZE, _PREVIEW_SIZE,
                 Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
-            ))
+            )
+            self._label.setPixmap(grayscale_pixmap(picture) if self._grayscale else picture)
         else:
             self._label.setText("✓")  # held, but no thumbnail to show
         self._badge.setVisible(True)

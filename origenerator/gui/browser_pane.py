@@ -619,8 +619,13 @@ class BrowserPane:
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
+        rows = self._v._db.list_generations()
+        # Every row's thumbnail, so a combine's run can show the video its
+        # settings came from. Off the listing already in hand rather than a query
+        # per job: the recipe video is an ordinary finished row somewhere in it.
+        thumb_by_id = {r.get("prompt_id"): r.get("thumbnail_path") for r in rows}
         items = []
-        for row in self._v._db.list_generations():
+        for row in rows:
             if row.get("status") not in ("running", "pending"):
                 continue
             pid = row["prompt_id"]
@@ -664,6 +669,18 @@ class BrowserPane:
                 # placed the way every other image's is — by the folder it joins.
                 source_image=(params.get("input_image")
                               if kind in SOURCE_FRAME_KINDS else None),
+                # What the Combine panel was asked for, when this run came from
+                # it: the act off its dropdown, else the video whose settings the
+                # run follows — shown gray beside the frame, being the recipe
+                # rather than the result. Never both. An act names what the video
+                # will do, which is the whole of what was chosen; the clip its
+                # recipe was mined out of is an answer to a question the user
+                # never asked, and a picture of a video they did not pick reads
+                # as a job that is that video. A dropped video *is* the choice,
+                # so there the picture is the only thing saying which.
+                recipe_category=row.get("recipe_category") or "",
+                recipe_thumbnail=(None if row.get("recipe_category")
+                                  else thumb_by_id.get(row.get("recipe_video_id"))),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
         place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}

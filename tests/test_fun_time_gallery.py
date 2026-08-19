@@ -812,3 +812,41 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     assert [label for label in view.findChildren(QLabel)
             if label.movie() is not None
             and label.movie().state() == QMovie.MovieState.Running]
+
+
+def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
+        qtbot, tmp_path, monkeypatch):
+    """The freeze is fanned out over the shows this window has OPEN, not over
+    the ones the region map calls visible.
+
+    A show the session has covered or parked is still a show, and one that went
+    on advancing through a frozen room is the room not being frozen.  The map
+    answers ``None`` for anything it does not consider visible, so reading the
+    freeze off it left exactly those shows running.
+    """
+    view = _fun_time_view(qtbot)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view._live_shows[0][0]
+    qtbot.addWidget(show)
+    monkeypatch.setattr(view, "region_show", lambda side: None)
+
+    view.set_session_paused(True)
+
+    assert show._session_paused is True
+    assert not show._timer.isActive()
+
+
+def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):
+    """Stepping past a clip that will not play is right while the show is
+    running and wrong while the room is held: a show hunting through its set for
+    something playable is the room moving during OmniPause."""
+    view = _fun_time_view(qtbot)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    view.set_session_paused(True)
+    at = show._playlist.index
+
+    show._preview.video_unplayable.emit()
+
+    assert show._playlist.index == at

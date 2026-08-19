@@ -562,7 +562,13 @@ class SlideshowView(QWidget):
         a pace of nought asks for would hold a black screen for the rest of the
         session.  The item stays in the set — the fault is the backend's, not
         the file's — but the show moves on.
+
+        The session's OmniPause is the one hold this yields to: the room is
+        frozen, and a show that walked its set looking for something playable
+        would be the room moving.  The black rectangle waits for the resume.
         """
+        if self._session_paused:
+            return
         logger.warning("Slideshow: a clip would not play; stepping past it")
         self._advance()
 

@@ -3812,13 +3812,17 @@ class GalleryView(QWidget):
         show left the thumbnails running with no sign of why.
         """
         self._session_paused = paused
-        for side in ("portrait", "landscape"):
-            show = self.region_show(side)
-            if show is not None and hasattr(show, "set_session_paused"):
-                try:
-                    show.set_session_paused(paused)
-                except Exception:
-                    logger.exception("Freezing the %s show failed", side)
+        # Every show this window has open, taken from the list it keeps of them
+        # rather than from the region map: that map answers only for a show it
+        # considers VISIBLE, and a show the session has covered or parked is
+        # still a show that must not go on playing through a frozen room.
+        for show, _where in list(self._live_shows):
+            if not hasattr(show, "set_session_paused"):
+                continue
+            try:
+                show.set_session_paused(paused)
+            except Exception:
+                logger.exception("Freezing a show failed")
         set_previews_paused(paused)
         self._info_tabs.set_previews_paused(paused)
 

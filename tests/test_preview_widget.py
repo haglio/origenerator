@@ -12,6 +12,7 @@ import origenerator.gui.preview_widget as preview_widget
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.ken_burns import TICK_MS, ZOOM_SPAN, progress_step, zoom_at
 
 from PyQt6.QtCore import Qt
 
@@ -653,3 +654,100 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch)
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
 
     assert _FakeDrag.last is None
+
+
+# --- the show's slow push into the still -------------------------------------
+
+def _big_png(path):
+    """Big enough that a crop of it still has pixels to spare when scaled up."""
+    Image.new("RGB", (400, 300), (10, 120, 200)).save(path, "PNG")
+    return path
+
+
+def _bordered_png(path):
+    """Blue inside a fat red border, so the crop shows in a corner pixel: the
+    border is the first thing a push into the middle throws away."""
+    image = Image.new("RGB", (400, 300), (200, 0, 0))
+    image.paste(Image.new("RGB", (320, 220), (0, 0, 200)), (40, 40))
+    image.save(path, "PNG")
+    return path
+
+
+def test_the_zoom_draws_the_middle_of_the_picture(make_preview, tmp_path):
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_bordered_png(tmp_path / "p.png"))
+    assert w._image_label.pixmap().toImage().pixelColor(0, 0).red() > 100
+
+    w.set_zoom(1.5)  # far enough in to be past the border on every side
+
+    corner = w._image_label.pixmap().toImage().pixelColor(0, 0)
+    assert corner.blue() > 100 and corner.red() < 100
+
+
+def test_the_push_never_moves_the_drawn_rect_by_so_much_as_a_pixel(make_preview, tmp_path):
+    # Exactly, not nearly.  A frame that changes size by one pixel is re-centered
+    # by the label, so the picture hops sideways several times a second — which
+    # is what a first cut of this did, and it reads as a twitch rather than a
+    # camera move.  The overlays placed against this rect care too.
+    w = make_preview()
+    w.resize(200, 150)
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    w.set_zoom(1.0)
+    before = w.media_rect()
+
+    for step in range(1, 41):
+        w.set_zoom(1.0 + (ZOOM_SPAN - 1) * step / 40)
+        assert w.media_rect() == before
+
+
+def test_the_push_moves_by_a_fraction_of_a_pixel_every_tick(make_preview, tmp_path):
+    # Fixed frame, but not a frozen picture: consecutive ticks of a real slide's
+    # rate must each redraw something different, or the move is stepping rather
+    # than creeping.
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_bordered_png(tmp_path / "p.png"))
+    w.set_zoom(1.0)
+
+    frames = []
+    for tick in range(1, 4):
+        w.set_zoom(zoom_at(tick * progress_step(TICK_MS, 4000)))
+        frames.append(w._image_label.pixmap().toImage())
+
+    assert frames[0] != frames[1] and frames[1] != frames[2]
+
+
+def test_a_new_picture_is_drawn_at_whatever_zoom_it_was_told(make_preview, tmp_path):
+    # The show resets the zoom itself when it puts a new slide up; a version of
+    # the SAME picture swapped in under it keeps the push it was part-way through.
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    w.set_zoom(1.08)
+
+    w.show_image(_big_png(tmp_path / "q.png"))
+
+    assert w._zoom == 1.08
+
+
+def test_a_pane_nobody_pushes_is_drawn_exactly_as_it_always_was(make_preview, tmp_path):
+    # The painter path belongs to the show.  Every other pane — the info pane's
+    # preview, the strips — keeps the plain fit, so nothing about them changed.
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+
+    assert w._pushing is False
+    assert w._push_source is None
+
+
+def test_the_zoom_never_backs_out_past_the_whole_picture(make_preview, tmp_path):
+    w = make_preview()
+    w._image_label.resize(200, 150)
+    w.show_image(_big_png(tmp_path / "p.png"))
+
+    w.set_zoom(0.5)
+
+    assert w._zoom == 1.0

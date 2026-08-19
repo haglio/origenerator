@@ -5,6 +5,10 @@ static images are scaled to fit (and rescaled on resize), animated images
 (animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
 default, so selecting one gives an immediate moving preview without stealing audio,
 while the fullscreen slideshow opts in to sound.
+
+A still can also be drawn part-way into itself (:meth:`PreviewWidget.set_zoom`),
+which is how the fullscreen show creeps into each picture while it holds the
+screen; every other pane leaves that at the whole picture.
 """
 
 from __future__ import annotations
@@ -15,14 +19,17 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
 )
-from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag
-from PyQt6.QtCore import Qt, QUrl, QPoint, QRect, QSize, QEvent, pyqtSignal
+from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag, QPainter
+from PyQt6.QtCore import (
+    Qt, QUrl, QPoint, QRect, QRectF, QSize, QEvent, pyqtSignal,
+)
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.ken_burns import ZOOM_SPAN, crop_box
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -76,6 +83,19 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self._drag_origin: QPoint | None = None
+        # How far into the still this pane is drawn — the fullscreen show's slow
+        # push (see set_zoom). 1.0, the whole picture, for every other pane:
+        # nothing but a show ever moves it, and a pane that is never pushed into
+        # keeps the plain fit it always had rather than going through the
+        # painter below.
+        self._zoom = 1.0
+        self._pushing = False
+        # What the push is drawn FROM and AT, prepared once per picture: see
+        # _ready_the_push. The key is what they were prepared for, so a new
+        # picture or a resized pane rebuilds them and nothing else does.
+        self._push_key: tuple | None = None
+        self._push_source: QPixmap | None = None
+        self._push_size = QSize()
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
@@ -310,6 +330,37 @@ class PreviewWidget(QWidget):
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
+    def set_zoom(self, zoom: float) -> None:
+        """Draw the still *zoom* deep into itself — the show's Ken Burns push.
+
+        Every frame of the push is drawn at ONE size, the size the whole picture
+        was fitted to, and what moves is a real-valued window sampled out of the
+        picture (:func:`~origenerator.ken_burns.crop_box`). Both halves of that
+        matter and each was learned the hard way:
+
+        * a frame whose size changes by a pixel is re-centered by the label, so
+          the picture hops sideways — several times a second, in whichever
+          direction the fit happened to round;
+        * a window snapped to whole pixels does not creep at all at this speed,
+          it holds and then steps, and its two axes step at different moments.
+
+        Together those made a still picture twitch rather than drift. Drawn
+        through a painter at a fixed size from a real-valued window, the
+        sampling grid slides between source pixels and the motion is continuous
+        — and :meth:`media_rect` is genuinely constant, which is what the
+        neighbor stills and the HUD map are placed against.
+
+        Stills only. An animated image is already moving and a video is its own
+        motion, so both take the number inertly — as does every pane but a
+        show's, none of which ever calls this.
+        """
+        zoom = max(1.0, float(zoom))
+        was_pushing, self._pushing = self._pushing, True
+        if zoom == self._zoom and was_pushing:
+            return
+        self._zoom = zoom
+        self._rescale()
+
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this pane's playback outright."""
         self._audio.setMuted(muted)
@@ -510,6 +561,9 @@ class PreviewWidget(QWidget):
         if self._pixmap is None or self._pixmap.isNull():
             self._image_label.setText("No preview available")
             return
+        if self._pushing:
+            self._image_label.setPixmap(self._push_frame())
+            return
         self._image_label.setPixmap(
             self._pixmap.scaled(
                 self._image_label.size(),
@@ -517,6 +571,62 @@ class PreviewWidget(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
+
+    # --- the push, drawn ----------------------------------------------------
+
+    def _ready_the_push(self) -> None:
+        """Fix the size every frame of this picture is drawn at, and prepare the
+        picture the frames are sampled from. Once per picture, not per frame.
+
+        The frames are drawn at the size the WHOLE picture fits the pane at, so
+        the drawn rect is the same at every point of the push — see
+        :meth:`set_zoom` for what a changing one does.
+
+        The source is shrunk once, with the good filter, to the resolution the
+        deepest point of the push actually needs. That leaves every frame a
+        near-1:1 draw. Sampling a much larger picture afresh each frame would
+        instead minify it thirty times a second with a grid that has crawled a
+        fraction of a pixel since the last one, and a fine texture under that
+        shimmers. A picture already smaller than that is left alone rather than
+        blown up to meet it.
+        """
+        key = (self._pixmap.cacheKey(),
+               self._image_label.width(), self._image_label.height())
+        if key == self._push_key:
+            return
+        self._push_key = key
+        self._push_size = self._pixmap.size().scaled(
+            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio)
+        deepest = QSize(max(1, round(self._push_size.width() * ZOOM_SPAN)),
+                        max(1, round(self._push_size.height() * ZOOM_SPAN)))
+        oversized = (self._pixmap.width() > deepest.width()
+                     or self._pixmap.height() > deepest.height())
+        self._push_source = (
+            self._pixmap.scaled(deepest, Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation)
+            if oversized else self._pixmap
+        )
+
+    def _push_frame(self) -> QPixmap:
+        """This picture at the push's current depth, drawn at the fixed size."""
+        self._ready_the_push()
+        if self._push_size.isEmpty() or self._push_source.isNull():
+            return QPixmap()
+        frame = QPixmap(self._push_size)
+        frame.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(frame)
+        # The one render hint that matters here: without it the window's
+        # fractional offset is thrown away and the push snaps pixel to pixel,
+        # which is the twitch this whole approach exists to remove.
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(
+            QRectF(0, 0, self._push_size.width(), self._push_size.height()),
+            self._push_source,
+            QRectF(*crop_box(self._push_source.width(),
+                             self._push_source.height(), self._zoom)),
+        )
+        painter.end()
+        return frame
 
     def eventFilter(self, obj, event):
         # Refit the media to the label's *own* size whenever the label resizes, rather

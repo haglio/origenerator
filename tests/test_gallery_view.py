@@ -10108,6 +10108,93 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
+def _spoken_genau_rows(view):
+    """Every run a spoken "genau it" has launched, landed or not."""
+    return [r for r in view._db.list_generations() if r.get("genau_requested_at")]
+
+
+def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, monkeypatch):
+    # Saying it twice is what you do when the first time appeared to do nothing,
+    # and it does appear to: the clip queues behind whatever the machine is on
+    # and the picture on screen doesn't change. Two identical runs would spend
+    # minutes of the one GPU making a clip that is already coming.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    surface = _VoiceSurface("img_act")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+    assert len(_spoken_genau_rows(view)) == 1
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert surface.noted == (None, "🎤 a Genau clip of this one is already on the way")
+    assert len(_spoken_genau_rows(view)) == 1
+
+
+def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
+        qtbot, tmp_path, monkeypatch):
+    # The mined tier asks the local model which recipe fits and that thinks for
+    # several seconds — the exact silence a second command is said into, and
+    # there is no row yet to notice it by.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    thinking = []
+    monkeypatch.setattr(view, "_run_off_thread",
+                        lambda work, done: thinking.append((work, done)))
+    surface = _VoiceSurface("img_act")
+    view._slideshow = surface
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert surface.noted == (None, "🎤 a Genau clip of this one is already on the way")
+    assert len(thinking) == 1
+    work, done = thinking[0]
+    done(work())  # the match comes back, and the one run it was for goes out
+    assert len(_spoken_genau_rows(view)) == 1
+
+
+def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, monkeypatch):
+    # A match that found nothing leaves nothing to wait for, so the picture must
+    # not stay held — asking again is the whole point once a loop exists.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe",
+                        lambda *a, **k: None)
+    view._slideshow = _VoiceSurface("img_act")
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert view._genau_resolving == set()
+
+
+def test_the_same_picture_can_be_asked_again_once_its_clip_has_landed(
+        qtbot, tmp_path, monkeypatch):
+    # The bar is one *queued* at a time; a clip that has arrived is no reason to
+    # refuse another of the same picture.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._slideshow = _VoiceSurface("img_act")
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+    (queued,) = _spoken_genau_rows(view)
+    view._db.update_generation(queued["prompt_id"], status="completed")
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert len(_spoken_genau_rows(view)) == 2
+
+
+def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
+        qtbot, tmp_path, monkeypatch):
+    # Only a spoken one is stamped, and only a spoken one can be said again into
+    # the wait: someone at the keyboard can see the queue they just joined.
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._generate_category("img_act", "dancing", recipe_match.GENAU)
+    view._slideshow = _VoiceSurface("img_act")
+
+    view._on_voice_command(gallery.GENAU_COMMAND)
+
+    assert len(_spoken_genau_rows(view)) == 1
+
+
 def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):
     # The spoken form of the Enhance button, aimed at the picture being watched.
     db = _enhanceable_db(tmp_path, count=1)

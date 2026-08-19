@@ -362,6 +362,10 @@ class GalleryView(QWidget):
             registry=WORKFLOW_REGISTRY, rng=random.Random()
         )
         self._image_rows: list[dict] = []
+        # Pictures whose spoken "genau it" is still choosing a recipe, so a
+        # second one said into that wait is refused rather than queued twice
+        # (:meth:`_genau_already_coming`). Only until the launch is a row.
+        self._genau_resolving: set[str] = set()
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
         # --- the gallery search (the box over the tree, the results in the middle
         # pane). The index is rebuilt with the gallery and queried on each
@@ -3737,6 +3741,7 @@ class GalleryView(QWidget):
         """
         image_row = self._db.get_generation(image_id)
         if image_row is None:
+            then(None)  # nothing to match against, and the caller stops waiting
             return
         image_prompts = {r.get("prompt_id"): r.get("positive_prompt") or "" for r in self._image_rows}
         candidates = [{**row, "start_scene": self._start_scene(row, image_prompts)}
@@ -3849,14 +3854,34 @@ class GalleryView(QWidget):
         overlay's curated recipe when one is pinned for the act, else the mined
         exemplar handed off to the shared combine launch. ``intent`` chooses which
         lane both tiers answer from; ``send`` hands the finished clip to Genau
-        without a second ask."""
+        without a second ask.
+
+        ``send`` also holds the picture until the launch is a row, because only a
+        spoken "genau it" sets it and only a spoken one can be said again into
+        the wait — see :meth:`_genau_already_coming`."""
+        if send:
+            self._genau_resolving.add(image_id)
         if self._generate_curated(image_id, category, intent, send):
+            self._genau_resolving.discard(image_id)
             return
         self._resolve_category(
             image_id, category, intent,
-            lambda video_id: video_id is not None
-            and self._generate_combination(image_id, video_id, send),
+            partial(self._combine_resolved, image_id, send),
         )
+
+    def _combine_resolved(self, image_id: str, send: bool, video_id: str | None):
+        """The recipe match came back: run what it found on the image, if it
+        found anything.
+
+        The picture is let go of either way — a launch is a row from here on,
+        which is where :meth:`_genau_already_coming` reads it, and a match that
+        found nothing leaves nothing to wait for.
+        """
+        try:
+            if video_id is not None:
+                self._generate_combination(image_id, video_id, send)
+        finally:
+            self._genau_resolving.discard(image_id)
 
     def _open_category(self, image_id: str, category: str,
                        intent: str = recipe_match.PLAYERS):
@@ -3911,6 +3936,35 @@ class GalleryView(QWidget):
         self._db.mark_genau_exported(row["prompt_id"])
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
+    def _genau_already_coming(self, row: dict) -> bool:
+        """Whether a Genau clip of this picture was asked for out loud already
+        and hasn't landed yet — still choosing its recipe, queued, or running.
+
+        Saying it twice is what someone does when the first time appeared to do
+        nothing, and it usually did appear to: the clip queues behind whatever
+        the machine is on and the picture on screen doesn't change. Answering
+        that with a second identical run spends minutes of the one GPU making a
+        clip that already exists, and sends both to Genau.
+
+        Both halves of "hasn't landed" are asked. A launched run is a row the
+        database calls pending or running, stamped as spoken for
+        (:meth:`_mark_for_sending`) — read from there rather than from the live
+        jobs, so a run reconnected after a restart still counts. Before that
+        there is a stretch with no row at all: the mined tier asks the local
+        model which recipe fits and that thinks for several seconds, which is
+        exactly the silence a second command is said into, so the picture is
+        held in :attr:`_genau_resolving` from the moment the command is heard
+        until its row exists.
+        """
+        if row.get("prompt_id") in self._genau_resolving:
+            return True
+        return any(
+            other.get("genau_requested_at")
+            and gallery.is_in_progress(other)
+            and gallery.find_source_image_id(other, [row]) is not None
+            for other in self._db.list_generations()
+        )
+
     def _genau_it(self, image_id: str | None) -> tuple[str | None, str]:
         """Animate an image as a Genau clip: the act read off its own prompt.
 
@@ -3930,6 +3984,8 @@ class GalleryView(QWidget):
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != "image":
             return None, "🎤 only a picture can become a Genau clip"
+        if self._genau_already_coming(row):
+            return None, "🎤 a Genau clip of this one is already on the way"
         category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
         if category is None:
             return None, "🎤 this prompt doesn't say what's happening — no act to animate"

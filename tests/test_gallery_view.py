@@ -6683,6 +6683,32 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
     assert view._queue.running_preview().key is None
 
 
+def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
+    # The show covers the strip, and a show is the one stretch where the line
+    # deliberately stops moving — so the queue follows onto the surface in front
+    # of the user, in the same order.
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    db.add(_running_row("gen1", prompt="a dog"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    # Fed at the opening rather than a poll and a half later.
+    assert view._slideshow._queue.lines()
+    assert not view._slideshow._queue.isHidden()
+
+    db.delete_generation("gen1")  # the job ends
+    view._poll()
+    assert view._slideshow._queue.isHidden()  # nothing being made, nothing said
+
+    view._slideshow.close()
+
+
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
     db = FakeDB([
         _running_row("running-one", prompt="a dog"),

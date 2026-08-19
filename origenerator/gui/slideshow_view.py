@@ -43,10 +43,14 @@ point it is an ordinary show of that file. So a generation can be watched
 full-screen while it's made, not only once it lands.
 
 The items either side of the one on screen ride along as small stills
-(see :mod:`origenerator.gui.neighbor_previews`). The shared OSR2 stroke keys ride
-along too (Space and friends — see :mod:`origenerator.gui.stroke_hud`) with
-genau's drive panel floated up top, so the device can run over a show of stills;
-a clip that carries a funscript instead offers itself as an
+(see :mod:`origenerator.gui.neighbor_previews`), and the queue rides along in the
+bottom-left corner (:mod:`origenerator.gui.slideshow_queue`) — the bottom strip
+that normally says what is being made is behind this view, and a show is exactly
+when the line stops moving and when the user keeps adding to it. The shared OSR2
+stroke keys ride along too (Space and friends — see
+:mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated up top, so
+the device can run over a show of stills; a clip that carries a funscript instead
+offers itself as an
 :meth:`osr2_drive_target`. Being the deliberate foreground view, it plays sound —
 the inline preview stays muted.
 """
@@ -59,6 +63,7 @@ from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
@@ -152,6 +157,11 @@ class SlideshowView(QWidget):
 
         # Where in the set this one is, floated over the bottom of the media.
         self._counter = PositionCaption(self)
+        # What is being made while this plays, in the corner the show leaves
+        # empty: the bottom strip that normally says so is behind this view, and
+        # a show is both when the queue stops moving (its videos are held) and
+        # when the user keeps adding to it (a held slide asks for an enhancement).
+        self._queue = SlideshowQueue(self)
         # A note about the item on screen: which of its versions this is, that an
         # enhancement of it is being made, and for a beat whatever a switch or a
         # spoken fix just did — the only way to tell, in a view with no panels,
@@ -237,6 +247,11 @@ class SlideshowView(QWidget):
         """
         self._levels_by_path = {str(k): list(v) for k, v in levels_by_path.items()}
         self._refresh_note()
+
+    def set_queue(self, items) -> None:
+        """Show what is in flight in the corner — the same list, in the same
+        order, the bottom strip this view is covering would be showing."""
+        self._queue.set_items(items)
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None) -> None:
         """A generation that belongs to what this show is playing has landed: it
@@ -675,6 +690,7 @@ class SlideshowView(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._counter.reposition()
+        self._queue.reposition()
         self._reposition_neighbors()
         self._reposition_note()
         if self._stroke_panel is not None:

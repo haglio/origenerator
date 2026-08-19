@@ -473,6 +473,55 @@ def test_the_enhancing_note_sits_above_the_counter_not_over_the_console(qtbot):
     assert note.top() > view.height() // 2      # bottom half, clear of the console
     assert note.bottom() <= counter.top()       # stacked with it, not over it
     assert abs(note.center().x() - view.width() // 2) <= 1
+
+
+# --- the queue, in the corner this view leaves empty -------------------------
+
+def _inflight(**kw):
+    from origenerator.gui.inflight import InFlightItem
+
+    kw.setdefault("key", "j1")
+    kw.setdefault("caption", "Alpha Workflow › a paper kite")
+    kw.setdefault("status", "queued")
+    kw.setdefault("frame", None)
+    kw.setdefault("reveal", lambda: None)
+    return InFlightItem(**kw)
+
+
+def test_the_queue_rides_along_in_the_shows_bottom_left(qtbot):
+    # The bottom strip that normally says what is being made is behind this view,
+    # and a show is when the queue stops moving: its videos are held until it ends.
+    view = _view(qtbot)
+    view.resize(800, 600)
+    QApplication.sendEvent(view, QResizeEvent(QSize(800, 600), QSize(640, 480)))
+    view.set_queue([_inflight(typical_seconds=30, job_kind="Image"),
+                    _inflight(key="j2", typical_seconds=600, job_kind="T2V",
+                              held=True)])
+
+    plate = view._queue.geometry()
+    assert view._queue.lines() == ["~30 sec · Image", "~10 min · T2V · held"]
+    assert plate.left() < view.width() // 2      # left…
+    assert plate.top() > view.height() // 2      # …and low, clear of the console
+    assert not plate.intersects(view._counter.geometry())  # beside it, not over it
+
+
+def test_a_show_with_nothing_in_flight_says_nothing_in_the_corner(qtbot):
+    view = _view(qtbot)
+    view.set_queue([])
+    assert view._queue.isHidden()
+
+
+def test_the_queue_follows_the_shows_bottom_edge_on_a_resize(qtbot):
+    view = _view(qtbot)
+    view.resize(800, 600)
+    view.set_queue([_inflight(typical_seconds=30, job_kind="Image")])
+
+    view.resize(1200, 900)
+    QApplication.sendEvent(view, QResizeEvent(QSize(1200, 900), QSize(800, 600)))
+
+    assert view._queue.geometry().bottom() > 600
+
+
 # --- locking also stars, and a double-click leaves ---------------------------
 
 def test_locking_stars_the_item_on_screen(qtbot):

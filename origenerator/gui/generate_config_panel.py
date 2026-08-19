@@ -42,6 +42,10 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE, THUMB_DIR,
 )
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 
@@ -281,8 +285,10 @@ class GenerateConfigPanel(QWidget):
         # A flow rather than a row: the bank wraps onto a second line when the pane
         # is too narrow to hold it, instead of squeezing every label down to an
         # unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
-        # the corner it has always sat in.
-        btn_row = FlowLayout(spacing=6, align_right=True)
+        # the corner it has always sat in, and at the family's two gaps — close
+        # along a row, wider between wrapped rows — like the gallery's own bank.
+        btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
+                             align_right=True)
         self._folder_btn = QPushButton("Go to folder")
         self._folder_btn.setToolTip("Open this generation's folder in the gallery.")
         self._folder_btn.clicked.connect(self._on_go_to_folder)

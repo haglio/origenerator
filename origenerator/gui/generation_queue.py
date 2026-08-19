@@ -10,8 +10,10 @@ On the right, taking the rest of the strip, *what is queued*: every in-flight jo
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click, and each draggable to a new place in the line. Only
 the top row is fixed: nothing can be moved in front of what is already rendering.
-With nothing queued at all, that side says so in dim letters in the middle of its
-own space, rather than sitting blank.
+With nothing queued at all, the strip says so in dim letters across the middle of
+the whole of itself, rather than sitting blank: the left half has no frame, no
+bar and (barring another app's backlog to report) nothing to say, so it stands
+down and the line takes the strip's whole width to be centered in.
 
 It opens one progress bar tall — about two rows, the rest a scroll away — and its
 top edge is a splitter handle, so a long queue can be dragged open to as many rows
@@ -39,7 +41,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QApplication, QFrame, QSizePolicy,
 )
 from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
-from PyQt6.QtCore import Qt, QMimeData, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QMimeData, QSize, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
@@ -365,6 +367,16 @@ class GenerationQueue(QWidget):
         """The live half. Its ``key`` is ``None`` when nothing is being made."""
         return self._running
 
+    def sizeHint(self) -> QSize:
+        """One progress bar tall, whatever is or isn't in it.
+
+        Read off the strip's own opening height rather than added up from its
+        children, whose number changes: an idle strip, whose live half has stood
+        down to leave the hint the full width, asks for exactly the room a busy
+        one does, so the splitter above it doesn't shift as the queue drains.
+        """
+        return QSize(super().sizeHint().width(), _STRIP_HEIGHT + 1)  # and its rule
+
     def rows(self) -> list[QueueRow]:
         """Every job in the line, top to bottom — the one being made first.
 
@@ -397,19 +409,23 @@ class GenerationQueue(QWidget):
         """
         leader = items[0] if items and not items[0].held else None
         self._running.show_item(leader)
-        # Nothing of ours in flight at all: the line has no rows to show, so it
-        # says what it is for instead.
-        self._hint.setVisible(not items)
         self._clear.setVisible(bool(foreign_queued))
         self._clear.setToolTip(
             f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"
             " another app has queued on ComfyUI"
         )
+        free_half = ""
         if leader is None:
-            self._running.show_foreign(
-                queue_held_text(sum(1 for item in items if item.held))
-                or foreign_queue_text(foreign_queued) or ""
-            )
+            free_half = (queue_held_text(sum(1 for item in items if item.held))
+                         or foreign_queue_text(foreign_queued) or "")
+            self._running.show_foreign(free_half)
+        # Nothing of ours in flight at all: the line has no rows to show, so it
+        # says what it is for instead. The left half stands down with it unless
+        # it has something to report — with no frame, no bar and nothing to say
+        # about another app it is an empty third of the strip, and the hint would
+        # be centered in the sliver beside it rather than in the strip itself.
+        self._hint.setVisible(not items)
+        self._running.setVisible(bool(items) or bool(free_half))
         if self.keys() != [item.key for item in items]:
             self._rebuild(items)
             return

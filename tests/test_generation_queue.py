@@ -68,16 +68,53 @@ def test_an_empty_line_says_what_it_is_for(queue):
     assert queue._hint.objectName() == "estimateLabel"  # the app's muted text
 
 
-def test_the_hint_sits_in_the_middle_of_the_space_it_explains(queue):
+def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
+    # The space it explains is the strip, not the part of it left over beside a
+    # live half with nothing in it: centered in that sliver, it reads as pushed
+    # off to the right.
     from PyQt6.QtWidgets import QApplication
 
     queue.set_items([])
     QApplication.processEvents()
-    hint, viewport = queue._hint, queue._scroll.viewport()
-    center = hint.mapTo(viewport, hint.rect().center())
+    center = queue._hint.mapTo(queue, queue._hint.rect().center())
 
-    assert abs(center.x() - viewport.width() // 2) <= 1
-    assert abs(center.y() - viewport.height() // 2) <= 1
+    assert abs(center.x() - queue.width() // 2) <= 4
+    assert abs(center.y() - queue.height() // 2) <= 4
+
+
+def test_the_live_half_stands_down_when_it_has_nothing_in_it(queue):
+    # With no frame, no bar and nothing to report it is an empty third of the
+    # strip, and the only thing it does there is push the hint off center.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([])
+    QApplication.processEvents()
+
+    assert not queue.running_preview().isVisible()
+
+
+def test_the_live_half_keeps_its_place_to_report_another_apps_backlog(queue):
+    # There it has something to say, and the hint centers in what is left.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([], foreign_queued=2)
+    QApplication.processEvents()
+
+    hint_left = queue._hint.mapTo(queue, queue._hint.rect().topLeft()).x()
+
+    assert queue.running_preview().isVisible()
+    assert queue._hint.isVisible()
+    assert hint_left > queue.running_preview().geometry().right()
+
+
+def test_the_live_half_comes_back_with_the_first_job(queue):
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([])
+    queue.set_items([_item(key="a")])
+    QApplication.processEvents()
+
+    assert queue.running_preview().isVisible()
 
 
 def test_the_first_job_takes_the_space_back_from_the_hint(queue):

@@ -3,7 +3,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_KEYCAP,
+    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_BUTTON_ACTIVE, BG_KEYCAP,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
     BORDER_SUBTLE, BORDER_PANEL, BLUE,
 )
@@ -173,6 +173,9 @@ def build_stylesheet() -> str:
     QPushButton:hover {{
         background-color: {_h(BG_TERTIARY)};
     }}
+    QPushButton:checked {{
+        background-color: {_h(BG_BUTTON_ACTIVE)};
+    }}
     QPushButton:pressed {{
         background-color: {_h(BLUE)};
     }}
@@ -232,6 +235,13 @@ def build_stylesheet() -> str:
     }}
     QToolButton:hover {{
         background-color: {_h(BG_TERTIARY)};
+    }}
+    /* A control that is ON sits on a lighter ground than one at rest -- one rule
+       across the family, so a toggled button reads the same whichever app it is
+       in. The blue below is the one exception, for a state that means more than
+       "engaged". */
+    QToolButton:checked {{
+        background-color: {_h(BG_BUTTON_ACTIVE)};
     }}
     QToolButton#iconButton {{
         padding: 4px;

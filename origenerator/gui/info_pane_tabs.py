@@ -434,6 +434,9 @@ class InfoPaneTabs(QTabWidget):
         elif not panel.is_blank():
             panel._preview.show_media(*preview)
             panel._preview.set_draggable_id(prompt_id)
+            # Re-showing the media clears whatever the pane was saying about it,
+            # so put the tab's own notice back if its form still deviates.
+            panel.refresh_modified_notice()
 
     def show_reroll_frame(self, frame: bytes | None, note: str | None = None):
         """Mirror a running re-roll's live frame into the current tab's preview —

@@ -20,7 +20,9 @@ from origenerator.gallery import (
     resolve_preview, row_output_files, rows_in_settings, settings_signature,
     videos_from_source_image, workflow_output_type,
 )
-from origenerator.generation_config import ConfigSnapshot, merge_denormalized
+from origenerator.generation_config import (
+    ConfigSnapshot, configs_match, merge_denormalized,
+)
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.generate_button import GenerateButton
@@ -41,6 +43,10 @@ from origenerator.config import (
 logger = logging.getLogger(__name__)
 
 _ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
+
+# What the preview says once the form has been edited away from the generation
+# on it: that picture was generated, these settings have not been.
+_MODIFIED_NOTICE = "(not yet generated with modifications)"
 
 
 class GenerateConfigPanel(QWidget):
@@ -101,6 +107,11 @@ class GenerateConfigPanel(QWidget):
         # card would run at — also the gallery's, pushed in the same way.
         self._pending_enhancement: tuple | None = None
         self._enhance_settings = EnhanceSettings()
+        # The settings the preview's generation went on display under, captured
+        # whenever one does. Editing the form away from these is what marks the
+        # preview as no longer showing what a Generate would make; None whenever
+        # there's no saved generation on display to be modified away from.
+        self._displayed_config: ConfigSnapshot | None = None
         self._build_ui()
         self._connect_signals()
 
@@ -381,6 +392,7 @@ class GenerateConfigPanel(QWidget):
         self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
+        self._param_form.changed.connect(self.refresh_modified_notice)
         self._form_host_box.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -549,6 +561,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()  # nothing generated with these settings yet
             self._displayed_row = None
+        self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows
 
     def _recent_matching_row(self) -> dict | None:
@@ -689,8 +702,37 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview, request)
+        self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
+
+    def _note_displayed_config(self):
+        """Take the settings the generation now on display is being shown under as
+        the mark to measure edits against, and clear any notice left from the last
+        one. From here it is the form moving away from these that says the picture
+        is no longer what a Generate would make."""
+        self._displayed_config = (
+            self.current_config() if self._displayed_row is not None else None
+        )
+        self.refresh_modified_notice()
+
+    def refresh_modified_notice(self):
+        """Mark the preview when the form no longer describes the picture on it.
+
+        A tab pointed at a saved generation — a browsed selection, a finished run,
+        or the idle autoshow of this config's newest result — shows that
+        generation's output beside the settings that made it. Change any of them
+        and what's on screen stops being an answer to what the form now asks, so
+        the preview says so instead of standing there as a silent one. Putting the
+        settings back takes the notice away again.
+
+        Public because the preview is also driven from outside (a suppressed
+        re-selection re-shows the same row's media), and anything that changes
+        what's on screen clears the notice — so whoever did that re-asserts it.
+        """
+        modified = (self._displayed_config is not None
+                    and not configs_match(self._displayed_config, self.current_config()))
+        self._preview.set_notice(_MODIFIED_NOTICE if modified else None)
 
     def _hide_footer(self):
         """Hide every info/action element that belongs only to a saved generation —
@@ -776,6 +818,7 @@ class GenerateConfigPanel(QWidget):
             return
         self._preview.show_media(*preview)
         self._preview.set_draggable_id(row["prompt_id"])
+        self.refresh_modified_notice()  # the picture is back; so is anything said about it
 
     def set_fullscreen_factory(self, make):
         """Wire what a double-click on this tab's preview opens — a slideshow of
@@ -870,6 +913,7 @@ class GenerateConfigPanel(QWidget):
         path = self._level_path(levels[position])
         if path.exists():
             self._preview.show_media(path, "image")
+            self.refresh_modified_notice()  # a version of the same generation, same notice
 
     def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
         """Reveal the source tile for whatever this row was built from, else hide

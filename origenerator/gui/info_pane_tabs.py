@@ -345,13 +345,23 @@ class InfoPaneTabs(QTabWidget):
         set — the light-touch update a suppressed poll/rebuild re-selection makes.
 
         ``prompt_id`` is the shown generation, so its preview can still be dragged
-        onto a combine slot after a Back/Forward that never re-seeded the form."""
+        onto a combine slot after a Back/Forward that never re-seeded the form.
+
+        The pane's resting tab is left alone: a tab with no workflow picked and
+        nothing on display holds no generation, so there is no preview of its own
+        to refresh, and giving it one shows a picture over a form still asking
+        which workflow to run. That is what reopening the app on the resting tab
+        used to do — the restored gallery selection re-selects itself through here,
+        and its image landed in a "New generation" tab. A genuine click doesn't
+        come this way: it goes through :meth:`load_selection`, which fills such a
+        tab whole — form, preview and footer together.
+        """
         panel = self.current_config_panel()
         if panel is None:
             return
         if preview is None:
             panel._preview.clear()  # nothing to show disarms the drag itself
-        else:
+        elif not panel.is_blank():
             panel._preview.show_media(*preview)
             panel._preview.set_draggable_id(prompt_id)
 

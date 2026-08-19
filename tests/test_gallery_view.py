@@ -3421,6 +3421,40 @@ def test_select_generation_missing_id_is_dropped(qtbot):
     assert view.selected_generation() != "ghost"
 
 
+def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
+    """Reopening the app must not drop the last selection's image into a tab that
+    holds no generation.
+
+    A session saved with the pane's resting tab in front reopens on that tab —
+    "New generation", no workflow picked — while the gallery restores the
+    generation that was selected. The restore re-selects it with history
+    suppressed, which refreshes the front tab's preview; the resting tab has
+    nothing to refresh, so it must stay empty rather than come up as a blank
+    generate form under someone else's picture.
+    """
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    probe = GalleryView(db)
+    qtbot.addWidget(probe)
+    probe.refresh()
+    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    folder_key = probe.selected_folder()
+
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view._preview.show_media = MagicMock()  # don't start WMF playback
+    view.select_folder(folder_key)
+    view.select_generation("i2")  # what the last session was looking at
+    view.refresh()
+
+    assert view.selected_generation() == "i2"  # the selection itself is restored
+    panel = view._info_tabs.current_config_panel()
+    assert panel.is_blank()  # ...into a tab still asking which workflow to run
+    panel._preview.show_media.assert_not_called()
+
+
 def _make_db(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

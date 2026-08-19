@@ -394,7 +394,7 @@ def test_current_config_panel_is_the_front_tab(tabs):
 
 
 def test_show_selection_preview_updates_only_the_current_preview(tabs):
-    panel = tabs.currentWidget()
+    panel = _pick_workflow(tabs.currentWidget())  # a tab in use, not the resting one
     panel._preview.show_media = MagicMock()
     panel.prefill = MagicMock()
 
@@ -403,6 +403,20 @@ def test_show_selection_preview_updates_only_the_current_preview(tabs):
     panel._preview.show_media.assert_called_once_with("x.png", "image")
     panel.prefill.assert_not_called()  # no form change
     assert panel._preview._draggable_id == "g1"  # its preview drags onto combine
+
+
+def test_show_selection_preview_leaves_the_resting_tab_empty(tabs):
+    # The resting tab holds no generation at all, so a re-selection has nothing to
+    # refresh in it: filling its preview would show a picture over a form still
+    # asking which workflow to run. Only a tab in use follows the selection.
+    panel = tabs.currentWidget()
+    assert panel.is_blank()
+    panel._preview.show_media = MagicMock()
+
+    tabs.show_selection_preview(("x.png", "image"), "g1")
+
+    panel._preview.show_media.assert_not_called()
+    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
 
 
 def test_show_selection_preview_of_nothing_disarms_the_drag(tabs):

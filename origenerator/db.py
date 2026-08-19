@@ -127,6 +127,19 @@ CREATE TABLE IF NOT EXISTS requests (
 -- record goes away when the item is restored, purged, or ages out of the
 -- retention window; the generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying behind a flag.
+-- What a branch session had bookmarked when the live app last adopted from it:
+-- the items that worktree's database starred, and its folder bookmarks. Only
+-- what has *changed* there since is applied at the next launch, so a star the
+-- user has removed here is not reinstated on every launch by a worktree copy
+-- that still carries it, and an unstar made in a preview crosses exactly once
+-- (see origenerator.branch_session.adopt_branch_curation). Keyed by worktree
+-- directory name; a row outlives its worktree harmlessly.
+CREATE TABLE IF NOT EXISTS branch_curation (
+    branch     TEXT PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    adopted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS deletions (
     prompt_id  TEXT PRIMARY KEY,
     row_json   TEXT NOT NULL,
@@ -601,6 +614,44 @@ class Database:
         reconcile has re-pointed it onto its current one."""
         with self._connect() as conn:
             conn.execute("DELETE FROM folder_meta WHERE folder_key = ?", (folder_key,))
+
+    # --- branch-session curation (what each worktree had bookmarked) ---------
+
+    def branch_curation_state(self, branch: str) -> dict | None:
+        """What was last adopted from the worktree named *branch*.
+
+        ``None`` when this worktree has never been read — which is precisely what
+        tells adoption it has no baseline to diff against, and so may add
+        bookmarks but not take any away (see
+        :func:`~origenerator.branch_session.adopt_branch_curation`). A record
+        written by a future version and unreadable here counts as never read, for
+        the same reason: guessing is what a missing baseline forbids.
+        """
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT state_json FROM branch_curation WHERE branch = ?",
+                (branch,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            state = json.loads(row["state_json"])
+        except (TypeError, ValueError):
+            return None
+        return state if isinstance(state, dict) else None
+
+    def set_branch_curation_state(self, branch: str, state: dict):
+        """Remember a worktree's bookmarks as of now, so the next launch can tell
+        what the branch changed from what it merely inherited."""
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO branch_curation (branch, state_json, adopted_at)
+                   VALUES (?, ?, datetime('now'))
+                   ON CONFLICT(branch) DO UPDATE SET
+                       state_json = excluded.state_json,
+                       adopted_at = excluded.adopted_at""",
+                (branch, json.dumps(state)),
+            )
 
     # --- custom folders: the groupings the user composes by hand -------------
 

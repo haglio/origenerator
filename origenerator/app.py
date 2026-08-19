@@ -307,6 +307,17 @@ def main():
         except Exception as e:
             logger.warning("Branch-session adoption failed: %s", e)
 
+        # And the bookmarks that session made on everything else. Separately
+        # guarded: a worktree database that defeats one pass has no bearing on
+        # the other, and neither is worth a failed launch.
+        from origenerator.branch_session import adopt_branch_curation
+        try:
+            marked = adopt_branch_curation(db, PROJECT_DIR / ".claude" / "worktrees")
+            if marked:
+                logger.info("Adopted %d bookmark(s) from branch sessions", marked)
+        except Exception as e:
+            logger.warning("Branch-session bookmark adoption failed: %s", e)
+
         status("Reconnecting to running generations...")
         # Resolve any generation left mid-run by a previous session against ComfyUI
         # (finished-while-away, still-running, or gone). Runs before the import below

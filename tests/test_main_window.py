@@ -108,6 +108,33 @@ def test_persists_the_audio_switch_on_close(qtbot, tmp_path):
     assert state.get("audio_enabled") is True
 
 
+def test_the_app_opens_listening(qtbot, tmp_path):
+    # The one switch that starts on. Spoken commands are worth nothing unheard,
+    # and a switch you have to remember to flip before speaking is one you find
+    # out about by talking to an app that wasn't listening — so a session with
+    # nothing to say about the mic opens it.
+    win = _window(qtbot, tmp_path)
+    assert win._gallery_view.mic_enabled() is True
+
+
+def test_restores_a_closed_mic_from_app_state(qtbot, tmp_path):
+    # Switched off, it stays off at the next launch: on is the default, not a
+    # setting that reasserts itself over the user.
+    state = AppState(tmp_path / "ui.json")
+    state.set("mic_enabled", False)
+    win = _window(qtbot, tmp_path, state)
+    assert win._gallery_view.mic_enabled() is False
+
+
+def test_persists_the_mic_switch_on_close(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    win = _window(qtbot, tmp_path, state)
+    win._gallery_view.set_mic_enabled(False)
+
+    win.close()  # closeEvent persists the session
+    assert state.get("mic_enabled") is False
+
+
 def test_restores_the_experiments_switch_from_app_state(qtbot, tmp_path):
     # The background experimenter resumes across launches — "spend the time I'm
     # not here" is a standing preference, not a per-session one.

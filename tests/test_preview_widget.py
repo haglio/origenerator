@@ -752,7 +752,7 @@ def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
     assert not w._notice_dim.isHidden()  # the picture behind it is dimmed
 
 
-def test_the_dim_covers_the_media_and_the_plate_rides_its_top(make_preview, tmp_path):
+def test_the_dim_covers_the_media_and_the_plate_sits_top_left(make_preview, tmp_path):
     w = make_preview()
     w._media_host.resize(300, 200)
     w.show_image(_make_png(tmp_path / "p.png"))
@@ -760,7 +760,9 @@ def test_the_dim_covers_the_media_and_the_plate_rides_its_top(make_preview, tmp_
     w.set_notice("modified")
 
     assert w._notice_dim.geometry() == w._media_host.rect()   # the whole picture
-    assert w._notice.y() < w._media_host.height() // 2        # ...and the message on top
+    # ...and the message in its top-left corner, clear of both edges.
+    assert 0 < w._notice.x() < w._media_host.width() // 2
+    assert 0 < w._notice.y() < w._media_host.height() // 2
     assert w._notice.width() <= w._media_host.width()
 
 

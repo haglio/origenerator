@@ -580,3 +580,116 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     assert len(cells) == 3                 # widened back to the whole set
     assert show._playlist.index == 0       # back at the top of the pass
     assert locked is False                 # the hold released with everything else
+
+
+def test_the_regions_open_on_the_whole_library_of_their_own_shape(
+        qtbot, tmp_path, monkeypatch):
+    """The base state of origenerator mode: each region shuffling every item of
+    its own orientation, the way each satellite player shuffles the whole
+    library of its own.
+
+    It opened on the Latest shelf before this — a recent slice rather than the
+    library — and on a black screen before that.
+    """
+    view = _fun_time_view(qtbot)
+    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    Image.new("RGB", (200, 100)).save(wide)
+    library = {
+        "__all__::portrait": [{"prompt_id": "p-1", "thumbnail_path": str(tall)}],
+        "__all__::landscape": [{"prompt_id": "l-1", "thumbnail_path": str(wide)}],
+    }
+    monkeypatch.setattr(view, "_rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(
+        view, "_slideshow_items",
+        lambda rows: [(row["thumbnail_path"], "image", row["prompt_id"],
+                       row["thumbnail_path"]) for row in rows])
+
+    view.fill_the_regions()
+
+    for side in ("portrait", "landscape"):
+        show = view.region_show(side)
+        assert show is not None and show.isVisible()
+        assert show.hud_order_label == "Shuffle"
+        cells, _position, _locked = show.hud_items()
+        assert [path for path, _still in cells] == \
+            [library[f"__all__::{side}"][0]["thumbnail_path"]]
+        qtbot.addWidget(show)
+    # And each remembers WHERE it plays from, so what lands in the library
+    # reaches a region sitting in its base state.
+    assert sorted(where for _show, where in view._live_shows) == [
+        "__all__::landscape", "__all__::portrait"]
+
+
+def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
+    """``__all__::portrait`` is the whole library narrowed to one shape, and it
+    stays re-askable: the base state holds the key rather than the rows, so a
+    region asked again after a generation lands sees the new item too."""
+    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    Image.new("RGB", (200, 100)).save(wide)
+    from tests.test_gallery_view import _row
+    rows = [
+        _row("p-1", "sdxl_t2i", {"positive_prompt": "a", "seed": 1},
+             "sdxl_t2i_p1.png", thumbnail_path=str(tall)),
+        _row("l-1", "sdxl_t2i", {"positive_prompt": "b", "seed": 2},
+             "sdxl_t2i_l1.png", thumbnail_path=str(wide)),
+    ]
+    view = _fun_time_view(qtbot, rows)
+    view.refresh()
+
+    everything = {row["prompt_id"] for row in view._rows_at("__all__")}
+    assert everything == {"p-1", "l-1"}
+    assert [row["prompt_id"] for row in view._rows_at("__all__::portrait")] == ["p-1"]
+    assert [row["prompt_id"] for row in view._rows_at("__all__::landscape")] == ["l-1"]
+
+
+def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
+        qtbot, tmp_path, monkeypatch):
+    """Reset means on a show what it means on a player: the narrowing comes off
+    and the side goes back to browsing its whole library.  A show started on
+    one folder therefore leaves that folder — restarting it would be the one
+    thing reset is not."""
+    from origenerator.gui.show_hud import ShowHud
+
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(5)]
+    monkeypatch.setattr(view, "_rows_at",
+                        lambda key: base if key == "__all__::portrait" else [])
+    _open_slideshow(view, monkeypatch, tmp_path, "folder", 100, 200, count=2)
+    # _open_slideshow stubs the items for the folder it opened; from here the
+    # rows the library hands back are the items.
+    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+    assert len(show.hud_items()[0]) == 2      # the folder it was started on
+    view._live_shows = [(show, "folder-a")]
+
+    hud._deliver("portrait_reset")
+
+    assert len(show.hud_items()[0]) == len(base)   # the library of its shape
+    assert show.hud_order_label == "Shuffle"
+    # And it is fed from the library now, not from the folder it left.
+    assert [where for _show, where in view._live_shows] == ["__all__::portrait"]
+
+
+def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypatch):
+    """Standalone there is no base state to go back to, so reset is the show's
+    own: F-mode off, the hold released, the top of its set on screen."""
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view._slideshow
+    qtbot.addWidget(show)
+    show._playlist.jump_to(1)
+    show._toggle_lock()
+
+    show.stroke_reset()
+
+    assert show._playlist.index == 0
+    assert show._playlist.locked is False
+    assert len(show.hud_items()[0]) == 3

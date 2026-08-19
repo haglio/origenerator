@@ -77,9 +77,13 @@ class SlideshowView(QWidget):
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
                  on_lock=None, player=None, stroke=None, pace=None,
                  on_drive_toggle=None, parent=None, order_label="Shuffle",
-                 starred_ids=None):
+                 starred_ids=None, on_reset=None):
         super().__init__(parent)
         self._on_delete = on_delete
+        # Where reset means something bigger than this show: hosted, a region
+        # has a base state to go back to, and only the gallery knows it (see
+        # :meth:`stroke_reset`).  Standalone there is none, and reset is local.
+        self._on_reset = on_reset
         # Told when a hold engages (with the held item's prompt_id): a hosting
         # session answers a lock by opening that item as a generate tab.
         self._on_lock = on_lock
@@ -377,17 +381,43 @@ class SlideshowView(QWidget):
 
     def stroke_reset(self) -> None:
         """Put the side back how it started, the players' own reset: F-mode
-        dropped, the hold released, and the top of the set on screen again.
+        dropped, the hold released, and the base set on screen again.
 
-        A show's defaults are simply its whole set from the beginning — there
-        is no filter or loop here to clear, which on a player is most of what
-        reset means.
+        Hosted, "how it started" is the REGION's base state, not this show's
+        own: a player's reset drops its filter and leaves it browsing its whole
+        library again, so a show started on one folder goes back to the library
+        too rather than restarting that folder.  The gallery owns that set, so
+        it comes in as a hook.  Standalone there is no such state and a show's
+        defaults are simply its own set from the beginning.
         """
+        if self._on_reset is not None:
+            self._on_reset(self)
+            return
+        self.reset_in_place()
+
+    def reset_in_place(self) -> None:
+        """This show's own reset: F-mode dropped, the hold released, and the top
+        of the set it is already playing back on screen."""
         if self._f_mode:
             self.toggle_f_mode()
         self._playlist.unlock()
         self._playlist.restart()
         self._show_current()
+
+    def retune(self, items, *, order_label="Shuffle") -> None:
+        """Point this show at *items* instead, back at its own defaults.
+
+        What a hosted reset does with the region's base set.  The window stays
+        up rather than being closed and reopened: it covers a satellite player,
+        and a region that blinks black between two shows is the thing the base
+        state exists to avoid.  F-mode and the hold come off the way any reset
+        takes them off, and the pass is a fresh shuffle.
+        """
+        self._f_mode = False
+        self._all_items = list(items)
+        self.hud_order_label = order_label
+        self._live = not items
+        self._replace_items(self._all_items)
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does

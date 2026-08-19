@@ -92,6 +92,7 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.gui.shelf_orientation import (
     ORIENTATION_LABELS as _ORIENTATION_LABELS,
+    filter_rows,
     oriented_key,
     split_key as _split_shelf_key,
 )
@@ -1243,6 +1244,7 @@ class GalleryView(QWidget):
             on_star=self._star_generation,
             on_lock=(self._open_generate_tab_for
                      if self._fun_time is not None else None),
+            on_reset=(self.reset_region if self._fun_time is not None else None),
             pace=self._pace, stroke=self._osr2_stroke,
             # Its Space reaches the one OSR2 switch, like every other surface's.
             on_drive_toggle=self._toggle_osr2_drive, **kwargs)
@@ -3153,27 +3155,67 @@ class GalleryView(QWidget):
             return self.region_show(side)
         return self._slideshow
 
+    def region_base_location(self, side: str) -> str:
+        """Where a region plays from with nothing else asked for: the whole
+        library, narrowed to that region's shape.
+
+        The base state of origenerator mode, and what its reset goes back to.
+        It is what the satellite players do in player mode — each shuffles the
+        whole library of its own orientation — and this side is meant to read
+        the same way.
+        """
+        return oriented_key(gallery.ALL_KEY, side)
+
     def fill_the_regions(self) -> None:
         """Put a show on each region: the whole library, shuffled, one shape each.
 
         What entering origenerator mode means — the session's own mode opens
         with both players playing, so this one opens with both regions playing
         rather than with two empty rectangles and a mode that has to be started
-        by hand.  Each side gets the shape it can show, which is the same split
-        a shelf's Portrait/Landscape subfolders make, and a region already
+        by hand.  Each side gets the shape it can show, and a region already
         holding a show is left alone: the switch is no reason to interrupt
         something already up.
         """
         for side in ("portrait", "landscape"):
             if self.region_show(side) is not None:
                 continue
-            key = oriented_key(_RECENTS_KEY, side)
-            items = self._slideshow_items(self._browser.rows_for_shelf(key) or [])
+            key = self.region_base_location(side)
+            items = self._slideshow_items(self._rows_at(key))
             if not items:
                 logger.info("Nothing of %s shape to open on the %s region", side, side)
                 continue
             self._open_slideshow(items, location=key, side=side,
                                  starred_ids=self._starred_prompt_ids())
+
+    def _side_of(self, show) -> str | None:
+        """Which satellite region *show* is holding, if it holds one."""
+        return next((side for side, held in self._region_shows.items()
+                     if held is show), None)
+
+    def reset_region(self, show) -> None:
+        """A region's reset: back to the base state, not to the top of whatever
+        that region happens to be playing.
+
+        The players' own meaning of the button — reset drops the narrowing and
+        leaves the satellite shuffling its whole library again — so a show
+        started on one folder goes back to the library of its shape.  A region
+        with nothing to play there, and a show holding no region at all, fall
+        back to the show's own reset rather than emptying the screen.
+        """
+        side = self._side_of(show)
+        if side is None:
+            show.reset_in_place()
+            return
+        key = self.region_base_location(side)
+        items = self._slideshow_items(self._rows_at(key))
+        if not items:
+            show.reset_in_place()
+            return
+        # The show is being re-pointed, so what feeds it has to move with it:
+        # a generation landing in the library must reach a reset region.
+        self._live_shows = [(held, key if held is show else where)
+                            for held, where in self._live_shows]
+        show.retune(items, order_label="Shuffle")
 
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
@@ -3586,14 +3628,24 @@ class GalleryView(QWidget):
         return getattr(group, "key", None)
 
     def _rows_at(self, location) -> list[dict]:
-        """What a show opened at *location* would play if it opened now."""
+        """What a show opened at *location* would play if it opened now.
+
+        A key can name a shape as well as a place: the shelves narrow
+        themselves (``rows_for_shelf`` splits the key it is handed), and a
+        folder key is resolved from its base and narrowed here.  That is what
+        lets a region's base state be "the whole library, this side's shape"
+        and still be re-askable as the library grows.
+        """
         if not location:
             return []
         rows = self._browser.rows_for_shelf(location)
         if rows is not None:
             return rows
-        group = self._group_for_key(location)
-        return gallery.rows_under(group) if group is not None else []
+        base, orientation = _split_shelf_key(location)
+        group = self._group_for_key(base)
+        if group is None:
+            return []
+        return filter_rows(gallery.rows_under(group), orientation)
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
         """A lock on a hosted show: go to the held item, in the browser and in

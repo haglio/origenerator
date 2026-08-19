@@ -8050,6 +8050,26 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     assert view._queue.keys() == [job.prompt_id]
 
 
+def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path):
+    # With no card of its own, the run shows only on the tile of the image it is
+    # upgrading — and that image can have been made a thousand tiles ago, where
+    # nobody would find it. What is being done to an image is the newest thing
+    # about it, so the shelf lists it by that, and it stays there once the
+    # enhancement has folded in.
+    db = _enhanceable_db(tmp_path, count=3)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+    assert view.visible_prompt_ids() == ["g2", "g1", "g0"]  # newest generated first
+
+    view.enhance_items(["g0"])
+    view.refresh()          # the launch's transient row is in the DB now
+
+    assert view.visible_prompt_ids() == ["g0", "g2", "g1"]
+    assert view._browser._thumb_widgets["g0"].is_enhancing()
+
+
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     # A batch shares one folder and so one frame slot: the frame there belongs
     # to whichever of them ComfyUI is running, and lending it to the tiles queued

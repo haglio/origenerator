@@ -473,6 +473,55 @@ def enhance_targets_row(input_image: str | None, row: dict) -> bool:
     return name in {_frame_name(f.get("filename")) for f in row_output_files(row)}
 
 
+def enhancement_recency(rows) -> dict[str, int]:
+    """Each image's newest enhancement, as the id of the run that made it —
+    ``{prompt_id: id}``, for the images that have one.
+
+    An enhancement is not an item beside the image but something that happens to
+    it, so the shelf that lists what you have lately made has to list the image
+    itself, moved: it belongs where its enhancement falls in the library's order,
+    not where its own generation does (:func:`~origenerator.gallery.tree.
+    recent_generations`). A run's id is that place, and it is available at both
+    ends of the run — in flight it is the transient enhance row still among
+    ``rows``, and once folded it is the id recorded on the level the run left
+    behind.
+
+    An image enhanced before that id was recorded has none here and keeps its own
+    place, which is the right answer: an enhancement older than the record of it
+    is an enhancement from long ago.
+    """
+    holders: dict[str, str] = {}
+    for row in rows:
+        # Every file an image holds, not just its leading one: a first enhance
+        # runs on the image's output and a re-enhance on the original still
+        # listed behind it, and both are the same image — the match
+        # :func:`enhance_targets_row` makes one row at a time, indexed. First
+        # match wins over the newest-first rows, which is the row
+        # :func:`fold_enhancement` will pick when the run lands.
+        if media_type_of_row(row) != "image":
+            continue
+        for stored in row_output_files(row):
+            name = _frame_name(stored.get("filename"))
+            if name:
+                holders.setdefault(name, row.get("prompt_id"))
+    recency: dict[str, int] = {}
+
+    def note(prompt_id, run_id):
+        if isinstance(run_id, int) and run_id > recency.get(prompt_id, 0):
+            recency[prompt_id] = run_id
+
+    for row in rows:
+        if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
+            name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+            target = holders.get(name) if name else None
+            if target is not None and target != row.get("prompt_id"):
+                note(target, row.get("id"))
+        for entry in parse_file_list(row.get("enhance_history")):
+            if isinstance(entry, dict):
+                note(row.get("prompt_id"), entry.get("run_id"))
+    return recency
+
+
 def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     """The members of a folder its Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked
@@ -713,13 +762,19 @@ def enhance_level_params(row: dict) -> dict:
     return level
 
 
-def _history_entries(files: list[dict], params: dict) -> list[dict]:
+def _history_entries(files: list[dict], params: dict,
+                     run_id: int | None) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
-    name and the knobs that made it, so a level can name its own settings even
-    after the transient job row is gone."""
+    name, the knobs that made it — so a level can name its own settings even
+    after the transient job row is gone — and ``run_id``, the id that row had.
+
+    The id is kept for the same reason: the row about to be deleted is what said
+    where this enhancement falls in the library's order, and the image it
+    upgraded sorts on the shelf by the newest one it has received
+    (:func:`enhancement_recency`)."""
     settings = _level_knobs(params)
     return [
-        {"filename": f.get("filename"), "params": settings}
+        {"filename": f.get("filename"), "params": settings, "run_id": run_id}
         for f in files if f.get("filename")
     ]
 
@@ -768,7 +823,8 @@ def fold_enhancement(db, enhance_row: dict,
     updates = {
         "output_files": json.dumps(enhanced_files + row_output_files(source)),
         "enhance_history": json.dumps(
-            _history_entries(enhanced_files, enhance_level_params(enhance_row))
+            _history_entries(enhanced_files, enhance_level_params(enhance_row),
+                             enhance_row.get("id"))
             + parse_file_list(source.get("enhance_history"))
         ),
     }

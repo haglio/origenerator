@@ -26,7 +26,11 @@ Qt dependency so it can be unit-tested directly.
 
 import json
 
-from origenerator.gallery.enhance import BASE_RENDER_SOURCE, ENHANCE_WORKFLOW
+from origenerator.gallery.enhance import (
+    BASE_RENDER_SOURCE,
+    ENHANCE_WORKFLOW,
+    enhancement_recency,
+)
 from origenerator.gallery.groups import (
     AllGroup,
     LoraGroup,
@@ -300,6 +304,14 @@ def recent_generations(
     in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
 
+    An image being enhanced, or lately enhanced, sits where the *enhancement*
+    falls in that order rather than where its own generation does
+    (:func:`~origenerator.gallery.enhance.enhancement_recency`). An enhancement
+    has no card of its own here — it is a version of an image, not an item beside
+    one — so if it did not move the image, the work would be listed nowhere and
+    the picture being worked on could sit a thousand tiles down, unfindable. What
+    an image is having done to it is the newest thing about it.
+
     Nothing is capped here: the shelf keeps going as far back as the user has ever
     generated, and the pane draws a page of tiles at a time as it's scrolled into
     (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow_recents`).
@@ -308,11 +320,20 @@ def recent_generations(
     the ``media_type_of_row`` values to keep. ``None`` (the default) keeps every
     type; an empty set keeps none.
     """
-    return [
+    listed = [
         row for row in rows
         if (row.get("source") or "generated") == "generated" and produced_output(row)
         and (media_types is None or media_type_of_row(row) in media_types)
     ]
+    # Ids are the order the caller already handed them in, so a row with no
+    # enhancement sorts exactly where it arrived, and rows that tie (a caller
+    # holding rows with no id at all) keep the order they came in — this only
+    # ever lifts an image its enhancement has moved ahead of.
+    bumped = enhancement_recency(rows)
+    return sorted(
+        listed, reverse=True,
+        key=lambda row: max(bumped.get(row.get("prompt_id"), 0), row.get("id") or 0),
+    )
 
 
 def starred_generations(rows: list[dict]) -> list[dict]:

@@ -831,6 +831,7 @@ class GenerateConfigPanel(QWidget):
             return  # nothing to look at; leave the frames rather than blank the pane
         self._preview.show_media(*preview)
         self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
+        self._arm_preview_actions(row["prompt_id"])  # …and wears its corners
 
     def _display_result(self, row: dict, image_rows: list[dict], request=None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
@@ -849,18 +850,26 @@ class GenerateConfigPanel(QWidget):
         self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
-    def _arm_preview_actions(self):
+    def _arm_preview_actions(self, prompt_id: str | None = None):
         """Point the preview's corners and right-click menu at what is on it.
 
-        Re-run after every change to the picture, because everything the corners
-        report can move under it: the row itself when the tab looks at another
-        generation, its bookmark when the menu toggles one, and what its plus is
-        offering whenever a knob turns on the Enhance panel. An autoshow arms them
-        as readily as an explicit selection — the footer stays hidden there because
-        an autoshow is a peek rather than a choice, but the picture is a real
-        generation and starring it means exactly what starring it anywhere means.
+        Re-run after every change to the picture, because showing media is what
+        takes them away — a control on a picture can no more outlive that picture
+        than the "no longer these settings" notice beside it can — and because
+        everything they report moves under the picture too: the bookmark when the
+        menu toggles one, what the plus is offering whenever a knob turns on the
+        Enhance panel. An autoshow arms them as readily as an explicit selection:
+        the footer stays hidden there because an autoshow is a peek rather than a
+        choice, but the picture is a real generation and starring it means exactly
+        what starring it anywhere means.
+
+        ``prompt_id`` names the generation when it is NOT the row this tab holds —
+        a suppressed re-selection puts another item's output in the preview
+        without the tab taking it on (:meth:`show_selection_media`), and the
+        corners have to be about the picture rather than about the row behind it.
         """
-        row = self._displayed_row
+        row = (self._displayed_row if prompt_id is None
+               else self._db.get_generation(prompt_id))
         if row is None:
             self._preview.set_actions(None)
             return
@@ -868,6 +877,24 @@ class GenerateConfigPanel(QWidget):
             row["prompt_id"], starred=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
         )
+
+    def show_selection_media(self, preview, prompt_id: str):
+        """Put ``prompt_id``'s output in this tab's preview and nothing else — no
+        form, no footer, and the row the tab holds left alone.
+
+        The light-touch refresh a suppressed re-selection makes: the rebuild after
+        every poll, and a Back/Forward that never re-seeded the form. Everything
+        the picture carries is re-asserted here, because showing media clears the
+        lot — the drag payload, the modified notice, and the corner controls. The
+        gallery reaches for this rather than the preview directly, so a surface
+        the tab owns is only ever driven through the tab.
+        """
+        self._preview.show_media(*preview)
+        self._preview.set_draggable_id(prompt_id)
+        self._arm_preview_actions(prompt_id)
+        # Re-showing the media clears whatever the pane was saying about it, so
+        # put this tab's own notice back if its form still deviates.
+        self.refresh_modified_notice()
 
     def _note_displayed_config(self):
         """Take the settings the generation now on display is being shown under as

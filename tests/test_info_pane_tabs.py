@@ -580,19 +580,29 @@ def test_clear_current_preview_clears_the_front_tab(tabs):
     panel._preview.clear.assert_called_once()
 
 
-def test_show_result_in_current_tab_keeps_a_prompt_typed_while_it_ran(tabs):
-    # A Generate finishing in the front tab lands its result there, but must not
-    # wipe a prompt the user has since typed into that same tab's form.
+def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
+    # A Generate finishing in the tab that launched it lands its result there, but
+    # must not wipe a prompt the user has since typed into that same tab's form.
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a cat", seed=1),
                         "sdxl_g1.png")
     panel = _pick_workflow(tabs.current_config_panel())
     panel._preview.show_media = MagicMock()
+    panel.note_launched("g1")  # this tab's own Generate started it
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
-    tabs.show_result_in_current_tab(row, [row])
+    tabs.panel_that_launched("g1").show_completed_result(row, [row])
 
     assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
     assert panel._displayed_row is row  # the finished result is on display
+
+
+def test_a_run_no_tab_launched_belongs_to_no_tab(tabs):
+    # The gallery's own launches — the folder tile's "+", the auto-generate loop —
+    # are nobody's Generate. Their results must not land in whatever tab happens to
+    # be in front: filling the pane's blank resting tab with a picture stopped it
+    # being the tab a click loads into, so the next click opened one beside it.
+    assert tabs.panel_that_launched("never-launched-here") is None
+    assert tabs.panel_that_launched(None) is None
 
 
 # --- double-clicking a tab keeps it ----------------------------------------

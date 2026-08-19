@@ -1437,7 +1437,8 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
     qtbot.addWidget(view)
     view.refresh()
     shown = []
-    monkeypatch.setattr(view, "_show_reroll_result_in_tab", shown.append)
+    monkeypatch.setattr(view, "_show_reroll_result_in_tab",
+                        lambda row, launcher: shown.append(row))
 
     view._on_reroll_finished("some-key", "e1")   # a background experiment landing
     assert shown == []                           # the user's tab is left alone
@@ -4851,6 +4852,80 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     assert panel._generating_prompt_id == view._reroll_jobs[key].prompt_id
 
 
+def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
+    # The reported bug: a loop left running while the user browsed grew a row of
+    # tabs, one per image it made. Each finished variation was loaded into whatever
+    # tab was in front — the pane's resting tab, which nothing in it had asked for
+    # the picture, and which then stopped being blank, so the next clicked
+    # generation opened a tab beside it rather than loading into it.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._toggle_auto(True)
+    for _ in range(3):  # three variations land while the user watches
+        client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    assert view._info_tabs.count() == 1
+    panel = view._info_tabs.current_config_panel()
+    assert panel.is_blank()  # the resting tab is still the one a click loads into
+
+    landed = next(r for r in db.list_generations() if r["status"] == "completed")
+    view._on_thumbnail_clicked(landed["prompt_id"])
+
+    assert view._info_tabs.count() == 1  # it filled that tab instead of forking one
+
+
+def test_auto_generate_still_ends_in_the_tab_following_that_folder(qtbot, tmp_path):
+    # A tab showing the looping folder claims each launch (it draws the progress and
+    # the Next-seed button), so the variation it was showing being made is what it
+    # ends up showing. Only tabs that asked for nothing are left alone.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    panel = _folder_tab(view, db)
+
+    view._toggle_auto(True)
+    job = view._reroll_jobs[key]
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert panel._displayed_row["prompt_id"] == job.prompt_id
+
+
+def test_the_loops_result_replaces_its_frames_without_taking_the_tab(
+        qtbot, tmp_path, monkeypatch):
+    # The pane mirrors the loop's live frames whoever launched it, so when a
+    # variation lands its picture belongs where those frames were — otherwise the
+    # pane (and a fullscreen show opened over it) sits on a half-drawn frame of a
+    # run that is over. The preview only: the tab holds none of a run it never
+    # asked for, so it is still the blank one a click loads into.
+    from origenerator.gui import generate_config_panel as gcp_module
+
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    panel = view._info_tabs.current_config_panel()
+    panel._preview.show_media = MagicMock()
+    done = tmp_path / "done.png"
+    Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, output_dir: (done, "image"))
+
+    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    panel._preview.show_media.assert_called_with(done, "image")  # the picture it made
+    assert panel._displayed_row is None and panel.is_blank()     # not the tab's own
+
+
 def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):
     # The claim is by folder, so a tab parked on a different recipe stays idle
     # rather than showing progress for a run that has nothing to do with it.
@@ -5568,33 +5643,54 @@ def test_finishing_a_selected_reroll_clears_the_reroll_selection(qtbot, tmp_path
     assert view._selected_reroll_key is None
 
 
-def test_finishing_a_reroll_loads_its_result_into_the_front_tab(qtbot, tmp_path):
+def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot, tmp_path):
     # Change 4: a Generate ends on its result. When the re-roll it launched finishes,
-    # the just-saved generation loads into the front config tab (show_completed_result),
-    # so the tab shows the finished item — not the live-frame or idle placeholder.
+    # the just-saved generation loads into that tab (show_completed_result), so it
+    # shows the finished item — not the live-frame or idle placeholder.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, job = _running_reroll(view)
+    panel = view._info_tabs.current_config_panel()
+    key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
+    job = view._reroll_jobs[key]
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
 
-    panel = view._info_tabs.current_config_panel()
     assert panel._displayed_row is not None
     assert panel._displayed_row["prompt_id"] == job.prompt_id  # the just-finished result
 
 
-def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
-    # The reported bug, end to end: the user keeps typing the next prompt while a
-    # Generate runs; when it finishes, loading its result into the front tab must
-    # not re-seed the form and wipe what they typed.
+def test_a_run_no_tab_launched_lands_in_no_tab(qtbot, tmp_path):
+    # The folder tile's "+" is the gallery's launch, not a tab's Generate, so its
+    # result belongs to no tab. It used to fill the front one whatever that was —
+    # which left the pane's resting tab holding a picture nothing in it had asked
+    # for, and no longer blank, so the next clicked generation opened a tab beside
+    # it instead of loading into it.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    panel = _tab_with_prompts(view)
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    panel = view._info_tabs.current_config_panel()
+    assert panel._displayed_row is None   # the resting tab was not taken over
+    assert panel.is_blank()               # ...so it is still the tab a click fills
+
+
+def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
+    # The reported bug, end to end: the user keeps typing the next prompt while a
+    # Generate runs; when it finishes, loading its result into that tab must not
+    # re-seed the form and wipe what they typed.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
+    job = view._reroll_jobs[key]
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes

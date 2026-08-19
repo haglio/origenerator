@@ -76,10 +76,12 @@ class RerollController(QObject):
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     preview = pyqtSignal(str, bytes)  # (folder key, frame) a job streamed a frame
-    # (folder key, prompt_id) a re-roll finished and was saved. The prompt_id
-    # tells the view whose completion this is — a user re-roll gets loaded into
-    # the front tab, a background experiment leaves the tabs alone.
-    finished = pyqtSignal(str, str)
+    # (folder key, prompt_id, origin) a re-roll finished and was saved. The
+    # prompt_id tells the view whose completion this is — a background experiment
+    # leaves the tabs alone. The origin is the id the run began under (its own,
+    # unless a chained i2v carried it across the hand-off), which is how the view
+    # finds the tab that launched it — the only tab its result belongs in.
+    finished = pyqtSignal(str, str, str)
     failed = pyqtSignal(str)          # (folder key) a re-roll failed
 
     def __init__(self, db, client, parent=None):
@@ -618,7 +620,7 @@ class RerollController(QObject):
         self._drop(key, job)
         self._pump()  # the machine is free: start whatever is next
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
-        self.finished.emit(key, job.prompt_id)
+        self.finished.emit(key, job.prompt_id, job.origin)
 
     def _on_failed(self, key, job, message):
         self._drop(key, job)

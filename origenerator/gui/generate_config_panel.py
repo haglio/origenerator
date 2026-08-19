@@ -690,6 +690,24 @@ class GenerateConfigPanel(QWidget):
         """
         self._display_result(row, image_rows)
 
+    def show_finished_media(self, row: dict):
+        """Put a finished run's saved output in the preview alone — no footer, no
+        form, and not as this tab's displayed generation.
+
+        What the tab *mirroring* a run shows when it lands: the live frames it has
+        been streaming give way to the picture they were making (and a fullscreen
+        show opened over them lands on it too), while the tab itself stays whatever
+        it was. That last part is the point — a run this tab didn't launch must not
+        make the pane's blank resting tab hold a generation, or a click would open
+        a tab beside it instead of filling it. The tab that *did* launch the run
+        gets the whole end-state through :meth:`show_completed_result`.
+        """
+        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is None:
+            return  # nothing to look at; leave the frames rather than blank the pane
+        self._preview.show_media(*preview)
+        self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
+
     def _display_result(self, row: dict, image_rows: list[dict], request=None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
         generation, whether freshly browsed or just completed. The form is left

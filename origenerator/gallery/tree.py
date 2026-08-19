@@ -512,10 +512,11 @@ def build_gallery_tree(
     folder_meta = folder_meta or {}
     # A running standalone enhance is machinery, not a generation: its result
     # folds into the image it upgrades, so its transient row must not grow an
-    # "Image Enhance" folder while it cooks (its progress shows as an in-flight
-    # card on Recents). A completed one still in the DB — its source image
-    # deleted before it could fold — stays visible, so it can be found and
-    # deleted rather than haunting the disk invisibly.
+    # "Image Enhance" folder while it cooks (its progress shows on the tile of
+    # the image it is upgrading, under that tile's "Enhancing…" scrim — the
+    # Recents shelf gives it no card of its own either). A completed one still
+    # in the DB — its source image deleted before it could fold — stays visible,
+    # so it can be found and deleted rather than haunting the disk invisibly.
     rows = [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))

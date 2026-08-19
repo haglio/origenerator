@@ -7938,6 +7938,26 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     assert not tile.is_enhancing()
 
 
+def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
+    # An enhancement is a version of an image, not an item beside it — so the
+    # shelf shows the run on that image's own tile, under the scrim, and never as
+    # a second card claiming something else is being made. The bottom strip's
+    # queue still lists it: that is what the GPU is doing.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+    view.refresh()          # the launch's transient row is in the DB now
+    _open_recents(view)
+
+    assert job.prompt_id not in view._inflight_cards
+    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._queue.keys() == [job.prompt_id]
+
+
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     # A batch shares one folder and so one frame slot: the frame there belongs
     # to whichever of them ComfyUI is running, and lending it to the tiles queued

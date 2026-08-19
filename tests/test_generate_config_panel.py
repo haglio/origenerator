@@ -89,6 +89,51 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
         assert not panel._scroll.horizontalScrollBar().isVisible(), f"at {width}px"
 
 
+def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
+    """Narrowed, the buttons drop onto further lines, each still at its full width.
+
+    The failure this exists for: a row layout squeezed them past their minimum and
+    clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    buttons = [panel._folder_btn, panel._evolver_btn, panel._genau_btn,
+               panel._cancel_btn, panel._generate_btn]
+    for button in buttons:
+        button.show()          # the busiest the bank ever is: every button on
+    panel.show()
+
+    panel.resize(340, 800)
+    QApplication.processEvents()
+
+    for button in buttons:
+        assert button.width() == button.sizeHint().width(), button.text()
+    assert len({button.y() for button in buttons}) > 1        # it wrapped
+    # ...and every line still ends in the corner the bank sits in.
+    lines = {}
+    for button in buttons:
+        lines[button.y()] = max(lines.get(button.y(), 0), button.x() + button.width())
+    assert len(set(lines.values())) == 1
+
+
+def test_the_pane_keeps_a_margin_round_its_contents(panel):
+    # Nothing sits flush against the tab's edge — not the preview at the top, not
+    # the settings down either side, not the button bank at the bottom.
+    from origenerator.gui.generate_config_panel import _PANE_MARGIN
+
+    panel.show()
+    panel.resize(700, 800)
+
+    top_left = panel._preview.mapTo(panel, panel._preview.rect().topLeft())
+    assert top_left.x() == _PANE_MARGIN
+    assert top_left.y() == _PANE_MARGIN
+    scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
+    assert panel.width() - scroll_right - 1 == _PANE_MARGIN
+    generate = panel._generate_btn
+    bottom = generate.mapTo(panel, generate.rect().bottomLeft()).y()
+    assert panel.height() - bottom - 1 == _PANE_MARGIN
+
+
 def _layout_containing(root, widget):
     """DFS a layout tree for the layout directly holding ``widget``."""
     for i in range(root.count()):

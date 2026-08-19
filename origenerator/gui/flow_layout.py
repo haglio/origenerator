@@ -7,10 +7,18 @@ class FlowLayout(QLayout):
 
     Unlike ``QGridLayout``'s fixed column count, this fits as many items per row
     as the current width allows and reflows on resize, so a pane of fixed-size
-    tiles uses the whole width instead of stopping at an arbitrary column.
+    tiles uses the whole width instead of stopping at an arbitrary column. And
+    unlike ``QHBoxLayout``, an item is always laid out at its own size hint: a row
+    of buttons wraps onto a second line rather than squeezing every label down to
+    an unreadable stub.
+
+    ``align_right`` pushes each row against the right edge, for a bank of buttons
+    that sits in that corner — the rows stay ragged on the left, the way a button
+    bank reads, instead of walking away from the corner as it wraps.
     """
 
-    def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None):
+    def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
+                 align_right=False):
         """*row_spacing* is the gap BETWEEN wrapped rows, defaulting to *spacing*.
 
         They are separate because a row of buttons wants its members close and
@@ -20,6 +28,7 @@ class FlowLayout(QLayout):
         super().__init__(parent)
         self._items = []
         self._row_spacing = spacing if row_spacing is None else row_spacing
+        self._align_right = align_right
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
 
@@ -70,23 +79,39 @@ class FlowLayout(QLayout):
         """Flow items across ``rect``; return the total height they occupy.
 
         With ``place`` false, only measure (for :meth:`heightForWidth`); with it
-        true, also position each item — the path Qt drives on resize.
+        true, also position each item — the path Qt drives on resize. The rows are
+        worked out first and placed after, because a right-aligned row cannot be
+        positioned until it is known how wide it ended up.
         """
         margins = self.contentsMargins()
         area = rect.adjusted(margins.left(), margins.top(),
                              -margins.right(), -margins.bottom())
         spacing = self.spacing()
-        x, y, row_height = area.x(), area.y(), 0
+        rows, row = [], []
+        x, row_height = area.x(), 0
         for item in self._items:
             if item.isEmpty():
                 continue  # a hidden widget takes no slot, and no gap where one was
             hint = item.sizeHint()
             if x > area.x() and x + hint.width() > area.right():
-                x = area.x()                     # this item won't fit; wrap
-                y += row_height + self._row_spacing
-                row_height = 0
-            if place:
-                item.setGeometry(QRect(QPoint(x, y), hint))
+                rows.append((row, x - spacing - area.x(), row_height))  # won't fit
+                row, x, row_height = [], area.x(), 0                    # wrap
+            row.append((item, hint))
             x += hint.width() + spacing
             row_height = max(row_height, hint.height())
-        return y + row_height - rect.y() + margins.bottom()
+        if row:
+            rows.append((row, x - spacing - area.x(), row_height))
+
+        y = area.y()
+        for placed, width, height in rows:
+            x = area.x()
+            if self._align_right:
+                x += max(0, area.width() - width)
+            for item, hint in placed:
+                if place:
+                    item.setGeometry(QRect(QPoint(x, y), hint))
+                x += hint.width() + spacing
+            y += height + self._row_spacing
+        if not rows:
+            return margins.top() + margins.bottom()
+        return y - self._row_spacing - rect.y() + margins.bottom()

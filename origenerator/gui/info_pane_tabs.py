@@ -424,8 +424,14 @@ class InfoPaneTabs(QTabWidget):
         ``(path, media_type)``, or ``None``) without touching its form or the tab
         set — the light-touch update a suppressed poll/rebuild re-selection makes.
 
-        ``prompt_id`` is the shown generation, so its preview can still be dragged
-        onto a combine slot after a Back/Forward that never re-seeded the form.
+        ``prompt_id`` is the shown generation, so the tab can hang everything the
+        picture carries back off it: the drag onto a combine slot, and the corner
+        controls and right-click menu, both of which showing media clears. That
+        is the tab's own business, so it does it
+        (:meth:`~origenerator.gui.generate_config_panel.GenerateConfigPanel.show_selection_media`)
+        rather than being reached into from here — which is what left the preview
+        bare of its corners on every launch, since the restored selection comes
+        through this path and not through a click.
 
         The pane's resting tab is left alone: a tab with no workflow picked and
         nothing on display holds no generation, so there is no preview of its own
@@ -442,11 +448,7 @@ class InfoPaneTabs(QTabWidget):
         if preview is None:
             panel._preview.clear()  # nothing to show disarms the drag itself
         elif not panel.is_blank():
-            panel._preview.show_media(*preview)
-            panel._preview.set_draggable_id(prompt_id)
-            # Re-showing the media clears whatever the pane was saying about it,
-            # so put the tab's own notice back if its form still deviates.
-            panel.refresh_modified_notice()
+            panel.show_selection_media(preview, prompt_id)
 
     def show_reroll_frame(self, frame: bytes | None, note: str | None = None):
         """Mirror a running re-roll's live frame into the current tab's preview —

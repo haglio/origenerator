@@ -508,6 +508,33 @@ def test_show_selection_preview_updates_only_the_current_preview(tabs):
     assert panel._preview._draggable_id == "g1"  # its preview drags onto combine
 
 
+def test_a_re_selected_preview_keeps_its_corner_controls(tabs):
+    # This is the path a launch and every poll take — the gallery re-selects what
+    # it restored with history suppressed — and showing media is what clears the
+    # corners. Miss the re-arm and the preview comes up bare on startup and stays
+    # that way until a real click goes through load_selection instead.
+    cat, _dog = _two_generations(tabs)
+    panel = _pick_workflow(tabs.currentWidget())
+
+    tabs.show_selection_preview(("cat.png", "image"), cat["prompt_id"])
+
+    assert panel._preview._actions_id == cat["prompt_id"]
+
+
+def test_a_re_selected_preview_carries_the_shown_row_not_the_tabs_own(tabs):
+    # A suppressed re-selection puts another item's output in the tab without the
+    # tab taking it on, so the corners have to be about the picture rather than
+    # about the row still behind it.
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    panel = tabs.current_config_panel()
+
+    tabs.show_selection_preview(("dog.png", "image"), dog["prompt_id"])
+
+    assert panel.displayed_row()["prompt_id"] == cat["prompt_id"]  # the tab held on
+    assert panel._preview._actions_id == dog["prompt_id"]          # the picture won
+
+
 def test_show_selection_preview_leaves_the_resting_tab_empty(tabs):
     # The resting tab holds no generation at all, so a re-selection has nothing to
     # refresh in it: filling its preview would show a picture over a form still

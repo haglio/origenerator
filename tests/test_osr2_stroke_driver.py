@@ -199,3 +199,25 @@ def test_the_status_line_reads_off_but_keeps_the_knobs_while_stopped(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)
     assert driver.status_text() == "OSR2 off · 200/min · sine · travel 100 around 50"
+
+
+def test_cruise_control_takes_the_stroke_over_and_it_is_what_is_streamed(qtbot):
+    # Hands off, the motion is no longer one wave: it is several summed, each
+    # with its own speed and its own share of the travel, both on their way
+    # somewhere else. What has to stay true is that the tick still sends where
+    # that stroke will be when the command's own interval runs out.
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    driver.toggle_cruise()
+    assert driver.cruising
+    assert not driver.state.cruise.stack  # drawn on the next tick, from the dials
+    for _ in range(60):
+        clock.t += 0.025
+        driver.poll()
+        pos, interval = broker.positions[-1]
+        assert pos == stroke_engine.position_ahead(driver.state, interval / 1000)
+    assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
+    assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
+    assert driver.state.cruise.stack.waves
+    driver.toggle_cruise()
+    assert not driver.cruising and not driver.state.cruise.stack.waves

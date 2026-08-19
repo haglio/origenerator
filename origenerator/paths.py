@@ -65,9 +65,10 @@ def ensure_player_core_on_path() -> None:
     """Put the ``player_core`` checkout on ``sys.path``.
 
     That package holds the family's stroke: the waveform and its dials
-    (``direct_control``), the hands-free variation of them (``cruise_control``),
-    and where the drive readout's parts sit (``drive_layout``).  Genau drives the
-    OSR2 from exactly these, so this app does too rather than growing a second
-    set that drifts from them.
+    (``direct_control``), the console and the drive readout that show them, and
+    where that readout's parts sit (``drive_layout``).  Genau drives the OSR2
+    from exactly these, so this app does too rather than growing a second set
+    that drifts from them.  Hands-free is the one part this app keeps for
+    itself -- see :mod:`origenerator.cruise_waves`.
     """
     ensure_sibling_on_path("player_core")

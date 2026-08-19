@@ -22,7 +22,7 @@ name: merge gate (full suite)
 # dependencies. So we check them out ADJACENT to origenerator under the
 # workspace root; that satisfies both the runtime lookup and tests/test_paths.py,
 # which asserts the siblings exist on disk. player_core carries the family's
-# stroke -- the waveform and its dials, cruise control, and where the drive
+# stroke -- the waveform and its dials, the console, and where the drive
 # readout's parts sit -- which this app drives the OSR2 from rather than keeping
 # a second copy of. All three repos are public, so the default GITHUB_TOKEN can
 # clone them.

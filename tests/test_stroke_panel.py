@@ -5,8 +5,11 @@ things that are this app's: that the picture really is that console (not a
 lookalike), and that each command it posts reaches the right thing here.
 """
 
+from origenerator import stroke_engine
 from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
 from origenerator.stroke_engine import Stroke
+from player_core import wave_stack
+from player_core.direct_control import POSITION_MAX
 from player_core.console import console_rows
 from player_core.console_hud import ConsoleHud, ConsolePainter
 
@@ -118,7 +121,7 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
 def test_the_stroke_buttons_reach_the_driver(qtbot):
     panel, stroke, _host = _panel(qtbot)
     stroke.active = True  # a parked device's marks are dimmed, and dim is unpressable
-    # A full-travel stroke has its centre pinned, and a pinned mark is dim too.
+    # A full-travel stroke has its center pinned, and a pinned mark is dim too.
     stroke.state.state.amplitude = 40
     panel.render_console()
     for action in ("genau_speed_up", "genau_amplitude_down", "genau_center_up",
@@ -278,3 +281,30 @@ def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
     pace.set_seconds(9)
     assert view._playlist.image_dwell_ms == 9000
     assert view.dwell_s == 9
+
+
+def test_the_readout_shows_the_summed_stroke_while_cruise_has_it(qtbot):
+    # Cruise control hands the device several waves summed, and the readout is
+    # meant to be the motion rather than a drawing of it — so the bar is the
+    # whole stroke's travel and center, and the trace is the sum, not whichever
+    # wave happens to be the big one.
+    import random
+
+    stroke = FakeStroke()
+    live = stroke.state
+    live.state.playing = True
+    live.cruise.rng = random.Random(4)
+    stroke_engine.toggle_cruise_control(live)
+    now = 1000.0
+    for _ in range(400):
+        now += 0.05
+        stroke_engine.advance(live, 0.05)
+        stroke_engine.tick_cruise_control(live, now)
+
+    dials = wave_stack.dials(live.cruise.stack, live.clock)
+    hud = drive_hud(live, active=True)
+    assert hud.amplitude == round(dials.travel)
+    assert abs(hud.center - dials.center) <= 1
+    assert hud.position == round(
+        POSITION_MAX * wave_stack.position(live.cruise.stack, live.clock) / 100)
+    assert len(set(hud.waveform)) > 20  # a live trace, not a held line

@@ -38,6 +38,7 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.voice.dictation import RequestDictation
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
+from origenerator import stroke_engine
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -11884,6 +11885,46 @@ def test_a_spoken_knob_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
     assert knobs.center == center + 5
     # Answered with what the device now reads, which is the panel's own line.
     assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
+
+
+def test_a_spoken_number_puts_a_dial_where_it_says(qtbot, tmp_path):
+    # The nudges walk a dial five or ten at a time, which never arrives from the
+    # far end; the number said outright is what Fun Time answers with too.
+    view = _listening(qtbot, tmp_path)
+    knobs = view._osr2_stroke.state.state
+
+    view._voice.speak("amp fifty")
+    assert knobs.amplitude == 50
+
+    view._voice.speak("center 30")   # whisper writes the number either way
+    assert knobs.intended_center == 30
+
+    view._voice.speak("max speed")
+    assert knobs.speed == stroke_engine.MAX_SPEED
+    assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
+
+
+def test_min_speed_lands_on_the_slowest_the_dial_actually_strokes(qtbot, tmp_path):
+    # The vocabulary says nought and the dial says what its floor is; the
+    # clamping is the dial's business, which is why the grid can be uniform.
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("min speed")
+
+    assert view._osr2_stroke.state.state.speed == stroke_engine.MIN_SPEED
+
+
+def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
+    view = _listening(qtbot, tmp_path)
+
+    view._voice.speak("cruise on")
+    assert view._osr2_stroke.cruising
+
+    view._voice.speak("cruise on")       # already on: still ends up on
+    assert view._osr2_stroke.cruising
+
+    view._voice.speak("cruise off")
+    assert not view._osr2_stroke.cruising
 
 
 def test_a_stroke_knob_answers_from_a_show_too(qtbot, tmp_path):

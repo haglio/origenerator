@@ -18,7 +18,7 @@ from origenerator.gui.gallery_tree import (
     RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
 )
 from origenerator.voice.commands import (
-    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
+    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command, split_side,
     voice_command_bias,
 )
 from origenerator.voice.show_commands import ShowCommand
@@ -104,3 +104,23 @@ def test_a_genau_command_can_name_the_side_it_means(text, side):
     command = match_voice_command(text)
 
     assert command == SurfaceCommand(GENAU_COMMAND, side)
+
+
+@pytest.mark.parametrize("text, side, rest", [
+    ("landscape request no feet", "landscape", "request no feet"),
+    ("portrait fix teeth", "portrait", "fix teeth"),
+    ("request no feet", None, "request no feet"),
+    ("", None, ""),
+])
+def test_the_side_splits_off_from_the_rest_of_what_was_said(text, side, rest):
+    """The one thing a request needs and cannot get from the matcher: its words
+    are the speaker's own, so nothing here claims them, and the dictation that
+    collects them must not be handed the side word as the first word of the
+    request itself."""
+    assert split_side(text) == (side, rest)
+
+
+def test_a_side_word_alone_is_a_side_and_nothing_else():
+    """It names a region without asking it for anything — the caller's other
+    uses get to decide what an empty rest means."""
+    assert split_side("portrait") == ("portrait", "")

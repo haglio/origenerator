@@ -150,11 +150,17 @@ class FakeVoiceSteering(QObject):
         """One utterance through the real dictation, as the mic would feed it:
         part of a request is re-emitted, anything else falls through to the
         command matcher exactly as the live steering routes it."""
-        spoken = self._dictation.push(text) if self._dictation is not None else None
+        spoken = self.push_dictation(text)
         if spoken is not None:
             self.request.emit(spoken)
             return spoken
         return self.speak_command(text)
+
+    def push_dictation(self, text):
+        """The same dictation, fed from somewhere other than the mic — the
+        hosting session's channel, which is where the words of a request arrive
+        while this app is hosted and its own mic is shut."""
+        return self._dictation.push(text) if self._dictation is not None else None
 
 
 @pytest.fixture(autouse=True)

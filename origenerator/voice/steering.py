@@ -131,6 +131,20 @@ class VoiceSteering(QObject):
             with self._lock:
                 self._dictation.reset()
 
+    def push_dictation(self, text: str):
+        """Feed the open request one transcription heard somewhere else, and
+        answer what it meant (``None`` when it is not part of a request).
+
+        Hosted inside a Fun Time session this app's mic is shut — the session
+        hears for the whole room, its own commands and this app's alike, and
+        posts what it heard on this app's channel — so the words of a request
+        arrive there rather than through the listener.  They go to the same
+        dictation under the same lock: the two sources never run at once, and
+        half a request must never be held in one of them and half in the other.
+        """
+        with self._lock:
+            return self._dictation.push(text) if self._dictation is not None else None
+
     def _on_utterance(self, audio) -> None:
         if self._get_prompts is None and self._execute_command is None:
             return

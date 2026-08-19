@@ -51,7 +51,7 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, in_order
 from origenerator.voice.commands import (
-    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
+    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command, split_side,
     voice_command_bias,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
@@ -3254,7 +3254,21 @@ class GalleryView(QWidget):
         words on this app's channel, and they are matched here against this
         app's own vocabulary: the session cannot know which shelves this tree
         has or which detail parts have detectors installed.
+
+        A request has first refusal, exactly as it does on this app's own mic.
+        "Request … over" runs to as many utterances as the speaker takes
+        breaths, so a matcher that only ever saw one at a time could not hear a
+        sentence said in three; while one is open the dictation swallows what
+        it hears, which is what keeps the words of a request from also matching
+        a command.  The side is split off first — it rides every utterance the
+        session posts, and fed in it would become the first word of the
+        request instead of the region the request is about.
         """
+        side, rest = split_side(text)
+        spoken = self._voice.push_dictation(rest)
+        if spoken is not None:
+            self._on_spoken_request(spoken, side=side)
+            return True
         matched = match_voice_command(text)
         if matched is None:
             logger.info("Voice (from the session): %r matched no command", text)
@@ -3579,15 +3593,21 @@ class GalleryView(QWidget):
 
     # --- spoken requests: "Request … over" over whatever is on screen ---------
 
-    def _on_spoken_request(self, spoken):
-        """One step of a spoken request, from the mic's dictation.
+    def _on_spoken_request(self, spoken, side: str | None = None):
+        """One step of a spoken request — from the mic's dictation, or from the
+        hosting session's channel with the region it was said to.
 
         While it is still being said the show holds and the corner says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
         the picture that prompted it, not whatever is up when the words run out.
+
+        Hosted, *side* is what makes "the picture" a picture at all: two shows
+        run at once on the satellite regions and neither is the active window,
+        so the region named is the only thing that says which one the words are
+        about.
         """
-        show = self._slideshow
+        show = self._voice_surface(side)
         if self._request_target is None:
             # Taken at the first step of the request, whichever step that is —
             # "Request, no hat, over" is a whole one in a single breath.
@@ -3601,7 +3621,7 @@ class GalleryView(QWidget):
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(show, "🎤 request dropped — never heard “over”")
             return
-        self._begin_request(target, spoken)
+        self._begin_request(target, spoken, side)
 
     def _voice_request_target(self, show) -> str | None:
         """What a request just opened is about: the slide filling the screen
@@ -3627,7 +3647,7 @@ class GalleryView(QWidget):
         else:
             self._show_voice_status(message, transient=True)
 
-    def _begin_request(self, prompt_id: str | None, spoken):
+    def _begin_request(self, prompt_id: str | None, spoken, side: str | None = None):
         """Start working out what a finished request changes.
 
         The working-out goes to the pool because it may have to ask the local
@@ -3636,9 +3656,13 @@ class GalleryView(QWidget):
         moment the app must not stutter. Whatever can be answered without that
         (nothing on screen, a recipe this app can't rebuild) is answered here,
         so a request that was never going to run doesn't wait on a model.
+
+        The side rides the pool's context so the answer comes back to the same
+        region the request was said to — seconds later, with two shows running,
+        it is the only thing that still says which.
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
-        show = self._slideshow
+        show = self._voice_surface(side)
         if row is None:
             self._answer_request(show, "🎤 nothing on screen to request a change to")
             return
@@ -3650,7 +3674,7 @@ class GalleryView(QWidget):
         params = filled_params(row, workflow)
         self._answer_request(show, f"🎤 working out “{spoken.text}”…")
         QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken),
+            self._revision, (row, workflow, params, spoken, side),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
             spoken.text,
         ))
@@ -3659,10 +3683,11 @@ class GalleryView(QWidget):
         """The revision came back from the pool: queue it, and say what it did.
 
         The show is looked up now rather than remembered, so an answer that took
-        a couple of seconds still lands wherever the speaker is looking.
+        a couple of seconds still lands wherever the speaker is looking — on
+        the region the request named, hosted, since two of them are up.
         """
-        row, workflow, params, spoken = context
-        show = self._slideshow
+        row, workflow, params, spoken, side = context
+        show = self._voice_surface(side)
         if revision is None:
             self._answer_request(show, f"🎤 didn't catch what to change in “{spoken.text}”")
             return

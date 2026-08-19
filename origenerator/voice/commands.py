@@ -82,12 +82,10 @@ def match_voice_command(text: str) -> ShelfCommand | ShowControl | SurfaceComman
     leads with its own phrase, a shelf command is nothing but the shelf's
     name), so the order only decides which is asked first.
     """
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    if not words:
+    side, spoken = split_side(text)
+    rest = spoken.split()
+    if not rest and side is None:
         return None
-    side = words[0] if words[0] in SIDES else None
-    rest = words[1:] if side else words
-    spoken = " ".join(rest)
 
     shelf = _shelf_named(rest)
     if shelf is not None:
@@ -101,6 +99,25 @@ def match_voice_command(text: str) -> ShelfCommand | ShowControl | SurfaceComman
     if surface is not None:
         return SurfaceCommand(surface, side)
     return None
+
+
+def split_side(text: str) -> tuple[str | None, str]:
+    """The side an utterance leads with, and everything after it.
+
+    ``("landscape", "fix teeth")`` for "landscape fix teeth", ``(None, "fix
+    teeth")`` for the same words with no side named.  Punctuation and case go
+    with it: both are the transcriber's invention rather than the speaker's,
+    and every matcher below works on the bare words.
+
+    Public because a spoken request needs the same split and cannot get it from
+    :func:`match_voice_command` — its words are the speaker's own, so no
+    matcher here claims them, and the dictation that collects them must not be
+    fed the side word as if it were the first word of the request.
+    """
+    words = re.findall(r"[a-z']+", (text or "").lower())
+    if words and words[0] in SIDES:
+        return words[0], " ".join(words[1:])
+    return None, " ".join(words)
 
 
 def _shelf_named(words: list[str]) -> str | None:

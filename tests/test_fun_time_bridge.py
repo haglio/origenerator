@@ -228,3 +228,48 @@ def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkey
 
     assert show._playlist.index == (before + 1) % 3  # the step still lands
     assert not show._timer.isActive()                # but the slide holds
+
+
+def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):
+    """The one spoken input with no phrase to match: the words between
+    "request" and "over" are the speaker's own, so the session forwards each
+    utterance verbatim and this app's own dictation assembles them — the same
+    one its mic feeds, since the two never listen at once.
+
+    Fabricated request wording, like every fixture here.
+    """
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    begun = []
+    monkeypatch.setattr(view, "_begin_request",
+                        lambda target, spoken, side=None: begun.append((spoken.text, side)))
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "PORTRAIT_SAY:request no feet\n", encoding="utf-8")
+    bridge._tick()
+    assert not begun  # still being said — the show holds rather than acting
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "PORTRAIT_SAY:over\n", encoding="utf-8")
+    bridge._tick()
+
+    # The side is the region it was said to, not the first word of the request.
+    assert begun == [("no feet", "portrait")]
+    assert show is view.region_show("portrait")
+
+
+def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkeypatch):
+    """While one is open the dictation swallows what it hears — half a sentence
+    must not fire a command because two of its words happened to be one."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    played = []
+    monkeypatch.setattr(view, "_play_shelf_aloud", played.append)
+    monkeypatch.setattr(view, "_begin_request", lambda *a, **kw: None)
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        "PORTRAIT_SAY:request no feet\nPORTRAIT_SAY:favorites\nPORTRAIT_SAY:over\n",
+        encoding="utf-8")
+    bridge._tick()
+
+    assert played == []

@@ -6977,6 +6977,57 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
     assert items["gen1"].source_image is None
 
 
+def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
+    # No act was picked, so the picture is the only thing naming which recipe
+    # this run is of — and its row is where that gets read.
+    db = FakeDB([])
+    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
+                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]",
+                recipe_video_id="recipe"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    assert item.recipe_category == ""
+    assert item.recipe_thumbnail == "thumbs/recipe.jpg"
+
+
+def test_a_picked_act_shows_no_recipe_picture_at_all(qtbot):
+    # The act names what the video will do, which is the whole of what was
+    # chosen. The clip its recipe was mined out of answers a question nobody
+    # asked, and a picture of a video the user never picked reads as a job that
+    # is that video.
+    db = FakeDB([])
+    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
+                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]",
+                recipe_category="dancing", recipe_video_id="recipe"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    assert item.recipe_category == "dancing"
+    assert item.recipe_thumbnail is None
+
+
+def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
+    db = FakeDB([])
+    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = view._inflight_items()[0]
+    assert item.recipe_category == ""
+    assert item.recipe_thumbnail is None
+
+
 def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
     # Its own output is the one picture it cannot show, so its row is placed by
     # what the same settings made last time — newest first, four at most.
@@ -7746,6 +7797,208 @@ def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_pat
     assert job.params["input_image"] == "sdxl_pick.png [output]"     # run on the dropped image
     assert job.params["lora_high"] == "example-act-high.safetensors"  # the curated spec's pin
     assert job.params["steps"] == 24
+
+
+# --- the line's answer to the press, before there is a job ------------------
+
+
+def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, monkeypatch):
+    # Checking every stored generation for a duplicate, building the params and
+    # posting the prompt all run on this thread; with nothing on screen for that
+    # stretch the button reads as one that did nothing.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    deferred = []
+    monkeypatch.setattr(view, "_after_painting", deferred.append)
+
+    view._combine_generate("img", "vid")
+
+    row, = view._queue.rows()
+    assert row.note() == "Starting…"
+    assert view._reroll_jobs == {}    # and nothing has been submitted for it yet
+
+    deferred[0]()                     # the launch the row was standing in for
+
+    assert len(view._reroll_jobs) == 1
+    assert not any(item.starting for item in view._queue._items)
+
+
+def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_path, monkeypatch):
+    # It is the row that will replace it, minus the price: so the line doesn't
+    # blink one thing away and a different-looking one in.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view, "_after_painting", lambda work: None)
+
+    view._combine_generate_category("img", "dancing", recipe_match.PLAYERS)
+
+    item = view._queue._items[0]
+    assert item.recipe_category == "dancing"
+    assert item.source_image == "sdxl_pick.png [output]"  # the frame being animated
+    assert item.recipe_thumbnail is None  # an act names itself; no clip to show
+    assert item.cancel is None            # nothing on the server to stop yet
+
+
+def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypatch):
+    db = _combine_db(tmp_path)
+    db.update_generation("vid", thumbnail_path="thumbs/vid.jpg")
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view, "_after_painting", lambda work: None)
+
+    view._combine_generate("img", "vid")
+
+    item = view._queue._items[0]
+    assert item.recipe_thumbnail == "thumbs/vid.jpg"
+    assert item.recipe_category == ""
+
+
+def test_the_stand_in_row_goes_when_the_act_has_no_recipe(qtbot, tmp_path, monkeypatch):
+    # It stands in for a launch, so it must not outlive one that never happened.
+    db = _combine_db(tmp_path)  # its one video is a "dance" clip: no epsilon recipe
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
+
+    view._combine_generate_category("img", "epsilon", recipe_match.PLAYERS)
+
+    assert view._queue.rows() == []
+    assert view._reroll_jobs == {}
+
+
+def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, monkeypatch):
+    # _resolve_category gives up before it asks anything; the row must go with it.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine_generate_category("missing", "dancing", recipe_match.PLAYERS)
+
+    assert view._queue.rows() == []
+
+
+# --- what a combine's run records about where its recipe came from ----------
+
+
+def _launched_row(view):
+    """The DB row of the one run the view just launched."""
+    job = next(iter(view._reroll_jobs.values()))
+    return view._db.get_generation(job.prompt_id)
+
+
+def test_a_dropped_recipe_names_the_video_it_came_from(qtbot, tmp_path):
+    # Nothing in the params says which video the settings were lifted off, and
+    # the queue row draws that clip in gray beside the frame being animated.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "vid")
+
+    row = _launched_row(view)
+    assert row["recipe_video_id"] == "vid"
+    assert row["recipe_category"] is None  # a dropped video is no dropdown choice
+
+
+def test_a_picked_act_is_recorded_with_the_recipe_it_resolved_to(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+
+    view._generate_category("img", "dancing")
+
+    row = _launched_row(view)
+    assert row["recipe_category"] == "dancing"
+    assert row["recipe_video_id"] == "vid"
+
+
+def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
+    # "gamma" is pinned in the example overlay: there is no past run for the
+    # queue row to show, and the act is the whole of what was chosen.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_category("img", "gamma")
+
+    row = _launched_row(view)
+    assert row["recipe_category"] == "gamma"
+    assert row["recipe_video_id"] is None
+
+
+def test_open_in_generator_marks_the_tab_with_where_the_recipe_came_from(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._open_combination("img", "vid", "dancing")
+
+    assert _front_panel(view).recipe_source() == ("dancing", "vid")
+
+
+def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_path, monkeypatch):
+    # The whole point of the mark riding through the tab: a combination edited
+    # before launching is still that act, and the queue row is where it is read.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    view._open_category("img", "dancing")
+    panel = _front_panel(view)
+    panel._param_form.set_values({"positive_prompt": "edited before running"})
+
+    panel._on_generate()
+
+    row = _launched_row(view)
+    assert row["recipe_category"] == "dancing"
+    assert row["recipe_video_id"] == "vid"
+
+
+def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_path):
+    # The tab is about that row now; a launch from it is not the combination's.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._open_combination("img", "vid", "dancing")
+    panel = _front_panel(view)
+
+    panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
+
+    assert panel.recipe_source() == ("", None)
+
+
+def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_path):
+    # A different workflow is a different recipe, so the mark must not ride onto
+    # a launch that has nothing to do with the combination.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._open_combination("img", "vid", "dancing")
+    panel = _front_panel(view)
+
+    panel.prefill("sdxl_t2i", _SDXL.default_params())
+
+    assert panel.recipe_source() == ("", None)
+
+
+def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_path):
+    # Nothing has been made from the combination yet, so the pane used to say
+    # "select a generation to preview" — over a tab that is about two specific
+    # things, both of them on hand to be shown.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._open_combination("img", "vid", "dancing")
+
+    preview = _front_panel(view)._preview
+    assert preview._stack.currentWidget() is preview._combination
 
 
 def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypatch):

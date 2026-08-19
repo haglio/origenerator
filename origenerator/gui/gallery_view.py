@@ -37,7 +37,7 @@ from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.find_bar import FindBar
-from origenerator.gui.inflight import EnhancingRun
+from origenerator.gui.inflight import EnhancingRun, InFlightItem
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.prompt_find import PromptFind
@@ -548,6 +548,11 @@ class GalleryView(QWidget):
         # What the last Esc took off, for the next one to put back — cleared as
         # soon as it is put back, so the key goes on alternating.
         self._stopped_by_escape: _Running | None = None
+        # Stand-in queue rows for a Generate pressed but not yet a job, by key
+        # (:meth:`_show_launching`), and the counter their keys are drawn from —
+        # anything that can't be mistaken for a prompt id.
+        self._launching: dict[str, InFlightItem] = {}
+        self._launch_seq = 0
         self._build_ui()
         self._sync_history_buttons()
         self._sync_nav_buttons()
@@ -885,8 +890,11 @@ class GalleryView(QWidget):
         self._combine = CombinePanel(
             self._combine_accepts_image, self._combine_accepts_video, self._combine_preview
         )
-        self._combine.generate_requested.connect(self._generate_combination)
-        self._combine.category_requested.connect(self._generate_category)
+        # Both Generate paths go through a wrapper that puts a stand-in row in the
+        # line first: the work between the press and a real job is seconds long,
+        # and a button that seems to do nothing reads as an app that has died.
+        self._combine.generate_requested.connect(self._combine_generate)
+        self._combine.category_requested.connect(self._combine_generate_category)
         self._combine.open_requested.connect(self._open_combination)
         self._combine.open_category_requested.connect(self._open_category)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
@@ -1797,9 +1805,17 @@ class GalleryView(QWidget):
             if panel is not None:
                 panel.use_random_seed()
         launching = self._info_tabs.current_config_panel()
-        if not self._reroll.start_prepared(key, wf, params):
+        prompt_id = self._reroll.start_prepared(key, wf, params)
+        if not prompt_id:
             return  # no client, or the submit failed
         if launching is not None:
+            # A tab Combine opened stamps its run with where the recipe came
+            # from, whether it was launched as opened or edited first — that mark
+            # is the only thing telling the queue what act this video is of.
+            category, video_id = launching.recipe_source()
+            if category or video_id:
+                self._db.set_recipe_source(prompt_id, category=category,
+                                           video_prompt_id=video_id)
             launching.note_launched(self._reroll.newest_job_for(key).origin)
         self._navigate_to_reroll(key)
 
@@ -1882,7 +1898,7 @@ class GalleryView(QWidget):
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
-        # An act with no video behind it has no recipe to mine, so grey it out rather
+        # An act with no video behind it has no recipe to mine, so gray it out rather
         # than let it be picked only to answer "no recipe yet".
         self._combine.set_available_categories(
             recipe_match.available_categories(
@@ -4078,6 +4094,92 @@ class GalleryView(QWidget):
     def _on_generation_drag_ended(self):
         self._combine.clear_drop_candidates()
 
+    # --- the line's answer to the press, before there is a job ------------
+
+    def _combine_generate(self, image_id: str, video_id: str):
+        """The combine panel's Generate with a dropped video, with the line
+        showing it at once.
+
+        The launch itself is left for the next turn of the event loop: reading
+        every stored generation to check for a duplicate, building the params and
+        posting the prompt all happen on this thread, and nothing painted while
+        they did — so the stand-in row would have appeared only once the work it
+        was standing in for was already over.
+        """
+        key = self._show_launching(image_id, video_id=video_id)
+
+        def run():
+            try:
+                self._generate_combination(image_id, video_id)
+            finally:
+                self._drop_launching(key)
+
+        self._after_painting(run)
+
+    def _combine_generate_category(self, image_id: str, category: str, intent: str):
+        """The combine panel's Generate with an act picked, with the line showing
+        it at once. The act's own resolution is the long part — a question put to
+        a local model — and :meth:`_generate_category` drops the stand-in when it
+        has an answer, however that turns out."""
+        key = self._show_launching(image_id, category=category)
+        self._after_painting(lambda: self._generate_category(
+            image_id, category, intent, launching=key))
+
+    def _after_painting(self, work):
+        """Run ``work`` on the next turn of the event loop, once what has just
+        been laid out has actually reached the screen.
+
+        A seam as much as a call, like :meth:`_run_off_thread`: the suite replaces
+        this with a straight-through version, so a test can press and inspect in
+        one breath rather than pumping an event loop for every launch.
+        """
+        QTimer.singleShot(0, work)
+
+    def _show_launching(self, image_id: str, *, category: str = "",
+                        video_id: str | None = None) -> str:
+        """Put a stand-in row at the back of the line for a Generate just pressed,
+        and return its key.
+
+        It carries everything already known about the run — the frame being
+        animated, the act, or the dropped video's clip in gray — so the row that
+        replaces it is the same row with its price filled in, rather than a
+        different-looking one appearing somewhere else. It offers no Cancel: there
+        is nothing on the server to stop yet, and a button that did nothing is what
+        this row exists to prevent.
+
+        At the back because that is where it will land: nothing has been submitted,
+        so every job already in the line is in front of it.
+        """
+        self._launch_seq += 1
+        key = f"launching-{self._launch_seq}"
+        image_row = self._db.get_generation(image_id) or {}
+        video_row = self._db.get_generation(video_id) if video_id else None
+        self._launching[key] = InFlightItem(
+            key=key,
+            caption="A video from Combine, still being started",
+            status="queued",
+            frame=None,
+            reveal=lambda: None,  # no folder to open yet: it has no settings
+            media_type="video",
+            job_kind="I2V",  # the video slot takes nothing else
+            recipe_category=category,
+            # The same rule the finished row follows: a picked act names itself in
+            # the text, and only a dropped video is shown.
+            recipe_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
+            source_image=gallery.output_file_reference(
+                gallery.row_output_files(image_row)),
+            starting=True,
+        )
+        self._update_queue()
+        return key
+
+    def _drop_launching(self, key: str | None):
+        """Take a stand-in row back off the line — what it stood for is a real row
+        now, or never became one. A no-op for a key already gone, so an exit path
+        that drops it twice costs nothing."""
+        if key is not None and self._launching.pop(key, None) is not None:
+            self._update_queue()
+
     def _combined_params(self, image_id: str, video_id: str):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
@@ -4100,17 +4202,47 @@ class GalleryView(QWidget):
             return None  # the dropped image has no output file to seed from
         return workflow, params, video_row, image_row
 
-    def _open_combination(self, image_id: str, video_id: str):
+    def _open_combination(self, image_id: str, video_id: str, category: str = ""):
         """Open a dropped image + video's recipe as an editable generate tab instead
         of running it — the combine panel's "Open in generator" path. The tab is
-        prefilled with the same combination Generate would launch, ready to tweak."""
+        prefilled with the same combination Generate would launch, ready to tweak,
+        and shows the pair it was opened with rather than an empty pane."""
         built = self._combined_params(image_id, video_id)
         if built is None:
             return
-        workflow, params, _video_row, _image_row = built
-        self._info_tabs.open_config(workflow.name, params)
+        workflow, params, video_row, image_row = built
+        self._open_prepared(workflow, params, image_row, video_row, category, video_id)
 
-    def _generate_combination(self, image_id: str, video_id: str, send: bool = False):
+    def _open_prepared(self, workflow, params, image_row, video_row,
+                       category: str, video_id: str | None):
+        """Hand a built combination to a generate tab: its settings on the form, its
+        two halves in the preview, and the mark saying where they came from.
+
+        The preview is the point of the pair being visible at all — nothing has
+        been generated from it yet, so the pane would otherwise sit on the line a
+        tab pointed at nothing wears, with both things the tab is about on hand.
+        A curated act has no ``video_row`` behind it, and shows the frame alone.
+        """
+        panel = self._info_tabs.open_config(workflow.name, params)
+        if panel is None:
+            return
+        panel.set_recipe_source(category, video_id)
+        panel.show_combination(
+            self._still_path(image_row),
+            self._animated_preview(video_row) if video_row is not None else None,
+        )
+
+    def _still_path(self, row: dict) -> str | None:
+        """The best picture of ``row`` for a pane to show: its full-size output
+        where that is a still, else the stored thumbnail (which a pane this big
+        would be enlarging), else nothing."""
+        preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is not None and preview[1] == "image":
+            return str(preview[0])
+        return row.get("thumbnail_path")
+
+    def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
+                              category: str = ""):
         """Generate a new video from a dropped image + a dropped video's recipe.
 
         Reuses the video's workflow, settings and seed, swapping only the input
@@ -4129,6 +4261,10 @@ class GalleryView(QWidget):
         clip handed on the moment it exists, and wants no dialog at all: it is
         answered in the show's corner and nothing runs, so the re-roll answers
         (and the frame re-draw behind them) belong to the pressed path alone.
+        ``category`` names the act the dropdown was set to, when one was picked.
+        The frame re-draw is the one answer it does not reach: that launches the
+        frame first and the clip second, under an id this never sees, so such a
+        clip's row goes without the recipe mark the queue reads.
         """
         built = self._combined_params(image_id, video_id)
         if built is None:
@@ -4176,6 +4312,8 @@ class GalleryView(QWidget):
                 return
         prompt_id = self._reroll.start_prepared(key, workflow, params)
         if prompt_id:
+            self._db.set_recipe_source(prompt_id, category=category,
+                                       video_prompt_id=video_id)
             self._mark_for_sending(prompt_id, send)
             self._reveal_combination(key)
 
@@ -4327,6 +4465,9 @@ class GalleryView(QWidget):
         )
         prompt_id = self._reroll.start_prepared(key, workflow, params)
         if prompt_id:
+            # The act, with no video behind it: a curated recipe is pinned in the
+            # overlay, so there is no past run for the queue row to show in gray.
+            self._db.set_recipe_source(prompt_id, category=category)
             self._mark_for_sending(prompt_id, send)
             self._reveal_combination(key)
         return True
@@ -4342,7 +4483,8 @@ class GalleryView(QWidget):
             self._db.mark_genau_requested(prompt_id)
 
     def _generate_category(self, image_id: str, category: str,
-                           intent: str = recipe_match.PLAYERS, send: bool = False):
+                           intent: str = recipe_match.PLAYERS, send: bool = False,
+                           launching: str | None = None):
         """Run the recipe that fits ``category`` on the dropped image: the
         overlay's curated recipe when one is pinned for the act, else the mined
         exemplar handed off to the shared combine launch. ``intent`` chooses which
@@ -4351,30 +4493,43 @@ class GalleryView(QWidget):
 
         ``send`` also holds the picture until the launch is a row, because only a
         spoken "genau it" sets it and only a spoken one can be said again into
-        the wait — see :meth:`_already_genaud`."""
+        the wait — see :meth:`_already_genaud`.
+
+        ``launching`` is the stand-in row the press already put in the line
+        (:meth:`_show_launching`), taken back off however this ends — launched,
+        answered by no recipe, or unresolvable. The mined path is where it earns
+        its keep: the act is answered by a local model that thinks for several
+        seconds, and until it does there is nothing to queue.
+        """
         if send:
             self._genau_resolving.add(image_id)
         if self._generate_curated(image_id, category, intent, send):
             self._genau_resolving.discard(image_id)
+            self._drop_launching(launching)
             return
         self._resolve_category(
             image_id, category, intent,
-            partial(self._combine_resolved, image_id, send),
+            partial(self._combine_resolved, image_id, send, category, launching),
         )
 
-    def _combine_resolved(self, image_id: str, send: bool, video_id: str | None):
+    def _combine_resolved(self, image_id: str, send: bool, category: str,
+                          launching: str | None, video_id: str | None):
         """The recipe match came back: run what it found on the image, if it
-        found anything.
+        found anything. ``category`` is the act it was asked for, which the
+        launched row records — the mined video answers it, but only the act says
+        what the user actually chose.
 
-        The picture is let go of either way — a launch is a row from here on,
-        which is where :meth:`_already_genaud` reads it, and a match that
-        found nothing leaves nothing to wait for.
+        The picture and the stand-in row are both let go of either way — a launch
+        is a row from here on, which is where :meth:`_already_genaud` reads it and
+        where the line reads the job, and a match that found nothing leaves
+        nothing to wait for.
         """
         try:
             if video_id is not None:
-                self._generate_combination(image_id, video_id, send)
+                self._generate_combination(image_id, video_id, send, category)
         finally:
             self._genau_resolving.discard(image_id)
+            self._drop_launching(launching)
 
     def _open_category(self, image_id: str, category: str,
                        intent: str = recipe_match.PLAYERS):
@@ -4389,16 +4544,18 @@ class GalleryView(QWidget):
         built = self._curated_combination(image_id, category, intent)
         if built is not None:
             workflow, params = built
-            self._info_tabs.open_config(workflow.name, params)
+            image_row = self._db.get_generation(image_id)
+            if image_row is not None:
+                self._open_prepared(workflow, params, image_row, None, category, None)
             return
         self._resolve_category(
             image_id, category, intent,
             lambda video_id: video_id is not None
-            and self._open_combination(image_id, video_id),
+            and self._open_combination(image_id, video_id, category),
         )
 
     def _on_combine_intent_changed(self, _intent: str):
-        """Re-grey the act list for the lane just chosen."""
+        """Re-gray the act list for the lane just chosen."""
         self._combine.set_available_categories(
             recipe_match.available_categories(
                 self._rebuildable_videos(self._db.list_generations()),
@@ -4824,11 +4981,17 @@ class GalleryView(QWidget):
         queue shows from anywhere, and one that isn't ours is visible before
         Generate rather than after.
 
+        Behind those, any Generate pressed but not yet turned into a job
+        (:meth:`_show_launching`). They go on here rather than in the in-flight
+        list itself because that list is what the database says is in flight, and
+        these have no row in it: they are the press's answer, not a record of
+        anything, and they last only until the real row exists.
+
         An open slideshow is fed the same list: it covers the strip, and it is
         the one stretch where the line deliberately stops moving, so the queue
         follows onto the surface that is actually in front of the user.
         """
-        items = self._inflight_items()
+        items = self._inflight_items() + list(self._launching.values())
         self._queue.set_items(items, self._foreign_queue.total)
         if self._slideshow is not None:
             self._slideshow.set_queue(items, self._foreign_queue.total)

@@ -58,20 +58,43 @@ class InFlightItem:
     # what an i2v (and an enhance) is *of*. Its picture is the fastest way to
     # tell two queued videos apart, their captions being their shared recipe.
     source_image: str | None = None
+    # The act picked in the Combine panel's dropdown, for a run launched from
+    # there — "" for every other run, and for a combine that was given a dropped
+    # video instead of a picked act. It is the one word saying what this video
+    # will *do*, and nothing else on the row carries it.
+    recipe_category: str = ""
+    # The thumbnail of the video whose settings this run re-uses, for a combine
+    # given a dropped video — the only thing naming which recipe that was. Drawn
+    # gray beside the start frame: it is the recipe, not the result, and a row
+    # showing it alone reads as a job that is that video. Empty where an act was
+    # picked instead: :attr:`recipe_category` already says what was chosen, and
+    # the clip its recipe was mined out of was never the user's pick.
+    recipe_thumbnail: str | None = None
     # Up to four thumbnail files from the folder this job will land in — what a
     # run with no picture of its own can be recognized by, its own output being
     # the thing that doesn't exist yet.
     folder_thumbnails: tuple = ()
+    # This one is not a job yet: it stands in for a press of Generate whose work
+    # to become one — resolving a recipe, building the params, the submit itself
+    # — has not finished. It has no row, no id on the server, and nothing to
+    # cancel; it exists so the press has a visible answer.
+    starting: bool = False
 
 
 def queue_lead_text(item: InFlightItem) -> str:
     """The head of a queue row: what the job costs, what it is, and who asked.
 
-    ``"~2 min · I2V · Auto · Request"``. Everything here is a fact about the job
-    that is true before it starts, which is what a line of waiting work is read
-    for — the price first, because that is what "how long until my turn" is added
-    up out of, and because it is the one figure that makes a queue of four videos
-    read differently from a queue of four pictures.
+    ``"~2 min · I2V · dancing · Auto · Request"``. Everything here is a fact about
+    the job that is true before it starts, which is what a line of waiting work is
+    read for — the price first, because that is what "how long until my turn" is
+    added up out of, and because it is the one figure that makes a queue of four
+    videos read differently from a queue of four pictures.
+
+    The act follows the kind, for a run the Combine panel launched from its
+    dropdown: "I2V" says a video is being made from a frame, and the act says
+    which video — the whole of what the user chose, and the one thing separating
+    two runs on the same picture. It rides through "Open in generator" too, so a
+    combination edited before launching still says what it was asked for.
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt
     for is the kind that piles up unnoticed (an auto-generate loop makes one
@@ -81,6 +104,8 @@ def queue_lead_text(item: InFlightItem) -> str:
     parts = [queue_estimate_label(item.typical_seconds)]
     if item.job_kind:
         parts.append(item.job_kind)
+    if item.recipe_category:
+        parts.append(item.recipe_category)
     if item.auto_generating:
         parts.append("Auto")
     if item.requested:
@@ -94,12 +119,16 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     "I2V" and a bare "~?" are shorthand a row has the width for and a first-time
     reader has no way to expand, so the long form lives one hover away.
     """
-    if item.typical_seconds is None:
+    if item.starting:
+        lines = ["Not sent to ComfyUI yet — this row stands in until it is"]
+    elif item.typical_seconds is None:
         lines = ["No timing data for this workflow yet"]
     else:
         lines = [f"About {queue_estimate_label(item.typical_seconds).lstrip('~')}"
                  " on this workflow's recent runs"]
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
+    if item.recipe_category:
+        lines.append(f"The “{item.recipe_category}” act, picked in Combine")
     if item.auto_generating:
         lines.append("Queued by its folder's auto-generate loop")
     if item.requested:
@@ -185,6 +214,21 @@ def queue_held_text(held: int | None) -> str | None:
     if not held:
         return None
     return (f"{held} video{'' if held == 1 else 's'} held until the slideshow closes")
+
+
+def starting_row_text(starting: bool) -> str | None:
+    """What a row that is not a job yet says in place of a wait.
+
+    Pressing Generate in the Combine panel is not the same as queueing something:
+    an act has to be answered by a recipe first — a question put to a local model,
+    several seconds of it — and then the params built and the prompt submitted.
+    With nothing on screen for that stretch, the press reads as a press that did
+    nothing, which is indistinguishable from a wedged app. This row is the answer,
+    and it says outright that it is not in the line yet.
+
+    ``None`` once it is, which is every row that came off the database.
+    """
+    return "Starting…" if starting else None
 
 
 def held_row_text(held: bool) -> str | None:

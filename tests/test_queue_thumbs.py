@@ -26,20 +26,62 @@ def _middle_of_cell(index):
     return index * (CELL + 1) + CELL // 2
 
 
-def test_a_cell_is_filled_by_the_middle_of_the_picture(qapp, tmp_path):
-    # Cover-cropped, not letterboxed: at this size a fitted thumbnail is mostly
-    # empty border, and the middle of a frame is where its subject is.
-    red = _picture(tmp_path / "a.png", (255, 0, 0))
+def test_a_cell_shows_the_whole_picture_letterboxed(qapp, tmp_path):
+    # Fitted, not cover-cropped: a crop takes the edges off, and a picture whose
+    # subject is not dead center comes out as a picture of something else.
+    red = _picture(tmp_path / "a.png", (255, 0, 0))  # wider than tall
 
     block = source_pixmap(red, CELL)
 
+    assert _color_at(block, CELL // 2, CELL // 2).red() > 200  # the picture itself
+    assert _color_at(block, CELL // 2, 0).alpha() == 0         # letterbox above it
+    assert _color_at(block, CELL // 2, CELL - 1).alpha() == 0  # and below
+
+
+def test_a_tall_picture_is_pillarboxed_instead(qapp, tmp_path):
+    tall = _picture(tmp_path / "tall.png", (255, 0, 0), size=(40, 80))
+
+    block = source_pixmap(tall, CELL)
+
     assert _color_at(block, CELL // 2, CELL // 2).red() > 200
+    assert _color_at(block, 0, CELL // 2).alpha() == 0
 
 
 def test_a_missing_file_is_no_picture_rather_than_a_blank_one(qapp, tmp_path):
     # A start frame can be a library file that has moved, or one still rendering.
     assert source_pixmap(tmp_path / "gone.png", CELL) is None
     assert source_pixmap(None, CELL) is None
+
+
+def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
+    # The frame leads because it is what gets animated; the recipe follows in
+    # gray because it is the settings being reused, not a second thing being made.
+    frame = _picture(tmp_path / "frame.png", (255, 0, 0))
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+
+    block = source_pixmap(frame, CELL, recipe)
+
+    lead = _color_at(block, _middle_of_cell(0), CELL // 2)
+    assert lead.red() > 200 and lead.blue() < 60         # the frame, still itself
+    follow = _color_at(block, _middle_of_cell(1), CELL // 2)
+    assert follow.red() == follow.green() == follow.blue()  # the recipe, drained
+
+
+def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
+    # A video queued behind the image it animates has no frame on disk yet. The
+    # recipe still says something about this run, and stays in its own cell so
+    # the two read as one column down the line.
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+
+    block = source_pixmap(tmp_path / "not-yet.png", CELL, recipe)
+
+    assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0
+    follow = _color_at(block, _middle_of_cell(1), CELL // 2)
+    assert follow.blue() > 0 and follow.red() == follow.blue()
+
+
+def test_neither_half_on_disk_is_still_no_picture(qapp, tmp_path):
+    assert source_pixmap(tmp_path / "gone.png", CELL, tmp_path / "also-gone.png") is None
 
 
 def test_the_pictures_lie_across_the_row_not_stacked(qapp, tmp_path):
@@ -109,12 +151,12 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
     source_pixmap(picture, CELL)
 
     reads = []
-    monkeypatch.setattr(queue_thumbs, "_crop_to_square",
+    monkeypatch.setattr(queue_thumbs, "_fit_in_square",
                         lambda *a: reads.append(a) or None)
     again = source_pixmap(picture, CELL)
 
     assert reads == []
-    assert again is not None  # answered from the cache, not re-cropped to nothing
+    assert again is not None  # answered from the cache, not re-fitted to nothing
 
 
 def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):

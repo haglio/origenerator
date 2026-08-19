@@ -10,10 +10,11 @@ On the right, taking the rest of the strip, *what is queued*: every in-flight jo
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click, and each draggable to a new place in the line. A
 row says what the job will cost and what kind of thing it is, and nothing else
-("~2 min · I2V · Auto · Request"): a line of waiting work is read to find out how
-long the wait is, and the workflow-and-prompt name that used to be here is the
-same on every row of a folder being re-rolled. Beside that, a picture — the frame
-an image-to-video animates, or a four-up of the folder the run will land in —
+("~2 min · I2V · dancing · Auto · Request"): a line of waiting work is read to
+find out how long the wait is, and the workflow-and-prompt name that used to be
+here is the same on every row of a folder being re-rolled. Beside that, a picture
+— the frame an image-to-video animates, the gray clip a dropped-video combine
+takes its settings from, or a four-up of the folder the run will land in —
 because the one picture a queued job cannot show is its own.
 Only the top row is fixed: nothing can be moved in front of what is already
 rendering.
@@ -53,7 +54,7 @@ from PyQt6.QtCore import Qt, QMimeData, QSize, QTimer, pyqtSignal
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
     held_row_text, queue_held_text, queue_lead_text, queue_lead_tooltip,
-    queue_wait_text,
+    queue_wait_text, starting_row_text,
 )
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
@@ -215,16 +216,17 @@ class QueueRow(QWidget):
     the button that throws it away.
 
     Read left to right: the button, then the job's picture, then what it is —
-    ``"~2 min · I2V · Auto"`` (:func:`inflight.queue_lead_text`). That line is the
-    whole of what the row says about the job. The workflow-and-prompt name a
-    Generate tab is titled with used to be here and is not: it answers "which
-    recipe", and every row of a folder being re-rolled carries the same one, so a
-    strip of eight said one thing eight times and none of them said which was the
-    ten-minute one. It is still a hover away.
+    ``"~2 min · I2V · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
+    line is the whole of what the row says about the job. The workflow-and-prompt
+    name a Generate tab is titled with used to be here and is not: it answers
+    "which recipe", and every row of a folder being re-rolled carries the same
+    one, so a strip of eight said one thing eight times and none of them said
+    which was the ten-minute one. It is still a hover away.
 
     The picture is second because that is where it lines up into a column and
-    where the eye lands: the frame an image-to-video animates, or four out of the
-    folder the run will land in (:mod:`origenerator.gui.queue_thumbs`).
+    where the eye lands: the frame an image-to-video animates (with the gray
+    recipe video beside it, where one was dropped), or four out of the folder the
+    run will land in (:mod:`origenerator.gui.queue_thumbs`).
 
     Only a wait worth explaining puts more text on the row — a video the queue is
     holding for a slideshow, or a job behind another app's work — and that note
@@ -311,11 +313,13 @@ class QueueRow(QWidget):
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The recipe is worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
-        # Two waits are worth explaining in a row's own width: one this queue is
-        # imposing (a video, while a slideshow plays), and another app's hold.
-        # The user's own place in the line is the line itself, and needs no words.
+        # Three waits are worth explaining in a row's own width: the stretch
+        # before a pressed Generate is a job at all, one this queue is imposing
+        # (a video, while a slideshow plays), and another app's hold. The user's own
+        # place in the line is the line itself, and needs no words.
         self._note_text = (
-            held_row_text(item.held) or queue_wait_text(item.foreign_ahead) or ""
+            starting_row_text(item.starting) or held_row_text(item.held)
+            or queue_wait_text(item.foreign_ahead) or ""
         )
         self._render_note()
         self._cancel.setText(discard_run_text(item.auto_generating))
@@ -345,11 +349,13 @@ class QueueRow(QWidget):
 
         The start frame wins whenever there is one, being about *this* run rather
         than about where it will land — and being the only thing separating two
-        i2v rows off one recipe. A run with no frame, or one whose frame isn't on
+        i2v rows off one recipe. A combine handed a dropped video draws that video
+        beside it, in gray. A run with neither, or one whose pictures aren't on
         disk yet, falls back to the folder view; a folder with nothing in it yet
         leaves the block off the row rather than draw an empty grid.
         """
-        if item.source_image and self._thumbs.show_source(item.source_image):
+        if ((item.source_image or item.recipe_thumbnail)
+                and self._thumbs.show_source(item.source_image, item.recipe_thumbnail)):
             return
         if item.folder_thumbnails:
             self._thumbs.show_folder(item.folder_thumbnails)

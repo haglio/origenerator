@@ -36,6 +36,39 @@ def test_insert_and_get_generation(tmp_path):
     assert row["source"] == "generated"
 
 
+def test_recipe_source_records_where_a_combine_got_its_recipe(tmp_path):
+    # Nothing else on the row says it: the params carry the recipe's values, never
+    # which video they came from or what the user called the act.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="rec-001", workflow_name="wan22_i2v", workflow_version="v001",
+        params_json="{}", workflow_json="{}",
+    )
+    assert db.get_generation("rec-001")["recipe_category"] is None
+
+    db.set_recipe_source("rec-001", category="dancing", video_prompt_id="vid-9")
+
+    row = db.get_generation("rec-001")
+    assert row["recipe_category"] == "dancing"
+    assert row["recipe_video_id"] == "vid-9"
+
+
+def test_each_half_of_a_recipe_source_can_stand_alone(tmp_path):
+    # A dropped video names no act, and an act the overlay curates a recipe for is
+    # answered from no past video.
+    db = Database(tmp_path / "test.db")
+    for pid in ("dropped", "curated"):
+        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+                             workflow_version="v001", params_json="{}", workflow_json="{}")
+    db.set_recipe_source("dropped", video_prompt_id="vid-9")
+    db.set_recipe_source("curated", category="dancing")
+
+    assert db.get_generation("dropped")["recipe_category"] is None
+    assert db.get_generation("dropped")["recipe_video_id"] == "vid-9"
+    assert db.get_generation("curated")["recipe_category"] == "dancing"
+    assert db.get_generation("curated")["recipe_video_id"] is None
+
+
 def test_update_generation(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

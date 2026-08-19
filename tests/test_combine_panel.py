@@ -19,6 +19,15 @@ def _panel(qtbot):
     return panel
 
 
+def test_only_the_video_slot_is_drained_of_color(qtbot):
+    # The video is here for its settings — never for what it looks like — while
+    # the image is the very thing being animated.
+    panel = _panel(qtbot)
+
+    assert panel.video_slot._grayscale
+    assert not panel.image_slot._grayscale
+
+
 def test_generate_is_disabled_until_both_slots_are_filled(qtbot):
     panel = _panel(qtbot)
     assert not panel._generate_btn.isEnabled()

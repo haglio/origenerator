@@ -18,13 +18,16 @@ def queue(qtbot):
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
           progress=None, reveal=None, cancel=None, foreign_ahead=None, held=False,
           started_at=None, typical_seconds=None, auto_generating=False,
-          job_kind="", requested=False, source_image=None, folder_thumbnails=()):
+          job_kind="", requested=False, source_image=None, folder_thumbnails=(),
+          recipe_category="", recipe_thumbnail=None, starting=False):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
                         foreign_ahead=foreign_ahead, held=held, started_at=started_at,
                         typical_seconds=typical_seconds, auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
-                        source_image=source_image, folder_thumbnails=folder_thumbnails)
+                        source_image=source_image, folder_thumbnails=folder_thumbnails,
+                        recipe_category=recipe_category, recipe_thumbnail=recipe_thumbnail,
+                        starting=starting)
 
 
 def _picture(path, color=(0, 0, 255)):
@@ -710,6 +713,28 @@ def test_a_hand_launched_job_says_neither(queue):
     assert queue.rows()[0].lead() == "~30 sec · Image"
 
 
+def test_a_row_names_the_act_it_was_asked_for(queue):
+    # "I2V" says a video is being made from a frame; the act says which video —
+    # the whole of what the user chose in Combine, and the one thing separating
+    # two runs on the same picture.
+    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V",
+                           recipe_category="dancing")])
+    assert queue.rows()[0].lead() == "~2 min · I2V · dancing"
+
+
+def test_a_run_nobody_picked_an_act_for_names_none(queue):
+    # A dropped video is the recipe itself: there was no dropdown choice to show,
+    # and inventing one from its prompt would be a guess the row states as fact.
+    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V")])
+    assert queue.rows()[0].lead() == "~2 min · I2V"
+
+
+def test_the_hover_spells_out_where_the_act_came_from(queue):
+    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V",
+                           recipe_category="dancing")])
+    assert "“dancing” act" in queue.rows()[0]._lead.toolTip()
+
+
 def test_a_workflow_nobody_has_timed_admits_it(queue):
     queue.set_items([_item(typical_seconds=None, job_kind="Image")])
     assert queue.rows()[0].lead() == "~? · Image"
@@ -755,7 +780,7 @@ def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="I2V", source_image=frame,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0].thumbs()._showing == ("source", frame)
+    assert queue.rows()[0].thumbs()._showing == ("source", frame, None)
 
 
 def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
@@ -773,6 +798,46 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
     queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
                            folder_thumbnails=mates)])
     assert queue.rows()[0].thumbs()._showing == ("folder", mates)
+
+
+def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path):
+    # Not the recipe video alone: that reads as a job that IS that clip. The
+    # frame being animated leads, and the video whose settings are being reused
+    # sits beside it (drawn gray, see queue_thumbs).
+    frame = _picture(tmp_path / "frame.png")
+    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe,
+                           folder_thumbnails=(_picture(tmp_path / "other.png"),))])
+    assert queue.rows()[0].thumbs()._showing == ("source", frame, recipe)
+
+
+def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue, tmp_path):
+    # A chained run draws its frame first, so the video behind it names one that
+    # isn't on disk yet. The recipe is about this run either way — better it than
+    # the folder, which says only where the result will land.
+    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
+                           recipe_thumbnail=recipe,
+                           folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
+    assert queue.rows()[0].thumbs()._showing == ("source", None, recipe)
+
+
+def test_a_row_that_is_not_a_job_yet_says_so(queue):
+    # The press of Generate has an answer on screen before the work that turns it
+    # into a job is done — otherwise the button reads as one that did nothing.
+    queue.set_items([_item(status="queued", job_kind="I2V", recipe_category="dancing",
+                           cancel=None, starting=True)])
+    row = queue.rows()[0]
+
+    assert row.note() == "Starting…"
+    assert row.lead() == "~? · I2V · dancing"   # what is known of it already
+    assert row._cancel.isHidden()               # nothing on the server to stop yet
+    assert "Not sent to ComfyUI yet" in row._lead.toolTip()
+
+
+def test_a_started_job_stops_saying_it_is_starting(queue):
+    queue.set_items([_item(status="queued", job_kind="I2V")])
+    assert queue.rows()[0].note() == ""
 
 
 def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):

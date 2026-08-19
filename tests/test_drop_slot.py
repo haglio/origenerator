@@ -11,8 +11,9 @@ from origenerator.gui.generation_drag import generation_mime
 
 
 def _slot(qtbot, kind="image", accepts=lambda pid: True,
-          preview=lambda pid: (None, None), placeholder="Drop here"):
-    slot = DropSlot(kind=kind, accepts=accepts, preview=preview, placeholder=placeholder)
+          preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False):
+    slot = DropSlot(kind=kind, accepts=accepts, preview=preview, placeholder=placeholder,
+                    grayscale=grayscale)
     qtbot.addWidget(slot)
     return slot
 
@@ -100,6 +101,44 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     movie = slot._label.movie()
     assert isinstance(movie, QMovie)
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
+
+
+def test_a_grayscale_slot_drains_the_clip_it_holds(qtbot, tmp_path):
+    # The video slot holds a recipe, not a result: in color it reads as a second
+    # subject beside the image it will animate.
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp), grayscale=True)
+
+    _drop(slot, "vid1")
+
+    assert slot._label.movie() is None  # frames come across as pixmaps, drained
+    color = slot._label.pixmap().toImage().pixelColor(2, 2)
+    assert color.red() == color.green() == color.blue()
+    assert slot._movie.state() == QMovie.MovieState.Running  # still looping
+
+
+def test_a_grayscale_slot_drains_a_still_too(qtbot, tmp_path):
+    # An i2v video with no animated preview shows its stored frame; it is held
+    # for the same reason and reads the same way.
+    still = tmp_path / "thumb.png"
+    Image.new("RGB", (40, 30), (200, 30, 30)).save(still)
+    slot = _slot(qtbot, kind="video", preview=lambda pid: (str(still), None),
+                 grayscale=True)
+
+    _drop(slot, "vid1")
+
+    color = slot._label.pixmap().toImage().pixelColor(2, 2)
+    assert color.red() == color.green() == color.blue()
+
+
+def test_an_ordinary_slot_keeps_its_color(qtbot, tmp_path):
+    still = tmp_path / "thumb.png"
+    Image.new("RGB", (40, 30), (200, 30, 30)).save(still)
+    slot = _slot(qtbot, preview=lambda pid: (str(still), None))
+
+    _drop(slot, "img1")
+
+    assert slot._label.pixmap().toImage().pixelColor(2, 2).red() > 150
 
 
 def test_set_placeholder_updates_the_empty_prompt_live(qtbot):

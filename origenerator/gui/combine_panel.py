@@ -2,9 +2,11 @@
 
 Drop an image into the top slot, then supply a *recipe* one of two ways — side by
 side in the video part: pick an act from the category dropdown and let the app find
-a fitting past video for you, or drop a specific i2v video for a custom action. The
-two are mutually exclusive: picking an act clears a dropped video (and relabels the
-slot as the override path), and dropping a video wipes the dropdown back to "-".
+a fitting past video for you, or drop a specific i2v video for a custom action. A
+dropped video shows in gray: it is here for its settings, not as a second picture
+to be made. The two are mutually exclusive: picking an act clears a dropped video
+(and relabels the slot as the override path), and dropping a video wipes the
+dropdown back to "-".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while Open in generator hands it to a generate tab to edit before running.
 
@@ -65,7 +67,11 @@ class CombinePanel(QWidget):
     ):
         super().__init__(parent)
         self.image_slot = DropSlot("image", image_accepts, preview, "Drop an image")
-        self.video_slot = DropSlot("video", video_accepts, preview, _DROP_PLACEHOLDER)
+        # Gray, always: the video in this slot is never what gets made — only the
+        # settings the making follows. In color it reads as a second subject beside
+        # the image, which is the one thing it is not.
+        self.video_slot = DropSlot("video", video_accepts, preview, _DROP_PLACEHOLDER,
+                                   grayscale=True)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
 
@@ -176,7 +182,7 @@ class CombinePanel(QWidget):
         self._category.setCurrentIndex(index if index >= 1 else 0)
 
     def set_available_categories(self, available: Collection[str]):
-        """Grey out every act the current lane has no recipe for — nothing to mine and
+        """Gray out every act the current lane has no recipe for — nothing to mine and
         nothing pinned, so offering it could only ever answer "no recipe yet". A
         disabled item says why on hover, naming the lane, since an act the players'
         lane answers happily can still be unanswerable as a loop. The neutral "-" is

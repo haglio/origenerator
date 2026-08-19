@@ -21,6 +21,7 @@ from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from origenerator.funscript import funscript_path_for, read_actions
+from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.drag_thumbnail import (
     fit_thumbnail, label_thumbnail, set_drag_thumbnail,
 )
@@ -127,6 +128,13 @@ class PreviewWidget(QWidget):
         self._player.mediaStatusChanged.connect(self._on_media_status)
         self._stack.addWidget(self._video)
 
+        # A third page, for what is not a generation at all: an image and the
+        # settings of a past video, waiting to be run together (see
+        # :meth:`show_combination`).
+        self._combination = CombinationView()
+        self._combination.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._stack.addWidget(self._combination)
+
         self._stack.setCurrentWidget(self._image_label)
 
         # The notice's two pieces, over the media host so they cover the picture
@@ -221,6 +229,28 @@ class PreviewWidget(QWidget):
         win = self._following_fullscreen()
         if win is not None:
             win.show_frame(data)  # keep a view watching this generation up to date
+
+    def show_combination(self, image_path, video_path) -> None:
+        """Show a combination waiting to be run: the frame on the left, a plus,
+        and the gray looping clip whose settings go with it
+        (:class:`~origenerator.gui.combination_view.CombinationView`).
+
+        What "Open in generator" leaves a tab holding. Nothing has been generated
+        from it yet, so there is no media to show and the idle placeholder — the
+        line a tab pointed at nothing wears — said only that, when the two things
+        the tab is actually about were both on hand to be shown.
+        """
+        self._player.stop()
+        self.set_notice(None)  # no picture of a past run left for a notice to be about
+        self._media = None     # a pair to be made, not a file to open fullscreen
+        self._end_live(None)
+        self._draggable_id = None  # nor a saved generation to drag out
+        self._set_movie(None)
+        self._pixmap = None
+        self._image_label.clear()
+        self._combination.show_pair(image_path, video_path)
+        self._stack.setCurrentWidget(self._combination)
+        self._hide_strip()  # nothing made yet, so no script to lay under it
 
     def show_message(self, text: str, *, live: bool = False) -> None:
         """Show a plain text message in place of any media.
@@ -508,7 +538,13 @@ class PreviewWidget(QWidget):
 
         The movie is parented to this widget so the label's pointer can't dangle
         if Python drops the wrapper before the next paint.
+
+        Every ``show_*`` passes through here, so it is also where a combination on
+        the other page is put down — its clip would otherwise keep looping behind
+        whatever replaced it. :meth:`show_combination` calls this before laying
+        its own pair out, so it is not undoing itself.
         """
+        self._combination.clear()
         if self._movie is not None:
             self._movie.stop()
             self._movie.deleteLater()

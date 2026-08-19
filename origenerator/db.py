@@ -53,7 +53,16 @@ CREATE TABLE IF NOT EXISTS generations (
     -- because a restart mid-generation is routine, and it is the only thing
     -- separating such a run from the identical loop workflow started by hand,
     -- which must stay put until Send-to-Genau is pressed.
-    genau_requested_at TEXT
+    genau_requested_at TEXT,
+    -- Where a combine launch got its recipe: the act picked in the Combine
+    -- panel's dropdown, and the video whose settings the run re-uses. Either can
+    -- stand alone — a dropped video names no act, and an act the overlay curates
+    -- a recipe for is answered from no past video. Nothing else about the run
+    -- records it: the params carry the recipe's values, never which video they
+    -- came from or what the user called the act. Stamped at launch, because a
+    -- queue row is read while the run is still pending.
+    recipe_category TEXT,
+    recipe_video_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -134,7 +143,7 @@ _GENERATION_COLUMNS = (
     "output_files", "original_files", "enhance_history", "thumbnail_path",
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
-    "genau_exported_at", "genau_requested_at",
+    "genau_exported_at", "genau_requested_at", "recipe_category", "recipe_video_id",
 )
 
 
@@ -178,6 +187,10 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN original_files TEXT")
         if "enhance_history" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN enhance_history TEXT")
+        if "recipe_category" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN recipe_category TEXT")
+        if "recipe_video_id" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN recipe_video_id TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -266,6 +279,25 @@ class Database:
             conn.execute(
                 "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
                 (params_json, prompt_id),
+            )
+
+    def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
+                          video_prompt_id: str | None = None):
+        """Record where a combine launch got its recipe: the act picked in the
+        dropdown, and the video whose settings the run re-uses.
+
+        Written straight after the launch rather than at insert time, because the
+        row goes in as the job is submitted and only the caller that built the
+        combination knows either of these. Empty values are stored as NULL, so a
+        dropped video (no act) and a curated act (no video) each record only the
+        half they have. Separate from ``update_generation``, whose allowlist
+        excludes provenance fields.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET recipe_category = ?, recipe_video_id = ? "
+                "WHERE prompt_id = ?",
+                (category or None, video_prompt_id or None, prompt_id),
             )
 
     def set_generation_starred(self, prompt_id: str, starred: bool):

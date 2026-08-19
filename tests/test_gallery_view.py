@@ -36,7 +36,7 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.voice.dictation import RequestDictation
 from origenerator.recovery import RETENTION_DAYS
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -5753,6 +5753,127 @@ def test_a_generation_from_a_folder_the_show_is_not_playing_stays_out(qtbot, mon
     view._on_reroll_finished("some-key", "v1")
 
     assert [item[2] for item in slideshow._playlist._items] == ["i1"]
+    slideshow.close()
+
+
+def _running(prompt_id, prompt="a cat", steps=50, seed=2):
+    """A row for a generation still being made: same settings folder as an
+    ``_image`` of the same prompt and steps, with no output file of its own."""
+    return _row(prompt_id, "sdxl_t2i",
+                {"positive_prompt": prompt, "steps": steps, "seed": seed}, "",
+                status="running", output_files=json.dumps([]))
+
+
+def _resolve_finished_only(monkeypatch):
+    """Resolve a preview for finished rows only, as the real one does — a row
+    still being made has no file to point at."""
+    monkeypatch.setattr(
+        gallery, "resolve_preview",
+        lambda row, output_dir: (None if row.get("status") != "completed"
+                                 else (f"{row['prompt_id']}.png", "image")),
+    )
+
+
+def test_a_run_that_starts_to_look_like_something_joins_the_open_show(qtbot, monkeypatch):
+    # The wait is not worth a slide, but the first iterations coming in are the
+    # best thing in a folder that is filling — and they used to reach the show
+    # only minutes later, as the finished file.
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+    assert [item[2] for item in slideshow._playlist._items] == ["i1"]
+
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    assert slideshow.holds("i2")
+    assert slideshow._playlist.peek(1) == (b"a-frame", LIVE, "i2", None)
+    slideshow.close()
+
+
+def test_a_run_in_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch):
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1),
+                 _running("i2", prompt="a dog", steps=12)])   # another folder
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    assert not slideshow.holds("i2")
+    slideshow.close()
+
+
+def test_a_run_being_made_joins_a_recents_show_too(qtbot, monkeypatch):
+    # Recents is a shelf of results and a run has none yet, so it cannot answer
+    # off its own list — but every generation this app makes lands there.
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    assert view._slideshow.holds("i2")
+    view._slideshow.close()
+
+
+def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
+    # It is a better version of a picture the show may already be playing, and it
+    # says so in that picture's own corner — not as a second, worse slide of it.
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1),
+                 _row("e1", gallery.ENHANCE_WORKFLOW, {"seed": 1}, "",
+                      status="running", output_files=json.dumps([]))])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._recents_item)
+    view._start_slideshow()
+    qtbot.addWidget(view._slideshow)
+
+    view._on_reroll_preview("some-key", "e1", b"a-frame")
+
+    assert not view._slideshow.holds("e1")
+    view._slideshow.close()
+
+
+def test_a_run_the_show_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch):
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    db.get_generation("i2").update(_image("i2", "a cat", 50, 2))  # it finished
+    view._on_reroll_finished("some-key", "i2")
+
+    assert len(slideshow._playlist) == 2              # the same slide, finished
+    assert slideshow._playlist.peek(1) == ("i2.png", "image", "i2", None)
+    slideshow.close()
+
+
+def test_a_run_that_stopped_being_made_leaves_the_open_show(qtbot, monkeypatch):
+    # Cancelled or failed: no file is coming, and the half-rendered frame it got
+    # to would otherwise hold a place in the pass forever.
+    _resolve_finished_only(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    slideshow = _slideshow_of_first_leaf(qtbot, view)
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    db.get_generation("i2")["status"] = "error"       # it is no longer in flight
+    view._update_queue()
+
+    assert not slideshow.holds("i2")
     slideshow.close()
 
 

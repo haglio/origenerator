@@ -451,6 +451,10 @@ class GalleryView(QWidget):
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
+        # Runs the open show has already turned down as slides of their own
+        # frames — another folder's work, an enhancement. Asked once and kept,
+        # since every frame of such a run asks again (:meth:`_show_would_play`).
+        self._show_refused: set[str] = set()
         # The folder whose running re-roll currently drives the info pane (its
         # tile is the selected item), that tile, and the last frame shown — so
         # live frames mirror from the browser-pane thumbnail into the full-size
@@ -1402,6 +1406,7 @@ class GalleryView(QWidget):
         ``resume`` where a closed show left off, for one picking that back up
         rather than naming its own opening slide.
         """
+        self._show_refused = set()  # a new show, a new set to be judged against
         self._slideshow = SlideshowView(
             items, on_delete=self._trash_generation,
             on_enhance=self._enhance_from_slideshow,
@@ -3977,6 +3982,84 @@ class GalleryView(QWidget):
         for item in self._slideshow_items([row]):
             self._slideshow.note_added(*item)
 
+    def _feed_slideshow_generating(self, prompt_id: str, frame: bytes):
+        """A run streamed a frame: an open show playing its folder takes it in as
+        a slide of that frame, right now, and keeps it current from there.
+
+        Waiting for the file is waiting minutes for the one thing the show is
+        being watched for. The first iterations are already worth looking at, so
+        the run joins on its first frame and swaps for the file when it lands.
+
+        The membership question is asked once per run, either way: a run the show
+        holds answers itself, and one it turned down is remembered as turned down
+        (:attr:`_show_refused`). A frame arrives every second or so, and the
+        question costs a row lookup and a walk of what is on screen.
+        """
+        show = self._slideshow
+        if show is None or show.is_live():
+            return  # a show already following one run full-screen is that run's
+        if not show.holds(prompt_id) and not self._show_would_play(prompt_id):
+            return
+        show.note_generating(prompt_id, frame)
+
+    def _show_would_play(self, prompt_id: str) -> bool:
+        """Whether the open show would be playing a generation that has no file
+        yet — the question :meth:`_feed_slideshow_finished` asks of the rows on
+        screen, asked a few minutes earlier.
+
+        A folder's show answers off those rows as usual: the tree keeps a run in
+        flight in the folder its settings put it in, so it is already among them.
+        A shelf's cannot — Recents is a shelf of results and a run has none yet —
+        so Recents answers for itself, by its own rule: every generation this app
+        makes lands there, and this is one. The other shelves are deliberate sets
+        (starred, requested, condemned) that nothing joins by being made, and a
+        search's hits are a set that was already asked for.
+
+        An enhancement is nobody's slide, wherever it is running. It is a better
+        version of a picture the show may already be playing, and it says so in
+        that picture's own corner note — a second slide of it half-rendered
+        would be the same image twice, one of them worse.
+
+        A no is kept for the life of the show, since it is asked again of every
+        frame of a run in some other folder — and the set behind a show doesn't
+        move while one is up, the gallery being covered by it.
+        """
+        if prompt_id in self._show_refused:
+            return False
+        row = self._db.get_generation(prompt_id)
+        plays = bool(
+            row is not None
+            and row.get("workflow_name") != gallery.ENHANCE_WORKFLOW
+            and (any(r["prompt_id"] == prompt_id for r in self._slideshow_rows())
+                 # Recents by its own rule, having no list of its own to consult.
+                 or (self._browser.showing_recents()
+                     and not self._browser.showing_search()
+                     and (row.get("source") or "generated") == "generated"
+                     and gallery.media_type_of_row(row) in self._media_types()))
+        )
+        if not plays:
+            self._show_refused.add(prompt_id)
+        return plays
+
+    def _feed_slideshow_in_flight(self, items):
+        """Tell an open show what is still being made, off the same in-flight list
+        the queue plate in its corner is drawn from.
+
+        Two things the frames alone can't say. A run whose frames began before the
+        show opened sends no new one for a while — the tail of a run is all decode
+        and save — and would otherwise be missing from a show of its own folder;
+        and a run that was cancelled or failed sends nothing ever again, leaving
+        the half-rendered frame it got to in the pass forever.
+        """
+        show = self._slideshow
+        if show is None or show.is_live():
+            return
+        for item in items:
+            if item.frame is not None and (show.holds(item.key)
+                                           or self._show_would_play(item.key)):
+                show.note_generating(item.key, item.frame)
+        show.note_in_flight({item.key for item in items})
+
     def _open_from_slideshow(self, prompt_id: str):
         """A slideshow handed its item over on the way out — Enter, or a show
         ended while that slide was locked. Land in the item's own folder with it
@@ -4732,7 +4815,7 @@ class GalleryView(QWidget):
             self._shown_wait_note = note
             self._info_tabs.show_reroll_frame(None, note)
 
-    def _on_reroll_preview(self, key: str, data: bytes):
+    def _on_reroll_preview(self, key: str, prompt_id: str, data: bytes):
         """Mirror a re-roll's live frame into the info pane while it's selected,
         remembering it so it survives the rebuild each stage completion triggers."""
         if key == self._selected_reroll_key:
@@ -4743,6 +4826,8 @@ class GalleryView(QWidget):
         # generation taking the preview over.
         self._enhance_frames[key] = data
         self._reconcile_pending_enhancements()
+        # And straight onto an open show, which is watching for exactly this.
+        self._feed_slideshow_generating(prompt_id, data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll as the info-pane source — a real
@@ -4995,14 +5080,16 @@ class GalleryView(QWidget):
         these have no row in it: they are the press's answer, not a record of
         anything, and they last only until the real row exists.
 
-        An open slideshow is fed the same list: it covers the strip, and it is
-        the one stretch where the line deliberately stops moving, so the queue
-        follows onto the surface that is actually in front of the user.
+        An open slideshow is fed the same list twice over: once for the queue it
+        covers, which is the one stretch where the line deliberately stops
+        moving, and once for the slides themselves, since a run that has begun to
+        look like something is a slide of that show (:meth:`_feed_slideshow_in_flight`).
         """
         items = self._inflight_items() + list(self._launching.values())
         self._queue.set_items(items, self._foreign_queue.total)
         if self._slideshow is not None:
             self._slideshow.set_queue(items, self._foreign_queue.total)
+            self._feed_slideshow_in_flight(items)
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.

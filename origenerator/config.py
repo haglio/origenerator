@@ -135,6 +135,15 @@ OSR2_BROKER_HOST = "127.0.0.1"
 OSR2_TCODE_UDP_PORT = 50557
 OSR2_STATE_DIR = project_dir("fun_time") / "state"
 OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / "genau_enabled.txt"
+# The broker stamps these with the time it last heard from the device and last
+# spoke to it. Stale on both counts means nothing is on the wire — how Fun Time's
+# console knows to say "Off" and grey its readout, and how this app's does too
+# (see origenerator.osr2.device_on).
+OSR2_SERIAL_RX_FILE = OSR2_STATE_DIR / "osr2_serial_rx.txt"
+OSR2_SERIAL_TX_FILE = OSR2_STATE_DIR / "osr2_serial_tx.txt"
+# How old a stamp may be and still count as the device being there. The broker's
+# own window, so the two apps answer "is it on?" the same way at the same moment.
+OSR2_STAMP_MAX_AGE_S = 16.0
 
 # --- Voice command → prompt edit ------------------------------------------
 # While a folder auto-generates, the mic listens (always-on); each spoken

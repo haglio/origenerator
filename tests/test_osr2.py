@@ -1,4 +1,4 @@
-from origenerator.osr2 import Osr2Broker, PARK_TCODE, format_position
+from origenerator.osr2 import Osr2Broker, PARK_TCODE, device_on, format_position
 
 
 class FakeSock:
@@ -74,3 +74,32 @@ def test_restore_genau_without_a_pause_does_nothing(tmp_path):
     flag = tmp_path / "genau_enabled.txt"
     _broker(tmp_path, FakeSock()).restore_genau()
     assert not flag.exists()
+
+
+# --- is the device on the wire: what the console reads to say "Off" ----------
+
+def _stamps(tmp_path, rx=None, tx=None):
+    """The broker's two serial stamps, written with whatever times are given."""
+    rx_file, tx_file = tmp_path / "rx.txt", tmp_path / "tx.txt"
+    for path, stamped in ((rx_file, rx), (tx_file, tx)):
+        if stamped is not None:
+            path.write_text(str(stamped), encoding="utf-8")
+    return {"rx_file": rx_file, "tx_file": tx_file}
+
+
+def test_a_fresh_stamp_either_way_means_the_device_is_there(tmp_path):
+    # Fun Time counts both: the device only speaks when spoken to, so the reply
+    # stamp alone goes quiet through any stretch nothing is being sent.
+    assert device_on(now=1000.0, **_stamps(tmp_path, rx=995.0, tx=100.0)) is True
+    assert device_on(now=1000.0, **_stamps(tmp_path, rx=100.0, tx=995.0)) is True
+
+
+def test_both_stamps_stale_means_nothing_is_on_the_wire(tmp_path):
+    assert device_on(now=1000.0, **_stamps(tmp_path, rx=980.0, tx=983.0)) is False
+
+
+def test_no_stamps_at_all_reads_as_off(tmp_path):
+    # A broker that never ran, a state dir that isn't there, a hand-mangled file:
+    # all of them are "as far as anything here can tell, no device".
+    assert device_on(now=1000.0, **_stamps(tmp_path)) is False
+    assert device_on(now=1000.0, **_stamps(tmp_path, rx="just now", tx="")) is False

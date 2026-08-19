@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtCore import Qt, QTimer
 
-from origenerator import stroke_engine
+from origenerator import osr2, stroke_engine
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND
@@ -86,7 +86,7 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def console_hud(stroke, host) -> ConsoleHud:
+def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated stroke over
@@ -94,17 +94,27 @@ def console_hud(stroke, host) -> ConsoleHud:
     :class:`ModeHud` is what leaves the status line saying only whether the
     slide is held — there is no compilation, no browse order and no length
     filter here to report.
+
+    ``device_on`` is whether the OSR2 is answering at all
+    (:func:`origenerator.osr2.device_on`). A stroke running with the device off
+    is a stroke nobody is receiving, and the console says so exactly as Fun
+    Time's does: the OSR2 row reads "Off" and the painter takes that as nothing
+    driving, which greys the readout and holds the trace still. The stroke goes
+    on stroking — it cannot see the device either way — so this is the only
+    thing standing between a switched-off OSR2 and a console animating a blue
+    wave nothing is riding.
     """
+    driving = stroke.active and device_on
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
             mode="genau", active=True, locked=host.locked,
-            osr2="genau" if stroke.active else "off",
+            osr2="genau" if driving else "off",
             cruise=stroke.state.cruise.active,
             shape=stroke.state.state.shape.value,
             advance_interval=host.dwell_s,
         ),
-        drive=drive_hud(stroke.state, stroke.active, host.dwell_s),
+        drive=drive_hud(stroke.state, driving, host.dwell_s),
         modes_row=False,
     )
 
@@ -128,9 +138,12 @@ class StrokePanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None, host=None, pace=None):
+    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None):
         super().__init__(parent)
         self._stroke = stroke
+        # How to ask whether the OSR2 is on the wire, or None for the real read.
+        # Injectable so a test never reaches the machine's own broker stamps.
+        self._ask_device = device_on
         # Without a slideshow behind it the console still has a pace to set: the
         # one the next slideshow will open at.
         self._host = host if host is not None else PaceOnlyHost(
@@ -247,7 +260,15 @@ class StrokePanel(QWidget):
         """The console drawn — the picture, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
-        return self._painter.rgba(console_hud(self._stroke, self._host))
+        return self._painter.rgba(
+            console_hud(self._stroke, self._host, device_on=self._device_on()))
+
+    def _device_on(self) -> bool:
+        """Whether the OSR2 is answering, asked afresh on every draw — the device
+        is switched on and off behind this app's back, so there is nothing to
+        cache the answer against."""
+        ask = self._ask_device if self._ask_device is not None else osr2.device_on
+        return bool(ask())
 
     def paintEvent(self, event):
         raw, (width, height) = self.render_console()

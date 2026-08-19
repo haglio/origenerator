@@ -152,6 +152,36 @@ def test_every_fixable_part_gets_a_number_of_its_own(qtbot):
     assert panel._fixes["faces"].toolTip()
 
 
+def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
+    # Seven parts share one line only if none of them is padded out: Qt's own
+    # hint for a spin box is far wider than "0.00", and a field given a floor
+    # and a share of the slack (as the three numbers above have) costs another
+    # part its place on the line.
+    panel, _ = _panel(qtbot)
+    box = panel._fixes["faces"]
+    digits = box.fontMetrics().horizontalAdvance("0.00")
+
+    assert digits < box.minimumWidth() <= digits + 20   # its own chrome, no more
+    assert box.minimumWidth() == box.maximumWidth()     # fixed, so a wide pane
+    assert box.minimumWidth() < box.sizeHint().width()  # doesn't stretch it
+
+
+def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
+    # The window tiles into a third of a monitor, so no row of fields may set
+    # the floor for it — and a line too long to fit has to wrap, since a
+    # clipped part is a setting that silently isn't there.
+    panel, _ = _panel(qtbot)
+    host = panel._fixes["faces"].parent().parent()
+    flow = host.layout()
+    pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
+
+    assert flow.heightForWidth(120) > flow.heightForWidth(4000)   # it wraps
+    assert host.hasHeightForWidth()   # or the wrapped rows are cut off the bottom
+    # Its floor is one part, not the whole line.
+    assert host.minimumSizeHint().width() <= max(
+        pair.sizeHint().width() for pair in pairs) + 8
+
+
 def test_a_part_turned_back_to_zero_stops_being_asked_for(qtbot):
     # Zero is the panel's way of saying "leave this part alone", so it must
     # leave the settings rather than ride along as a pass at no denoise.

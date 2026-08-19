@@ -25,13 +25,14 @@ on submit.
 """
 
 from PyQt6.QtWidgets import (
-    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
+    QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
 
 from origenerator.gallery import (
     ENHANCE_SETTING_KEYS, ENHANCE_WORKFLOW, MATCH_SOURCE_MODEL, EnhanceSettings,
 )
 from origenerator.gui.enhance_versions import params_from_mime
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.param_help import param_help
 from origenerator.gui.no_wheel import (
     NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
@@ -53,14 +54,24 @@ _NO_DETECTOR_TOOLTIP = (
     "Subpack node pack, put one whose name says \"{}\" in its "
     "models/ultralytics/bbox folder, and restart it."
 )
-# How many parts share a line before the next one starts. Three, like the row of
-# numbers above it, which is what a pane tiled to a third of the screen holds.
-_FIXES_PER_ROW = 3
+# What a fix field costs around its digits: the padding either side below, its
+# 1px border, and the few pixels a spin box keeps for its cursor — measured by
+# rendering one, since a field a hair too narrow clips the last digit of 0.00.
+_FIX_FIELD_PADDING = 4
+_FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 8
 # Disabling a widget is not the same as it looking disabled: the app's sheet
 # colors every label, picker and spin box outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
 # this panel's own fields — set on the panel, so nothing outside it is touched.
 # (The auto switch is the exception: it paints itself, and dims itself.)
+_FIX_FIELD_CSS = f"""
+    #enhancePanel QDoubleSpinBox#fixField {{
+        /* The app sheet holds 18px on the right of every spin box for the step
+           buttons. These have none, and seven fields' worth of held-back space
+           is the difference between one line of parts and two. */
+        padding: {_FIX_FIELD_PADDING}px;
+    }}
+"""
 _DISABLED_CSS = f"""
     #enhancePanel QLabel:disabled,
     #enhancePanel QComboBox:disabled,
@@ -134,7 +145,7 @@ class EnhancePanel(QWidget):
         self._defs = _enhancer_param_defs()
         self.setAcceptDrops(True)  # a version tile dropped here hands its settings over
         self.setObjectName("enhancePanel")
-        self.setStyleSheet(_DISABLED_CSS)
+        self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS)
 
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
@@ -200,27 +211,45 @@ class EnhancePanel(QWidget):
         # because it can afford to be far bolder: nothing outside the regions a
         # detector finds is touched, and a mouth wants a harder redraw than a
         # face does.
-        fix_heading = QLabel("Fix at")
+        fix_heading = QLabel("Fixes")
         fix_heading.setToolTip(param_help("enhance_detail_fixes"))
         form.addRow(fix_heading)
-        form.addRow(self._fix_grid())
+        form.addRow(self._fix_row())
 
         box.addLayout(form)
         box.addStretch(1)
 
-    def _fix_grid(self) -> QGridLayout:
-        """A number per fixable part, three to a row — the pane tiles narrow.
+    def _fix_row(self) -> QWidget:
+        """Every fixable part on one line: its name, then the denoise it runs at.
 
-        Every part the app knows is shown, installed detector or not: one with
+        Each box is exactly as wide as ``0.00`` and its steppers need — no floor,
+        no share of the leftover — because the point of the line is reading all
+        the parts at once, and a number stretched to fill a pane costs another
+        part its place. (The three numbers above take the opposite deal, a floor
+        each and the slack between them: there are only three, and they are the
+        enhancement itself rather than a list.)
+
+        Flowed rather than fixed, so a pane too narrow for the line wraps the
+        last parts onto a second one instead of cutting them off — and so the
+        line never widens the window, which tiles into a third of a monitor.
+        Each name travels with its own box, so a wrap can't separate them.
+
+        Every part the app knows is here, installed detector or not: one with
         nothing to find it is greyed with the file to add on it, which says more
-        than an absent row (nothing at all to notice) and far more than a live
+        than an absent field (nothing at all to notice) and far more than a live
         one that would be rejected on submit.
         """
-        grid = QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(4)
+        host = QWidget()
+        flow = FlowLayout(host, spacing=4)
+        # Without this the form gives the line one row's worth of height however
+        # many it wraps to, and the parts past the first row are simply cut off:
+        # a widget only offers its layout's height-for-width when its policy
+        # says it has one.
+        policy = host.sizePolicy()
+        policy.setHeightForWidth(True)
+        host.setSizePolicy(policy)
         self._fixes = {}
-        for index, part in enumerate(DETAIL_PARTS):
+        for part in DETAIL_PARTS:
             widget = self._fix_number()
             if detector_for_part(part) is None:
                 widget.setEnabled(False)
@@ -228,18 +257,26 @@ class EnhancePanel(QWidget):
                     part.name, part.matches[0]))
             label = self._labeled(part.name.capitalize(), widget)
             label.setEnabled(widget.isEnabled())
-            row, column = divmod(index, _FIXES_PER_ROW)
-            grid.addWidget(label, row, column * 2)
-            grid.addWidget(widget, row, column * 2 + 1)
+            pair = QWidget()
+            pair_row = QHBoxLayout(pair)
+            pair_row.setContentsMargins(0, 0, 0, 0)
+            pair_row.setSpacing(4)
+            pair_row.addWidget(label)
+            pair_row.addWidget(widget)
+            flow.addWidget(pair)
             self._fixes[part.name] = widget
-        for column in range(_FIXES_PER_ROW):
-            grid.setColumnStretch(column * 2 + 1, 1)
-        return grid
+        return host
 
     def _fix_number(self) -> NoWheelDoubleSpinBox:
         """One part's denoise box, ranged from the enhancer's own ParamDef so a
         floor of zero — the value that means "leave this part alone" — stays the
-        workflow's answer rather than this panel's."""
+        workflow's answer rather than this panel's.
+
+        Sized to the digits it shows: Qt's own hint for a spin box is two and a
+        half times ``0.00``, and seven of those hints is the difference between
+        one line of parts and three. Measured off the font rather than typed as
+        a number, so it still fits at another font size.
+        """
         widget = NoWheelDoubleSpinBox()
         pd = self._defs.get("enhance_detail_fixes")
         widget.setMinimum(pd.min_val if pd is not None else 0.0)
@@ -247,7 +284,12 @@ class EnhancePanel(QWidget):
         widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
         widget.setDecimals(2)
         widget.setValue(0.0)
-        widget.setMinimumWidth(70)
+        # No steppers: seven pairs of arrows cost more width than the numbers
+        # beside them, and a denoise is typed or nudged with the arrow keys.
+        widget.setButtonSymbols(NoWheelDoubleSpinBox.ButtonSymbols.NoButtons)
+        widget.setObjectName("fixField")
+        widget.setFixedWidth(widget.fontMetrics().horizontalAdvance("0.00")
+                             + _FIX_FIELD_CHROME)
         widget.setToolTip(param_help("enhance_detail_fixes"))
         widget.valueChanged.connect(self._emit)
         return widget

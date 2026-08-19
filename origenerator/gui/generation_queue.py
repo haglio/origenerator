@@ -10,6 +10,8 @@ On the right, taking the rest of the strip, *what is queued*: every in-flight jo
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click, and each draggable to a new place in the line. Only
 the top row is fixed: nothing can be moved in front of what is already rendering.
+With nothing queued at all, that side says so in dim letters in the middle of its
+own space, rather than sitting blank.
 
 It opens one progress bar tall — about two rows, the rest a scroll away — and its
 top edge is a splitter handle, so a long queue can be dragged open to as many rows
@@ -342,6 +344,16 @@ class GenerationQueue(QWidget):
         self._rows_box.setContentsMargins(0, 0, 0, 0)
         self._rows_box.setSpacing(0)
         self._rows_box.addStretch(1)  # rows stack from the top
+        # What the empty line is for. The strip holds its space whether or not
+        # anything is queued, so this side spends most of its life with nothing
+        # in it, and a blank half of a laid-out strip reads as something that
+        # failed to draw. It sits between two stretches, so it centers in the
+        # space it is explaining while nothing is listed, and the rows still
+        # stack from the top once it has given way to them.
+        self._hint = QLabel("(queued jobs show up here)")
+        self._hint.setObjectName("estimateLabel")  # muted secondary text
+        self._rows_box.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._rows_box.addStretch(1)
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
 
@@ -354,10 +366,15 @@ class GenerationQueue(QWidget):
         return self._running
 
     def rows(self) -> list[QueueRow]:
-        """Every job in the line, top to bottom — the one being made first."""
+        """Every job in the line, top to bottom — the one being made first.
+
+        Jobs only: the hint that fills an empty line shares the same box, and it
+        is no row — nothing may be dropped in front of it, reordered against it,
+        or throw it away with the others on a rebuild.
+        """
         return [self._rows_box.itemAt(i).widget()
                 for i in range(self._rows_box.count())
-                if self._rows_box.itemAt(i).widget() is not None]
+                if isinstance(self._rows_box.itemAt(i).widget(), QueueRow)]
 
     def keys(self) -> list[str]:
         return [row.key for row in self.rows()]
@@ -380,6 +397,9 @@ class GenerationQueue(QWidget):
         """
         leader = items[0] if items and not items[0].held else None
         self._running.show_item(leader)
+        # Nothing of ours in flight at all: the line has no rows to show, so it
+        # says what it is for instead.
+        self._hint.setVisible(not items)
         self._clear.setVisible(bool(foreign_queued))
         self._clear.setToolTip(
             f"Drop the {foreign_queued} job{'' if foreign_queued == 1 else 's'}"

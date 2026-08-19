@@ -5130,6 +5130,25 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     assert view._voice_status.isHidden()
 
 
+def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
+    # Whisper renders "genau" a dozen ways and the matcher answers to all of
+    # them, so printing the transcription showed a misspelling of a command that
+    # was understood perfectly well — "gunow it" over a caption that then went
+    # and made a Genau clip.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
+
+    view._voice.heard.emit("Gunow it.")
+    assert "Genau it" in view._voice_status.text()
+    assert "Gunow" not in view._voice_status.text()
+
+    view._voice.heard.emit("give her a wider hat")  # no command: as it was heard
+    assert "give her a wider hat" in view._voice_status.text()
+
+
 def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
     # It used to float centered over the top of the view, landing squarely on the
     # header toolbar the user was trying to click. It now takes its own room at

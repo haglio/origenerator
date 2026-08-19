@@ -143,6 +143,21 @@ def match_fix_command(text: str) -> tuple:
     return tuple(part for part in DETAIL_PARTS if named & set(part.spoken))
 
 
+def fix_command_spelling(text: str) -> str | None:
+    """A fix command written the way the app names it — "Six teeth." read back
+    as "fix teeth" — or ``None`` when the utterance is no fix.
+
+    Only the lead verb is respelled. That is the word :func:`_lead_is_fix`
+    stretches to cover, so it is the one the caption would otherwise misspell;
+    the parts are said in whatever word named them, because "mouth" is a name
+    for teeth here and not a mishearing of one.
+    """
+    if not match_fix_command(text):
+        return None
+    words = re.findall(r"[a-z]+", (text or "").lower())
+    return " ".join(["fix", *words[1:]])
+
+
 def fix_command_bias() -> str:
     """The command vocabulary as whisper's initial prompt.
 

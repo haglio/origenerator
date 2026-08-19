@@ -23,7 +23,8 @@ from origenerator.paths import ensure_player_core_on_path
 ensure_player_core_on_path()
 
 from player_core.cruise_control import (  # noqa: E402
-    CruiseControlState, tick_cruise_control, toggle_cruise_control,
+    CruiseControlState, disable_cruise_control, enable_cruise_control,
+    tick_cruise_control, toggle_cruise_control,
 )
 from player_core.direct_control import (  # noqa: E402
     MAX_SPEED, MIN_SPEED, DirectControlState, WaveformShape, adjust_amplitude,
@@ -34,7 +35,8 @@ from player_core.direct_control import (  # noqa: E402
 __all__ = [
     "MAX_SPEED", "MIN_SPEED", "CruiseControlState", "DirectControlState",
     "Stroke", "WaveformShape", "adjust_amplitude", "adjust_center",
-    "adjust_speed", "advance", "bpm_for_speed", "cycle_shape", "position",
+    "adjust_speed", "advance", "bpm_for_speed", "cycle_shape",
+    "disable_cruise_control", "enable_cruise_control", "position",
     "position_ahead", "quarter_offset", "set_amplitude", "set_center",
     "set_speed", "tick_cruise_control", "toggle_cruise_control", "trace",
 ]

@@ -249,6 +249,21 @@ class Osr2StrokeDriver(QObject):
         with self._lock:
             stroke_engine.toggle_cruise_control(self._state.cruise)
 
+    def set_cruise(self, on: bool) -> None:
+        """Put cruise control the way asked, whichever way it is standing.
+
+        The toggle above is what a key press is; this is what a spoken "cruise
+        on" is, and the two are different questions. Someone reaching for
+        hands-free has not looked at the panel, so a toggle would be a coin
+        flip — the same reason every switch in the toolbar answers an explicit
+        on and off beside its flip.
+        """
+        with self._lock:
+            if on:
+                stroke_engine.enable_cruise_control(self._state.cruise)
+            else:
+                stroke_engine.disable_cruise_control(self._state.cruise)
+
     @property
     def cruising(self) -> bool:
         return self._state.cruise.active

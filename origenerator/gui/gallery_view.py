@@ -49,7 +49,7 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import (
-    AppCommand, app_command_bias, match_app_command,
+    AppCommand, DialSetting, app_command_bias, match_app_command,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
 from origenerator.voice.show_commands import (
@@ -299,7 +299,18 @@ _VOICE_STROKE = {
     AppCommand.NEXT_SHAPE: ("cycle_shape", 1),
     AppCommand.PREVIOUS_SHAPE: ("cycle_shape", -1),
     AppCommand.CRUISE: ("toggle_cruise", None),
+    AppCommand.CRUISE_ON: ("set_cruise", True),
+    AppCommand.CRUISE_OFF: ("set_cruise", False),
     AppCommand.OFFSET: ("quarter_offset", None),
+}
+
+# The driver's setter for each dial the numeric grid names
+# (:class:`~origenerator.voice.app_commands.DialSetting`), so "amp fifty" puts
+# the dial at fifty rather than walking it there ten at a time.
+_VOICE_DIALS = {
+    "speed": "set_speed",
+    "amp": "set_amplitude",
+    "center": "set_center",
 }
 
 # The app-wide switch each spoken word flips, as (the button's attribute, the
@@ -3452,6 +3463,8 @@ class GalleryView(QWidget):
             self._run_show_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
+        elif isinstance(matched, DialSetting):
+            self._set_stroke_dial(matched)
         else:
             self._on_picture_command(matched)
 
@@ -3569,6 +3582,19 @@ class GalleryView(QWidget):
         method, argument = _VOICE_STROKE[command]
         turn = getattr(self._osr2_stroke, method)
         turn() if argument is None else turn(argument)
+        self._answer_command(f"🎤 {self._osr2_stroke.status_text()}")
+
+    def _set_stroke_dial(self, setting: DialSetting):
+        """Put one of the stroke's dials where a spoken number asks for it.
+
+        The nudges above are for a stroke that is nearly right; this is for one
+        that is not, and it is the same driver either way — so it answers with
+        the same line, and from the gallery and a show alike. The dial does its
+        own clamping, which is why "min speed" can say nought and land on the
+        slowest the device actually strokes at.
+        """
+        put = getattr(self._osr2_stroke, _VOICE_DIALS[setting.dial])
+        put(setting.value)
         self._answer_command(f"🎤 {self._osr2_stroke.status_text()}")
 
     def _run_on_show(self, show, command: AppCommand):

@@ -9,7 +9,8 @@ the picture.
 import pytest
 
 from origenerator.voice.app_commands import (
-    _PHRASES, AppCommand, app_command_bias, match_app_command,
+    _BIAS_SKIP, _PHRASES, AppCommand, DialSetting, app_command_bias,
+    match_app_command,
 )
 
 
@@ -59,6 +60,54 @@ def test_the_stroke_knobs_keep_fun_times_phrases():
     assert match_app_command("center up") is AppCommand.CENTER_UP
     assert match_app_command("cruise control") is AppCommand.CRUISE
     assert match_app_command("offset") is AppCommand.OFFSET
+
+
+def test_cruise_answers_an_explicit_on_and_off_as_well_as_a_flip():
+    # Hands-free is reached for without looking at the panel, so a speaker who
+    # wants it ON must not have to find out which way it is standing first.
+    assert match_app_command("cruise") is AppCommand.CRUISE
+    assert match_app_command("cruise on") is AppCommand.CRUISE_ON
+    assert match_app_command("cruise off") is AppCommand.CRUISE_OFF
+
+
+# --- the dials said outright, which is Fun Time's numeric grid ---------------
+
+@pytest.mark.parametrize("said, wanted", [
+    ("amp fifty", DialSetting("amp", 50)),
+    ("speed thirty", DialSetting("speed", 30)),
+    ("center seventy", DialSetting("center", 70)),
+    ("speed zero", DialSetting("speed", 0)),
+    ("amp one hundred", DialSetting("amp", 100)),
+])
+def test_a_dial_takes_the_number_said(said, wanted):
+    assert match_app_command(said) == wanted
+
+
+@pytest.mark.parametrize("said, wanted", [
+    ("min speed", DialSetting("speed", 0)),
+    ("max speed", DialSetting("speed", 100)),
+    ("min amp", DialSetting("amp", 0)),
+    ("max amp", DialSetting("amp", 100)),
+    ("min center", DialSetting("center", 0)),
+    ("max center", DialSetting("center", 100)),
+])
+def test_both_ends_of_a_dial_have_a_name(said, wanted):
+    # The far end in one utterance, rather than a number to remember or a dozen
+    # nudges to get there.
+    assert match_app_command(said) == wanted
+
+
+@pytest.mark.parametrize("said", ["amp 50", "Amp 50.", "amp fifty"])
+def test_a_number_counts_whether_whisper_wrote_it_in_words_or_digits(said):
+    # Whisper picks between "fifty" and "50" on its own, so a vocabulary that
+    # knows only one of the two hears half of what was said.
+    assert match_app_command(said) == DialSetting("amp", 50)
+
+
+def test_the_nudges_still_outrank_the_grid_they_sit_beside():
+    # "speed up" is a nudge and "speed ten" is a setting; neither eats the other.
+    assert match_app_command("speed up") is AppCommand.SPEED_UP
+    assert match_app_command("speed ten") == DialSetting("speed", 10)
 
 
 def test_a_two_word_command_is_not_shadowed_by_its_first_word():
@@ -145,9 +194,32 @@ def test_the_bias_follows_the_vocabulary_rather_than_a_second_list():
     bias_words = set(app_command_bias().rstrip(".").split(": ", 1)[1].split(", "))
     for phrase in _PHRASES:
         for word in phrase.split():
-            assert word in bias_words
+            if word not in _BIAS_SKIP:
+                assert word in bias_words
+
+
+def test_the_skipped_words_are_only_ones_whisper_cannot_get_wrong():
+    # The prompt has a hard budget (tests/test_voice_bias.py), so it is spent on
+    # the odd words. What is skipped has to be genuinely ordinary — a command's
+    # own name landing in here would be a command whisper was never told about.
+    assert _BIAS_SKIP.isdisjoint(
+        {"recents", "starred", "experiments", "requests", "trash", "weird",
+         "unlock", "cruise", "offset", "amp", "center", "speed", "shape"}
+    )
 
 
 def test_every_command_has_at_least_one_word_that_reaches_it():
     # A command nobody can say is a command that does not exist.
-    assert set(_PHRASES.values()) == set(AppCommand)
+    assert set(AppCommand) <= set(_PHRASES.values())
+
+
+def test_every_dial_can_be_sent_to_every_stop_on_the_grid():
+    # The grid is uniform on purpose: three dials, the same stops, both ends
+    # named. A hole in it is a number that works on one dial and not another.
+    reachable = {value for value in _PHRASES.values()
+                 if isinstance(value, DialSetting)}
+    assert reachable == {
+        DialSetting(dial, stop)
+        for dial in ("speed", "amp", "center")
+        for stop in (0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
+    }

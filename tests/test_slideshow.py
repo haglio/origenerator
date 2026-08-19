@@ -264,3 +264,68 @@ def test_an_upgraded_item_takes_the_new_thumbnail_when_one_comes_with_it():
     playlist.replace_item("id-a", "a_better.png", "image", "a_better_thumb.png")
     assert playlist.current()[3] == "a_better_thumb.png"
 
+
+
+# --- picking a closed show's pass back up -----------------------------------
+
+def _four(**kw):
+    kw.setdefault("shuffle", lambda order: None)
+    return SlideshowPlaylist(
+        [(f"{name}.png", "image", f"id-{name}") for name in "abcd"], **kw
+    )
+
+
+def test_a_resumed_pass_plays_the_order_it_was_left_in():
+    playlist = _four(shuffle=lambda order: order.reverse())  # d, c, b, a
+
+    assert playlist.resume(["id-b", "id-d", "id-a", "id-c"], "id-d") is True
+
+    assert playlist.current()[2] == "id-d"           # standing where it left off
+    assert playlist.advance()[2] == "id-a"           # and carrying on that pass
+    assert playlist.order_ids() == ["id-b", "id-d", "id-a", "id-c"]
+
+
+def test_a_resumed_pass_stands_on_the_slide_wherever_the_order_puts_it():
+    playlist = _four()
+    assert playlist.resume(["id-c", "id-a", "id-b", "id-d"], "id-b") is True
+    assert playlist.index == 2
+
+
+def test_a_slide_that_is_no_longer_here_resumes_nothing():
+    # Culled while the show was away, or this is another folder's set entirely:
+    # a pass laid out around an item that isn't in it would open on a stranger.
+    playlist = _four()
+    assert playlist.resume(["id-elsewhere"], "id-elsewhere") is False
+    assert playlist.current()[2] == "id-a"           # the shuffle, undisturbed
+    assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]
+
+
+def test_items_the_remembered_order_never_saw_follow_the_ones_it_did():
+    # Two landed while the show was away. They were no part of the pass being
+    # picked back up, and the next pass reshuffles the lot anyway.
+    playlist = _four()
+    assert playlist.resume(["id-c", "id-a"], "id-c") is True
+    assert playlist.order_ids() == ["id-c", "id-a", "id-b", "id-d"]
+
+
+def test_a_remembered_item_that_has_since_gone_is_skipped():
+    playlist = _four()
+    playlist.resume(["id-d", "id-gone", "id-b"], "id-d")
+    assert playlist.order_ids() == ["id-d", "id-b", "id-a", "id-c"]
+
+
+def test_a_set_with_no_ids_names_no_pass():
+    # A playlist assembled without ids (a test's, or a lone file's) has nothing
+    # to say about where it was.
+    playlist = _playlist()
+    assert playlist.order_ids() == [None, None, None]
+    assert playlist.resume([None], None) is False
+
+
+def test_the_lock_can_be_put_back_where_a_closed_show_left_it():
+    playlist = _four()
+    playlist.set_locked(True)
+    assert playlist.locked
+    assert playlist.dwell_ms() is None     # held, so nothing moves it on
+    playlist.set_locked(False)
+    assert not playlist.locked

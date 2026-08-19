@@ -6,6 +6,7 @@ from origenerator.timing import (
     estimate_seconds,
     execution_duration_seconds,
     progress_time_label,
+    queue_estimate_label,
     remaining_seconds,
 )
 
@@ -165,3 +166,16 @@ def test_progress_time_label_is_empty_before_a_job_starts():
     # A queued job has no elapsed time; a zero counting up beside an unmoved bar
     # would say it was running.
     assert progress_time_label(None, None, 724.0) == ""
+
+
+def test_a_queued_jobs_estimate_rounds_to_one_unit():
+    # The queue's rows are scanned, not studied: "~2 min" is the whole of what a
+    # median of past runs can back up, and is what a wait gets added up out of.
+    assert queue_estimate_label(126.0) == "~2 min"
+    assert queue_estimate_label(41.0) == "~41 sec"
+
+
+def test_an_untimed_workflow_admits_it_rather_than_guess():
+    # A workflow nobody has run yet has nothing to estimate from, and a number
+    # invented for that slot would be read as one measured.
+    assert queue_estimate_label(None) == "~?"

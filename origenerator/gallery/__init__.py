@@ -49,6 +49,7 @@ from origenerator.gallery.labels import (
     config_folder_name,
     config_tab_title,
     item_label,
+    job_kind_label,
     lora_label,
     model_label,
 )

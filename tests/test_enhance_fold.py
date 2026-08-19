@@ -208,12 +208,18 @@ def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
                "inputs": {"images": ["11", 0],
                           "filename_prefix": "image/image_enhance"}},
     }
-    for offset, detector in enumerate(detectors):
+    # Three nodes per part fixed, exactly as the workflow lays them out: the
+    # detailer names no part, so which one it redrew is only readable back
+    # through the segs it sampled and the detector that found them.
+    for offset, (detector, fix_denoise) in enumerate(detectors):
         base = 13 + offset * 3
         graph[str(base)] = {"class_type": "UltralyticsDetectorProvider",
                             "inputs": {"model_name": f"bbox/{detector}"}}
+        graph[str(base + 1)] = {"class_type": "BboxDetectorSEGS",
+                                "inputs": {"bbox_detector": [str(base), 0]}}
         graph[str(base + 2)] = {"class_type": "DetailerForEach",
-                                "inputs": {"denoise": 0.45}}
+                                "inputs": {"segs": [str(base + 1), 0],
+                                           "denoise": fix_denoise}}
     return graph
 
 
@@ -293,7 +299,7 @@ def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
         db, "i1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png",
         scale_by=0.375, steps=24, denoise=0.25,
         checkpoint="example_xl_v1.safetensors", upscale_model="4xExample_v1.pt",
-        detectors=("face_example.pt", "hand_example.pt"))
+        detectors=(("face_example.pt", 0.45), ("hand_example.pt", 0.6)))
     fold_completed_enhancements(db)
 
     level = gallery.displayed_levels(db.get_generation("src"))[0]
@@ -301,9 +307,7 @@ def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
         "checkpoint": "example_xl_v1.safetensors",
         "upscale_model": "4xExample_v1.pt",
         "enhance_scale": 1.5, "enhance_steps": 24, "enhance_denoise": 0.25,
-        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
-        "enhance_face_detector": "face_example.pt",
-        "enhance_hand_detector": "hand_example.pt",
+        "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
     }
 
 

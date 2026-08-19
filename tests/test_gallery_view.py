@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
 
 from origenerator import evolver_export, gallery, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
-from origenerator.gallery import detail_parts
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -9133,9 +9134,7 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
 
     (job,) = view._reroll_jobs.values()
     assert job.workflow.name == "image_enhance"
-    assert job.params["enhance_detail_fix"] is True
-    assert job.params["enhance_face_detector"] == "teeth_yolov8n.pt"
-    assert job.params["enhance_hand_detector"] == ""
+    assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
     # The show answers where the speaker is looking, then reads Enhancing….
     assert "fixing teeth" in view._slideshow._note.text()
 

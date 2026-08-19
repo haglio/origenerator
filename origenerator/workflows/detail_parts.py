@@ -1,26 +1,28 @@
 """The parts a detail fix can be aimed at by name — "fix teeth" resolved to the
 installed detector that finds teeth.
 
-The enhance's detail pass runs whatever detector models its two slots name
-(:meth:`~origenerator.workflows.base.WorkflowTemplate.detail_fix_nodes`), so
-aiming it at one part is a matter of putting the right model file in a slot and
-blanking the other. What this module adds is the naming: a table of the parts
-worth asking for out loud, each carrying the words a spoken command may call it
-and the filename fragments an installed detector is recognized by. The table is
+An enhancement's detail pass is a fix per part: each one names how hard its own
+regions are redrawn, and a part left at zero simply builds no nodes
+(:meth:`~origenerator.workflows.base.WorkflowTemplate.detail_fix_nodes`). What
+this module owns is the naming that makes that possible — a table of the parts
+worth asking for, each carrying the words a spoken command may call it and the
+filename fragments an installed detector is recognized by. The table is
 deliberately not derived from the installed files — ``face_yolov8m.pt`` says
 "face" only to something that knows to look — and a part stays in the table with
-no detector installed, so the answer to "fix teeth" can name the file to add
-rather than pretend nothing was said.
+no detector installed, so the Enhance panel can grey that part with the reason
+on it and the answer to "fix teeth" can name the file to add rather than pretend
+nothing was said.
 
 Only the anatomy any photo has is named here. The rest of the vocabulary is
 library content, unpublishable for the same reason the act names are, so it
 comes from the content overlay's optional ``detail_fix_parts`` entries
 (``content.example.json`` documents the shape) and extends this table at load.
 
-Both directions live here: a spoken command resolves to a part and an installed
-detector (:func:`match_fix_command`, :func:`detector_for_part`), and a recorded
-detector filename resolves back to the word that captions the level it made
-(:func:`detector_part_label`).
+Every direction lives here: a spoken command or a panel row resolves to a part
+and an installed detector (:func:`match_fix_command`, :func:`detector_for_part`),
+a recorded detector filename resolves back to the word that captions the level
+it made (:func:`detector_part_label`), and one enhancement's params resolve to
+the passes it actually runs (:func:`detail_fixes_of`, :func:`detail_fix_passes`).
 """
 
 import re
@@ -29,6 +31,12 @@ from pathlib import PureWindowsPath
 
 from origenerator.content import load_content
 from origenerator.workflows.model_files import list_detector_files
+
+# What a fix asked for without a number of its own runs at — a spoken "fix
+# teeth" on a folder whose panel has that part at zero. Bold enough to actually
+# re-form the part, which is the whole point of a pass that touches nothing
+# outside the regions it found.
+DEFAULT_FIX_DENOISE = 0.45
 
 
 @dataclass(frozen=True)
@@ -164,3 +172,74 @@ def detector_part_label(filename: str) -> str:
         if any(fragment in base for fragment in part.matches):
             return part.name
     return PureWindowsPath(str(filename)).stem
+
+
+def part_named(name: str) -> DetailPart | None:
+    """The table's entry for a part by its canonical name, or ``None`` — a part
+    an old row names that the overlay no longer lists is simply not fixable."""
+    return next((part for part in DETAIL_PARTS if part.name == str(name)), None)
+
+
+def _denoise(value) -> float | None:
+    """One part's number as a denoise, or ``None`` when it asks for no pass.
+
+    Zero is how a part says "leave it alone", and so is anything that isn't a
+    number at all — these come back through JSON, where a stored setting can be
+    whatever an older version or a hand edit left behind.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def detail_fixes_of(params: dict) -> dict:
+    """The parts an enhancement redraws and how hard, as ``{part: denoise}``.
+
+    ``enhance_detail_fixes`` is where that lives now — one number per part, and
+    absent or zero means the part is left alone. The older shape is translated
+    rather than ignored: a tick, a single denoise and up to two detector files
+    named is exactly a fix on whichever parts those files find, all at that one
+    denoise. Every enhancement this library already carries was recorded that
+    way, so they must go on captioning themselves and re-running as what they
+    were.
+    """
+    fixes = params.get("enhance_detail_fixes")
+    if isinstance(fixes, dict):
+        found = {str(name): _denoise(value) for name, value in fixes.items()}
+        return {name: value for name, value in found.items() if value is not None}
+    if not params.get("enhance_detail_fix"):
+        return {}
+    denoise = _denoise(params.get("enhance_detail_denoise")) or DEFAULT_FIX_DENOISE
+    # A level recorded before the detectors were carries neither name, and what
+    # it ran was the generic pair.
+    named = [detector_part_label(params[key])
+             for key in ("enhance_face_detector", "enhance_hand_detector")
+             if params.get(key)]
+    return {name: denoise for name in (named or ["faces", "hands"])}
+
+
+def detail_fix_passes(params: dict) -> list:
+    """The passes an enhancement's detail stage actually builds: ``(detector
+    file, denoise)`` per part asked for, in the table's own order.
+
+    A part with no installed detector is dropped here rather than carried into
+    the graph: ComfyUI validates the model name and rejects the whole prompt
+    over one it cannot find, which would take every other pass down with it.
+    Settings outlive the file they named — a folder configured while a detector
+    was installed must go on enhancing after it is removed, minus that part.
+
+    Table order rather than the order the parts were asked for, so the same
+    fixes always build the same graph.
+    """
+    wanted = detail_fixes_of(params)
+    passes = []
+    for part in DETAIL_PARTS:
+        denoise = wanted.get(part.name)
+        if denoise is None:
+            continue
+        detector = detector_for_part(part)
+        if detector:
+            passes.append((detector, denoise))
+    return passes

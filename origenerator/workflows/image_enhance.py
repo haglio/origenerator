@@ -1,15 +1,13 @@
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.model_arch import SD15, SDXL
-from origenerator.workflows.model_files import ANY, list_detector_files, list_model_files
+from origenerator.workflows.model_files import ANY, list_model_files
 
 _DEFAULT_CHECKPOINT = "reapony_v80.safetensors"
 _DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
-# The detail pass's detectors. Named rather than derived so a run records which
-# model found its regions; an install with neither dims the pass instead (see
-# :func:`~origenerator.workflows.model_files.list_detector_files`).
-_DEFAULT_FACE_DETECTOR = "face_yolov8m.pt"
-_DEFAULT_HAND_DETECTOR = "hand_yolov8s.pt"
+# The first of the node ids the detail pass takes, three per part it fixes —
+# past the twelve this workflow's own graph uses.
+_FIRST_DETAIL_NODE_ID = 13
 
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
@@ -28,12 +26,13 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
 
     That tail's gentleness is also its ceiling: it cannot mend a mouth fused
     into its teeth or a hand with a finger too many, because the denoise that
-    would redraw them redraws everything else too. ``enhance_detail_fix`` adds a second
-    stage past it (:meth:`WorkflowTemplate.detail_fix_nodes`) that finds the
-    faces and hands and re-samples each one alone, at its own much higher
-    denoise, leaving every pixel outside those regions exactly as the tail left
-    it. Off by default: it needs detectors installed, and it costs a sampling
-    run per region found.
+    would redraw them redraws everything else too. ``enhance_detail_fixes`` adds
+    a second stage past it (:meth:`WorkflowTemplate.detail_fix_nodes`) that
+    finds one named part at a time — faces, hands, teeth, whatever a detector is
+    installed for — and re-samples each found region alone at that part's own
+    much higher denoise, leaving every pixel outside those regions exactly as
+    the tail left it. Every part is at zero by default: each one needs its
+    detector installed, and each costs a sampling run per region found.
 
     Machinery, not a peer workflow (``selectable`` False): its results are
     upgrades of existing images, not generations with a shared nature, so it
@@ -45,7 +44,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     """
 
     name = "image_enhance"
-    version = "v002"
+    version = "v003"
     display_name = "Image Enhance"
     output_type = "image"
     derives_size_from_input = True
@@ -68,10 +67,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
-            "enhance_detail_fix": False,
-            "enhance_detail_denoise": 0.45,
-            "enhance_face_detector": _DEFAULT_FACE_DETECTOR,
-            "enhance_hand_detector": _DEFAULT_HAND_DETECTOR,
+            "enhance_detail_fixes": {},
             "filename_prefix": "image/image_enhance",
         }
 
@@ -82,7 +78,6 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         upscalers = list_model_files(
             "upscale_models", [_DEFAULT_UPSCALE_MODEL], accepts=ANY,
         )
-        detectors = list_detector_files()
         return [
             ParamDef("input_image", "Image", "image", ""),
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
@@ -97,15 +92,13 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
-            ParamDef("enhance_detail_fix", "Fix Faces & Hands", "bool", False),
-            # Floored above zero: the detailer node rejects 0, and a pass that
-            # repaints nothing is a slower way of not running one.
-            ParamDef("enhance_detail_denoise", "Detail Denoise", "float", 0.45,
-                     min_val=0.05, max_val=1.0, step=0.05),
-            ParamDef("enhance_face_detector", "Face Detector", "combo",
-                     _DEFAULT_FACE_DETECTOR, options=detectors),
-            ParamDef("enhance_hand_detector", "Hand Detector", "combo",
-                     _DEFAULT_HAND_DETECTOR, options=detectors),
+            # One denoise per part fixed, keyed by the part's name — the Enhance
+            # panel's row of numbers, and the range those spin boxes take. Zero
+            # is a part left alone rather than a pass that repaints nothing
+            # (which the detailer node rejects outright), so the floor is 0 and
+            # an absent part reads the same as one set to it.
+            ParamDef("enhance_detail_fixes", "Fixes", "fixes", {},
+                     min_val=0.0, max_val=1.0, step=0.05),
         ]
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
@@ -118,26 +111,6 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             return None
         scale = params.get("enhance_scale", 1.0)
         return round(size[0] * scale), round(size[1] * scale)
-
-    @staticmethod
-    def _with_installed_detectors(params: dict) -> dict:
-        """``params`` with any detail-pass detector ComfyUI hasn't got blanked.
-
-        Faces and hands are found by two different models, and having only one
-        of them installed is an ordinary state — but ComfyUI validates the name
-        and rejects the whole prompt over the missing one, which would take the
-        half that could have run down with it. Blanked, that half simply builds
-        no nodes (see :meth:`WorkflowTemplate.detail_fix_nodes`). With neither
-        installed the pass builds nothing at all, which is the state the Enhance
-        panel dims its checkbox for.
-        """
-        if not params.get("enhance_detail_fix"):
-            return params
-        installed = set(list_detector_files())
-        return dict(params, **{
-            key: (params.get(key) if params.get(key) in installed else "")
-            for key in ("enhance_face_detector", "enhance_hand_detector")
-        })
 
     def build_api_payload(self, params: dict) -> dict:
         tail, enhanced_ref = self.enhance_image_nodes(
@@ -162,10 +135,10 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 },
             }
         detail, saved_ref = self.detail_fix_nodes(
-            ("13", "14", "15"), ("16", "17", "18"),
+            _FIRST_DETAIL_NODE_ID,
             image_ref=enhanced_ref, model_ref=["2", 0], clip_ref=["2", 1],
             vae_ref=["5", 0], positive_ref=["3", 0], negative_ref=["4", 0],
-            params=self._with_installed_detectors(params),
+            params=params,
         )
         return {
             "1": {

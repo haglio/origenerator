@@ -8,6 +8,7 @@ already received.
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
+from PyQt6.QtWidgets import QLabel
 
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL, EnhanceLevel, EnhanceSettings, default_enhance_params,
@@ -19,28 +20,21 @@ from origenerator.gui.enhance_versions import (
     params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.detail_parts import DETAIL_PARTS
 
 
-def _wanted_detectors() -> tuple[str, str]:
-    """The face and hand models the detail pass looks for, read off the workflow
-    rather than retyped — the panel offers the pass only when one is installed,
-    so a test that named its own files would be measuring the wrong thing."""
-    defaults = WORKFLOW_REGISTRY["image_enhance"].default_params()
-    return (defaults["enhance_face_detector"], defaults["enhance_hand_detector"])
+_FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
 
-def _panel(qtbot, detectors=None):
-    """A panel built against a stated set of installed face/hand detectors —
-    the one thing on it that can be missing, and so the one thing a test must
-    not read off whatever this machine happens to have in its ComfyUI."""
-    import origenerator.workflows.image_enhance as enhancer
+def _panel(qtbot, detectors=_FOUND_DETECTORS):
+    """A panel built against a stated set of installed detectors — the one thing
+    on it that can be missing, and so the one thing a test must not read off
+    whatever this machine happens to have in its ComfyUI."""
+    import origenerator.workflows.detail_parts as parts
 
-    if detectors is None:
-        detectors = _wanted_detectors()
     edits = []
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(enhancer, "list_detector_files", lambda: list(detectors))
+        mp.setattr(parts, "list_detector_files", lambda: list(detectors))
         panel = EnhancePanel(edits.append)
     qtbot.addWidget(panel)
     return panel, edits
@@ -142,50 +136,63 @@ def test_every_knob_reports_its_edit(qtbot):
     assert latest.params["enhance_denoise"] == 0.4
 
 
-def test_the_detail_pass_is_a_check_and_a_denoise_of_its_own(qtbot):
-    # The pass is bolder than the enhance around it precisely because it only
-    # touches the regions it found, so it carries its own denoise rather than
-    # sharing the one above it.
+def test_every_fixable_part_gets_a_number_of_its_own(qtbot):
+    # One row per part the app can aim a detail pass at, each its own denoise:
+    # a mouth wants a harder redraw than a face, and one shared number could
+    # never say so.
     panel, edits = _panel(qtbot)
-    assert panel._detail.isEnabled()
-    assert panel.settings().params["enhance_detail_fix"] is False
+    assert list(panel._fixes) == [part.name for part in DETAIL_PARTS]
+    # Every part starts at zero — nothing pays for a pass it didn't ask for.
+    assert panel.settings().params["enhance_detail_fixes"] == {}
 
-    panel._detail.setChecked(True)
-    panel._detail_denoise.setValue(0.5)
+    panel._fixes["faces"].setValue(0.45)
+    panel._fixes["hands"].setValue(0.6)
 
-    assert edits[-1].params["enhance_detail_fix"] is True
-    assert edits[-1].params["enhance_detail_denoise"] == 0.5
-    assert panel._detail.toolTip() and panel._detail_denoise.toolTip()
+    assert edits[-1].params["enhance_detail_fixes"] == {"faces": 0.45, "hands": 0.6}
+    assert panel._fixes["faces"].toolTip()
 
 
-def test_the_detail_pass_dims_itself_when_no_detector_is_installed(qtbot):
-    # The one setting here that can be unavailable: the models that find the
-    # faces and hands are a separate install, and a run without one is rejected
-    # on submit. Better a control that says why than a tick that quietly fails.
-    panel, _ = _panel(qtbot, detectors=())
-    assert not panel._detail.isEnabled()
-    assert not panel._detail_denoise.isEnabled()
+def test_a_part_turned_back_to_zero_stops_being_asked_for(qtbot):
+    # Zero is the panel's way of saying "leave this part alone", so it must
+    # leave the settings rather than ride along as a pass at no denoise.
+    panel, edits = _panel(qtbot)
+    panel._fixes["faces"].setValue(0.45)
+    panel._fixes["faces"].setValue(0.0)
+    assert edits[-1].params["enhance_detail_fixes"] == {}
+
+
+def test_a_part_with_no_detector_installed_dims_itself(qtbot):
+    # The settings here that can be unavailable rather than merely unset: the
+    # model that finds a part is a separate install, and a run naming one
+    # ComfyUI hasn't got is rejected on submit. Better a number that says why
+    # than one that quietly fails.
+    panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
+    assert panel._fixes["faces"].isEnabled()
+    assert not panel._fixes["hands"].isEnabled()
     # The whole setup, in the one place someone reads carefully: the node pack
-    # that runs the detectors as well as the folder the models go in.
-    assert "models/ultralytics/bbox" in panel._detail.toolTip()
-    assert "Impact Subpack" in panel._detail.toolTip()
+    # that runs the detectors, the folder the models go in, and what the file
+    # this part needs is called.
+    tooltip = panel._fixes["hands"].toolTip()
+    assert "models/ultralytics/bbox" in tooltip
+    assert "Impact Subpack" in tooltip
+    assert "hand" in tooltip
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
-    # The pass names the two models it looks for, so some other detector sitting
-    # in that folder would leave the box tickable and the pass finding nothing.
-    # Dimmed names the file to add; enabled-but-inert says nothing at all.
+    # Some other detector sitting in that folder would leave every number live
+    # and every pass finding nothing. Dimmed says which file to add.
     panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not panel._detail.isEnabled()
-    assert all(name in panel._detail.toolTip() for name in _wanted_detectors())
+    assert not any(box.isEnabled() for box in panel._fixes.values())
 
 
-def test_one_of_the_two_detectors_is_enough_to_offer_the_pass(qtbot):
-    # Faces and hands are found by different models, and having only one is an
-    # ordinary install — the half that can run still should.
-    panel, _ = _panel(qtbot, detectors=_wanted_detectors()[:1])
-    assert panel._detail.isEnabled()
-    assert panel._detail_denoise.isEnabled()
+def test_the_parts_label_dims_with_its_number(qtbot):
+    # The word is what someone looks at to see whether a part is on offer, so a
+    # live-looking label over a dead box would be the whole failure.
+    panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
+    labels = {label.text().lower(): label
+              for label in panel.findChildren(QLabel)}
+    assert labels["faces"].isEnabled()
+    assert not labels["hands"].isEnabled()
 
 
 def _mean_ink(widget) -> float:
@@ -236,11 +243,11 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
     # Switching the panel off and on again must not hand back a knob that was
-    # grayed in its own right: the pass still has no model to run.
+    # grayed in its own right: the part still has no model to find it.
     panel, _ = _panel(qtbot, detectors=())
     panel.set_applicable(False, "nope")
     panel.set_applicable(True)
-    assert panel.isEnabled() and not panel._detail.isEnabled()
+    assert panel.isEnabled() and not panel._fixes["faces"].isEnabled()
 
 
 def test_a_disabled_toggle_switch_dims(qtbot):

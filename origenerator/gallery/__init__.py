@@ -63,7 +63,7 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
-from origenerator.gallery.detail_parts import match_fix_command
+from origenerator.workflows.detail_parts import match_fix_command
 from origenerator.gallery.voice_commands import (
     ENHANCE_COMMAND,
     GENAU_COMMAND,

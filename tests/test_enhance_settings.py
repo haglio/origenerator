@@ -13,7 +13,8 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.gallery import detail_parts
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from origenerator.gallery.enhance import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
@@ -107,14 +108,13 @@ def test_enhance_params_take_the_folders_settings_over_the_workflow_defaults():
 def test_the_detail_pass_is_one_of_the_knobs_the_panel_sets():
     # It is part of what an enhancement IS, not a property of one image, so it
     # is set once on the panel and every enhance launched from there carries it.
-    settings = EnhanceSettings(params={"enhance_detail_fix": True,
-                                       "enhance_detail_denoise": 0.5})
+    settings = EnhanceSettings(params={"enhance_detail_fixes": {"teeth": 0.5}})
     params = enhance_params_for(_source_row(), settings)
-    assert params["enhance_detail_fix"] is True
-    assert params["enhance_detail_denoise"] == 0.5
-    # Left alone it stays off, so nothing starts paying for it by accident.
+    assert params["enhance_detail_fixes"] == {"teeth": 0.5}
+    # Left alone every part stays at zero, so nothing starts paying for a pass
+    # by accident.
     unset = enhance_params_for(_source_row(), EnhanceSettings())
-    assert unset["enhance_detail_fix"] is False
+    assert unset["enhance_detail_fixes"] == {}
 
 
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
@@ -281,22 +281,22 @@ def test_a_level_recorded_before_a_knob_existed_still_reads_as_a_duplicate(tmp_p
     })
     assert level_matching_settings(row, settings) == 0
     assert level_matching_settings(
-        row, EnhanceSettings(params=dict(settings.params, enhance_detail_fix=True))
+        row, EnhanceSettings(params=dict(settings.params,
+                                         enhance_detail_fixes={"faces": 0.45}))
     ) is None
 
 
-def test_describe_names_the_detail_pass_only_when_it_ran():
+def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
     # Two versions of one image can differ by nothing but this, and the strip's
     # captions are the only place that difference is visible.
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
-        "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
-    }) == "2x · 20 steps · 0.15 denoise · faces & hands 0.45"
-    # Off says nothing: it is the default rather than a choice, the same reason
-    # a source-matched model goes unnamed.
-    assert describe_enhance_params({"enhance_scale": 2.0,
-                                    "enhance_detail_fix": False,
-                                    "enhance_detail_denoise": 0.45}) == "2x"
+        "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
+    }) == "2x · 20 steps · 0.15 denoise · faces 0.45 & hands 0.6"
+    # A part at zero says nothing: it is the default rather than a choice, the
+    # same reason a source-matched model goes unnamed.
+    assert describe_enhance_params({
+        "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x"
 
 
 def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
@@ -398,20 +398,20 @@ def test_removing_a_name_the_row_never_held_changes_nothing(tmp_path):
     assert remove_enhance_levels(_folded(tmp_path), ["someone_elses.png"]) == {}
 
 
-def test_describe_names_a_targeted_fix_by_its_part():
-    # A teeth-fixed version and a faces-&-hands one differ only in what their
-    # passes found; the caption must say which is which.
+def test_describe_still_names_a_level_recorded_the_old_way():
+    # Every enhancement in the library predates the per-part numbers, and its
+    # caption must go on reading as what it did — a targeted fix by its part,
+    # the generic pass as the pair it ran.
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "teeth_yolov8n.pt", "enhance_hand_detector": "",
     }) == "2x · 20 steps · 0.15 denoise · teeth 0.45"
-    # The generic pair still reads as it always has.
     assert describe_enhance_params({
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "face_yolov8m.pt",
         "enhance_hand_detector": "hand_yolov8s.pt",
-    }) == "faces & hands 0.45"
+    }) == "faces 0.45 & hands 0.45"
 
 
 # --- a spoken "fix <part>": the latest enhancement plus a targeted pass -----
@@ -446,9 +446,7 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
     assert params["checkpoint"] == "driftwood_v1.safetensors"
     # Re-derived from the original, like any re-enhance, with the one pass on.
     assert params["input_image"] == "image/sdxl_t2i_src.png [output]"
-    assert params["enhance_detail_fix"] is True
-    assert params["enhance_face_detector"] == "teeth_yolov8n.pt"
-    assert params["enhance_hand_detector"] == ""
+    assert params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
 
 
 def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkeypatch):
@@ -456,9 +454,17 @@ def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkey
     params = fix_part_params(_source_row(), _spoken("fix hands"),
                              EnhanceSettings(params={"enhance_steps": 33}))
     assert params["enhance_steps"] == 33
-    assert params["enhance_detail_fix"] is True
-    assert params["enhance_face_detector"] == "hand_yolov8s.pt"
-    assert params["enhance_hand_detector"] == ""
+    assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}
+
+
+def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch):
+    # Nobody says a denoise out loud, so the panel's own number for that part is
+    # what the command means — its default only where the panel leaves it alone.
+    _install_detectors(monkeypatch, "hand_yolov8s.pt")
+    params = fix_part_params(
+        _source_row(), _spoken("fix hands"),
+        EnhanceSettings(params={"enhance_detail_fixes": {"hands": 0.7}}))
+    assert params["enhance_detail_fixes"] == {"hands": 0.7}
 
 
 def test_a_spoken_fix_with_no_detector_for_the_part_declines(monkeypatch):
@@ -477,14 +483,30 @@ def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
     db = Database(tmp_path / "t.db")
     _seed_source(db)
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
+                  enhance_detail_fixes={"teeth": 0.5})
+
+    params = fix_part_params(db.get_generation("src"), _spoken("fix eyes"))
+
+    assert params["enhance_detail_fixes"] == {
+        "teeth": 0.5, "eyes": DEFAULT_FIX_DENOISE}
+
+
+def test_a_spoken_fix_accumulates_onto_a_level_recorded_the_old_way(
+        tmp_path, monkeypatch):
+    # The level being added to is whatever the library already holds, and that
+    # is the old shape everywhere: its passes must ride along all the same.
+    _install_detectors(monkeypatch, "eyes_yolov8n.pt", "teeth_yolov8n.pt")
+    db = Database(tmp_path / "t.db")
+    _seed_source(db)
+    _add_and_fold(db, "e1", "image_enhance_00001_.png",
                   enhance_detail_fix=True, enhance_detail_denoise=0.45,
                   enhance_face_detector="teeth_yolov8n.pt",
                   enhance_hand_detector="")
 
     params = fix_part_params(db.get_generation("src"), _spoken("fix eyes"))
 
-    assert params["enhance_face_detector"] == "teeth_yolov8n.pt"
-    assert params["enhance_hand_detector"] == "eyes_yolov8n.pt"
+    assert params["enhance_detail_fixes"] == {
+        "teeth": 0.45, "eyes": DEFAULT_FIX_DENOISE}
 
 
 def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatch):

@@ -18,13 +18,14 @@ An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
-One knob here can be unavailable rather than merely unset: the detail pass needs
-a face/hand detector installed in ComfyUI, so with none it is greyed with the
-reason on it — the alternative being a tick that fails on submit.
+The knobs that can be unavailable rather than merely unset are the detail pass's:
+each part it redraws needs a detector installed in ComfyUI, so a part with none
+is greyed with the file to add on it — the alternative being a number that fails
+on submit.
 """
 
 from PyQt6.QtWidgets import (
-    QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
+    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
 )
 
 from origenerator.gallery import (
@@ -37,7 +38,9 @@ from origenerator.gui.no_wheel import (
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows import WORKFLOW_REGISTRY
-from shared_ui.check_box import CheckBox
+from origenerator.workflows.detail_parts import (
+    DETAIL_PARTS, detail_fixes_of, detector_for_part,
+)
 from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
 
 _AUTO_TOOLTIP = (
@@ -46,15 +49,18 @@ _AUTO_TOOLTIP = (
     "against it or redone."
 )
 _NO_DETECTOR_TOOLTIP = (
-    "Unavailable: ComfyUI hasn't got what this needs. Install the Impact "
-    "Subpack node pack, put {} and {} in its models/ultralytics/bbox folder, "
-    "and restart it."
+    "Unavailable: ComfyUI hasn't got a model that finds {}. Install the Impact "
+    "Subpack node pack, put one whose name says \"{}\" in its "
+    "models/ultralytics/bbox folder, and restart it."
 )
+# How many parts share a line before the next one starts. Three, like the row of
+# numbers above it, which is what a pane tiled to a third of the screen holds.
+_FIXES_PER_ROW = 3
 # Disabling a widget is not the same as it looking disabled: the app's sheet
 # colors every label, picker and spin box outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
 # this panel's own fields — set on the panel, so nothing outside it is touched.
-# (The switch paints itself and dims itself; the check boxes already did.)
+# (The auto switch is the exception: it paints itself, and dims itself.)
 _DISABLED_CSS = f"""
     #enhancePanel QLabel:disabled,
     #enhancePanel QComboBox:disabled,
@@ -75,8 +81,6 @@ def _read(widget):
     """What one field reads as, in the type its param is stored as."""
     if isinstance(widget, NoWheelComboBox):
         return widget.currentText()
-    if isinstance(widget, CheckBox):
-        return widget.isChecked()
     return widget.value()
 
 
@@ -93,8 +97,6 @@ def _fill(widget, value) -> None:
             widget.addItem(str(value))
             index = widget.findText(str(value))
         widget.setCurrentIndex(index)
-    elif isinstance(widget, CheckBox):
-        widget.setChecked(bool(value))
     elif isinstance(widget, NoWheelSpinBox):
         widget.setValue(int(value))
     else:
@@ -192,28 +194,63 @@ class EnhancePanel(QWidget):
             numbers.addWidget(widget, 1)
         form.addRow(numbers)
 
-        # The detail pass and the denoise it runs at, on one line, reading as
-        # the sentence it is: fix faces & hands at 0.45. Its denoise is separate
-        # from the one above because it can afford to be far bolder — nothing
-        # outside the regions it finds is touched.
-        detail = QHBoxLayout()
-        detail.setContentsMargins(0, 0, 0, 0)
-        detail.setSpacing(4)
-        self._detail = CheckBox("Fix faces & hands")
-        self._detail.setToolTip(param_help("enhance_detail_fix"))
-        self._detail.toggled.connect(self._emit)
-        self._widgets["enhance_detail_fix"] = self._detail
-        self._detail_denoise = self._number("enhance_detail_denoise",
-                                            NoWheelDoubleSpinBox())
-        detail.addWidget(self._detail)
-        detail.addStretch(1)
-        detail.addWidget(self._labeled("at", self._detail_denoise))
-        detail.addWidget(self._detail_denoise)
-        form.addRow(detail)
-        self._show_detectors_installed()
+        # The detail pass: one number per part it can be aimed at, each the
+        # denoise that part is redrawn at and each defaulting to 0 — no fix.
+        # Their denoise is separate from the one above, and from each other's,
+        # because it can afford to be far bolder: nothing outside the regions a
+        # detector finds is touched, and a mouth wants a harder redraw than a
+        # face does.
+        fix_heading = QLabel("Fix at")
+        fix_heading.setToolTip(param_help("enhance_detail_fixes"))
+        form.addRow(fix_heading)
+        form.addRow(self._fix_grid())
 
         box.addLayout(form)
         box.addStretch(1)
+
+    def _fix_grid(self) -> QGridLayout:
+        """A number per fixable part, three to a row — the pane tiles narrow.
+
+        Every part the app knows is shown, installed detector or not: one with
+        nothing to find it is greyed with the file to add on it, which says more
+        than an absent row (nothing at all to notice) and far more than a live
+        one that would be rejected on submit.
+        """
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(4)
+        self._fixes = {}
+        for index, part in enumerate(DETAIL_PARTS):
+            widget = self._fix_number()
+            if detector_for_part(part) is None:
+                widget.setEnabled(False)
+                widget.setToolTip(_NO_DETECTOR_TOOLTIP.format(
+                    part.name, part.matches[0]))
+            label = self._labeled(part.name.capitalize(), widget)
+            label.setEnabled(widget.isEnabled())
+            row, column = divmod(index, _FIXES_PER_ROW)
+            grid.addWidget(label, row, column * 2)
+            grid.addWidget(widget, row, column * 2 + 1)
+            self._fixes[part.name] = widget
+        for column in range(_FIXES_PER_ROW):
+            grid.setColumnStretch(column * 2 + 1, 1)
+        return grid
+
+    def _fix_number(self) -> NoWheelDoubleSpinBox:
+        """One part's denoise box, ranged from the enhancer's own ParamDef so a
+        floor of zero — the value that means "leave this part alone" — stays the
+        workflow's answer rather than this panel's."""
+        widget = NoWheelDoubleSpinBox()
+        pd = self._defs.get("enhance_detail_fixes")
+        widget.setMinimum(pd.min_val if pd is not None else 0.0)
+        widget.setMaximum(pd.max_val if pd is not None else 1.0)
+        widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
+        widget.setDecimals(2)
+        widget.setValue(0.0)
+        widget.setMinimumWidth(70)
+        widget.setToolTip(param_help("enhance_detail_fixes"))
+        widget.valueChanged.connect(self._emit)
+        return widget
 
     def set_applicable(self, applicable: bool, reason: str = "") -> None:
         """Switch the whole panel on or off, and look it.
@@ -221,29 +258,11 @@ class EnhancePanel(QWidget):
         Off, every field is disabled *and* muted, so the panel reads as what it
         is where it can't apply — settings for an action that isn't on offer —
         rather than as live knobs that quietly do nothing. Back on, each field
-        returns to whatever it was in its own right: the detail pass stays
-        grayed if ComfyUI still hasn't got a detector.
+        returns to whatever it was in its own right: a part stays grayed if
+        ComfyUI still hasn't got a detector that finds it.
         """
         self.setEnabled(applicable)
         self.setToolTip("" if applicable else reason)
-
-    def _show_detectors_installed(self) -> None:
-        """Dim the detail pass when ComfyUI hasn't got a detector it runs.
-
-        The pass is the only setting here that can be unavailable rather than
-        merely unset: the models that find the faces and hands are a separate
-        install. It looks for two by name, so what matters is whether one of
-        THOSE is there — some other detector in that folder would leave the box
-        tickable and the pass finding nothing, which says less than a greyed box
-        naming the file to add.
-        """
-        keys = ("enhance_face_detector", "enhance_hand_detector")
-        found = [k for k in keys if self._defs[k].default in self._options(k)]
-        for widget in (self._detail, self._detail_denoise):
-            widget.setEnabled(bool(found))
-            if not found:
-                widget.setToolTip(_NO_DETECTOR_TOOLTIP.format(
-                    *(self._defs[k].default for k in keys)))
 
     @staticmethod
     def _labeled(text: str, widget) -> QLabel:
@@ -278,7 +297,12 @@ class EnhancePanel(QWidget):
         return widget
 
     def show_settings(self, settings: EnhanceSettings) -> None:
-        """Fill the panel from one folder's stored settings, writing nothing back."""
+        """Fill the panel from one folder's stored settings, writing nothing back.
+
+        A part the settings don't name is a part left alone, so it reads zero —
+        filling only what is named would leave the last folder's fixes standing
+        on a folder that asked for none.
+        """
         self._loading = True
         try:
             self._auto.setChecked(settings.auto)
@@ -286,6 +310,9 @@ class EnhancePanel(QWidget):
                 value = settings.params.get(key)
                 if value is not None:
                     _fill(widget, value)
+            fixes = detail_fixes_of(settings.params)
+            for name, widget in self._fixes.items():
+                widget.setValue(float(fixes.get(name, 0.0)))
         finally:
             self._loading = False
 
@@ -296,6 +323,13 @@ class EnhancePanel(QWidget):
             widget = self._widgets.get(key)
             if widget is not None:
                 params[key] = _read(widget)
+        # Only the parts actually asked for: a part at zero is one this
+        # enhancement doesn't touch, and carrying it as a zero would make two
+        # identical settings compare as different.
+        params["enhance_detail_fixes"] = {
+            name: widget.value()
+            for name, widget in self._fixes.items() if widget.value() > 0
+        }
         return EnhanceSettings(auto=self._auto.isChecked(), params=params)
 
     def _emit(self, *_args):

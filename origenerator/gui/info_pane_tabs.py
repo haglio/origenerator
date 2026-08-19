@@ -478,6 +478,19 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel.show_finished_media(row)
 
+    def drop_previews_of_gone_rows(self, live_ids):
+        """Empty the preview of every tab showing a generation that is no longer
+        there — the deletion (or trashing) a gallery rebuild has just taken in.
+
+        Every tab, and only what has gone: a rebuild happens whenever anything
+        lands, so blanking more than that takes the picture out of a tab the user
+        left open and is looking at.
+        """
+        for panel in self._config_panels():
+            row = panel.displayed_row()
+            if row is not None and row.get("prompt_id") not in live_ids:
+                panel._preview.clear()
+
     def clear_current_preview(self):
         """Empty the current tab's preview (a re-roll ended with nothing to show,
         or the selection was deleted)."""

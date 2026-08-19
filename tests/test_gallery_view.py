@@ -4880,10 +4880,13 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
     assert view._info_tabs.count() == 1  # it filled that tab instead of forking one
 
 
-def test_auto_generate_still_ends_in_the_tab_following_that_folder(qtbot, tmp_path):
-    # A tab showing the looping folder claims each launch (it draws the progress and
-    # the Next-seed button), so the variation it was showing being made is what it
-    # ends up showing. Only tabs that asked for nothing are left alone.
+def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
+    # The reported bug: the loop's live frames filled the preview of whichever tab
+    # was open, over the picture the user had put there, and its results landed
+    # there too. A loop runs while the user works on something else; the folder's
+    # own live tile is where it can be watched. Even a tab on the looping folder —
+    # which does light up with its progress and Next-seed button — keeps showing
+    # what the user opened it on.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -4891,23 +4894,26 @@ def test_auto_generate_still_ends_in_the_tab_following_that_folder(qtbot, tmp_pa
     view.refresh()
     key = _select_first_leaf(view)
     panel = _folder_tab(view, db)
+    showing = panel._displayed_row
+    panel._preview.show_frame = MagicMock()
+    panel._preview.show_media = MagicMock()
 
     view._toggle_auto(True)
     job = view._reroll_jobs[key]
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    client.preview_image.emit(job.prompt_id, b"a frame")   # the run streams
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # ...and lands
 
-    assert panel._displayed_row["prompt_id"] == job.prompt_id
+    panel._preview.show_frame.assert_not_called()
+    panel._preview.show_media.assert_not_called()
+    assert panel._displayed_row is showing  # still the user's own generation
+    assert view._selected_reroll_key is None  # the pane was never taken over
 
 
-def test_the_loops_result_replaces_its_frames_without_taking_the_tab(
-        qtbot, tmp_path, monkeypatch):
-    # The pane mirrors the loop's live frames whoever launched it, so when a
-    # variation lands its picture belongs where those frames were — otherwise the
-    # pane (and a fullscreen show opened over it) sits on a half-drawn frame of a
-    # run that is over. The preview only: the tab holds none of a run it never
-    # asked for, so it is still the blank one a click loads into.
-    from origenerator.gui import generate_config_panel as gcp_module
-
+def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp_path):
+    # Clicking the folder's live tile is how the loop is watched full size, and it
+    # is the one thing that gives the pane to a loop. Watching one variation is
+    # watching what the loop does next, so the tile picked once keeps mirroring
+    # across the hand-off rather than going dark after one.
     db = _seeded_db(tmp_path)
     client = _reroll_client()
     view = GalleryView(db, client=client)
@@ -4915,16 +4921,34 @@ def test_the_loops_result_replaces_its_frames_without_taking_the_tab(
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
+    _reroll_tile(view).selected.emit()  # the user points the pane at the loop
     panel = view._info_tabs.current_config_panel()
-    panel._preview.show_media = MagicMock()
-    done = tmp_path / "done.png"
-    Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, output_dir: (done, "image"))
+    panel._preview.show_frame = MagicMock()
 
     client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+    client.preview_image.emit(view._reroll_jobs[key].prompt_id, b"the next one")
 
-    panel._preview.show_media.assert_called_with(done, "image")  # the picture it made
-    assert panel._displayed_row is None and panel.is_blank()     # not the tab's own
+    assert view._selected_reroll_key == key
+    panel._preview.show_frame.assert_called_with(b"the next one")
+
+
+def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
+    # The key stands for the loop while one runs, so the switch going off is what
+    # ends the pane's watch — nothing else is coming to take it.
+    db = _seeded_db(tmp_path)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    _reroll_tile(view).selected.emit()
+    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+
+    view._toggle_auto(False)
+    view._cancel_reroll(key)  # and the variation in flight is thrown away
+
+    assert view._selected_reroll_key is None
 
 
 def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path):

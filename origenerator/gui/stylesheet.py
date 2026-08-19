@@ -344,6 +344,17 @@ def build_stylesheet() -> str:
     QPushButton#sectionHeading:hover {{
         color: {_h(BLUE)};
     }}
+    /* The standing label over each half of the TOC pane, naming the shape that
+       half holds. Outside the tree rather than a row in it, so it is still on
+       screen when the rows under it have scrolled; ruled off below so it reads
+       as the head of the list rather than as its first entry. */
+    QLabel#treeSectionLabel {{
+        color: {_h(TEXT_PRIMARY)};
+        font-weight: bold;
+        background: transparent;
+        border-bottom: 1px solid {_h(BORDER_SUBTLE)};
+        padding: 4px 2px 3px 2px;
+    }}
     QLabel#dropSlot {{
         border: 1px dashed {_h(BORDER_PANEL)};
         border-radius: 4px;

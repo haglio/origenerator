@@ -39,7 +39,8 @@ from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tree import FolderTree, TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
@@ -95,7 +96,6 @@ from origenerator.gui.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
     ORIENTATION_LABELS as _ORIENTATION_LABELS,
     LANDSCAPE as _LANDSCAPE,
-    ROOT_KEY as _SIDE_ROOT_KEY,
     base_of as _base_of,
     filter_rows,
     oriented_key,
@@ -606,13 +606,14 @@ class GalleryView(QWidget):
         # "(no LoRA)" folder, and the source-image level shows only for
         # image-conditioned workflows). Folders start collapsed and only expand on
         # the disclosure arrow; double-click renames.
-        self._tree = FolderTree(_GROUP_ROLE)  # it offers star/delete on leaf rows itself
-        self._tree_view = GalleryTree(self._tree)  # builds it + the key/prompt→item maps
-        self._tree.setHeaderHidden(True)
+        # One tree per shape, each under a standing label and each scrolling on
+        # its own: the table of contents exists twice over, and which half you
+        # are in is what decides the screen a slideshow goes to.
+        self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
+        self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)
-        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._tree.customContextMenuRequested.connect(self._on_tree_context_menu)
+        self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         # Picking several folders (Shift/Ctrl) shows them together, as the folder
         # they would make; this fires after currentItemChanged, so it has the last
@@ -653,7 +654,7 @@ class GalleryView(QWidget):
         self._search_edit.setClearButtonEnabled(True)
         self._search_edit.textChanged.connect(self._on_search_changed)
         toc_box.addWidget(self._search_edit)
-        toc_box.addWidget(self._tree, 1)  # the tree takes the height; combine sits below
+        toc_box.addWidget(self._tree, 1)  # the trees take the height; combine sits below
         # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
         # on the image. Needs a client to generate, so it hides without one.
         self._combine = CombinePanel(
@@ -2206,11 +2207,6 @@ class GalleryView(QWidget):
             return
         if base == _TRASH_KEY:
             self._browser.show_trash_overview(orientation)
-            return
-        if base == _SIDE_ROOT_KEY:
-            # A header naming the split, not a place: it is unselectable, so the
-            # only way here is the caret passing over it on its way between two
-            # rows, and the panes belong to whichever of those you land on.
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -5073,9 +5069,7 @@ class GalleryView(QWidget):
 
     # --- rename & star -----------------------------------------------------
 
-    def _on_tree_context_menu(self, pos: QPoint):
-        global_pos = self._tree.viewport().mapToGlobal(pos)
-        item = self._tree.itemAt(pos)
+    def _on_tree_context_menu(self, item, global_pos: QPoint):
         if item is None:
             self._empty_tree_context_menu(global_pos)
             return

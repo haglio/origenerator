@@ -298,26 +298,23 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
 
 
 def _side(tree, orientation=LANDSCAPE):
-    """The Portrait or Landscape root — the tree carries the whole table of
-    contents twice, once per shape (see :mod:`origenerator.gui.orientation`)."""
-    label = ORIENTATION_LABELS[orientation]
-    for i in range(tree.topLevelItemCount()):
-        if tree.topLevelItem(i).text(0) == label:
-            return tree.topLevelItem(i)
-    raise AssertionError(f"no {label} root in the tree")
+    """One half of the TOC pane — the Portrait tree or the Landscape one. The
+    table of contents exists twice over, once per shape (see
+    :mod:`origenerator.gui.orientation`)."""
+    return tree.tree_for(orientation)
 
 
 def _top_level(tree, orientation=LANDSCAPE):
-    """One side's rows: its shelves, its custom folders, its All.
+    """One half's rows: its shelves, its custom folders, its All.
 
     Landscape by default because that is where these fixtures land — a row with
     no thumbnail, no file on disk and no size in its params has no shape to
     read, and an unmeasurable item files under the roomier region everywhere in
     this app. A test about the split itself names the side it means.
     """
-    root = _side(tree, orientation)
-    return {root.child(i).text(0): root.child(i)
-            for i in range(root.childCount())}
+    half = _side(tree, orientation)
+    return {half.topLevelItem(i).text(0): half.topLevelItem(i)
+            for i in range(half.topLevelItemCount())}
 
 
 def _media_roots(tree, orientation=LANDSCAPE):
@@ -436,7 +433,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     view.show()
     qtbot.waitExposed(view)
     view.refresh()
-    tree = view._tree
+    tree = _side(view._tree)  # one half; both are the same widget class
     step = tree.indentation()
     assert step <= 16   # a caret's width, not the platform's roomy default
 
@@ -3622,9 +3619,9 @@ def _find_settings_node(view, predicate):
             if hit is not None:
                 return hit
         return None
-    root = view._tree.invisibleRootItem()
-    for i in range(root.childCount()):
-        hit = walk(root.child(i))
+    half = _side(view._tree)
+    for i in range(half.topLevelItemCount()):
+        hit = walk(half.topLevelItem(i))
         if hit is not None:
             return hit
     return None

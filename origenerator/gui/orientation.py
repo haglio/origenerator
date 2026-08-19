@@ -7,12 +7,14 @@ for half the items in it — and standalone the same set is routed by a majority
 vote, which letterboxes the losing half.  A mixed show is a design space this
 app does not want to be in at all.
 
-So the tree has two roots, Portrait and Landscape, and each carries the ENTIRE
-table of contents — every shelf, the All row, the media → workflow → model →
-LoRA → settings hierarchy, and the folders the user composed — built from that
-shape's rows alone.  Whatever you are standing on is one shape by construction,
-so its slideshow has exactly one region to go to, and which one is read off the
-key rather than measured back out of the items.
+So the table of contents exists twice over, once per shape: the TOC pane is two
+trees, Portrait and Landscape, each under a standing label and each carrying the
+ENTIRE contents — every shelf, the All row, the media → workflow → model → LoRA
+→ settings hierarchy, and the folders the user composed — built from that
+shape's rows alone (:mod:`origenerator.gui.split_folder_tree` lays them out).
+Whatever you are standing on is one shape by construction, so its slideshow has
+exactly one region to go to, and which one is read off the key rather than
+measured back out of the items.
 
 The key scheme is what carries the shape: a row's tree key is its folder's own
 key with ``::portrait`` or ``::landscape`` appended (:func:`oriented_key`), and
@@ -43,11 +45,6 @@ PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
 ORIENTATIONS = (PORTRAIT, LANDSCAPE)
 ORIENTATION_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape"}
-
-# The two rows the tree is rooted on. Keyed like the synthetic shelves so no
-# derived folder key can collide with one, and oriented like everything under
-# them so a root comes apart under the same function every other key does.
-ROOT_KEY = "__orientation__"
 
 _SEPARATOR = "::"
 
@@ -81,11 +78,6 @@ def base_of(key: str | None) -> str | None:
 def orientation_of(key: str | None) -> str | None:
     """Which side a tree key is on (``None`` for a key naming no side)."""
     return split_key(key)[1]
-
-
-def root_key(orientation: str) -> str:
-    """The tree key of the *orientation* root — the row a whole side hangs off."""
-    return oriented_key(ROOT_KEY, orientation)
 
 
 def row_orientation(row: dict) -> str:

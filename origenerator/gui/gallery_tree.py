@@ -1,11 +1,13 @@
-"""Builds and queries the gallery's folder-tree widget — the left TOC pane.
+"""Builds and queries the gallery's folder trees — the left TOC pane.
 
-The tree has two roots, Portrait and Landscape, and each carries the whole table
-of contents: the Recents, Starred, Experiments, Requests and Trash shelves, the
-folders the user composed, and the All row over the media → workflow → model →
-LoRA → [source image] → settings hierarchy — all built from that shape's rows
-alone. Standing anywhere means standing on one shape, so a slideshow started
-there has one region to go to (see :mod:`origenerator.gui.orientation`).
+The pane is two trees, one per shape, each under a standing label and each
+scrolling on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`).
+Each carries the whole table of contents: the Recents, Starred, Experiments,
+Requests and Trash shelves, the folders the user composed, and the All row over
+the media → workflow → model → LoRA → [source image] → settings hierarchy — all
+built from that shape's rows alone. Standing anywhere means standing on one
+shape, so a slideshow started there has one region to go to (see
+:mod:`origenerator.gui.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
@@ -14,9 +16,9 @@ membership hang off, and it is untouched: ``keys_by_folder`` maps one back to
 the rows drawing it, which is how a navigation that knows only a folder key
 (a re-roll, a combine, a folder tile) finds a row to select.
 
-Pure tree rendering and lookups over a ``FolderTree`` the GalleryView owns and
-lays out; it has no database or refresh concerns — folder rename/star/delete
-live in the view, which rebuilds the tree through :meth:`populate`.
+Pure rendering and lookups over the pane the GalleryView owns and lays out; it
+has no database or refresh concerns — folder rename/star/delete live in the
+view, which rebuilds both halves through :meth:`populate`.
 
 The folders the user composed by hand ride between the shelves and the media
 roots, rendered flat like a shelf: a custom folder's members can sit anywhere in
@@ -33,7 +35,7 @@ from PyQt6.QtCore import Qt
 from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE, TREE_KEY_ROLE
-from origenerator.gui.orientation import ORIENTATION_LABELS, oriented_key, root_key
+from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
 from origenerator.recovery import RETENTION_DAYS
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
@@ -90,7 +92,7 @@ def _row_tip(group) -> str:
 class GalleryTree:
     """The folder tree: builds it from the gallery model and answers the lookups
     (key→item, prompt→item, breadcrumb, the selected folder's key) the view
-    navigates by. The ``FolderTree`` widget itself is owned by the view."""
+    navigates by. The pane holding the two trees is owned by the view."""
 
     def __init__(self, tree):
         self._tree = tree
@@ -106,19 +108,18 @@ class GalleryTree:
     def populate(self, sides, expanded_keys, *, folder_meta=None):
         """Rebuild the tree from ``sides``, restoring the folders in ``expanded_keys``.
 
-        ``sides`` are the :class:`SideModel`s to root the tree on, one per shape
-        and in the order they are drawn. ``folder_meta`` is the same label/star
-        overlay the tree models were built with, so the All row each side wraps
-        around its model can be renamed and starred like any folder under it.
+        ``sides`` are the :class:`SideModel`s to fill the halves with, one per
+        shape. ``folder_meta`` is the same label/star overlay the tree models
+        were built with, so the All row each side wraps around its model can be
+        renamed and starred like any folder under it.
         """
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
         self.leaf_by_id = {}
         self.keys_by_folder = {}
-        root = self._tree.invisibleRootItem()
         for side in sides:
-            self._add_side(root, side, folder_meta)
+            self._add_side(self._tree.root_for(side.orientation), side, folder_meta)
         # Folders default to collapsed; only restore folders the user had open.
         for key in expanded_keys:
             item = self.item_by_key.get(key)
@@ -128,37 +129,25 @@ class GalleryTree:
         self._tree.blockSignals(False)
         self._built = True
 
-    def _add_side(self, root, side, folder_meta) -> QTreeWidgetItem:
-        """One shape's whole table of contents, under a root row naming it.
+    def _add_side(self, root, side, folder_meta) -> None:
+        """One shape's whole table of contents, filling that shape's half.
 
-        Both roots are always drawn, even for a side with nothing in it yet: the
-        split is what tells a slideshow which screen it is for, so the side you
-        have not generated for yet still has to be somewhere you can stand and
-        somewhere its first generation can appear.
+        Both halves are always drawn, even for a side with nothing in it yet:
+        the split is what tells a slideshow which screen it is for, so the side
+        you have not generated for yet is still somewhere you can stand and
+        somewhere its first generation can appear. Its label says so even while
+        the rows under it are only empty shelves.
         """
-        item = QTreeWidgetItem([ORIENTATION_LABELS[side.orientation]])
-        item.setToolTip(0, f"Everything {side.orientation}-shaped — its own shelves, "
-                           "folders and library")
-        # A header naming the split rather than a place to stand: everything it
-        # holds is one row down, and the two things it could otherwise mean are
-        # either that side's All row (which is right here) or that row plus the
-        # trash, which is the mixed set the whole split exists to prevent.
-        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-        self._register(item, root_key(side.orientation), root)
-        self._add_shelves(item, side)
+        self._add_shelves(root, side)
         for custom in side.custom_folders:
-            self._add_custom_folder(item, custom, side.orientation)
-        # One root over the media folders, standing for the library entire. It is
-        # what the search means by "everywhere": the tree selection scopes a query,
-        # so without a row above Images and Videos there is nowhere to stand that
-        # doesn't already narrow the answer by half.
+            self._add_custom_folder(root, custom, side.orientation)
+        # One row over the media folders, standing for that side's library
+        # entire. It is what the search means by "everywhere": the tree
+        # selection scopes a query, so without a row above Images and Videos
+        # there is nowhere to stand that doesn't already narrow it by half.
         if side.tree_model:
             self._add_node(gallery.all_group(side.tree_model, folder_meta),
-                           item, side.orientation)
-        # Opened once it has children to open, and never closed: the split is the
-        # first thing the tree says, and a shut root says none of it.
-        item.setExpanded(True)
-        return item
+                           root, side.orientation)
 
     def _add_shelves(self, side_item, side) -> None:
         """The synthetic shelves leading a side: Recents (in-flight work plus
@@ -326,16 +315,24 @@ class GalleryTree:
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
 
     def breadcrumb(self, item) -> str:
-        """The path down to ``item``, side included: a folder's own label alone
-        would not say which of the two copies of it you are standing in."""
+        """The path down to ``item``, led by its side.
+
+        The side comes from the row's own key rather than from a row above it —
+        each half is a tree of its own — and it leads the path because a
+        folder's label alone would not say which of the two copies of it you
+        are standing in. The header over the browser pane is a long way from
+        the label over the half you clicked.
+        """
         parts = []
         node = item
         while node is not None:
             group = node.data(0, GROUP_ROLE)
+            # Only a shelf row has no group, and it is named by its own text.
             parts.append(group.label if group is not None else node.text(0))
             node = node.parent()
-        # Only a shelf or a side root has no group; every other row above one
-        # does, so the walk stops naming rows only where a group runs out.
+        side = orientation_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
+        if side is not None:
+            parts.append(ORIENTATION_LABELS[side])
         return "  ›  ".join(reversed(parts))
 
 

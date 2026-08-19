@@ -4091,6 +4091,7 @@ class GalleryView(QWidget):
             # no slideshow feed, no auto-loop or combine bookkeeping.
             self.refresh()
             return
+        folded = False
         if finished_row is not None \
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             # A standalone enhance is an upgrade, not a generation: fold its
@@ -4099,6 +4100,7 @@ class GalleryView(QWidget):
             # upgraded image be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
+                folded = True
                 finished_row = self._db.get_generation(source_id)
                 # A slideshow that asked for this one swaps the slide for it.
                 self._feed_slideshow_enhanced(finished_row)
@@ -4113,6 +4115,13 @@ class GalleryView(QWidget):
         self.refresh()
         self._feed_slideshow_finished(finished_row)  # a show of its folder gains it
         self._show_reroll_result_in_tab(finished_row, launcher)
+        if folded:
+            # The image itself changed — it now holds a level it did not a
+            # moment ago — and a tab holds the row it was handed, not a live
+            # view of the database. Without this the new version reaches the
+            # list only when the tab is next opened, which is a tab away and
+            # back.
+            self._info_tabs.refresh_displayed(finished_row, self._image_rows)
         if was_mirrored:
             self._show_mirrored_result(finished_row, launcher)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that

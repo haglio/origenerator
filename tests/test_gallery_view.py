@@ -7663,6 +7663,51 @@ def test_enhance_all_queues_every_member_image(qtbot, tmp_path):
     assert gallery.is_enhanced_row(upgraded)
 
 
+def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_path):
+    # The tab holds the row it was handed, not a live view of the database, so
+    # an enhancement folding a new level onto that row used to reach the list
+    # only when the tab was next opened — a tab away and back.
+    from origenerator.gui.enhance_versions import _LevelRow, _PendingRow
+
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    panel = view._info_tabs.current_config_panel()
+    assert len(panel._versions._host.findChildren(_LevelRow)) == 1  # the original
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    rows = panel._versions._host.findChildren(_LevelRow)
+    assert len(rows) == 2       # the enhancement, and the original behind it
+    # The live row gave way to the level it was making, rather than to nothing.
+    assert not panel._versions._host.findChildren(_PendingRow)
+    assert panel.displayed_row()["prompt_id"] == "g0"   # still the same image
+
+
+def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_path):
+    # Only the tabs actually showing that generation catch up; a tab looking at
+    # another image is not touched by what happened to this one.
+    from origenerator.gui.enhance_versions import _LevelRow
+
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g1")
+    panel = view._info_tabs.current_config_panel()
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    assert panel.displayed_row()["prompt_id"] == "g1"
+    assert len(panel._versions._host.findChildren(_LevelRow)) == 1
+
+
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
     # The thumbnail context menu's action: enhance exactly the picked images,
     # through the same queue the folder button uses.

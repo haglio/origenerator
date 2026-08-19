@@ -477,6 +477,16 @@ class InfoPaneTabs(QTabWidget):
         if panel is not None:
             panel.show_finished_media(row)
 
+    def refresh_displayed(self, row: dict, image_rows: list[dict]):
+        """A row has changed: re-show it in every tab displaying it.
+
+        Every tab rather than the front one, and only the tabs actually on that
+        generation (:meth:`GenerateConfigPanel.refresh_displayed`) — a change to
+        one image must not touch a tab looking at another.
+        """
+        for panel in self._config_panels():
+            panel.refresh_displayed(row, image_rows)
+
     def drop_previews_of_gone_rows(self, live_ids):
         """Empty the preview of every tab showing a generation that is no longer
         there — the deletion (or trashing) a gallery rebuild has just taken in.

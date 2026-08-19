@@ -498,16 +498,13 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         return str(item[0]) if item is not None else ""
 
-    def voice_fix_target(self):
-        """The generation a spoken "fix …" lands on: the slide on screen."""
+    def voice_target(self):
+        """The generation a spoken order or request is about: the slide on
+        screen — what the speaker is looking at while saying it."""
         return self._current_prompt_id()
 
-    def voice_request_target(self):
-        """The generation a spoken request is about: the slide on screen."""
-        return self._current_prompt_id()
-
-    def note_voice_fix(self, prompt_id, message: str) -> None:
-        """Say what a spoken fix did and, when it launched a run
+    def note_voice_run(self, prompt_id, message: str) -> None:
+        """Say what a spoken order did and, when it launched a run
         (``prompt_id``), keep the note reading Enhancing… once the flash
         fades — the same note a hold's enhance earns."""
         if prompt_id is not None:

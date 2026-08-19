@@ -1,15 +1,16 @@
 """What a spoken utterance over a fullscreen picture can ask for.
 
-Two commands share one mic. "fix <part>" aims a targeted detail pass at what's on
-screen (:mod:`~origenerator.gallery.detail_parts` owns the parts and the match);
-"genau it" animates the picture as a Genau clip. :func:`match_command` is the one
-matcher the voice surface is given, so adding a verb here is all it takes to teach
-it — and :func:`command_bias` hands every word to whisper up front, which is what
-makes a short imperative off a quiet mic land at all.
+Three commands share one mic. "fix <part>" aims a targeted detail pass at what's
+on screen (:mod:`~origenerator.gallery.detail_parts` owns the parts and the
+match); "genau it" animates the picture as a Genau clip; "enhance" asks for the
+better version of it. :func:`match_command` is the one matcher the voice surface
+is given, so adding a verb here is all it takes to teach it — and
+:func:`command_bias` hands every word to whisper up front, which is what makes a
+short imperative off a quiet mic land at all.
 
-Both are deliberately strict about shape: an utterance that matches nothing here
-falls through to prompt steering, so a loose match would silently spend a command
-on rewriting a prompt.
+All three are deliberately strict about shape: an utterance that matches nothing
+here falls through to prompt steering, so a loose match would silently spend a
+command on rewriting a prompt.
 """
 
 import re
@@ -33,41 +34,62 @@ GENAU_PHRASES: tuple[str, ...] = (
     "go now", "genau", "gunow", "genow", "ganau",
 )
 
+# The enhance command, the same shape: what to enhance is the picture on screen.
+ENHANCE_COMMAND = "enhance"
+
+# The word itself, and the past tense whisper offers about as readily off a
+# quiet mic. Nothing looser: everything unmatched here is rewritten into the
+# prompt instead, and "enhanced" is a word a prompt edit may well open with.
+ENHANCE_PHRASES: tuple[str, ...] = ("enhance", "enhanced")
+
 # The command takes no argument, so anything past the phrase and a trailing "it"
 # is a sentence that happens to begin with the words.
 _MAX_TRAILING_WORDS = 1
 
 
-def match_genau_command(text: str) -> str | None:
-    """``GENAU_COMMAND`` when the utterance asks to animate what's on screen.
+def _leads_with(text: str, phrases: tuple[str, ...]) -> bool:
+    """Whether the utterance *leads* with one of ``phrases`` and says no more
+    than a trailing "it".
 
-    It must *lead* with the phrase — "go now", "go now it", "genau it" all count,
-    while a sentence merely containing it does not. That is far more likely to be
-    a prompt edit mentioning the word than an order to run anything, and the cost
-    of being wrong is a generation the speaker did not ask for.
+    A sentence merely containing the words does not count. That is far more
+    likely to be a prompt edit mentioning them than an order to run anything,
+    and the cost of being wrong is a generation the speaker did not ask for.
     """
     words = re.findall(r"[a-z]+", (text or "").lower())
     if not words:
-        return None
-    for phrase in GENAU_PHRASES:
+        return False
+    for phrase in phrases:
         lead = phrase.split()
-        if words[: len(lead)] != lead:
-            continue
-        if len(words) - len(lead) <= _MAX_TRAILING_WORDS:
-            return GENAU_COMMAND
-    return None
+        if words[: len(lead)] == lead and len(words) - len(lead) <= _MAX_TRAILING_WORDS:
+            return True
+    return False
+
+
+def match_genau_command(text: str) -> str | None:
+    """``GENAU_COMMAND`` when the utterance asks to animate what's on screen —
+    "go now", "go now it", "genau it"."""
+    return GENAU_COMMAND if _leads_with(text, GENAU_PHRASES) else None
+
+
+def match_enhance_command(text: str) -> str | None:
+    """``ENHANCE_COMMAND`` when the utterance asks for the better version of
+    what's on screen — "enhance", "enhance it"."""
+    return ENHANCE_COMMAND if _leads_with(text, ENHANCE_PHRASES) else None
 
 
 def match_command(text: str):
     """The command an utterance asks for, or ``None`` when it asks for none.
 
     A :class:`~origenerator.gallery.detail_parts.DetailPart` for a targeted fix,
-    or :data:`GENAU_COMMAND`. Fixes are tried first: they are the older and more
-    tightly-shaped of the two, and the two vocabularies do not overlap.
+    :data:`GENAU_COMMAND`, or :data:`ENHANCE_COMMAND`. Fixes are tried first:
+    they are the oldest and most tightly-shaped of the three, and none of the
+    three vocabularies overlaps another.
     """
-    return match_fix_command(text) or match_genau_command(text)
+    return (match_fix_command(text) or match_genau_command(text)
+            or match_enhance_command(text))
 
 
 def command_bias() -> str:
-    """Every command word as whisper's initial prompt, fixes and Genau alike."""
-    return f"{fix_command_bias().rstrip('.')}, " + ", ".join(GENAU_PHRASES) + "."
+    """Every command word as whisper's initial prompt — fixes, Genau, enhance."""
+    spoken = ", ".join([*GENAU_PHRASES, *ENHANCE_PHRASES])
+    return f"{fix_command_bias().rstrip('.')}, {spoken}."

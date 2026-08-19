@@ -63,12 +63,12 @@ from origenerator.gallery.output import (
     resolve_preview,
     row_output_files,
 )
-from origenerator.gallery.detail_parts import fix_command_bias, match_fix_command
+from origenerator.gallery.detail_parts import match_fix_command
 from origenerator.gallery.voice_commands import (
+    ENHANCE_COMMAND,
     GENAU_COMMAND,
     command_bias,
     match_command,
-    match_genau_command,
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,

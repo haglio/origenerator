@@ -13,6 +13,7 @@ from origenerator.config import COMFYUI_INPUT_DIR
 from origenerator.gui import diff_text
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
+from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui import param_sections
 from origenerator.gui.param_help import param_help
@@ -198,27 +199,24 @@ class ParamForm(QWidget):
         as well as its input: the label is what you are looking at when you
         wonder what a setting is, and hovering the word is the natural move.
 
-        The label wraps. A phrase like "CFG (High) (0 = CFG Scale)" asks for three
-        hundred pixels on one line, and a non-wrapping label hands that on as a
-        floor under the whole form — which is how a narrow pane ended up scrolling
-        sideways instead of squeezing its fields."""
+        The label elides. A phrase like "CFG (High) (0 = CFG Scale)" asks for three
+        hundred pixels on one line, and a plain label hands that on as a floor under
+        the whole form — which is how a narrow pane ended up scrolling sideways
+        instead of squeezing its fields. Its whole text stays in the tooltip."""
         title = param_sections.section_title(key)
         keys = self._present_keys[title]
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
-        form.insertRow(index, label, field)
+        label_widget = ElidingLabel(label)
+        form.insertRow(index, label_widget, field)
         keys.insert(index, key)
-        label_widget = form.itemAt(index, form.ItemRole.LabelRole)
-        label_widget = label_widget.widget() if label_widget is not None else None
-        if label_widget is not None:
-            label_widget.setWordWrap(True)
-        help_text = param_help(key)
-        if help_text:
-            if label_widget is not None:
-                label_widget.setToolTip(help_text)
-            widget = self._widgets.get(key)
-            if widget is not None:
-                widget.setToolTip(help_text)
+        # A label cut short is one you most want spelled out, so the tip says the
+        # whole thing when the param has nothing more useful to explain.
+        help_text = param_help(key) or label
+        label_widget.setToolTip(help_text)
+        widget = self._widgets.get(key)
+        if widget is not None and param_help(key):
+            widget.setToolTip(help_text)
 
     @staticmethod
     def _insert_index(present: list[str], key: str) -> int:
@@ -272,7 +270,9 @@ class ParamForm(QWidget):
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
         if pd.type == "image":
-            browse = QPushButton("Browse...")
+            # Elides: it is the widest thing on any row, so a plain button would
+            # decide how narrow the whole form can be squeezed.
+            browse = ElidingButton("Browse...")
             browse.clicked.connect(
                 lambda _checked=False, key=pd.key: self._browse_image(key)
             )

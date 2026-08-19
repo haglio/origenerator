@@ -89,6 +89,45 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
         assert not panel._scroll.horizontalScrollBar().isVisible(), f"at {width}px"
 
 
+def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel):
+    """Squeezed, the settings shorten — none of them runs off the side.
+
+    The failure this exists for: QFormLayout's WrapLongRows lays a wrapped label
+    out at its own full-line size hint without clamping it to the row, so a label
+    like "Noise Seed (Stage 1)" ran 50px past the edge of the column it was in.
+    Nothing on screen said what had been cut: not an ellipsis, and not the scroll
+    bar, which stayed away because the layout's stated minimum still fit.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    panel = blank_panel
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    for section in panel._param_form._sections.values():
+        section.set_collapsed(False)
+    panel.show()
+
+    host = panel._scroll.widget()
+    for width in (600, 420, 320, 260, 240):
+        panel.resize(width, 800)
+        QApplication.processEvents()
+        over = []
+
+        def walk(widget):
+            if not widget.isVisible():
+                return
+            right = widget.mapTo(host, widget.rect().topRight()).x()
+            if right >= host.width():
+                over.append((type(widget).__name__,
+                             getattr(widget, "text", lambda: "")(),
+                             right - host.width()))
+            for child in widget.children():
+                if child.isWidgetType():
+                    walk(child)
+
+        walk(host)
+        assert not over, f"at {width}px: {over[:3]}"
+
+
 def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     """Narrowed, the buttons drop onto further lines, each still at its full width.
 

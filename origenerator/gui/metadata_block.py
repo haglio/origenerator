@@ -20,7 +20,7 @@ from PyQt6.QtGui import QFontMetrics
 from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
-from origenerator.gui.eliding_button import ElidingButton
+from origenerator.gui.eliding import ElidingButton
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
 
@@ -152,7 +152,7 @@ def _reveal_button(target: str) -> QPushButton:
 
     The longest label on any file row, so it is the one that decides how narrow a
     pane holding file rows can be squeezed: it elides rather than hold that width
-    (see :mod:`origenerator.gui.eliding_button`)."""
+    (see :mod:`origenerator.gui.eliding`)."""
     btn = ElidingButton("Show in Explorer")
     btn.setObjectName("revealButton")
     btn.setStyleSheet("padding: 2px 6px;")

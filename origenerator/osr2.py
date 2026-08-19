@@ -27,32 +27,31 @@ logger = logging.getLogger(__name__)
 PARK_TCODE = "L00000I500"
 
 
-def device_on(*, now: float | None = None, rx_file=None, tx_file=None) -> bool:
-    """Whether the OSR2 is on the wire — Fun Time's rule, read from the same files.
+def device_on(*, now: float | None = None, rx_file=None) -> bool:
+    """Whether the OSR2 is there — the broker's own rule, off the broker's own stamp.
 
-    The broker stamps one file when the device last spoke and another when it was
-    last spoken to; either one fresh means it is there. Both, rather than the
-    reply alone, because the device only answers traffic: through any stretch
-    nothing is being sent, the reply stamp goes quiet on a device that is plainly
-    still plugged in, and calling that "off" is what made Fun Time's readout go
-    dead grey mid-picture before it counted both.
+    The device speaking is the only evidence that it is switched on: the USB
+    cable is never unplugged, so the port is enumerated whether or not the thing
+    at the end of it has power, and T-code carries no acknowledgment, so a write
+    that goes nowhere looks exactly like one that arrives. The broker keeps a
+    second stamp for what it last *sent*, and that one is nothing to go by here
+    for precisely this app's reason: its stroke streams T-code through the broker
+    the moment the switch goes on, which would keep the sent stamp fresh against
+    a device that is switched off and have the console call it driving. (Fun
+    Time can afford to count that stamp — the genau it runs drives only a device
+    that has already announced itself over the wire.)
 
     Best-effort like everything else here: a missing state dir, an unreadable
     stamp, or a broker that never ran all read as off, which is the truth as far
     as anything here can tell.
     """
     current = time.time() if now is None else now
-    files = (rx_file if rx_file is not None else config.OSR2_SERIAL_RX_FILE,
-             tx_file if tx_file is not None else config.OSR2_SERIAL_TX_FILE)
-    return any(_stamp_is_fresh(Path(path), current) for path in files)
-
-
-def _stamp_is_fresh(path: Path, now: float) -> bool:
+    path = Path(rx_file if rx_file is not None else config.OSR2_SERIAL_RX_FILE)
     try:
-        stamped = float(path.read_text(encoding="utf-8").strip())
+        spoke_at = float(path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return False
-    return (now - stamped) < config.OSR2_STAMP_MAX_AGE_S
+    return (current - spoke_at) < config.OSR2_RX_STALE_S
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:

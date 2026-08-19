@@ -145,7 +145,7 @@ def _scene_video(pid, prompt, start_scene, created, **params):
 def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_pick(monkeypatch):
     rows = [
         _scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X"),
-        _scene_video("x2", "a alpha", "his anchor already at her lips", "2026-01-02", lora_high="X"),
+        _scene_video("x2", "a alpha", "his anchor already in her grip", "2026-01-02", lora_high="X"),
         _scene_video("y1", "a alpha", "she waits, no anchor in frame", "2026-01-03", lora_high="Y"),
     ]
     seen = {}
@@ -161,7 +161,7 @@ def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_
     )
     # recipe X is one option (its most-recent member x2 represents it), recipe Y another.
     assert got == "x2"                                     # choice 0 → recipe X's representative
-    assert "his anchor already at her lips" in seen["user"]  # X shown by x2's start scene, not x1's
+    assert "his anchor already in her grip" in seen["user"]  # X shown by x2's start scene, not x1's
     assert "she waits, no anchor in frame" in seen["user"]   # Y is offered too
 
 

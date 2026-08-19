@@ -50,6 +50,14 @@ def _shift(view, key):
                                  Qt.KeyboardModifier.ShiftModifier))
 
 
+def _fade(view):
+    """What a flash's own timer does when it fires: it is a single shot, so it is
+    no longer running by the time the note falls back to whatever the show would
+    otherwise be saying."""
+    view._note_timer.stop()
+    view._refresh_note()
+
+
 def test_opens_on_the_first_item(qtbot):
     view = _view(qtbot)
     assert view._playlist.current() == ("a.png", "image")
@@ -370,7 +378,9 @@ def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
 
     assert asked == ["id-a"]
     assert view._playlist.locked
-    assert not view._note.isHidden() and "Enhancing" in view._note.text()
+    # In the line until the gallery says otherwise — a launch is a place in the
+    # queue, not a picture being made.
+    assert view._note.text() == "Enhancement queued"
 
 
 def test_releasing_the_hold_asks_for_nothing(qtbot):
@@ -402,6 +412,54 @@ def test_e_turns_the_whole_behavior_off(qtbot):
     _press(view, Qt.Key.Key_Down)   # release the hold
     _press(view, Qt.Key.Key_Down)   # hold again
     assert asked == ["id-a"]
+
+
+def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):
+    # Holding several slides sends out several runs and ComfyUI takes them one at
+    # a time, so a slide the show comes back around to is usually still waiting.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    _press(view, Qt.Key.Key_Down)        # ask for this one
+    _press(view, Qt.Key.Key_Down)        # let go, so the show can move
+    _press(view, Qt.Key.Key_Right)
+    _press(view, Qt.Key.Key_Down)        # and ask for the next
+
+    view.note_enhancing({"id-a": "running", "id-b": "queued"})
+
+    assert view._note.text() == "Enhancement queued"
+    _press(view, Qt.Key.Key_Down)        # let go
+    _press(view, Qt.Key.Key_Left)        # back to the one being made
+    assert view._note.text() == "Enhancing…"
+
+
+def test_the_note_follows_the_run_from_the_line_onto_the_gpu(qtbot):
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    _press(view, Qt.Key.Key_Down)
+    assert view._note.text() == "Enhancement queued"
+
+    view.note_enhancing({"id-a": "running"})
+
+    assert view._note.text() == "Enhancing…"
+
+
+def test_a_run_of_an_item_this_show_never_asked_about_says_nothing(qtbot):
+    # Enhance All queues its own runs while a show plays; the corner speaks for
+    # the ones this show asked for, and stays out of the way otherwise.
+    view = _view(qtbot, _KEYED)
+    view.note_enhancing({"id-a": "running"})
+    assert view._note.isHidden()
+
+
+def test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer(qtbot):
+    # The statuses arrive every poll; a spoken command's answer is on screen for
+    # a beat, and losing it to one would leave the speaker with no reply.
+    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view.note_voice_run("id-a", "🎤 fixing teeth…")
+
+    view.note_enhancing({"id-a": "running"})
+
+    assert "fixing teeth" in view._note.text()
+    _fade(view)
+    assert view._note.text() == "Enhancing…"
 
 
 def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
@@ -528,9 +586,11 @@ def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
     view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
     view.note_voice_run("id-a", "🎤 fixing teeth…")
     assert "fixing teeth" in view._note.text()
-    # The flash fades into the same note a hold's enhance earns, until the
-    # upgraded version lands.
-    view._refresh_note()
+    # The flash fades into the same note a hold's enhance earns, which follows
+    # the run: waiting its turn, then being made, until the version lands.
+    _fade(view)
+    assert view._note.text() == "Enhancement queued"
+    view.note_enhancing({"id-a": "running"})
     assert view._note.text() == "Enhancing…"
 
 
@@ -538,7 +598,7 @@ def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
     view = _view(qtbot, _KEYED)
     view.note_voice_run(None, "🎤 no teeth detector installed")
     assert "no teeth detector" in view._note.text()
-    view._refresh_note()
+    _fade(view)
     assert view._note.isHidden()
 
 

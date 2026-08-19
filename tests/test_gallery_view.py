@@ -7614,6 +7614,7 @@ class _VoiceSurface:
     def __init__(self, prompt_id):
         self._prompt_id = prompt_id
         self.noted = None
+        self.enhancing = {}
 
     def isActiveWindow(self):
         return True
@@ -7623,6 +7624,9 @@ class _VoiceSurface:
 
     def note_voice_run(self, prompt_id, message):
         self.noted = (prompt_id, message)
+
+    def note_enhancing(self, statuses):
+        self.enhancing = statuses
 
 
 def _enhanceable_db(tmp_path, count=2):
@@ -8089,6 +8093,34 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"  # still waiting in the line, never sent
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
+
+
+def test_a_held_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
+                                                                 monkeypatch):
+    # Holding a slide asks for an enhancement, and what it gets first is a place
+    # in the line — a show of held slides has several out at once. The corner
+    # used to read "Enhancing…" from the moment of the ask, over a picture
+    # nothing had started making.
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._start_slideshow()
+    show = view._slideshow
+    qtbot.addWidget(show)
+
+    show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+
+    (job,) = view._reroll.all_jobs
+    assert show._note.text() == "Enhancement queued"
+
+    view._client.preview_image.emit(job.prompt_id, _png_bytes())  # ComfyUI began
+
+    assert show._note.text() == "Enhancing…"
+    show.close()
 
 
 def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypatch,

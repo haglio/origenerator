@@ -18,11 +18,13 @@ library content, unpublishable for the same reason the act names are, so it
 comes from the content overlay's optional ``detail_fix_parts`` entries
 (``content.example.json`` documents the shape) and extends this table at load.
 
-Every direction lives here: a spoken command or a panel row resolves to a part
-and an installed detector (:func:`match_fix_command`, :func:`detector_for_part`),
-a recorded detector filename resolves back to the word that captions the level
-it made (:func:`detector_part_label`), and one enhancement's params resolve to
-the passes it actually runs (:func:`detail_fixes_of`, :func:`detail_fix_passes`).
+Every direction lives here: a spoken command or a panel row resolves to the
+parts it asks for and the installed detectors that find them
+(:func:`match_fix_command`, :func:`detector_for_part`, :func:`fixable_parts`),
+those parts resolve back to the words that name them (:func:`name_parts`), a
+recorded detector filename resolves back to the word that captions the level it
+made (:func:`detector_part_label`), and one enhancement's params resolve to the
+passes it actually runs (:func:`detail_fixes_of`, :func:`detail_fix_passes`).
 """
 
 import re
@@ -85,9 +87,16 @@ def _overlay_parts() -> tuple:
 
 DETAIL_PARTS = _BUILTIN_PARTS + _overlay_parts()
 
-# A command is a few words — "fix her teeth, please" — while anything
-# sentence-shaped is a prompt edit that happens to start with "fix".
+# A command is a few words — "fix her teeth, please", "fix hands and mouth" —
+# while anything sentence-shaped is a prompt edit that happens to start with
+# "fix". Naming several parts costs a word each and stays well inside this;
+# raising it to make room for more would start claiming sentences like "fix the
+# color of her eyes to blue", which is a prompt edit and must stay one.
 _MAX_COMMAND_WORDS = 6
+
+# What "fix all" says: one word standing in for the whole table, so a picture
+# that wants every part gone over doesn't have to have them listed out loud.
+ALL_PARTS_WORDS = ("all", "everything")
 
 
 def _lead_is_fix(word: str) -> bool:
@@ -108,23 +117,30 @@ def _lead_is_fix(word: str) -> bool:
     )
 
 
-def match_fix_command(text: str) -> DetailPart | None:
-    """The part a spoken utterance asks to fix, or ``None`` when it isn't asking.
+def match_fix_command(text: str) -> tuple:
+    """The parts a spoken utterance asks to fix — ``()`` when it isn't asking.
+
+    Every part it names, not the first: "fix hands and mouth" is one command
+    asking for two passes, and a fix that quietly ran one of them would be the
+    same wrong answer as a fix that ran all seven.
+    :data:`ALL_PARTS_WORDS` asks for the whole table in a breath.
 
     Deliberately strict about the shape — it must lead with "fix" (as heard,
     :func:`_lead_is_fix`) and name a known part within a few words — because
     while prompt steering is also listening, everything unmatched here falls
     through to a prompt rewrite, and "fix the lighting" is one of those.
     Punctuation and case are whisper's, so both are ignored.
+
+    The table's order, whichever order the parts were said in, so one command
+    always reads and builds the same way round.
     """
     words = re.findall(r"[a-z]+", (text or "").lower())
     if not words or not _lead_is_fix(words[0]) or len(words) > _MAX_COMMAND_WORDS:
-        return None
+        return ()
     named = set(words[1:])
-    for part in DETAIL_PARTS:
-        if named & set(part.spoken):
-            return part
-    return None
+    if named & set(ALL_PARTS_WORDS):
+        return tuple(DETAIL_PARTS)
+    return tuple(part for part in DETAIL_PARTS if named & set(part.spoken))
 
 
 def fix_command_bias() -> str:
@@ -136,7 +152,7 @@ def fix_command_bias() -> str:
     what actually fixed that capture, so the transcriber is biased with every
     word a command may use, overlay parts included.
     """
-    words = ["fix", "fixed"]
+    words = ["fix", "fixed", *ALL_PARTS_WORDS]
     for part in DETAIL_PARTS:
         words += [w for w in part.spoken if w not in words]
     return "Voice commands: " + ", ".join(words) + "."
@@ -161,6 +177,19 @@ def detector_for_part(part: DetailPart) -> str | None:
     return None
 
 
+def fixable_parts(parts) -> tuple:
+    """Those of ``parts`` something installed can actually find.
+
+    A part with no detector is dropped rather than run: ComfyUI validates the
+    model name and rejects the whole prompt over one it cannot find, so one
+    missing detector in a "fix hands and teeth" would take the hands down with
+    it. Dropping it here is what lets the rest of the command still happen —
+    and what "fix all" means on an install that has detectors for only some of
+    the table. Nothing left is the caller's to say out loud.
+    """
+    return tuple(part for part in parts if detector_for_part(part) is not None)
+
+
 def detector_part_label(filename: str) -> str:
     """The part a detector file finds, as the word a caption uses.
 
@@ -174,10 +203,15 @@ def detector_part_label(filename: str) -> str:
     return PureWindowsPath(str(filename)).stem
 
 
-def part_named(name: str) -> DetailPart | None:
-    """The table's entry for a part by its canonical name, or ``None`` — a part
-    an old row names that the overlay no longer lists is simply not fixable."""
-    return next((part for part in DETAIL_PARTS if part.name == str(name)), None)
+def name_parts(parts) -> str:
+    """The parts of one fix as the words that name it — "teeth", "hands &
+    teeth".
+
+    The same joiner an enhancement's caption uses for its passes
+    (:func:`~origenerator.gallery.enhance.describe_enhance_params`), so a fix
+    said out loud is named the way the level it makes will be.
+    """
+    return " & ".join(part.name for part in parts)
 
 
 def _denoise(value) -> float | None:

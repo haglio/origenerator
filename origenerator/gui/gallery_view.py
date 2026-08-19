@@ -212,7 +212,7 @@ def _is_deletable_folder(group) -> bool:
 
 
 # What a spoken command about the picture is asking for, in the words its "no
-# picture on screen" answer names it by. A fix names its own part instead.
+# picture on screen" answer names it by. A fix names its own parts instead.
 _VOICE_WANTS = {
     gallery.GENAU_COMMAND: "a Genau clip",
     gallery.ENHANCE_COMMAND: "an enhancement",
@@ -3018,9 +3018,9 @@ class GalleryView(QWidget):
         )
 
     def _on_picture_command(self, command):
-        """A spoken command about the picture on screen: a targeted "fix <part>",
-        "enhance" for the better version of it, or "genau it" to animate it as a
-        Genau clip.
+        """A spoken command about the picture on screen: a targeted "fix <part>"
+        (or several parts, or "fix all"), "enhance" for the better version of
+        it, or "genau it" to animate it as a Genau clip.
 
         Answered out of the show's own note — the speaker is looking at it, not
         at this pane. Said with no show up there is no "on screen" to act on, and
@@ -3028,7 +3028,7 @@ class GalleryView(QWidget):
         here, so the caption says so rather than letting it vanish."""
         show = self._slideshow
         if show is None:
-            wants = _VOICE_WANTS.get(command) or f"a {command.name} fix"
+            wants = _VOICE_WANTS.get(command) or f"a {gallery.name_parts(command)} fix"
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)
             return
@@ -3038,7 +3038,7 @@ class GalleryView(QWidget):
         elif command == gallery.ENHANCE_COMMAND:
             prompt_id, message = self._enhance_it(target)
         else:
-            prompt_id, message = self._fix_part(target, command)
+            prompt_id, message = self._fix_parts(target, command)
         show.note_voice_run(prompt_id, message)
 
     def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
@@ -3062,25 +3062,33 @@ class GalleryView(QWidget):
             return None, "🎤 this one has no file to enhance"
         return self._launch_spoken_enhance(row, params, "enhance", "enhancing…")
 
-    def _fix_part(self, prompt_id: str | None, part) -> tuple[str | None, str]:
+    def _fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
         (``None`` when it didn't) and the line the surface should say about it.
 
-        The run is the image's latest enhancement done again with the detail
-        pass aimed at the named part (:func:`~origenerator.gallery.enhance.
-        fix_part_params`) — so the answer to a bad hand on an already-enhanced
-        image is the same image, same settings, hand redrawn."""
+        The run is the image's latest enhancement done again with a detail pass
+        aimed at each part named (:func:`~origenerator.gallery.enhance.
+        fix_params_for`) — so the answer to a bad hand on an already-enhanced
+        image is the same image, same settings, hand redrawn.
+
+        Said back in the parts it is actually redrawing, which is not always the
+        parts asked for: one with nothing installed to find it is dropped rather
+        than taking the rest of the command down with it, and the caption is
+        where that shows. Refused outright only when none of them can run."""
+        asked = gallery.name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, f"🎤 only a finished image can get a {part.name} fix"
-        params = gallery.fix_part_params(row, part, self._enhance_settings)
+            return None, f"🎤 only a finished image can get a {asked} fix"
+        params = gallery.fix_params_for(row, parts, self._enhance_settings)
         if params is None:
-            return None, (f"🎤 no {part.name} detector installed "
+            return None, (f"🎤 no {asked} detector installed "
                           "(ComfyUI models/ultralytics/bbox)")
         if gallery.level_matching_params(row, params) is not None:
-            return None, f"🎤 already has this {part.name} fix"
-        return self._launch_spoken_enhance(row, params, f"{part.name} fix",
-                                           f"fixing {part.name}…")
+            return None, f"🎤 already has this {asked} fix"
+        fixing = gallery.name_parts(
+            [part for part in parts if part.name in params["enhance_detail_fixes"]])
+        return self._launch_spoken_enhance(row, params, f"{fixing} fix",
+                                           f"fixing {fixing}…")
 
     def _launch_spoken_enhance(self, row: dict, params: dict, what: str,
                                doing: str) -> tuple[str | None, str]:
@@ -3884,7 +3892,7 @@ class GalleryView(QWidget):
         """Animate an image as a Genau clip: the act read off its own prompt.
 
         Returns the id it launched on (``None`` when it didn't) and the line the
-        speaking surface should say — the same shape as :meth:`_fix_part`, because
+        speaking surface should say — the same shape as :meth:`_fix_parts`, because
         the speaker is looking at the picture, not at this pane.
 
         Nothing is picked and nothing is dropped: the act comes from the image's

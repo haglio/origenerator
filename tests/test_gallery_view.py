@@ -6533,6 +6533,23 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     assert config.params["seed"] == 42                               # the video's seed, carried in
 
 
+def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
+    # "Open in generator" is the same "show me this" gesture a thumbnail click is:
+    # it lands in the pane's untouched "New generation" tab rather than beside it,
+    # and wears the slant that says the next open may replace it.
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    tabs = view._info_tabs
+    before = tabs.count()
+
+    view._open_combination("img", "vid")
+
+    assert tabs.count() == before  # no "New generation" left standing beside it
+    panel = tabs.current_config_panel()
+    assert tabs.tabBar().preview_index() == tabs.indexOf(panel)
+
+
 def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

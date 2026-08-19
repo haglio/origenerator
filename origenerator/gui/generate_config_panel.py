@@ -7,22 +7,24 @@ from PyQt6.QtWidgets import (
     QComboBox, QPushButton, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QIcon, QPixmap
 
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
     EnhanceSettings, animated_preview_path,
-    build_image_config_index, config_tab_title, describe_enhance_params,
-    displayed_levels, enhance_params_for, find_source_image_id,
+    build_image_config_index, config_folder_name, describe_enhance_params,
+    displayed_levels, enhance_params_for, find_source_image_id, item_label,
     level_matching_settings, media_type_of_row, output_file_path,
     resolve_preview, row_output_files, rows_in_settings, settings_signature,
-    videos_from_source_image,
+    videos_from_source_image, workflow_output_type,
 )
 from origenerator.generation_config import ConfigSnapshot, merge_denormalized
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui import icons
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
@@ -70,7 +72,8 @@ class GenerateConfigPanel(QWidget):
     one question it asks first is which workflow to run.
     """
 
-    title_changed = pyqtSignal(str)     # current tab title
+    title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
+    form_edited = pyqtSignal()          # any field changed — every keystroke
     form_replaced = pyqtSignal()        # a new workflow swapped the param form out
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
@@ -87,7 +90,6 @@ class GenerateConfigPanel(QWidget):
         super().__init__(parent)
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
-        self._custom_title: str | None = None        # user-set name; overrides the auto title
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (drives the progress button)
         self._generating_prompt_id: str | None = None  # that run's prompt, so only ITS progress fills the button
@@ -378,7 +380,7 @@ class GenerateConfigPanel(QWidget):
         with the info above it, not boxed in a separate scroll of its own."""
         self._detach_form()
         self._param_form = form
-        self._param_form.changed.connect(self._emit_title)
+        self._param_form.changed.connect(self.form_edited)
         self._form_host_box.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -547,6 +549,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()  # nothing generated with these settings yet
             self._displayed_row = None
+        self._emit_title()  # the tab is named after what it shows
 
     def _recent_matching_row(self) -> dict | None:
         """The newest saved generation in this tab's settings folder, or None."""
@@ -576,24 +579,35 @@ class GenerateConfigPanel(QWidget):
         return self._workflow_combo.currentData() is None and self._displayed_row is None
 
     def title(self) -> str:
-        """The tab title: the user's custom name, else the model + gallery folder."""
-        if self._custom_title:
-            return self._custom_title
-        params = self._param_form.get_values_static() if self._param_form else {}
-        return config_tab_title(self._workflow_combo.currentData(), params)
+        """This tab's name: the item on display, else the gallery folder this
+        config would generate into, else what a tab with no workflow yet is.
 
-    def set_custom_title(self, name: str):
-        """Pin a user-chosen tab name that overrides the auto gallery-folder name."""
-        self._custom_title = name
-        self._emit_title()
-
-    def custom_title(self) -> str | None:
-        """The user-set tab name, or ``None`` when the title is auto-derived.
-
-        Distinct from :meth:`title`, which always returns a displayable string;
-        this reports only an explicit rename, for session persistence.
+        Named after what it is showing rather than after its settings, so the row
+        of tabs reads as the things you have open. A config that has never run
+        has no item to name it, so it takes its folder's name — the same name the
+        folder wears in the tree, code or typed.
         """
-        return self._custom_title
+        name = item_label(self._displayed_row)
+        if not name:
+            key = self.settings_key()
+            if key is not None:
+                name = config_folder_name(*key, self._db.folder_meta_map())
+        return name or "New generation"
+
+    def tab_icon(self) -> QIcon:
+        """The mark beside this tab's name: the displayed item's own thumbnail,
+        else the plain image/video mark for what this config makes.
+
+        A null icon for a tab with no workflow picked — nothing is known yet, and
+        a mark guessing at one would be the tab's most confident claim.
+        """
+        row = self._displayed_row
+        thumb = (row or {}).get("thumbnail_path")
+        if thumb and Path(thumb).exists():
+            return QIcon(QPixmap(str(thumb)))
+        media = (media_type_of_row(row) if row is not None
+                 else workflow_output_type(self._workflow_combo.currentData()))
+        return icons.media_type_icon(media) if media else QIcon()
 
     def prefill(self, workflow_name: str, params: dict):
         # Switch to the matching workflow. A registered workflow the picker
@@ -675,6 +689,7 @@ class GenerateConfigPanel(QWidget):
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview, request)
+        self._emit_title()  # the tab is named after what it shows
         self.displayed_changed.emit()  # the view reconciles OSR2 driving off this
 
     def _hide_footer(self):

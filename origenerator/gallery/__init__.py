@@ -46,7 +46,9 @@ from origenerator.gallery.groups import (
 )
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
+    config_folder_name,
     config_tab_title,
+    item_label,
     lora_label,
     model_label,
 )

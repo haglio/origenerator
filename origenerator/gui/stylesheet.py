@@ -292,7 +292,11 @@ def build_stylesheet() -> str:
     QTabBar::tab {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};
-        padding: 8px 20px;
+        /* The horizontal padding is where a tab's contents begin, so it is what
+           sets the gap in front of its mark. It matches the one the ✕ leaves at
+           the other end (eliding_tab_bar.EDGE), or a tab reads as two separate
+           decisions rather than one row. */
+        padding: 8px 10px;
         border: none;
         /* A hairline between tabs, so it reads which ✕ belongs to which. */
         border-right: 1px solid {_h(BORDER_SUBTLE)};

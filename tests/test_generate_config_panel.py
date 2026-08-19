@@ -3,6 +3,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QPixmap
 
 from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -10,6 +12,7 @@ from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import icons
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -488,29 +491,71 @@ def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
     assert fired == []
 
 
-# --- title ------------------------------------------------------------------
+# --- title and mark ---------------------------------------------------------
 
-def test_title_is_workflow_name_for_blank_config(panel):
-    assert panel.title() == "SDXL Text-to-Image"
-
-
-def test_title_leads_with_model_then_prompt(panel):
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a cat in a hat"})
-    assert panel.title() == "SDXL Text-to-Image › a cat in a hat"
+def _folder_name(panel):
+    """The name the gallery folder this config maps to wears in the tree."""
+    return gallery.config_folder_name(*panel.settings_key(),
+                                      panel._db.folder_meta_map())
 
 
-def test_title_changed_emitted_when_prompt_edited(panel):
+def test_a_config_with_no_result_is_named_by_its_folder(panel):
+    # Nothing has been generated with these settings, so there is no item to name
+    # the tab: it wears the name of the folder its output would land in — the
+    # same short code the tree shows over there.
+    assert panel.title() == _folder_name(panel)
+    assert panel.title() != "New generation"
+
+
+def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
+    from origenerator.gallery.keys import settings_key
+    panel._db.rename_folder(settings_key("image", *panel.settings_key()), "Wizards")
+
+    assert panel.title() == "Wizards"
+
+
+def test_a_displayed_item_names_the_tab_by_its_file(panel, tmp_path):
+    row = _image_row(panel._db, filename="sdxl_img1.png")
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(row, [row])
+
+    assert panel.title() == "sdxl_img1.png"
+
+
+def test_title_changed_when_the_shown_item_changes(panel):
+    row = _image_row(panel._db, filename="sdxl_img1.png")
+    panel._preview.show_media = MagicMock()
     titles = []
     panel.title_changed.connect(titles.append)
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert titles and titles[-1] == "SDXL Text-to-Image › a fox"
+
+    panel.show_saved_generation(row, [row])
+
+    assert titles and titles[-1] == "sdxl_img1.png"
 
 
-def test_custom_title_overrides_and_sticks(panel):
-    panel.set_custom_title("My experiments")
-    assert panel.title() == "My experiments"
-    panel.prefill("sdxl_t2i", {"positive_prompt": "a fox"})
-    assert panel.title() == "My experiments"  # rename survives config changes
+def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
+    pixmap = QPixmap(4, 4)
+    pixmap.fill(Qt.GlobalColor.red)
+    thumb = tmp_path / "thumb.png"
+    pixmap.save(str(thumb))
+    row = dict(_image_row(panel._db), thumbnail_path=str(thumb))
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(row, [row])
+
+    # The item's own picture, at its own size — not one of the drawn glyphs.
+    assert panel.tab_icon().availableSizes() == [QSize(4, 4)]
+
+
+def test_the_mark_falls_back_to_what_the_config_makes(panel):
+    # No result yet, so no thumbnail: the plain photo/play mark says which kind
+    # of thing this tab would produce.
+    assert panel.tab_icon().cacheKey() == icons.media_type_icon("image").cacheKey()
+
+
+def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
+    assert blank_panel.tab_icon().isNull()
 
 
 # --- estimate label ---------------------------------------------------------
@@ -519,7 +564,8 @@ class SpyDB:
     """A minimal stand-in returning canned recent durations and no rows.
 
     ``list_generations`` returns ``[]`` (the strip and recent-preview stay empty,
-    which these duration tests don't inspect) and ``recent_durations`` feeds the
+    which these duration tests don't inspect), ``folder_meta_map`` no names (the
+    tab falls back to its folder's code), and ``recent_durations`` feeds the
     estimate label.
     """
 
@@ -531,6 +577,9 @@ class SpyDB:
 
     def list_generations(self):
         return []
+
+    def folder_meta_map(self):
+        return {}
 
 
 def _spy_panel(qtbot, db):

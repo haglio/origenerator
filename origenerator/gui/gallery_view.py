@@ -1587,6 +1587,10 @@ class GalleryView(QWidget):
         # The bottom strip is always on screen, so refresh it every tick — its
         # rows' live frames and progress advance between rebuilds.
         self._update_queue()
+        # And a show's corner, for the same reason and one more: a run starting
+        # is not a change to any row, so nothing else here would tell the show
+        # its held slide went from waiting to being made.
+        self._feed_slideshow_enhancing()
         self._refresh_wait_note()
 
     def _rebuild(self, rows, meta):
@@ -3367,6 +3371,30 @@ class GalleryView(QWidget):
                 self._pending_enhancement_for(row, running) if row else None
             )
         self._reconcile_enhancing_tiles(running)
+        self._feed_slideshow_enhancing()
+
+    def _feed_slideshow_enhancing(self):
+        """Tell an open show how the enhancements in flight are going.
+
+        A show is where a batch of them gets asked for — every held slide is a
+        run — so it is the surface most likely to be looking at a picture whose
+        turn has not come. The show cannot tell on its own: a hold hears only
+        that a run started, not where in the line it landed. Told, its corner
+        says whether the version is being made or waiting to be.
+
+        Keyed by the mapping the tiles are drawn from, which covers every image
+        in the library rather than the open folder's — a show of a shelf plays
+        items from anywhere. The status is :meth:`_enhancing_run`'s, read off the
+        job rather than its row: the row says "running" from the moment the job
+        is handed to ComfyUI, and the wait on ComfyUI's own queue is exactly the
+        stretch this is here to name.
+        """
+        if self._slideshow is None:
+            return
+        self._slideshow.note_enhancing({
+            prompt_id: "running" if job.state == "running" else "queued"
+            for prompt_id, (_key, job) in self._enhancing_by_prompt.items()
+        })
 
     def _reconcile_enhancing_tiles(self, running):
         """Stream each running enhance onto the tile of the image it is enhancing.

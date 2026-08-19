@@ -65,6 +65,11 @@ from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.slideshow import SlideshowPlaylist, in_order
 
 _GENERATING = "Generating…"
+# What the corner says about an enhancement of the slide on screen. Which of the
+# two is a fact about the run, not about the ask: holding slide after slide
+# sends out a line of runs, and ComfyUI is making exactly one of them.
+_ENHANCING = "Enhancing…"
+_ENHANCE_QUEUED = "Enhancement queued"
 
 
 class SlideshowView(QWidget):
@@ -90,6 +95,11 @@ class SlideshowView(QWidget):
         self._on_enhance = on_enhance
         self._enhance_on_hold = on_enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
+        # How each enhancement in flight is actually going, as the gallery
+        # reads it (``prompt_id`` -> "running"/"queued"). Pushed in by
+        # :meth:`note_enhancing`: the show knows what it asked for, and only
+        # the side holding the jobs knows which of them is on the GPU.
+        self._enhance_status: dict[str, str] = {}
         self._on_star = on_star
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
         # Space goes to the gallery's one OSR2 switch rather than straight to
@@ -480,6 +490,7 @@ class SlideshowView(QWidget):
         what's on it.
         """
         self._enhancing.discard(prompt_id)
+        self._enhance_status.pop(prompt_id, None)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._level_base = None  # its versions are a level deeper now
@@ -488,6 +499,28 @@ class SlideshowView(QWidget):
                 self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
         self._refresh_note()
+
+    def note_enhancing(self, statuses: dict) -> None:
+        """How every enhancement in flight is going, as the gallery reads it:
+        ``prompt_id`` -> ``"running"`` or ``"queued"``.
+
+        Pushed in whenever it changes rather than asked for, because the show has
+        no way to tell: a hold launches a run and hears only that one started,
+        and a show of held slides has a line of them out at once with ComfyUI
+        working through it one at a time. Without this the note claimed every one
+        of them was being made the moment it was asked for.
+
+        Carries every run in flight, not only the ones this show asked for —
+        which of them the corner speaks for is :meth:`_refresh_note`'s call, and
+        the ones it doesn't cost a dict entry each.
+        """
+        if statuses == self._enhance_status:
+            return
+        self._enhance_status = dict(statuses)
+        # Not over a flash: a status arriving mid-sentence would wipe the answer
+        # to a spoken command. The flash's own timer refreshes on the way out.
+        if not self._note_timer.isActive():
+            self._refresh_note()
 
     def _current_prompt_id(self):
         """The id of the item on screen, or ``None`` — a playlist assembled
@@ -513,8 +546,9 @@ class SlideshowView(QWidget):
 
     def note_voice_run(self, prompt_id, message: str) -> None:
         """Say what a spoken order did and, when it launched a run
-        (``prompt_id``), keep the note reading Enhancing… once the flash
-        fades — the same note a hold's enhance earns."""
+        (``prompt_id``), keep the note on that run once the flash fades — the
+        same note a hold's enhance earns, and it reads the same way: where the
+        run has got to, not merely that one was asked for."""
         if prompt_id is not None:
             self._enhancing.add(prompt_id)
         self.note_voice_command(message)
@@ -527,8 +561,9 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         """Say what there is to say about the item on screen: the request being
-        spoken (which holds the show, so it outranks the rest), that a version of
-        it is cooking, or — failing those — which of its versions this one is.
+        spoken (which holds the show, so it outranks the rest), where the version
+        being made of it has got to, or — failing those — which of its versions
+        this one is.
 
         Stepping levels is invisible without the last line: two versions of one
         picture differ by texture, which is exactly what you cannot tell apart
@@ -539,7 +574,14 @@ class SlideshowView(QWidget):
             return
         prompt_id = self._current_prompt_id()
         if prompt_id is not None and prompt_id in self._enhancing:
-            self._show_note("Enhancing…")
+            # Being made, or still in the line — an ask made minutes ago on a
+            # slide the show has come back around to is usually the latter, and
+            # "Enhancing…" over a run nobody has started yet is simply wrong
+            # about the picture being looked at. A run nothing has been said
+            # about counts as waiting: the ask is what has happened to it so far.
+            self._show_note(_ENHANCING
+                            if self._enhance_status.get(prompt_id) == "running"
+                            else _ENHANCE_QUEUED)
             return
         levels = self._levels_by_path.get(self._level_base or self._current_base()) or []
         if len(levels) <= 1:

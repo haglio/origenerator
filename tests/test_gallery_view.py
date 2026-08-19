@@ -6657,6 +6657,132 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     assert view._queue.running_preview()._caption.text() == ""
 
 
+def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
+    # The price and the kind: the two things about a job that are true before it
+    # starts, and what a line of waiting work is read for.
+    db = FakeDB([
+        _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=120.0),
+    ])
+    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = view._inflight_items()[0]
+    assert item.job_kind == "I2V"
+    assert item.typical_seconds == 120.0
+
+
+def test_a_job_a_spoken_request_queued_says_so(qtbot):
+    # The one kind of job launched without looking at a form, and so the one
+    # hardest to recognize later in the line.
+    db = FakeDB([_image("src", "a kite", 50, 1)])
+    db.add(_running_row("asked", prompt="a kite, no string"))
+    db.record_request(prompt_id="asked", source_prompt_id="src", heard="no string")
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["asked"].requested
+
+
+def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
+    db = FakeDB([_image("src", "a kite", 50, 1)])
+    db.add(_running_row("typed", prompt="a kite"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert not view._inflight_items()[0].requested
+
+
+def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
+    # Its row shows that picture: two i2v runs off one recipe are the same
+    # caption and differ only in the frame.
+    db = FakeDB([])
+    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+
+
+def test_an_enhancement_carries_the_picture_it_is_a_second_pass_over(qtbot):
+    # Same relation as a video's start frame: the image it is *of* is the whole
+    # of what one enhancement in the line has to distinguish it from another.
+    db = FakeDB([])
+    db.add(_row("en1", "image_enhance", {"input_image": "kite_00007_.png [output]"},
+                "en1.png", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+
+
+def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
+    # A pose transfer reads a structure image, but what it is making is an image
+    # like any other — so its row is placed the way every image's is.
+    db = FakeDB([])
+    db.add(_row("pt1", "sdxl_pose_transfer", {"input_image": "pose_00002_.png [output]"},
+                "pt1.png", status="running", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = view._inflight_items()[0]
+    assert item.job_kind == "Image"
+    assert item.source_image is None
+
+
+def test_a_job_started_from_words_alone_names_no_frame(qtbot):
+    db = FakeDB([_image("done", "a kite", 50, 1)])
+    db.add(_running_row("gen1", prompt="a kite"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["gen1"].source_image is None
+
+
+def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
+    # Its own output is the one picture it cannot show, so its row is placed by
+    # what the same settings made last time — newest first, four at most.
+    settings = {"positive_prompt": "a kite", "steps": 50}
+    db = FakeDB([])
+    for i in range(6):  # oldest first, so the listing hands them back newest first
+        db.add(_row(f"done{i}", "sdxl_t2i", {**settings, "seed": i}, f"done{i}.png",
+                    thumbnail_path=f"thumbs/done{i}.jpg"))
+    db.add(_row("waiting", "sdxl_t2i", {**settings, "seed": 99}, "waiting.png",
+                status="pending", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["waiting"].folder_thumbnails == (
+        "thumbs/done5.jpg", "thumbs/done4.jpg", "thumbs/done3.jpg", "thumbs/done2.jpg",
+    )
+
+
+def test_the_first_run_of_a_new_recipe_has_no_folder_to_show(qtbot):
+    # Nothing has landed there yet, so there is no folder in the tree at all —
+    # and the row draws no block rather than an empty grid.
+    db = FakeDB([_image("elsewhere", "a boat", 50, 1)])
+    db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "a kite", "steps": 12},
+                "waiting.png", status="pending", output_files="[]"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    items = {it.key: it for it in view._inflight_items()}
+    assert items["waiting"].folder_thumbnails == ()
+
+
 def _running_folder_key(view):
     """The settings-folder key the running wan22_i2v row above lands in."""
     return gallery.settings_folder_key(

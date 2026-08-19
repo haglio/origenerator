@@ -35,6 +35,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_LABEL, RECENTS_LABEL, REQUESTS_LABEL, STARRED_LABEL, TRASH_LABEL,
 )
@@ -124,6 +125,11 @@ def _inflight_signature(items) -> tuple:
     """The identity of the in-flight set — its job keys — so a frame-only change
     refreshes cards in place while an added or removed job forces a re-render."""
     return tuple(sorted(it.key for it in items))
+
+
+# The job kinds whose queue row shows what they are made from rather than what
+# their folder holds (:func:`gallery.job_kind_label`).
+SOURCE_FRAME_KINDS = ("I2V", "Enhance")
 
 
 class BrowserPane:
@@ -586,6 +592,11 @@ class BrowserPane:
         whether a drag moved one. A row the line holds no job for — one a restart
         hasn't re-adopted — sorts to the back rather than jumping the queue on
         screen.
+
+        The strip's rows carry more than the shelf's cards do — a price, a kind, a
+        picture of what the job is made from or of the folder it will land in —
+        and all of it is read off the row and the tree already in hand, so a poll
+        costs one listing whatever the queue is showing.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._v._reroll.jobs_by_folder.items()
@@ -593,8 +604,12 @@ class BrowserPane:
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
         held = {job.prompt_id for job in self._v._reroll.held_jobs()}
+        # Which of these the user asked for out loud. One listing rather than a
+        # lookup per job: the table is small and the queue rarely is.
+        requested = {r["prompt_id"] for r in self._v._db.list_requests()}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
+        stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
         items = []
         for row in self._v._db.list_generations():
             if row.get("status") not in ("running", "pending"):
@@ -613,11 +628,11 @@ class BrowserPane:
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
             workflow_name = row.get("workflow_name") or ""
+            params = gallery.parse_params(row.get("params_json"))
+            kind = gallery.job_kind_label(workflow_name)
             items.append(InFlightItem(
                 key=pid,
-                caption=gallery.config_tab_title(
-                    workflow_name, gallery.parse_params(row.get("params_json"))
-                ),
+                caption=gallery.config_tab_title(workflow_name, params),
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
                 reveal=lambda k=folder_key: self._reveal_reroll(k),
@@ -631,11 +646,49 @@ class BrowserPane:
                 held=pid in held,
                 started_at=started,
                 typical_seconds=self._typical_seconds(workflow_name, typical),
+                job_kind=kind,
+                requested=pid in requested,
+                # Only where the start frame is what the run is *of*: a video
+                # animating a picture, and an enhancement of one. An image
+                # workflow that happens to take an input (the pose transfer's
+                # structure image) is still an image being made, and its row is
+                # placed the way every other image's is — by the folder it joins.
+                source_image=(params.get("input_image")
+                              if kind in SOURCE_FRAME_KINDS else None),
+                folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
         place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    it.status != "running"))
         return items
+
+    def _folder_thumbnails(self, folder_key: str, cache: dict) -> tuple:
+        """A few thumbnails already in the folder a queued job is headed for.
+
+        What a queued job with no picture of its own can be recognized by: its
+        output doesn't exist yet, but the folder it will join is full of what the
+        same settings made last time. Newest first, since ``list_generations``
+        hands them back that way and the newest are what the user was just looking
+        at.
+
+        Read off the folder tree the gallery already built rather than by keying
+        every row again — the tree is rebuilt when the rows change, and this runs
+        on every poll. A folder with nothing in it yet (the first run of a new
+        recipe, or an enhancement, whose product folds into the row it enhanced
+        rather than landing anywhere) has no node in the tree at all and answers
+        with nothing, which the row draws as no block rather than an empty grid.
+        ``cache`` memoizes for the length of one pass, since an auto-generate loop
+        fills the line with jobs from a single folder.
+        """
+        if folder_key not in cache:
+            group = self._v._group_for_key(folder_key)
+            rows = gallery.rows_under(group) if group is not None else []
+            # Only what is finished and has a picture — the job asking, and
+            # every other row still in the line, is exactly what has none.
+            cache[folder_key] = tuple(
+                row["thumbnail_path"] for row in rows if row.get("thumbnail_path")
+            )[:FOLDER_CELLS]
+        return cache[folder_key]
 
     def _typical_seconds(self, workflow_name: str, cache: dict):
         """What a whole run of ``workflow_name`` usually takes, for the running

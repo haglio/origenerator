@@ -16,6 +16,8 @@ away, which three panes each draw.
 from dataclasses import dataclass
 from typing import Callable
 
+from origenerator.timing import queue_estimate_label
+
 
 @dataclass
 class InFlightItem:
@@ -37,6 +39,77 @@ class InFlightItem:
     # recent runs say a whole one takes.
     started_at: float | None = None
     typical_seconds: float | None = None
+    # What kind of work this is in one word — "Image", "T2V", "I2V", "Enhance"
+    # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
+    # template for. The workflow's display name is in :attr:`caption` and answers
+    # a different question: which recipe, not what it costs to ask for.
+    job_kind: str = ""
+    # A spoken "Request … over" queued this one, rather than a press of Generate
+    # or an auto-generate loop. Worth its own mark: it is the one kind of job the
+    # user launched without looking at a form, and so the one they are most
+    # likely to find in the line without recognizing it.
+    requested: bool = False
+    # The start frame this run is built from, as its ``LoadImage`` reference —
+    # what an i2v (and an enhance) is *of*. Its picture is the fastest way to
+    # tell two queued videos apart, their captions being their shared recipe.
+    source_image: str | None = None
+    # Up to four thumbnail files from the folder this job will land in — what a
+    # run with no picture of its own can be recognized by, its own output being
+    # the thing that doesn't exist yet.
+    folder_thumbnails: tuple = ()
+
+
+def queue_lead_text(item: InFlightItem) -> str:
+    """The head of a queue row: what the job costs, what it is, and who asked.
+
+    ``"~2 min · I2V · Auto · Request"``. Everything here is a fact about the job
+    that is true before it starts, which is what a line of waiting work is read
+    for — the price first, because that is what "how long until my turn" is added
+    up out of, and because it is the one figure that makes a queue of four videos
+    read differently from a queue of four pictures.
+
+    The two marks at the end are only ever *added*: a job nobody typed a prompt
+    for is the kind that piles up unnoticed (an auto-generate loop makes one
+    every few seconds), and a spoken request is the kind that is easy not to
+    recognize later. A hand-launched job says neither, and needs to say neither.
+    """
+    parts = [queue_estimate_label(item.typical_seconds)]
+    if item.job_kind:
+        parts.append(item.job_kind)
+    if item.auto_generating:
+        parts.append("Auto")
+    if item.requested:
+        parts.append("Request")
+    return " · ".join(parts)
+
+
+def queue_lead_tooltip(item: InFlightItem) -> str:
+    """The hover line spelling out :func:`queue_lead_text`, which is abbreviated.
+
+    "I2V" and a bare "~?" are shorthand a row has the width for and a first-time
+    reader has no way to expand, so the long form lives one hover away.
+    """
+    if item.typical_seconds is None:
+        lines = ["No timing data for this workflow yet"]
+    else:
+        lines = [f"About {queue_estimate_label(item.typical_seconds).lstrip('~')}"
+                 " on this workflow's recent runs"]
+    lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
+    if item.auto_generating:
+        lines.append("Queued by its folder's auto-generate loop")
+    if item.requested:
+        lines.append("Queued by a spoken request")
+    return "\n".join(lines)
+
+
+# What each of :func:`gallery.job_kind_label`'s four words means, spelled out for
+# the hover. An unregistered workflow's "" has no entry and contributes no line.
+_KIND_TOOLTIPS = {
+    "Image": "An image",
+    "T2V": "A video from the prompt alone",
+    "I2V": "A video from a start frame",
+    "Enhance": "An enhancement of an image already made",
+}
 
 
 def discard_run_text(auto_generating: bool) -> str:

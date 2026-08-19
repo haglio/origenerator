@@ -20,6 +20,7 @@ from origenerator.gallery import (
     folder_id,
     folder_level,
     is_renamable,
+    job_kind_label,
     find_source_image_id,
     media_type_of_row,
     lora_label,
@@ -82,6 +83,32 @@ def test_config_tab_title_is_just_the_model_without_a_prompt():
 
 def test_config_tab_title_handles_unknown_workflow():
     assert config_tab_title("nope", {}) == "nope"
+
+
+def test_job_kind_separates_a_video_from_a_picture():
+    # What the queue's rows lead with, because it is what a job costs: seconds
+    # against minutes.
+    assert job_kind_label("sdxl_t2i") == "Image"
+    assert job_kind_label("wan22_i2v") == "I2V"
+
+
+def test_job_kind_separates_the_two_kinds_of_video():
+    # A video off a start frame can't start until that frame exists; one off the
+    # prompt alone can start now. Same length of run, different thing to queue.
+    assert job_kind_label("wan22_flf2v_loop") == "I2V"
+
+
+def test_an_enhancement_is_its_own_kind_of_job():
+    # It outputs an image from an image, so neither "Image" nor "I2V" says what
+    # it is: a second pass over something already made.
+    assert job_kind_label("image_enhance") == "Enhance"
+
+
+def test_an_unregistered_workflow_claims_no_kind():
+    # An old import this build has no template for. A row saying nothing is read
+    # as unknown; one guessing "Image" at a video is read, wrongly, as seconds.
+    assert job_kind_label("nope") == ""
+    assert job_kind_label(None) == ""
 
 
 def _row(**kw):

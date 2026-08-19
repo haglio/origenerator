@@ -12,6 +12,7 @@ name, which the tree and the folder tiles show on hover.
 
 import json
 
+from origenerator.gallery.enhance import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
@@ -20,6 +21,7 @@ from origenerator.gallery.signatures import (
     _named_loras,
     _registered,
     _unannotated,
+    is_image_conditioned,
     settings_only,
     workflow_lora_keys,
     workflow_model_keys,
@@ -128,6 +130,30 @@ def config_folder_name(workflow_name: str, signature: str,
                        workflow_name, signature)
     meta = (folder_meta or {}).get(key) or {}
     return meta.get("custom_name") or folder_id(key)
+
+
+def job_kind_label(workflow_name: str | None) -> str:
+    """What kind of work a run of ``workflow_name`` is, in the queue's vocabulary.
+
+    Four answers, because they are what a queued job costs and what it needs
+    before it can start: an "Image" is seconds, a "T2V" is minutes out of words
+    alone, an "I2V" is minutes out of a picture that has to exist first, and an
+    "Enhance" is a second pass over something already made. The workflow's own
+    display name is beside this in the row and answers none of them — "WAN 2.2
+    FLF2V Loop" and "WAN 2.2 I2V" are the same kind of ask, at the same price.
+
+    ``""`` for a workflow this build doesn't have registered — an old import,
+    say. A row that says nothing about its kind is read as unknown; one that
+    guesses "Image" at a video is read, wrongly, as seconds away.
+    """
+    if workflow_name == ENHANCE_WORKFLOW:
+        return "Enhance"
+    output_type = workflow_output_type(workflow_name)
+    if output_type is None:
+        return ""
+    if output_type == "video":
+        return "I2V" if is_image_conditioned(workflow_name) else "T2V"
+    return "Image"
 
 
 def _short_value(value) -> str:

@@ -1174,6 +1174,10 @@ class GalleryView(QWidget):
         # stretch when nobody is waiting on a video. The queue holds them until it
         # closes and keeps making images.
         self._reroll.hold_videos(True)
+        # And say so at once rather than a poll later: the hold is this opening's
+        # own doing, so the corner comes up already saying what is waiting on it
+        # rather than blank for a second and a half.
+        self._slideshow.set_queue(self._inflight_items())
         return self._slideshow
 
     def _folder_level_playlists(self) -> dict:
@@ -4369,8 +4373,16 @@ class GalleryView(QWidget):
         """Feed the bottom strip every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
-        Generate rather than after."""
-        self._queue.set_items(self._inflight_items(), self._foreign_queue.total)
+        Generate rather than after.
+
+        An open slideshow is fed the same list: it covers the strip, and it is
+        the one stretch where the line deliberately stops moving, so the queue
+        follows onto the surface that is actually in front of the user.
+        """
+        items = self._inflight_items()
+        self._queue.set_items(items, self._foreign_queue.total)
+        if self._slideshow is not None:
+            self._slideshow.set_queue(items)
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.

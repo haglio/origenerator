@@ -1,8 +1,28 @@
-from PyQt6.QtWidgets import QLabel, QPushButton
+import pytest
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
+from origenerator.gui.stylesheet import build_stylesheet
 
 _LONG = "Show in Explorer"
+
+
+@pytest.fixture(autouse=True)
+def _wearing_the_apps_own_chrome():
+    """Measure these widgets dressed the way the app dresses them.
+
+    Every assertion here is a width against another width, and a stylesheet moves
+    both: bare, a stock button's minimum is 116 px and the eliding one's is the
+    style's own 80 px floor; under the app's sheet they are 132 and 61. So the
+    file used to read whichever chrome the tests before it happened to leave on
+    the application — passing in a full forward run and failing on its own, which
+    says nothing about the widget either way.
+    """
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    yield
+    app.setStyleSheet(prior)
 
 
 def test_it_does_not_hold_a_pane_open_at_its_label(qtbot):

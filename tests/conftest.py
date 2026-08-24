@@ -228,6 +228,26 @@ def _never_take_the_real_device(monkeypatch):
     monkeypatch.setattr(stroke_panel.osr2, "device_on", lambda **_kw: True)
 
 
+def pytest_collection_finish(session):
+    """Take the import graph out of every collection the reap below runs.
+
+    That reap is a full ``gc.collect()`` after each of ~3,280 tests, and nearly
+    everything it walks is import graph — pytest, PyQt6, origenerator and the
+    test modules themselves — which is permanently live and never garbage.
+    ``gc.freeze`` moves it to the permanent generation, which no collection
+    traverses, so each reap costs what the test allocated instead of what the
+    interpreter holds.
+
+    Nothing about reaping changes for what tests build afterwards: a cycle
+    created post-freeze is still promoted through the generations and still
+    reaped by a full collect. Collection-finish is the last moment before any
+    test runs — every test module is imported by then, and pytest-qt's
+    QApplication does not exist yet, so no widget can be frozen alive.
+    """
+    gc.collect()
+    gc.freeze()
+
+
 # The suite's standing tail of deliberately long-lived widgets: measured at
 # 26-27 at the end of identical full runs. Growth past double that is
 # accumulation — the pile-up the per-test reap below exists to prevent —

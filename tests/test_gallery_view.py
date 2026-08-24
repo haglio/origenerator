@@ -5713,6 +5713,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
 def test_esc_stops_auto_generate(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
+    _keys_are_the_gallerys(view)  # said outright, not inherited from a neighbour
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
@@ -10290,6 +10291,10 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
     from PyQt6.QtWidgets import QApplication, QWidget
     view, _driver, _panel = _osr2_view(qtbot)
+    # Which window Qt calls active is ambient in a test process — a fullscreen
+    # show another test opened and closed can still hold it — so both sides of
+    # the guard are said here rather than inherited.
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
     assert view._other_window_owns_keys() is False  # only the gallery is up
 
     other = QWidget()

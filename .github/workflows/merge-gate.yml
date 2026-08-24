@@ -84,3 +84,22 @@ jobs:
           pip install -e ".[dev]" --config-settings editable_mode=compat
       - name: Run the suite
         run: python -m pytest -q
+      # Again, back to front. Three tests here used to carry information about
+      # collection order rather than about the code -- two read whichever window
+      # Qt happened to call active, one read whichever chrome its neighbours had
+      # left on the application -- and reversing inverts every "this runs before
+      # that" the suite has, so the next such lean goes red where it is
+      # introduced. TEST_COLLECTION_ORDER=shuffle with TEST_COLLECTION_SEED is
+      # the deeper local check (see tests/conftest.py); the gate takes the
+      # deterministic one.
+      #
+      # Not on pull_request: this suite is the family's longest, and a second
+      # pass on every push to a branch would cost more runner time than the leg
+      # is worth. The queue still gates it -- a PR carrying a lean is evicted
+      # rather than merged -- and backlog item 1 (the gen-0 GC fixture) is what
+      # makes running it on every push affordable.
+      - name: Run the suite back to front
+        if: github.event_name != 'pull_request'
+        env:
+          TEST_COLLECTION_ORDER: reverse
+        run: python -m pytest -q

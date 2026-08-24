@@ -27,7 +27,8 @@ import os
 import struct
 
 import pytest
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal
+from PyQt6.QtWidgets import QApplication
 
 # Render Qt offscreen for the whole suite. Agents run these GUI tests on every
 # commit; without this, each test that shows a widget throws a real window onto
@@ -225,6 +226,51 @@ def _never_take_the_real_device(monkeypatch):
     # the console's own state before it could tell — and the tests about the
     # device being off inject their own.
     monkeypatch.setattr(stroke_panel.osr2, "device_on", lambda **_kw: True)
+
+
+# The suite's standing tail of deliberately long-lived widgets: measured at
+# 26-27 at the end of identical full runs. Growth past double that is
+# accumulation — the pile-up the per-test reap below exists to prevent —
+# well before the hundreds it takes to hurt.
+_WIDGET_TAIL_ALLOWANCE = 50
+
+
+def _deliver_the_deletions_already_scheduled():
+    """Carry out Qt's pending ``deleteLater`` deletions now.
+
+    pytest-qt hands each test's registered widgets a ``deleteLater`` at
+    teardown, but a posted DeferredDelete is only delivered once an event loop
+    spins — which a test that never pumps one leaves undone. Until then the C++
+    widget is still allocated and still connected, so the deletion has to be
+    driven rather than waited for: a lone ``pytest tests/test_gallery_view.py``
+    otherwise ends holding 1,048 widgets that are already condemned, and every
+    one of them goes when this runs.
+    """
+    if QApplication.instance() is None:
+        return
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _the_live_widget_count_stays_flat():
+    """The per-test reap's acceptance criterion, asserted: widgets from the
+    run's thousands of built-and-discarded panels must not accumulate.
+
+    Sampled after the pending deletions are delivered and the cycles collected,
+    so what it counts is what something still *holds* — a widget already
+    condemned is not a leak, and a widget nothing can reach is not one either.
+    """
+    before = len(QApplication.allWidgets()) if QApplication.instance() else 0
+    yield
+    if QApplication.instance() is None:
+        return
+    _deliver_the_deletions_already_scheduled()
+    gc.collect()
+    grown = len(QApplication.allWidgets()) - before
+    assert grown <= _WIDGET_TAIL_ALLOWANCE, (
+        f"{grown} more live widgets at session end than at start: the "
+        f"per-test reap is no longer keeping the live object count flat"
+    )
 
 
 @pytest.fixture(autouse=True)

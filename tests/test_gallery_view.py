@@ -1798,14 +1798,74 @@ def _warnings_shown(monkeypatch):
     return said
 
 
-def _trash_shelf_view(qtbot, actions):
-    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
-                       actions=actions)
+def _trash_shelf_view(qtbot, actions, held=(("d1", "a cat"),)):
+    """The Trash shelf open over the deletions given as ``(prompt_id, prompt)``,
+    with the first of them picked."""
+    view = GalleryView(
+        _bin_db(held=[(pid, _image(pid, prompt, 50, n))
+                      for n, (pid, prompt) in enumerate(held, start=1)]),
+        actions=actions,
+    )
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-    view._apply_selection("d1", _NO_MOD)
+    view._apply_selection(held[0][0], _NO_MOD)
     return view
+
+
+_TWO_HELD = (("d1", "a cat"), ("d2", "a dog"))
+
+
+def test_a_trash_tiles_menu_carries_the_two_acts_a_deleted_item_has(qtbot, monkeypatch):
+    # The hover corners act on the one tile under the pointer; the menu acts on
+    # the whole pick, which is the only way to answer for a batch at once.
+    view = _trash_shelf_view(qtbot, FakeActions(), held=_TWO_HELD)
+    view._apply_selection("d2", _CTRL)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _right_click(view, "d1")
+
+    assert labels == ["Restore 2 items", "Delete 2 items permanently"]
+
+
+def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, monkeypatch):
+    actions = FakeActions()
+    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)
+    view._apply_selection("d2", _CTRL)
+    picked = view.selected_prompt_ids()
+    _answer_menu(monkeypatch, "Restore 2 items")
+
+    _right_click(view, "d1")
+
+    assert actions.restored == [picked]
+
+
+def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch):
+    # This entry and the tile's own corner are the only two routes in the app that
+    # take files with nothing behind them, so the menu's wiring is not a detail.
+    actions = FakeActions()
+    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)
+    view._apply_selection("d2", _CTRL)
+    picked = view.selected_prompt_ids()
+    _answer_menu(monkeypatch, "Delete 2 items permanently")
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+
+    _right_click(view, "d1")
+
+    assert actions.purged == [picked]
+
+
+def test_right_clicking_an_unpicked_trash_tile_narrows_to_that_one(qtbot, monkeypatch):
+    # Otherwise a menu raised over one tile would answer for a pick somewhere else
+    # on the shelf — and here that means ending the wrong files for good.
+    actions = FakeActions()
+    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)  # d1 is the picked one
+    _answer_menu(monkeypatch, "Restore 1 item")
+
+    _right_click(view, "d2")
+
+    assert actions.restored == [["d2"]]
 
 
 def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(

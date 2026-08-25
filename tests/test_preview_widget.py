@@ -244,6 +244,19 @@ def test_show_image_animates_animated_file(make_preview, tmp_path):
     assert w.is_showing_video() is False  # animated images use the image page
 
 
+def test_an_animated_preview_is_fitted_into_the_pane_without_being_stretched(
+        make_preview, tmp_path):
+    # The hazard this scaling exists for, and the one it was never asked about: a
+    # 4:3 loop stretched to fill a square pane is a different picture from the one
+    # that was made, and the shape is what a viewer notices first.
+    w = make_preview()
+    w._image_label.resize(200, 200)
+
+    w.show_image(_make_animated_gif(tmp_path / "loop.gif"))  # 16 x 12 native
+
+    assert w._image_label.movie().scaledSize() == QSize(200, 150)
+
+
 def test_show_static_image_uses_no_movie(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
@@ -555,25 +568,34 @@ def test_clearing_hides_the_strip(qtbot, tmp_path):
 
 # --- dragging the shown generation out to a combine slot --------------------
 
-class _FakeDrag:
-    """Stands in for QDrag so a test can drive the drag path without the modal,
-    blocking QDrag.exec (and without a real drag loop)."""
+@pytest.fixture
+def drags(monkeypatch):
+    """The drags the preview begins, in the order it began them.
 
-    last = None
+    Stands in for QDrag, whose exec is modal and blocks on a real drag loop. The
+    list is this test's own: the stand-in used to keep its latest instance on the
+    class, where four of these tests read whatever the one before them had left
+    behind — and the video drag passed that way with its own feature broken.
+    """
+    started = []
 
-    def __init__(self, source):
-        self.mime = None
-        self.pixmap = None
-        _FakeDrag.last = self
+    class _Drag:
+        def __init__(self, _source):
+            self.mime = None
+            self.pixmap = None
+            started.append(self)
 
-    def setMimeData(self, mime):
-        self.mime = mime
+        def setMimeData(self, mime):
+            self.mime = mime
 
-    def setPixmap(self, pixmap):
-        self.pixmap = pixmap
+        def setPixmap(self, pixmap):
+            self.pixmap = pixmap
 
-    def exec(self, *args, **kwargs):
-        return None
+        def exec(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr(preview_widget, "QDrag", _Drag)
+    return started
 
 
 def _press(w, x=0, y=0):
@@ -623,8 +645,7 @@ def test_a_transient_view_disarms_the_drag(make_preview, transient):
     assert w._draggable_id is None  # nothing saved to drag out of a transient view
 
 
-def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_path, monkeypatch):
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
+def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_draggable_id("gen1")
@@ -636,14 +657,14 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
 
     assert started == ["gen1"]      # announced so a combine slot lights at drag start
     assert ended == [True]          # and cleared when the gesture ends
-    assert bytes(_FakeDrag.last.mime.data(GENERATION_MIME)).decode() == "gen1"
+    (drag,) = drags
+    assert bytes(drag.mime.data(GENERATION_MIME)).decode() == "gen1"
 
 
 def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
-        qtbot, make_preview, tmp_path, monkeypatch):
+        qtbot, make_preview, tmp_path, drags):
     # The pane fits its picture to its own size, which is far bigger than a drop
     # slot; under the cursor it travels as a thumbnail like every other drag.
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
     w = make_preview()
     w.show()
     w.resize(600, 480)
@@ -656,28 +677,27 @@ def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
 
     _drag_out(w)
 
-    picture = _FakeDrag.last.pixmap
-    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+    (drag,) = drags
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
 
 
-def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, monkeypatch):
+def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, drags):
     # An animated WebP plays through a QMovie, so the label holds no pixmap.
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
     w = make_preview()
     w.show_image(_animated_webp(tmp_path / "a.webp"))
     w.set_draggable_id("gen1")
 
     _drag_out(w)
 
+    (drag,) = drags
     assert w._image_label.pixmap().isNull()  # nothing there to reach for
-    assert not _FakeDrag.last.pixmap.isNull()  # the movie's frame all the same
+    assert not drag.pixmap.isNull()  # the movie's frame all the same
 
 
-def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, monkeypatch):
+def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drags):
     # A video's picture is on the player's surface, in no label at all — the last
     # frame handed to the sink is the only hold on it, and without it a dragged
     # video was the one drag in the app that showed nothing.
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")
     w.set_draggable_id("gen1")
@@ -687,15 +707,14 @@ def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, monk
 
     _drag_out(w)
 
-    picture = _FakeDrag.last.pixmap
-    assert picture is not None and not picture.isNull()
-    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+    (drag,) = drags
+    assert drag.pixmap is not None and not drag.pixmap.isNull()
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
 
 
-def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, monkeypatch):
+def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
     # Dragged before the first frame arrives there is genuinely nothing to show,
     # and that must not stop the drag.
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")
     w.set_draggable_id("gen1")
@@ -704,13 +723,12 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, monkeypatc
 
     _drag_out(w)
 
+    (drag,) = drags
     assert started == ["gen1"]
-    assert _FakeDrag.last.pixmap is None
+    assert drag.pixmap is None
 
 
-def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, monkeypatch):
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
-    _FakeDrag.last = None
+def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))  # shown, but never armed
     started = []
@@ -719,12 +737,10 @@ def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, monkeypatch):
     _drag_out(w)
 
     assert started == []
-    assert _FakeDrag.last is None  # no QDrag was ever built
+    assert drags == []  # no QDrag was ever built
 
 
-def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch):
-    monkeypatch.setattr(preview_widget, "QDrag", _FakeDrag)
-    _FakeDrag.last = None
+def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_draggable_id("gen1")
@@ -732,7 +748,7 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, monkeypatch)
     _press(w, 0, 0)
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
 
-    assert _FakeDrag.last is None
+    assert drags == []
 
 
 # --- the show's slow push into the still -------------------------------------

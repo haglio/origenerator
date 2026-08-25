@@ -18,14 +18,23 @@ from origenerator.comfyui_client import ComfyUIClient
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
 
 
-def test_warming_the_voice_runtimes_survives_any_install(monkeypatch):
+def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(monkeypatch):
     # The warm runs before Qt so ctranslate2/onnxruntime get a clean DLL init
     # (imported after Qt, the first model load is an access violation that
-    # takes the app with it). The extra is optional and a broken install
+    # takes the app with it). So it has to actually reach for them — emptied to a
+    # bare return it ran green. The extra is optional and a broken install
     # raises OSError, not ImportError — neither may cost the boot.
+    real_import = builtins.__import__
+    asked = []
+
+    def recording(name, *args, **kwargs):
+        asked.append(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", recording)
     _warm_voice_runtimes()  # whatever this machine actually has
 
-    real_import = builtins.__import__
+    assert {"ctranslate2", "onnxruntime"} <= set(asked)
 
     def broken(name, *args, **kwargs):
         if name in ("onnxruntime", "ctranslate2"):
@@ -398,3 +407,187 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
                   "--width", "700", "--height", "900"])
 
     mock_loading.assert_not_called()
+
+
+# --- the launch over a library of our own -------------------------------------
+#
+# The tests above hand main a MagicMock database, whose every query answers with
+# an empty iterable — so the boot phases their patch chain does not name run over
+# nothing at all and are asserted by nothing. Four separate mutations to main
+# survived them: the folder-bookmark reconcile deleted, the duration backfill's
+# result thrown away, a branch preview sweeping the LIVE install's recovery bin,
+# and the branch database never seeded. These boot the same main over a real
+# database under tmp_path and read each phase's effect off it afterwards.
+
+@pytest.fixture
+def library(tmp_path, monkeypatch):
+    """Point every path the launch reads at tmp_path, and hand back its database.
+
+    Also what keeps these tests out of the checkout's own state/ directory, which
+    is where the launch writes its log, its trash and its database by default.
+    """
+    from origenerator import config
+
+    state = tmp_path / "state"
+    for name, path in (("STATE_DIR", state),
+                       ("COMFYUI_OUTPUT_DIR", tmp_path / "output"),
+                       ("COMFYUI_LOG_DIR", tmp_path / "logs"),
+                       ("THUMB_DIR", tmp_path / "thumbs"),
+                       ("PROJECT_DIR", tmp_path / "checkout")):
+        path.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config, name, path)
+    monkeypatch.setattr(config, "DB_PATH", state / "origenerator.db")
+    monkeypatch.setattr(config, "UI_STATE_PATH", state / "ui.json")
+    return config.DB_PATH
+
+
+def _boot(library_path, argv=()):
+    """Run the launch, patching only the boundary: the splash, the window, and
+    ComfyUI. Every maintenance pass runs for real."""
+    from origenerator.db import Database
+
+    with patch("origenerator.app._init_windows_taskbar_identity"), \
+         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.main_window.OrigeneratorWindow"), \
+         patch("origenerator.app._ensure_comfyui_server"), \
+         patch("origenerator.comfyui_client.ComfyUIClient"), \
+         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+        with pytest.raises(SystemExit):
+            main(list(argv))
+    return Database(library_path)
+
+
+def _completed_image(db, prompt_id, **params):
+    """One finished SDXL image in the library, fabricated whole."""
+    import json
+
+    values = {"positive_prompt": "a paper boat", "steps": 30, "seed": 1, **params}
+    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json=json.dumps(values),
+                         workflow_json="{}")
+    db.update_generation(
+        prompt_id, status="completed",
+        output_files=json.dumps([{"filename": f"sdxl_t2i_{prompt_id}.png",
+                                  "subfolder": "image"}]),
+    )
+    return db.get_generation(prompt_id)
+
+
+def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
+    # QToolTip popups are top-level widgets: a window-level sheet never reaches
+    # them, which is exactly how every tooltip in the app went missing once. It
+    # has to be the QApplication, and it has to be here — asserted by reading the
+    # sheet back off the application, because the same call sitting in a comment
+    # reads identically to anything that only greps app.py for the line.
+    from origenerator.gui.stylesheet import build_stylesheet
+
+    qapp.setStyleSheet("")
+
+    _boot(library)
+
+    assert qapp.styleSheet() == build_stylesheet()
+
+
+def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
+    # The reconcile is why a star survives a change to the key formula. Deleting
+    # both its calls left the boot tests green, and the star would simply be gone
+    # from the folder the user put it on.
+    from origenerator import gallery
+    from origenerator.db import Database
+
+    row = _completed_image(Database(library), "p1")
+    legacy = gallery.legacy_settings_folder_key(row)
+    Database(library).set_folder_starred(legacy, True)
+
+    db = _boot(library)
+
+    meta = db.folder_meta_map()
+    assert meta.get(gallery.settings_folder_key(row), {}).get("starred") is True
+    assert legacy not in meta  # and the stale key is not left behind beside it
+
+
+def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
+    # Estimates have no history to draw on until this runs, and throwing its
+    # result away left the boot tests green.
+    from datetime import datetime, timezone
+
+    from origenerator import config
+    from origenerator.db import Database
+
+    db = Database(library)
+    db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
+                         workflow_version="imported", params_json="{}",
+                         workflow_json="{}", source="imported")
+    finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
+    db.update_generation(
+        "p1", status="completed",
+        completed_at=datetime.fromtimestamp(finished, tz=timezone.utc).isoformat())
+    (config.COMFYUI_LOG_DIR / "comfyui.log").write_text(
+        "[2026-06-29 12:20:53.244] Prompt executed in 15.26 seconds\n",
+        encoding="utf-8")
+
+    db = _boot(library)
+
+    assert db.get_generation("p1")["duration_seconds"] == 15.26
+
+
+def _held_deletion(library_path, prompt_id, *, days_ago):
+    """A deletion held ``days_ago`` days — old enough to be swept, or not."""
+    import json
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+
+    from origenerator.db import Database
+
+    db = Database(library_path)
+    row = _completed_image(db, prompt_id)
+    db.delete_generation(prompt_id)
+    db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
+    then = (datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(library_path) as conn:
+        conn.execute("UPDATE deletions SET deleted_at = ?", (then,))
+
+
+def test_the_launch_ends_a_deletion_that_has_outlived_its_window(qapp, library):
+    _held_deletion(library, "p1", days_ago=61)
+
+    db = _boot(library)
+
+    assert db.list_deletions() == []  # the "60 days, then it's really gone" half
+
+
+def test_a_branch_preview_sweeps_nothing_out_of_the_recovery_bin(
+        qapp, library, monkeypatch):
+    # A preview's database is a copy, so every deletion it inherits points at the
+    # LIVE install's held files: purging one from here takes the only copy of
+    # something the running app is still showing. Letting the sweep run anyway
+    # left the boot tests green.
+    from origenerator.branch_session import ENV_FLAG
+
+    _held_deletion(library, "p1", days_ago=61)
+    monkeypatch.setenv(ENV_FLAG, "1")
+
+    db = _boot(library)
+
+    assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
+
+
+def test_a_branch_preview_starts_from_the_live_installs_library(
+        qapp, library, monkeypatch, tmp_path):
+    # Without the seed the preview comes up on an empty database with no library
+    # at all, and there is nothing in it to judge the branch by. Skipping the seed
+    # left the boot tests green.
+    from origenerator import config
+    from origenerator.branch_session import ENV_FLAG
+    from origenerator.db import Database
+
+    primary = tmp_path / "primary"
+    _completed_image(Database(primary / "state" / library.name), "live-1")
+    monkeypatch.setattr(config, "project_dir", lambda name, *a, **kw: primary)
+    monkeypatch.setenv(ENV_FLAG, "1")
+    assert not library.exists()  # the preview has no database of its own yet
+
+    db = _boot(library)
+
+    assert [row["prompt_id"] for row in db.list_generations()] == ["live-1"]

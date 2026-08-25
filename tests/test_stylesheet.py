@@ -48,15 +48,12 @@ def test_stylesheet_styles_tooltips():
     assert "border-radius" not in tooltip_rule
 
 
-def test_the_launch_applies_the_stylesheet_to_the_application():
-    # QToolTip popups are top-level widgets: a window-level stylesheet never
-    # reaches them, which is exactly how every tooltip in the app went missing
-    # once — the QToolTip rule sat inert on the main window. The sheet must be
-    # set on the QApplication, in main().
-    from pathlib import Path
-    app_source = (Path(__file__).resolve().parents[1]
-                  / "origenerator" / "app.py").read_text(encoding="utf-8")
-    assert "app.setStyleSheet(build_stylesheet())" in app_source
+# That the launch applies this sheet to the QApplication — the reason tooltips
+# render at all, since a QToolTip popup is a top-level widget no window-level
+# sheet reaches — is pinned by running the launch and reading the sheet back off
+# the application: tests/test_app.py, test_the_launch_dresses_the_application_in_
+# the_stylesheet. It used to be asserted by grepping app.py for the call, which
+# holds just as well with that call sitting in a comment.
 
 
 def test_stylesheet_styles_collapsible_section_headers():

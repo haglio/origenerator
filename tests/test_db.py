@@ -1,6 +1,8 @@
 import json
 import sqlite3
 
+import pytest
+
 from origenerator.db import Database
 
 
@@ -104,10 +106,13 @@ def test_update_generation_stores_duration_seconds(tmp_path):
     assert row["duration_seconds"] == 15.26
 
 
-def test_opening_db_without_duration_column_migrates_it(tmp_path):
-    db_path = tmp_path / "old.db"
-    # Faithful pre-duration_seconds schema: everything the table has had since
-    # the start, minus the column this migration adds.
+def _database_as_first_written(db_path):
+    """A database with the two tables as this app first wrote them, before any
+    column was added to either — and one generation already in it.
+
+    Every column since is patched in by ``Database._migrate``, whose whole job is
+    that a user's own library, made against this schema, still opens.
+    """
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -125,15 +130,54 @@ def test_opening_db_without_duration_column_migrates_it(tmp_path):
         " completed_at TEXT)"
     )
     conn.execute(
+        "CREATE TABLE folder_meta ("
+        " folder_key TEXT PRIMARY KEY,"
+        " custom_name TEXT,"
+        " starred INTEGER NOT NULL DEFAULT 0)"
+    )
+    conn.execute(
         "INSERT INTO generations"
         " (prompt_id, workflow_name, workflow_version, params_json, workflow_json)"
         " VALUES ('old-001', 'sdxl_t2i', 'v002', '{}', '{}')"
     )
     conn.commit()
     conn.close()
+    return db_path
 
-    db = Database(db_path)
+
+def _columns(db_path, table):
+    with sqlite3.connect(db_path) as conn:
+        return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+# Every column the two tables have grown since. Seven of these could be dropped
+# from the migration with the whole suite still green, and each one dropped is a
+# user's own library failing to open on the next launch.
+@pytest.mark.parametrize("column", [
+    "duration_seconds", "evolver_exported_at", "genau_exported_at",
+    "genau_requested_at", "progress_json", "starred", "experiment_verdict",
+    "original_files", "enhance_history", "recipe_category", "recipe_video_id",
+])
+def test_an_early_database_gains_every_generations_column(tmp_path, column):
+    Database(_database_as_first_written(tmp_path / "old.db"))
+
+    assert column in _columns(tmp_path / "old.db", "generations")
+
+
+@pytest.mark.parametrize("column", ["level", "ref_prompt_id"])
+def test_an_early_database_gains_every_folder_meta_column(tmp_path, column):
+    Database(_database_as_first_written(tmp_path / "old.db"))
+
+    assert column in _columns(tmp_path / "old.db", "folder_meta")
+
+
+def test_the_generations_already_there_survive_the_migration(tmp_path):
+    # The point of patching columns in rather than recreating the table: what the
+    # user already made stays, and the new columns are writable on it.
+    db = Database(_database_as_first_written(tmp_path / "old.db"))
+
     db.update_generation("old-001", duration_seconds=9.5)
+
     assert db.get_generation("old-001")["duration_seconds"] == 9.5
 
 

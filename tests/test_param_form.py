@@ -475,6 +475,29 @@ def test_param_form_set_values_updates_widgets(qtbot, sample_defs):
     assert vals["sampler"] == "dpm"
 
 
+def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
+    # A LoRA strength of 0.85 rounded to 0.8 by the field's own precision is a
+    # different render, and it is what goes back into the database as the recipe.
+    form = ParamForm(sample_defs)
+    qtbot.addWidget(form)
+
+    form.set_values({"cfg": 0.85})
+
+    assert form.get_values()["cfg"] == 0.85
+
+
+def test_a_number_field_with_no_stated_ceiling_takes_a_large_value(qtbot):
+    # A param that names no maximum is bounded only by the form's fallback, so
+    # that fallback is what "unbounded" means here — set low, the field silently
+    # rewrites what the user typed.
+    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
+    qtbot.addWidget(form)
+
+    form.set_values({"steps": 5000})
+
+    assert form.get_values()["steps"] == 5000
+
+
 def test_set_values_preserves_params_without_a_field(qtbot, sample_defs):
     # A reused config carries params this form has no widget for — a workflow's
     # hidden VAE/CLIP settings. The form must echo them back unchanged (in both

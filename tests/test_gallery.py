@@ -1,6 +1,8 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 from origenerator.gallery import (
     ALL_KEY,
     AllGroup,
@@ -209,6 +211,27 @@ def test_settings_signature_ignores_the_audio_seed_like_the_sampler_seeds():
     a = json.dumps({"positive_prompt": "a wave", "audio_seed": 1})
     b = json.dumps({"positive_prompt": "a wave", "audio_seed": 2})
     assert settings_signature("wan22_i2v", a, {}) == settings_signature("wan22_i2v", b, {})
+
+
+@pytest.mark.parametrize("key, one, other", [
+    ("audio_seed", 1, 2),
+    ("enhance", False, True),
+    ("enhance_scale", 2.0, 4.0),
+    ("enhance_steps", 20, 40),
+    ("enhance_denoise", 0.2, 0.5),
+])
+def test_an_import_keeps_one_folder_however_this_param_varies(key, one, other):
+    """The two static key sets are only ever the answer for a row with no
+    registered workflow, and every test that names one of these behaviours passes
+    a registered name — which derives its keys from the template instead. So a
+    member dropped from either set shows up here or nowhere, and an imported row
+    would start splitting its folder by the foley seed, or by how hard it was
+    upscaled after the fact.
+    """
+    def params(value):
+        return json.dumps({"positive_prompt": "a lighthouse", key: value})
+
+    assert settings_signature(None, params(one)) == settings_signature(None, params(other))
 
 
 def test_settings_signature_drops_input_image_for_an_unknown_workflow():

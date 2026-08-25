@@ -1778,6 +1778,78 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     assert actions.purged == [["d1"]]
 
 
+class _FailingActions(FakeActions):
+    """Actions whose trash operations cannot complete — a trash folder moved out
+    from under the app, a file the OS will not give back."""
+
+    def restore_deleted(self, prompt_ids):
+        raise OSError("the trash folder is gone")
+
+    def purge_deleted(self, prompt_ids):
+        raise OSError("the trash folder is gone")
+
+
+def _warnings_shown(monkeypatch):
+    """Collect what a warning box would have said, instead of opening one."""
+    said = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        staticmethod(lambda parent, title, text, *a, **kw: said.append((title, text))),
+    )
+    return said
+
+
+def _trash_shelf_view(qtbot, actions):
+    view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
+                       actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._apply_selection("d1", _NO_MOD)
+    return view
+
+
+def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
+        qtbot, monkeypatch):
+    # The arm that has never rendered once: a restore that throws must reach the
+    # user as a sentence, not as a shelf that quietly did nothing.
+    view = _trash_shelf_view(qtbot, _FailingActions())
+    said = _warnings_shown(monkeypatch)
+
+    view.restore_from_trash(["d1"])
+
+    assert said == [("Restore failed",
+                     "Could not restore the selected item(s):\n\nthe trash folder is gone")]
+    assert view.selected_prompt_ids() == ["d1"]  # not cleared, as a success clears it
+
+
+def test_a_purge_that_cannot_finish_says_why_and_keeps_the_item_picked(
+        qtbot, monkeypatch):
+    view = _trash_shelf_view(qtbot, _FailingActions())
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+    said = _warnings_shown(monkeypatch)
+
+    view.purge_from_trash(["d1"])
+
+    assert said == [("Delete failed",
+                     "Could not permanently delete the selected item(s):"
+                     "\n\nthe trash folder is gone")]
+    assert view.selected_prompt_ids() == ["d1"]
+
+
+def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
+    # A "Permanently delete 0 items?" prompt would be the app asking the user to
+    # confirm nothing; the confirmation is never reached (this test would trip the
+    # suite's no-unanswered-dialog guard if it were).
+    actions = _FailingActions()  # so much as touching them here would raise
+    view = _trash_shelf_view(qtbot, actions)
+
+    view.restore_from_trash([])
+    view.purge_from_trash([])
+
+    assert actions.restored == [] and actions.purged == []
+
+
 def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
     # The picked items are already deleted, so the button's one remaining
     # meaning is "for good" — rather than a live-looking control doing nothing.
@@ -4672,6 +4744,22 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
     assert actions.deleted == []  # only folders inside a workflow may go
 
 
+def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatch):
+    # A tree row's own trash control, which reaches a delete without passing
+    # through the toolbar button or any menu.
+    actions = FakeActions()
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _image_workflow(view._tree).child(0).child(0)
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+
+    view._tree.delete_clicked.emit(_key(lora.child(0)))
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}  # that row's folder
+
+
 def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
     actions = FakeActions()
     # Two settings groups (cat, dog) share one model -> a single model folder.
@@ -5593,6 +5681,23 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     assert "open a settings folder" in view._auto_btn.toolTip()
 
 
+def test_the_switchs_tip_takes_you_to_whichever_folder_is_looping(qtbot, tmp_path):
+    # The tip is only offered while the loop is somewhere other than the folder on
+    # screen, and being taken there is the whole of what it is for — naming the
+    # folder would be no help, since the names are long and alike.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
+    assert _selected_folder(view) != key
+
+    view._auto_tip.link_activated.emit("looping")
+
+    assert _selected_folder(view) == key
+
+
 # --- a tab's Generate is a re-roll of its folder, navigated to at once ---------
 
 def _generate_in_current_tab(view, positive_prompt, seed):
@@ -5733,6 +5838,29 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
 
     view._mic_btn.setChecked(False)
     assert view._voice_status.isHidden()
+
+
+def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
+    """The caption holds an utterance for a beat and then reverts — to "Listening"
+    while the mic is still open, and to nothing at all once it is closed."""
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._mic_btn.setChecked(True)
+    view._voice.heard.emit("no hat")
+
+    view._voice_status_timer.timeout.emit()  # the beat is up
+
+    assert view._voice_status.text() == "🎤 Listening…"
+    assert not view._voice_status.isHidden()
+
+    view._mic_btn.setChecked(False)
+    view._show_voice_status("🎤 nothing here to enhance", transient=True)
+
+    view._voice_status_timer.timeout.emit()
+
+    assert view._voice_status.isHidden()  # no mic open, so nothing to say
 
 
 def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
@@ -10368,6 +10496,17 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     other = QWidget()
     qtbot.addWidget(other)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
+    assert view._other_window_owns_keys() is True
+
+    # And a dialog or a combo's dropdown with no window of its own behind it: the
+    # filter is installed on the application, so without this it eats the keys the
+    # popup was opened to take.
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
+    monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: other))
+    assert view._other_window_owns_keys() is True
+
+    monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: None))
+    monkeypatch.setattr(QApplication, "activeModalWidget", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
 
 

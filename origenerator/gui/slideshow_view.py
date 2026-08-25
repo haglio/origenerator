@@ -246,6 +246,9 @@ class SlideshowView(QWidget):
         # What the corner reads while a spoken request holds the show; empty
         # whenever nothing is being dictated.
         self._request_note = ""
+        # And what it reads afterwards, while the request said is still being
+        # worked out — held rather than flashed, and cleared by the answer.
+        self._working_note = ""
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
@@ -914,9 +917,22 @@ class SlideshowView(QWidget):
             if not self._playlist.locked:
                 self._rearm_dwell()
 
-    def note_request(self, message: str) -> None:
-        """Say what a spoken request did, where the speaker is looking."""
-        self._flash_note(message, ms=3000)
+    def note_request(self, message: str, *, working: bool = False) -> None:
+        """Say what a spoken request did, where the speaker is looking.
+
+        *working* means it hasn't done it yet: the corner holds that line
+        instead of flashing it, because working out what a request changes can
+        mean asking the local LLM which of the prompt's own terms the speaker
+        meant — the case that outlasts a flash — and a corner that empties while
+        the app is still working says the request was dropped when it wasn't.
+        The answer, said the ordinary way, is what releases the hold.
+        """
+        self._working_note = message if working else ""
+        if working:
+            self._note_timer.stop()  # it holds, rather than fading after a beat
+            self._refresh_note()
+        else:
+            self._flash_note(message, ms=3000)
 
     def _rearm_dwell(self) -> None:
         """Start the dwell timer again for the slide already on screen — a
@@ -1054,9 +1070,10 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         """Say what there is to say about the item on screen: the request being
-        spoken (which holds the show, so it outranks the rest), that this slide
-        is still being made, where the version being made of it has got to, or —
-        failing those — which of its versions this one is.
+        spoken (which holds the show, so it outranks the rest), the one already
+        said and still being worked out, that this slide is still being made,
+        where the version being made of it has got to, or — failing those —
+        which of its versions this one is.
 
         Stepping levels is invisible without the last line: two versions of one
         picture differ by texture, which is exactly what you cannot tell apart
@@ -1066,6 +1083,9 @@ class SlideshowView(QWidget):
         """
         if self._request_note:
             self._show_note(self._request_note)
+            return
+        if self._working_note:
+            self._show_note(self._working_note)
             return
         if self._playlist.current_is_live():
             self._show_note(_GENERATING)

@@ -3407,10 +3407,14 @@ class GalleryView(QWidget):
         watching a slideshow — who can see nothing of this window at all, and
         for whom a mic that heard nothing and one that heard the wrong words
         look exactly alike.
+
+        A spoken line, not an answer to a request — which matters while one is
+        being worked out, because the show's corner is holding that work and a
+        line said over it has to fade back to it rather than take its place.
         """
         self._show_voice_status(message, transient=True)
         if self._slideshow is not None:
-            self._slideshow.note_request(message)
+            self._slideshow.note_voice_command(message)
 
     def _sync_auto_button(self):
         """Keep the auto-generate toggle on screen wherever the user is, lit
@@ -4430,12 +4434,18 @@ class GalleryView(QWidget):
         elif spoken.listening:
             self._show_voice_status(note or "🎤 Request…", transient=False)
 
-    def _answer_request(self, show, message: str):
-        """Say what the request did, where the speaker is looking."""
+    def _answer_request(self, show, message: str, *, working: bool = False):
+        """Say what the request did, where the speaker is looking.
+
+        *working* is the one line that is not an answer but a promise of one, so
+        it is held rather than flashed: the working-out may go to the local LLM,
+        and a corner that empties while the app is still at it says the request
+        was dropped. Whatever comes back next releases the hold.
+        """
         if show is not None:
-            show.note_request(message)
+            show.note_request(message, working=working)
         else:
-            self._show_voice_status(message, transient=True)
+            self._show_voice_status(message, transient=not working)
 
     def _begin_request(self, prompt_id: str | None, spoken, side: str | None = None):
         """Start working out what a finished request changes.
@@ -4462,7 +4472,7 @@ class GalleryView(QWidget):
                 show, "🎤 this one can't be re-made, so there's nothing to revise")
             return
         params = filled_params(row, workflow)
-        self._answer_request(show, f"🎤 working out “{spoken.text}”…")
+        self._answer_request(show, f"🎤 working out “{spoken.text}”…", working=True)
         QThreadPool.globalInstance().start(ReviseTask(
             self._revision, (row, workflow, params, spoken, side),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),

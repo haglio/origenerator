@@ -4942,7 +4942,9 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
 
     view._release_held_media([tmp_path / "clip.mp4"])
 
-    view._slideshow.release_media.assert_called_once()
+    # With the paths, not merely called: handing the show an empty list releases
+    # nothing, and Windows then refuses to move the file the delete is about.
+    view._slideshow.release_media.assert_called_once_with([tmp_path / "clip.mp4"])
 
 
 # --- re-roll ("+") tile -----------------------------------------------------
@@ -5122,6 +5124,7 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     view._start_reroll(key)
     view._start_reroll(key)
 
+    assert list(view._reroll_jobs) == [key]  # the second press found one running
     client.submit_job.assert_called_once()
 
 
@@ -7041,7 +7044,7 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     _reroll_tile(view).selected.emit()
 
     view._preview.clear.assert_not_called()
-    view._preview.show_message.assert_called_once()
+    view._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
 
 
 def _waiting_view(qtbot, tmp_path, backlog):
@@ -7876,11 +7879,14 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
+    folder = gallery.settings_folder_key(
+        db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
     view._select_reroll = MagicMock()
 
     view._inflight_items()[0].reveal()
 
-    view._select_reroll.assert_called_once()
+    assert _selected_folder(view) == folder             # the folder it will land in
+    view._select_reroll.assert_called_once_with(folder)  # ...and its live card
 
 
 def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):

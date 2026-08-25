@@ -326,13 +326,13 @@ def test_unlocking_swaps_the_plain_value_for_an_editable_box(qtbot):
 
 
 def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
-    from origenerator.gui.param_form import _LOCK_CLOSED, _LOCK_OPEN
-
+    # The glyphs themselves, not the constants that set them: read back through
+    # those, a toggle wearing the same padlock in both states passes.
     form = _sized_form(qtbot)
     assert form._unlock_btn.isCheckable()
-    assert form._unlock_btn.text() == _LOCK_CLOSED     # locked: a closed padlock
+    assert form._unlock_btn.text() == "🔒"     # locked: a closed padlock
     form._unlock_btn.setChecked(True)
-    assert form._unlock_btn.text() == _LOCK_OPEN        # unlocked: an open one
+    assert form._unlock_btn.text() == "🔓"      # unlocked: an open one
 
 
 def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):

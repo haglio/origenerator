@@ -252,6 +252,35 @@ def _never_take_the_real_device(monkeypatch):
     monkeypatch.setattr(stroke_panel.osr2, "device_on", lambda **_kw: True)
 
 
+@pytest.fixture(autouse=True)
+def _no_dialog_nobody_can_answer(monkeypatch):
+    """Fail on a modal the test never arranged to answer, rather than hang on it.
+
+    A message box or input dialog raised in an offscreen run has nobody to click
+    it: it spins a nested event loop that nothing ever ends, so the test stops
+    dead and holds the merge gate open until GitHub's six-hour limit, with no
+    output naming which test it was. That is worse than the wrong answer in every
+    way, and it is one mis-wired menu entry away at all times — a "Rename…"
+    pointed at the delete's handler asks for confirmation, and there the run
+    stops. Every test that means to reach a dialog answers it with a monkeypatch
+    of its own, which lands over this one.
+    """
+    from PyQt6.QtWidgets import QInputDialog, QMessageBox
+
+    def refuse(name):
+        def blocked(*_args, **_kwargs):
+            raise AssertionError(
+                f"{name} was raised with nothing to answer it. If the dialog is "
+                "the behaviour under test, monkeypatch it in the test."
+            )
+        return staticmethod(blocked)
+
+    for name in ("question", "warning", "information", "critical", "about"):
+        monkeypatch.setattr(QMessageBox, name, refuse(f"QMessageBox.{name}"))
+    for name in ("getText", "getInt", "getDouble", "getItem", "getMultiLineText"):
+        monkeypatch.setattr(QInputDialog, name, refuse(f"QInputDialog.{name}"))
+
+
 def pytest_collection_finish(session):
     """Take the import graph out of every collection the reap below runs.
 

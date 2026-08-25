@@ -33,7 +33,7 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
 )
 from origenerator.gui.orientation import (
-    LANDSCAPE, ORIENTATION_LABELS, base_of, oriented_key,
+    LANDSCAPE, base_of, oriented_key,
 )
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.gui.media_badge import MediaBadge
@@ -7300,7 +7300,7 @@ def test_image_seed_hover_rerolls_only_the_item_image_seed(qtbot, tmp_path):
     view._thumb_widgets["vid"]._corner_buttons[1].click()  # "Randomize image seed"
 
     view._reroll.reroll_image_seed.assert_called_once()
-    _key, row, image_rows = view._reroll.reroll_image_seed.call_args.args
+    _key, row, _image_rows = view._reroll.reroll_image_seed.call_args.args
     assert row["prompt_id"] == "vid"
 
 
@@ -7608,7 +7608,7 @@ def test_open_folder_shows_a_running_generation_via_the_reroll_tile(qtbot, tmp_p
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    key, job = _running_reroll(view)                 # a real re-roll running in the folder
+    _key, job = _running_reroll(view)                 # a real re-roll running in the folder
 
     assert _reroll_tile(view) is not None            # the running generation IS the tile
     assert job.prompt_id not in view._inflight_cards  # not a separate in-flight card
@@ -7638,7 +7638,7 @@ def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    key, job = _running_reroll(view)            # a real re-roll running in the folder
+    _key, job = _running_reroll(view)            # a real re-roll running in the folder
 
     view._rerender_current_leaf()               # redraw the open folder with its live tile
 
@@ -10254,7 +10254,7 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     # A folder that is looping used to answer this gesture with the auto-generate
     # montage — a second slideshow, for a double-click that means "this one,
     # bigger". Watching the frames come in is what fullscreen is for.
-    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     panel = view._info_tabs.current_config_panel()
     panel._preview.show_frame(_png_bytes())  # the loop's generation, streaming
 
@@ -10269,7 +10269,7 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_stroke(qtbot, mon
     # The one switch picks the source, and a script beats the stroke: turning it
     # on over an image strokes, and browsing to a scripted video hands the device
     # to the funscript rather than leaving both streaming at it.
-    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
     view._osr2_driver = driver
     panel = view._info_tabs.current_config_panel()
@@ -10288,7 +10288,7 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_stroke(qtbot, mon
 def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     # The stroke is app-global: dismissing a view must not park the device.
     _resolve_by_id(monkeypatch)
-    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
     # And its Space reaches the one switch, like every other surface's.
@@ -10299,7 +10299,7 @@ def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
 
 
 def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
-    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Esc is the gallery's here — no dialog and no fullscreen view up. Said
     # outright, because which window Qt calls active is ambient in a test process
     # (a fullscreen view another test opened and closed can still hold it).
@@ -10313,7 +10313,7 @@ def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
 def test_the_stroke_keys_work_in_the_main_window_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
-    view, key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_L, _NO_MOD)
     assert view.eventFilter(view, event) is True
@@ -10475,7 +10475,7 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
     # A fullscreen preview or the slideshow is a separate top-level window that uses
     # Esc to close. The gallery's app-wide filter sees Esc first, so it must defer
     # when another window is active rather than swallow Esc to stop the OSR2.
-    from PyQt6.QtWidgets import QApplication, QWidget
+    from PyQt6.QtWidgets import QApplication
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view._osr2_btn.setChecked(True)
@@ -10491,7 +10491,7 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
 def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # The shared guard behind both Esc and Delete: when a separate top-level window
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
-    from PyQt6.QtWidgets import QApplication, QWidget
+    from PyQt6.QtWidgets import QApplication
     view, _driver, _panel = _osr2_view(qtbot)
     # Which window Qt calls active is ambient in a test process — a fullscreen
     # show another test opened and closed can still hold it — so both sides of
@@ -10587,7 +10587,7 @@ def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
 def test_esc_over_the_show_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
                                                                  monkeypatch):
     # A dropdown or dialog opened over the show owns Esc, as it does everywhere.
-    from PyQt6.QtWidgets import QApplication, QWidget
+    from PyQt6.QtWidgets import QApplication
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     show = view._slideshow
     popup = QWidget()
@@ -10724,7 +10724,7 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
     # It holds what it took, not a growing memory of everything ever stopped:
     # something switched on by hand after a stop is all the next press takes
     # away, and all the one after that puts back.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
+    view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     _press_escape(view)
     view._audio_btn.setChecked(True)  # by hand, with everything else still off
 
@@ -10861,7 +10861,7 @@ def _make_folder(view, name, keys):
 
 
 def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
-    view, cat, dog = _two_leaf_view(qtbot)
+    view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
 
     row = _top_level(view._tree)["Favorites"]

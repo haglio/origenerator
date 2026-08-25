@@ -1058,19 +1058,18 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
     # A one-word query over a full library can match most of it, and thousands of
     # tiles in one pass locks the window. The cap is stated rather than silent —
-    # "2,000 results" alone would read as 2,000 tiles you could scroll to.
-    from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
-
-    over = SEARCH_DRAW_LIMIT + 5
-    rows = [_image(f"i{n}", f"a cat number {n}", 50, n) for n in range(over)]
+    # "2,000 results" alone would read as 2,000 tiles you could scroll to. The cap
+    # is written out rather than read from SEARCH_DRAW_LIMIT: taken from the
+    # constant that sets it, this test passes at any cap at all.
+    rows = [_image(f"i{n}", f"a cat number {n}", 50, n) for n in range(205)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
     _search_for(view, "cat")
 
-    assert len(view.visible_prompt_ids()) == SEARCH_DRAW_LIMIT
-    assert f"{over:,} results" in view._search_count.text()
+    assert len(view.visible_prompt_ids()) == 200
+    assert "205 results" in view._search_count.text()
     assert "add a word" in view._search_count.text()
 
 

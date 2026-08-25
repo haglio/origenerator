@@ -185,20 +185,20 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
 
 def test_the_pane_keeps_a_margin_round_its_contents(panel):
     # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the settings down either side, not the button bank at the bottom.
-    from origenerator.gui.generate_config_panel import _PANE_MARGIN
-
+    # the settings down either side, not the button bank at the bottom. The width
+    # is written out rather than read from _PANE_MARGIN: taken from the constant
+    # that sets it, this test passes at any margin at all.
     panel.show()
     panel.resize(700, 800)
 
     top_left = panel._preview.mapTo(panel, panel._preview.rect().topLeft())
-    assert top_left.x() == _PANE_MARGIN
-    assert top_left.y() == _PANE_MARGIN
+    assert top_left.x() == 8
+    assert top_left.y() == 8
     scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
-    assert panel.width() - scroll_right - 1 == _PANE_MARGIN
+    assert panel.width() - scroll_right - 1 == 8
     generate = panel._generate_btn
     bottom = generate.mapTo(panel, generate.rect().bottomLeft()).y()
-    assert panel.height() - bottom - 1 == _PANE_MARGIN
+    assert panel.height() - bottom - 1 == 8
 
 
 def _layout_containing(root, widget):

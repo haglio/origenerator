@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
+from PyQt6.QtWidgets import QSplitter, QLineEdit, QMessageBox, QPushButton, QWidget
 
 from origenerator import evolver_export, gallery, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
@@ -2182,6 +2182,18 @@ def _answer_menu(monkeypatch, label):
         return act
 
     monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", pick)
+
+
+def _answer_confirmation(monkeypatch, button):
+    """Click ``button`` on the next confirmation box.
+
+    Most tests of a destructive action replace `_confirm` outright, which is the
+    right way to keep a modal out of a test that is about something else. These
+    few answer the real box instead, because the step from the button the user
+    clicks to the decision the gallery takes is otherwise pinned nowhere: with it
+    inverted, a "No" at the delete prompt deletes anyway and all 657 tests passed.
+    """
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **kw: button))
 
 
 def _menu_labels(monkeypatch, labels):
@@ -4377,27 +4389,28 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     assert view.selected_prompt_ids() == ["i1"]
 
 
-def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(qtbot):
+def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(
+        qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)  # leaf selected, nothing picked
-    view._confirm = lambda text: True
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     view._delete_selection()
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 
-def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot):
+def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot, monkeypatch):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._confirm = lambda text: False  # user says no
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)  # user says no
 
     view._delete_selection()
 
@@ -11093,24 +11106,24 @@ def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
     assert view._queue._clear.isHidden()
 
 
-def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot):
+def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot, monkeypatch):
     # What the user asked for: a way out from under a queue he didn't fill,
     # instead of waiting out a batch no window here can account for.
     client = _QueueClient(ForeignQueue(running=["r"], pending=["a", "b"]))
     view = _queue_view(qtbot, client)
     view._poll()
-    view._confirm_clear_queue = lambda total: True
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     view._queue._clear.click()
 
     assert client.cleared == 1
 
 
-def test_clearing_can_be_declined_at_the_prompt(qtbot):
+def test_clearing_can_be_declined_at_the_prompt(qtbot, monkeypatch):
     client = _QueueClient(ForeignQueue(running=[], pending=["a"]))
     view = _queue_view(qtbot, client)
     view._poll()
-    view._confirm_clear_queue = lambda total: False  # user says no
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)  # user says no
 
     view._queue._clear.click()
 

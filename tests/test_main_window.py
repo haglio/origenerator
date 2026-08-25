@@ -550,6 +550,24 @@ def test_reopening_a_maximized_window_reopens_maximized(qtbot, tmp_path):
     assert reopened.isMaximized()
 
 
+def test_a_geometry_blob_that_no_longer_decodes_costs_the_size_not_the_launch(
+        qtbot, tmp_path):
+    # The state file is JSON a person can open and edit, and the geometry value is
+    # opaque base64 — the one field a stray keystroke turns into something that
+    # cannot be decoded at all. That must cost the saved size, not the window.
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first.showMaximized()
+    first.close()
+    hand_edited = AppState(path)
+    hand_edited.set("window_geometry", "not base64 at all")
+    hand_edited.save()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    assert not reopened.isMaximized()  # opened at its default, and opened
+
+
 def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))

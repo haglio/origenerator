@@ -690,75 +690,85 @@ def test_a_foreign_drag_carries_nothing_this_panel_wants():
     assert params_from_mime(mime) is None
 
 
-def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, monkeypatch):
+@pytest.fixture
+def level_drags(monkeypatch):
+    """The drags a version row begins, in the order it began them.
+
+    QDrag stands aside so no test enters the real drag loop, which is modal and
+    waits on a mouse. The list is this test's own, so nothing carries over.
+    """
+    started = []
+
+    class _Drag:
+        def __init__(self, source):
+            self.source = source
+            self.mime = None
+            self.pixmap = None
+            started.append(self)
+
+        def setMimeData(self, mime):
+            self.mime = mime
+
+        def setPixmap(self, pixmap):
+            self.pixmap = pixmap
+
+        def exec(self, _action):
+            return None
+
+    monkeypatch.setattr(versions_module, "QDrag", _Drag)
+    return started
+
+
+def _an_image(path, size=(16, 16)):
+    from PIL import Image
+
+    Image.new("RGB", size, (200, 80, 40)).save(path)
+    return path
+
+
+def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, level_drags):
     # The same gesture as dragging a gallery thumbnail onto Combine: the picture
     # comes along under the cursor, so what is being dragged is never in doubt.
-    from PIL import Image
-
-    image = tmp_path / "e1.png"
-    Image.new("RGB", (16, 16), (200, 80, 40)).save(image)
-
-    dragged = {}
-
-    class _RecordingDrag:
-        def __init__(self, source):
-            dragged["source"] = source
-
-        def setMimeData(self, mime):
-            dragged["mime"] = mime
-
-        def setPixmap(self, pixmap):
-            dragged["pixmap"] = pixmap
-
-        def exec(self, _action):
-            return None
-
-    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
-
-    (level,) = _levels(1, {"enhance_scale": 2.0})[:1]
-    tile = _LevelRow(level, 0, image)
+    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+                     _an_image(tmp_path / "e1.png"))
     qtbot.addWidget(tile)
+
     qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(tile, QPoint(90, 90))
 
-    assert "pixmap" in dragged and not dragged["pixmap"].isNull()
-    assert params_from_mime(dragged["mime"]) == {"enhance_scale": 2.0}
+    (drag,) = level_drags
+    assert not drag.pixmap.isNull()
+    assert params_from_mime(drag.mime) == {"enhance_scale": 2.0}
 
 
-def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, monkeypatch):
+def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_drags):
+    # Both drag tests here move eighty pixels, well past the threshold that tells
+    # a click from a drag — so removing it left them green, and a click that
+    # wobbles a pixel would pick the row up instead of selecting it.
+    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+                     _an_image(tmp_path / "e1.png"))
+    qtbot.addWidget(tile)
+
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tile, QPoint(3, 3))  # inside the start-drag distance
+
+    assert level_drags == []
+
+
+def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
     # An enhancement is an upscale, so the file behind a version can be huge; the
     # picture under the cursor is the same thumbnail every other drag trails.
-    from PIL import Image
-
     from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
 
-    image = tmp_path / "big.png"
-    Image.new("RGB", (1024, 768), (60, 90, 200)).save(image)
-
-    dragged = {}
-
-    class _RecordingDrag:
-        def __init__(self, source):
-            pass
-
-        def setMimeData(self, mime):
-            pass
-
-        def setPixmap(self, pixmap):
-            dragged["pixmap"] = pixmap
-
-        def exec(self, _action):
-            return None
-
-    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
-
-    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, image)
+    tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
+                     _an_image(tmp_path / "big.png", (1024, 768)))
     qtbot.addWidget(tile)
+
     qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(tile, QPoint(90, 90))
 
-    picture = dragged["pixmap"]
-    assert max(picture.width(), picture.height()) == THUMBNAIL_BOX
+    (drag,) = level_drags
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
 
 
 def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):

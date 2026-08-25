@@ -669,15 +669,28 @@ class GalleryView(QWidget):
         # Neither keyPressEvent nor a shortcut delivered the key in the running
         # app — a clicked thumbnail's key press never reached the view through
         # the scroll area — so intercept it before delivery, independent of which
-        # widget holds focus. Auto-removed when this view is destroyed.
-        app = QApplication.instance()
-        if app is not None:
-            app.installEventFilter(self)
+        # widget holds focus. Taken off again in closeEvent, and re-armed by
+        # showEvent for a view shown after one.
+        self._intercept_the_rooms_keys(True)
 
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
+
+    def _intercept_the_rooms_keys(self, intercepting: bool):
+        """Take (or hand back) every key the application delivers.
+
+        Taking it is idempotent — Qt moves a filter already on the list rather
+        than adding a second copy — so ``showEvent`` can re-arm without counting.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return
+        if intercepting:
+            app.installEventFilter(self)
+        else:
+            app.removeEventFilter(self)
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.KeyPress:
@@ -2116,6 +2129,7 @@ class GalleryView(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._poll_timer.start()
+        self._intercept_the_rooms_keys(True)  # back on screen: back on the keys
         self.refresh()
 
     def hideEvent(self, event):
@@ -2123,14 +2137,17 @@ class GalleryView(QWidget):
         self._poll_timer.stop()  # no need to poll while the tab is hidden
 
     def closeEvent(self, event):
-        """Put the poll down for good, however the view was let go.
+        """Put down everything this view arms application-wide, however it was
+        let go: the poll, and the filter that takes the room's keys.
 
-        ``hideEvent`` alone is not enough: a widget that was never shown is
-        never hidden either, so ``close()`` on one left the 1.5 s poll running —
-        blocking HTTP and a whole-table SELECT, on a view nobody can see, until
-        the garbage collector happened to take the timer with it.
+        ``hideEvent`` alone is not enough for either: a widget that was never
+        shown is never hidden, so ``close()`` on one left the 1.5 s poll running
+        — blocking HTTP and a whole-table SELECT, on a view nobody can see —
+        and left a closed gallery answering Esc from whatever window has focus,
+        which is the panic-stop for the whole room.
         """
         self._poll_timer.stop()
+        self._intercept_the_rooms_keys(False)
         super().closeEvent(event)
 
     # --- data loading & live update ---------------------------------------

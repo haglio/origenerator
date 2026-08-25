@@ -1,6 +1,7 @@
 import json
 import random
 
+from origenerator.experiments import policy as policy_module
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 
@@ -206,19 +207,28 @@ def test_video_bases_dominate_even_an_image_heavy_gallery():
     assert video_share > 0.6
 
 
-def test_lora_dims_are_the_favorite_mutation():
+def test_lora_dims_are_the_favorite_mutation(monkeypatch):
     # "Experimenting with LoRAs" — the LoRA file and its strength get picked to
-    # mutate well beyond an even split with the other dimensions.
+    # mutate well beyond an even split with the other dimensions. Measured against
+    # the same run with the favouring switched off, not against a number: the
+    # arithmetic behind the old threshold was wrong for this fixture (an even
+    # split already lands at 51%, not 40%), so removing the weighting entirely
+    # left the one behaviour this test names passing.
     rows = [make_row("vid-1", workflow_name="fake_i2v",
                      params={"input_image": "frame.png [output]"})]
-    policy = make_policy(seed=10)
-    mutated = []
-    for _ in range(400):
-        mutated.extend(policy.propose(rows).mutated_keys)
-    lora = sum(1 for key in mutated if "lora" in key)
-    # Two LoRA dims among five mutable would get 40% of picks under an even
-    # split; favoring them has to show clearly above that.
-    assert lora > len(mutated) * 0.5
+
+    def lora_share():
+        policy = make_policy(seed=10)
+        mutated = []
+        for _ in range(400):
+            mutated.extend(policy.propose(rows).mutated_keys)
+        return sum(1 for key in mutated if "lora" in key) / len(mutated)
+
+    favoured = lora_share()
+    monkeypatch.setattr(policy_module, "_LORA_DIM_WEIGHT", 1.0)
+    even = lora_share()
+
+    assert favoured > even + 0.15
 
 
 def test_video_experiments_keep_their_start_frame():

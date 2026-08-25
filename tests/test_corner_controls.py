@@ -2,7 +2,8 @@
 
 import json
 
-from PyQt6.QtCore import QRect
+from PyQt6.QtCore import QEvent, QPointF, QRect
+from PyQt6.QtGui import QEnterEvent
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
@@ -147,6 +148,28 @@ def test_the_star_says_which_way_it_would_go(qtbot):
 
     controls.set_starred(True)
     assert star.toolTip() == "Unstar this item"
+
+
+def test_a_chip_under_the_pointer_wears_its_armed_mark(qtbot):
+    # test_icons pins that an armed mark is drawn differently from a resting one;
+    # nothing ever armed a real chip, so the step from a hover to that drawing ran
+    # in no test at all.
+    host, controls = _controls(qtbot)
+    controls.show_for(starred=False, enhance=None)
+    star = controls.buttons()[0]
+
+    def mark():
+        return star.icon().pixmap(CORNER_SIZE, CORNER_SIZE).toImage()
+
+    resting = mark()
+
+    star.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
+
+    assert mark() != resting  # the hover shows
+
+    star.leaveEvent(QEvent(QEvent.Type.Leave))
+
+    assert mark() == resting  # and goes again when the pointer does
 
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):

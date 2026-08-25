@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt, QMimeData, QPoint, QPointF, QRect
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QTreeWidgetItem
 
+from origenerator.gui import folder_tree
 from origenerator.gui.folder_tree import (
     DROP_KEY_ROLE, FOLDER_KEYS_MIME, TREE_KEY_ROLE, FolderTree, _action_rects,
 )
@@ -221,6 +222,75 @@ def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
     tree.setCurrentItem(a)
 
     assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
+
+
+def _started_drags(monkeypatch):
+    """Capture the drags ``startDrag`` begins rather than entering the real drag
+    loop, which waits on a mouse no test has. Each capture is the test's own list,
+    so nothing carries from one test to the next."""
+    started = []
+
+    class _Drag:
+        def __init__(self, _source):
+            self.mime = None
+            started.append(self)
+
+        def setMimeData(self, mime):
+            self.mime = mime
+
+        def exec(self, action):
+            return action
+
+    monkeypatch.setattr(folder_tree, "QDrag", _Drag)
+    return started
+
+
+def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, monkeypatch):
+    # The payload's producer and its reader, in one pass. Every other drag test
+    # here writes the mime itself, so the format could be anything at all and they
+    # would all still pass.
+    tree, shelf, a, b = _collecting_tree(qtbot)
+    started = _started_drags(monkeypatch)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.setCurrentItem(a)
+    b.setSelected(True)
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+    (drag,) = started
+    _drop_at(tree, shelf, drag.mime)
+
+    assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE),
+                                        oriented_key("k/b", LANDSCAPE)])]
+
+
+def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch):
+    # The file-manager rule, and what keeps a multi-selection the user has since
+    # forgotten about from riding along on the next drag.
+    tree, shelf, a, b = _collecting_tree(qtbot)
+    started = _started_drags(monkeypatch)
+    dropped = []
+    tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
+    tree.setCurrentItem(a)
+    a.setSelected(False)
+    b.setSelected(True)  # the pick is elsewhere; the pressed row is A
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+    (drag,) = started
+    _drop_at(tree, shelf, drag.mime)
+
+    assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE)])]
+
+
+def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
+    # A shelf collects folders; it is not one, so there is nothing to pick it up by.
+    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    started = _started_drags(monkeypatch)
+    tree.setCurrentItem(shelf)
+
+    tree.startDrag(Qt.DropAction.CopyAction)
+
+    assert started == []
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):

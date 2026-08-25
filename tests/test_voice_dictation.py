@@ -88,6 +88,19 @@ def test_a_request_that_never_hears_over_is_given_up_on():
     assert dictation.push("a woman in a red coat") is None  # listening no more
 
 
+def test_the_shipped_limit_gives_up_after_eight_utterances():
+    # The test above hands in a limit of its own, so the number the app actually
+    # ships with ran in no test: raising it to a hundred restored the failure that
+    # comment describes. Eight is written out here rather than read off
+    # _MAX_UTTERANCES, which would hold at a hundred just as well.
+    dictation = RequestDictation()
+    assert dictation.push("Request.").state == OPENED
+    for _ in range(6):
+        assert dictation.push("and another clause").state == COLLECTING
+
+    assert dictation.push("and one more").state == ABANDONED
+
+
 def test_reset_drops_a_half_said_request():
     dictation = RequestDictation()
     dictation.push("Request.")

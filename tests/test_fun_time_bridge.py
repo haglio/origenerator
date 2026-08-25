@@ -60,7 +60,13 @@ def test_side_verbs_drive_the_show_holding_that_region(qtbot, tmp_path, monkeypa
 def test_a_verb_for_an_empty_region_is_dropped(qtbot, tmp_path):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     (tmp_path / "origenerator_cmd.txt").write_text("LANDSCAPE_TRASH\n", encoding="utf-8")
-    bridge._tick()  # nothing holds the landscape region — nothing to crash
+
+    bridge._tick()  # nothing holds the landscape region
+
+    # Dropped, not queued: the verb is taken off the channel like any other, and
+    # nothing was opened to answer it with.
+    assert not (tmp_path / "origenerator_cmd.txt").exists()
+    assert view.region_show("landscape") is None
 
 
 def test_lock_verb_holds_the_slide(qtbot, tmp_path, monkeypatch):

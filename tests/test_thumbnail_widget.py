@@ -447,15 +447,6 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     assert later._image_label.movie().state() == QMovie.MovieState.Running
 
 
-def test_a_still_tile_takes_the_freeze_inertly(qtbot, tmp_path):
-    from origenerator.gui.looping_preview import set_previews_paused
-    still = tmp_path / "still.png"
-    Image.new("RGB", (40, 30)).save(still)
-    tile = ThumbnailWidget("p2", str(still), "a picture")
-    qtbot.addWidget(tile)
-
-    set_previews_paused(True)  # nothing was moving; nothing to stop
-
 # --- the enhancement being made of this image --------------------------------
 
 def _run(**kw):

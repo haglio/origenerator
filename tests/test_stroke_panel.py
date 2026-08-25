@@ -304,10 +304,13 @@ def test_the_panel_actually_paints(qtbot):
     # A NameError in paintEvent takes the whole app down the first time the
     # panel is shown — which is what shipped once.
     panel, stroke, _host = _panel(qtbot)
-    panel.grab()
+
+    assert not panel.grab().isNull()
+
     stroke.active = True
     stroke.state.cruise.active = True
-    panel.grab()
+
+    assert not panel.grab().isNull()  # and again with every reading lit
 
 
 def test_the_pace_starts_at_the_slideshows_own_default(qtbot):

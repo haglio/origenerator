@@ -44,6 +44,20 @@ def test_shows_file_and_created(block):
     assert "generated" not in texts
 
 
+def test_a_long_unbroken_value_is_given_places_to_wrap(block):
+    # Every other test here strips these out to read the value, so the whole point
+    # of inserting them — that a model path or an output name wraps down the pane
+    # instead of pushing the block sideways — was pinned nowhere. They have no
+    # width, so what the user reads is unchanged, which is why _texts drops them.
+    block.show_row(_row(output_files=json.dumps(
+        [{"filename": "wan22_i2v_00042_.mp4", "subfolder": "video/loops"}])))
+
+    raw = [text for text in (lbl.text() for lbl in block.findChildren(QLabel))
+           if "wan22" in text]
+
+    assert raw == ["video/​loops/​wan22_​i2v_​00042_​.​mp4"]
+
+
 def test_copy_button_copies_just_the_filename(block):
     block.show_row(_row())
     copy_btns = [b for b in block.findChildren(QPushButton)

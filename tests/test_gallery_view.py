@@ -2578,6 +2578,45 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
 
 
+def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
+    """Every other poll test calls ``_poll`` by hand, which leaves the timer that
+    makes this screen live — how a finished ComfyUI job arrives without a click —
+    covered by nothing at all."""
+    db = FakeDB([_image("old", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+
+    assert view._poll_timer.isActive()
+    # The number itself, not _POLL_INTERVAL_MS: read back through the constant
+    # that set it, a gallery slowed to one tick a minute still passes.
+    assert view._poll_timer.interval() == 1500
+
+    db.add(_image("new", "a dog", 50, 2))
+    view._poll_timer.timeout.emit()  # the tick, delivered the way the timer does
+
+    assert view.visible_prompt_ids() == ["new", "old"]
+
+
+def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
+    """Polling costs a pair of DB reads a second, so it is worth paying only while
+    the screen is up — and must resume the moment it is back."""
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.show()
+    qtbot.waitExposed(view)
+
+    view.hide()
+
+    assert not view._poll_timer.isActive()
+
+    view.show()
+    qtbot.waitExposed(view)
+
+    assert view._poll_timer.isActive()
+
+
 def test_folders_start_collapsed(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)

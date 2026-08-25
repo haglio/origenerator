@@ -55,7 +55,8 @@ def test_a_long_unbroken_value_is_given_places_to_wrap(block):
     raw = [text for text in (lbl.text() for lbl in block.findChildren(QLabel))
            if "wan22" in text]
 
-    assert raw == ["video/​loops/​wan22_​i2v_​00042_​.​mp4"]
+    zwsp = "\u200b"  # spelled out: the character is invisible in source
+    assert raw == [f"video/{zwsp}loops/{zwsp}wan22_{zwsp}i2v_{zwsp}00042_{zwsp}.{zwsp}mp4"]
 
 
 def test_copy_button_copies_just_the_filename(block):

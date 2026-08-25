@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -146,7 +147,9 @@ def _database_as_first_written(db_path):
 
 
 def _columns(db_path, table):
-    with sqlite3.connect(db_path) as conn:
+    # closing(), not the bare `with`: sqlite3's context manager commits and leaves
+    # the connection open — the very thing origenerator.db._connect exists to fix.
+    with closing(sqlite3.connect(db_path)) as conn:
         return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 

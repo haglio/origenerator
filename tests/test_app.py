@@ -481,11 +481,14 @@ def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
     # reads identically to anything that only greps app.py for the line.
     from origenerator.gui.stylesheet import build_stylesheet
 
-    qapp.setStyleSheet("")
+    prior = qapp.styleSheet()
+    qapp.setStyleSheet("")  # so a sheet an earlier launch left on cannot answer for this one
+    try:
+        _boot(library)
 
-    _boot(library)
-
-    assert qapp.styleSheet() == build_stylesheet()
+        assert qapp.styleSheet() == build_stylesheet()
+    finally:
+        qapp.setStyleSheet(prior)  # every later test renders in the chrome it expected
 
 
 def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
@@ -533,8 +536,8 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
 def _held_deletion(library_path, prompt_id, *, days_ago):
     """A deletion held ``days_ago`` days — old enough to be swept, or not."""
-    import json
     import sqlite3
+    from contextlib import closing
     from datetime import datetime, timedelta, timezone
 
     from origenerator.db import Database
@@ -545,8 +548,9 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
     db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
     then = (datetime.now(timezone.utc).replace(tzinfo=None)
             - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
-    with sqlite3.connect(library_path) as conn:
+    with closing(sqlite3.connect(library_path)) as conn:
         conn.execute("UPDATE deletions SET deleted_at = ?", (then,))
+        conn.commit()
 
 
 def test_the_launch_ends_a_deletion_that_has_outlived_its_window(qapp, library):

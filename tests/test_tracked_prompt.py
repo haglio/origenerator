@@ -1,7 +1,7 @@
 """A prompt field showing what is being typed into it as a change to what it said."""
 
 import pytest
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit, QVBoxLayout, QWidget
 
@@ -111,6 +111,29 @@ def test_lighting_a_word_does_not_move_the_cursor(pair):
 
     assert pair.edit.textCursor().position() == len("a ginger ")
     assert _marked(pair.edit, "lit") == "ginger"
+
+
+def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(pair):
+    """Ten tests here pay this pause and none of them says what it is worth.
+
+    It is the whole answer to two complaints at once: a strike that waited for the
+    field to be left, and a document re-laid under the caret on every keystroke.
+    """
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+
+    _type_over(pair.edit, "cat", "dog")
+
+    settle, = pair.edit.findChildren(QTimer)
+    assert settle.isActive() and settle.isSingleShot()
+    assert _marked(pair.edit, "struck") == ""  # nothing put back while typing
+    # The number itself, not SETTLE_MS: read back through the constant that sets
+    # it, a strike arriving on every letter passes just as well as this does.
+    assert settle.interval() == 150
+
+    settle.timeout.emit()  # the pause, delivered the way the timer does
+
+    assert _marked(pair.edit, "struck") == "cat"
 
 
 def test_typing_over_a_word_strikes_it_through_without_leaving_the_field(pair, qtbot):

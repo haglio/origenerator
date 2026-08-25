@@ -528,6 +528,12 @@ class GalleryView(QWidget):
         self._voice_status_timer = QTimer(self)
         self._voice_status_timer.setSingleShot(True)
         self._voice_status_timer.timeout.connect(self._voice_status_revert)
+        # What that caption goes back to saying rather than the idle line: the
+        # request it is still working out, and which request that is. It has one
+        # slot, so a line flashed over the promise has to know what to restore
+        # — the show's corner keeps its own copy of the same pair.
+        self._working_status = ""
+        self._working_request = None
         # The fullscreen slideshow window while one is open — whether it was
         # started from the toolbar (a whole folder, shuffled) or by
         # double-clicking a picture (that folder in order, held at a pace of
@@ -3374,7 +3380,14 @@ class GalleryView(QWidget):
             self._voice_status_timer.stop()
 
     def _voice_status_revert(self):
-        if self._listening():  # still listening
+        if self._working_status:
+            # A request is still being worked out, so the caption goes back to
+            # saying so rather than to the idle line: whatever flashed over the
+            # promise, the promise is still the truest thing this pane has to
+            # say, and "Listening…" over an app mid-request reads as a request
+            # that was dropped.
+            self._show_voice_status(self._working_status, transient=False)
+        elif self._listening():  # still listening
             self._show_voice_status("🎤 Listening…", transient=False)
         else:
             self._voice_status.hide()
@@ -3409,8 +3422,9 @@ class GalleryView(QWidget):
         look exactly alike.
 
         A spoken line, not an answer to a request — which matters while one is
-        being worked out, because the show's corner is holding that work and a
-        line said over it has to fade back to it rather than take its place.
+        being worked out, because both surfaces are then holding a promise about
+        that work, and a line said over one has to fade back to it rather than
+        take its place.
         """
         self._show_voice_status(message, transient=True)
         if self._slideshow is not None:
@@ -4413,7 +4427,7 @@ class GalleryView(QWidget):
         self._request_target = None
         self._hold_for_request(show, spoken)
         if spoken.state != COMPLETED:  # given up on — the terminator never came
-            self._answer_request(show, "🎤 request dropped — never heard “over”")
+            self._answer_request(show, "🎤 request dropped — never heard “over”", spoken)
             return
         self._begin_request(target, spoken, side)
 
@@ -4434,16 +4448,30 @@ class GalleryView(QWidget):
         elif spoken.listening:
             self._show_voice_status(note or "🎤 Request…", transient=False)
 
-    def _answer_request(self, show, message: str, *, working: bool = False):
-        """Say what the request did, where the speaker is looking.
+    def _answer_request(self, show, message: str, spoken, *,
+                        working: bool = False):
+        """Say what *spoken* did, where the speaker is looking.
 
         *working* is the one line that is not an answer but a promise of one, so
         it is held rather than flashed: the working-out may go to the local LLM,
-        and a corner that empties while the app is still at it says the request
-        was dropped. Whatever comes back next releases the hold.
+        and a surface that empties while the app is still at it says the request
+        was dropped. Only that request's own answer takes the promise down —
+        an answer to another one flashes over it and leaves it standing.
+
+        The promise is made on the surface the speaker was looking at, and taken
+        down on both: a show can open while the pool is still working, and the
+        answer then lands somewhere other than where the promise was made.
         """
+        if working:
+            self._working_status = "" if show is not None else message
+            self._working_request = spoken
+        elif spoken is self._working_request:
+            promised, self._working_status = self._working_status, ""
+            self._working_request = None
+            if promised and self._voice_status.text() == promised:
+                self._voice_status_revert()  # it was still promising this pane
         if show is not None:
-            show.note_request(message, working=working)
+            show.note_request(message, spoken, working=working)
         else:
             self._show_voice_status(message, transient=not working)
 
@@ -4464,15 +4492,18 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id) if prompt_id else None
         show = self._voice_surface(side)
         if row is None:
-            self._answer_request(show, "🎤 nothing on screen to request a change to")
+            self._answer_request(
+                show, "🎤 nothing on screen to request a change to", spoken)
             return
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None or self._client is None:
             self._answer_request(
-                show, "🎤 this one can't be re-made, so there's nothing to revise")
+                show, "🎤 this one can't be re-made, so there's nothing to revise",
+                spoken)
             return
         params = filled_params(row, workflow)
-        self._answer_request(show, f"🎤 working out “{spoken.text}”…", working=True)
+        self._answer_request(show, f"🎤 working out “{spoken.text}”…", spoken,
+                             working=True)
         QThreadPool.globalInstance().start(ReviseTask(
             self._revision, (row, workflow, params, spoken, side),
             params.get("positive_prompt", ""), params.get("negative_prompt", ""),
@@ -4489,13 +4520,15 @@ class GalleryView(QWidget):
         row, workflow, params, spoken, side = context
         show = self._voice_surface(side)
         if revision is None:
-            self._answer_request(show, f"🎤 didn't catch what to change in “{spoken.text}”")
+            self._answer_request(
+                show, f"🎤 didn't catch what to change in “{spoken.text}”", spoken)
             return
         if not revision.changed:
-            self._answer_request(show, f"🎤 “{revision.term}” is already how you asked for it")
+            self._answer_request(
+                show, f"🎤 “{revision.term}” is already how you asked for it", spoken)
             return
         self._answer_request(show, self._queue_request(row, workflow, params,
-                                                          spoken, revision))
+                                                       spoken, revision), spoken)
 
     def _queue_request(self, row, workflow, params, spoken, revision) -> str:
         """Launch the revised generation and record the request behind it;

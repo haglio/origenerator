@@ -247,8 +247,10 @@ class SlideshowView(QWidget):
         # whenever nothing is being dictated.
         self._request_note = ""
         # And what it reads afterwards, while the request said is still being
-        # worked out — held rather than flashed, and cleared by the answer.
+        # worked out — held rather than flashed, and cleared by that request's
+        # own answer, which is why the request it is about is kept beside it.
         self._working_note = ""
+        self._working_request = None
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
@@ -917,22 +919,31 @@ class SlideshowView(QWidget):
             if not self._playlist.locked:
                 self._rearm_dwell()
 
-    def note_request(self, message: str, *, working: bool = False) -> None:
-        """Say what a spoken request did, where the speaker is looking.
+    def note_request(self, message: str, request=None, *,
+                     working: bool = False) -> None:
+        """Say what the spoken *request* did, where the speaker is looking.
 
         *working* means it hasn't done it yet: the corner holds that line
         instead of flashing it, because working out what a request changes can
         mean asking the local LLM which of the prompt's own terms the speaker
         meant — the case that outlasts a flash — and a corner that empties while
         the app is still working says the request was dropped when it wasn't.
-        The answer, said the ordinary way, is what releases the hold.
+
+        Which is why the hold comes down only for the request that took it.
+        Nothing stops a second request being said over the first, and an answer
+        to the first would otherwise blank the corner while the second is still
+        out at the model — the same defect, one request later. An answer to
+        anything else flashes over the held line and leaves it standing,
+        because it is still true.
         """
-        self._working_note = message if working else ""
         if working:
+            self._working_note, self._working_request = message, request
             self._note_timer.stop()  # it holds, rather than fading after a beat
             self._refresh_note()
-        else:
-            self._flash_note(message, ms=3000)
+            return
+        if request is self._working_request:
+            self._working_note, self._working_request = "", None
+        self._flash_note(message, ms=3000)
 
     def _rearm_dwell(self) -> None:
         """Start the dwell timer again for the slide already on screen — a

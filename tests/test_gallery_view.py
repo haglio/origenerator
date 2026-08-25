@@ -2155,17 +2155,33 @@ def _right_click(view, prompt_id):
 
 
 def _answer_menu(monkeypatch, label):
-    """Answer the next generation menu with the entry reading ``label``.
+    """Answer the next menu with the entry reading ``label``.
 
-    By its words rather than its place in the list: the menu grows and shrinks
-    with what the item can do — "Go to folder" is absent inside the item's own
-    folder, Enhance is absent for a video — so an index picks a different entry
-    depending on where it is raised.
+    By its words rather than its place in the list: a menu grows and shrinks with
+    what the row it was raised over can do — "Go to folder" is absent inside the
+    item's own folder, Enhance is absent for a video, "Delete folder…" is absent
+    over a workflow — so an index picks a different entry depending on where it
+    is raised.
+
+    Sub-menus are searched after the top level, so the folders listed under "Add
+    to folder" are answerable by their own names.
     """
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
-        lambda menu, *a: next(act for act in menu.actions() if act.text() == label),
-    )
+    def find(menu):
+        for act in menu.actions():
+            if act.text() == label:
+                return act
+        for act in menu.actions():
+            if act.menu() is not None and (found := find(act.menu())) is not None:
+                return found
+        return None
+
+    def pick(menu, *_args):
+        act = find(menu)
+        if act is None:  # loudly, not as a menu the user dismissed
+            raise AssertionError(f"no menu entry reading {label!r}")
+        return act
+
+    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", pick)
 
 
 def _menu_labels(monkeypatch, labels):
@@ -10589,14 +10605,14 @@ def test_esc_stops_the_audio_bed_on_its_own(qtbot):
 
 # --- folders the user composes: multi-select, group, drop, rename, remove -----
 
-def _two_leaf_view(qtbot, extra=()):
+def _two_leaf_view(qtbot, extra=(), actions=None):
     """A view whose Images tree holds two settings folders ("a cat", "a dog")
     under one "(no LoRA)" parent, plus whatever ``extra`` rows are handed in.
 
     Returns the two folders by *key*: every rebuild throws its tree items away,
     and these tests all rebuild."""
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1), *extra]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     lora = _image_workflow(view._tree).child(0).child(0)
@@ -10807,6 +10823,205 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
 
     assert view._selection_group is not None
     assert len(view.visible_folder_keys()) == 2
+
+
+# --- the tree's right-click menus: the only route to several of these actions --
+#
+# Every test below raises a real menu and answers it by the words the user reads,
+# because the menu is where the label is wired to the handler. Calling the handler
+# instead — which is what the rest of this file does — leaves that wiring covered
+# by nothing at all: swapping the custom folder's Rename and Remove arms so that
+# "Rename…" deletes the folder used to pass all 657 tests.
+
+def _tree_menu(view, key=None):
+    """Raise a tree row's context menu the way the tree's own signal does, or the
+    empty-space menu below the last row when no key is given."""
+    view._on_tree_context_menu(
+        view._tree_item_for(key) if key is not None else None, QPoint(0, 0)
+    )
+
+
+def test_a_folders_menu_offers_rename_star_and_a_delete_kept_apart(qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, cat)
+
+    # The separator is the point: the one entry that destroys anything sits below
+    # it, away from the two that cost nothing.
+    assert labels == ["Rename…", "Star", "", "Delete folder…"]
+
+
+def test_a_workflows_menu_offers_neither_a_rename_nor_a_delete(qtbot, monkeypatch):
+    # Its name states which workflow it is, so a name of your own there would only
+    # hide that; and a whole workflow's history must never go in one action.
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, _key(_image_workflow(view._tree)))
+
+    assert labels == ["Star"]
+
+
+def test_renaming_a_folder_from_its_menu_renames_it_and_takes_nothing_away(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _answer_menu(monkeypatch, "Rename…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Kittens", True)))
+
+    _tree_menu(view, cat)
+
+    assert view._db.folder_meta_map()[cat]["custom_name"] == "Kittens"
+    assert view._tree_item_for(cat).text(0) == "Kittens"
+    # The folder is renamed, not emptied: this menu's other entries destroy things.
+    assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
+
+
+def test_dismissing_the_rename_dialog_leaves_the_folder_named_as_it_was(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _answer_menu(monkeypatch, "Rename…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Kittens", False)))  # Cancel
+
+    _tree_menu(view, cat)
+
+    assert view._db.folder_meta_map() == {}
+
+
+def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
+        qtbot, monkeypatch):
+    actions = FakeActions()
+    view, cat, _dog = _two_leaf_view(qtbot, actions=actions)
+    view._confirm = lambda text: True
+    _answer_menu(monkeypatch, "Delete folder…")
+
+    _tree_menu(view, cat)
+
+    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}  # its own row only
+
+
+def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [cat])
+    _answer_menu(monkeypatch, "Keepers")  # under "Add to folder"
+
+    _tree_menu(view, dog)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["members"] == [cat, dog]
+
+
+def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [cat])
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, cat)
+
+    assert "Add to folder" not in labels
+
+
+def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat, dog])
+    view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
+    _answer_menu(monkeypatch, "Remove from “Keepers”")
+
+    _tree_menu(view, dog)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["id"] == folder_id and record["members"] == [cat]
+    assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
+
+
+def test_the_menu_over_a_folder_of_your_own_offers_only_rename_and_remove(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat])
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, gallery.custom_folder_key(folder_id))
+
+    # No star (a bookmark of a bookmark shelf collects nothing) and no delete —
+    # removing one of these must never reach the generations it gathers.
+    assert labels == ["Rename…", "", "Remove folder…"]
+
+
+def test_renaming_a_folder_of_your_own_renames_it_rather_than_removing_it(
+        qtbot, monkeypatch):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat])
+    _answer_menu(monkeypatch, "Rename…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Best of", True)))
+
+    _tree_menu(view, gallery.custom_folder_key(folder_id))
+
+    (record,) = view._db.list_custom_folders()
+    assert record["name"] == "Best of" and record["members"] == [cat]
+    assert "Best of" in _top_level(view._tree)
+
+
+def test_removing_a_folder_of_your_own_from_its_menu_keeps_what_it_gathered(
+        qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    folder_id = _make_folder(view, "Keepers", [cat, dog])
+    view._confirm = lambda text: True
+    _answer_menu(monkeypatch, "Remove folder…")
+
+    _tree_menu(view, gallery.custom_folder_key(folder_id))
+
+    assert view._db.list_custom_folders() == []
+    assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
+
+
+def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
+        qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    _answer_menu(monkeypatch, "New folder…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Keepers", True)))
+
+    _tree_menu(view)  # no row under the cursor
+
+    (record,) = view._db.list_custom_folders()
+    assert record["name"] == "Keepers" and record["members"] == []
+    assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
+
+
+def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+    _answer_menu(monkeypatch, "Group 2 folders into a new folder…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Keepers", True)))
+
+    _tree_menu(view, cat)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["members"] == [cat, dog]  # both, not the one under the cursor
+
+
+def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
+        qtbot, monkeypatch):
+    # Otherwise a right-click on a folder the user did not pick would act on the
+    # ones they did, which is the same click meaning two different things.
+    view, cat, dog = _two_leaf_view(qtbot, extra=[_image("i3", "a fish", 50, 1)])
+    fish = _key(_image_workflow(view._tree).child(0).child(0).child(2))
+    _pick(view, cat, dog)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, fish)
+
+    assert labels == ["Rename…", "Star", "", "Delete folder…"]
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------

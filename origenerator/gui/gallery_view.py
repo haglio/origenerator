@@ -2122,6 +2122,17 @@ class GalleryView(QWidget):
         super().hideEvent(event)
         self._poll_timer.stop()  # no need to poll while the tab is hidden
 
+    def closeEvent(self, event):
+        """Put the poll down for good, however the view was let go.
+
+        ``hideEvent`` alone is not enough: a widget that was never shown is
+        never hidden either, so ``close()`` on one left the 1.5 s poll running —
+        blocking HTTP and a whole-table SELECT, on a view nobody can see, until
+        the garbage collector happened to take the timer with it.
+        """
+        self._poll_timer.stop()
+        super().closeEvent(event)
+
     # --- data loading & live update ---------------------------------------
 
     def refresh(self):

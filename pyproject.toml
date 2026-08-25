@@ -25,13 +25,20 @@ dependencies = [
 origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt", "vulture"]
+dev = ["pytest", "pytest-qt", "pytest-timeout", "vulture"]
 # Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
 # optional — the mic button degrades gracefully when these aren't installed.
 # Install with:  pip install -e .[voice]
 voice = ["faster-whisper", "sounddevice"]
 
 [tool.pytest.ini_options]
+# The timeout is a ceiling, not a target: the slowest test here is the
+# tracked-tree content scan, which walks the largest tree in the family and takes
+# ~38 s on this machine, so 240 s clears it six times over and can only bite on a
+# hang. The thread method prints the hung stack, which is what turns a stalled
+# required check into a one-line diagnosis. tests/test_timeouts.py holds both
+# halves of it.
+addopts = "--timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

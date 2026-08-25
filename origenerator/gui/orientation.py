@@ -34,6 +34,7 @@ region — the same default the region routing uses for an unmeasurable set.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 
 from PIL import Image
@@ -48,12 +49,25 @@ ORIENTATION_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape"}
 
 _SEPARATOR = "::"
 
+# How many measured shapes are kept at once. Comfortably above one library's
+# worth, because a rebuild measures every row: a cap under that would evict the
+# rows measured at the top of a pass before the pass reached the bottom, and
+# every poll would go back to opening a thumbnail per row — the cost the cache
+# exists to avoid. Above that ceiling it is only memory, and this many short
+# paths is a few megabytes.
+_MEASURED_LIMIT = 20_000
+
 # Measured shapes, by the file that answered. A rebuild re-reads every row, and
 # opening a thumbnail per row per poll is a cost the tree now pays for both
 # sides at once; the file a shape was read from never changes its shape, so the
 # answer is kept against its path. Only successful reads are kept — a row whose
 # file has not landed yet has to be asked again once it has.
-_measured: dict[str, str] = {}
+#
+# Ordered so it can be bounded: nothing here ever becomes wrong, so the only
+# reason to drop an entry is room, and the one to drop is the one longest
+# unasked-for — a generation deleted an hour ago, rather than a row the open
+# folder redraws every poll.
+_measured: OrderedDict[str, str] = OrderedDict()
 
 
 def oriented_key(base_key: str, orientation: str) -> str:
@@ -86,15 +100,25 @@ def row_orientation(row: dict) -> str:
         path = str(candidate)
         remembered = _measured.get(path)
         if remembered is not None:
+            _measured.move_to_end(path)  # asked for, so not the next to go
             return remembered
         try:
             with Image.open(candidate) as image:
                 width, height = image.size
         except (OSError, ValueError):
             continue
-        _measured[path] = measured = PORTRAIT if height > width else LANDSCAPE
+        measured = PORTRAIT if height > width else LANDSCAPE
+        _remember(path, measured)
         return measured
     return requested_orientation(gallery.parse_params(row.get("params_json"))) or LANDSCAPE
+
+
+def _remember(path: str, measured: str) -> None:
+    """Keep *path*'s shape, making room for it by dropping the entry nothing
+    has asked for in longest."""
+    _measured[path] = measured
+    if len(_measured) > _MEASURED_LIMIT:
+        _measured.popitem(last=False)
 
 
 def _probe_candidates(row: dict) -> list[Path]:

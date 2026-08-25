@@ -32,12 +32,17 @@ dev = ["pytest", "pytest-qt", "pytest-timeout", "vulture"]
 voice = ["faster-whisper", "sounddevice"]
 
 [tool.pytest.ini_options]
-# The timeout is a ceiling, not a target: the slowest test here is the
-# tracked-tree content scan, which walks the largest tree in the family and takes
-# ~38 s on this machine, so 240 s clears it six times over and can only bite on a
-# hang. The thread method prints the hung stack, which is what turns a stalled
-# required check into a one-line diagnosis. tests/test_timeouts.py holds both
-# halves of it.
+# A ceiling on a hang, not a performance budget. The slowest test on a
+# developer machine is the tracked-tree content scan, but it is not the
+# slowest on a runner: it returns early when no blocklist is reachable, and
+# the blocklist is git-ignored, so a fresh checkout has none. Nothing CI runs
+# here goes much past a second. The ceiling stays the family's highest because
+# this is its largest suite, and because a session-scoped fixture's teardown
+# is charged to whichever test ran last -- here a full widget-count sweep and
+# gc over a run that built thousands of Qt panels. --timeout-method=thread is
+# the half that pays for itself: it dumps the hung stack, which turns a
+# stalled required check into a one-line diagnosis. tests/test_timeouts.py
+# holds all three halves of it.
 addopts = "--timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"

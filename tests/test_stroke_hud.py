@@ -82,5 +82,8 @@ def test_space_reaches_the_switch_it_is_given_rather_than_the_strokes_own():
 def test_the_legend_names_every_key_the_cluster_answers():
     # The panel's tooltip is the only place these keys are written down, so a
     # legend that drifts from the table above is a cluster nobody can find.
-    for written in ("Space", "J/L", "7/9", "U/O", "I", "/", "\\"):
+    # Each key beside the word for what it does: "/" and "I" alone appear inside
+    # "J/L" and elsewhere, so on their own they would say nothing.
+    for written in ("Space drives", "J/L speed", "7/9 travel", "U/O center",
+                    "I shape", "/ cruise", "\\ nudge"):
         assert written in STROKE_KEY_LEGEND

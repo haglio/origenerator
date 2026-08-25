@@ -33,6 +33,19 @@ def test_the_renderings_that_are_ordinary_english_claim_nothing_longer():
     assert voice_commands.match_genau_command("can now be a windy day") is None
 
 
+def test_one_word_past_the_phrase_is_all_a_command_may_carry():
+    # The two negatives above are four words past the lead, so a limit of three
+    # reads the same as a limit of one — and a mis-heard "genau it now please"
+    # would fire a generation nobody asked for. This is the pair either side of
+    # the line: "it" is the one word these commands take.
+    assert voice_commands.match_genau_command("genau it") == voice_commands.GENAU_COMMAND
+    assert voice_commands.match_genau_command("genau it now") is None
+    assert voice_commands.match_genau_command("good now it") == voice_commands.GENAU_COMMAND
+    assert voice_commands.match_genau_command("good now it again") is None
+    assert voice_commands.match_enhance_command("enhance it") == voice_commands.ENHANCE_COMMAND
+    assert voice_commands.match_enhance_command("enhance it more") is None
+
+
 def test_a_sentence_merely_mentioning_it_is_not_a_command():
     # Far more likely a prompt edit that names the tool than an order to run it,
     # and the cost of being wrong is a generation nobody asked for.

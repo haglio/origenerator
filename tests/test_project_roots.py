@@ -71,17 +71,49 @@ class TestProjectDir:
 
 
 class TestWhichPathsMovedAndWhichDidNot:
-    def test_the_osr2_state_dir_comes_from_a_project_root(self):
-        assert any(
-            config.OSR2_STATE_DIR.is_relative_to(root) for root in config.PROJECT_ROOTS
-        ), f"{config.OSR2_STATE_DIR} is under none of {config.PROJECT_ROOTS}"
-
-    def test_the_genau_flag_file_stays_inside_the_osr2_state_dir(self):
-        assert config.OSR2_GENAU_ENABLED_FILE.parent == config.OSR2_STATE_DIR
-
     def test_comfyui_stays_on_the_suite_root_because_it_is_not_one_of_our_repos(self):
         """ComfyUI is a third-party app that did not move with the suite."""
         assert config.COMFYUI_DIR == config.SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
-    def test_the_evolver_inbox_stays_on_the_suite_root_because_the_library_did_not_move(self):
-        assert config.EVOLVER_INBOX_DIR.is_relative_to(config.SUITE_ROOT / "videos")
+
+class TestTheValuesAnotherAppHoldsToo:
+    """Each of these is only correct because a sibling app holds the same one.
+
+    Spelled out rather than derived: a derivation ("the flag is inside the state
+    dir", "the inbox is somewhere under videos") reads exactly the same before and
+    after the value moves, and noticing that it moved is the whole job. Change one
+    of these without changing the counterpart named beside it and a channel
+    between two running apps goes quiet — the writer keeps writing and the reader
+    hears nothing, with no error anywhere.
+    """
+
+    def test_the_broker_takes_t_code_on_this_udp_port(self):
+        # osr2_broker/session.py binds the same number. A different one here is an
+        # OSR2 that never moves, with nothing on screen saying why.
+        assert config.OSR2_TCODE_UDP_PORT == 50557
+
+    def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
+        # Not this app's state dir and not the broker's: fun_time's, which is
+        # where all three look for these files.
+        assert config.OSR2_STATE_DIR == config.project_dir("fun_time") / "state"
+
+    def test_the_genau_flag_is_the_file_the_broker_reads(self):
+        # This app writes "0" here while it drives, and restores the prior value
+        # after; the broker reads it to know whether genau's auto-mode may run.
+        assert config.OSR2_GENAU_ENABLED_FILE.name == "genau_enabled.txt"
+
+    def test_the_devices_own_stamp_is_the_file_the_broker_writes(self):
+        # The only evidence the OSR2 is there at all (see origenerator.osr2).
+        assert config.OSR2_SERIAL_RX_FILE.name == "osr2_serial_rx.txt"
+
+    def test_the_device_may_stay_quiet_for_the_brokers_own_window(self):
+        # osr2_broker.monitor.MonitorState answers the same question with the same
+        # window, so the app and the broker never disagree about whether it is on.
+        assert config.OSR2_RX_STALE_S == 30.0
+
+    def test_evolver_watches_this_exact_inbox(self):
+        # Mirrors evolver's own INBOX_DIR. A folder evolver is not watching is a
+        # finished video that is simply never ingested.
+        assert config.EVOLVER_INBOX_DIR == (
+            config.SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox")
+        assert config.EVOLVER_SOURCE == "origenerator"  # how evolver routes ours

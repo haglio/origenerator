@@ -654,10 +654,8 @@ class ParamForm(QWidget):
                 w.addItems(pd.options)
             _select_combo_value(w, str(pd.default))
             return w
-        if pd.type == "image":
-            w = QLineEdit()
-            w.setText(str(pd.default))
-            return w
+        # An "image" field is a plain path box like any other -- what makes it an
+        # image field is the Browse button beside it, added above.
         w = QLineEdit()
         w.setText(str(pd.default))
         return w

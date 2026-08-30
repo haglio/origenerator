@@ -6,7 +6,7 @@ pane above the prompt has to be every picture — showing the newest one alone
 would say the edit was about that picture.
 
 The wall fills the pane. The grid is whichever column count leaves the cells
-squarest for the space there is (:func:`grid_for`), the last rows share out the
+squarest for the space there is (:func:`rows_for`), the last rows share out the
 remainder so no row ends ragged (:func:`row_counts`), and each picture is scaled
 to cover its cell and cropped to it. Nothing is letterboxed and nothing is
 lettered: this is a picture of a folder, not a sheet to read filenames off.
@@ -23,28 +23,28 @@ from PyQt6.QtGui import QPainter, QPixmap
 from PyQt6.QtWidgets import QWidget
 
 
-def grid_for(count: int, width: int, height: int) -> tuple[int, int]:
-    """``(columns, rows)`` for ``count`` cells filling a ``width``×``height`` rect.
+def rows_for(count: int, width: int, height: int) -> int:
+    """How many rows ``count`` cells take filling a ``width``×``height`` rect.
 
-    Chosen by trying every column count and keeping the one whose cells come out
+    Chosen by trying every row count and keeping the one whose cells come out
     least oblong — which is what makes a wall of pictures read as a wall rather
     than as a row of slivers or a stack of bands. A rect with no area, or nothing
-    to put in it, is ``(0, 0)``.
+    to put in it, is ``0``.
+
+    The rows are the whole answer: how many cells each one holds is
+    :func:`row_counts`, which shares the remainder out row by row, and the widest
+    row is what a candidate's cell width is measured at. Searching columns
+    instead would score a cell shape no row ends up drawn at.
     """
     if count <= 0 or width <= 0 or height <= 0:
-        return 0, 0
+        return 0
     best = None
     for rows in range(1, count + 1):
-        # Row count is the free choice; the columns follow from it, because the
-        # remainder is shared out row by row (:func:`row_counts`) and the widest
-        # row is what the grid has to hold. Searching columns instead measures a
-        # cell shape no row ends up drawn at.
-        columns = math.ceil(count / rows)
-        cell = (width / columns, height / rows)
+        cell = (width / math.ceil(count / rows), height / rows)
         oblong = max(cell) / min(cell)
         if best is None or oblong < best[0]:
-            best = (oblong, columns, rows)
-    return best[1], best[2]
+            best = (oblong, rows)
+    return best[1]
 
 
 def row_counts(count: int, rows: int) -> list[int]:
@@ -106,7 +106,7 @@ class ContactSheet(QWidget):
         it can be read without painting."""
         if not self._pictures:
             return []
-        _, rows = grid_for(len(self._pictures), self.width(), self.height())
+        rows = rows_for(len(self._pictures), self.width(), self.height())
         laid = []
         for row, columns in enumerate(row_counts(len(self._pictures), rows)):
             top = round(row * self.height() / rows)

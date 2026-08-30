@@ -313,7 +313,7 @@ def _side(tree, orientation=LANDSCAPE):
     """One half of the TOC pane — the Portrait tree or the Landscape one. The
     table of contents exists twice over, once per shape (see
     :mod:`origenerator.gui.orientation`)."""
-    return tree.tree_for(orientation)
+    return tree._halves[orientation]
 
 
 def _top_level(tree, orientation=LANDSCAPE):

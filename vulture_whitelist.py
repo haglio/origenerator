@@ -81,9 +81,6 @@ _._height_label  # noqa  # unused attribute: param_form.py:145, param_form.py:36
 # origenerator/gui/prompt_find.py
 _.current_field  # noqa  # unused method: prompt_find.py:141
 
-# origenerator/gui/split_folder_tree.py
-_.tree_for  # noqa  # unused method: split_folder_tree.py:126
-
 # origenerator/gui/thumbnail_widget.py
 _.is_starred  # noqa  # unused method: thumbnail_widget.py:181
 _.is_enhancing  # noqa  # unused method: thumbnail_widget.py:220

@@ -1742,9 +1742,12 @@ def test_a_one_image_folder_gets_its_own_wording(blank_panel, tmp_path):
 
 
 def test_every_prompt_is_marked_against_what_it_says_now(requesting):
-    from origenerator.gui import tracked_prompt
-    tracked = {tracked_prompt.baseline(w) for w in requesting._param_form.text_fields()}
-    assert tracked == {"a cat on a couch", "blurry"}
+    from origenerator.gui.tracked_prompt import _Tracker
+    fields = requesting._param_form.text_fields()
+    # Every one of them carries a tracker, each rewriting from its own text --
+    # a prompt is not a change to itself, so nothing is marked until one is typed in.
+    assert all(w.findChildren(_Tracker) for w in fields)
+    assert {w.toPlainText() for w in fields} == {"a cat on a couch", "blurry"}
 
 
 def test_the_tab_is_named_after_the_folder_it_asks_about(requesting):
@@ -1789,9 +1792,9 @@ def test_showing_a_generation_ends_the_request(requesting, tmp_path):
 
     requesting.show_saved_generation(row, [])
 
-    from origenerator.gui import tracked_prompt
-    assert all(tracked_prompt.baseline(w) is None
-               for w in requesting._param_form.text_fields())
+    from origenerator.gui.tracked_prompt import _Tracker
+    assert not any(w.findChildren(_Tracker)
+                   for w in requesting._param_form.text_fields())
     assert requesting._generate_btn.text() == "Generate"
 
 

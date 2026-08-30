@@ -153,6 +153,16 @@ class CombinePanel(QWidget):
         """``PLAYERS`` or ``GENAU`` — which lane the chosen recipe is answered from."""
         return GENAU if self._genau_radio.isChecked() else PLAYERS
 
+    def set_intent(self, intent: str):
+        """Select the ``PLAYERS``/``GENAU`` radio; anything else selects players.
+
+        For putting the panel back the way a session left it
+        (:meth:`GalleryView.restore_combine_selection`) -- the lane decides which
+        acts are answerable, so it goes in before the act does.
+        """
+        self._genau_radio.setChecked(intent == GENAU)
+        self._players_radio.setChecked(intent != GENAU)
+
     def _on_intent_changed(self, _button, checked: bool):
         """Announce the new lane once, on the radio that just went on.
 
@@ -169,6 +179,17 @@ class CombinePanel(QWidget):
         """The picked act, or "" when the neutral "-" option (index 0) is selected."""
         index = self._category.currentIndex()
         return self._category.currentText() if index >= 1 else ""
+
+    def set_category(self, category: str):
+        """Select ``category``, or the neutral option for anything else --
+        including an act the current lane cannot answer, which
+        :meth:`set_available_categories` has greyed out. A greyed act must not
+        arrive selected for the same reason it must not stay selected: the
+        buttons would go live on a pick that can only answer "no recipe yet".
+        """
+        index = self._category.findText(category)
+        usable = index >= 1 and self._category.model().item(index).isEnabled()
+        self._category.setCurrentIndex(index if usable else 0)
 
     def set_available_categories(self, available: Collection[str]):
         """Gray out every act the current lane has no recipe for — nothing to mine and

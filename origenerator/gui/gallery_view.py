@@ -5103,18 +5103,42 @@ class GalleryView(QWidget):
             return (None, None)
         return (row.get("thumbnail_path"), self._animated_preview(row))
 
-    def combine_selection(self) -> list:
-        """The ``[image_id, video_id]`` sitting in the combine slots, for session save."""
-        return [self._combine.image_slot.current_id(), self._combine.video_slot.current_id()]
+    def combine_selection(self) -> dict:
+        """Everything the combine panel is holding, for session save: the two
+        slots, the lane and the act.
+
+        All four, because all four are choices the user made and none is
+        recoverable from the others — an act says nothing about which lane
+        answers it, and a restart that put the picture back and forgot it was for
+        a Genau loop would answer the next Generate out of the wrong recipes.
+        """
+        return {
+            "image": self._combine.image_slot.current_id(),
+            "video": self._combine.video_slot.current_id(),
+            "intent": self._combine.selected_intent(),
+            "category": self._combine.selected_category(),
+        }
 
     def restore_combine_selection(self, saved) -> None:
-        """Refill the combine slots from a saved ``[image_id, video_id]``, skipping an
-        item that's since been deleted or no longer fits its slot."""
-        if not isinstance(saved, (list, tuple)) or len(saved) != 2:
+        """Put the combine panel back the way a session left it, skipping an item
+        that has since been deleted or no longer fits its slot, and an act the
+        lane can no longer answer.
+
+        The lane goes in before the act: it decides which acts are answerable,
+        and ``set_category`` refuses one that is greyed out under it.
+
+        A list of two is what sessions before this wrote — the slots alone — and
+        is still read, so an existing ``ui_state.json`` restores what it has.
+        """
+        if isinstance(saved, (list, tuple)) and len(saved) == 2:
+            saved = {"image": saved[0], "video": saved[1]}
+        if not isinstance(saved, dict):
             return
-        image_id, video_id = saved
+        image_id, video_id = saved.get("image"), saved.get("video")
         if image_id and self._combine_accepts_image(image_id):
             self._combine.image_slot.set_item(image_id)
+        self._combine.set_intent(saved.get("intent") or recipe_match.PLAYERS)
+        self._combine.set_category(saved.get("category") or "")
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
 

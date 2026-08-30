@@ -9705,20 +9705,88 @@ def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
     assert job.params["seed"] == 42
 
 
-def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
+def _combine_view(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
+    return view
+
+
+def _pick_act(panel, act):
+    """Choose an act in the combine panel's dropdown, as a click on its row would."""
+    index = panel._category.findText(act)
+    panel._category.setCurrentIndex(index if index >= 1 else 0)
+
+
+def _pick_lane(panel, intent):
+    """Click the combine panel's lane radio; the group releases the other."""
+    radio = (panel._genau_radio if intent == recipe_match.GENAU
+             else panel._players_radio)
+    radio.setChecked(True)
+
+
+def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
     view._combine.image_slot.set_item("img")
     view._combine.video_slot.set_item("vid")
 
-    assert view.combine_selection() == ["img", "vid"]
+    assert view.combine_selection() == {
+        "image": "img", "video": "vid",
+        "intent": recipe_match.PLAYERS, "category": "",
+    }
+
+
+def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
+    # All four are choices the user made, and none is recoverable from the
+    # others: an act says nothing about which lane answers it.
+    view = _combine_view(qtbot, tmp_path)
+    view._combine.image_slot.set_item("img")
+    _pick_lane(view._combine, recipe_match.GENAU)
+    _pick_act(view._combine, "beta")
+
+    assert view.combine_selection() == {
+        "image": "img", "video": None,
+        "intent": recipe_match.GENAU, "category": "beta",
+    }
 
 
 def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
+    view = _combine_view(qtbot, tmp_path)
+
+    view.restore_combine_selection({"image": "img", "video": "vid"})
+
+    assert view._combine.image_slot.current_id() == "img"
+    assert view._combine.video_slot.current_id() == "vid"
+
+
+def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
+
+    view.restore_combine_selection(
+        {"image": "img", "intent": recipe_match.GENAU, "category": "beta"})
+
+    assert view._combine.selected_intent() == recipe_match.GENAU
+    assert view._combine.selected_category() == "beta"
+    assert view._combine._generate_btn.isEnabled()  # an image and a recipe: ready
+
+
+def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
+    # The lane decides which acts are answerable, and what could be answered when
+    # the session closed may not be now — a video binned, or the lane itself
+    # changed. A greyed act must not come back selected: the buttons would be
+    # live on a pick that can only report "no recipe yet".
+    view = _combine_view(qtbot, tmp_path)
+
+    view.restore_combine_selection(
+        {"image": "img", "intent": recipe_match.GENAU, "category": "dancing"})
+
+    assert view._combine.selected_intent() == recipe_match.GENAU
+    assert view._combine.selected_category() == ""
+
+
+def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
+        qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(["img", "vid"])
 
@@ -9727,26 +9795,25 @@ def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
 
 
 def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_path):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
+    view = _combine_view(qtbot, tmp_path)
 
     # image slot given a deleted id; video slot given an image (wrong kind)
-    view.restore_combine_selection(["ghost", "img"])
+    view.restore_combine_selection({"image": "ghost", "video": "img"})
 
     assert view._combine.image_slot.current_id() is None   # "ghost" no longer exists
     assert view._combine.video_slot.current_id() is None   # "img" isn't an i2v recipe
 
 
 def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
+    view = _combine_view(qtbot, tmp_path)
 
     view.restore_combine_selection(None)          # nothing saved yet
     view.restore_combine_selection(["only-one"])  # malformed
 
-    assert view.combine_selection() == [None, None]
+    assert view.combine_selection() == {
+        "image": None, "video": None,
+        "intent": recipe_match.PLAYERS, "category": "",
+    }
 
 
 def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):

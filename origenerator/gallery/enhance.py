@@ -73,13 +73,6 @@ ENHANCE_SETTING_KEYS = (
     "enhance_denoise", "enhance_detail_fixes",
 )
 
-# Everything a finished level is identified by. This used to carry the detail
-# pass's two detector files on top of the panel's knobs, because a level made by
-# a spoken "fix teeth" and one made by the generic faces-&-hands pass differed
-# by nothing else; ``enhance_detail_fixes`` names the parts itself, so the
-# panel's knobs are now the whole identity.
-ENHANCE_LEVEL_KEYS = ENHANCE_SETTING_KEYS
-
 # What a folder's settings leave to the source image rather than pinning: the
 # refining checkpoint, which by default is whichever one made the image, so an
 # enhanced image stays in its own style. The subpanel offers this as an option
@@ -100,7 +93,7 @@ def default_enhance_params() -> dict:
 def _level_knobs(params: dict) -> dict:
     """The knobs one enhancement is remembered by, out of whatever it recorded.
 
-    :data:`ENHANCE_LEVEL_KEYS` filtered off ``params``, with the detail pass
+    :data:`ENHANCE_SETTING_KEYS` filtered off ``params``, with the detail pass
     read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
     so a level recorded under the old tick-and-two-detectors shape comes back as
     the parts it fixed, and captions, re-runs and duplicate checks all see one
@@ -108,7 +101,7 @@ def _level_knobs(params: dict) -> dict:
     an enhancement whose knobs are unknown must stay indistinguishable from one
     that recorded nothing at all, which is what an empty ``params`` means.
     """
-    knobs = {k: v for k, v in params.items() if k in ENHANCE_LEVEL_KEYS}
+    knobs = {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}
     fixes = detail_fixes_of(params)
     if fixes:
         knobs["enhance_detail_fixes"] = fixes
@@ -419,7 +412,7 @@ def _knobs(params: dict) -> dict:
     gaps — the parts its detail pass redrew included, since a targeted fix and
     a plain enhancement differ by nothing else."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
-    base = {k: defaults[k] for k in ENHANCE_LEVEL_KEYS if k in defaults}
+    base = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
     base["checkpoint"] = MATCH_SOURCE_MODEL
     base.update(_level_knobs(params))
     return base
@@ -731,7 +724,7 @@ def _graph_level_params(row: dict) -> dict:
             fixes[detector_part_label(model.rsplit("/", 1)[-1])] = denoise
     if fixes:
         found["enhance_detail_fixes"] = fixes
-    return {k: v for k, v in found.items() if v is not None and k in ENHANCE_LEVEL_KEYS}
+    return {k: v for k, v in found.items() if v is not None and k in ENHANCE_SETTING_KEYS}
 
 
 def _linked_inputs(graph: dict, ref) -> dict:

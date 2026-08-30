@@ -77,7 +77,6 @@ from origenerator.gallery.voice_commands import (
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
-    ENHANCE_LEVEL_KEYS,
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
     MATCH_SOURCE_MODEL,
@@ -142,7 +141,7 @@ from origenerator.gallery.tree import (
 # not here.
 __all__ = [
     "ALL_KEY", "ALL_LABEL", "AllGroup", "BASE_RENDER_SOURCE", "CustomGroup",
-    "ENHANCE_COMMAND", "ENHANCE_LEVEL_KEYS", "ENHANCE_SETTING_KEYS",
+    "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS",
     "ENHANCE_WORKFLOW", "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND",
     "LoraGroup", "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY",
     "SettingsGroup", "SourceImageGroup", "WorkflowGroup", "all_group",

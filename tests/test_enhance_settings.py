@@ -557,7 +557,7 @@ def test_a_repeated_spoken_fix_reads_as_the_duplicate_it_is(tmp_path, monkeypatc
     _seed_source(db)
     first = fix_params_for(db.get_generation("src"), _spoken("fix teeth"))
     _add_and_fold(db, "e1", "image_enhance_00001_.png",
-                  **{k: first[k] for k in gallery.ENHANCE_LEVEL_KEYS})
+                  **{k: first[k] for k in gallery.ENHANCE_SETTING_KEYS})
     row = db.get_generation("src")
 
     # Asking again would remake the level it already has; a different part is a

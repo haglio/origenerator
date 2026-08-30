@@ -49,10 +49,6 @@ _.playing  # noqa  # unused method: ambient_audio.py:65, osr2_stroke_driver.py:1
 base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62
 
-# origenerator/gui/combine_panel.py
-_.set_intent  # noqa  # unused method: combine_panel.py:156
-_.set_category  # noqa  # unused method: combine_panel.py:178
-
 # origenerator/gui/corner_controls.py
 _.set_starred  # noqa  # unused method: corner_controls.py:172, thumbnail_widget.py:184
 

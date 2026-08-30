@@ -153,11 +153,6 @@ class CombinePanel(QWidget):
         """``PLAYERS`` or ``GENAU`` — which lane the chosen recipe is answered from."""
         return GENAU if self._genau_radio.isChecked() else PLAYERS
 
-    def set_intent(self, intent: str):
-        """Select the ``PLAYERS``/``GENAU`` radio; anything else selects players."""
-        self._genau_radio.setChecked(intent == GENAU)
-        self._players_radio.setChecked(intent != GENAU)
-
     def _on_intent_changed(self, _button, checked: bool):
         """Announce the new lane once, on the radio that just went on.
 
@@ -174,12 +169,6 @@ class CombinePanel(QWidget):
         """The picked act, or "" when the neutral "-" option (index 0) is selected."""
         index = self._category.currentIndex()
         return self._category.currentText() if index >= 1 else ""
-
-    def set_category(self, category: str):
-        """Select ``category`` (a member of ``CATEGORIES``), or the neutral option
-        for anything else."""
-        index = self._category.findText(category)
-        self._category.setCurrentIndex(index if index >= 1 else 0)
 
     def set_available_categories(self, available: Collection[str]):
         """Gray out every act the current lane has no recipe for — nothing to mine and

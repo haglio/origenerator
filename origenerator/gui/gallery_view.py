@@ -3817,8 +3817,9 @@ class GalleryView(QWidget):
         word about the app or the slide in front of the speaker, or an order
         about the picture — each with the side it named, if it named one.
 
-        A bare command with no wrapper round it named no side, which is what
-        every utterance was before the room had two shows to aim at.
+        An order about the picture always arrives wrapped in a
+        :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
+        how the side travels, and the matchers put every one of them in it.
         """
         if isinstance(matched, ShelfCommand):
             self._play_shelf_aloud(matched)
@@ -3829,14 +3830,15 @@ class GalleryView(QWidget):
                 self._run_app_command(matched.command, matched.side)
             else:
                 self._on_picture_command(matched)
-        elif isinstance(matched, ShowCommand):
-            self._run_show_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
         elif isinstance(matched, DialSetting):
             self._set_stroke_dial(matched)
         else:
-            self._on_picture_command(SurfaceCommand(matched))
+            # The two matchers between them produce exactly the five above. A
+            # sixth kind arriving is a new matcher nobody wired through to here,
+            # and dropping it silently is how that goes unnoticed for a release.
+            logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
 
     def _answer_command(self, message: str):
         """Say what a spoken command did, where the speaker is looking — the
@@ -3848,7 +3850,7 @@ class GalleryView(QWidget):
         else:
             self._show_voice_status(message, transient=True)
 
-    def _run_show_command(self, command: ShowCommand, side: str | None = None):
+    def _run_show_command(self, command: ShowCommand, side: str | None):
         """Get the show going, hold it, or close it — on *side*'s region when
         the utterance named one, else on the show that is up.
 

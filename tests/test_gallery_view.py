@@ -11763,10 +11763,10 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
     surface = _VoiceSurface("img_act")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
     assert len(_spoken_genau_rows(view)) == 1
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
     assert len(_spoken_genau_rows(view)) == 1
@@ -11784,8 +11784,8 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     surface = _VoiceSurface("img_act")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
     assert len(thinking) == 1
@@ -11802,7 +11802,7 @@ def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, mo
                         lambda *a, **k: None)
     view._slideshow = _VoiceSurface("img_act")
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert view._genau_resolving == set()
 
@@ -11815,12 +11815,12 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
     surface = _VoiceSurface("img_act")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (made,) = _spoken_genau_rows(view)
     view._db.update_generation(made["prompt_id"], status="completed",
                                output_files=json.dumps([{"filename": "loop_2.mp4"}]))
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
     assert len(_spoken_genau_rows(view)) == 1
@@ -11833,11 +11833,11 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._slideshow = _VoiceSurface("img_act")
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (failed,) = _spoken_genau_rows(view)
     view._db.update_generation(failed["prompt_id"], status="error")
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert len(_spoken_genau_rows(view)) == 2
 
@@ -11856,7 +11856,7 @@ def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monke
     surface.note_voice_run = lambda prompt_id, message: notes.append((prompt_id, message))
     view._slideshow = surface
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert asked == []
     assert (None, gallery_view_module.ALREADY_GENAUD) in notes
@@ -11871,7 +11871,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     view._generate_category("img_act", "dancing", recipe_match.GENAU)
     view._slideshow = _VoiceSurface("img_act")
 
-    view._on_voice_command(gallery.GENAU_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert len(_spoken_genau_rows(view)) == 1
 
@@ -11886,7 +11886,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     surface = _VoiceSurface("g0")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     (job,) = view._reroll_jobs.values()
     assert job.workflow.name == "image_enhance"
@@ -11911,7 +11911,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_pa
     surface = _VoiceSurface("g0")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 this one is enhanced already")
     assert view._reroll_jobs == {}
@@ -11927,7 +11927,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
     surface = _VoiceSurface("g0")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 only a finished image can be enhanced")
     assert view._reroll_jobs == {}
@@ -11945,7 +11945,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     surface = _VoiceSurface("g0")
     view._slideshow = surface
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 this one has no file to enhance")
     assert view._reroll_jobs == {}
@@ -11961,7 +11961,7 @@ def test_a_spoken_enhance_with_no_show_up_presses_the_bank_button(qtbot, tmp_pat
     _set_enhance(view, params={"enhance_steps": 29})
     _select_first_leaf(view)
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     (job,) = view._reroll_jobs.values()
     assert job.workflow.name == "image_enhance"
@@ -11976,7 +11976,7 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._on_voice_command(gallery.ENHANCE_COMMAND)
+    view._on_voice_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert view._voice_status.text() == "🎤 Nothing here to enhance"
     assert view._reroll_jobs == {}

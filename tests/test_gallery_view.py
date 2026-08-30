@@ -8667,7 +8667,7 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     view._combine_generate("img", "vid")
 
     row, = view._queue.rows()
-    assert row.note() == "Starting…"
+    assert row._note_text == "Starting…"
     assert view._reroll_jobs == {}    # and nothing has been submitted for it yet
 
     deferred[0]()                     # the launch the row was standing in for

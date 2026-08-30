@@ -279,7 +279,7 @@ def test_a_live_frame_updates_the_rows_without_rebuilding_them(queue):
                            job_kind="I2V")])
 
     assert queue.rows()[1] is row
-    assert row.lead() == "~10 min · I2V"
+    assert row._lead.text() == "~10 min · I2V"
 
 
 # --- cancel, spelled the way the Generate tab spells it -----------------------
@@ -370,7 +370,7 @@ def test_the_row_does_not_repeat_the_wait(queue):
     # line's business, and belongs to the half that carries the bar it is holding
     # up — repeated down every row it says nothing about any of them.
     queue.set_items([_item(status="queued", foreign_ahead=3)])
-    assert queue.rows()[0].note() == ""
+    assert queue.rows()[0]._note_text == ""
 
 
 def test_the_wait_is_written_under_the_bar_it_explains(queue):
@@ -400,7 +400,7 @@ def test_the_users_own_queue_needs_no_explaining(queue):
     # says more than it always says.
     queue.set_items([_item(key="a", foreign_ahead=0),
                      _item(key="b", status="queued", foreign_ahead=0)])
-    assert [row.note() for row in queue.rows()] == ["", ""]
+    assert [row._note_text for row in queue.rows()] == ["", ""]
     assert _timing(queue) == ""
 
 
@@ -410,7 +410,7 @@ def test_a_held_row_says_what_it_is_waiting_on(queue):
     # A line that stops moving with the GPU idle is a mystery worth ending, and
     # this one ends by closing the show.
     queue.set_items([_item(status="queued", held=True)])
-    assert queue.rows()[0].note() == "Held until the slideshow closes"
+    assert queue.rows()[0]._note_text == "Held until the slideshow closes"
 
 
 def test_the_free_half_says_the_hold_when_nothing_of_ours_runs(queue):
@@ -729,7 +729,7 @@ def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
     # price comes before the recipe — which is the same for every row of a folder
     # being re-rolled and so tells you nothing about the wait.
     queue.set_items([_item(typical_seconds=126.0, job_kind="I2V")])
-    assert queue.rows()[0].lead() == "~2 min · I2V"
+    assert queue.rows()[0]._lead.text() == "~2 min · I2V"
 
 
 def test_a_row_says_when_nobody_typed_its_prompt(queue):
@@ -737,12 +737,12 @@ def test_a_row_says_when_nobody_typed_its_prompt(queue):
     # loop makes one every few seconds, and a spoken request never touched a form.
     queue.set_items([_item(typical_seconds=30.0, job_kind="Image",
                            auto_generating=True, requested=True)])
-    assert queue.rows()[0].lead() == "~30 sec · Image · Auto · Request"
+    assert queue.rows()[0]._lead.text() == "~30 sec · Image · Auto · Request"
 
 
 def test_a_hand_launched_job_says_neither(queue):
     queue.set_items([_item(typical_seconds=30.0, job_kind="Image")])
-    assert queue.rows()[0].lead() == "~30 sec · Image"
+    assert queue.rows()[0]._lead.text() == "~30 sec · Image"
 
 
 def test_a_row_names_the_act_it_was_asked_for(queue):
@@ -751,14 +751,14 @@ def test_a_row_names_the_act_it_was_asked_for(queue):
     # two runs on the same picture.
     queue.set_items([_item(typical_seconds=126.0, job_kind="I2V",
                            recipe_category="dancing")])
-    assert queue.rows()[0].lead() == "~2 min · I2V · dancing"
+    assert queue.rows()[0]._lead.text() == "~2 min · I2V · dancing"
 
 
 def test_a_run_nobody_picked_an_act_for_names_none(queue):
     # A dropped video is the recipe itself: there was no dropdown choice to show,
     # and inventing one from its prompt would be a guess the row states as fact.
     queue.set_items([_item(typical_seconds=126.0, job_kind="I2V")])
-    assert queue.rows()[0].lead() == "~2 min · I2V"
+    assert queue.rows()[0]._lead.text() == "~2 min · I2V"
 
 
 def test_the_hover_spells_out_where_the_act_came_from(queue):
@@ -769,14 +769,14 @@ def test_the_hover_spells_out_where_the_act_came_from(queue):
 
 def test_a_workflow_nobody_has_timed_admits_it(queue):
     queue.set_items([_item(typical_seconds=None, job_kind="Image")])
-    assert queue.rows()[0].lead() == "~? · Image"
+    assert queue.rows()[0]._lead.text() == "~? · Image"
 
 
 def test_an_unregistered_workflow_leads_with_the_price_alone(queue):
     # An old import this build has no template for: it claims no kind rather than
     # guess one, and the row still says what it will cost.
     queue.set_items([_item(typical_seconds=30.0, job_kind="")])
-    assert queue.rows()[0].lead() == "~30 sec"
+    assert queue.rows()[0]._lead.text() == "~30 sec"
 
 
 def test_the_lead_outlives_a_row_that_is_explaining_a_wait(queue):
@@ -786,8 +786,8 @@ def test_the_lead_outlives_a_row_that_is_explaining_a_wait(queue):
                      _item(key="b", status="queued", held=True,
                            typical_seconds=600.0, job_kind="I2V")])
     row = queue.rows()[1]
-    assert row.lead() == "~10 min · I2V"
-    assert row.note() == "Held until the slideshow closes"
+    assert row._lead.text() == "~10 min · I2V"
+    assert row._note_text == "Held until the slideshow closes"
 
 
 def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
@@ -861,15 +861,15 @@ def test_a_row_that_is_not_a_job_yet_says_so(queue):
                            cancel=None, starting=True)])
     row = queue.rows()[0]
 
-    assert row.note() == "Starting…"
-    assert row.lead() == "~? · I2V · dancing"   # what is known of it already
+    assert row._note_text == "Starting…"
+    assert row._lead.text() == "~? · I2V · dancing"   # what is known of it already
     assert row._cancel.isHidden()               # nothing on the server to stop yet
     assert "Not sent to ComfyUI yet" in row._lead.toolTip()
 
 
 def test_a_started_job_stops_saying_it_is_starting(queue):
     queue.set_items([_item(status="queued", job_kind="I2V")])
-    assert queue.rows()[0].note() == ""
+    assert queue.rows()[0]._note_text == ""
 
 
 def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
@@ -883,8 +883,8 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
     row = queue.rows()[0]
 
     assert row._note.text().endswith("…")
-    assert row.note() == "Held until the slideshow closes"
-    assert row._note.toolTip() == row.note()
+    assert row._note_text == "Held until the slideshow closes"
+    assert row._note.toolTip() == "Held until the slideshow closes"
 
 
 def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):

@@ -166,9 +166,16 @@ class RunningPreview(QWidget):
         self._caption.setVisible(bool(text) or self._item is None)
 
     def status_text(self) -> str:
-        """Whatever this half is saying about the head of the line: what the shared
-        server is holding it up with, if anything is, else its bar's own reading —
-        and, with nothing of ours in flight, that note about the server alone."""
+        """What this half is saying about the head of the line, as one string:
+        the server's hold if it has one, else the bar's own reading, and nothing
+        at all once nothing of ours is running -- a bar keeps its last reading,
+        and reporting that after the queue empties would be a stale clock.
+
+        No production caller: on screen these are two stacked widgets and the
+        half shows whichever has something to say. This is the strip's
+        inspection surface, kept because the caption-else-bar rule is one rule
+        and a second copy of it in a test helper is worse than a method.
+        """
         return self._caption.text() or (
             self._progress.caption() if self._item is not None else ""
         )
@@ -325,14 +332,6 @@ class QueueRow(QWidget):
         layout.addWidget(self._note, 1)
 
         self.update_item(item)
-
-    def lead(self) -> str:
-        """What the row says about the job: its price, its kind, and who asked."""
-        return self._lead.text()
-
-    def note(self) -> str:
-        """The wait this row is explaining, before any elision — ``""`` if none."""
-        return self._note_text
 
     def update_item(self, item):
         """Re-render this row in place — a queued→running flip, a fresh estimate,

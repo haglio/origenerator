@@ -122,5 +122,3 @@ projects_root  # noqa  # unused function: paths.py:30
 # origenerator/prompt_diff.py
 diff_html  # noqa  # unused function: prompt_diff.py:74
 
-# origenerator/recipe_match.py
-INTENTS  # noqa  # unused variable: recipe_match.py:61

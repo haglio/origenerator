@@ -57,7 +57,6 @@ base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62
 
 # origenerator/gui/gallery_view.py
-_match_voice_command  # noqa  # unused function: gallery_view.py:310
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023
 _._apply_selection  # noqa  # unused method: gallery_view.py:6199
 

@@ -59,9 +59,7 @@ from origenerator.voice.commands import (
     sided_app_command, split_side, voice_command_bias,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import (
-    ShowCommand, match_show_command, show_command_bias,
-)
+from origenerator.voice.show_commands import ShowCommand, show_command_bias
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.show_commands import ShowCommand
@@ -305,25 +303,6 @@ ALREADY_GENAUD = "🎤 already Genau'd"
 _VOICE_WANTS = {
     gallery.GENAU_COMMAND: "a Genau clip",
 }
-
-
-def _match_voice_command(text: str):
-    """The one command an utterance is, or ``None`` — the vocabularies that
-    tolerate a filler word or two, in the order they are tried.
-
-    The show's own controls, then everything said about the picture on screen
-    (:func:`~origenerator.gallery.voice_commands.match_command`, which owns that
-    half's order). Each matcher is strict about its own shape and none can claim
-    another's — a show command names the slideshow, a fix leads with "fix" — so
-    the order only decides which is asked first. Everything unclaimed falls
-    through to a prompt rewrite, which is why none of them may be loose.
-
-    The bare vocabulary (:mod:`origenerator.voice.app_commands`) is not here.
-    It matches whole utterances only, which is strict enough to be asked ahead
-    of an opening request — so the mic is given it separately, as its
-    ``bare_matcher``.
-    """
-    return match_show_command(text) or gallery.match_command(text)
 
 
 # The shelf each spoken shelf name stands you in. What to call it back comes

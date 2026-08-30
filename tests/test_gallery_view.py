@@ -7579,13 +7579,13 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
     assert view._queue.isVisible()
     assert view._queue.keys() == ["gen1"]
-    assert view._queue.running_preview().key == "gen1"
+    assert view._queue._running.key == "gen1"
 
     db.delete_generation("gen1")   # the job ends, its running row gone
     view._poll()
     assert view._queue.isVisible()                    # still holding its slot
     assert view._queue.keys() == []                   # but blank
-    assert view._queue.running_preview().key is None
+    assert view._queue._running.key is None
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
@@ -7607,7 +7607,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     # Filled at the opening rather than a poll and a half later, and with the
     # same rows and the same live half the docked strip is showing.
     assert floated.keys() == view._queue.keys() == ["gen1"]
-    assert floated.running_preview().key == "gen1"
+    assert floated._running.key == "gen1"
     assert not floated.isHidden()
 
     db.delete_generation("gen1")  # the job ends
@@ -7720,7 +7720,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     assert item.typical_seconds == 724.0   # the median of the three timed runs
 
     view._update_queue()
-    assert view._queue.running_preview().status_text() == "50% · 1:30 elapsed · ~6:02 left"
+    assert view._queue._running.status_text() == "50% · 1:30 elapsed · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
@@ -7734,7 +7734,7 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     view.refresh()
 
     assert view._inflight_items()[0].started_at is None
-    assert view._queue.running_preview().status_text() == ""
+    assert view._queue._running.status_text() == ""
 
 
 def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
@@ -10817,7 +10817,7 @@ def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview().status_text() == (
+    assert view._queue._running.status_text() == (
         "3 jobs from another app are queued on ComfyUI")
     assert not view._queue._clear.isHidden()
 
@@ -10827,7 +10827,7 @@ def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
 
     view._poll()
 
-    assert view._queue.running_preview().status_text() == ""
+    assert view._queue._running.status_text() == ""
     assert view._queue._clear.isHidden()
 
 
@@ -10911,7 +10911,7 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     client._foreign = ForeignQueue(running=[], pending=[])  # the clear empties it
     view._queue._clear.click()
 
-    assert view._queue.running_preview().status_text() == ""
+    assert view._queue._running.status_text() == ""
     assert view._queue._clear.isHidden()
 
 

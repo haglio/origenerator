@@ -334,9 +334,6 @@ class QueueRow(QWidget):
         """The wait this row is explaining, before any elision — ``""`` if none."""
         return self._note_text
 
-    def thumbs(self) -> QueueThumbs:
-        return self._thumbs
-
     def update_item(self, item):
         """Re-render this row in place — a queued→running flip, a fresh estimate,
         or an Auto toggle that changed what the button gets you."""
@@ -508,10 +505,6 @@ class GenerationQueue(QWidget):
         self.set_items([])
 
     # --- what the strip is showing -----------------------------------------
-
-    def running_preview(self) -> RunningPreview:
-        """The live half. Its ``key`` is ``None`` when nothing is being made."""
-        return self._running
 
     def sizeHint(self) -> QSize:
         """One progress bar tall, whatever is or isn't in it.

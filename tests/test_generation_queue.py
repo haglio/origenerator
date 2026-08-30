@@ -63,7 +63,7 @@ def test_keeps_its_slot_when_idle(queue):
     # doesn't shove the panes up. It stays laid out but blank.
     queue.set_items([])
     assert queue.isVisible()
-    assert queue.running_preview().key is None
+    assert queue._running.key is None
     assert queue.rows() == []
 
 
@@ -104,7 +104,7 @@ def test_the_live_half_stands_down_when_it_has_nothing_in_it(queue):
     queue.set_items([])
     QApplication.processEvents()
 
-    assert not queue.running_preview().isVisible()
+    assert not queue._running.isVisible()
 
 
 def test_the_live_half_keeps_its_place_to_report_another_apps_backlog(queue):
@@ -116,9 +116,9 @@ def test_the_live_half_keeps_its_place_to_report_another_apps_backlog(queue):
 
     hint_left = queue._hint.mapTo(queue, queue._hint.rect().topLeft()).x()
 
-    assert queue.running_preview().isVisible()
+    assert queue._running.isVisible()
     assert queue._hint.isVisible()
-    assert hint_left > queue.running_preview().geometry().right()
+    assert hint_left > queue._running.geometry().right()
 
 
 def test_the_live_half_comes_back_with_the_first_job(queue):
@@ -128,7 +128,7 @@ def test_the_live_half_comes_back_with_the_first_job(queue):
     queue.set_items([_item(key="a")])
     QApplication.processEvents()
 
-    assert queue.running_preview().isVisible()
+    assert queue._running.isVisible()
 
 
 def test_the_first_job_takes_the_space_back_from_the_hint(queue):
@@ -170,7 +170,7 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
     queue.set_items([_item(status="running", progress=(10, 20),
                            started_at=time.time() - 90.5, typical_seconds=725.0)])
     QApplication.processEvents()
-    preview = queue.running_preview()
+    preview = queue._running
 
     assert preview._progress.caption() == "50% · 1:30 elapsed · ~6:02 left"
     assert preview._progress.isTextVisible()
@@ -185,7 +185,7 @@ def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
 
     queue.set_items([_item(status="running")])
     QApplication.processEvents()
-    frame = queue.running_preview()._frame
+    frame = queue._running._frame
     corner = frame.mapTo(queue, frame.rect().bottomLeft())
 
     assert frame.width() == frame.height() == queue.height() - 1
@@ -203,7 +203,7 @@ def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
     queue.resize(800, 400)
     QApplication.processEvents()
 
-    assert queue.running_preview()._frame.height() == _STRIP_HEIGHT
+    assert queue._running._frame.height() == _STRIP_HEIGHT
     assert queue._scroll.height() > _STRIP_HEIGHT
 
 
@@ -232,7 +232,7 @@ def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
 
     queue.set_items([_item(status="running", frame=_png_bytes())])
     QApplication.processEvents()
-    frame = queue.running_preview()._frame
+    frame = queue._running._frame
 
     assert frame.pixmap().height() == frame.height()
 
@@ -242,16 +242,16 @@ def test_the_left_half_follows_the_job_being_made(queue):
         _item(key="a", caption="the one rendering", progress=(5, 20)),
         _item(key="b", caption="next", status="queued"),
     ])
-    assert queue.running_preview().key == "a"
-    assert queue.running_preview()._progress.maximum() == 20
-    assert queue.running_preview()._progress.value() == 5
+    assert queue._running.key == "a"
+    assert queue._running._progress.maximum() == 20
+    assert queue._running._progress.value() == 5
 
 
 def test_progress_is_indeterminate_without_step_counts(queue):
     # A queued job at the head, or a running one before its first progress tick,
     # shows a moving (indeterminate) bar rather than a stuck 0%.
     queue.set_items([_item(status="queued", progress=None)])
-    assert queue.running_preview()._progress.maximum() == 0
+    assert queue._running._progress.maximum() == 0
 
 
 def test_the_whole_queue_is_listed_the_job_being_made_first(queue):
@@ -265,7 +265,7 @@ def test_the_line_moves_up_when_the_leader_finishes(queue):
     queue.set_items([_item(key="a"), _item(key="b", status="queued")])
     queue.set_items([_item(key="b", status="running")])
     assert queue.keys() == ["b"]
-    assert queue.running_preview().key == "b"
+    assert queue._running.key == "b"
 
 
 def test_a_live_frame_updates_the_rows_without_rebuilding_them(queue):
@@ -380,7 +380,7 @@ def test_the_wait_is_written_under_the_bar_it_explains(queue):
 
     queue.set_items([_item(status="queued", foreign_ahead=3)])
     QApplication.processEvents()
-    half = queue.running_preview()
+    half = queue._running
 
     assert half._progress.isVisible() and half._progress.maximum() == 0  # sweeping
     assert half._caption.isVisible()
@@ -391,7 +391,7 @@ def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
     # Nothing is holding this one up, so there is nothing to explain and the line
     # under the bar stands down rather than sitting there empty.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
-    assert not queue.running_preview()._caption.isVisible()
+    assert not queue._running._caption.isVisible()
 
 
 def test_the_users_own_queue_needs_no_explaining(queue):
@@ -417,7 +417,7 @@ def test_the_free_half_says_the_hold_when_nothing_of_ours_runs(queue):
     queue.set_items([_item(key="a", status="queued", held=True),
                      _item(key="b", status="queued", held=True)])
 
-    assert queue.running_preview().key is None  # a held job has no frame to show
+    assert queue._running.key is None  # a held job has no frame to show
     assert _timing(queue) == "2 videos held until the slideshow closes"
 
 
@@ -431,14 +431,14 @@ def test_the_hold_is_said_before_another_apps_backlog(queue):
 def test_a_running_job_still_takes_the_half_while_others_are_held(queue):
     queue.set_items([_item(key="a", status="running", started_at=time.time() - 5.5),
                      _item(key="b", status="queued", held=True)])
-    assert queue.running_preview().key == "a"
+    assert queue._running.key == "a"
     assert "elapsed" in _timing(queue)
 
 
 # --- how long it's been, and how long is left ---------------------------------
 
 def _timing(queue) -> str:
-    return queue.running_preview().status_text()
+    return queue._running.status_text()
 
 
 def test_shows_how_far_along_it_is_the_elapsed_time_and_what_is_left(queue):
@@ -471,18 +471,18 @@ def test_the_clock_advances_between_polls(queue):
     # time.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
     assert _timing(queue) == "0:05 elapsed"
-    queue.running_preview()._item.started_at -= 3  # as if three seconds had gone by
-    queue.running_preview()._tick.timeout.emit()
+    queue._running._item.started_at -= 3  # as if three seconds had gone by
+    queue._running._tick.timeout.emit()
     assert _timing(queue) == "0:08 elapsed"
 
 
 def test_the_clock_stops_when_the_queue_empties(queue):
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
-    assert queue.running_preview()._tick.isActive()
+    assert queue._running._tick.isActive()
 
     queue.set_items([])
 
-    assert not queue.running_preview()._tick.isActive()
+    assert not queue._running._tick.isActive()
     assert _timing(queue) == ""
 
 
@@ -812,7 +812,7 @@ def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="I2V", source_image=frame,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0].thumbs()._showing == ("source", frame, None)
+    assert queue.rows()[0]._thumbs._showing == ("source", frame, None)
 
 
 def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
@@ -820,7 +820,7 @@ def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
     # in — what the same settings made last time.
     mates = tuple(_picture(tmp_path / f"{i}.png") for i in range(3))
     queue.set_items([_item(job_kind="Image", folder_thumbnails=mates)])
-    assert queue.rows()[0].thumbs()._showing == ("folder", mates)
+    assert queue.rows()[0]._thumbs._showing == ("folder", mates)
 
 
 def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_path):
@@ -829,7 +829,7 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
     mates = (_picture(tmp_path / "mate.png"),)
     queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
                            folder_thumbnails=mates)])
-    assert queue.rows()[0].thumbs()._showing == ("folder", mates)
+    assert queue.rows()[0]._thumbs._showing == ("folder", mates)
 
 
 def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path):
@@ -840,7 +840,7 @@ def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0].thumbs()._showing == ("source", frame, recipe)
+    assert queue.rows()[0]._thumbs._showing == ("source", frame, recipe)
 
 
 def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue, tmp_path):
@@ -851,7 +851,7 @@ def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue
     queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
                            recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
-    assert queue.rows()[0].thumbs()._showing == ("source", None, recipe)
+    assert queue.rows()[0]._thumbs._showing == ("source", None, recipe)
 
 
 def test_a_row_that_is_not_a_job_yet_says_so(queue):
@@ -898,14 +898,14 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     QApplication.processEvents()
     row = queue.rows()[0]
 
-    assert row._cancel.x() < row.thumbs().x() < row._lead.x() < row._note.x()
+    assert row._cancel.x() < row._thumbs.x() < row._lead.x() < row._note.x()
 
 
 def test_a_job_with_nothing_to_show_carries_no_block(queue):
     # The first run of a brand-new recipe: no frame, and an empty folder. An empty
     # grid would read as a picture that failed to load.
     queue.set_items([_item(job_kind="Image")])
-    assert queue.rows()[0].thumbs().isHidden()
+    assert queue.rows()[0]._thumbs.isHidden()
 
 
 def test_rows_are_the_height_that_shows_about_two_at_a_time(queue):
@@ -930,4 +930,4 @@ def test_the_bar_leaves_the_strip_to_the_queue(queue):
 
     _four(queue)
     QApplication.processEvents()
-    assert queue._scroll.width() > queue.running_preview().width()
+    assert queue._scroll.width() > queue._running.width()

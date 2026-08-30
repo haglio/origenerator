@@ -602,7 +602,7 @@ def test_the_queue_rides_along_in_the_shows_bottom_left(qtbot):
 
     plate = view._queue.geometry()
     assert view._queue.keys() == ["j1", "j2"]        # the rows themselves
-    assert view._queue.running_preview().key == "j1"  # and the live half
+    assert view._queue._running.key == "j1"  # and the live half
     assert plate.left() < view.width() // 2      # left…
     assert plate.top() > view.height() // 2      # …and low, clear of the console
     assert not plate.intersects(view._counter.geometry())  # beside it, not over it

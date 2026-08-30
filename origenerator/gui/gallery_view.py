@@ -889,17 +889,14 @@ class GalleryView(QWidget):
         # Hosted by Fun Time the rect is an upright column, so the panes fold
         # into _stack instead of sitting side by side: the info pane on top, the
         # tree and browser as one row under it, and the queue across the foot of
-        # all three.  _left_column goes unused there — hosted, the queue belongs
-        # to the window rather than to the folder column.
+        # all three: hosted, the queue belongs to the window rather than to the
+        # folder column, so there is no _left_column at all on that side.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
         self._folder_panes = QSplitter(Qt.Orientation.Horizontal)
         self._folder_panes.setChildrenCollapsible(False)
         self._folder_panes.setHandleWidth(6)
-        self._left_column = QSplitter(Qt.Orientation.Vertical)
-        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
-        self._left_column.setHandleWidth(6)
         self._stack = None
         if self._fun_time is not None:
             self._stack = QSplitter(Qt.Orientation.Vertical)
@@ -1252,6 +1249,9 @@ class GalleryView(QWidget):
             # reason to move it.  The folder panes go straight beside the tree.
             self._panes.addWidget(self._folder_panes)
         else:
+            self._left_column = QSplitter(Qt.Orientation.Vertical)
+            self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
+            self._left_column.setHandleWidth(6)
             self._left_column.addWidget(self._folder_panes)
             self._left_column.addWidget(self._queue)
             self._panes.addWidget(self._left_column)

@@ -5985,18 +5985,6 @@ class GalleryView(QWidget):
     def visible_prompt_ids(self) -> list[str]:
         return self._browser.visible_prompt_ids()
 
-    def visible_folder_keys(self) -> list[str]:
-        return self._browser.visible_folder_keys()
-
-    # --- browser-pane facade (the shelves/inflight the view drives into it) -
-
-    @property
-    def _inflight_cards(self) -> dict:
-        return self._browser._inflight_cards
-
-    def _showing_recents(self) -> bool:
-        return self._browser.showing_recents()
-
     def _media_types(self) -> set[str]:
         """The media types the gallery's two checkboxes currently include — what
         the folder tree, every shelf, the in-flight cards and the search index are
@@ -6021,15 +6009,6 @@ class GalleryView(QWidget):
         # select, so the folder-selected signal that normally re-syncs this
         # button never fires — and it went on offering a show of nothing.
         self._sync_slideshow_button()
-
-    def _drill_into(self, key: str):
-        self._browser._drill_into(key)
-
-    def _thumbnail_double_clicked(self, prompt_id: str):
-        self._browser._thumbnail_double_clicked(prompt_id)
-
-    def _on_inflight_clicked(self, key: str):
-        self._browser._on_inflight_clicked(key)
 
     def _inflight_items(self) -> list:
         return self._browser._inflight_items()
@@ -6167,24 +6146,10 @@ class GalleryView(QWidget):
 
     # --- selection ---------------------------------------------------------
 
-    def _thumbnail_clicked(self, prompt_id: str):
-        self._browser._thumbnail_clicked(prompt_id)
-
-    def _apply_selection(self, prompt_id: str, modifiers):
-        self._browser.apply_selection(prompt_id, modifiers)
-
     def selected_prompt_ids(self) -> list[str]:
         return self._browser.selected_prompt_ids()
 
-    @property
-    def _thumb_widgets(self) -> dict:
-        """The on-screen thumbnail widgets, owned by the browser pane."""
-        return self._browser._thumb_widgets
-
     # --- deletion & undo ---------------------------------------------------
-
-    def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        self._browser._thumbnail_context_menu(prompt_id, global_pos)
 
     def generation_menu(self, prompt_ids: list[str], global_pos):
         """The right-click menu a generation's picture offers, wherever it is shown.

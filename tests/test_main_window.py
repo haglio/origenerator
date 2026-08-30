@@ -633,9 +633,9 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     pid = gv._reroll_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
-    assert pid in gv._inflight_cards   # the running generation shows as a card
+    assert pid in gv._browser._inflight_cards   # the running generation shows as a card
 
-    gv._on_inflight_clicked(pid)       # click that card
+    gv._browser._on_inflight_clicked(pid)       # click that card
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
@@ -663,7 +663,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     gv = win._gallery_view
     gv.refresh()
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
-    assert "vid_run" in gv._inflight_cards
+    assert "vid_run" in gv._browser._inflight_cards
 
 
 def _seed_combine_db(tmp_path):

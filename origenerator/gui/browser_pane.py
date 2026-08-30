@@ -1354,9 +1354,6 @@ class BrowserPane:
     def visible_prompt_ids(self) -> list[str]:
         return list(self._visible_ids)
 
-    def visible_folder_keys(self) -> list[str]:
-        return list(self._visible_keys)
-
     # --- multi-selection ---------------------------------------------------
 
     def _thumbnail_clicked(self, prompt_id: str):

@@ -4248,13 +4248,13 @@ class GalleryView(QWidget):
         a player, so the readout — the lit button and the status line — says so
         without anything here having to draw it."""
         show = self._voice_surface(side)
-        if show is None or not hasattr(show, "toggle_f_mode"):
+        if show is None:
             self._show_voice_status(
                 "🎤 F-mode needs a show to narrow", transient=True)
             return
         show.toggle_f_mode()
         self._show_voice_status(
-            "🎤 F-mode on" if getattr(show, "hud_f_mode", False) else "🎤 F-mode off",
+            "🎤 F-mode on" if show.hud_f_mode else "🎤 F-mode off",
             transient=True)
 
     def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
@@ -4697,7 +4697,7 @@ class GalleryView(QWidget):
         """
         # Where it had got to, so the next one opens back on that slide: the
         # look at the folder behind a picture doesn't cost the place among them.
-        if show is not None and hasattr(show, "state"):
+        if show is not None:
             self._show_state = show.state()
         self._live_shows = [entry for entry in self._live_shows
                             if entry[0] is not show]
@@ -4803,8 +4803,7 @@ class GalleryView(QWidget):
         # Silent like every satellite: the session's main player owns the
         # room's audio, and this surface is landing on a satellite's region.
         # Standalone the same view is the deliberate foreground and plays sound.
-        if hasattr(view, "set_audio_muted"):
-            view.set_audio_muted(True)
+        view.set_audio_muted(True)
         rect = self._fun_time.region_rect(side)
         view.setGeometry(rect.x, rect.y, rect.width, rect.height)
         view.show()
@@ -4819,7 +4818,7 @@ class GalleryView(QWidget):
         # A show opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
-        if self._session_paused and hasattr(view, "set_session_paused"):
+        if self._session_paused:
             view.set_session_paused(True)
         self._wear_the_hud(view, side)
 
@@ -4839,7 +4838,7 @@ class GalleryView(QWidget):
         its own stills and plate still on — see :func:`_shared_hud_widget`.
         """
         hud = _shared_hud_widget()
-        if hud is None or not hasattr(view, "adopt_hud"):
+        if hud is None:
             return
         view.adopt_hud()
         hud(view, side=side,
@@ -4871,8 +4870,6 @@ class GalleryView(QWidget):
         # considers VISIBLE, and a show the session has covered or parked is
         # still a show that must not go on playing through a frozen room.
         for show, _where in list(self._live_shows):
-            if not hasattr(show, "set_session_paused"):
-                continue
             try:
                 show.set_session_paused(paused)
             except Exception:

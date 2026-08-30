@@ -8951,6 +8951,29 @@ class _VoiceSurface:
     def note_in_flight(self, prompt_ids):
         self.in_flight = set(prompt_ids)
 
+    # A real show is a SlideshowView, which answers all of these, and the view
+    # calls them without asking first. A stand-in that answered fewer would have
+    # to be guarded against in production, which is the same as saying the
+    # guards would exist for this class alone.
+    def state(self):
+        return None
+
+    def set_audio_muted(self, muted):
+        self.muted = muted
+
+    def toggle_f_mode(self):
+        self.f_mode = not getattr(self, "f_mode", False)
+
+    @property
+    def hud_f_mode(self):
+        return getattr(self, "f_mode", False)
+
+    def set_session_paused(self, paused):
+        self.session_paused = paused
+
+    def adopt_hud(self):
+        self.adopted = True
+
 
 def test_the_poll_runs_over_a_show_being_spoken_to(qtbot, tmp_path):
     # The 1.5s poll feeds every open show, and it lands mid-test wherever it

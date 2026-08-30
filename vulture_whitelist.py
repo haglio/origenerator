@@ -64,12 +64,6 @@ _.requesting_changes  # noqa  # unused method: generate_config_panel.py:862
 _.thumbs  # noqa  # unused method: generation_queue.py:337
 _.running_preview  # noqa  # unused method: generation_queue.py:512
 
-# origenerator/gui/info_pane_tabs.py
-_.preview_paused  # noqa  # unused method: info_pane_tabs.py:474
-
-# origenerator/gui/looping_preview.py
-previews_paused  # noqa  # unused function: looping_preview.py:79
-
 # origenerator/gui/osr2_stroke_driver.py
 _.set_cruise  # noqa  # unused method: osr2_stroke_driver.py:257
 _.cruising  # noqa  # unused property: osr2_stroke_driver.py:272

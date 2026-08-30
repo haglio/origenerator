@@ -462,18 +462,14 @@ class InfoPaneTabs(QTabWidget):
         showing a still takes it inertly; one showing a video stops.
 
         Remembered, not just applied: a tab opened (or re-pointed at a video)
-        while the room is frozen has to open frozen too, which is why
-        :meth:`preview_paused` exists for a panel to ask on the way up.  The
-        looping thumbnails around these previews are held elsewhere and
-        app-wide — see :mod:`origenerator.gui.looping_preview`.
+        while the room is frozen has to open frozen too, so ``_add_subtab``
+        pushes the remembered flag into every panel it builds.  The looping
+        thumbnails around these previews are held elsewhere and app-wide — see
+        :mod:`origenerator.gui.looping_preview`.
         """
         self._previews_paused = paused
         for panel in self._config_panels():
             panel.set_preview_paused(paused)
-
-    def preview_paused(self) -> bool:
-        """Whether a preview built now should open held."""
-        return self._previews_paused
 
     def show_selection_preview(self, preview, prompt_id: str):
         """Point the current tab's preview at ``preview`` (a resolved

@@ -3,17 +3,17 @@ import subprocess
 import sys
 from pathlib import Path
 
-from origenerator.paths import ensure_shared_ui_on_path, projects_root
+from origenerator.paths import ensure_shared_ui_on_path, sibling_checkout
 
 
-def test_projects_root_contains_shared_ui():
-    root = projects_root()
-    assert (root / "shared_ui" / "__init__.py").exists()
+def test_the_shared_ui_checkout_holds_the_package_of_the_same_name():
+    checkout = sibling_checkout("shared_ui")
+    assert (checkout / "shared_ui" / "__init__.py").exists()
 
 
 def test_ensure_shared_ui_on_path_makes_it_importable_and_is_idempotent():
     ensure_shared_ui_on_path()
-    root = str(projects_root())
+    root = str(sibling_checkout("shared_ui"))
     assert root in sys.path
 
     before = list(sys.path)

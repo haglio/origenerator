@@ -27,11 +27,6 @@ def sibling_checkout(name: str) -> Path:
     raise RuntimeError(f"Could not locate the {name} package above {here}")
 
 
-def projects_root() -> Path:
-    """Return the ``shared_ui`` checkout dir."""
-    return sibling_checkout("shared_ui")
-
-
 def ensure_sibling_on_path(name: str) -> None:
     """Put the *name* checkout on ``sys.path`` so ``name`` is importable.
 

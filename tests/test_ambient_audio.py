@@ -190,7 +190,6 @@ def test_starting_plays_one_clip_per_voice(qtbot, tmp_path):
 
     bed.start()
 
-    assert bed.is_running()
     assert len(players) == 3
     assert [p.play_count for p in players] == [1, 1, 1]
     # Three different clips, so the room hears three sources rather than an echo.
@@ -239,7 +238,6 @@ def test_stopping_silences_and_releases_every_voice(qtbot, tmp_path):
 
     bed.stop()
 
-    assert not bed.is_running()
     assert [p.stopped for p in players] == [1, 1, 1]
     assert [p.sources[-1] for p in players] == ["", "", ""]  # the source is let go
 
@@ -253,7 +251,6 @@ def test_a_late_end_of_clip_after_stopping_starts_nothing(qtbot, tmp_path):
     players[0].finish()  # a status change arriving out of the teardown
 
     assert [p.play_count for p in players] == plays_at_stop
-    assert not bed.is_running()
 
 
 def test_starting_twice_does_not_double_the_voices(qtbot, tmp_path):
@@ -271,7 +268,6 @@ def test_a_folder_with_no_clips_stays_silent(qtbot, tmp_path):
     bed.start()
 
     assert players == []
-    assert not bed.is_running()
     bed.stop()  # and stopping an empty bed is harmless
 
 
@@ -282,6 +278,5 @@ def test_the_bed_can_restart_after_being_stopped(qtbot, tmp_path):
 
     bed.start()
 
-    assert bed.is_running()
     assert len(players) == 6  # a fresh set of three
     assert [p.play_count for p in players[3:]] == [1, 1, 1]

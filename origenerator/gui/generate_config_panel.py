@@ -859,10 +859,6 @@ class GenerateConfigPanel(QWidget):
             self._param_form.clear_prompt_rewrites()
         self._apply_generate_caption()
 
-    def requesting_changes(self) -> str | None:
-        """The folder this tab is rewriting the prompt of, or ``None``."""
-        return None if self._folder_request is None else self._folder_request["folder_key"]
-
     # --- displaying a saved generation (the browsed selection) ----------------
 
     def show_saved_generation(self, row: dict, image_rows: list[dict], request=None):

@@ -1790,7 +1790,6 @@ def test_showing_a_generation_ends_the_request(requesting, tmp_path):
     requesting.show_saved_generation(row, [])
 
     from origenerator.gui import tracked_prompt
-    assert requesting.requesting_changes() is None
     assert all(tracked_prompt.baseline(w) is None
                for w in requesting._param_form.text_fields())
     assert requesting._generate_btn.text() == "Generate"
@@ -1809,7 +1808,6 @@ def test_ending_the_request_gives_the_prompts_their_undo_back(requesting):
 def test_picking_another_workflow_ends_the_request(requesting):
     requesting._workflow_combo.setCurrentIndex(_combo_index(requesting, "wan22_i2v"))
 
-    assert requesting.requesting_changes() is None
     assert requesting._generate_btn.text() == "Generate"
 
 

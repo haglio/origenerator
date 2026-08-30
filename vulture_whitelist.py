@@ -61,9 +61,6 @@ _match_voice_command  # noqa  # unused function: gallery_view.py:310
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023
 _._apply_selection  # noqa  # unused method: gallery_view.py:6199
 
-# origenerator/gui/generate_config_panel.py
-_.requesting_changes  # noqa  # unused method: generate_config_panel.py:862
-
 # origenerator/gui/generation_queue.py
 _.thumbs  # noqa  # unused method: generation_queue.py:337
 _.running_preview  # noqa  # unused method: generation_queue.py:512

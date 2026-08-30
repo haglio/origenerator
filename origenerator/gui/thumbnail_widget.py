@@ -181,13 +181,6 @@ class ThumbnailWidget(QWidget):
     def is_starred(self) -> bool:
         return self._starred
 
-    def set_starred(self, starred: bool):
-        """Fill or hollow the corner star as the item's bookmark is toggled."""
-        if starred == self._starred:
-            return
-        self._starred = starred
-        self._sync_controls()
-
     def enhance_state(self) -> str | None:
         """What this tile's enhance corner is saying, or ``None`` where it has no
         plus at all (:mod:`origenerator.gui.corner_controls`)."""

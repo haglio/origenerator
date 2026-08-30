@@ -56,9 +56,6 @@ _.pwszVal  # noqa  # origenerator/win32.py:147
 base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62
 
-# origenerator/gui/corner_controls.py
-_.set_starred  # noqa  # unused method: corner_controls.py:172, thumbnail_widget.py:184
-
 # origenerator/gui/gallery_view.py
 _match_voice_command  # noqa  # unused function: gallery_view.py:310
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023

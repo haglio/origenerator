@@ -293,17 +293,6 @@ def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
     assert all(not b.isHidden() for b in _corners(tw))
 
 
-def test_set_starred_fills_the_corner_star_live(qtbot):
-    tw = ThumbnailWidget("p1", None, "label")
-    qtbot.addWidget(tw)
-    star = _corners(tw)[0]
-    was = star.icon().cacheKey()
-    tw.set_starred(True)
-    assert tw.is_starred() is True and star.icon().cacheKey() != was
-    tw.set_starred(False)
-    assert tw.is_starred() is False and star.icon().cacheKey() == was
-
-
 def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
     # A knob turned on the Enhance panel changes what every picture on screen
     # would get from a press, and none of those tiles were touched.

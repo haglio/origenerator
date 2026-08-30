@@ -169,15 +169,6 @@ class CornerControls(QObject):
         self._available = False
         self._sync()
 
-    def set_starred(self, starred: bool):
-        """Follow a bookmark toggled from anywhere: this corner, the menu, the
-        button bank. Idempotent, so a rebuild that re-asserts the same state
-        doesn't redraw."""
-        if starred == self._starred:
-            return
-        self._starred = starred
-        self._redraw()
-
     def set_enhance(self, enhance: str | None):
         """Follow the enhance corner's reading changing under the item — which a
         turn of the Enhance panel's knobs does to every picture on screen at

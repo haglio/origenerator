@@ -10,12 +10,11 @@ constants this repo has accumulated. It also keeps the report readable, since
 `unittest.mock` assigns `return_value` and `side_effect` on throwaway objects and
 vulture reports every one of them.
 
-`vulture_whitelist.py` has two halves. The first is the framework false
-positives, permanent by nature — Qt hooks the C++ event loop calls, a ctypes
-struct field COM reads. The second is everything the scan reported on the day
-the gate went in: the gate had to come before the deletions or they would have
-had nothing watching them, so those names are recorded rather than judged.
-Emptying that half is backlog item 24.
+`vulture_whitelist.py` holds nothing but callers vulture cannot follow — Qt's
+C++ event loop, sqlite3, COM, player_core, one string-dispatch table. It had a
+second half when the gate went in, the 38 names the first scan reported and
+nobody had yet judged; backlog item 24 emptied it, deleting each name or giving
+it a reader.
 """
 from __future__ import annotations
 

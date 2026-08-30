@@ -7,6 +7,13 @@ that actually calls it.
 
 `tests/test_dead_code.py` fails on an entry that has stopped suppressing
 anything, so nothing may stay here once its subject is gone.
+
+Everything in it is now a caller vulture cannot follow -- Qt's C++ event loop,
+sqlite3, COM, player_core, one string-dispatch table. The section this file
+opened with, the 38 names the first scan reported and nobody had yet judged, is
+empty: backlog item 24 read each one and either deleted it or gave it a reader.
+An entry added here from now on says which of those five it is, or it does not
+belong.
 """
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
@@ -37,18 +44,3 @@ _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch
 # --- ctypes PROPVARIANT fields consumed by COM IPropertyStore (win32.py: _set_lnk_aumid) ---
 _.vt  # noqa  # origenerator/win32.py:146
 _.pwszVal  # noqa  # origenerator/win32.py:147
-
-# --- Reported when this gate went in, 2026-08-30: not yet judged -----------
-#
-# Every line below is something vulture reports today. They are here so the
-# gate could be turned on before the deletions rather than after -- backlog
-# item 24 is the pass that reads each one and either deletes it or gives it a
-# caller, and this section is that item's worklist. It is meant to reach zero;
-# nothing new belongs in it.
-#
-# Nothing here was deleted while the gate went in: within a repo the order is
-# tests first, then deletions, and most of these are accessors some test still
-# calls, so removing one changes what the suite covers. The cheap end to start
-# from is what vulture is most certain of -- the two unused imports in
-# `gui/stroke_panel.py` and the unused local in `gui/reroll_controller.py`.
-

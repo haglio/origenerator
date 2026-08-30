@@ -117,8 +117,6 @@ GENAU_SOURCE = _CONTENT["genau_source"]
 # library root because that root is private and must stay out of source.
 CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
 
-THUMB_SIZE = (256, 256)
-
 # --- Funscript / OSR2 -------------------------------------------------------
 # Each generated video gets a funscript synthesized alongside it (see
 # funscript.py). The motion isn't measured from the video — it's a steady stroke

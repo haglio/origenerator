@@ -48,9 +48,6 @@ _.playing  # noqa  # unused method: ambient_audio.py:65, osr2_stroke_driver.py:1
 # origenerator/comfyui_client.py
 _.fetch_output_file  # noqa  # unused method: comfyui_client.py:446
 
-# origenerator/config.py
-THUMB_SIZE  # noqa  # unused variable: config.py:120
-
 # origenerator/experiments/policy.py
 base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62

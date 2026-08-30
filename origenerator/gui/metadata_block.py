@@ -1,11 +1,13 @@
-"""Render a generation's read-only metadata as a compact block of sections.
+"""Render a generation's read-only metadata as one compact titled block.
 
 Sits in the info-pane tab's footer, under the editable form, and shows only what
-the form can't: the output file, when the run happened, its status and source,
-and any parameter the workflow lays out no field for. The section/item model lives
-in :mod:`origenerator.generation_metadata`; this does the Qt rendering.
+the form can't: the output file and when the run happened. Everything else the
+block once carried has a better home — a parameter the workflow lays out no
+field for is a read-only row in the form itself, and an image's files are
+versions, listed with the level that made each. The model lives in
+:mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
-Each section is a titled block of ``label: value`` rows; a row gains a
+The block is a titled set of ``label: value`` rows; a row gains a
 copy-to-clipboard button when its item declares copyable text (a filename).
 """
 
@@ -17,7 +19,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics
 
-from origenerator.generation_metadata import MetaItem, MetaSection, build_sections
+from origenerator.generation_metadata import MetaItem, MetaSection, basic_section
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
@@ -50,17 +52,17 @@ class MetadataBlock(QWidget):
         self._container: QWidget | None = None
 
     def show_row(self, row: dict) -> bool:
-        """Render this row's sections, reporting whether it had any.
+        """Render this row's section, reporting whether it had one.
 
         An image usually has none — every file it holds is a version, listed
         with the enhancement level that made it — and a caller shows this block
         only when there is something in it, rather than leaving a bare gap above
         the form."""
-        sections = build_sections(row)
-        self._render(sections)
-        return bool(sections)
+        section = basic_section(row)
+        self._render(section)
+        return section is not None
 
-    def _render(self, sections: list[MetaSection]):
+    def _render(self, section: MetaSection | None):
         if self._container is not None:
             # setParent(None) drops it from this block's children at once (so a
             # rebuild's findChildren/layout sees only the new rows); deleteLater
@@ -72,7 +74,7 @@ class MetadataBlock(QWidget):
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        for section in sections:
+        if section is not None:
             layout.addWidget(_build_section(section))
         self._container = container
         self._outer.addWidget(container)

@@ -183,7 +183,7 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     # The file information is per enhancement, so it belongs to the level that
     # made the file rather than to one block at the top of the pane. The top
     # block is then left with nothing to say about an image at all.
-    from origenerator.generation_metadata import build_sections, file_item
+    from origenerator.generation_metadata import basic_section, file_item
 
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -195,7 +195,7 @@ def test_each_version_carries_its_own_file_row(tmp_path):
         ("Enhance 1", "image/image_enhance_00001_.png"),
         ("Original", "image/sdxl_t2i_src.png"),
     ]
-    assert build_sections(row) == []
+    assert basic_section(row) is None
 
 
 # --- an enhancement the live app never recorded, arriving as a bare file -----

@@ -1,6 +1,6 @@
 import json
 
-from origenerator.generation_metadata import build_sections
+from origenerator.generation_metadata import basic_section
 
 
 def _row(**overrides):
@@ -31,14 +31,10 @@ def _image_row(**overrides):
     })
 
 
-def _section(sections, title):
-    return next(s for s in sections if s.title == title)
-
-
 # --- section layout --------------------------------------------------------
 
 def test_basic_leads_with_the_output_file_and_the_date():
-    items = _section(build_sections(_row(created_at="2026-07-01")), "Basic").items
+    items = basic_section(_row(created_at="2026-07-01")).items
     assert items[0].label == "File"
     assert items[0].value == "video/clip.mp4"
     assert items[1].label == "Created"
@@ -49,7 +45,7 @@ def test_file_shows_the_subfolder_path_but_copies_just_the_filename():
     row = _row(output_files=json.dumps(
         [{"filename": "clip_00001.mp4", "subfolder": "video"}]
     ))
-    file_item = _section(build_sections(row), "Basic").items[0]
+    file_item = basic_section(row).items[0]
     assert file_item.value == "video/clip_00001.mp4"
     assert file_item.copy == "clip_00001.mp4"
 
@@ -58,7 +54,7 @@ def test_every_output_file_gets_its_own_row():
     row = _row(output_files=json.dumps([
         {"filename": "a.mp4", "subfolder": ""}, {"filename": "b.mp4", "subfolder": ""},
     ]))
-    files = [i.value for i in _section(build_sections(row), "Basic").items
+    files = [i.value for i in basic_section(row).items
              if i.label == "File"]
     assert files == ["a.mp4", "b.mp4"]
 
@@ -70,7 +66,7 @@ def test_file_item_reveals_the_absolute_output_path():
     from origenerator.config import COMFYUI_OUTPUT_DIR
 
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
-    file_item = _section(build_sections(row), "Basic").items[0]
+    file_item = basic_section(row).items[0]
     assert file_item.reveal == str(COMFYUI_OUTPUT_DIR / "video" / "clip.mp4")
 
 
@@ -79,45 +75,47 @@ def test_file_item_reveals_a_deleted_items_file_where_it_now_sits():
     # to follow them there, or it points at a folder the file left.
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video",
                                          "path": r"C:\state\trash\abc\0_clip.mp4"}]))
-    file_item = _section(build_sections(row), "Basic").items[0]
+    file_item = basic_section(row).items[0]
     assert file_item.reveal == r"C:\state\trash\abc\0_clip.mp4"
 
 
 # --- a deleted item's file line says how long it has been in the trash -------
 
 def test_a_deleted_items_file_line_leads_with_its_days_in_the_trash():
-    file_item = _section(build_sections(_row(days_in_trash=3)), "Basic").items[0]
+    file_item = basic_section(_row(days_in_trash=3)).items[0]
     assert file_item.value == "(3 days in trash) video/clip.mp4"
     assert file_item.copy == "clip.mp4"  # the copy button still hands over the name
 
 
 def test_one_day_in_the_trash_reads_as_one_day():
-    file_item = _section(build_sections(_row(days_in_trash=1)), "Basic").items[0]
+    file_item = basic_section(_row(days_in_trash=1)).items[0]
     assert file_item.value.startswith("(1 day in trash)")
 
 
 def test_an_item_binned_today_says_so_rather_than_counting_zero():
-    file_item = _section(build_sections(_row(days_in_trash=0)), "Basic").items[0]
+    file_item = basic_section(_row(days_in_trash=0)).items[0]
     assert file_item.value == "(deleted today) video/clip.mp4"
 
 
 def test_a_live_items_file_line_says_nothing_about_the_trash():
-    file_item = _section(build_sections(_row()), "Basic").items[0]
+    file_item = basic_section(_row()).items[0]
     assert file_item.value == "video/clip.mp4"
 
 
 def test_created_row_carries_no_reveal_path():
     # Only the output file is a real thing on disk; the date has nothing to reveal.
-    created = _section(build_sections(_row()), "Basic").items[1]
+    created = basic_section(_row()).items[1]
     assert created.label == "Created"
     assert created.reveal is None
 
 
-def test_basic_is_the_only_section():
+def test_a_passthrough_param_does_not_grow_a_second_block():
     # Params — editable or read-only passthrough — now live in the form itself, so
-    # this block is just the output file and its date; there's no Parameters section.
+    # this block stays the output file and its date whatever a row carries.
     row = _row(params_json=json.dumps({"vae": "x.safetensors"}))
-    assert [s.title for s in build_sections(row)] == ["Basic"]
+    section = basic_section(row)
+    assert section.title == "Basic"
+    assert [item.label for item in section.items] == ["File", "Created"]
 
 
 # --- an image's files belong to its versions, not to this block -------------
@@ -126,7 +124,7 @@ def test_an_image_has_no_block_at_all():
     # Its one file is its Original — listed down in the version list, beside the
     # enhancement (none, yet) that made it. Repeating it here under a second
     # label is exactly what moving it was for.
-    assert build_sections(_image_row()) == []
+    assert basic_section(_image_row()) is None
 
 
 def test_a_batch_still_lists_the_siblings_no_version_claims():
@@ -138,6 +136,6 @@ def test_a_batch_still_lists_the_siblings_no_version_claims():
         {"filename": "b.png", "subfolder": ""},
         {"filename": "c.png", "subfolder": ""},
     ]))
-    files = [i.value for i in _section(build_sections(row), "Basic").items
+    files = [i.value for i in basic_section(row).items
              if i.label == "File"]
     assert files == ["b.png", "c.png"]

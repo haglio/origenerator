@@ -104,7 +104,7 @@ def created_item(file: dict, fallback: str = "") -> MetaItem:
     return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def _basic(row: dict) -> MetaSection | None:
+def basic_section(row: dict) -> MetaSection | None:
     """The at-a-glance facts kept at the top: what this run produced, and when.
 
     ``None`` — no block at all — once every file the row holds is listed as a
@@ -121,7 +121,3 @@ def _basic(row: dict) -> MetaSection | None:
     items.append(MetaItem("Created", str(row.get("created_at", ""))))
     return MetaSection("Basic", items)
 
-
-def build_sections(row: dict) -> list[MetaSection]:
-    basic = _basic(row)
-    return [basic] if basic is not None else []

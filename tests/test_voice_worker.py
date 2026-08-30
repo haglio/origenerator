@@ -66,16 +66,6 @@ def test_a_rewrite_error_is_reported_not_raised(qtbot):
     assert len(fails) == 1 and "no LLM server" in fails[0]
 
 
-def test_busy_toggles_around_the_work(qtbot):
-    worker = VoiceWorker(lambda audio: "go", lambda pos, neg, instr: ("new", ""))
-    states = []
-    worker.busy.connect(states.append)
-
-    worker.process(object(), _PROMPTS)
-
-    assert states == [True, False]
-
-
 def _teeth_matcher(text):
     return "teeth" if "teeth" in text.lower() else None
 

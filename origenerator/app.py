@@ -207,7 +207,6 @@ def main(argv: list[str] | None = None):
         handlers=log_handlers,
     )
     logger = logging.getLogger(__name__)
-    logger.info("BUILD MARKERS: slideshow=random, voice=always-listening (Auto = voice on)")
 
     # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
     # above, and letting Qt re-read those flags would only invite collisions.

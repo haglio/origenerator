@@ -4677,16 +4677,16 @@ class GalleryView(QWidget):
         # set shuffles — and the show's HUD status line says which.
         base, orientation = _split_shelf_key(location)
         latest = base == _RECENTS_KEY
-        show = self._open_slideshow(
+        self._open_slideshow(
             items, location=location, side=side or orientation,
             resume=self._show_state,
             shuffle=(lambda order: None) if latest else None,
             order_label="Latest" if latest else "Shuffle",
             starred_ids=self._starred_prompt_ids(),
         )
-        logger.info("Slideshow of %s: %d items, %s order[:10]=%s",
+        logger.info("Slideshow of %s: %d items, %s",
                     self._slideshow_subject(), len(items),
-                    "latest" if latest else "shuffled", show._playlist.order[:10])
+                    "latest" if latest else "shuffled")
 
     def _on_slideshow_closed(self, show=None):
         """A show was dismissed (however): let it go, with the hold it put on

@@ -362,7 +362,7 @@ def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
 
 def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    job.detach()
+    job._detach()
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
     client.job_completed.emit("comfy-A", SDXL_HISTORY)

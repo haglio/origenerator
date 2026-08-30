@@ -781,7 +781,7 @@ def test_the_box_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     view._search_edit.setFixedWidth(
         metrics.horizontalAdvance("Search …" + leaf.text(0)) + 24)
 
-    scope = view._search_edit.scope()
+    scope = view._search_edit._scope
     placeholder = view._search_edit.placeholderText()
     assert placeholder.startswith("Search …")       # said to be cut, at the front
     tail = placeholder[len("Search …"):]
@@ -880,7 +880,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
 
     view._title.edit_requested.emit()
     view._title.edited.emit("Beach trip")
-    qtbot.waitUntil(lambda: view._search_edit.scope().endswith("Beach trip"))
+    qtbot.waitUntil(lambda: view._search_edit._scope.endswith("Beach trip"))
 
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
@@ -1212,7 +1212,7 @@ def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monk
     assert _press_ctrl_f(view, monkeypatch) is True
 
     assert view._find_bar.isVisible()
-    assert view._find.fields() == view._info_tabs.current_config_panel().prompt_fields()
+    assert view._find._fields == view._info_tabs.current_config_panel().prompt_fields()
 
 
 def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, monkeypatch):
@@ -1301,7 +1301,7 @@ def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, 
 
     view._info_tabs.setCurrentWidget(second)
 
-    assert view._find.fields() == second.prompt_fields()
+    assert view._find._fields == second.prompt_fields()
     assert view._find.count() == 0
     assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
 
@@ -5848,10 +5848,10 @@ def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
 
-    assert view._reroll.videos_held is True
+    assert view._reroll._videos_held is True
 
     view._slideshow.close()
-    assert view._reroll.videos_held is False  # closing lets the held ones run
+    assert view._reroll._videos_held is False  # closing lets the held ones run
 
 
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):

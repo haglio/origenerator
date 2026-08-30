@@ -83,9 +83,6 @@ class PromptFind:
         self._fields = list(fields)
         return self._run(reset=True)
 
-    def fields(self) -> list:
-        return list(self._fields)
-
     # --- searching ------------------------------------------------------------
 
     def search(self, query: str) -> int:

@@ -269,10 +269,6 @@ class GenerationJob(QObject):
             logger.warning("Failed to cancel job %s: %s", self.prompt_id, e)
         self._state = "canceled"
 
-    def detach(self):
-        """Stop reacting to the client without touching the server-side job."""
-        self._detach()
-
     def reconcile(self):
         """Finish this job from /history if its live completion was missed.
 

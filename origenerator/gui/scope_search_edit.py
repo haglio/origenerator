@@ -36,10 +36,6 @@ class ScopeSearchEdit(QLineEdit):
             self._scope = path
             self._render_placeholder()
 
-    def scope(self) -> str:
-        """The full, un-elided path the placeholder is showing some of."""
-        return self._scope
-
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._render_placeholder()  # a wider pane shows more of the path

@@ -549,11 +549,6 @@ class RerollController(QObject):
         """
         return [job.prompt_id for job in self._on_server + self._waiting]
 
-    @property
-    def videos_held(self) -> bool:
-        """Whether the slideshow's gate is currently keeping videos off the GPU."""
-        return self._videos_held
-
     def held_jobs(self) -> list:
         """The waiting jobs the gate is holding — what a surface names as held."""
         return queue_line.held_back(self._waiting, videos_held=self._videos_held)

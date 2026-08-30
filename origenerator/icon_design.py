@@ -15,7 +15,11 @@ from PIL import Image
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QImage, QPainter, QPainterPath
 
-from shared_ui.colors import PINK
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
+
+from shared_ui.colors import PINK  # noqa: E402
 
 CANVAS = 256  # icon master size
 INSET = 31  # glyph box offset within the canvas

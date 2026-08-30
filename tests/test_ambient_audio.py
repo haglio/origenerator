@@ -84,7 +84,6 @@ def test_a_voice_skips_a_clip_another_voice_has_on_air():
 
     assert rotation.next_clip(0) == Path("a")
     assert rotation.next_clip(1) == Path("b")  # "a" is taken, so it steps past it
-    assert rotation.playing() == [Path("a"), Path("b")]
 
 
 def test_finishing_a_clip_frees_it_for_the_other_voices():
@@ -92,8 +91,7 @@ def test_finishing_a_clip_frees_it_for_the_other_voices():
     rotation.next_clip(0)                       # voice 0 holds "a"
     rotation.next_clip(1)                       # voice 1 steps past it to "b"
 
-    rotation.next_clip(0)                       # voice 0 moves on, letting "a" go
-    assert rotation.playing() == [Path("c"), Path("b")]
+    assert rotation.next_clip(0) == Path("c")   # voice 0 moves on, letting "a" go
     assert rotation.next_clip(1) == Path("a")   # so "a" is available again
 
 
@@ -118,15 +116,7 @@ def test_more_voices_than_clips_doubles_up_rather_than_hanging():
 
 def test_an_empty_clip_set_hands_out_nothing():
     rotation = AmbientRotation([], 3)
-    assert rotation.next_clip(0) is None
-    assert rotation.playing() == [None, None, None]
-
-
-def test_release_takes_a_voice_off_air():
-    rotation = AmbientRotation(_clips("a", "b"), 2, shuffle=_in_order([0, 1]))
-    rotation.next_clip(0)
-    rotation.release(0)
-    assert rotation.playing() == [None, None]
+    assert [rotation.next_clip(v) for v in range(3)] == [None, None, None]
 
 
 # --- the players -----------------------------------------------------------

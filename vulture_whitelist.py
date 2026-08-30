@@ -21,6 +21,11 @@ _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_whe
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 
+# --- player_core reads this off the stroke state this app writes it on ---
+# `cruise_control` asks `direct.playing` whether the stroke is running before it
+# advances the wave stack; nothing here reads it back.
+_.playing  # noqa  # origenerator/gui/osr2_stroke_driver.py:146, origenerator/gui/osr2_stroke_driver.py:163
+
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
 
@@ -41,9 +46,6 @@ _.pwszVal  # noqa  # origenerator/win32.py:147
 # calls, so removing one changes what the suite covers. The cheap end to start
 # from is what vulture is most certain of -- the two unused imports in
 # `gui/stroke_panel.py` and the unused local in `gui/reroll_controller.py`.
-
-# origenerator/ambient_audio.py
-_.playing  # noqa  # unused method: ambient_audio.py:65, osr2_stroke_driver.py:146, osr2_stroke_driver.py:163
 
 # origenerator/experiments/policy.py
 base_prompt_id  # noqa  # unused variable: policy.py:61

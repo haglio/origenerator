@@ -484,7 +484,6 @@ def test_every_http_call_carries_a_timeout():
         lambda: client.cancel_prompt("pid"),
         lambda: client.fetch_history("pid"),
         client.fetch_queue,
-        lambda: client.fetch_output_file("out.png"),
     ]
     for call in calls:
         with patch("urllib.request.urlopen", return_value=_mock_response(200, body)) as m:

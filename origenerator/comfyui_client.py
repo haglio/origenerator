@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import urllib.error
-import urllib.parse
 import urllib.request
 import uuid
 from typing import NamedTuple
@@ -442,13 +441,3 @@ class ComfyUIClient(QThread):
         url = f"{self.base_url}/queue"
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             return json.loads(resp.read())
-
-    def fetch_output_file(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
-        params = urllib.parse.urlencode({
-            "filename": filename,
-            "subfolder": subfolder,
-            "type": folder_type,
-        })
-        url = f"{self.base_url}/view?{params}"
-        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
-            return resp.read()

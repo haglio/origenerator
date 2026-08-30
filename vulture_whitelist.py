@@ -45,9 +45,6 @@ _.pwszVal  # noqa  # origenerator/win32.py:147
 # origenerator/ambient_audio.py
 _.playing  # noqa  # unused method: ambient_audio.py:65, osr2_stroke_driver.py:146, osr2_stroke_driver.py:163
 
-# origenerator/comfyui_client.py
-_.fetch_output_file  # noqa  # unused method: comfyui_client.py:446
-
 # origenerator/experiments/policy.py
 base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62

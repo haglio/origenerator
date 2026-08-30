@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
-from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize
 
 from origenerator import (
     evolver_export, gallery, prompt_edit, recipe_match, recovery, search, timing,
@@ -51,17 +51,12 @@ from origenerator.gui.request_worker import RevisionWorker, ReviseTask
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
-from origenerator.voice.app_commands import (
-    AppCommand, DialSetting, app_command_bias, match_app_command,
-)
+from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
 from origenerator.voice.commands import (
     ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
     sided_app_command, split_side, voice_command_bias,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import ShowCommand, show_command_bias
-from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (

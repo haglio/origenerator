@@ -19,6 +19,8 @@ Emptying that half is backlog item 24.
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 from app_support.dead_code import assert_no_dead_code, assert_whitelist_is_live
@@ -38,3 +40,28 @@ def test_no_dead_code():
 
 def test_the_whitelist_still_suppresses_what_it_claims_to():
     assert_whitelist_is_live(*SCANNED, whitelist=WHITELIST)
+
+
+def test_nothing_is_imported_or_assigned_and_left_unread():
+    """The hole vulture cannot see: deadness local to one module.
+
+    Vulture resolves names across the whole tree it is handed, so an import
+    unused HERE but live in a sibling module does not report -- which is how
+    `gallery_view` came to carry three unread imports and a line repeated
+    twice over, and `comfyui_client` an `import urllib.parse` whose one caller
+    had gone. ruff answers per file.
+
+    It answers per file only where a file says what it exports: without an
+    ``__all__``, `gallery/__init__.py`'s ninety-odd deliberate re-exports report
+    as F401 and are the entire signal, so a genuinely accidental import there
+    could never be seen among them.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check",
+         "--output-format", "concise",
+         "--select", "F401,F811,F841",
+         *(str(target) for target in SCANNED)],
+        capture_output=True, text=True, cwd=str(ROOT),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -57,7 +57,7 @@ from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QMimeData, QSize, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
-    InFlightItem, discard_run_text, discard_run_tooltip, foreign_queue_text,
+    discard_run_text, discard_run_tooltip, foreign_queue_text,
     held_row_text, queue_held_text, queue_lead_text, queue_lead_tooltip,
     queue_wait_text, starting_row_text,
 )

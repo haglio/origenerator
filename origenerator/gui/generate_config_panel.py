@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
+    QWidget, QVBoxLayout, QFormLayout, QLabel,
     QPushButton, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal

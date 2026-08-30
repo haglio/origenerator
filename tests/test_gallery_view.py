@@ -2023,7 +2023,7 @@ def test_starred_shelf_collects_starred_items_as_thumbnails(qtbot):
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i2"]  # the starred item, on the shelf
-    assert view._thumb_widgets["i2"].is_starred() is True
+    assert view._thumb_widgets["i2"]._starred is True
 
 
 def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
@@ -2266,7 +2266,7 @@ def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeyp
 
     assert db.get_generation("i1")["starred"]                # persisted
     assert view._showing_recents()                           # still on the shelf
-    assert view._thumb_widgets["i1"].is_starred() is True    # tile updated on rebuild
+    assert view._thumb_widgets["i1"]._starred is True    # tile updated on rebuild
 
 
 def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_path, monkeypatch):
@@ -2964,7 +2964,7 @@ def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
     view._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.STAR)
 
     assert db.get_generation("i2")["starred"]
-    assert view._thumb_widgets["i2"].is_starred() is True   # redrawn on the rebuild
+    assert view._thumb_widgets["i2"]._starred is True   # redrawn on the rebuild
     assert not db.get_generation("i1").get("starred")
 
 
@@ -4471,8 +4471,8 @@ def test_a_starred_row_renders_a_starred_tile(qtbot):
     view.refresh()
     _open_leaf(view)
 
-    assert view._thumb_widgets["i1"].is_starred() is False
-    assert view._thumb_widgets["i2"].is_starred() is True
+    assert view._thumb_widgets["i1"]._starred is False
+    assert view._thumb_widgets["i2"]._starred is True
 
 
 def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
@@ -4490,7 +4490,7 @@ def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
     view._thumbnail_context_menu("i1", QPoint(0, 0))
 
     assert db.get_generation("i1")["starred"]           # persisted
-    assert view._thumb_widgets["i1"].is_starred() is True  # tile updated on rebuild
+    assert view._thumb_widgets["i1"]._starred is True  # tile updated on rebuild
 
 
 def test_right_click_unstar_clears_a_starred_thumbnail(qtbot, monkeypatch):
@@ -9360,14 +9360,14 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._browser._thumb_widgets["g0"]._enhancing is None
 
     view.enhance_items(["g0"])
 
     # The launch redraws the folder, so the tile to watch is the one now up.
     tile = view._browser._thumb_widgets["g0"]
-    assert tile.is_enhancing()
-    assert not view._browser._thumb_widgets["g1"].is_enhancing()
+    assert tile._enhancing is not None
+    assert view._browser._thumb_widgets["g1"]._enhancing is None
 
     (job,) = view._reroll.all_jobs
     view._client.preview_image.emit(job.prompt_id, _png_bytes())
@@ -9379,7 +9379,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     # partial render of a file that never landed.
     view._reroll._jobs.clear()
     view._reconcile_pending_enhancements()
-    assert not tile.is_enhancing()
+    assert tile._enhancing is None
 
 
 def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
@@ -9398,7 +9398,7 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     _open_recents(view)
 
     assert job.prompt_id not in view._inflight_cards
-    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._browser._thumb_widgets["g0"]._enhancing is not None
     assert view._queue.keys() == [job.prompt_id]
 
 
@@ -9419,7 +9419,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
     view.refresh()          # the launch's transient row is in the DB now
 
     assert view.visible_prompt_ids() == ["g0", "g2", "g1"]
-    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._browser._thumb_widgets["g0"]._enhancing is not None
 
 
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
@@ -9437,7 +9437,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
-    assert tiles["g0"].is_enhancing() and tiles["g1"].is_enhancing()
+    assert tiles["g0"]._enhancing is not None and tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"  # still waiting in the line, never sent
     assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
@@ -10924,12 +10924,12 @@ def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_p
     view.refresh()
     _select_first_leaf(view)
     tile = view._browser._thumb_widgets["g0"]
-    assert not tile.is_enhancing()
+    assert tile._enhancing is None
 
     view.enhance_items(["g0"])
     view._rerender_current_leaf()
 
-    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    assert view._browser._thumb_widgets["g0"]._enhancing is not None
 
 
 def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):

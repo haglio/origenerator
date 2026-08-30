@@ -248,7 +248,7 @@ def test_a_starred_tile_shows_it_in_the_star(qtbot):
     tw = ThumbnailWidget("p1", None, "label", starred=True)
     qtbot.addWidget(tw)
     star, trash, _plus = _corners(tw)
-    assert tw.is_starred() is True
+    assert tw._starred is True
     assert not star.isHidden() and not trash.isHidden()
 
 
@@ -464,7 +464,7 @@ def _png_bytes(color=(30, 90, 160)):
 def test_a_resting_tile_wears_neither_overlay(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
-    assert tw.is_enhancing() is False
+    assert tw._enhancing is None
     assert tw._enhancing_overlay.isHidden()
     assert tw._enhancing_bar.isHidden()
 
@@ -477,7 +477,7 @@ def test_an_enhancing_tile_says_so_over_the_picture_and_on_a_bar(qtbot):
         progress=(10, 20), started_at=time.time() - 90.5, typical_seconds=725.0))
     qtbot.addWidget(tw)
 
-    assert tw.is_enhancing() is True
+    assert tw._enhancing is not None
     assert tw._enhancing_overlay.text() == "Enhancing…"
     assert tw._enhancing_bar.caption() == "50% · ~6:02 left"
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
@@ -549,7 +549,7 @@ def test_the_run_ending_takes_both_overlays_away(qtbot):
 
     tw.set_enhancing(None)
 
-    assert tw.is_enhancing() is False
+    assert tw._enhancing is None
     assert tw._enhancing_overlay.isHidden()
     assert tw._enhancing_bar.isHidden()
     assert not tw._enhancing_tick.isActive()

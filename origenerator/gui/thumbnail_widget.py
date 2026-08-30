@@ -178,9 +178,6 @@ class ThumbnailWidget(QWidget):
         self._selected = selected
         self._apply_styles()
 
-    def is_starred(self) -> bool:
-        return self._starred
-
     def enhance_state(self) -> str | None:
         """What this tile's enhance corner is saying, or ``None`` where it has no
         plus at all (:mod:`origenerator.gui.corner_controls`)."""
@@ -209,9 +206,6 @@ class ThumbnailWidget(QWidget):
             self._controls.hide_all()
         else:
             self._controls.show_for(starred=self._starred, enhance=self._enhance)
-
-    def is_enhancing(self) -> bool:
-        return self._enhancing is not None
 
     def set_enhancing(self, run: EnhancingRun | None):
         """Show the enhancement being made of this image, or clear it away.

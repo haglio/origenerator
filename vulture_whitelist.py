@@ -113,6 +113,3 @@ _.tree_for  # noqa  # unused method: split_folder_tree.py:126
 _.is_starred  # noqa  # unused method: thumbnail_widget.py:181
 _.is_enhancing  # noqa  # unused method: thumbnail_widget.py:220
 
-# origenerator/prompt_diff.py
-diff_html  # noqa  # unused function: prompt_diff.py:74
-

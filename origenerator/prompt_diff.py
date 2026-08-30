@@ -10,23 +10,16 @@ tells the truth about a revision however it was produced. Word-level, because
 that is the grain a prompt reads at — a changed term should show as a term
 replaced, not as a scatter of altered letters.
 
-Pure and Qt-free: :func:`diff_spans` is the model, :func:`diff_html` the rich
-text a ``QLabel`` draws.
+Pure and Qt-free: :func:`diff_spans` is the model, and the two surfaces that
+show a diff paint it themselves with ``QTextCharFormat``.
 """
 
-import html
 import re
 from difflib import SequenceMatcher
 
 SAME = "same"
 REMOVED = "removed"
 ADDED = "added"
-
-# What went is struck through in red; what arrived is lit. Deliberately not the
-# gallery's accent blue, which already means "selected" everywhere else here.
-_REMOVED_COLOR = "#ff3c3c"
-_ADDED_BG = "#1f4d2a"
-_ADDED_COLOR = "#d8f5de"
 
 # Words, numbers (decimal point included, so a weight is one piece), whitespace
 # runs, and every other character on its own — so a rebuilt run is
@@ -69,25 +62,3 @@ def diff_spans(before: str, after: str) -> list:
             spans += [(REMOVED, token) for token in old[i1:i2]]
             spans += [(ADDED, token) for token in new[j1:j2]]
     return _merge(spans)
-
-
-def diff_html(before: str, after: str) -> str:
-    """The same diff as rich text — removals struck through, additions lit.
-
-    Whitespace between changed words is marked along with them, so a highlight
-    reads as one continuous phrase; the text itself is escaped, since a prompt
-    may legitimately contain angle brackets (a LoRA tag) or ampersands.
-    """
-    out = []
-    for kind, text in diff_spans(before, after):
-        escaped = html.escape(text).replace("\n", "<br>")
-        if kind == REMOVED:
-            out.append(f'<s style="color: {_REMOVED_COLOR};">{escaped}</s>')
-        elif kind == ADDED:
-            out.append(
-                f'<span style="background-color: {_ADDED_BG}; '
-                f'color: {_ADDED_COLOR};">{escaped}</span>'
-            )
-        else:
-            out.append(escaped)
-    return "".join(out)

@@ -342,7 +342,7 @@ def test_a_clicked_generation_makes_the_resting_tab_the_preview_tab(tabs):
     tabs.load_selection(cat, [cat])
 
     assert tabs._preview_panel is resting
-    assert tabs.tabBar().preview_index() == tabs.indexOf(resting)
+    assert tabs.tabBar()._preview_index == tabs.indexOf(resting)
 
 
 def test_pinning_the_front_tab_sends_the_next_click_to_a_new_one(tabs):
@@ -369,7 +369,7 @@ def test_only_one_tab_is_ever_the_preview_tab(tabs):
 
     fresh = tabs.current_config_panel()
     assert tabs._preview_panel is fresh
-    assert tabs.tabBar().preview_index() == tabs.indexOf(fresh)
+    assert tabs.tabBar()._preview_index == tabs.indexOf(fresh)
 
 
 def test_pinning_a_tab_that_was_never_the_preview_one_is_harmless(tabs):
@@ -388,7 +388,7 @@ def test_pinning_a_tab_that_was_never_the_preview_one_is_harmless(tabs):
 def test_the_resting_tab_opens_italic(tabs):
     # Nothing has been done in it, so the next open takes it over — which is
     # what the slant says.
-    assert tabs.tabBar().preview_index() == tabs.indexOf(tabs.currentWidget())
+    assert tabs.tabBar()._preview_index == tabs.indexOf(tabs.currentWidget())
 
 
 def test_picking_a_workflow_in_the_resting_tab_takes_its_italic_off(tabs):
@@ -396,7 +396,7 @@ def test_picking_a_workflow_in_the_resting_tab_takes_its_italic_off(tabs):
     # someone made.
     _pick_workflow(tabs.currentWidget())
 
-    assert tabs.tabBar().preview_index() == -1
+    assert tabs.tabBar()._preview_index == -1
 
 
 def test_an_opened_tab_wears_the_italic_mark_too(tabs):
@@ -408,7 +408,7 @@ def test_an_opened_tab_wears_the_italic_mark_too(tabs):
     opened = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})
 
     assert tabs._preview_panel is opened
-    assert tabs.tabBar().preview_index() == tabs.indexOf(opened)
+    assert tabs.tabBar()._preview_index == tabs.indexOf(opened)
 
 
 def test_an_open_takes_over_a_blank_tab_that_is_not_in_front(tabs):
@@ -459,7 +459,7 @@ def test_closing_the_preview_tab_leaves_no_tab_marked(tabs):
     tabs._close_subtab(tabs.currentIndex())
 
     assert tabs._preview_panel is None
-    assert tabs.tabBar().preview_index() == -1
+    assert tabs.tabBar()._preview_index == -1
 
 
 def test_the_italic_mark_follows_a_dragged_tab(tabs):
@@ -471,7 +471,7 @@ def test_the_italic_mark_follows_a_dragged_tab(tabs):
 
     tabs.tabBar().moveTab(tabs.indexOf(preview), 1)
 
-    assert tabs.tabBar().preview_index() == tabs.indexOf(preview) == 1
+    assert tabs.tabBar()._preview_index == tabs.indexOf(preview) == 1
 
 
 def test_an_edited_tab_on_another_folder_is_left_alone(tabs):
@@ -625,7 +625,7 @@ def test_double_clicking_a_tab_takes_its_italic_off(tabs):
     tabs._pin_subtab(tabs.indexOf(preview))
 
     assert tabs._preview_panel is None
-    assert tabs.tabBar().preview_index() == -1
+    assert tabs.tabBar()._preview_index == -1
 
 
 def test_double_clicking_a_tab_that_was_never_italic_is_harmless(tabs):

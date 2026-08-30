@@ -59,9 +59,6 @@ _.set_starred  # noqa  # unused method: corner_controls.py:172, thumbnail_widget
 # origenerator/gui/diff_text.py
 showing_diff  # noqa  # unused function: diff_text.py:111
 
-# origenerator/gui/eliding_tab_bar.py
-_.preview_index  # noqa  # unused method: eliding_tab_bar.py:130
-
 # origenerator/gui/gallery_view.py
 _match_voice_command  # noqa  # unused function: gallery_view.py:310
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023

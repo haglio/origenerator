@@ -8102,7 +8102,7 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
 
     assert tabs.count() == before  # no "New generation" left standing beside it
     panel = tabs.current_config_panel()
-    assert tabs.tabBar().preview_index() == tabs.indexOf(panel)
+    assert tabs.tabBar()._preview_index == tabs.indexOf(panel)
 
 
 def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_path, monkeypatch):

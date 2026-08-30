@@ -125,8 +125,8 @@ class ThumbnailWidget(QWidget):
         self._apply_styles()
 
         # In a mixed listing (the Recents shelf) a corner badge names the kind;
-        # inside a single-type folder the caller leaves it off as redundant. It
-        # takes the top-right, the one corner the controls below leave alone.
+        # inside a single-type folder the caller leaves it off as redundant. Which
+        # corner it takes is MediaBadge's own business, and it says so.
         if media_type:
             MediaBadge(media_type, self)
 

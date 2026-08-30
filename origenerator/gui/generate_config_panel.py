@@ -103,10 +103,10 @@ class GenerateConfigPanel(QWidget):
     File/Created block above the editable form and, at its bottom, the displayed
     generation's related media, then a single button bank
     (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
-    There's no status line —
-    Generate itself doubles as the progress bar, filling as a run advances, and its
-    caption says when a press will draw a fresh seed rather than re-create a
-    generation these settings have already made. The
+    There's no status line: Generate only ever submits, and a run in flight is
+    watched in the strip's queue and on the browser pane's card. Its caption says
+    when a press will draw a fresh seed rather than re-create a generation these
+    settings have already made. The
     preview is driven from outside: a browsed selection's output, a running
     re-roll's live frames, or this config's newest matching result when idle.
 

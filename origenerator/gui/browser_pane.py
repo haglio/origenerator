@@ -182,9 +182,6 @@ class BrowserPane:
         self._visible_ids: list[str] = []   # generations on screen, in shown order
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
-        # Whether the room is OmniPaused: the tiles loop little clips of
-        # themselves, and a rebuild draws new ones, so this is remembered and
-        # re-applied rather than edged onto whatever was on screen at the time.
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf

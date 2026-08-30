@@ -71,10 +71,6 @@ _.requesting_changes  # noqa  # unused method: generate_config_panel.py:862
 _.thumbs  # noqa  # unused method: generation_queue.py:337
 _.running_preview  # noqa  # unused method: generation_queue.py:512
 
-# origenerator/gui/param_form.py
-_._width_label  # noqa  # unused attribute: param_form.py:144, param_form.py:362
-_._height_label  # noqa  # unused attribute: param_form.py:145, param_form.py:363
-
 # origenerator/gui/thumbnail_widget.py
 _.is_starred  # noqa  # unused method: thumbnail_widget.py:181
 _.is_enhancing  # noqa  # unused method: thumbnail_widget.py:220

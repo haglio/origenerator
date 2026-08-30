@@ -42,7 +42,6 @@ class DropSlot(QWidget):
         grayscale: bool = False,
     ):
         super().__init__(parent)
-        self._kind = kind          # "image"/"video" — which badge this slot wears
         self._accepts = accepts
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder

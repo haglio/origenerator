@@ -412,7 +412,7 @@ class RerollController(QObject):
         Each preempted experiment is dropped exactly as a hand-cancel would drop
         it: interrupted or dequeued, its abandoned row deleted.
         """
-        for key, jobs in list(self._jobs.items()):
+        for jobs in list(self._jobs.values()):
             for job in list(jobs):
                 if job.source == "experiment":
                     logger.info(
@@ -432,7 +432,7 @@ class RerollController(QObject):
         )
         # Persist the job's live progress onto its row so a restart mid-run can resume
         # the bar at its last position (see GenerationJob.reconnect(progress_state=…)).
-        job.progress.connect(lambda value, mx, j=job: self._persist_progress(j))
+        job.progress.connect(lambda *_, j=job: self._persist_progress(j))
 
     def _persist_progress(self, job: GenerationJob):
         """Write a running job's progress to its row, throttled to spare the disk."""

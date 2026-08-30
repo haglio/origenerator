@@ -74,9 +74,6 @@ _.set_starred  # noqa  # unused method: corner_controls.py:172, thumbnail_widget
 # origenerator/gui/diff_text.py
 showing_diff  # noqa  # unused function: diff_text.py:111
 
-# origenerator/gui/drop_slot.py
-_._kind  # noqa  # unused attribute: drop_slot.py:45
-
 # origenerator/gui/eliding_tab_bar.py
 _.preview_index  # noqa  # unused method: eliding_tab_bar.py:130
 
@@ -111,9 +108,6 @@ _._height_label  # noqa  # unused attribute: param_form.py:145, param_form.py:36
 
 # origenerator/gui/prompt_find.py
 _.current_field  # noqa  # unused method: prompt_find.py:141
-
-# origenerator/gui/reroll_controller.py
-mx  # noqa  # unused variable: reroll_controller.py:435
 
 # origenerator/gui/split_folder_tree.py
 _.tree_for  # noqa  # unused method: split_folder_tree.py:126

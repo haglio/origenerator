@@ -26,6 +26,11 @@ supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 # advances the wave stack; nothing here reads it back.
 _.playing  # noqa  # origenerator/gui/osr2_stroke_driver.py:146, origenerator/gui/osr2_stroke_driver.py:163
 
+# --- reached by name, from the table a spoken word is dispatched through ---
+# `gallery_view._VOICE_STROKE` maps AppCommand.CRUISE_ON/CRUISE_OFF to the string
+# "set_cruise", which `_turn_stroke_knob` hands to getattr.
+_.set_cruise  # noqa  # origenerator/gui/osr2_stroke_driver.py:257
+
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
 
@@ -65,10 +70,6 @@ _.requesting_changes  # noqa  # unused method: generate_config_panel.py:862
 # origenerator/gui/generation_queue.py
 _.thumbs  # noqa  # unused method: generation_queue.py:337
 _.running_preview  # noqa  # unused method: generation_queue.py:512
-
-# origenerator/gui/osr2_stroke_driver.py
-_.set_cruise  # noqa  # unused method: osr2_stroke_driver.py:257
-_.cruising  # noqa  # unused property: osr2_stroke_driver.py:272
 
 # origenerator/gui/param_form.py
 _._width_label  # noqa  # unused attribute: param_form.py:144, param_form.py:362

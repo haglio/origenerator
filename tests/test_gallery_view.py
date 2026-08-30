@@ -12306,13 +12306,13 @@ def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.speak("cruise on")
-    assert view._osr2_stroke.cruising
+    assert view._osr2_stroke.state.cruise.active
 
     view._voice.speak("cruise on")       # already on: still ends up on
-    assert view._osr2_stroke.cruising
+    assert view._osr2_stroke.state.cruise.active
 
     view._voice.speak("cruise off")
-    assert not view._osr2_stroke.cruising
+    assert not view._osr2_stroke.state.cruise.active
 
 
 def test_a_stroke_knob_answers_from_a_show_too(qtbot, tmp_path):

@@ -14,9 +14,11 @@ a value has a practical range or a known trap, it says that too. Kept Qt-free so
 the text is unit-testable, and a guard test keeps every registered workflow's
 params covered — a new param must be explained before it can ship.
 
-Params with no field of their own (a hidden VAE, an import's extras) are here
-too: the form renders them as read-only rows, and a row you cannot change is
-exactly the one you most want explained.
+An import's extras are here too: the form renders those as read-only rows, and a
+row you cannot change is exactly the one you most want explained. A key in
+:data:`~origenerator.gui.param_sections.HIDDEN_KEYS` is not -- the form gives it
+no row at all, editable or read-only, so a line written for it could never be
+read by anyone.
 """
 
 # Keyed by param name; the value is the whole tooltip. Second person, no
@@ -154,11 +156,6 @@ PARAM_HELP: dict[str, str] = {
     "shift_low": "Where the low-noise stage spends its effort: lower favors fine detail.",
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
-    "enhance": (
-        "Whether this run finishes with the upscale and low-denoise re-sample. "
-        "Enhancement is applied as a separate layer now, from the Enhance panel, "
-        "so nothing sets this by hand any more."
-    ),
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. "
         "2x is the usual finish; past 3x the pass has to invent a lot."
@@ -223,20 +220,6 @@ PARAM_HELP: dict[str, str] = {
         "picture. It watches the finished motion while it scores."
     ),
     "audio_negative_prompt": "Sounds to keep out of the generated soundtrack.",
-
-    # --- output ---
-    "batch_size": (
-        "How many images this run makes from one prompt. Each gets its own file; "
-        "they are siblings of one run, not versions of one image."
-    ),
-    "crf": (
-        "The video encoder's quality dial, where lower means a bigger, cleaner "
-        "file. It affects the saved file only, never what was generated."
-    ),
-    "filename_prefix": (
-        "The folder and name stem the output is saved under, inside ComfyUI's "
-        "output directory. ComfyUI appends its own counter."
-    ),
 }
 
 

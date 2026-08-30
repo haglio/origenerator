@@ -49,9 +49,6 @@ _.playing  # noqa  # unused method: ambient_audio.py:65, osr2_stroke_driver.py:1
 base_prompt_id  # noqa  # unused variable: policy.py:61
 mutated_keys  # noqa  # unused variable: policy.py:62
 
-# origenerator/gallery/signatures.py
-workflow_param_order  # noqa  # unused function: signatures.py:190
-
 # origenerator/gui/ambient_audio.py
 _.is_running  # noqa  # unused method: ambient_audio.py:39
 

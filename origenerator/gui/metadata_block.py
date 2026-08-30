@@ -26,9 +26,7 @@ from origenerator.reveal import show_in_explorer
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import (
-    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BORDER_SUBTLE,
-)
+from shared_ui.colors import TEXT_SECONDARY, TEXT_MUTED
 
 _SELECTABLE = Qt.TextInteractionFlag.TextSelectableByMouse
 

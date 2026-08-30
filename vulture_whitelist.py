@@ -121,10 +121,6 @@ _.tree_for  # noqa  # unused method: split_folder_tree.py:126
 # origenerator/gui/stroke_hud.py
 CAPTION_CSS  # noqa  # unused variable: stroke_hud.py:19
 
-# origenerator/gui/stroke_panel.py
-console_rows  # noqa  # unused import: stroke_panel.py:35
-row_width  # noqa  # unused import: stroke_panel.py:35
-
 # origenerator/gui/thumbnail_widget.py
 _.is_starred  # noqa  # unused method: thumbnail_widget.py:181
 _.is_enhancing  # noqa  # unused method: thumbnail_widget.py:220

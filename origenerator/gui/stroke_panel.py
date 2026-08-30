@@ -32,7 +32,7 @@ from origenerator.paths import ensure_player_core_on_path
 ensure_player_core_on_path()
 
 from player_core import drive_layout  # noqa: E402
-from player_core.console import ConsoleModel, console_rows, row_width  # noqa: E402
+from player_core.console import ConsoleModel  # noqa: E402
 from player_core.console_hud import (  # noqa: E402
     ConsoleHud, ConsolePainter, ModeHud, hud_xy,
 )

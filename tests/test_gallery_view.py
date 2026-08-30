@@ -339,15 +339,6 @@ def _top_level(tree, orientation=LANDSCAPE):
             for i in range(half.topLevelItemCount())}
 
 
-def _media_roots(tree, orientation=LANDSCAPE):
-    """The Images / Videos rows, which hang under one side's All row."""
-    all_row = _top_level(tree, orientation).get("All")
-    if all_row is None:
-        return {}
-    return {all_row.child(i).text(0): all_row.child(i)
-            for i in range(all_row.childCount())}
-
-
 def _selected_folder(view):
     """Which folder the tree has open, with the side stripped — what a test that
     is not about the split itself means by "the selected folder"."""

@@ -2407,7 +2407,7 @@ class GalleryView(QWidget):
         self._run_search()
 
     def _search_scope(self) -> _SearchScope:
-        """What the search covers: its short name, its path, and what is in it.
+        """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A shelf
         counts: Recents, Starred, Experiments and Trash are each a collection of
@@ -2872,12 +2872,6 @@ class GalleryView(QWidget):
         label = timing.average_label(durations)
         self._avg_label.setText(f"Average time: {label}" if label else "")
 
-    # --- main view: folder tiles or thumbnails -----------------------------
-
-    # --- the Recents shelf: in-flight work, then recently finished items ----
-
-    # --- the Starred shelf: every bookmarked folder, gathered in one place ---
-
     # --- re-roll: a new variation of a folder's settings, here in the gallery
 
     def _can_reroll(self, group) -> bool:
@@ -2914,8 +2908,9 @@ class GalleryView(QWidget):
         panel = self._info_tabs.current_config_panel()
         return panel._preview if panel is not None else None
 
-    # The folder tree's key→item / prompt→item maps and shelf rows are owned by the
-    # GalleryTree renderer; surfaced here for navigation, selection, and rebuild.
+    # The folder tree's key→item and prompt→item maps are owned by the GalleryTree
+    # renderer; surfaced here for navigation, selection, and rebuild. A shelf's row
+    # is reached separately, through _shelf_item.
     @property
     def _item_by_key(self) -> dict:
         return self._tree_view.item_by_key

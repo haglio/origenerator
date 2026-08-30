@@ -62,9 +62,6 @@ showing_diff  # noqa  # unused function: diff_text.py:111
 # origenerator/gui/eliding_tab_bar.py
 _.preview_index  # noqa  # unused method: eliding_tab_bar.py:130
 
-# origenerator/gui/funscript_strip.py
-_.has_script  # noqa  # unused method: funscript_strip.py:33
-
 # origenerator/gui/gallery_view.py
 _match_voice_command  # noqa  # unused function: gallery_view.py:310
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023

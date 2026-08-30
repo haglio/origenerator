@@ -1204,7 +1204,7 @@ def test_a_scripted_clip_shows_its_strip(qtbot, tmp_path):
     write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
     view = _view(qtbot, [(str(vid), "video")])
     assert view._preview._strip is not None
-    assert view._preview._strip.has_script() is True
+    assert view._preview._strip._actions
 
 
 def test_it_does_not_nest_another_fullscreen_view(qtbot):

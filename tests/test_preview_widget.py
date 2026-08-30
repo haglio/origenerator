@@ -528,14 +528,14 @@ def test_no_strip_unless_opted_in(make_preview, tmp_path):
 def test_scripted_video_shows_its_heatmap_strip(qtbot, tmp_path):
     w = _strip_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
-    assert w._strip.has_script() is True
+    assert w._strip._actions
     assert not w._strip.isHidden()
 
 
 def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):
     w = _strip_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written
-    assert w._strip.has_script() is False
+    assert not w._strip._actions
     assert w._strip.isHidden()
 
 

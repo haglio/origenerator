@@ -30,10 +30,6 @@ class FunscriptStrip(QWidget):
         self._actions = list(actions or [])
         self.update()
 
-    def has_script(self) -> bool:
-        """Whether a non-empty script is set — the strip's only queryable state."""
-        return bool(self._actions)
-
     def sizeHint(self) -> QSize:
         return QSize(0, _STRIP_HEIGHT)
 

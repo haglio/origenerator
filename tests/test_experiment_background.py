@@ -39,6 +39,15 @@ class FakeLauncher:
         return f"exp-{len(self.launched):03d}"
 
 
+def test_each_launch_records_what_it_was_bred_from_and_what_it_varies(caplog):
+    # The only record of what an unattended batch explored: the app is closed
+    # while it runs, and a proposal's provenance is nowhere else.
+    with caplog.at_level("INFO", logger="origenerator.experiments.background"):
+        queue_experiments([], StubPolicy(limit=1), FakeLauncher())
+
+    assert "bred from base, varying steps" in caplog.text
+
+
 def test_closing_fills_the_queue_with_a_batch_of_experiments():
     policy = StubPolicy()
     launcher = FakeLauncher()

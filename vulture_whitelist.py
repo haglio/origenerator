@@ -52,10 +52,6 @@ _.pwszVal  # noqa  # origenerator/win32.py:147
 # from is what vulture is most certain of -- the two unused imports in
 # `gui/stroke_panel.py` and the unused local in `gui/reroll_controller.py`.
 
-# origenerator/experiments/policy.py
-base_prompt_id  # noqa  # unused variable: policy.py:61
-mutated_keys  # noqa  # unused variable: policy.py:62
-
 # origenerator/gui/gallery_view.py
 _._showing_recents  # noqa  # unused method: gallery_view.py:6023
 _._apply_selection  # noqa  # unused method: gallery_view.py:6199

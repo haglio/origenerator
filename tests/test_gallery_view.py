@@ -309,6 +309,16 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
+def _amber_matches(field) -> int:
+    """How many of ``field``'s find highlights are the current-match amber. The
+    find re-lays every field's highlights on each step, so across the fields
+    exactly one of them is ever amber."""
+    from origenerator.gui.prompt_find import _CURRENT_BG
+
+    return sum(sel.format.background().color() == _CURRENT_BG
+               for sel in field.extraSelections())
+
+
 def _side(tree, orientation=LANDSCAPE):
     """One half of the TOC pane — the Portrait tree or the Landscape one. The
     table of contents exists twice over, once per shape (see
@@ -1228,7 +1238,6 @@ def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, mo
 
     assert view._find.count() == 2
     assert view._find.position() == 1
-    assert view._find.current_field() is positive
     assert positive.textCursor().position() == positive.toPlainText().find("sparrows")
 
 
@@ -1243,11 +1252,12 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
 
     view._find_bar.step_requested.emit(1)
     assert view._find.position() == 2
-    assert view._find.current_field() is negative  # on into the next field
+    # The amber highlight moved with it, on into the next field.
+    assert _amber_matches(negative) == 1 and _amber_matches(positive) == 0
 
     view._find_bar.step_requested.emit(1)
     assert view._find.position() == 1              # and around again
-    assert view._find.current_field() is positive
+    assert _amber_matches(positive) == 1 and _amber_matches(negative) == 0
 
 
 def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypatch):

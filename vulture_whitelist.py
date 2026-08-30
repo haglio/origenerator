@@ -78,9 +78,6 @@ _.cruising  # noqa  # unused property: osr2_stroke_driver.py:272
 _._width_label  # noqa  # unused attribute: param_form.py:144, param_form.py:362
 _._height_label  # noqa  # unused attribute: param_form.py:145, param_form.py:363
 
-# origenerator/gui/prompt_find.py
-_.current_field  # noqa  # unused method: prompt_find.py:141
-
 # origenerator/gui/thumbnail_widget.py
 _.is_starred  # noqa  # unused method: thumbnail_widget.py:181
 _.is_enhancing  # noqa  # unused method: thumbnail_widget.py:220

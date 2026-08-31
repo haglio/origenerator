@@ -11,10 +11,12 @@ That is the whole point of searching here rather than in the tree — the answer
 "where is the one with the two of them on the couch" is a wall of thumbnails you
 recognize, not a list of folder names you have to open one by one.
 
-It drives the surrounding pieces it doesn't own — the info pane on a click, the
-tree on a drill, the re-roll tile, the delete action — so it holds a reference to
-the GalleryView and calls back into it rather than standing alone. The view keeps
-thin delegates so the pane's rendering and selection are one concern in one place.
+It stands alone: everything it works with arrives at construction — its scroll
+area, the database, the re-roll and auto-generate controllers, and two narrow
+records of what it may ask the gallery around it (:class:`TreeNavigation`,
+:class:`PaneHost`). Every gesture made on a tile leaves as a signal; the view
+connects them and answers — the info pane on a click, the tree on a drill, the
+delete on a menu.
 """
 
 import logging

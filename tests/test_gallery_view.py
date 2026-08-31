@@ -9955,7 +9955,7 @@ def test_a_show_gets_space_wired_to_the_switch(qtbot):
     # main window, since a slideshow is where the device is usually driven from.
     view, _driver, _panel = _osr2_view(qtbot)
     show = _double_click_show(view, qtbot)
-    assert show._on_drive_toggle == view._toggle_osr2_drive
+    assert show._actions.drive_toggle == view._toggle_osr2_drive
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
@@ -10181,7 +10181,7 @@ def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
     # And its Space reaches the one switch, like every other surface's.
-    assert view._slideshow._on_drive_toggle == view._toggle_osr2_drive
+    assert view._slideshow._actions.drive_toggle == view._toggle_osr2_drive
     view._osr2_btn.setChecked(True)
     view._slideshow.close()
     assert view._osr2_stroke.active
@@ -11120,7 +11120,7 @@ def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
     # Each carries its label, so the note can say which version is on screen.
     assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
     # And Down asks through the gallery, which holds the settings.
-    assert show._on_enhance == view._enhance_from_slideshow
+    assert show._actions.enhance == view._enhance_from_slideshow
     show.close()
 
 

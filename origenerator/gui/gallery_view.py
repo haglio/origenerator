@@ -48,6 +48,7 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.request_worker import RevisionWorker, ReviseTask
+from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
@@ -1591,8 +1592,9 @@ class GalleryView(QWidget):
         return self._open_slideshow(items, start=index, frame=frame,
                                     image_dwell_ms=0, shuffle=in_order,
                                     folder_items=self._folder_media(),
-                                    order_label="", looping=False,
-                                    starred_ids=self._starred_prompt_ids())
+                                    hud=HudFacts(
+                                        order_label="", looping=False,
+                                        starred_ids=self._starred_prompt_ids()))
 
     def _open_slideshow(self, items, *, folder_items=None, location=None,
                         side=None, resume=None, **kwargs):
@@ -1614,16 +1616,21 @@ class GalleryView(QWidget):
         """
         self._show_refused = set()  # a new show, a new set to be judged against
         self._slideshow = SlideshowView(
-            items, on_delete=self._trash_generation,
-            on_enhance=self._enhance_from_slideshow,
-            on_star=self._star_generation,
-            on_lock=(self._open_generate_tab_for
-                     if self._fun_time is not None else None),
-            on_reset=(self.reset_region if self._fun_time is not None else None),
+            items,
+            actions=ShowActions(
+                delete=self._trash_generation,
+                enhance=self._enhance_from_slideshow,
+                star=self._star_generation,
+                # Two of the six are a session's: a lock opens the held item as
+                # a generate tab, and a reset means the REGION's base state.
+                lock=(self._open_generate_tab_for
+                      if self._fun_time is not None else None),
+                reset=(self.reset_region if self._fun_time is not None else None),
+                # Space reaches the one OSR2 switch, like every other surface's.
+                drive_toggle=self._toggle_osr2_drive,
+            ),
             pace=self._pace, stroke=self._osr2_stroke,
-            filters=self._filters,
-            # Its Space reaches the one OSR2 switch, like every other surface's.
-            on_drive_toggle=self._toggle_osr2_drive, **kwargs)
+            filters=self._filters, **kwargs)
         self._live_shows.append((self._slideshow, location))
         if folder_items and self._slideshow.is_live():
             # Watching something render is no reason to lose the folder it is
@@ -4142,8 +4149,10 @@ class GalleryView(QWidget):
                 continue
             logger.info("The %s region opens on the library of its shape: %d items",
                         side, len(items))
-            self._open_slideshow(items, location=key, side=side, looping=False,
-                                 starred_ids=self._starred_prompt_ids())
+            self._open_slideshow(items, location=key, side=side,
+                                 hud=HudFacts(
+                                     looping=False,
+                                     starred_ids=self._starred_prompt_ids()))
 
     def close_the_regions(self) -> None:
         """Give both regions back -- the session leaving origenerator mode.
@@ -4172,8 +4181,10 @@ class GalleryView(QWidget):
         items = self._slideshow_items(self._rows_at(key))
         if not items:
             return
-        self._open_slideshow(items, location=key, side=side, looping=False,
-                             starred_ids=self._starred_prompt_ids())
+        self._open_slideshow(items, location=key, side=side,
+                             hud=HudFacts(
+                                 looping=False,
+                                 starred_ids=self._starred_prompt_ids()))
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""
@@ -4203,7 +4214,7 @@ class GalleryView(QWidget):
         # a generation landing in the library must reach a reset region.
         self._live_shows = [(held, key if held is show else where)
                             for held, where in self._live_shows]
-        show.retune(items, order_label="Shuffle", looping=False)
+        show.retune(items)
 
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
@@ -4237,8 +4248,8 @@ class GalleryView(QWidget):
         self._open_slideshow(
             items, location=key, side=command.side,
             shuffle=(lambda order: None) if latest else None,
-            order_label="Latest" if latest else "Shuffle",
-            starred_ids=self._starred_prompt_ids(),
+            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
+                         starred_ids=self._starred_prompt_ids()),
         )
 
     def _toggle_f_mode_aloud(self, side) -> None:
@@ -4678,8 +4689,8 @@ class GalleryView(QWidget):
             items, location=location, side=side or orientation,
             resume=self._show_state,
             shuffle=(lambda order: None) if latest else None,
-            order_label="Latest" if latest else "Shuffle",
-            starred_ids=self._starred_prompt_ids(),
+            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
+                         starred_ids=self._starred_prompt_ids()),
         )
         logger.info("Slideshow of %s: %d items, %s",
                     self._slideshow_subject(), len(items),

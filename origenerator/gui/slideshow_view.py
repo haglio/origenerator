@@ -87,6 +87,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
+from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.preview_widget import PreviewWidget
@@ -116,32 +117,17 @@ class SlideshowView(QWidget):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
-                 shuffle=None, on_delete=None, on_enhance=None, on_star=None,
-                 on_lock=None, player=None, stroke=None, pace=None,
-                 on_drive_toggle=None, filters=None, parent=None,
-                 order_label="Shuffle", starred_ids=None, on_reset=None,
-                 looping=True):
+                 shuffle=None, actions=None, hud=None, player=None, stroke=None,
+                 pace=None, filters=None, parent=None):
         super().__init__(parent)
-        self._on_delete = on_delete
-        # Where reset means something bigger than this show: hosted, a region
-        # has a base state to go back to, and only the gallery knows it (see
-        # :meth:`stroke_reset`).  Standalone there is none, and reset is local.
-        self._on_reset = on_reset
-        # Told when a hold engages (with the held item's prompt_id): a hosting
-        # session answers a lock by opening that item as a generate tab.
-        self._on_lock = on_lock
-        # What this show's own HUD says about it: how the set is
-        # ordered (Recents plays Latest, everything else Shuffle — the players'
-        # own vocabulary), and which items are favorites, so the star readout
-        # and the F-mode narrowing mean here what they mean on a player.
-        self.hud_order_label = order_label
-        # Whether this show is a LOOP as a player means it: a set someone asked
-        # for, played round and round.  A region's base state is not one -- it
-        # is that side browsing its whole library, the same thing a satellite
-        # does when no loop is on -- so its HUD must not light the loop button
-        # or say "Looping seeds" over it.
-        self.hud_looping = looping
-        self._starred_ids = set(starred_ids or ())
+        # What a press here asks the gallery to do on its behalf — the half of
+        # each gesture that lands on the generation rather than on the slide.
+        # None of it, for a show standing on its own (see ShowActions).
+        self._actions = actions if actions is not None else ShowActions()
+        # What this show's own HUD says about the set: its order, whether it is
+        # a loop someone asked for, and which of its items are favorites (see
+        # HudFacts). The first two are read straight off this view by the HUD.
+        self._wear(hud if hud is not None else HudFacts())
         self._f_mode = False
         self._all_items = list(items)
         # Holding a slide is also how you ask for it: Down enhances what is on
@@ -149,19 +135,14 @@ class SlideshowView(QWidget):
         # one that gets the better version — and one that already has a better
         # version is left alone. ``E`` turns that off for the session, for when
         # it is in the way.
-        self._on_enhance = on_enhance
-        self._enhance_on_hold = on_enhance is not None
+        self._enhance_on_hold = self._actions.enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         # How each enhancement in flight is actually going, as the gallery
         # reads it (``prompt_id`` -> "running"/"queued"). Pushed in by
         # :meth:`note_enhancing`: the show knows what it asked for, and only
         # the side holding the jobs knows which of them is on the GPU.
         self._enhance_status: dict[str, str] = {}
-        self._on_star = on_star
         self._stroke = stroke  # the gallery's app-global stroke driver, or None
-        # Space goes to the gallery's one OSR2 switch rather than straight to
-        # the stroke: which source drives is that switch's call, not a key's.
-        self._on_drive_toggle = on_drive_toggle
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -467,7 +448,7 @@ class SlideshowView(QWidget):
         Called after :meth:`set_levels`, because which version a slide was showing
         is only a version once the levels behind it are armed.
         """
-        if self._on_enhance is not None:
+        if self._actions.enhance is not None:
             self._enhance_on_hold = state.enhance_on_hold
         if self._live or not self._playlist.resume(state.order, state.current):
             return False
@@ -576,8 +557,8 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         if item is None:
             return
-        if self._on_delete is not None and len(item) > 2 and item[1] != LIVE:
-            self._on_delete(item[2])
+        if self._actions.delete is not None and len(item) > 2 and item[1] != LIVE:
+            self._actions.delete(item[2])
         # Out of the full set too, so widening F-mode back cannot resurrect it.
         self._all_items = [kept for kept in self._all_items if kept is not item]
         self._playlist.remove_current()
@@ -685,8 +666,8 @@ class SlideshowView(QWidget):
         it comes in as a hook.  Standalone there is no such state and a show's
         defaults are simply its own set from the beginning.
         """
-        if self._on_reset is not None:
-            self._on_reset(self)
+        if self._actions.reset is not None:
+            self._actions.reset(self)
             return
         self.reset_in_place()
 
@@ -699,21 +680,38 @@ class SlideshowView(QWidget):
         self._playlist.restart()
         self._show_current()
 
-    def retune(self, items, *, order_label="Shuffle", looping=False) -> None:
-        """Point this show at *items* instead, back at its own defaults.
+    def retune(self, items) -> None:
+        """Point this show at the region's base set instead.
 
-        What a hosted reset does with the region's base set.  The window stays
-        up rather than being closed and reopened: it covers a satellite player,
-        and a region that blinks black between two shows is the thing the base
-        state exists to avoid.  F-mode and the hold come off the way any reset
-        takes them off, and the pass is a fresh shuffle.
+        What a hosted reset does.  The window stays up rather than being closed
+        and reopened: it covers a satellite player, and a region that blinks
+        black between two shows is the thing the base state exists to avoid.
+        F-mode and the hold come off the way any reset takes them off, and the
+        pass is a fresh shuffle.
+
+        A base state is one KIND of set and always the same one, so it is
+        re-dressed rather than re-described: shuffled, and NOT a loop anyone
+        asked for — that side browsing its whole library, which is what a
+        satellite does with no loop on.  It kept the starred ids it had, and
+        still does; nothing about a reset changes which items are favorites.
         """
         self._f_mode = False
         self._all_items = list(items)
-        self.hud_order_label = order_label
-        self.hud_looping = looping
+        self._wear(HudFacts(looping=False, starred_ids=self._starred_ids))
         self._live = not items
         self._replace_items(self._all_items)
+
+    def _wear(self, hud) -> None:
+        """Take on what the HUD says about the set.
+
+        ``hud_order_label`` and ``hud_looping`` are plain attributes because the
+        players' HUD reads them straight off this view — it is the show's own
+        panel, not a report it files (see
+        :class:`~origenerator.gui.show_host.ShowHost`).
+        """
+        self.hud_order_label = hud.order_label
+        self.hud_looping = hud.looping
+        self._starred_ids = set(hud.starred_ids or ())
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does
@@ -743,9 +741,9 @@ class SlideshowView(QWidget):
         """Bookmark the slide on screen; ``False`` when there is nothing to
         bookmark — a live generation has no row of its own yet."""
         item = self._playlist.current()
-        if self._on_star is None or item is None or len(item) <= 2:
+        if self._actions.star is None or item is None or len(item) <= 2:
             return False
-        self._on_star(item[2])
+        self._actions.star(item[2])
         return True
 
     # The stroke console reaches the three above by its own names: it drives this
@@ -941,7 +939,7 @@ class SlideshowView(QWidget):
 
     def _toggle_enhance_on_hold(self):
         """E: stop (or resume) holding a slide meaning "enhance this"."""
-        if self._on_enhance is None:
+        if self._actions.enhance is None:
             return
         self._enhance_on_hold = not self._enhance_on_hold
         self._flash_note(
@@ -956,14 +954,14 @@ class SlideshowView(QWidget):
         ``True`` back means a run started, and the note says so until the
         finished version arrives.
         """
-        if self._on_enhance is None or not self._enhance_on_hold:
+        if self._actions.enhance is None or not self._enhance_on_hold:
             return
         if self._playlist.current_is_live():
             return  # no file yet to make a better version of; the hold still holds
         prompt_id = self._current_prompt_id()
         if prompt_id is None or prompt_id in self._enhancing:
             return
-        if self._on_enhance(prompt_id):
+        if self._actions.enhance(prompt_id):
             self._enhancing.add(prompt_id)
             self._refresh_note()
 
@@ -1112,10 +1110,10 @@ class SlideshowView(QWidget):
             self._disarm_dwell()  # hold on the current item, and on the push
             self.star()
             self._update_counter()
-            if self._on_lock is not None:
+            if self._actions.lock is not None:
                 prompt_id = self._current_prompt_id()
                 if prompt_id is not None:
-                    self._on_lock(prompt_id)
+                    self._actions.lock(prompt_id)
             return True
         self._show_current()  # released, re-arming the dwell timer
         return False
@@ -1210,7 +1208,7 @@ class SlideshowView(QWidget):
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_stroke_key(self._stroke, key,
-                              on_drive_toggle=self._on_drive_toggle):
+                              on_drive_toggle=self._actions.drive_toggle):
             # Space belongs to the stroke cluster now, everywhere — locking the
             # slideshow is Down, matching the auto-generate view's lock.
             self._stroke_panel.refresh()

@@ -259,17 +259,40 @@ class GenerateConfigPanel(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        # One column: the preview over the settings form and the Generate button.
-        # The preview leads (a running re-roll's frames, then the finished output);
-        # the button bank sits at the bottom, under the settings.
+        """The column, in the order it reads: the preview, then one scroll
+        holding everything that is about the settings, then the button bank.
+
+        Each region below builds itself and says why it is the way it is; this
+        is only their order, which is the one thing about them a reader has to
+        take in at once. Two orderings inside them are load-bearing and are
+        noted where they happen: the picker takes its index before its signal is
+        connected, and _on_workflow_changed runs last, once everything it lays
+        out below the picker exists.
+        """
         layout = QVBoxLayout(self)
         # A margin round the whole tab, so nothing in it — the preview, the form's
         # headings, the button bank — sits flush against the pane's edge.
         layout.setContentsMargins(_PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN)
         layout.setSpacing(8)
-        # The preview leads the column: it mirrors a running re-roll's frames (driven
-        # from outside), shows the browsed generation's output when one is loaded, and
-        # the newest matching result otherwise.
+        layout.addWidget(self._build_preview(), 3)
+        body = self._build_body_scroll()
+        self._build_saved_generation_block(body)
+        self._build_workflow_header(body)
+        self._build_related_media(body)
+        # The slack goes here, under everything, so a short column rests at the
+        # top of the scroll rather than spreading itself out.
+        body.addStretch(1)
+        layout.addWidget(self._scroll, 4)
+        layout.addLayout(self._build_button_bank())
+        # Lays out the empty state on a fresh panel — no form, no estimate, and a
+        # Generate with nothing to run — and everything below the picker once a
+        # workflow is chosen. Last, because everything it lays out has to exist.
+        self._on_workflow_changed()
+
+    def _build_preview(self) -> PreviewWidget:
+        """The pane leading the column: a running re-roll's frames (driven from
+        outside), the browsed generation's output when one is loaded, and the
+        newest matching result otherwise."""
         self._preview = PreviewWidget(show_funscript_strip=True)
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
@@ -280,11 +303,17 @@ class GenerateConfigPanel(QWidget):
         # pane's thumbnails take, so an act means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
-        layout.addWidget(self._preview, 3)
-        # One scroll under the preview holds everything else: the read-only info on
-        # top, the editable form below it, so they scroll together. This replaces the
-        # old split — a cramped form-only scroll above a separate, non-scrolling info
-        # footer — that buried the form (width/height, the swap button) out of reach.
+        return self._preview
+
+    def _build_body_scroll(self) -> QVBoxLayout:
+        """One scroll under the preview for everything else, and the column
+        inside it that the three regions below fill.
+
+        The read-only info on top, the editable form below it, so they scroll
+        together. This replaces the old split — a cramped form-only scroll above
+        a separate, non-scrolling info footer — that buried the form
+        (width/height, the swap button) out of reach.
+        """
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         body_host = QWidget()
@@ -293,16 +322,21 @@ class GenerateConfigPanel(QWidget):
         # running under it; the pane's own margin covers the other three sides.
         body.setContentsMargins(0, 0, _PANE_MARGIN, 0)
         body.setSpacing(8)
+        self._scroll.setWidget(body_host)
+        return body
 
-        # The output file + when it was made, at the top of the scroll (shown only
-        # while displaying a saved generation). Params — editable or read-only — all
-        # live in the form below now, so this block carries only those two facts.
+    def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
+        """The output file + when it was made, at the top of the scroll (shown
+        only while displaying a saved generation). Params — editable or read-only
+        — all live in the form below now, so this block carries only those two
+        facts."""
         self._metadata_block = MetadataBlock()
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
 
-        # Editable: the workflow picker, its typical-time estimate, and the param
-        # form (swapped into _form_host whenever the workflow changes).
+    def _build_workflow_header(self, body: QVBoxLayout) -> None:
+        """The editable half: the workflow picker, its typical-time estimate, and
+        the host the param form is swapped into whenever the workflow changes."""
         self._form_workflow_key = None  # which workflow the installed form belongs to
         # A form row rather than a plain side-by-side pair, so that squeezed past
         # what the word and the picker can share, the picker drops onto its own
@@ -347,17 +381,19 @@ class GenerateConfigPanel(QWidget):
         self._form_host_box.setContentsMargins(0, 0, 0, 0)
         body.addWidget(self._form_host)
 
-        # The displayed generation's related media, below the form: a clickable
-        # source-image tile for a video, or the "animated in" strip for an image.
-        # Mutually exclusive; both hidden when the tab isn't showing a saved
-        # generation.
-        #
-        # Stacked straight under it, with no stretch between. A stretch here used
-        # to push these to the bottom of the viewport, which meant folding a form
-        # section opened an elastic gap above them — the space growing by exactly
-        # what the fold saved, so the closer the form got the further away they
-        # went. Every gap in this column is the layout's spacing now, the same as
-        # between the form's own sections.
+    def _build_related_media(self, body: QVBoxLayout) -> None:
+        """The displayed generation's related media, below the form: a clickable
+        source-image tile for a video, or the "animated in" strip for an image,
+        and every version an enhanced image holds. All hidden when the tab isn't
+        showing a saved generation.
+
+        Stacked straight under the form, with no stretch between. A stretch here
+        used to push these to the bottom of the viewport, which meant folding a
+        form section opened an elastic gap above them — the space growing by
+        exactly what the fold saved, so the closer the form got the further away
+        they went. Every gap in this column is the layout's spacing now, the same
+        as between the form's own sections.
+        """
         # One tile, one place: the start frame for a video, and for something a
         # spoken request made, the item it was asked about — the same kind of
         # link (this came from that) in the same spot, rather than a second tile
@@ -368,8 +404,7 @@ class GenerateConfigPanel(QWidget):
         self._animated_strip = AnimatedVideoStrip()
         self._animated_strip.video_activated.connect(self.animated_activated)
         body.addWidget(self._animated_strip)
-        # Every version an enhanced image holds, alongside the other cross-links:
-        # the preview opens on the most-enhanced one, and this is where the
+        # The preview opens on the most-enhanced version, and this is where the
         # earlier levels (and the original) are, each captioned with what made
         # it and draggable onto the Enhance subpanel to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
@@ -378,26 +413,24 @@ class GenerateConfigPanel(QWidget):
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_levels_delete_requested)
         body.addWidget(self._versions)
-        # The slack goes here, under everything, so a short column rests at the
-        # top of the scroll rather than spreading itself out.
-        body.addStretch(1)
 
-        self._scroll.setWidget(body_host)
-        layout.addWidget(self._scroll, 4)
+    def _build_button_bank(self) -> FlowLayout:
+        """One bank, fixed under the scroll so Generate is always reachable.
 
-        # One button bank, fixed under the scroll so Generate is always reachable.
-        # Send-to-Evolver shows only while displaying a saved
-        # generation (and only for a video); the discard button only while a run
-        # this tab launched is in flight (the gallery owns the job and drives
-        # set_generating), throwing it away from the tab like the folder's tile —
-        # "Cancel", or "Next seed" while that folder is auto-generating. Generate
-        # only ever submits: a run in flight is watched in the strip's queue and on
-        # the browser pane's card, so the button says nothing about one.
-        # A flow rather than a row: the bank wraps onto a second line when the pane
-        # is too narrow to hold it, instead of squeezing every label down to an
-        # unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
-        # the corner it has always sat in, and at the family's two gaps — close
-        # along a row, wider between wrapped rows — like the gallery's own bank.
+        An export lane's button shows only while displaying a saved generation,
+        and only for a video; the discard button only while a run this tab
+        launched is in flight (the gallery owns the job and drives
+        set_generating), throwing it away from the tab like the folder's tile —
+        "Cancel", or "Next seed" while that folder is auto-generating. Generate
+        only ever submits: a run in flight is watched in the strip's queue and on
+        the browser pane's card, so the button says nothing about one.
+
+        A flow rather than a row: the bank wraps onto a second line when the pane
+        is too narrow to hold it, instead of squeezing every label down to an
+        unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
+        the corner it has always sat in, and at the family's two gaps — close
+        along a row, wider between wrapped rows — like the gallery's own bank.
+        """
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
         # One button per lane, in the order EXPORT_LANES lists them: a third lane
@@ -409,23 +442,16 @@ class GenerateConfigPanel(QWidget):
             lane.button.clicked.connect(
                 lambda _checked=False, lane=lane: self._on_send(lane))
             lane.button.hide()  # shown only for a video the tab is displaying
+            btn_row.addWidget(lane.button)
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        for lane in self._lanes.values():
-            btn_row.addWidget(lane.button)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
-        layout.addLayout(btn_row)
-
-
-        # Lays out the empty state on a fresh panel — no form, no estimate, and a
-        # Generate with nothing to run — and everything below the picker once a
-        # workflow is chosen.
-        self._on_workflow_changed()
+        return btn_row
 
     def minimumSizeHint(self):
         """Never narrower than the settings can be squeezed into.

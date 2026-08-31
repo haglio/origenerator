@@ -1,6 +1,9 @@
 import builtins
+import runpy
+import sys
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
 
@@ -398,3 +401,151 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
                   "--width", "700", "--height", "900"])
 
     mock_loading.assert_not_called()
+
+
+# --- the boot sequence itself -------------------------------------------------
+#
+# What the tests above pin is what main *reaches*; these pin the order it
+# reaches it in, which is the part a phase split can silently reorder. The order
+# is load-bearing and stated in main's own comments: adoption before the import
+# scan (so a preview's own rows are not rebuilt as lesser "imported" ones from
+# the bare files), the enhancement fold after that scan, and the folder
+# reconciles last because every backfill above can move a generation's folder.
+
+# Each maintenance pass, as (module, attribute), in the order main runs them.
+_MAINTENANCE_PASSES = (
+    ("origenerator.branch_session", "adopt_branch_rows"),
+    ("origenerator.branch_session", "adopt_branch_curation"),
+    ("origenerator.reconcile", "reconcile_in_flight"),
+    ("origenerator.importer", "import_comfyui_output"),
+    ("origenerator.importer", "merge_video_sidecar_rows"),
+    ("origenerator.importer", "backfill_unknown_workflows"),
+    ("origenerator.importer", "backfill_model_and_lora_params"),
+    ("origenerator.importer", "backfill_input_image"),
+    ("origenerator.gallery", "fold_completed_enhancements"),
+    ("origenerator.importer", "backfill_shared_thumbnails"),
+    ("origenerator.log_backfill", "backfill_durations_from_logs"),
+    ("origenerator.reconcile", "reconcile_folder_meta"),
+    ("origenerator.reconcile", "reconcile_custom_folders"),
+)
+
+
+@contextmanager
+def _a_faked_boot(record, *, passes=None, **patches):
+    """``main`` with every collaborator faked, each maintenance pass recording.
+
+    *record* collects the name of each pass as it runs, so a test can read the
+    order back. *passes* overrides individual ones (``{"import_comfyui_output":
+    a_mock}``) where a test needs one to misbehave; *patches* adds or replaces
+    any other target by dotted path.
+    """
+    targets = {
+        "origenerator.app._init_windows_taskbar_identity": DEFAULT,
+        "origenerator.app._ensure_comfyui_server": DEFAULT,
+        "origenerator.gui.loading_screen.LoadingScreen": DEFAULT,
+        "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,
+        "origenerator.gui.fun_time_bridge.FunTimeBridge": DEFAULT,
+        "origenerator.app_state.AppState": DEFAULT,
+        "origenerator.db.Database": DEFAULT,
+        "origenerator.trash.Trash": DEFAULT,
+        "origenerator.recovery.sweep": 0,
+        "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
+        "PyQt6.QtWidgets.QApplication.exec": 0,
+    }
+    passes = passes or {}
+    with ExitStack() as stack:
+        for target, value in targets.items():
+            stack.enter_context(
+                patch(target) if value is DEFAULT else patch(target, return_value=value))
+        for module, name in _MAINTENANCE_PASSES:
+            stack.enter_context(patch(
+                f"{module}.{name}",
+                passes.get(name, MagicMock(
+                    side_effect=lambda *a, _n=name, **k: record.append(_n) or 0))))
+        for target, value in patches.items():
+            stack.enter_context(patch(target, value))
+        yield
+
+
+def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
+    ran = []
+
+    with _a_faked_boot(ran):
+        with pytest.raises(SystemExit):
+            main([])
+
+    assert ran == [name for _, name in _MAINTENANCE_PASSES]
+
+
+def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
+    """Every pass is best-effort: a library the app cannot finish tidying is
+    still a library it must open. Each is guarded on its own, so the one that
+    throws costs only itself."""
+    ran = []
+    window = MagicMock()
+
+    with _a_faked_boot(
+        ran,
+        passes={"import_comfyui_output": MagicMock(side_effect=OSError("no output dir"))},
+        **{"origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window)},
+    ):
+        with pytest.raises(SystemExit):
+            main([])
+
+    assert "import_comfyui_output" not in ran
+    # ...and everything after it still ran, up to and including the window.
+    assert ran[-1] == "reconcile_custom_folders"
+    window.show.assert_called_once()
+
+
+def test_a_branch_session_maintains_nothing_but_the_enhancement_fold(qapp):
+    """A preview shows unlanded code, not a maintained library: its database is
+    a seeded copy the live app already maintains. The fold is the exception —
+    it rewrites rows the copy already holds, touching no file and reading no
+    output history, so leaving it out would show enhancements standing as
+    images of their own long after the live app stopped doing that."""
+    ran = []
+
+    with _a_faked_boot(ran), \
+         patch("origenerator.branch_session.is_branch_session", return_value=True), \
+         patch("origenerator.branch_session.seed_branch_db", return_value=True):
+        with pytest.raises(SystemExit):
+            main([])
+
+    assert ran == ["fold_completed_enhancements"]
+
+
+def test_a_branch_session_sweeps_no_deletions(qapp):
+    """The seeded deletions point at the *live* install's held files, so both
+    purging and restoring them from a preview would reach into the library the
+    live app is still showing."""
+    with _a_faked_boot([]) as _, \
+         patch("origenerator.recovery.sweep", return_value=0) as sweep, \
+         patch("origenerator.branch_session.is_branch_session", return_value=True), \
+         patch("origenerator.branch_session.seed_branch_db", return_value=True):
+        with pytest.raises(SystemExit):
+            main([])
+
+    sweep.assert_not_called()
+
+
+def test_the_entry_point_hands_the_process_whatever_main_gives_back():
+    """``python -m origenerator`` is how both .vbs launchers start the app, and
+    the exit code is all either of them gets back out of the hidden console —
+    so whatever ``main`` reports has to arrive there unchanged."""
+    with patch("origenerator.app.main", return_value=7), \
+         patch.object(sys, "argv", ["origenerator"]):
+        with pytest.raises(SystemExit) as exit_:
+            runpy.run_module("origenerator", run_name="__main__")
+
+    assert exit_.value.code == 7
+
+
+def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
+    """End to end through the entry point: Qt's own exit code is the app's."""
+    with _a_faked_boot([], **{"PyQt6.QtWidgets.QApplication.exec": MagicMock(return_value=3)}), \
+         patch.object(sys, "argv", ["origenerator"]):
+        with pytest.raises(SystemExit) as exit_:
+            runpy.run_module("origenerator", run_name="__main__")
+
+    assert exit_.value.code == 3

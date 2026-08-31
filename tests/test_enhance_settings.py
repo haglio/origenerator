@@ -15,16 +15,18 @@ from origenerator import gallery
 from origenerator.db import Database
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from origenerator.gallery.enhance import (
+from origenerator.gallery.enhance_fold import fold_enhancement
+from origenerator.gallery.enhance_settings import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+)
+from origenerator.gallery.enhance import (
     displayed_levels,
     enhance_levels,
     enhance_params_for,
     fix_params_for,
-    fold_enhancement,
     level_matching_params,
     level_matching_settings,
     remove_enhance_levels,

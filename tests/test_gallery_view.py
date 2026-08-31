@@ -2694,7 +2694,7 @@ def test_committing_a_header_rename_rebuilds_after_the_click_that_ended_it(qtbot
 
 
 def _source_tile(view):
-    return view._info_tabs.current_config_panel()._source_tile
+    return view._info_tabs.current_config_panel()._related._source_tile
 
 
 def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
@@ -3552,7 +3552,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
 
 
 def _animated_strip(view):
-    return view._info_tabs.current_config_panel()._animated_strip
+    return view._info_tabs.current_config_panel()._related._animated_strip
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
@@ -5039,7 +5039,7 @@ def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     _request_card(view).clicked.emit()
 
     panel = view._info_tabs.current_config_panel()
-    assert panel._folder_request["folder_key"] == key
+    assert panel._folder_request.folder_key == key
     assert panel._preview._stack.currentWidget() is panel._preview._sheet
     client.submit_job.assert_not_called()  # an edit to make, not a run to start
 
@@ -9955,7 +9955,7 @@ def test_a_show_gets_space_wired_to_the_switch(qtbot):
     # main window, since a slideshow is where the device is usually driven from.
     view, _driver, _panel = _osr2_view(qtbot)
     show = _double_click_show(view, qtbot)
-    assert show._on_drive_toggle == view._toggle_osr2_drive
+    assert show._actions.drive_toggle == view._toggle_osr2_drive
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
@@ -10181,7 +10181,7 @@ def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     view._start_slideshow()
     qtbot.addWidget(view._slideshow)
     # And its Space reaches the one switch, like every other surface's.
-    assert view._slideshow._on_drive_toggle == view._toggle_osr2_drive
+    assert view._slideshow._actions.drive_toggle == view._toggle_osr2_drive
     view._osr2_btn.setChecked(True)
     view._slideshow.close()
     assert view._osr2_stroke.active
@@ -11114,13 +11114,18 @@ def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
 
     show = _double_click_show(view, qtbot)
 
-    (levels,) = show._levels_by_path.values()
+    # Keyed by the file the folder shows the image under, which is not the one
+    # the show happens to have opened on, so the key comes from the same place
+    # the show's did — and asking the show for it proves it took them.
+    (key, computed), = view._folder_level_playlists().items()
+    levels = show._levels.levels(base=key)
+    assert levels == computed
     assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.
     assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
     # And Down asks through the gallery, which holds the settings.
-    assert show._on_enhance == view._enhance_from_slideshow
+    assert show._actions.enhance == view._enhance_from_slideshow
     show.close()
 
 
@@ -11627,8 +11632,8 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     view._on_thumbnail_clicked(job.prompt_id)
 
     panel = view._info_tabs.current_config_panel()
-    assert not panel._source_tile.isHidden()
-    assert panel._source_tile._prompt_id == "orig"
+    assert not panel._related._source_tile.isHidden()
+    assert panel._related._source_tile._prompt_id == "orig"
 
 
 def test_a_request_item_marks_its_change_in_the_prompt_field(

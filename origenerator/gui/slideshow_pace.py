@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from origenerator.gui.show_host import ShowHost
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 
 # The console's pair steps by this, and will not walk past these ends.
@@ -56,12 +57,17 @@ class SlideshowPace(QObject):
         return max(MIN_S, min(MAX_S, int(seconds)))
 
 
-class PaceOnlyHost:
+class PaceOnlyHost(ShowHost):
     """What the console acts on where there is no slideshow behind it.
 
     The main window shows the console with nothing to step, so its transport does
     nothing there — but the pace is app-wide and setting it is worth doing
     anywhere, because it is what the next slideshow will open at.
+
+    Everything below the transport is about a set, and this host has none: the
+    answers come from :class:`~origenerator.gui.show_host.ShowHost` itself, which
+    is where "a host with nothing to step" is written down once instead of being
+    guessed at by every caller.
     """
 
     locked = True

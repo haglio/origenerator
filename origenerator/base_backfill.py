@@ -180,6 +180,11 @@ def render_base_now(client, workflow, params: dict, *,
     """Run one repair to completion and return its output files; ``[]`` if it
     never lands.
 
+    *client* is only ever asked for HTTP -- a
+    :class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt, and which a
+    ``ComfyUIClient`` forwards every call of. The polling below is why this one
+    is not on the app's own Qt loop.
+
     The absence path does not block: it hands ComfyUI a batch through the app's
     own :class:`~origenerator.gui.generation_job.GenerationJob`, which follows
     each run over the websocket, and the next launch folds whatever finished.
@@ -272,6 +277,8 @@ def fold_completed_base_renders(db) -> int:
 
 def cancel_base_renders(db, client) -> int:
     """Clear ComfyUI of the re-renders the last absence queued but didn't reach.
+
+    *client* is asked for HTTP only, as in :func:`render_base_now`.
 
     The app is open now, so the GPU is the user's. Mirrors the experimenter's
     own cancel: every one still queued is dropped and its abandoned row deleted,

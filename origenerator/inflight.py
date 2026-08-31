@@ -15,9 +15,11 @@ Runs before the importer so a finalized row's output is already recorded and is
 not imported a second time. Never raises: if ComfyUI can't be read, in-flight
 rows are left untouched for a later launch to resolve.
 
-The only startup reconcile that needs a ComfyUI client; the bookmark reconciles
-are :mod:`origenerator.bookmark_reconcile`, and share nothing with this but the
-word.
+The only startup reconcile that needs to reach ComfyUI at all; the bookmark
+reconciles are :mod:`origenerator.bookmark_reconcile`, and share nothing with
+this but the word. What it needs is the REST surface --
+:class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt -- and a
+``ComfyUIClient`` forwards every call of it, so either can be handed in.
 """
 
 import json

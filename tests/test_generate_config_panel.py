@@ -11,6 +11,8 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.gui import export_lane as export_lane_module
+from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui import corner_controls, icons
@@ -1622,7 +1624,7 @@ def _positive_field(panel):
 
 
 def _request(count=3, label=_FOLDER_LABEL, opened_on=None):
-    return gcp_module.FolderRequest(
+    return folder_request_module.FolderRequest(
         folder_key=_FOLDER_KEY, label=label, count=count,
         opened_on=opened_on or ConfigSnapshot("sdxl_t2i", _folder_params(), False))
 
@@ -1777,7 +1779,7 @@ def test_a_landed_run_does_not_take_the_wall_of_images_away(requesting):
 
 
 def _lanes():
-    return list(gcp_module.EXPORT_LANES)
+    return list(export_lane_module.EXPORT_LANES)
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

@@ -14,8 +14,12 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
 * :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
+* :mod:`.enhance_settings` — what a folder's enhancement is configured with,
+  and how one enhancement is described.
+* :mod:`.enhance_graph` — the same knobs read back off a row's stored ComfyUI
+  graph, for a row whose own params are vague about them.
 * :mod:`.enhance` — what an enhancement is, which rows have had one and which
-  want one, and the knobs one runs at.
+  want one.
 * :mod:`.enhance_fold` — folding a finished enhancement onto the image it
   upgraded. The one module here that takes a database and changes what is in it;
   everything else takes rows and answers questions about them.
@@ -82,13 +86,7 @@ from origenerator.gallery.voice_commands import (
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
-    ENHANCE_SETTING_KEYS,
-    ENHANCE_WORKFLOW,
-    MATCH_SOURCE_MODEL,
     EnhanceLevel,
-    EnhanceSettings,
-    default_enhance_params,
-    describe_enhance_params,
     displayed_levels,
     enhance_levels,
     enhance_params_for,
@@ -106,6 +104,14 @@ from origenerator.gallery.enhance import (
 from origenerator.gallery.enhance_fold import (
     fold_completed_enhancements,
     fold_enhancement,
+)
+from origenerator.gallery.enhance_settings import (
+    ENHANCE_SETTING_KEYS,
+    ENHANCE_WORKFLOW,
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
+    default_enhance_params,
+    describe_enhance_params,
 )
 from origenerator.gallery.signatures import (
     is_image_conditioned,

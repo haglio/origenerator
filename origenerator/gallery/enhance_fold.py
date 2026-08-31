@@ -30,11 +30,10 @@ import json
 import logging
 
 from origenerator.gallery.enhance import (
-    ENHANCE_WORKFLOW,
-    _level_knobs,
     enhance_level_params,
     is_enhance_product_row,
 )
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_knobs
 from origenerator.gallery.output import (
     media_type_of_row,
     parse_file_list,
@@ -56,7 +55,7 @@ def _history_entries(files: list[dict], params: dict,
     where this enhancement falls in the library's order, and the image it
     upgraded sorts on the shelf by the newest one it has received
     (:func:`enhancement_recency`)."""
-    settings = _level_knobs(params)
+    settings = level_knobs(params)
     return [
         {"filename": f.get("filename"), "params": settings, "run_id": run_id}
         for f in files if f.get("filename")

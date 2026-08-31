@@ -1,5 +1,7 @@
 import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -92,6 +94,75 @@ _REQUEST_TIP_ONE = (
 )
 _REQUEST_GUARD = "Rewrite the prompt first"
 _REQUEST_TITLE = "Request {folder}"
+
+
+@dataclass(frozen=True)
+class ExportLane:
+    """One outbound lane: a folder in Evolver's inbox, a column on the row, and
+    the words its button and its failure wear.
+
+    Both lanes are the same errand — copy the clip on display into the inbox
+    Evolver watches, then stamp the row so the send survives a restart — and
+    they differ in nothing but the fields below. Written out twice they were
+    fifty lines of code with four literals swapped, and the panel's own docstring
+    said so; a third lane would have been a third copy. It is a row of this
+    table now.
+
+    ``source`` is the sub-folder Evolver reads the destination from, so it is a
+    name agreed with another repo and must stay spelled exactly as
+    :mod:`origenerator.config` has it. ``flag`` is the persisted column and
+    ``mark`` stamps it — two halves of one fact, spelled apart, which is why a
+    test pins that every lane's pair agrees. ``mark`` names the database method
+    outright rather than by a string the panel would have to look up: reached by
+    name, a stamp nothing else calls reads as dead code and is deleted by the
+    next person to run the scan. ``noun`` is what the failure dialog calls the
+    file: the two lanes call the same file a video and a clip, and each says it
+    in the words of the app it is bound for.
+    """
+
+    name: str
+    source: str
+    flag: str
+    mark: Callable[[Database, str], None]
+    noun: str
+    tooltip: str
+    # The button this lane wears, filled in per panel when the bank is built
+    # (see :meth:`GenerateConfigPanel._build_ui`). ``None`` on the table's own
+    # rows, which describe the lanes rather than any one panel's buttons.
+    button: QPushButton | None = None
+
+    @property
+    def send_caption(self) -> str:
+        return f"Send to {self.name}"
+
+    @property
+    def sent_caption(self) -> str:
+        return f"Sent to {self.name} \u2713"
+
+    @property
+    def failure_title(self) -> str:
+        return f"Send to {self.name} failed"
+
+    def failure_body(self, error) -> str:
+        return f"Could not send this {self.noun} to {self.name}:\n\n{error}"
+
+
+# In the order they sit in the button bank.
+EXPORT_LANES = (
+    ExportLane(
+        name="Evolver", source=EVOLVER_SOURCE, flag="evolver_exported_at",
+        mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
+        noun="video",
+        tooltip="Copy this video into Evolver's inbox for sorting and upscaling.",
+    ),
+    ExportLane(
+        name="Genau", source=GENAU_SOURCE, flag="genau_exported_at",
+        mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
+        noun="clip",
+        tooltip="Send this clip down the Genau lane: Evolver upscales it on its "
+                "usual schedule, then delivers it to the folder Genau plays from.",
+    ),
+)
 
 
 class GenerateConfigPanel(QWidget):
@@ -329,27 +400,23 @@ class GenerateConfigPanel(QWidget):
         # along a row, wider between wrapped rows — like the gallery's own bank.
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
-        self._evolver_btn = QPushButton("Send to Evolver")
-        self._evolver_btn.setToolTip(
-            "Copy this video into Evolver's inbox for sorting and upscaling."
-        )
-        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
-        self._evolver_btn.hide()  # shown only for a video the tab is displaying
-        self._genau_btn = QPushButton("Send to Genau")
-        self._genau_btn.setToolTip(
-            "Send this clip down the Genau lane: Evolver upscales it on its usual "
-            "schedule, then delivers it to the folder Genau plays from."
-        )
-        self._genau_btn.clicked.connect(self._on_send_to_genau)
-        self._genau_btn.hide()  # shown only for a video the tab is displaying
+        # One button per lane, in the order EXPORT_LANES lists them: a third lane
+        # is a row of that table and appears here without another line of this.
+        self._lanes = {lane.name: replace(lane, button=QPushButton(lane.send_caption))
+                       for lane in EXPORT_LANES}
+        for lane in self._lanes.values():
+            lane.button.setToolTip(lane.tooltip)
+            lane.button.clicked.connect(
+                lambda _checked=False, lane=lane: self._on_send(lane))
+            lane.button.hide()  # shown only for a video the tab is displaying
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        btn_row.addWidget(self._evolver_btn)
-        btn_row.addWidget(self._genau_btn)
+        for lane in self._lanes.values():
+            btn_row.addWidget(lane.button)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
         layout.addLayout(btn_row)
@@ -1061,8 +1128,8 @@ class GenerateConfigPanel(QWidget):
         self._pending_enhancement = None  # nothing on display to be enhancing
         self._source_tile.clear()
         self._animated_strip.hide()
-        self._evolver_btn.hide()
-        self._genau_btn.hide()
+        for lane in self._lanes.values():
+            lane.button.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the read-only
@@ -1082,8 +1149,8 @@ class GenerateConfigPanel(QWidget):
         self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
         self._show_source_tile(row, image_rows, request)
         self._show_request_diff(request)
-        self._update_evolver_button(preview)
-        self._update_genau_button(preview)
+        for lane in self._lanes.values():
+            self._update_export_button(lane, preview)
 
     def displayed_row(self) -> dict | None:
         """The saved generation this tab is showing, or ``None``.
@@ -1305,68 +1372,50 @@ class GenerateConfigPanel(QWidget):
     def _video_rows(self) -> list[dict]:
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]
 
-    # --- Send to Genau: hand a clip to the lane that ends in Genau's folder ---
+    # --- the export lanes: hand a displayed clip to a sibling app -----------
 
-    def _update_genau_button(self, preview):
-        """Reflect the displayed generation on the Send-to-Genau button.
+    def _update_export_button(self, lane, preview):
+        """Reflect the displayed generation on *lane*'s button.
 
-        Shown only for a video with a file on disk — the Genau lane carries clips.
-        One already sent shows a persistent, disabled "Sent ✓", read from the row
-        rather than the button's state so it survives a restart. ``preview`` is the
-        resolved ``(path, media_type)``, or ``None``.
+        Shown only for a video with a file on disk — every lane carries clips,
+        and Evolver is a video pipeline — so an image or a missing file hides it.
+        One already sent shows a persistent, disabled "Sent \u2713", read from the
+        row rather than from the button's own state so it survives a restart.
+        ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
         is_video = preview is not None and preview[1] == "video"
-        self._genau_btn.setVisible(is_video)
+        lane.button.setVisible(is_video)
         if not is_video:
             return
-        already_sent = bool(self._displayed_row and self._displayed_row.get("genau_exported_at"))
-        self._genau_btn.setText("Sent to Genau ✓" if already_sent else "Send to Genau")
-        self._genau_btn.setEnabled(not already_sent)
+        already_sent = bool(self._displayed_row and self._displayed_row.get(lane.flag))
+        lane.button.setText(lane.sent_caption if already_sent else lane.send_caption)
+        lane.button.setEnabled(not already_sent)
 
-    def _on_send_to_genau(self):
-        """Copy the displayed video into the Genau lane's inbox and remember the send.
+    def _on_send(self, lane):
+        """Copy the displayed video into *lane*'s inbox folder and remember it.
 
-        The same handoff as :meth:`_on_send_to_evolver` down to the re-read of the
-        persisted flag and the loud failure — only the source folder differs, which
-        is what tells Evolver to deliver the upscaled result to Genau.
+        Re-checks the persisted flag rather than the button's disabled state, so
+        the handoff cannot be repeated. The copy lands in another app's inbox
+        with no other visible result here, so a failure that reached only the log
+        would look exactly like a success — hence the dialog.
         """
-        if not self._displayed_row or self._displayed_row.get("genau_exported_at"):
+        if not self._displayed_row or self._displayed_row.get(lane.flag):
             return
         path = self._displayed_video_path()
         if path is None:
             return
         try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / GENAU_SOURCE)
+            evolver_export.export_video(path, EVOLVER_INBOX_DIR / lane.source)
         except Exception as e:
-            logger.exception("Failed to send %s to Genau", path)
-            QMessageBox.warning(
-                self._preview, "Send to Genau failed",
-                f"Could not send this clip to Genau:\n\n{e}",
-            )
+            logger.exception("Failed to send %s to %s", path, lane.name)
+            QMessageBox.warning(self._preview, lane.failure_title,
+                                lane.failure_body(e))
             return
         prompt_id = self._displayed_row["prompt_id"]
-        self._db.mark_genau_exported(prompt_id)
+        lane.mark(self._db, prompt_id)
         # Re-read so the row (and thus the button) reflects the persisted send.
         self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_genau_button((path, "video"))
-
-    # --- Send to Evolver: hand a displayed video to the sibling pipeline -------
-
-    def _update_evolver_button(self, preview):
-        """Reflect the displayed generation on the Send-to-Evolver button.
-
-        Shown only when the generation is a video with a file on disk; Evolver is
-        a video pipeline, so for an image or a missing file the button is hidden.
-        A video already sent shows a persistent, disabled "Sent ✓" (the flag is
-        read from the row, which the DB persists). ``preview`` is the resolved
-        ``(path, media_type)``, or ``None``."""
-        is_video = preview is not None and preview[1] == "video"
-        self._evolver_btn.setVisible(is_video)
-        if not is_video:
-            return
-        already_sent = bool(self._displayed_row and self._displayed_row.get("evolver_exported_at"))
-        self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
-        self._evolver_btn.setEnabled(not already_sent)
+        self._update_export_button(lane, (path, "video"))
 
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
@@ -1397,29 +1446,3 @@ class GenerateConfigPanel(QWidget):
         media player to follow, and the funscript actions beside it. ``None`` when the
         tab isn't showing a video, or that video has no funscript."""
         return drive_target_for(self._displayed_video_path(), self._preview.player())
-
-    def _on_send_to_evolver(self):
-        """Copy the displayed video into Evolver's inbox and remember the send.
-
-        Re-checks the persisted flag (not just the button's disabled state) so the
-        handoff can't be repeated. The copy lands in another app's inbox with no
-        other visible result here, so a failure must surface loudly."""
-        if not self._displayed_row or self._displayed_row.get("evolver_exported_at"):
-            return
-        path = self._displayed_video_path()
-        if path is None:
-            return
-        try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
-        except Exception as e:
-            logger.exception("Failed to send %s to Evolver", path)
-            QMessageBox.warning(
-                self._preview, "Send to Evolver failed",
-                f"Could not send this video to Evolver:\n\n{e}",
-            )
-            return
-        prompt_id = self._displayed_row["prompt_id"]
-        self._db.mark_evolver_exported(prompt_id)
-        # Re-read so the row (and thus the button) reflects the persisted send.
-        self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_evolver_button((path, "video"))

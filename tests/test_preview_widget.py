@@ -1211,30 +1211,26 @@ def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_previe
     assert not w._notice.isHidden()
 
 
-def test_showing_a_folder_puts_down_all_the_pane_was_holding_but_the_corners(
-        make_preview, tmp_path):
-    # HELD DEFECT (audit §3 bug 15, awaiting sign-off): every other view-changing
-    # method disarms the corner controls first; this one does not, so trash there
-    # lands on a generation the user is no longer looking at. Pinned as it is so
-    # the shared preamble cannot quietly change it — the fix is to stop asking to
-    # keep them.
+def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
+                                                             tmp_path):
     w = _pane_holding_everything(make_preview(), tmp_path)
 
     w.show_folder([_make_png(tmp_path / "wall.png")])
 
     assert w._player.stop.called
     assert w._notice.isHidden()
+    assert w._actions_id is None            # a wall of pictures is not a row
     assert w._media is None
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None
     assert w._draggable_id is None
-    assert w._actions_id == "held"          # the defect: still the last generation's
 
 
-def test_the_corners_left_armed_over_a_folder_still_fire_at_the_old_row(
-        make_preview, tmp_path):
-    # The consequence, spelled out: this is what makes bug 15 a defect rather
-    # than a tidiness note.
+def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
+                                                                 tmp_path):
+    # The defect this closes (audit §3 bug 15, signed off 2026-08-31): the wall
+    # kept the corners of whatever generation was there before it, so pressing
+    # trash binned a picture the user was no longer looking at.
     w = _pane_holding_everything(make_preview(), tmp_path)
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))
@@ -1242,4 +1238,5 @@ def test_the_corners_left_armed_over_a_folder_still_fire_at_the_old_row(
     w.show_folder([_make_png(tmp_path / "wall.png")])
     w._on_control("trash")
 
-    assert fired == [("held", "trash")]
+    assert fired == []
+    assert all(b.isHidden() for b in _corners(w))

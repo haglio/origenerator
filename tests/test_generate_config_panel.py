@@ -1696,6 +1696,37 @@ def test_the_tab_is_named_after_the_folder_it_asks_about(requesting):
     assert requesting.title() == f"Request {_FOLDER_LABEL}"
 
 
+def test_a_request_tab_offers_no_corners_over_its_wall_of_pictures(
+        saved_panel, tmp_path, monkeypatch):
+    # Audit §3 bug 15, signed off and fixed 2026-08-31: the wall used to keep
+    # the corners of whichever generation the tab had been showing, so trash
+    # there binned a picture the user was not looking at.
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/img1.png"), "image"))
+    panel.show_saved_generation(image, [image])
+    assert panel._preview._actions_id == "img1"      # armed on that generation
+    fired = []
+    panel.item_action_requested.connect(lambda pid, action: fired.append(pid))
+
+    panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+                              _folder_params(), _images(tmp_path, 3))
+
+    assert panel._preview._actions_id is None
+    panel._preview._on_control("trash")
+    assert fired == []
+
+
+def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(requesting):
+    # The corners are re-armed after every change to the picture, and the
+    # gallery pushes enhance settings on a poll — so the fix has to hold past
+    # the next one rather than only at the moment the wall goes up.
+    requesting.set_enhance_settings(gallery.EnhanceSettings(auto=True))
+
+    assert requesting._preview._actions_id is None
+
+
 def test_a_request_tab_holds_no_generation_of_its_own(requesting):
     # It is about a folder, so there is no file on display and nothing for the
     # "not yet generated with modifications" notice to be measured against.

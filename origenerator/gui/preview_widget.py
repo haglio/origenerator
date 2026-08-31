@@ -237,8 +237,7 @@ class PreviewWidget(QWidget):
                 app.aboutToQuit.connect(self._release)
 
     def _take_the_pane(self, media, *, stop_player: bool = True,
-                       keep_notice: bool = False, keep_actions: bool = False,
-                       keep_draggable: bool = False,
+                       keep_notice: bool = False,
                        live: bool = False, live_frame: bytes | None = None) -> None:
         """Put down everything the pane is holding, ready for new content.
 
@@ -251,20 +250,16 @@ class PreviewWidget(QWidget):
         anything that is not a file on disk) and hands a fullscreen view opened
         over a running generation the file it landed as.
 
-        The keep_* switches are the deliberate exceptions, one caller each:
+        The drag follows ``media`` rather than a switch of its own: a view with
+        no file on disk has nothing to drag out, and a view that has one leaves
+        the arming to its owner, since only the owner knows which generation the
+        file belongs to.
 
+        The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a clip does not stop the player it is about to hand a
         new source to. ``keep_notice`` — frames of an enhancement of the picture
         on screen are the coming state of that picture, so what a notice says
-        about it is just as true of them. ``keep_draggable`` — a saved file is
-        draggable, but only its owner knows which generation it is, so the arming
-        is left for the owner rather than cleared out from under it.
-
-        ``keep_actions`` is not an exception; it is a defect held pending
-        sign-off (audit §3 bug 15). :meth:`show_folder` alone leaves the corners
-        armed on the generation before it, so pressing trash over a wall of
-        pictures acts on a row the user is not looking at. Deleting the one
-        argument at that call site is the whole fix.
+        about it is just as true of them.
         """
         self._set_movie(None)
         self._pixmap = None
@@ -273,13 +268,12 @@ class PreviewWidget(QWidget):
             self._player.stop()
         if not keep_notice:
             self.set_notice(None)
-        if not keep_actions:
-            self.set_actions(None)
+        self.set_actions(None)
         self._media = media
         self._end_live(media)
         if live:
             self._live, self._live_frame = True, live_frame
-        if not keep_draggable:
+        if media is None:
             self._draggable_id = None
 
     def show_media(self, path, media_type: str) -> None:
@@ -290,7 +284,7 @@ class PreviewWidget(QWidget):
             self.show_image(path)
 
     def show_image(self, path) -> None:
-        self._take_the_pane((path, "image"), keep_draggable=True)
+        self._take_the_pane((path, "image"))
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._set_movie(QMovie(str(path)), reader.size())
@@ -300,7 +294,7 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._image_label)
 
     def show_video(self, path) -> None:
-        self._take_the_pane((path, "video"), stop_player=False, keep_draggable=True)
+        self._take_the_pane((path, "video"), stop_player=False)
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
@@ -358,13 +352,11 @@ class PreviewWidget(QWidget):
         What a tab about a folder rather than a generation puts in the pane —
         the rewrite a folder's Request card opens. There is no one file on display, so
         nothing here is draggable, openable fullscreen, or scripted; the wall is
-        the folder, and the folder is what the settings below it are about.
-
-        ``keep_actions`` holds audit §3 bug 15 exactly as it stands: the corners
-        stay armed on the generation shown before this wall, which no other view
-        allows. Drop the argument once the fix is signed off.
+        the folder, and the folder is what the settings below it are about — and
+        no one of them is what the corner controls would act on, which is why
+        they come down here as they do everywhere else.
         """
-        self._take_the_pane(None, keep_actions=True)
+        self._take_the_pane(None)
         self._image_label.clear()
         self._sheet.show_pictures(paths)
         self._stack.setCurrentWidget(self._sheet)

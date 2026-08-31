@@ -207,8 +207,7 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     # Splash is visible for the whole boot and dismissed once the window shows.
     assert events == ["loading.show", "window.show", "loading.close"]
@@ -245,8 +244,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert events == [
         "front:loading",  # the splash leads the launch too, not just the window
@@ -276,8 +274,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert calls[:2] == ["reconcile", "import"]
 
@@ -300,8 +297,7 @@ def test_main_ages_out_the_recovery_bin_on_startup(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     sweep.assert_called_once()
     assert sweep.call_args.args[1] is trash
@@ -326,8 +322,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient") as mock_client, \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert mock_client.call_args.kwargs["client_id"] == "persisted-id"
 
@@ -362,9 +357,8 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("origenerator.gui.fun_time_bridge.FunTimeBridge") as mock_bridge, \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main(["--fun-time", "--x", "5", "--y", "6",
-                  "--width", "700", "--height", "900"])
+        assert main(["--fun-time", "--x", "5", "--y", "6",
+                     "--width", "700", "--height", "900"]) == 0
 
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
@@ -396,9 +390,8 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("origenerator.gui.fun_time_bridge.FunTimeBridge"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        with pytest.raises(SystemExit):
-            main(["--fun-time", "--x", "5", "--y", "6",
-                  "--width", "700", "--height", "900"])
+        assert main(["--fun-time", "--x", "5", "--y", "6",
+                     "--width", "700", "--height", "900"]) == 0
 
     mock_loading.assert_not_called()
 
@@ -471,8 +464,7 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
     ran = []
 
     with _a_faked_boot(ran):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
 
@@ -489,8 +481,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
         passes={"import_comfyui_output": MagicMock(side_effect=OSError("no output dir"))},
         **{"origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window)},
     ):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert "import_comfyui_output" not in ran
     # ...and everything after it still ran, up to and including the window.
@@ -509,8 +500,7 @@ def test_a_branch_session_maintains_nothing_but_the_enhancement_fold(qapp):
     with _a_faked_boot(ran), \
          patch("origenerator.branch_session.is_branch_session", return_value=True), \
          patch("origenerator.branch_session.seed_branch_db", return_value=True):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     assert ran == ["fold_completed_enhancements"]
 
@@ -523,8 +513,7 @@ def test_a_branch_session_sweeps_no_deletions(qapp):
          patch("origenerator.recovery.sweep", return_value=0) as sweep, \
          patch("origenerator.branch_session.is_branch_session", return_value=True), \
          patch("origenerator.branch_session.seed_branch_db", return_value=True):
-        with pytest.raises(SystemExit):
-            main([])
+        assert main([]) == 0
 
     sweep.assert_not_called()
 

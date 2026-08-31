@@ -59,6 +59,33 @@ def load_content(
 load_content.cache_clear = _text.cache_clear
 
 
+def missing_overlay_keys(
+    local_path: Path | None = None,
+    example_path: Path | None = None,
+) -> tuple[str, ...]:
+    """Keys the committed example documents that the local overlay does not have.
+
+    The example IS the list of what an overlay must carry — it is the file whose
+    job is to document the shape — so there is no second list here to keep in
+    step, and a key added to it is a key the overlay has to gain.
+
+    ``content.local.json`` is git-ignored and hand-maintained, so it does not
+    grow a key when the app does; the example has gone from three keys to nine
+    in six weeks. A key present but EMPTY is not missing: that is how a feature
+    is switched off, and every consumer of an optional key already reads it as
+    ``.get(key) or default``.
+
+    Empty when there is no local overlay at all: a fresh or public checkout runs
+    on the example, so there is nothing to be short of.
+    """
+    local_path = LOCAL_CONTENT if local_path is None else local_path
+    example_path = EXAMPLE_CONTENT if example_path is None else example_path
+    if not local_path.exists():
+        return ()
+    documented = {key for key in json.loads(_text(example_path)) if key != "_comment"}
+    return tuple(sorted(documented - set(json.loads(_text(local_path)))))
+
+
 class MissingOverlayKey(LookupError):
     """A key the overlay has to carry, and does not — named, with its file.
 

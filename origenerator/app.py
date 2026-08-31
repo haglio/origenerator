@@ -505,6 +505,44 @@ def _build_window(client, db, app_state, fun_time):
     return window
 
 
+def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
+    """Say which keys `content.local.json` is short of, and stop the launch.
+
+    That file is git-ignored and hand-maintained, so it does not gain a key when
+    the app does -- and the committed example it is written from has gone from
+    three keys to nine in six weeks. Three of those nine are read with a bare
+    subscript, so an overlay one release behind used to be a dead icon: no
+    window, and the traceback in a launcher log nobody opens. The other six went
+    quietly one feature at a time, which is worse in its own way -- a stroke
+    aimed at the wrong part of the frame reads as the model having a bad day.
+
+    One rule for all nine, then: name what is missing and do not start. A key
+    can be left EMPTY to switch that feature off, so this is not a demand to
+    configure what you do not use.
+
+    Nothing has been logged yet at this point -- logging is configured from
+    ``config``, which is what a missing key stops from importing -- so this goes
+    to the console the launcher redirects into ``state/origenerator_launcher.log``,
+    and to a dialog when there is a screen to put one on. Hosted by Fun Time
+    there is not: nobody is at this window to dismiss a modal and it would sit
+    over one of the session's players, which is why the splash is suppressed
+    there too.
+    """
+    from origenerator.content import EXAMPLE_CONTENT, LOCAL_CONTENT
+
+    message = (
+        f"{LOCAL_CONTENT} is missing {len(missing)} key(s) this version needs:\n\n"
+        + "\n".join(f"    {key}" for key in missing)
+        + f"\n\nCopy them from {EXAMPLE_CONTENT.name}. A key can be left empty "
+          "to switch that feature off."
+    )
+    print(f"Origenerator: {message}", file=sys.stderr)
+    if fun_time is None:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.critical(None, "Origenerator: incomplete content overlay", message)
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Boot the app and run it; return the code the process should exit with.
 
@@ -524,16 +562,23 @@ def main(argv: list[str] | None = None) -> int:
 
     from PyQt6.QtWidgets import QApplication
 
+    # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
+    # above, and letting Qt re-read those flags would only invite collisions.
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+
+    # Before config, because config is the first thing a missing key stops from
+    # importing, and before the splash, because there is nothing to put one over.
+    from origenerator.content import missing_overlay_keys
+    missing = missing_overlay_keys()
+    if missing:
+        return _refuse_an_incomplete_overlay(missing, fun_time)
+
     from origenerator.config import (
         DB_PATH, PROJECT_DIR, STATE_DIR, COMFYUI_HOST, COMFYUI_PORT,
         COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
     )
 
     logger = _configure_logging(STATE_DIR)
-
-    # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
-    # above, and letting Qt re-read those flags would only invite collisions.
-    app = QApplication.instance() or QApplication(sys.argv[:1])
 
     # The one place the stylesheet is applied, and it must be the application:
     # QToolTip popups are top-level widgets a window-level sheet never reaches,

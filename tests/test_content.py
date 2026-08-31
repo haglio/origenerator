@@ -143,3 +143,77 @@ def test_a_consumer_of_the_overlay_does_not_read_it_at_import(module):
     seen = _import_in_a_fresh_interpreter(module)
 
     assert seen["overlay_reads"] == ["content.example.json"]
+
+
+# --- the overlay is behind the app ---------------------------------------------
+#
+# `content.local.json` is hand-maintained and git-ignored, so it does not gain a
+# key when the app does — and the committed example has gone from three keys to
+# nine in six weeks. Each of those six additions is a launch where a local
+# overlay written the day before is short of one, and three of the nine are read
+# with a bare subscript, which used to be a dead icon and a traceback in a log
+# nobody opens.
+
+
+def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
+    complete = json.loads((REPO_ROOT / "content.example.json").read_text())
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps(
+        {k: v for k, v in complete.items() if k not in ("genau_source", "suite_root")}),
+        encoding="utf-8")
+
+    assert content.missing_overlay_keys(local, REPO_ROOT / "content.example.json") == (
+        "genau_source", "suite_root")
+
+
+def test_a_complete_overlay_is_missing_nothing(tmp_path):
+    local = tmp_path / "content.local.json"
+    local.write_text((REPO_ROOT / "content.example.json").read_text(), encoding="utf-8")
+
+    assert content.missing_overlay_keys(
+        local, REPO_ROOT / "content.example.json") == ()
+
+
+def test_a_key_present_but_empty_is_not_missing(tmp_path):
+    """How you switch a feature off: the key is there with nothing in it. Every
+    consumer of an optional key already reads it as `.get(key) or default`."""
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"suite_root": "C:/x", "search_synonyms": [["a"]]}),
+                       encoding="utf-8")
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"suite_root": "D:/y", "search_synonyms": []}),
+                     encoding="utf-8")
+
+    assert content.missing_overlay_keys(local, example) == ()
+
+
+def test_no_local_overlay_at_all_is_missing_nothing(tmp_path):
+    """A fresh or public checkout: the example is not compared against itself,
+    it IS what loads."""
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"suite_root": "C:/x"}), encoding="utf-8")
+
+    assert content.missing_overlay_keys(tmp_path / "content.local.json", example) == ()
+
+
+def test_the_comment_the_example_carries_is_not_a_key_to_copy(tmp_path):
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"_comment": "what this file is", "suite_root": "C:/x"}),
+                       encoding="utf-8")
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"suite_root": "D:/y"}), encoding="utf-8")
+
+    assert content.missing_overlay_keys(local, example) == ()
+
+
+def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
+    """No second list to keep in step: the file that documents the shape is the
+    one the check reads, so a key added to it is a key the overlay must carry."""
+    documented = {k for k in json.loads(
+        (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
+
+    assert documented == {
+        "suite_root", "ambient_audio_dir", "genau_source", "recipe_categories",
+        "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
+        "detector_labels",
+    }

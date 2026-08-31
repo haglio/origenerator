@@ -581,3 +581,88 @@ def test_every_pass_says_what_went_wrong_when_something_does():
 
     for boot_pass in (*MAINTENANCE, *BRANCH_SESSION_MAINTENANCE):
         assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__
+
+
+# --- the overlay is behind the app ---------------------------------------------
+
+
+class TestAnOverlayShortOfAKey:
+    """`content.local.json` is hand-maintained and git-ignored, so it does not
+    gain a key when the app does — and the committed example went from three
+    keys to nine in six weeks. Three of the nine were read with a bare
+    subscript, so an overlay a release behind was a dead icon: no window, and
+    the traceback only in the launcher's log.
+
+    One rule now, for all nine: the launch says which keys are missing and does
+    not start. A key can be left empty to switch that feature off, which is what
+    keeps this from being a demand to configure things you do not use.
+    """
+
+    SHORT = ("detector_labels", "genau_source")
+
+    def test_the_launch_stops_and_no_window_is_built(self, qapp):
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
+            "PyQt6.QtWidgets.QMessageBox.critical": MagicMock(),
+        }):
+            code = main([])
+
+        assert code != 0
+        window.show.assert_not_called()
+        window.showMinimized.assert_not_called()
+
+    def test_it_names_every_missing_key_and_the_file_to_put_them_in(
+            self, qapp, tmp_path, monkeypatch):
+        from origenerator import content
+
+        # The suite pins the overlay at the committed example (tests/conftest.py),
+        # so point it somewhere with the name a real install would have.
+        monkeypatch.setattr(content, "LOCAL_CONTENT", tmp_path / "content.local.json")
+        told = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
+            "PyQt6.QtWidgets.QMessageBox.critical": told,
+        }):
+            main([])
+
+        said = " ".join(str(arg) for arg in told.call_args.args)
+        for key in self.SHORT:
+            assert key in said
+        assert "content.local.json" in said     # the file to fix
+        assert "content.example.json" in said   # the file to copy from
+
+    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
+        """Parked behind a Fun Time session there is nobody at this window to
+        dismiss a modal, and it would sit over one of the session's players —
+        the same reason the splash is suppressed there. It goes to the console
+        the launcher redirects into its log instead."""
+        told = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
+            "PyQt6.QtWidgets.QMessageBox.critical": told,
+        }):
+            code = main(["--fun-time", "--x", "5", "--y", "6",
+                         "--width", "700", "--height", "900"])
+
+        assert code != 0
+        told.assert_not_called()
+
+    def test_a_complete_overlay_says_nothing_and_boots(self, qapp):
+        """The control: the suite runs on the committed example, which is
+        complete by definition, so nothing here may fire on a normal launch."""
+        told = MagicMock()
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "PyQt6.QtWidgets.QMessageBox.critical": told,
+        }):
+            assert main([]) == 0
+
+        told.assert_not_called()
+        window.show.assert_called_once()

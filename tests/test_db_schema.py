@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from origenerator.db import _GENERATION_COLUMNS, Database
+from origenerator.db import _ADDED_COLUMNS, _GENERATION_COLUMNS, Database
 
 # (name, type, not_null, default, primary_key_position) per column, in
 # declaration order — exactly what `PRAGMA table_info` reports.
@@ -201,3 +201,102 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
     forgotten there is silently dropped from every undone delete."""
     assert _GENERATION_COLUMNS == tuple(
         column for column, *_ in SCHEMA["generations"])
+
+
+# --- upgrading a database made before a column existed ------------------------
+
+# What each table held when it first shipped. This is history, so it never
+# changes again — which is exactly what makes the equality below a gate rather
+# than a restatement: a column added from here on is not in this list, so
+# `_ADDED_COLUMNS` is the only place left for it to be, and forgetting it there
+# fails this file instead of quietly shipping a column every existing user's
+# database will never have.
+FIRST_SHIPPED = {
+    "branch_curation": {"branch", "state_json", "adopted_at"},
+    "custom_folder_members": {
+        "folder_id", "folder_key", "level", "ref_prompt_id", "position"},
+    "custom_folders": {"id", "name", "created_at"},
+    "deletions": {"prompt_id", "row_json", "batch_json", "deleted_at"},
+    "folder_meta": {"folder_key", "custom_name", "starred"},
+    "generations": {
+        "id", "prompt_id", "source", "workflow_name", "workflow_version",
+        "status", "positive_prompt", "negative_prompt", "seed", "params_json",
+        "workflow_json", "output_files", "thumbnail_path", "error_message",
+        "created_at", "completed_at"},
+    "requests": {
+        "prompt_id", "source_prompt_id", "heard", "term", "polarity", "action",
+        "old_positive", "old_negative", "new_positive", "new_negative",
+        "created_at"},
+}
+
+
+@pytest.mark.parametrize("table", sorted(SCHEMA))
+def test_every_column_either_shipped_with_the_table_or_the_migration_adds_it(table):
+    """Held as an equality, per table. Below means a column has gone missing;
+    above means one was added to the DDL and to nothing else, so it exists for a
+    fresh install and for nobody who has been running the app."""
+    assert {column for column, *_ in SCHEMA[table]} == (
+        FIRST_SHIPPED[table] | set(_ADDED_COLUMNS.get(table, ())))
+
+
+
+def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
+    """The table as it was before *dropped* were added, from the snapshot above.
+
+    Reconstructed rather than written out a second time, so this stays honest as
+    the schema grows: what it builds is always today's table minus the columns
+    the migration claims to add.
+    """
+    columns = []
+    for name, type_, not_null, default, pk in SCHEMA[table]:
+        if name in dropped:
+            continue
+        parts = [name, type_]
+        if pk:
+            parts.append("PRIMARY KEY")
+        if not_null:
+            parts.append("NOT NULL")
+        if default is not None:
+            # Parenthesised whatever it is: sqlite needs it for a function
+            # default like datetime('now'), and accepts it for a literal.
+            parts.append(f"DEFAULT ({default})")
+        columns.append(" ".join(parts))
+    conn.execute(f"CREATE TABLE {table} ({', '.join(columns)})")
+
+
+@pytest.mark.parametrize("table", sorted(_ADDED_COLUMNS))
+def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
+    """``CREATE TABLE IF NOT EXISTS`` leaves a user's older table exactly as it
+    was, so a column added later reaches them only through the migration. One
+    forgotten there is a column that exists for a fresh install and not for
+    anybody who has been running the app."""
+    path = tmp_path / f"older-{table}.db"
+    with sqlite3.connect(path) as conn:
+        _create_without(conn, table, set(_ADDED_COLUMNS[table]))
+
+    Database(path)
+
+    with sqlite3.connect(path) as conn:
+        found = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    assert found == {column for column, *_ in SCHEMA[table]}
+
+
+@pytest.mark.parametrize("table", sorted(_ADDED_COLUMNS))
+def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, table):
+    """The other half: the column can arrive with the right name and the wrong
+    shape. ``starred`` is ``INTEGER NOT NULL DEFAULT 0`` in the DDL, and an
+    upgrade that spelt it a plain ``INTEGER`` would give two users' databases
+    two different tables under one name."""
+    path = tmp_path / f"older-{table}.db"
+    with sqlite3.connect(path) as conn:
+        _create_without(conn, table, set(_ADDED_COLUMNS[table]))
+
+    Database(path)
+
+    with sqlite3.connect(path) as conn:
+        migrated = {row[1]: (row[2], row[3], row[4]) for row in
+                    conn.execute(f"PRAGMA table_info({table})")}
+    fresh = {name: (type_, not_null, default)
+             for name, type_, not_null, default, _ in SCHEMA[table]}
+    for column in _ADDED_COLUMNS[table]:
+        assert migrated[column] == fresh[column], column

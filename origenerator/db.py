@@ -155,6 +155,34 @@ CREATE TABLE IF NOT EXISTS deletions (
 );
 """
 
+# Columns added to a table after it first shipped, and how the DDL above
+# declares each one. ``CREATE TABLE IF NOT EXISTS`` leaves a user's existing
+# table exactly as it was, so these reach an older database only through
+# ``_migrate`` — as data rather than as thirteen copies of one `if`, so that
+# adding a column is one entry rather than a fourth place to remember.
+# tests/test_db_schema.py holds this against the schema from both sides: an
+# older table gains every one of them, and each arrives with the type, NOT NULL
+# and default the DDL gives it.
+_ADDED_COLUMNS = {
+    "generations": {
+        "duration_seconds": "REAL",
+        "evolver_exported_at": "TEXT",
+        "genau_exported_at": "TEXT",
+        "genau_requested_at": "TEXT",
+        "progress_json": "TEXT",
+        "starred": "INTEGER NOT NULL DEFAULT 0",
+        "experiment_verdict": "TEXT",
+        "original_files": "TEXT",
+        "enhance_history": "TEXT",
+        "recipe_category": "TEXT",
+        "recipe_video_id": "TEXT",
+    },
+    "folder_meta": {
+        "level": "TEXT",
+        "ref_prompt_id": "TEXT",
+    },
+}
+
 # Every column of the generations table, in declaration order. Used to restore a
 # previously-captured row verbatim (see ``restore_generation``).
 _GENERATION_COLUMNS = (
@@ -183,39 +211,15 @@ class Database:
         """Bring an older database up to the current schema.
 
         ``CREATE TABLE IF NOT EXISTS`` leaves a pre-existing table untouched, so
-        columns added after a user's table was first created must be patched in
-        here. Each step is guarded to stay idempotent.
+        every column in ``_ADDED_COLUMNS`` is patched in here. Guarded against
+        what the table already has, so this stays idempotent.
         """
-        existing = {row[1] for row in conn.execute("PRAGMA table_info(generations)")}
-        if "duration_seconds" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN duration_seconds REAL")
-        if "evolver_exported_at" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN evolver_exported_at TEXT")
-        if "genau_exported_at" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN genau_exported_at TEXT")
-        if "genau_requested_at" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN genau_requested_at TEXT")
-        if "progress_json" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN progress_json TEXT")
-        if "starred" not in existing:
-            conn.execute(
-                "ALTER TABLE generations ADD COLUMN starred INTEGER NOT NULL DEFAULT 0"
-            )
-        if "experiment_verdict" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN experiment_verdict TEXT")
-        if "original_files" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN original_files TEXT")
-        if "enhance_history" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN enhance_history TEXT")
-        if "recipe_category" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN recipe_category TEXT")
-        if "recipe_video_id" not in existing:
-            conn.execute("ALTER TABLE generations ADD COLUMN recipe_video_id TEXT")
-        folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
-        if "level" not in folder_cols:
-            conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
-        if "ref_prompt_id" not in folder_cols:
-            conn.execute("ALTER TABLE folder_meta ADD COLUMN ref_prompt_id TEXT")
+        for table, columns in _ADDED_COLUMNS.items():
+            existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            for column, declaration in columns.items():
+                if column not in existing:
+                    conn.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
     @contextmanager
     def _connect(self):

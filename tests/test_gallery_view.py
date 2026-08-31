@@ -7346,6 +7346,9 @@ class _FakeRerollJob:
     def refresh_backlog(self):
         pass  # the poll re-reads the queue position here; the fake's is fixed
 
+    def cancel(self):
+        self.state = "canceled"
+
 
 def _open_recents(view):
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
@@ -12422,3 +12425,84 @@ def test_a_sentence_holding_a_command_word_still_steers_the_prompt(qtbot, tmp_pa
 
     assert view._voice.speak("a lock of hair over her eye") is None
     assert surface.said is None and surface.steps == []
+
+
+# --- the pane→view wiring: each pane gesture reaches its view handler --------
+#
+# The browser pane connects its tiles' signals straight to view handlers today,
+# and the coupling inversion (audit item 30) re-routes every one of these wires
+# through a pane signal. Each test here drives the wire end to end — emit the
+# widget's own signal, observe the app-level consequence — so a re-route that
+# quietly drops a wire fails a test instead of a spoken command or a click.
+
+
+def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
+    db = FakeDB([_experiment_row("e1")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+
+    view._browser._thumb_widgets["e1"].corner_action_triggered.emit("e1", "keep")
+
+    assert db.get_generation("e1")["experiment_verdict"] == "up"
+
+
+def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._browser._thumb_widgets["i1"].control_triggered.emit(
+        "i1", corner_controls.STAR)
+
+    assert db.get_generation("i1")["starred"]
+
+
+def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # child folders as tiles
+    labels = []
+    _menu_labels(monkeypatch, labels)
+    from origenerator.gui.folder_tile import FolderTile
+    (tile,) = view._scroll.widget().findChildren(FolderTile)
+
+    tile.context_requested.emit(_key(_image_workflow(view._tree).child(0)),
+                                QPoint(1, 1))
+
+    assert "Star" in labels
+
+
+def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
+        qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    leaf = view._leaf_by_id["vid"]
+    view._tree.setCurrentItem(leaf)
+
+    view._browser._thumb_widgets["vid"].corner_action_triggered.emit("vid", "video")
+
+    (job,) = [job for jobs in view._reroll.jobs_by_folder.values() for job in jobs]
+    assert job.workflow.name == "wan22_i2v"
+
+
+def test_a_queue_items_cancel_drops_that_run(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.add(_running_row("rr1", prompt="a cat"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    folder_key = _key(_image_workflow(view._tree).child(0).child(0))
+    view._reroll._jobs[folder_key] = [_FakeRerollJob(
+        "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running")]
+
+    (item,) = [it for it in view._inflight_items() if it.key == "rr1"]
+    item.cancel()
+
+    assert view._reroll.jobs_by_folder.get(folder_key, []) == []
+    assert db.get_generation("rr1") is None

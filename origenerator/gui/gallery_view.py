@@ -79,7 +79,7 @@ from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.browser_pane import (
-    BrowserPane, BrowserScrollArea, SEARCH_DRAW_LIMIT, SearchTile,
+    BrowserPane, BrowserScrollArea, SEARCH_DRAW_LIMIT, SearchTile, TreeNavigation,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -592,7 +592,12 @@ class GalleryView(QWidget):
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards. Its signals
         # carry every gesture made on a tile; the handlers here answer them.
-        self._browser = BrowserPane(self, db, self._reroll, self._auto)
+        self._browser = BrowserPane(self, db, self._reroll, self._auto,
+                                    TreeNavigation(
+                                        selected_folder_key=self._selected_folder_key,
+                                        folder_context=self._folder_context,
+                                        group_for_key=self._group_for_key,
+                                    ))
         self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._browser.tab_pin_requested.connect(self.pin_config_tab)
         self._browser.item_jump_requested.connect(self._on_source_link)
@@ -3011,6 +3016,15 @@ class GalleryView(QWidget):
     def _shelf_item(self, shelf_key: str, orientation: str | None = None):
         """One side's copy of a shelf row — the side being browsed by default."""
         return self._tree_view.shelf_item(shelf_key, orientation or self._current_side())
+
+    def _folder_context(self, key: str) -> str:
+        """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
+        top of the tree. The caption a tile drawn far from the tree wears
+        (see :class:`~origenerator.gui.browser_pane.TreeNavigation`)."""
+        item = self._tree_item_for(key)
+        if item is None or item.parent() is None:
+            return ""
+        return self._tree_view.breadcrumb(item.parent())
 
     def _current_group(self):
         """The folder on screen, or ``None`` (a shelf, a search, or an empty

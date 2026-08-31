@@ -20,6 +20,7 @@ thin delegates so the pane's rendering and selection are one concern in one plac
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QApplication, QPushButton, QScrollArea, QVBoxLayout,
@@ -154,6 +155,28 @@ def _inflight_signature(items) -> tuple:
     return tuple(sorted(it.key for it in items))
 
 
+@dataclass(frozen=True)
+class TreeNavigation:
+    """The whole of what the pane may ask about the folder tree, as three
+    questions bound to the view's own answers at construction.
+
+    A record of callables rather than a back-reference: the pane used to walk
+    ``view._tree_view`` and ``view._tree_item_for`` for these, which put the
+    tree's item model and the view's cross-side key resolution inside the
+    pane's reach. Three named questions are the actual dependency — and a test
+    can stand the pane up by answering them alone.
+    """
+
+    # The tree key of the selected row (a folder's, or a shelf's), or ``None``.
+    selected_folder_key: Callable[[], str | None]
+    # Where folder ``key`` lives — the breadcrumb of its parent, "" at the top.
+    # What a tile drawn far from the tree is captioned with, so identically
+    # named folders from opposite corners stay tellable apart.
+    folder_context: Callable[[str], str]
+    # The folder ``key`` names, as the side being browsed holds it, or ``None``.
+    group_for_key: Callable[[str], object]
+
+
 # The job kinds whose queue row shows what they are made from rather than what
 # their folder holds (:func:`gallery.job_kind_label`).
 SOURCE_FRAME_KINDS = ("I2V", "Enhance")
@@ -187,12 +210,13 @@ class BrowserPane(QObject):
     drag_ended = pyqtSignal()
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
 
-    def __init__(self, view, db, reroll, auto):
+    def __init__(self, view, db, reroll, auto, tree: TreeNavigation):
         super().__init__()
         self._v = view
         self._db = db          # the generations the cards and corners re-read
         self._reroll = reroll  # the live jobs and the queue's own line
         self._auto = auto      # whether a folder is auto-generating (its card says)
+        self._tree = tree      # the three questions the pane may ask the tree
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
         self._visible_ids: list[str] = []   # generations on screen, in shown order
@@ -330,10 +354,8 @@ class BrowserPane(QObject):
         members = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
         for member in members:
-            item = self._v._tree_item_for(member.key)
-            context = (self._v._tree_view.breadcrumb(item.parent())
-                       if item is not None and item.parent() is not None else "")
-            self._add_folder_tile(flow, member, starred=member.starred, context=context)
+            self._add_folder_tile(flow, member, starred=member.starred,
+                                  context=self._tree.folder_context(member.key))
         self.show_widget(container if members else self._empty_state(
             f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
             "pick several folders with Shift/Ctrl and group them."
@@ -462,11 +484,8 @@ class BrowserPane(QObject):
         than the order the search scored them.
         """
         if tile.group is not None:
-            item = self._v._tree_item_for(tile.group.key)
-            context = (self._v._tree_view.breadcrumb(item.parent())
-                       if item is not None and item.parent() is not None else "")
             self._add_folder_tile(flow, tile.group, starred=tile.group.starred,
-                                  context=context)
+                                  context=self._tree.folder_context(tile.group.key))
         else:
             self._add_shelf_thumbnail(flow, tile.row)
         self._search_rows.extend(tile.rows or [tile.row])
@@ -663,7 +682,7 @@ class BrowserPane(QObject):
                 "gallery re-roll — collect here, newest first.")
 
     def showing_recents(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == RECENTS_KEY
 
     def refresh_inflight(self):
@@ -836,7 +855,7 @@ class BrowserPane(QObject):
         fills the line with jobs from a single folder.
         """
         if folder_key not in cache:
-            group = self._v._group_for_key(folder_key)
+            group = self._tree.group_for_key(folder_key)
             rows = gallery.rows_under(group) if group is not None else []
             # Only what is finished and has a picture — the job asking, and
             # every other row still in the line, is exactly what has none.
@@ -895,7 +914,7 @@ class BrowserPane(QObject):
                          else self._empty_state(self._experiments_empty_hint()))
 
     def showing_experiments(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == EXPERIMENTS_KEY
 
     def _experiments_empty_hint(self) -> str:
@@ -946,7 +965,7 @@ class BrowserPane(QObject):
                          else self._empty_state(self._requests_empty_hint()))
 
     def showing_requests(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == REQUESTS_KEY
 
     @staticmethod
@@ -1059,7 +1078,7 @@ class BrowserPane(QObject):
                 "they're removed for good.")
 
     def showing_trash(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == TRASH_KEY
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
@@ -1082,9 +1101,8 @@ class BrowserPane(QObject):
         for row in rows:
             self._add_shelf_thumbnail(flow, row)
         for group in groups:
-            item = self._v._tree_item_for(group.key)
-            context = self._v._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
-            self._add_folder_tile(flow, group, starred=False, context=context)
+            self._add_folder_tile(flow, group, starred=False,
+                                  context=self._tree.folder_context(group.key))
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         self.show_widget(container if (rows or groups) else self._empty_state(
             "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
@@ -1092,7 +1110,7 @@ class BrowserPane(QObject):
         ))
 
     def showing_starred(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == STARRED_KEY
 
     @staticmethod

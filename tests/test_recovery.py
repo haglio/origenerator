@@ -7,6 +7,7 @@ from pathlib import Path
 
 from origenerator import recovery
 from origenerator.db import Database
+from origenerator.db_connection import SqliteFile
 from origenerator.trash import Trash
 
 _NOW = datetime(2026, 8, 15, 3, 0, 0)
@@ -228,7 +229,7 @@ def _age(db: Database, prompt_id: str, days: int):
     """Back-date a held deletion, so the retention window can be tested without
     a fixture that has to sit around for two months."""
     stamp = (recovery._now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
-    with db._connect() as conn:
+    with SqliteFile(db.path).connect() as conn:
         conn.execute("UPDATE deletions SET deleted_at = ? WHERE prompt_id = ?",
                      (stamp, prompt_id))
 

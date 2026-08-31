@@ -1,3 +1,23 @@
+"""The app's database: every table of it, under one object.
+
+`Database` is a facade. Each table's queries live in their own module —
+:mod:`origenerator.db_generations`, :mod:`~origenerator.db_deletions`,
+:mod:`~origenerator.db_requests`, :mod:`~origenerator.db_folder_meta`,
+:mod:`~origenerator.db_custom_folders`, :mod:`~origenerator.db_branch_curation`
+— and this holds one of each, forwarding the method names ~700 call sites across
+this package, the gui package and the suite already spell.
+
+**Hand a unit the store it needs, not this.** Every consumer here uses a
+disjoint slice: recovery and gallery_actions touch only `deletions`, reconcile
+only `folder_meta` and `custom_folder_members`, branch_session only
+`branch_curation` and `generations`. A store is whole on its own, so a unit that
+takes one can be given a narrow fake and a change to one table stops being a
+change to the file 24 modules import.
+
+The schema is :mod:`origenerator.db_schema` and the connection policy
+:mod:`origenerator.db_connection`; tests/test_db_schema.py holds the file on disk
+as a snapshot, because evolver reads it.
+"""
 from pathlib import Path
 
 from origenerator.db_branch_curation import BranchCurationStore
@@ -5,257 +25,88 @@ from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
+from origenerator.db_generations import GenerationStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
-from origenerator.db_schema import GENERATION_COLUMNS, SCHEMA, create
+from origenerator.db_schema import SCHEMA, create
 
 
 class Database:
-    """Every table of the app's one database, under one object.
-
-    The schema lives in :mod:`origenerator.db_schema` and the connection policy
-    in :mod:`origenerator.db_connection`; what is left here is the queries, and
-    they are on their way out to one module per table.
-    """
+    """One store per table, and the method names that predate the split."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         salvage_if_malformed(self.path, SCHEMA)
         file = SqliteFile(self.path)
-        self._connect = file.connect
-        with self._connect() as conn:
+        with file.connect() as conn:
             create(conn)
-        # One store per table. Hand a unit the store it needs rather than the
-        # whole database: recovery and gallery_actions want `deletions`,
-        # reconcile wants `folder_meta` and `custom_folders`, and neither has
-        # any business with the rest.
+        self.generations = GenerationStore(file)
         self.deletions = DeletionStore(file)
+        self.requests = RequestStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
-        self.requests = RequestStore(file)
         self.branch_curation = BranchCurationStore(file)
 
-    def insert_generation(
-        self,
-        *,
-        prompt_id: str,
-        workflow_name: str,
-        workflow_version: str,
-        positive_prompt: str | None = None,
-        negative_prompt: str | None = None,
-        seed: int | None = None,
-        params_json: str,
-        workflow_json: str,
-        source: str = "generated",
-    ):
-        with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO generations
-                   (prompt_id, source, workflow_name, workflow_version,
-                    positive_prompt, negative_prompt, seed,
-                    params_json, workflow_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (prompt_id, source, workflow_name, workflow_version,
-                 positive_prompt, negative_prompt, seed,
-                 params_json, workflow_json),
-            )
+    # --- generations (see origenerator.db_generations) -----------------------
+
+    def insert_generation(self, *, prompt_id: str, workflow_name: str,
+                          workflow_version: str, positive_prompt: str | None = None,
+                          negative_prompt: str | None = None, seed: int | None = None,
+                          params_json: str, workflow_json: str,
+                          source: str = "generated"):
+        return self.generations.insert_generation(
+            prompt_id=prompt_id, workflow_name=workflow_name,
+            workflow_version=workflow_version, positive_prompt=positive_prompt,
+            negative_prompt=negative_prompt, seed=seed, params_json=params_json,
+            workflow_json=workflow_json, source=source)
 
     def update_generation(self, prompt_id: str, **fields):
-        allowed = {
-            "status", "output_files", "original_files", "enhance_history",
-            "thumbnail_path", "error_message", "completed_at", "duration_seconds",
-            "progress_json",
-        }
-        to_set = {k: v for k, v in fields.items() if k in allowed}
-        if not to_set:
-            return
-        set_clause = ", ".join(f"{k} = ?" for k in to_set)
-        values = list(to_set.values()) + [prompt_id]
-        with self._connect() as conn:
-            conn.execute(
-                f"UPDATE generations SET {set_clause} WHERE prompt_id = ?",
-                values,
-            )
+        return self.generations.update_generation(prompt_id, **fields)
 
     def set_workflow_name(self, prompt_id: str, workflow_name: str):
-        """Correct a row's workflow_name (e.g. backfilling 'unknown' imports).
-
-        Deliberately separate from update_generation, whose allowlist excludes
-        provenance fields like workflow_name.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET workflow_name = ? WHERE prompt_id = ?",
-                (workflow_name, prompt_id),
-            )
+        return self.generations.set_workflow_name(prompt_id, workflow_name)
 
     def set_params_json(self, prompt_id: str, params_json: str):
-        """Rewrite a row's params_json (e.g. backfilling model/LoRA onto imports).
-
-        Deliberately separate from update_generation, whose allowlist excludes
-        params_json since it is normally fixed at insert time.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
-                (params_json, prompt_id),
-            )
+        return self.generations.set_params_json(prompt_id, params_json)
 
     def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
                           video_prompt_id: str | None = None):
-        """Record where a combine launch got its recipe: the act picked in the
-        dropdown, and the video whose settings the run re-uses.
-
-        Written straight after the launch rather than at insert time, because the
-        row goes in as the job is submitted and only the caller that built the
-        combination knows either of these. Empty values are stored as NULL, so a
-        dropped video (no act) and a curated act (no video) each record only the
-        half they have. Separate from ``update_generation``, whose allowlist
-        excludes provenance fields.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET recipe_category = ?, recipe_video_id = ? "
-                "WHERE prompt_id = ?",
-                (category or None, video_prompt_id or None, prompt_id),
-            )
+        return self.generations.set_recipe_source(
+            prompt_id, category=category, video_prompt_id=video_prompt_id)
 
     def set_generation_starred(self, prompt_id: str, starred: bool):
-        """Star (or unstar) one generation — the user's per-item bookmark.
-
-        Deliberately separate from update_generation, whose allowlist covers a
-        job's lifecycle fields rather than a user gesture like this.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET starred = ? WHERE prompt_id = ?",
-                (1 if starred else 0, prompt_id),
-            )
+        return self.generations.set_generation_starred(prompt_id, starred)
 
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
-        """Record the user's review of a background experiment: ``'up'`` (keep),
-        ``'down'`` (reject), or ``None`` (back to unreviewed — an undone verdict).
-
-        Deliberately separate from update_generation, whose allowlist covers a
-        job's lifecycle fields rather than a user gesture like this.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET experiment_verdict = ? WHERE prompt_id = ?",
-                (verdict, prompt_id),
-            )
+        return self.generations.set_experiment_verdict(prompt_id, verdict)
 
     def mark_evolver_exported(self, prompt_id: str):
-        """Record that this generation's video was sent to Evolver's inbox.
-
-        Stamps the current time so the gallery remembers the send across sessions
-        (a plain marker — the value is only ever tested for presence).
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET evolver_exported_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        return self.generations.mark_evolver_exported(prompt_id)
 
     def mark_genau_exported(self, prompt_id: str):
-        """Record that this generation's clip was sent down the Genau lane.
-
-        The twin of :meth:`mark_evolver_exported`, and equally a plain marker: the
-        value is only ever tested for presence, so the button can show the send
-        across sessions.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET genau_exported_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        return self.generations.mark_genau_exported(prompt_id)
 
     def mark_genau_requested(self, prompt_id: str):
-        """Record that a spoken "genau it" started this run.
-
-        Stamped at launch, read at completion: it is what tells the finished clip
-        to hand itself to the Genau lane without a second ask. Only ever tested
-        for presence.
-        """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET genau_requested_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        return self.generations.mark_genau_requested(prompt_id)
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
-        """Most-recent measured generation times for a workflow, newest first.
-
-        Only completed rows with a recorded ``duration_seconds`` count, so the
-        result feeds duration estimates directly.
-        """
-        with self._connect() as conn:
-            rows = conn.execute(
-                """SELECT duration_seconds FROM generations
-                   WHERE workflow_name = ?
-                     AND status = 'completed'
-                     AND duration_seconds IS NOT NULL
-                   ORDER BY id DESC
-                   LIMIT ?""",
-                (workflow_name, limit),
-            ).fetchall()
-            return [r[0] for r in rows]
+        return self.generations.recent_durations(workflow_name, limit)
 
     def completed_without_duration(self) -> list[dict]:
-        """Completed rows that have a finish time but no recorded duration.
-
-        These are the candidates for log-based backfill: their ``completed_at``
-        (the output file's mtime) is what a log line gets matched against.
-        """
-        with self._connect() as conn:
-            rows = conn.execute(
-                """SELECT * FROM generations
-                   WHERE status = 'completed'
-                     AND duration_seconds IS NULL
-                     AND completed_at IS NOT NULL
-                   ORDER BY id"""
-            ).fetchall()
-            return [dict(r) for r in rows]
+        return self.generations.completed_without_duration()
 
     def delete_generation(self, prompt_id: str):
-        with self._connect() as conn:
-            conn.execute(
-                "DELETE FROM generations WHERE prompt_id = ?", (prompt_id,)
-            )
+        return self.generations.delete_generation(prompt_id)
 
     def restore_generation(self, row: dict):
-        """Re-insert a row captured by ``get_generation``, exactly as it was.
-
-        Unlike ``insert_generation``, this writes every column present in
-        ``row`` — including the original ``id`` and ``created_at`` — so an undone
-        deletion reappears in its former gallery position rather than on top.
-        """
-        cols = [c for c in GENERATION_COLUMNS if c in row]
-        placeholders = ", ".join("?" for _ in cols)
-        with self._connect() as conn:
-            conn.execute(
-                f"INSERT INTO generations ({', '.join(cols)}) VALUES ({placeholders})",
-                [row[c] for c in cols],
-            )
+        return self.generations.restore_generation(row)
 
     def get_generation(self, prompt_id: str) -> dict | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM generations WHERE prompt_id = ?",
-                (prompt_id,),
-            ).fetchone()
-            return dict(row) if row else None
+        return self.generations.get_generation(prompt_id)
 
     def list_generations(self) -> list[dict]:
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM generations ORDER BY id DESC"
-            ).fetchall()
-            return [dict(r) for r in rows]
+        return self.generations.list_generations()
 
     # --- the recovery bin (see origenerator.db_deletions) --------------------
 

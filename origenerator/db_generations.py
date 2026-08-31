@@ -31,9 +31,10 @@ class GenerationStore(Store):
     def _set(self, prompt_id: str, column: str, value):
         """Write one column outside :data:`LIFECYCLE_COLUMNS`.
 
-        *column* is a literal from one of the named methods below, never a
-        caller's string -- which is what makes interpolating it into the
-        statement safe.
+        *column* is interpolated into the statement, which is safe because every
+        one is a literal written below and a real column of the table --
+        tests/test_db_stores.py reads that off this file's syntax tree rather
+        than leaving it to care.
         """
         with self._connect() as conn:
             conn.execute(

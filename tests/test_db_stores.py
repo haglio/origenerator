@@ -13,10 +13,13 @@ through the facade every call site still uses. This file covers the seam.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+import ast
 import inspect
+from pathlib import Path
 
 import pytest
 
+import origenerator.db_generations
 from origenerator.db import Database
 from origenerator.db_branch_curation import BranchCurationStore
 from origenerator.db_connection import SqliteFile, Store
@@ -25,6 +28,7 @@ from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_requests import RequestStore
+from origenerator.db_schema import GENERATION_COLUMNS
 
 # The attribute each store hangs off `Database` under, and a read that proves it
 # is talking to its own table.
@@ -108,3 +112,25 @@ class TestDeletionStore:
 
         assert [held["prompt_id"] for held in db.list_deletions()] == ["gen-beta"]
         assert db.deletions.get_deletion("gen-beta") is not None
+
+
+def test_every_column_written_by_name_is_a_literal_column_of_the_table():
+    """`GenerationStore._set` and `._stamp` interpolate a column name straight
+    into their statement, which is safe exactly as long as every one of them is
+    a literal written in that file and a column that exists. Read off the syntax
+    tree rather than left to care: a name reaching either of them from a
+    caller's string, or a column that has been renamed out of the schema, fails
+    here — before the statement, rather than as an OperationalError mid-write.
+    """
+    source = (Path(origenerator.db_generations.__file__)).read_text(encoding="utf-8")
+    written = [
+        node.args[1]
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr in ("_set", "_stamp") and len(node.args) >= 2
+    ]
+
+    assert written, "the walk found no call at all, so this checks nothing"
+    for column in written:
+        assert isinstance(column, ast.Constant), ast.unparse(column)
+        assert column.value in GENERATION_COLUMNS, column.value

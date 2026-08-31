@@ -6154,7 +6154,7 @@ class GalleryView(QWidget):
         self._sync_slideshow_button()
 
     def _inflight_items(self) -> list:
-        return self._browser._inflight_items()
+        return self._browser.inflight_items()
 
     def _update_queue(self):
         """Feed the bottom strip every in-flight job, in the order ComfyUI will

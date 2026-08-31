@@ -690,7 +690,7 @@ class BrowserPane(QObject):
         """
         media_types = self._host.media_types()
         side = self._shelf_orientation
-        return [it for it in self._inflight_items()
+        return [it for it in self.inflight_items()
                 if it.media_type in media_types
                 and it.job_kind != ENHANCE_KIND
                 and (side is None or it.orientation == side)]
@@ -699,7 +699,7 @@ class BrowserPane(QObject):
         """Which sides have work in flight — what keeps a Recents shelf up on a
         side with no folders yet, so a first-ever generation of that shape is
         visible while it runs."""
-        return {item.orientation for item in self._inflight_items()}
+        return {item.orientation for item in self.inflight_items()}
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —
@@ -741,7 +741,7 @@ class BrowserPane(QObject):
             if card is not None:
                 card.update_item(item)
 
-    def _inflight_items(self) -> list:
+    def inflight_items(self) -> list:
         """Every queued/running generation as a card model, in the order the queue
         will work through them.
 
@@ -978,7 +978,7 @@ class BrowserPane(QObject):
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
         container, flow = self._new_tile_pane()
-        cooking = {item.key: item for item in self._inflight_items()}
+        cooking = {item.key: item for item in self.inflight_items()}
         shown = [item for item in self._request_items
                  if self._shelf_orientation is None
                  or row_orientation(item["row"]) == self._shelf_orientation]

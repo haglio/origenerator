@@ -2668,21 +2668,8 @@ class GalleryView(QWidget):
             self._browser.show_empty()
             self._sync_action_buttons()
             return
-        if base == _RECENTS_KEY:
-            self._browser.show_recents_overview(orientation)
-            return
-        if base == _STARRED_KEY:
-            self._browser.show_starred_overview(orientation)
-            return
-        if base == _EXPERIMENTS_KEY:
-            self._sync_experiments_bar()
-            self._browser.show_experiments_overview(orientation)
-            return
-        if base == _REQUESTS_KEY:
-            self._browser.show_requests_overview(orientation)
-            return
-        if base == _TRASH_KEY:
-            self._browser.show_trash_overview(orientation)
+        if base in _SHELF_KEYS:
+            self._open_shelf(base, orientation)
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -2702,6 +2689,35 @@ class GalleryView(QWidget):
         self._update_folder_average(group)
         self._show_group_contents(group)
         self._sync_action_buttons()
+
+    def _open_shelf(self, base: str, orientation: str | None):
+        """Show one side's copy of a shelf: dress the header, clear the info
+        pane (a shelf opens showing nothing until an item is picked), have the
+        browser render it, and record the visit so Back can return to it."""
+        if base == _EXPERIMENTS_KEY:
+            self._sync_experiments_bar()  # what the switch's position means
+        self._title.set_display(self._shelf_title(base, orientation))
+        self._avg_label.setText(self._browser.trash_note(orientation)
+                                if base == _TRASH_KEY else "")
+        self._clear_metadata()
+        self._browser.show_shelf(base, orientation)
+        if base == _REQUESTS_KEY:
+            self._sync_delete_button()
+        else:
+            self._sync_action_buttons()
+        self._record_location()
+
+    @staticmethod
+    def _shelf_title(base: str, orientation: str | None) -> str:
+        """A shelf's header: its side, then its name — the path shape a folder's
+        breadcrumb has, since a shelf belongs to one side like everything else.
+        Favorites keeps the star its tree row wears."""
+        label = _SHELF_LABELS[base]
+        if base == _STARRED_KEY:
+            label = "★ " + label
+        if orientation is None:
+            return label
+        return f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
 
     def _show_group_contents(self, group):
         """Fill the browser pane with what a folder holds: its generations

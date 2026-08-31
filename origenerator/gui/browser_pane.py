@@ -38,14 +38,9 @@ from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
-    RECENTS_KEY, RECENTS_LABEL, REQUESTS_KEY, REQUESTS_LABEL,
-    STARRED_KEY, STARRED_LABEL,
-    TRASH_KEY, TRASH_LABEL,
+    EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
 )
-from origenerator.gui.orientation import (
-    ORIENTATION_LABELS, filter_rows, row_orientation, split_key,
-)
+from origenerator.gui.orientation import filter_rows, row_orientation, split_key
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -53,7 +48,6 @@ logger = logging.getLogger(__name__)
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
-_STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shelf
 # The Recents shelf lists every generation ever made, so it draws a page of tiles
 # at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
 # end — far enough ahead (three tile rows) that the next page is there before the
@@ -480,41 +474,44 @@ class BrowserPane(QObject):
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the Recents shelf: in-flight work, then recently finished items ----
+    # --- the shelves: Recents / Starred / Experiments / Requests / Trash -----
 
-    def show_recents_overview(self, orientation: str | None = None):
-        """Render the Recents shelf: a card for every in-flight generation (queued
-        or running, from a Generate tab or a gallery re-roll) atop the recently
-        finished items. Clicking an in-flight card reveals where its job runs; a
-        finished one previews in the info pane, right here on the shelf, the way a
-        thumbnail does inside a folder — and double-clicking it jumps to its own
-        folder. Opens with the info pane cleared, so it shows nothing until an
-        item is picked.
+    def show_shelf(self, base: str, orientation: str | None = None):
+        """Render one side's copy of shelf ``base``.
 
         *orientation* is the side whose shelf this is. A job that has produced
         nothing yet still has a side — the shape it was asked to come out — so
         its card sits on the shelf its picture will land on rather than moving
-        there once it has."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(RECENTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_recents()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
+        there once it has.
 
-    @staticmethod
-    def _oriented_title(label: str, orientation: str | None) -> str:
-        """A shelf's header: its side, then its name — the path shape a folder's
-        breadcrumb has, since a shelf belongs to one side like everything else."""
-        if orientation is None:
-            return label
-        return f"{ORIENTATION_LABELS[orientation]}  ›  {label}"
+        The view dresses the shelf around this call — the header, the cleared
+        info pane, the button sync and the Back record all happen there
+        (:meth:`GalleryView._open_shelf`); this renders the pane itself.
+        """
+        self._shelf_orientation = orientation
+        if base == RECENTS_KEY:
+            self._render_recents()
+        elif base == EXPERIMENTS_KEY:
+            self._render_experiments()
+        elif base == REQUESTS_KEY:
+            self._render_requests()
+        elif base == TRASH_KEY:
+            self._render_trash()
+        elif base == STARRED_KEY:
+            self._show_starred(self._starred_groups.get(orientation, ()),
+                               filter_rows(self._starred_rows, orientation))
 
     def _render_recents(self):
-        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails a page at a time; a hint when the media-type
-        filter leaves neither. Both the cards and the thumbnails obey that filter.
+        """The Recents shelf: a card for every in-flight generation (queued or
+        running, from a Generate tab or a gallery re-roll) atop the recently
+        finished items. Clicking an in-flight card reveals where its job runs; a
+        finished one previews in the info pane, right here on the shelf, the way
+        a thumbnail does inside a folder — and double-clicking it jumps to its
+        own folder.
+
+        In-flight cards first (the newest, still-cooking work), then the
+        finished thumbnails a page at a time; a hint when the media-type filter
+        leaves neither. Both the cards and the thumbnails obey that filter.
 
         The shelf has no end — it lists every generation ever made — so it opens on
         one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
@@ -873,22 +870,13 @@ class BrowserPane(QObject):
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
-    def show_experiments_overview(self, orientation: str | None = None):
-        """Render the Experiments shelf: what the background experimenter has come
-        up with since the user last looked, newest first, each tile wearing
-        keep/reject hover controls. A kept item just leaves the queue — it has been
-        in its own folder since it ran; a rejected one is trashed and teaches the
-        policy what to avoid. Clicking previews the item right here and
-        double-clicking opens its folder, like the other shelves."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(EXPERIMENTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_experiments()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
-
     def _render_experiments(self):
+        """The Experiments shelf: what the background experimenter has come up
+        with since the user last looked, newest first, each tile wearing
+        keep/reject hover controls. A kept item just leaves the queue — it has
+        been in its own folder since it ran; a rejected one is trashed and
+        teaches the policy what to avoid. Clicking previews the item right here
+        and double-clicking opens its folder, like the other shelves."""
         container, flow = self._new_tile_pane()
         actions = [
             ("keep", icons.experiment_verdict_icon("up"),
@@ -925,25 +913,16 @@ class BrowserPane(QObject):
 
     # --- the Requests shelf: what you asked for out loud ---------------------
 
-    def show_requests_overview(self, orientation: str | None = None):
-        """Render the Requests shelf: what your spoken requests made, newest
-        first — ordinary tiles, since what a request produced is an ordinary
-        generation that happens to have been asked for out loud. What was heard
-        and what it changed in the prompt show where the prompt does, in the
-        config tab a click loads.
+    def _render_requests(self):
+        """The Requests shelf: what your spoken requests made, newest first —
+        ordinary tiles, since what a request produced is an ordinary generation
+        that happens to have been asked for out loud. What was heard and what it
+        changed in the prompt show where the prompt does, in the config tab a
+        click loads.
 
         One still generating shows as the live card the Recents shelf gives
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(REQUESTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_requests()
-        self._v._sync_delete_button()
-        self._v._record_location()  # so Back can return to the shelf
-
-    def _render_requests(self):
         container, flow = self._new_tile_pane()
         cooking = {item.key: item for item in self._inflight_items()}
         shown = [item for item in self._request_items
@@ -979,22 +958,13 @@ class BrowserPane(QObject):
 
     # --- the Trash shelf: deleted items, still recoverable -------------------
 
-    def show_trash_overview(self, orientation: str | None = None):
-        """Render the Trash shelf: every deleted item the recovery bin is still
+    def _render_trash(self):
+        """The Trash shelf: every deleted item the recovery bin is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
         returns to its own folder, files and all; a purged one is gone for good,
         which is what the whole shelf exists to make deliberate rather than
         automatic."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(TRASH_LABEL, orientation))
-        self._v._avg_label.setText(self._trash_note())
-        self._v._clear_metadata()
-        self._render_trash()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
-
-    def _render_trash(self):
         container, flow = self._new_tile_pane()
         actions = [
             ("restore", icons.recovery_action_icon("restore"),
@@ -1065,10 +1035,11 @@ class BrowserPane(QObject):
         return f"{BrowserPane._thumbnail_caption(row)} · {days}d left" if days \
             else f"{BrowserPane._thumbnail_caption(row)} · expiring"
 
-    def _trash_note(self) -> str:
-        """The line under the header stating the retention promise — shown only
-        with something on the shelf, since the empty state already says it."""
-        if not filter_rows(self._trash_rows, self._shelf_orientation):
+    def trash_note(self, orientation: str | None) -> str:
+        """The line under the Trash header stating the retention promise — shown
+        only with something on that side's shelf, since the empty state already
+        says it."""
+        if not filter_rows(self._trash_rows, orientation):
             return ""
         return (f"Deleted items are held here for {RETENTION_DAYS} days, then "
                 "removed for good.")
@@ -1090,21 +1061,6 @@ class BrowserPane(QObject):
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
 
-    def show_starred_overview(self, orientation: str | None = None):
-        """Render the Starred shelf: the individual starred images and videos as
-        thumbnails, then one tile per bookmarked folder (each captioned with its
-        breadcrumb so identically-named folders stay tellable apart). A starred
-        item previews here on click and opens its own folder on double-click; a
-        folder tile lists its sub-folders."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(_STARRED_TITLE, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._show_starred(self._starred_groups.get(orientation, ()),
-                           filter_rows(self._starred_rows, orientation))
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
-
     def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
         """Everything one side's Favorites shelf stands for: its starred items,
         plus the items inside the folders it has bookmarked."""
@@ -1114,6 +1070,11 @@ class BrowserPane(QObject):
         ])
 
     def _show_starred(self, groups, rows):
+        """The Starred shelf: the individual starred images and videos as
+        thumbnails, then one tile per bookmarked folder (each captioned with its
+        breadcrumb so identically-named folders stay tellable apart). A starred
+        item previews here on click and opens its own folder on double-click; a
+        folder tile lists its sub-folders."""
         container, flow = self._new_tile_pane()
         for row in rows:
             self._add_shelf_thumbnail(flow, row)

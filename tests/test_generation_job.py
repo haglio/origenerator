@@ -286,7 +286,7 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
     # Submitted isn't started: on a busy queue the wait can be many minutes, and
     # counting it as run time would make the estimate of what's left nonsense.
-    job, _client_ = _started_job(tmp_path)
+    job, _client = _started_job(tmp_path)
     assert job.started_at is None
 
 

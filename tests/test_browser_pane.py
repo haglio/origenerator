@@ -16,7 +16,10 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gui.browser_pane import (
-    BrowserPane, BrowserScrollArea, PaneHost, TreeNavigation,
+    BrowserPane,
+    BrowserScrollArea,
+    PaneHost,
+    TreeNavigation,
 )
 from origenerator.gui.gallery_tree import RECENTS_KEY, TRASH_KEY
 
@@ -61,8 +64,9 @@ class _StubDB:
 
 
 class _StubReroll:
-    jobs_by_folder: dict = {}
-    queue_order: list = []
+    def __init__(self):
+        self.jobs_by_folder = {}
+        self.queue_order = []
 
     def held_jobs(self):
         return []
@@ -88,7 +92,7 @@ def _pane(qtbot, rows=()):
         ),
         PaneHost(
             media_types=lambda: {"image", "video"},
-            image_rows=lambda: [],
+            image_rows=list,
             animated_preview=lambda row: None,
             enhancing_run=lambda row: None,
             enhance_settings=lambda: gallery.EnhanceSettings(),

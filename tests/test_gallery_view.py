@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
 from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton, QWidget
+from PyQt6.QtWidgets import QSplitter, QLineEdit, QPushButton
 
 from origenerator import evolver_export, gallery, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
@@ -33,7 +33,7 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
 )
 from origenerator.gui.orientation import (
-    LANDSCAPE, ORIENTATION_LABELS, base_of, oriented_key,
+    LANDSCAPE, base_of, oriented_key,
 )
 from origenerator.voice.commands import SurfaceCommand
 from origenerator.gui.media_badge import MediaBadge

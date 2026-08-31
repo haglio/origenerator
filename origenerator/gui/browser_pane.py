@@ -19,35 +19,41 @@ connects them and answers — the info pane on a click, the tree on a drill, the
 delete on a menu.
 """
 
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
-from PyQt6.QtWidgets import (
-    QWidget, QLabel, QApplication, QPushButton, QScrollArea, QVBoxLayout,
-)
 from PyQt6.QtCore import QObject, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator import gallery, search, timing
-from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
-from origenerator.gui.corner_controls import enhance_state
 from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
+from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
+from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    STARRED_KEY,
+    TRASH_KEY,
+)
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
-from origenerator.gui.queue_thumbs import FOLDER_CELLS
-from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
-)
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key
+from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.workflows.derived_size import resolve_input_image_path
-
-logger = logging.getLogger(__name__)
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview

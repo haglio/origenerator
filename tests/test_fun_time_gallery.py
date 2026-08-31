@@ -222,11 +222,13 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     calls: list[str] = []
     stub.raise_ = lambda: calls.append("raise")
     stub.activateWindow = lambda: calls.append("activate")
-    # Presenting mutes and, mid-freeze, holds the surface: a real one is a
-    # SlideshowView, which answers both, and the view calls them outright.
+    # Presenting mutes and, mid-freeze, holds the surface, and dresses it in the
+    # players' HUD: a real one is a SlideshowView, which answers all of that —
+    # the last through ShowHost — and the view calls them outright.
     stub.set_audio_muted = lambda muted: None
     stub.set_session_paused = lambda paused: None
     stub.adopt_hud = lambda: None
+    stub.hud_items = lambda: ((), 0, False)  # a host with no set draws no map
     view._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 

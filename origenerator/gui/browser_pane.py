@@ -210,9 +210,10 @@ class BrowserPane(QObject):
     drag_ended = pyqtSignal()
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
 
-    def __init__(self, view, db, reroll, auto, tree: TreeNavigation):
+    def __init__(self, view, scroll, db, reroll, auto, tree: TreeNavigation):
         super().__init__()
         self._v = view
+        self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
         self._db = db          # the generations the cards and corners re-read
         self._reroll = reroll  # the live jobs and the queue's own line
         self._auto = auto      # whether a folder is auto-generating (its card says)
@@ -273,7 +274,7 @@ class BrowserPane(QObject):
     # --- folder-tile overview ----------------------------------------------
 
     def show_widget(self, widget: QWidget):
-        self._v._scroll.setWidget(widget)  # replaces & deletes the previous widget
+        self._scroll.setWidget(widget)  # replaces & deletes the previous widget
 
     def show_empty(self):
         """Clear the pane to nothing on screen — no folder selected."""
@@ -597,7 +598,7 @@ class BrowserPane(QObject):
     def _scroll_bar(self):
         """The browser pane's vertical scroll bar: what the shelf grows off, and
         what a redraw puts back where the user was reading."""
-        return self._v._scroll.verticalScrollBar()
+        return self._scroll.verticalScrollBar()
 
     def _restore_scroll(self, offset: int):
         """Scroll the freshly drawn shelf back to ``offset``. The new pane hasn't
@@ -1372,7 +1373,7 @@ class BrowserPane(QObject):
             self._scroll_to(widget)
 
     def _scroll_to(self, widget):
-        self._v._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
+        self._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():

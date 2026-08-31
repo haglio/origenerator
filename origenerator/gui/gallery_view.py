@@ -591,8 +591,12 @@ class GalleryView(QWidget):
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards. Its signals
-        # carry every gesture made on a tile; the handlers here answer them.
-        self._browser = BrowserPane(self, db, self._reroll, self._auto,
+        # carry every gesture made on a tile; the handlers here answer them. The
+        # scroll area is its canvas — built here so it can be handed over, placed
+        # into the layout by _build_ui.
+        self._scroll = BrowserScrollArea()
+        self._browser = BrowserPane(self, self._scroll, db, self._reroll,
+                                    self._auto,
                                     TreeNavigation(
                                         selected_folder_key=self._selected_folder_key,
                                         folder_context=self._folder_context,
@@ -1240,7 +1244,6 @@ class GalleryView(QWidget):
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
         browser_box.addWidget(self._avg_label)
-        self._scroll = BrowserScrollArea()
         self._scroll.setWidgetResizable(True)
         # A click on the background between the tiles puts the selection down,
         # as it does in a file browser — and here it is also the only way back

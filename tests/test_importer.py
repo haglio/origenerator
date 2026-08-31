@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
@@ -607,3 +608,82 @@ def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
     assert meta["seed"] == 4242
     assert meta["params"]["steps"] == 50
     assert meta["params"]["denoise"] == 1.0
+
+
+# --- which workflow made this graph -------------------------------------------
+
+def _graph_of(*class_types):
+    """A minimal ComfyUI graph carrying nothing but these node classes."""
+    return {str(i): {"class_type": name, "inputs": {}}
+            for i, name in enumerate(class_types, start=1)}
+
+
+# (the node classes in the graph, the workflow it must be read as). The chain is
+# ORDERED, because a graph can satisfy more than one test: an flf2v graph also
+# carries the i2v conditioning, a Flux one can also load a checkpoint. So the
+# cases that matter are the ones naming the node that must LOSE beside the one
+# that must win.
+_READ_AS = (
+    (("WanFirstLastFrameToVideo",), "wan22_flf2v_loop"),
+    (("WanFirstLastFrameToVideo", "WanImageToVideo"), "wan22_flf2v_loop"),
+    (("WanImageToVideo",), "wan22_i2v"),
+    (("WanImageToVideo", "CheckpointLoaderSimple"), "wan22_i2v"),
+    (("EmptyHunyuanLatentVideo", "SaveImage"), "wan22_t2i"),
+    (("EmptyHunyuanLatentVideo", "SaveImage", "CheckpointLoaderSimple"), "wan22_t2i"),
+    (("FluxGuidance",), "flux_t2i_upscaled"),
+    (("UnetLoaderGGUF", "DualCLIPLoader"), "flux_t2i_upscaled"),
+    (("FluxGuidance", "CheckpointLoaderSimple"), "flux_t2i_upscaled"),
+    (("CheckpointLoaderSimple",), "sdxl_t2i"),
+    # A video latent that was NOT saved as an image is not text-to-image, and a
+    # GGUF UNET without the dual encoders is not Flux: both fall through, and
+    # the filename's guess (none, for this name) stands.
+    (("EmptyHunyuanLatentVideo",), "unknown"),
+    (("UnetLoaderGGUF",), "unknown"),
+    (("SomeNodeNobodyHasHeardOf",), "unknown"),
+)
+
+
+@pytest.mark.parametrize("node_types, expected", _READ_AS)
+def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
+    import origenerator.importer as imp
+
+    # A filename matching no workflow prefix, so the graph alone decides.
+    path = tmp_path / "renamed_00001_.png"
+    _make_png_with_metadata(path, _graph_of(*node_types))
+
+    assert imp._extract_metadata(path, ".png")["workflow_name"] == expected
+
+
+def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
+    """The filename is a first guess only — a file renamed, or written under a
+    prefix that was later reused, would otherwise be filed under the wrong
+    workflow forever. Workflow names are persisted into every row and named from
+    the overlay's recipes, so this is a data defect, not a display one."""
+    import origenerator.importer as imp
+
+    path = tmp_path / "sdxl_t2i_00001_.png"
+    _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
+
+    assert imp._extract_metadata(path, ".png")["workflow_name"] == "wan22_i2v"
+
+
+def test_a_graph_that_names_nothing_leaves_the_filenames_guess_standing(tmp_path):
+    import origenerator.importer as imp
+
+    path = tmp_path / "flux_t2i_upscaled_00001_.png"
+    _make_png_with_metadata(path, _graph_of("SomeNodeNobodyHasHeardOf"))
+
+    assert imp._extract_metadata(path, ".png")["workflow_name"] == "flux_t2i_upscaled"
+
+
+def test_a_file_with_no_embedded_graph_keeps_the_filenames_guess(tmp_path):
+    import origenerator.importer as imp
+
+    path = tmp_path / "wan22_t2i_00001_.png"
+    Image.new("RGB", (8, 8)).save(path)
+
+    meta = imp._extract_metadata(path, ".png")
+
+    assert meta["workflow_name"] == "wan22_t2i"
+    assert meta["prompt_data"] == {}
+    assert meta["params"] == {}

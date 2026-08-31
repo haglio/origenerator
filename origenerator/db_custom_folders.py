@@ -7,7 +7,7 @@ gathered folders and their generations outlive it.
 
 Membership is by tree key, so it drifts when a key formula moves exactly as a
 `folder_meta` bookmark does, and carries the same identity columns for the same
-reason: `origenerator.reconcile` re-points it from a member generation.
+reason: `origenerator.bookmark_reconcile` re-points it from a member generation.
 """
 from origenerator.db_connection import Store
 

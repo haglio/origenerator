@@ -4,9 +4,10 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.reconcile import (
-    reconcile_custom_folders, reconcile_in_flight, reconcile_folder_meta,
+from origenerator.bookmark_reconcile import (
+    reconcile_bookmarks, reconcile_custom_folders, reconcile_folder_meta,
 )
+from origenerator.inflight import reconcile_in_flight
 
 # sdxl_t2i saves under output node "7".
 SDXL_HISTORY = {"outputs": {"7": {"images": [{"filename": "a.png", "subfolder": ""}]}}}
@@ -382,3 +383,101 @@ def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
     assert reconcile_custom_folders(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
+
+
+# --- one reading of the tree, for both passes ---------------------------------
+
+
+def _a_library_with_both_kinds_of_bookmark(tmp_path):
+    """One generation, its settings folder starred under a legacy key, and a
+    hand-composed folder holding that same legacy key."""
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a harbor", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    legacy_key = gallery.legacy_settings_folder_key(row)
+    db.set_folder_starred(legacy_key, True)
+    folder_id = db.create_custom_folder("Scene One")
+    db.add_custom_folder_members(folder_id, [(legacy_key, None, None)])
+    return db, row, legacy_key
+
+
+def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
+    """The two passes ask the same question of the same tree, and building it
+    reads every row in the database — so the boot paid for two full builds back
+    to back. One index now serves both."""
+    from origenerator import bookmark_reconcile
+
+    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    builds = []
+    build = gallery.build_gallery_tree
+    monkeypatch.setattr(bookmark_reconcile.gallery, "build_gallery_tree",
+                        lambda rows, meta: (builds.append(len(rows)), build(rows, meta))[1])
+
+    bookmark_reconcile.reconcile_bookmarks(db)
+
+    assert len(builds) == 1
+
+
+def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_path):
+    """The control on sharing the index: a shared reading must not change any
+    answer. Same library, both ways round."""
+    from origenerator import bookmark_reconcile
+
+    shared_db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    apart_db, _, _ = _a_library_with_both_kinds_of_bookmark(tmp_path / "apart")
+
+    together = bookmark_reconcile.reconcile_bookmarks(shared_db)
+    apart = {"folder_meta": reconcile_folder_meta(apart_db),
+             "custom_folders": reconcile_custom_folders(apart_db)}
+
+    assert together == apart
+    assert shared_db.folder_meta_map() == apart_db.folder_meta_map()
+    assert shared_db.list_custom_folders() == apart_db.list_custom_folders()
+
+
+def test_neither_bookmark_pass_touches_a_generation(tmp_path):
+    """What makes one index safe for both: the second pass reconciles against
+    the tree the first left, and the tree is built out of `generations`. Both
+    write only to the bookmark tables."""
+    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    before = db.list_generations()
+
+    reconcile_bookmarks(db)
+
+    assert db.list_generations() == before
+
+
+def test_the_stars_are_reconciled_before_the_hand_composed_folders(tmp_path, monkeypatch):
+    """The order the boot ran them in, kept now that one call runs both. A
+    custom folder gathers the same keys a star sits on, so the star's move is
+    the one that has to be settled first."""
+    from origenerator import bookmark_reconcile
+
+    db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
+    ran = []
+    for name in ("reconcile_folder_meta", "reconcile_custom_folders"):
+        monkeypatch.setattr(bookmark_reconcile, name, (
+            lambda *a, _n=name, _f=getattr(bookmark_reconcile, name), **k:
+            (ran.append(_n), _f(*a, **k))[1]))
+
+    bookmark_reconcile.reconcile_bookmarks(db)
+
+    assert ran == ["reconcile_folder_meta", "reconcile_custom_folders"]
+
+
+def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
+    """Nothing bookmarked is the common case on a fresh install, and building
+    the tree to discover that would read every row for nothing."""
+    from origenerator import bookmark_reconcile
+
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "p1", params={"positive_prompt": "a harbor"}, filename="a.png")
+    builds = []
+    monkeypatch.setattr(bookmark_reconcile.gallery, "build_gallery_tree",
+                        lambda rows, meta: builds.append(len(rows)) or [])
+
+    summaries = bookmark_reconcile.reconcile_bookmarks(db)
+
+    assert builds == []
+    assert summaries == {"folder_meta": {"refreshed": 0, "repointed": 0, "orphaned": 0},
+                         "custom_folders": {"refreshed": 0, "repointed": 0, "orphaned": 0}}

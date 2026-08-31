@@ -1,6 +1,6 @@
 """A gallery folder's bookmark: the name the user gave it, and its star.
 
-One of the six tables `Database` used to hold all of. `origenerator.reconcile`
+One of the six tables `Database` used to hold all of. `origenerator.bookmark_reconcile`
 and the gallery tree are its readers.
 
 A folder here is a tree key, which is derived rather than stored -- so a bookmark

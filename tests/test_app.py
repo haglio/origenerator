@@ -265,7 +265,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash"), \
-         patch("origenerator.reconcile.reconcile_in_flight",
+         patch("origenerator.inflight.reconcile_in_flight",
                side_effect=lambda *a, **k: calls.append("reconcile")), \
          patch("origenerator.importer.import_comfyui_output",
                side_effect=lambda *a, **k: calls.append("import") or 0), \
@@ -409,7 +409,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
 _MAINTENANCE_PASSES = (
     ("origenerator.branch_session", "adopt_branch_rows"),
     ("origenerator.branch_session", "adopt_branch_curation"),
-    ("origenerator.reconcile", "reconcile_in_flight"),
+    ("origenerator.inflight", "reconcile_in_flight"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "backfill_unknown_workflows"),
@@ -418,8 +418,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.gallery", "fold_completed_enhancements"),
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
-    ("origenerator.reconcile", "reconcile_folder_meta"),
-    ("origenerator.reconcile", "reconcile_custom_folders"),
+    ("origenerator.bookmark_reconcile", "reconcile_bookmarks"),
 )
 
 
@@ -485,7 +484,7 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
 
     assert "import_comfyui_output" not in ran
     # ...and everything after it still ran, up to and including the window.
-    assert ran[-1] == "reconcile_custom_folders"
+    assert ran[-1] == "reconcile_bookmarks"
     window.show.assert_called_once()
 
 

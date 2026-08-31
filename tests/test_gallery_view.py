@@ -5039,7 +5039,7 @@ def test_the_card_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     _request_card(view).clicked.emit()
 
     panel = view._info_tabs.current_config_panel()
-    assert panel._folder_request["folder_key"] == key
+    assert panel._folder_request.folder_key == key
     assert panel._preview._stack.currentWidget() is panel._preview._sheet
     client.submit_job.assert_not_called()  # an edit to make, not a run to start
 

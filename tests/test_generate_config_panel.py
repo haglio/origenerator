@@ -1617,6 +1617,51 @@ def _positive_field(panel):
     return panel._param_form._widgets["positive_prompt"]
 
 
+def _request(count=3, label=_FOLDER_LABEL, opened_on=None):
+    return gcp_module.FolderRequest(
+        folder_key=_FOLDER_KEY, label=label, count=count,
+        opened_on=opened_on or ConfigSnapshot("sdxl_t2i", _folder_params(), False))
+
+
+def test_a_request_names_itself_after_the_folder_it_asks_about():
+    assert _request().title() == f"Request {_FOLDER_LABEL}"
+
+
+def test_a_request_counts_its_runs_in_the_hover_rather_than_on_the_button():
+    # The button asks for one thing — this folder, said the way it now reads —
+    # so how many runs that costs is a hover away.
+    assert _request(count=3).caption() == "Request changes"
+    assert "all 3 images" in _request(count=3).tooltip()
+
+
+def test_a_one_image_folder_gets_wording_of_its_own():
+    # Not the plural switched off, which read "Run all 1 image ... each with its
+    # own seed" on a folder holding one.
+    tooltip = _request(count=1).tooltip()
+    assert "one image" in tooltip
+    assert "1 image" not in tooltip
+
+
+def test_a_request_knows_whether_anything_has_actually_been_rewritten():
+    # Unchanged, the press would run every seed in the folder to re-create the
+    # folder, which is the one thing the tab must never do by accident.
+    opened_on = ConfigSnapshot("sdxl_t2i", _folder_params(), False)
+    request = _request(opened_on=opened_on)
+
+    assert request.is_unchanged(ConfigSnapshot("sdxl_t2i", _folder_params(), False))
+    assert not request.is_unchanged(
+        ConfigSnapshot("sdxl_t2i", _folder_params(prompt="a dog on a couch"), False))
+
+
+def test_a_request_cannot_be_edited_after_the_tab_opens_on_it():
+    # What the tab opened on is how a press tells a rewrite from a re-run; a
+    # request that could be edited could quietly agree with whatever was typed.
+    from dataclasses import FrozenInstanceError
+
+    with pytest.raises(FrozenInstanceError):
+        _request().count = 9
+
+
 def test_a_request_tab_shows_the_whole_folder_in_its_preview(requesting):
     # Every image the press will re-run, tiled — not the newest one of them,
     # which would say the edit was about that image.
@@ -1630,15 +1675,6 @@ def test_the_press_asks_for_changes_and_counts_them_in_the_hover(requesting):
     # so how many runs that costs is a hover away rather than on its face.
     assert requesting._generate_btn.text() == "Request changes"
     assert "all 3 images" in requesting._generate_btn.toolTip()
-
-
-def test_a_one_image_folder_gets_its_own_wording(blank_panel, tmp_path):
-    # Not the plural switched off, which read "Run all 1 image ... each with
-    # its own seed".
-    blank_panel.open_folder_request(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
-                                    _folder_params(), _images(tmp_path, 1))
-    assert "one image" in blank_panel._generate_btn.toolTip()
-    assert "1 image" not in blank_panel._generate_btn.toolTip()
 
 
 def test_every_prompt_is_marked_against_what_it_says_now(requesting):

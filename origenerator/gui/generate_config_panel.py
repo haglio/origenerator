@@ -97,6 +97,50 @@ _REQUEST_TITLE = "Request {folder}"
 
 
 @dataclass(frozen=True)
+class FolderRequest:
+    """A tab that is a whole folder's prompt rewrite rather than one config.
+
+    A tab opened this way is about a folder: it shows the folder's pictures
+    instead of a file, its Generate asks for one run per picture rather than one
+    run, and its name is the folder's. That is a distinct state, and it used to
+    be a four-key dict tested for None at four sites — each site knowing on its
+    own which key it wanted and what to make of it.
+
+    ``opened_on`` is the settings the tab opened at, and is the whole of how a
+    press tells a rewrite from a re-run of the folder being rewritten: a request
+    that asked for nothing would re-run every seed in the folder to re-create the
+    folder. Frozen, because a request that could be edited could quietly come to
+    agree with whatever was typed after it.
+
+    ``count`` is one per run the press will make, whether or not there is a
+    thumbnail to draw for it, so the hover counts images rather than readable
+    files.
+    """
+
+    folder_key: str
+    label: str
+    count: int
+    opened_on: ConfigSnapshot
+
+    def title(self) -> str:
+        """What the row of tabs calls this one."""
+        return _REQUEST_TITLE.format(folder=self.label)
+
+    def caption(self) -> str:
+        """What the Generate button says: one ask, not a count of runs."""
+        return _REQUEST_CAPTION
+
+    def tooltip(self) -> str:
+        """…and how many runs that ask costs, a hover away."""
+        return (_REQUEST_TIP_ONE if self.count == 1
+                else _REQUEST_TIP.format(count=self.count))
+
+    def is_unchanged(self, config: ConfigSnapshot) -> bool:
+        """Whether the tab still says exactly what it opened saying."""
+        return configs_match(self.opened_on, config)
+
+
+@dataclass(frozen=True)
 class ExportLane:
     """One outbound lane: a folder in Evolver's inbox, a column on the row, and
     the words its button and its failure wear.
@@ -243,7 +287,7 @@ class GenerateConfigPanel(QWidget):
         # configuration: the folder being rewritten, what to call it, how many
         # pictures the press will run, and the settings it opened on — which is
         # what says whether anything has actually been rewritten yet.
-        self._folder_request: dict | None = None
+        self._folder_request: FolderRequest | None = None
         # Where this tab's settings came from, when the Combine panel opened them
         # here: the act picked in its dropdown and the video whose recipe they
         # are, as (category, video_prompt_id). Carried so a run launched from this
@@ -630,11 +674,8 @@ class GenerateConfigPanel(QWidget):
     def _apply_generate_caption(self):
         """Say on the button what a press will do, and why, or leave it plain."""
         if self._folder_request is not None:
-            count = self._folder_request["count"]
-            self._generate_btn.set_caption(_REQUEST_CAPTION)
-            self._generate_btn.setToolTip(
-                _REQUEST_TIP_ONE if count == 1
-                else _REQUEST_TIP.format(count=count))
+            self._generate_btn.set_caption(self._folder_request.caption())
+            self._generate_btn.setToolTip(self._folder_request.tooltip())
             return
         wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
         config = self.current_config()
@@ -681,10 +722,10 @@ class GenerateConfigPanel(QWidget):
             # A request that asked for nothing would re-run every seed in the
             # folder to re-create the folder, so the press says what it still
             # needs rather than filling the queue with copies.
-            if configs_match(self._folder_request["opened_on"], self.current_config()):
+            if self._folder_request.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_REQUEST_GUARD)
                 return
-            self.changes_requested.emit(self._folder_request["folder_key"], key, params)
+            self.changes_requested.emit(self._folder_request.folder_key, key, params)
             return
         self.generate_requested.emit(key, params)
 
@@ -845,7 +886,7 @@ class GenerateConfigPanel(QWidget):
         folder wears in the tree, code or typed.
         """
         if self._folder_request is not None:
-            return _REQUEST_TITLE.format(folder=self._folder_request["label"])
+            return self._folder_request.title()
         name = item_label(self._displayed_row)
         if not name:
             key = self.settings_key()
@@ -921,14 +962,12 @@ class GenerateConfigPanel(QWidget):
         the number of images rather than of readable files.
         """
         self.prefill(workflow_name, params)  # ends any rewrite already here
-        self._folder_request = {
-            "folder_key": folder_key,
-            "label": label,
-            "count": len(pictures),
+        self._folder_request = FolderRequest(
+            folder_key=folder_key, label=label, count=len(pictures),
             # What the tab opened on, so a press can tell a rewrite from a
             # re-run of the folder it was rewriting.
-            "opened_on": self.current_config(),
-        }
+            opened_on=self.current_config(),
+        )
         self._hide_footer()
         self._displayed_row = None     # a folder, not a generation on display
         self._displayed_config = None  # ...so no settings for a notice to deviate from

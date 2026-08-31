@@ -79,7 +79,8 @@ from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.browser_pane import (
-    BrowserPane, BrowserScrollArea, SEARCH_DRAW_LIMIT, SearchTile, TreeNavigation,
+    BrowserPane, BrowserScrollArea, PaneHost, SEARCH_DRAW_LIMIT, SearchTile,
+    TreeNavigation,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -595,13 +596,27 @@ class GalleryView(QWidget):
         # scroll area is its canvas — built here so it can be handed over, placed
         # into the layout by _build_ui.
         self._scroll = BrowserScrollArea()
-        self._browser = BrowserPane(self, self._scroll, db, self._reroll,
-                                    self._auto,
-                                    TreeNavigation(
-                                        selected_folder_key=self._selected_folder_key,
-                                        folder_context=self._folder_context,
-                                        group_for_key=self._group_for_key,
-                                    ))
+        self._browser = BrowserPane(
+            self._scroll, db, self._reroll, self._auto,
+            TreeNavigation(
+                selected_folder_key=self._selected_folder_key,
+                folder_context=self._folder_context,
+                group_for_key=self._group_for_key,
+            ),
+            # Each answer looks itself up through self at call time, as the
+            # pane's old view reads did — so a per-instance stub (tests fake
+            # _animated_preview this way) still lands.
+            PaneHost(
+                media_types=lambda: self._media_types(),
+                image_rows=lambda: self._image_rows,
+                animated_preview=lambda row: self._animated_preview(row),
+                enhancing_run=lambda row: self.enhancing_run(row),
+                enhance_settings=lambda: self._enhance_settings,
+                experiments_enabled=lambda: self.experiments_enabled(),
+                add_lead_tiles=lambda flow, group: self._add_lead_tiles(flow, group),
+            ),
+        )
+        self._browser.pane_reset.connect(self._forget_reroll_tile)
         self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._browser.tab_pin_requested.connect(self.pin_config_tab)
         self._browser.item_jump_requested.connect(self._on_source_link)
@@ -3047,6 +3062,21 @@ class GalleryView(QWidget):
             return None
         item = self._tree.currentItem()
         return item.data(0, _GROUP_ROLE) if item else None
+
+    def _add_lead_tiles(self, flow, group):
+        """Lead a settings folder's grid with the view's own tiles — the live
+        re-roll tile and, beside it, its mirror (the same seeds again, said
+        differently) — when the folder supports each. The pane grants the spot
+        (:attr:`~origenerator.gui.browser_pane.PaneHost.add_lead_tiles`)."""
+        if self._can_reroll(group):
+            self._add_reroll_tile(flow, group)
+        if self._can_request_changes(group):
+            self._add_folder_request_tile(flow, group)
+
+    def _forget_reroll_tile(self):
+        """The pane is dropping what it holds, the re-roll tile with it — it is
+        re-created only when a re-rolling folder is next rendered."""
+        self._reroll_tile = None
 
     def _add_reroll_tile(self, flow, group):
         job = self._reroll.job_for(group.key)

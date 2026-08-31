@@ -156,6 +156,35 @@ def _inflight_signature(items) -> tuple:
 
 
 @dataclass(frozen=True)
+class PaneHost:
+    """The questions the pane may ask the gallery it fills, bound to the view's
+    answers at construction — plus the one favor it grants back.
+
+    Callables rather than pushed values so each is read at the moment a tile is
+    built: the media filter, the enhance settings and the in-flight runs all
+    move between renders, and several tiles are built mid-rebuild, where a
+    value captured earlier would already be the old one.
+    """
+
+    # The media types the gallery's two checkboxes currently include.
+    media_types: Callable[[], set]
+    # Every image row of the current model — what places an untracked run and
+    # decides whether an i2v item's start frame can itself be re-drawn.
+    image_rows: Callable[[], list]
+    # The looping-preview path for a video row, or None (the tile shows its still).
+    animated_preview: Callable[[dict], str | None]
+    # The standalone enhance being made of this image right now, or None.
+    enhancing_run: Callable[[dict], object]
+    # What every enhance runs at, app-wide — the Enhance subpanel's value.
+    enhance_settings: Callable[[], object]
+    # Whether the background experimenter is on (the empty shelf teaches off it).
+    experiments_enabled: Callable[[], bool]
+    # The favor: lead a settings folder's grid with the view's own tiles — the
+    # live re-roll tile and its request mirror — before the finished pictures.
+    add_lead_tiles: Callable[[object, object], None]
+
+
+@dataclass(frozen=True)
 class TreeNavigation:
     """The whole of what the pane may ask about the folder tree, as three
     questions bound to the view's own answers at construction.
@@ -209,15 +238,17 @@ class BrowserPane(QObject):
     drag_started = pyqtSignal(str)          # a tile began dragging (combine slots)
     drag_ended = pyqtSignal()
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
+    pane_reset = pyqtSignal()  # the outgoing pane's state is being dropped
 
-    def __init__(self, view, scroll, db, reroll, auto, tree: TreeNavigation):
+    def __init__(self, scroll, db, reroll, auto, tree: TreeNavigation,
+                 host: PaneHost):
         super().__init__()
-        self._v = view
         self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
         self._db = db          # the generations the cards and corners re-read
         self._reroll = reroll  # the live jobs and the queue's own line
         self._auto = auto      # whether a folder is auto-generating (its card says)
         self._tree = tree      # the three questions the pane may ask the tree
+        self._host = host      # the rest of what it asks the gallery (see PaneHost)
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
         self._visible_ids: list[str] = []   # generations on screen, in shown order
@@ -292,7 +323,7 @@ class BrowserPane(QObject):
         would otherwise outlive the tiles it referred to.
         """
         self.clear_selection()
-        self._v._reroll_tile = None  # re-created below only when this folder re-rolls
+        self.pane_reset.emit()  # the view drops its re-roll tile with the old pane
         self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
         self._inflight_by_key = {}
         self._visible_ids = []
@@ -624,10 +655,10 @@ class BrowserPane(QObject):
         tw = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             enhance=self._enhance_state(row),           # the plus in the picture's corner
-            enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
+            enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -657,7 +688,7 @@ class BrowserPane(QObject):
         strip's queue still lists the job, which is where a run that has the GPU
         belongs.
         """
-        media_types = self._v._media_types()
+        media_types = self._host.media_types()
         side = self._shelf_orientation
         return [it for it in self._inflight_items()
                 if it.media_type in media_types
@@ -673,7 +704,7 @@ class BrowserPane(QObject):
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —
         which media types (if any) it's looking for."""
-        media_types = self._v._media_types()
+        media_types = self._host.media_types()
         if not media_types:
             return ("No media types selected.\n\nCheck Images or Videos over the "
                     "folder list to bring your recent generations back.")
@@ -764,7 +795,7 @@ class BrowserPane(QObject):
                 cancel = lambda p=pid: self.cancel_requested.emit(p)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
-                    image_index = gallery.build_image_config_index(self._v._image_rows)
+                    image_index = gallery.build_image_config_index(self._host.image_rows())
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
             workflow_name = row.get("workflow_name") or ""
@@ -924,7 +955,7 @@ class BrowserPane(QObject):
                     "database is a copy, so a verdict recorded here would never "
                     "reach the live app — and rejecting would delete files its "
                     "own gallery still shows. The results are waiting there.")
-        if self._v.experiments_enabled():
+        if self._host.experiments_enabled():
             return ("Nothing to review yet.\n\nEach time you close the app, "
                     "variations of your own generations are queued up and run "
                     "while you're away; they collect here for your verdict.")
@@ -1023,7 +1054,7 @@ class BrowserPane(QObject):
         tile = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners
             corner_actions=corner_actions,
@@ -1215,21 +1246,17 @@ class BrowserPane(QObject):
         # a re-roll, which is also what a tab's Generate now is — is this tile: it
         # shows the live frame, so the running row is left out of the static grid
         # below rather than drawn as a broken, output-less thumbnail.
-        if self._v._can_reroll(group):
-            self._v._add_reroll_tile(flow, group)
-        # ...and beside it its mirror: the same seeds again, said differently.
-        if self._v._can_request_changes(group):
-            self._v._add_folder_request_tile(flow, group)
+        self._host.add_lead_tiles(flow, group)
         self._add_folder_inflight_cards(flow, group)
         for row in group.rows:
             if not gallery.produced_output(row):
                 continue  # still in flight — represented by the RerollTile, not a tile
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+                movie_path=self._host.animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
                 enhance=self._enhance_state(row),           # the plus in the picture's corner
-                enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
+                enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
@@ -1284,7 +1311,7 @@ class BrowserPane(QObject):
         seed (new motion of the same frame), plus the image seed (a new frame)
         when the item's start frame is itself a re-buildable generation."""
         actions = [("video", icons.reroll_seed_icon("video"), "Randomize video seed")]
-        if gallery.find_source_image_id(row, self._v._image_rows) is not None:
+        if gallery.find_source_image_id(row, self._host.image_rows()) is not None:
             actions.append(("image", icons.reroll_seed_icon("image"), "Randomize image seed"))
         return actions
 
@@ -1428,7 +1455,7 @@ class BrowserPane(QObject):
     def _enhance_state(self, row) -> str | None:
         """What the plus in this row's bottom-right corner has to say, at the
         Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
-        return enhance_state(row, self._v._enhance_settings)
+        return enhance_state(row, self._host.enhance_settings())
 
     def refresh_enhance_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.

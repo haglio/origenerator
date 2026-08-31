@@ -14,6 +14,11 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
 * :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
+* :mod:`.enhance` — what an enhancement is, which rows have had one and which
+  want one, and the knobs one runs at.
+* :mod:`.enhance_fold` — folding a finished enhancement onto the image it
+  upgraded. The one module here that takes a database and changes what is in it;
+  everything else takes rows and answers questions about them.
 
 This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
@@ -92,13 +97,15 @@ from origenerator.gallery.enhance import (
     level_matching_params,
     level_matching_settings,
     original_files_of,
-    fold_completed_enhancements,
-    fold_enhancement,
     is_enhance_product_row,
     is_enhanceable_row,
     is_enhanced_row,
     remove_enhance_levels,
     rows_awaiting_enhancement,
+)
+from origenerator.gallery.enhance_fold import (
+    fold_completed_enhancements,
+    fold_enhancement,
 )
 from origenerator.gallery.signatures import (
     is_image_conditioned,

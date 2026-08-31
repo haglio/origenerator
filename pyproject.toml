@@ -32,6 +32,9 @@ dev = ["pytest", "pytest-qt", "vulture", "ruff"]
 voice = ["faster-whisper", "sounddevice"]
 
 [tool.pytest.ini_options]
+# The content guard's enforcement check, adopted the way every repo in the
+# family adopts it: one line, and no copy of the check to drift.
+addopts = "-p app_support.sanitize.pytest_plugin"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

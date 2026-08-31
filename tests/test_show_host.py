@@ -12,6 +12,8 @@ import ast
 from pathlib import Path
 from unittest.mock import MagicMock
 
+ROOT = Path(__file__).resolve().parent.parent
+
 import pytest
 
 from origenerator.gui.show_host import ShowHost
@@ -105,7 +107,7 @@ def test_a_host_with_no_set_draws_no_hud_map(pace_only):
 
 def _probes_in(relative_path: str) -> list[str]:
     """Every hasattr/getattr in the file that names a member of the protocol."""
-    tree = ast.parse(Path(relative_path).read_text(encoding="utf-8"))
+    tree = ast.parse((ROOT / relative_path).read_text(encoding="utf-8"))
     members = set(TRANSPORT + THE_SET)
     return [
         f"{relative_path}:{node.lineno} {node.func.id}(…, {node.args[1].value!r})"

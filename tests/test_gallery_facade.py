@@ -11,7 +11,8 @@ from pathlib import Path
 
 from origenerator import gallery
 
-_PACKAGE = Path("origenerator/gallery")
+ROOT = Path(__file__).resolve().parent.parent
+_PACKAGE = ROOT / "origenerator" / "gallery"
 
 # Every name the package publishes. Held as an equality rather than a floor: a
 # name added without a line here is as much a failure as one dropped, because
@@ -64,25 +65,58 @@ def test_every_published_name_is_actually_there():
     assert missing == []
 
 
-def _writes_in(path: Path) -> list[str]:
-    """Every ``db.<something>`` call in the file that is not a plain read."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    writes = []
+# The one module of the package allowed to know a database exists.
+THE_DB_MODULE = "enhance_fold.py"
+
+
+def _modules(predicate) -> list[str]:
+    """The package's modules for which *predicate* holds of the parsed source."""
+    return sorted(path.name for path in _PACKAGE.glob("*.py")
+                  if predicate(ast.parse(path.read_text(encoding="utf-8"))))
+
+
+def _calls_a_db(tree) -> bool:
+    """Whether the module calls anything on a local named ``db``."""
+    return any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+               and isinstance(node.func.value, ast.Name)
+               and node.func.value.id == "db"
+               for node in ast.walk(tree))
+
+
+def _takes_a_db(tree) -> bool:
+    """Whether any function in the module is handed a database."""
+    return any(arg.arg == "db"
+               for node in ast.walk(tree)
+               if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+               for arg in (*node.args.posonlyargs, *node.args.args,
+                           *node.args.kwonlyargs))
+
+
+def _imports_the_db_module(tree) -> bool:
+    """Whether the module reaches for :mod:`origenerator.db` at all."""
     for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
-            continue
-        target = node.func.value
-        if not (isinstance(target, ast.Name) and target.id == "db"):
-            continue
-        writes.append(f"{path.name}:{node.lineno} db.{node.func.attr}")
-    return writes
+        if isinstance(node, ast.ImportFrom) and (node.module or "") == "origenerator.db":
+            return True
+        if isinstance(node, ast.Import) and any(a.name == "origenerator.db"
+                                                for a in node.names):
+            return True
+    return False
 
 
-def test_only_one_module_of_the_gallery_package_touches_the_database():
-    # The package is otherwise pure: rows in, answers out. One module holds
-    # every call against a database, so a reader looking for what the gallery
-    # can change has one file to read and a caller wanting the pure half can
-    # take it without a database at all.
-    touching = sorted({path.name for path in _PACKAGE.glob("*.py")
-                       if _writes_in(path)})
-    assert touching == ["enhance_fold.py"]
+def test_only_one_module_of_the_gallery_package_is_handed_a_database():
+    # The package is otherwise pure: rows in, answers out. One module takes a
+    # db, so a reader looking for what the gallery can change has one file to
+    # read and a caller wanting the pure half can take it without a database.
+    assert _modules(_takes_a_db) == [THE_DB_MODULE]
+
+
+def test_only_that_module_calls_anything_on_a_database():
+    # The same rule spelled a second way, because taking one and using one are
+    # two facts and a module could pick up either without the other.
+    assert _modules(_calls_a_db) == [THE_DB_MODULE]
+
+
+def test_no_module_of_the_gallery_package_imports_the_database_module():
+    # And a third: the two above see a parameter named db, so a module that
+    # built its own connection would walk past both of them.
+    assert _modules(_imports_the_db_module) == []

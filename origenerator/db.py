@@ -1,10 +1,11 @@
-import json
 from pathlib import Path
 
+from origenerator.db_branch_curation import BranchCurationStore
 from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
 from origenerator.db_folder_meta import FolderMetaStore
+from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import GENERATION_COLUMNS, SCHEMA, create
 
@@ -32,6 +33,8 @@ class Database:
         self.deletions = DeletionStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
+        self.requests = RequestStore(file)
+        self.branch_curation = BranchCurationStore(file)
 
     def insert_generation(
         self,
@@ -268,46 +271,27 @@ class Database:
     def forget_deletion(self, prompt_id: str):
         return self.deletions.forget_deletion(prompt_id)
 
-    # --- spoken requests (what the Requests shelf lists) --------------------
+    # --- spoken requests (see origenerator.db_requests) ----------------------
 
     def record_request(self, *, prompt_id: str, source_prompt_id: str, heard: str,
                        term: str | None = None, polarity: str | None = None,
                        action: str | None = None, old_positive: str = "",
                        old_negative: str = "", new_positive: str = "",
                        new_negative: str = ""):
-        """Record that ``prompt_id`` was queued by a request about
-        ``source_prompt_id`` — spoken, or typed as one picture of a folder-wide
-        rewrite, which leaves ``heard`` empty. Replaces any earlier record for
-        the same generation, which only a re-used prompt id could produce."""
-        with self._connect() as conn:
-            conn.execute(
-                """INSERT OR REPLACE INTO requests
-                       (prompt_id, source_prompt_id, heard, term, polarity, action,
-                        old_positive, old_negative, new_positive, new_negative)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (prompt_id, source_prompt_id, heard, term, polarity, action,
-                 old_positive, old_negative, new_positive, new_negative),
-            )
+        return self.requests.record_request(
+            prompt_id=prompt_id, source_prompt_id=source_prompt_id, heard=heard,
+            term=term, polarity=polarity, action=action,
+            old_positive=old_positive, old_negative=old_negative,
+            new_positive=new_positive, new_negative=new_negative)
 
     def list_requests(self) -> list[dict]:
-        """Every recorded request, newest first — the Requests shelf's listing.
-
-        The stamp has second resolution, so requests made in one burst tie; the
-        rowid breaks it, keeping them in the order they were spoken.
-        """
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM requests ORDER BY created_at DESC, rowid DESC"
-            ).fetchall()
-            return [dict(r) for r in rows]
+        return self.requests.list_requests()
 
     def get_request(self, prompt_id: str) -> dict | None:
-        """The request that queued this generation, or ``None`` if none did."""
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM requests WHERE prompt_id = ?", (prompt_id,)
-            ).fetchone()
-            return dict(row) if row else None
+        return self.requests.get_request(prompt_id)
+
+
+
 
     # --- folder metadata (see origenerator.db_folder_meta) ------------------
 
@@ -332,43 +316,15 @@ class Database:
     def delete_folder_meta(self, folder_key: str):
         return self.folder_meta.delete_folder_meta(folder_key)
 
-    # --- branch-session curation (what each worktree had bookmarked) ---------
+    # --- branch-session curation (see origenerator.db_branch_curation) -------
 
     def branch_curation_state(self, branch: str) -> dict | None:
-        """What was last adopted from the worktree named *branch*.
-
-        ``None`` when this worktree has never been read — which is precisely what
-        tells adoption it has no baseline to diff against, and so may add
-        bookmarks but not take any away (see
-        :func:`~origenerator.branch_session.adopt_branch_curation`). A record
-        written by a future version and unreadable here counts as never read, for
-        the same reason: guessing is what a missing baseline forbids.
-        """
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT state_json FROM branch_curation WHERE branch = ?",
-                (branch,),
-            ).fetchone()
-        if row is None:
-            return None
-        try:
-            state = json.loads(row["state_json"])
-        except (TypeError, ValueError):
-            return None
-        return state if isinstance(state, dict) else None
+        return self.branch_curation.branch_curation_state(branch)
 
     def set_branch_curation_state(self, branch: str, state: dict):
-        """Remember a worktree's bookmarks as of now, so the next launch can tell
-        what the branch changed from what it merely inherited."""
-        with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO branch_curation (branch, state_json, adopted_at)
-                   VALUES (?, ?, datetime('now'))
-                   ON CONFLICT(branch) DO UPDATE SET
-                       state_json = excluded.state_json,
-                       adopted_at = excluded.adopted_at""",
-                (branch, json.dumps(state)),
-            )
+        return self.branch_curation.set_branch_curation_state(branch, state)
+
+
 
     # --- custom folders (see origenerator.db_custom_folders) ----------------
 

@@ -1,6 +1,8 @@
 import json
 import sqlite3
 
+import pytest
+
 from origenerator.db import Database
 
 
@@ -88,6 +90,45 @@ def test_update_generation(tmp_path):
     assert row["status"] == "completed"
     assert row["output_files"] == json.dumps([{"filename": "out.png"}])
     assert row["thumbnail_path"] == "thumbs/out.jpg"
+
+
+def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
+    """It writes a job's lifecycle. Everything else on the row is provenance
+    fixed at insert, or a user's own mark, and each of those has its own named
+    method -- so a key outside the set is a caller reaching for the wrong one.
+    It used to be dropped in silence, which made a typo a no-op with no error."""
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="upd-002",
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        params_json="{}",
+        workflow_json="{}",
+    )
+
+    with pytest.raises(ValueError) as refused:
+        db.update_generation("upd-002", workflow_name="wan22_i2v")
+
+    assert "workflow_name" in str(refused.value)
+    assert db.get_generation("upd-002")["workflow_name"] == "sdxl_t2i"
+
+
+def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
+    """Callers build the field dict conditionally -- an enhance level removed
+    from a row that had none yields ``{}`` -- so an empty update is a normal
+    outcome rather than a mistake."""
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="upd-003",
+        workflow_name="sdxl_t2i",
+        workflow_version="v002",
+        params_json="{}",
+        workflow_json="{}",
+    )
+
+    db.update_generation("upd-003")
+
+    assert db.get_generation("upd-003")["status"] == "pending"
 
 
 def test_update_generation_stores_duration_seconds(tmp_path):

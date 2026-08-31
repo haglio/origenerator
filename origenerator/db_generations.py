@@ -12,9 +12,45 @@ seven of these columns read-only, so tests/test_db_schema.py holds them.
 from origenerator.db_connection import Store
 from origenerator.db_schema import GENERATION_COLUMNS
 
+#: The columns :meth:`GenerationStore.update_generation` writes: a job's
+#: lifecycle, from queued to finished or failed. Everything else on the row is
+#: either provenance -- the workflow, its params, the prompts, the seed, all
+#: fixed when the job was submitted -- or a mark the user or an export lane
+#: leaves, and each of those has its own named method below. So a key outside
+#: this set is a caller reaching for the wrong method, which is worth saying.
+LIFECYCLE_COLUMNS = frozenset({
+    "status", "output_files", "original_files", "enhance_history",
+    "thumbnail_path", "error_message", "completed_at", "duration_seconds",
+    "progress_json",
+})
+
 
 class GenerationStore(Store):
     """The sixteen queries over the `generations` table."""
+
+    def _set(self, prompt_id: str, column: str, value):
+        """Write one column outside :data:`LIFECYCLE_COLUMNS`.
+
+        *column* is a literal from one of the named methods below, never a
+        caller's string -- which is what makes interpolating it into the
+        statement safe.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE generations SET {column} = ? WHERE prompt_id = ?",
+                (value, prompt_id),
+            )
+
+    def _stamp(self, prompt_id: str, column: str):
+        """Set one column to now. The three export marks, whose value is only
+        ever tested for presence; the database's clock, so the stamp reads the
+        same as every other one on the row."""
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE generations SET {column} = datetime('now')"
+                " WHERE prompt_id = ?",
+                (prompt_id,),
+            )
 
     def insert_generation(
         self,
@@ -42,16 +78,24 @@ class GenerationStore(Store):
             )
 
     def update_generation(self, prompt_id: str, **fields):
-        allowed = {
-            "status", "output_files", "original_files", "enhance_history",
-            "thumbnail_path", "error_message", "completed_at", "duration_seconds",
-            "progress_json",
-        }
-        to_set = {k: v for k, v in fields.items() if k in allowed}
-        if not to_set:
+        """Move a job along: any of :data:`LIFECYCLE_COLUMNS`, in one statement.
+
+        A column outside that set is refused by name rather than dropped -- the
+        drop was silent, so a typo, or a caller reaching for a provenance field
+        this does not write, was a no-op with nothing said. Callers build the
+        field dict conditionally, so no fields at all is a normal outcome and
+        stays a no-op.
+        """
+        refused = set(fields) - LIFECYCLE_COLUMNS
+        if refused:
+            raise ValueError(
+                f"update_generation does not write {', '.join(sorted(refused))}; "
+                f"it writes a job's lifecycle ({', '.join(sorted(LIFECYCLE_COLUMNS))}). "
+                "Provenance and the user's own marks have their own methods.")
+        if not fields:
             return
-        set_clause = ", ".join(f"{k} = ?" for k in to_set)
-        values = list(to_set.values()) + [prompt_id]
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [prompt_id]
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE generations SET {set_clause} WHERE prompt_id = ?",
@@ -61,26 +105,18 @@ class GenerationStore(Store):
     def set_workflow_name(self, prompt_id: str, workflow_name: str):
         """Correct a row's workflow_name (e.g. backfilling 'unknown' imports).
 
-        Deliberately separate from update_generation, whose allowlist excludes
-        provenance fields like workflow_name.
+        Its own method rather than a key of update_generation, which writes a
+        job's lifecycle and not its provenance.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET workflow_name = ? WHERE prompt_id = ?",
-                (workflow_name, prompt_id),
-            )
+        self._set(prompt_id, "workflow_name", workflow_name)
 
     def set_params_json(self, prompt_id: str, params_json: str):
         """Rewrite a row's params_json (e.g. backfilling model/LoRA onto imports).
 
-        Deliberately separate from update_generation, whose allowlist excludes
-        params_json since it is normally fixed at insert time.
+        Its own method rather than a key of update_generation: the params are
+        provenance, normally fixed at insert time.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET params_json = ? WHERE prompt_id = ?",
-                (params_json, prompt_id),
-            )
+        self._set(prompt_id, "params_json", params_json)
 
     def set_recipe_source(self, prompt_id: str, *, category: str | None = None,
                           video_prompt_id: str | None = None):
@@ -91,8 +127,7 @@ class GenerationStore(Store):
         row goes in as the job is submitted and only the caller that built the
         combination knows either of these. Empty values are stored as NULL, so a
         dropped video (no act) and a curated act (no video) each record only the
-        half they have. Separate from ``update_generation``, whose allowlist
-        excludes provenance fields.
+        half they have. Two columns in one statement, so it keeps its own.
         """
         with self._connect() as conn:
             conn.execute(
@@ -104,27 +139,19 @@ class GenerationStore(Store):
     def set_generation_starred(self, prompt_id: str, starred: bool):
         """Star (or unstar) one generation — the user's per-item bookmark.
 
-        Deliberately separate from update_generation, whose allowlist covers a
-        job's lifecycle fields rather than a user gesture like this.
+        Its own method rather than a key of update_generation, which covers a
+        job's lifecycle rather than a user gesture like this.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET starred = ? WHERE prompt_id = ?",
-                (1 if starred else 0, prompt_id),
-            )
+        self._set(prompt_id, "starred", 1 if starred else 0)
 
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         """Record the user's review of a background experiment: ``'up'`` (keep),
         ``'down'`` (reject), or ``None`` (back to unreviewed — an undone verdict).
 
-        Deliberately separate from update_generation, whose allowlist covers a
-        job's lifecycle fields rather than a user gesture like this.
+        Its own method rather than a key of update_generation, which covers a
+        job's lifecycle rather than a user gesture like this.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET experiment_verdict = ? WHERE prompt_id = ?",
-                (verdict, prompt_id),
-            )
+        self._set(prompt_id, "experiment_verdict", verdict)
 
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
@@ -132,12 +159,7 @@ class GenerationStore(Store):
         Stamps the current time so the gallery remembers the send across sessions
         (a plain marker — the value is only ever tested for presence).
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET evolver_exported_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        self._stamp(prompt_id, "evolver_exported_at")
 
     def mark_genau_exported(self, prompt_id: str):
         """Record that this generation's clip was sent down the Genau lane.
@@ -146,12 +168,7 @@ class GenerationStore(Store):
         value is only ever tested for presence, so the button can show the send
         across sessions.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET genau_exported_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        self._stamp(prompt_id, "genau_exported_at")
 
     def mark_genau_requested(self, prompt_id: str):
         """Record that a spoken "genau it" started this run.
@@ -160,12 +177,7 @@ class GenerationStore(Store):
         to hand itself to the Genau lane without a second ask. Only ever tested
         for presence.
         """
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE generations SET genau_requested_at = datetime('now')"
-                " WHERE prompt_id = ?",
-                (prompt_id,),
-            )
+        self._stamp(prompt_id, "genau_requested_at")
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         """Most-recent measured generation times for a workflow, newest first.

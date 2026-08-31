@@ -456,29 +456,42 @@ def _scalars(inputs: dict) -> dict:
     return {k: v for k, v in inputs.items() if isinstance(v, (int, float, str, bool))}
 
 
+# Which registered workflow a graph's node classes name, MOST SPECIFIC FIRST.
+# The order is load-bearing and cannot come from the registry, whose own order
+# runs the other way (sdxl_t2i first): a graph can satisfy more than one entry —
+# an flf2v graph also carries the i2v conditioning, a Flux one can also load a
+# checkpoint — and the first match wins. Nor can it be derived from the
+# signatures, since flf2v and i2v are each one node class and neither is a
+# superset of the other; what orders them is that an flf2v graph contains both.
+#
+# Each entry is a workflow name and the node-class sets that identify it: any
+# one set being wholly present is enough. tests/test_importer.py holds every
+# case with the losers named; tests/test_workflows.py holds these names against
+# the registry, and holds what every registered workflow's own graph reads as.
+_GRAPH_SIGNATURES = (
+    ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
+    ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
+    # A Wan/Hunyuan video latent saved as a still image: text-to-image.
+    ("wan22_t2i", (frozenset({"EmptyHunyuanLatentVideo", "SaveImage"}),)),
+    # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders and a
+    # FluxGuidance node — none of which the other workflows use.
+    ("flux_t2i_upscaled", (frozenset({"FluxGuidance"}),
+                           frozenset({"UnetLoaderGGUF", "DualCLIPLoader"}))),
+    ("sdxl_t2i", (frozenset({"CheckpointLoaderSimple"}),)),
+)
+
+
 def _workflow_from_nodes(graph: dict) -> str | None:
     """Which registered workflow built this graph, from its node classes.
 
-    ORDERED, because a graph can satisfy more than one test: an flf2v graph also
-    carries the i2v conditioning, and a Flux one can also load a checkpoint. The
-    first match wins. ``None`` when nothing matches, which leaves the filename's
-    guess standing. tests/test_importer.py holds every case, losers named.
+    ``None`` when nothing matches, which leaves the filename's guess standing.
     """
     node_types = {n.get("class_type") for n in graph.values()}
-    if "WanFirstLastFrameToVideo" in node_types:
-        return "wan22_flf2v_loop"
-    if "WanImageToVideo" in node_types:
-        return "wan22_i2v"
-    if {"EmptyHunyuanLatentVideo", "SaveImage"} <= node_types:
-        # A Wan/Hunyuan video latent saved as a still image: text-to-image.
-        return "wan22_t2i"
-    if "FluxGuidance" in node_types or {"UnetLoaderGGUF", "DualCLIPLoader"} <= node_types:
-        # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders
-        # and a FluxGuidance node — none of which the other workflows use.
-        return "flux_t2i_upscaled"
-    if "CheckpointLoaderSimple" in node_types:
-        return "sdxl_t2i"
-    return None
+    return next(
+        (name for name, signatures in _GRAPH_SIGNATURES
+         if any(signature <= node_types for signature in signatures)),
+        None,
+    )
 
 
 def _extract_metadata(fpath: Path, suffix: str) -> dict:

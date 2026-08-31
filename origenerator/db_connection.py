@@ -37,6 +37,31 @@ class SqliteFile:
 
 
 
+class ReadOnlySqliteFile(SqliteFile):
+    """A database this app may read and must not write.
+
+    A branch session's worktree database is one: it belongs to another install
+    of this app, and adoption reads it and never writes it (see
+    :mod:`origenerator.branch_session`, whose docstrings promise exactly that).
+    Opened ``?mode=ro``, so sqlite refuses the write rather than the reader
+    having to remember not to make one.
+
+    A worktree that is half-deleted, mid-write, or predates a column raises
+    ``sqlite3.Error`` here as anywhere, which is what lets adoption yield
+    nothing rather than fail a launch.
+    """
+
+    @contextmanager
+    def connect(self):
+        conn = sqlite3.connect(f"file:{self.path.as_posix()}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+
 class Store:
     """A group of queries over one table of a :class:`SqliteFile`.
 

@@ -15,7 +15,7 @@ import sqlite3
 
 import pytest
 
-from origenerator.db_connection import SqliteFile
+from origenerator.db_connection import ReadOnlySqliteFile, SqliteFile
 
 
 @pytest.fixture
@@ -69,3 +69,42 @@ def test_rows_come_back_by_column_name(file):
         row = conn.execute("SELECT id, body FROM notes").fetchone()
 
     assert row["body"] == "scene three"
+
+
+class TestReadOnly:
+    """How a worktree's database is opened. It belongs to another install of
+    this app — a branch session's copy — and adoption reads it and never writes
+    it, so that is refused by sqlite rather than by care (see
+    origenerator.branch_session, whose docstrings promise it)."""
+
+    def test_what_is_there_can_be_read(self, file):
+        with file.connect() as conn:
+            conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene one",))
+
+        with ReadOnlySqliteFile(file.path).connect() as conn:
+            assert [r["body"] for r in conn.execute("SELECT body FROM notes")] == [
+                "scene one"]
+
+    def test_a_write_is_refused(self, file):
+        with pytest.raises(sqlite3.OperationalError):
+            with ReadOnlySqliteFile(file.path).connect() as conn:
+                conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene two",))
+
+        with file.connect() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0
+
+    def test_a_database_that_is_not_there_is_a_plain_sqlite_error(self, tmp_path):
+        """Which is what the branch adoption catches: a half-deleted worktree
+        must yield nothing rather than fail the launch."""
+        missing = ReadOnlySqliteFile(tmp_path / "no-such-worktree" / "origenerator.db")
+
+        with pytest.raises(sqlite3.Error):
+            with missing.connect() as conn:
+                conn.execute("SELECT 1")
+
+    def test_it_is_closed_on_the_way_out_like_any_other(self, file):
+        with ReadOnlySqliteFile(file.path).connect() as conn:
+            pass
+
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute("SELECT 1")

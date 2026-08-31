@@ -29,6 +29,11 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from origenerator.db_connection import ReadOnlySqliteFile
+from origenerator.db_folder_meta import FolderMetaStore
+from origenerator.db_generations import GenerationStore
+from origenerator.db_requests import RequestStore
+
 ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
 
 
@@ -144,12 +149,7 @@ def _completed_rows(branch_db: Path) -> list[dict]:
     mid-write, corrupt, half-deleted worktrees — yield nothing rather than
     failing the launch."""
     try:
-        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
-        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
-            conn.row_factory = sqlite3.Row
-            return [dict(r) for r in conn.execute(
-                "SELECT * FROM generations WHERE status = 'completed'"
-                " AND (source IS NULL OR source = 'generated') ORDER BY id")]
+        return GenerationStore(ReadOnlySqliteFile(branch_db)).completed_generated()
     except sqlite3.Error:
         return []
 
@@ -164,10 +164,7 @@ def _request_records(branch_db: Path) -> dict:
     than failing the launch, exactly as :func:`_completed_rows` does.
     """
     try:
-        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
-        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = [dict(r) for r in conn.execute("SELECT * FROM requests")]
+        rows = RequestStore(ReadOnlySqliteFile(branch_db)).list_requests()
     except sqlite3.Error:
         return {}
     for row in rows:
@@ -281,21 +278,11 @@ def _curation_state(branch_db: Path) -> dict | None:
     baseline, which would make the branch's untouched bookmarks look like
     deletions on the very next launch.
     """
+    worktree = ReadOnlySqliteFile(branch_db)
     try:
-        source_uri = f"file:{Path(branch_db).as_posix()}?mode=ro"
-        with closing(sqlite3.connect(source_uri, uri=True)) as conn:
-            conn.row_factory = sqlite3.Row
-            stars = [r["prompt_id"] for r in conn.execute(
-                "SELECT prompt_id FROM generations WHERE starred = 1"
-                " ORDER BY prompt_id")]
-            folders = {r["folder_key"]: {
-                "custom_name": r["custom_name"],
-                "starred": bool(r["starred"]),
-                "level": r["level"],
-                "ref_prompt_id": r["ref_prompt_id"],
-            } for r in conn.execute(
-                "SELECT folder_key, custom_name, starred, level, ref_prompt_id"
-                " FROM folder_meta")}
+        stars = GenerationStore(worktree).starred_prompt_ids()
+        folders = {row.pop("folder_key"): row
+                   for row in FolderMetaStore(worktree).folder_meta_full()}
     except sqlite3.Error:
         return None
     return {"stars": stars, "folders": folders}

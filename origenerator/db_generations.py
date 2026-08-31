@@ -179,6 +179,33 @@ class GenerationStore(Store):
         """
         self._stamp(prompt_id, "genau_requested_at")
 
+    def completed_generated(self) -> list[dict]:
+        """Completed rows this install generated itself, oldest first.
+
+        What a branch session's database is adopted from (see
+        :mod:`origenerator.branch_session`). Only ``generated`` rows: a worktree
+        database also holds thousands of seeded and imported rows describing the
+        shared library, and "adopting" those would churn the live table with
+        copies of records it already keeps. Oldest first, so adoption preserves
+        the order they were made in.
+        """
+        with self._connect() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT * FROM generations WHERE status = 'completed'"
+                " AND (source IS NULL OR source = 'generated') ORDER BY id")]
+
+    def starred_prompt_ids(self) -> list[str]:
+        """Every starred generation, by prompt id, in a stable order.
+
+        The item half of what a branch session had bookmarked. Ordered by id
+        rather than by row, because the list is recorded as a baseline and
+        diffed against the next reading of it.
+        """
+        with self._connect() as conn:
+            return [r["prompt_id"] for r in conn.execute(
+                "SELECT prompt_id FROM generations WHERE starred = 1"
+                " ORDER BY prompt_id")]
+
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         """Most-recent measured generation times for a workflow, newest first.
 

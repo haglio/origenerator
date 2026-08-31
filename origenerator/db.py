@@ -90,6 +90,12 @@ class Database:
     def mark_genau_requested(self, prompt_id: str):
         return self.generations.mark_genau_requested(prompt_id)
 
+    def completed_generated(self) -> list[dict]:
+        return self.generations.completed_generated()
+
+    def starred_prompt_ids(self) -> list[str]:
+        return self.generations.starred_prompt_ids()
+
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         return self.generations.recent_durations(workflow_name, limit)
 

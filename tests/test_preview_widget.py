@@ -1090,3 +1090,156 @@ def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_p
     picture = w.media_rect()
     assert picture.width() < w.width()          # it really is letterboxed
     assert picture.contains(_corners(w)[0].geometry())
+
+
+# --- putting the pane down before laying new content in it -------------------
+#
+# Every show_* opens by clearing what the pane was holding: the playback, the
+# notice, the corner controls, the media, the live follow and the drag. The set
+# is the same six things each time, so these pin it as one list — including the
+# two deliberate exceptions (a saved file leaves the drag for its owner to arm,
+# a kept notice rides over the frames of the picture it is about) and the one
+# that is a defect, held below.
+
+
+def _pane_holding_everything(w, tmp_path):
+    """A pane holding a saved generation with every resettable thing set: an
+    animated picture, a notice over it, armed corners and an armed drag."""
+    w.show_image(_animated_webp(tmp_path / "held.webp"))
+    w.set_notice("no longer what these settings would make")
+    w.set_actions("held", starred=True, enhance=None)
+    w.set_draggable_id("held")
+    w._player.reset_mock()
+    return w
+
+
+def test_showing_an_image_puts_down_all_the_pane_was_holding(make_preview, tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    path = _make_png(tmp_path / "next.png")
+    w.show_image(path)
+
+    assert w._player.stop.called            # whatever was playing
+    assert w._notice.isHidden()             # the notice about the last picture
+    assert w._actions_id is None            # and its corners
+    assert w._media == (path, "image")
+    assert (w._live, w._live_frame) == (False, None)
+    assert w._movie is None                 # the animation it replaced
+    assert w._draggable_id == "held"        # a saved file: the owner re-arms it
+
+
+def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    path = tmp_path / "clip.mp4"
+    w.show_video(path)
+
+    assert not w._player.stop.called        # setSource takes over from the old clip
+    assert w._notice.isHidden()
+    assert w._actions_id is None
+    assert w._media == (path, "video")
+    assert (w._live, w._live_frame) == (False, None)
+    assert w._movie is None
+    assert w._draggable_id == "held"        # a saved file: the owner re-arms it
+
+
+def test_showing_a_live_frame_puts_down_all_the_pane_was_holding(make_preview,
+                                                                 tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    data = _png_bytes()
+    w.show_frame(data)
+
+    assert w._player.stop.called
+    assert w._notice.isHidden()
+    assert w._actions_id is None
+    assert w._media is None                 # a frame is no file to open fullscreen
+    assert (w._live, w._live_frame) == (True, data)
+    assert w._movie is None
+    assert w._draggable_id is None          # nor a saved generation to drag out
+
+
+def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
+                                                                  tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    w.show_combination(_make_png(tmp_path / "frame.png"), None)
+
+    assert w._player.stop.called
+    assert w._notice.isHidden()
+    assert w._actions_id is None
+    assert w._media is None
+    assert (w._live, w._live_frame) == (False, None)
+    assert w._movie is None
+    assert w._draggable_id is None
+
+
+def test_showing_a_message_puts_down_all_the_pane_was_holding(make_preview,
+                                                              tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    w.show_message("Waiting for preview…")
+
+    assert w._player.stop.called
+    assert w._notice.isHidden()
+    assert w._actions_id is None
+    assert w._media is None
+    assert (w._live, w._live_frame) == (False, None)
+    assert w._movie is None
+    assert w._draggable_id is None
+
+
+def test_a_message_marked_live_leaves_the_pane_following_the_run(make_preview,
+                                                                 tmp_path):
+    # The wait before a re-roll's first frame: the pane says it is generating and
+    # a double-click still opens fullscreen over it.
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    w.show_message("Generating…", live=True)
+
+    assert (w._live, w._live_frame) == (True, None)
+
+
+def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_preview,
+                                                                     tmp_path):
+    # An enhancement of the picture on screen: whatever the notice says about that
+    # picture is just as true of the version being made, so it stays up.
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    w.show_frame(_png_bytes(), keep_notice=True)
+
+    assert not w._notice.isHidden()
+
+
+def test_showing_a_folder_puts_down_all_the_pane_was_holding_but_the_corners(
+        make_preview, tmp_path):
+    # HELD DEFECT (audit §3 bug 15, awaiting sign-off): every other view-changing
+    # method disarms the corner controls first; this one does not, so trash there
+    # lands on a generation the user is no longer looking at. Pinned as it is so
+    # the shared preamble cannot quietly change it — the fix is to stop asking to
+    # keep them.
+    w = _pane_holding_everything(make_preview(), tmp_path)
+
+    w.show_folder([_make_png(tmp_path / "wall.png")])
+
+    assert w._player.stop.called
+    assert w._notice.isHidden()
+    assert w._media is None
+    assert (w._live, w._live_frame) == (False, None)
+    assert w._movie is None
+    assert w._draggable_id is None
+    assert w._actions_id == "held"          # the defect: still the last generation's
+
+
+def test_the_corners_left_armed_over_a_folder_still_fire_at_the_old_row(
+        make_preview, tmp_path):
+    # The consequence, spelled out: this is what makes bug 15 a defect rather
+    # than a tidiness note.
+    w = _pane_holding_everything(make_preview(), tmp_path)
+    fired = []
+    w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))
+
+    w.show_folder([_make_png(tmp_path / "wall.png")])
+    w._on_control("trash")
+
+    assert fired == [("held", "trash")]

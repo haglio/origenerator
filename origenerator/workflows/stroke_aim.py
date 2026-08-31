@@ -20,22 +20,17 @@ build.
 """
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 
-from origenerator.content import load_content
+from origenerator.content import load_content, overlay_value
 
 logger = logging.getLogger(__name__)
 
 _MODEL_REPO = "deepghs/anime_censor_detection"
 _MODEL_FILE = "censor_detect_v1.0_s/model.onnx"
-# The aim model's class names are library vocabulary; they come from the
-# content overlay rather than from source.
-_MODEL_LABELS = tuple(load_content()["detector_labels"]["model_labels"])
 _INFER_SIZE = 640
 _IOU_LIMIT = 0.45
-
-# The label whose box the stroke aims at.
-_SHAFT_CLASSES = set(load_content()["detector_labels"]["anchor_classes"])
 # The gallery's photoreal renders score low on the anime-trained detector even
 # when the box is spot-on (measured ~0.28 on a frame-filling anchor the box
 # nailed), so the bar sits low; a wrong aim is bounded by the manual override
@@ -51,6 +46,29 @@ _SPAN_BOTTOM = 0.72
 _ANCHOR = 0.93
 
 _detector = None
+
+
+@lru_cache(maxsize=1)
+def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
+    """The aim model's class names, and the ones whose box the stroke aims at.
+
+    Library vocabulary, so it comes from the content overlay rather than from
+    source. Read on first use rather than at module scope: this module is
+    imported by ``wan21_ati_i2v``, which ``workflows/__init__`` imports, which
+    twelve modules depend on -- so an overlay written before ``detector_labels``
+    existed used to take the whole app down with a bare ``KeyError``, at import,
+    before there was a window to say which key or which file was wrong. Now it
+    is a :class:`~origenerator.content.MissingOverlayKey` that names both, and
+    only auto-aim is lost.
+
+    One call for both, cached: the labels index every decoded box and the anchor
+    classes filter every one of them.
+    """
+    labels = overlay_value(load_content(), "detector_labels")
+    return (
+        tuple(overlay_value(labels, "model_labels")),
+        frozenset(overlay_value(labels, "anchor_classes")),
+    )
 
 
 def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
@@ -90,9 +108,10 @@ def detect_grip_aim(image_path: Path | None) -> dict | None:
 
 
 def _best_anchor(detections) -> dict | None:
+    _, anchor_classes = _detector_labels()
     return max(
         (d for d in detections
-         if d.get("class") in _SHAFT_CLASSES and d.get("score", 0) >= _MIN_SCORE),
+         if d.get("class") in anchor_classes and d.get("score", 0) >= _MIN_SCORE),
         key=lambda d: d["score"],
         default=None,
     )
@@ -124,6 +143,7 @@ def _decode_yolo(out, scale: float, pad_x: int, pad_y: int) -> list[dict]:
     mapped back through the letterbox into original image pixels."""
     import numpy as np
 
+    model_labels, _ = _detector_labels()
     boxes_cxcywh = out[:4].T
     scores = out[4:].T
     class_idx = scores.argmax(axis=1)
@@ -136,7 +156,7 @@ def _decode_yolo(out, scale: float, pad_x: int, pad_y: int) -> list[dict]:
         x = (cx - bw / 2 - pad_x) / scale
         y = (cy - bh / 2 - pad_y) / scale
         detections.append({
-            "class": _MODEL_LABELS[ci],
+            "class": model_labels[ci],
             "score": float(score),
             "box": (x, y, bw / scale, bh / scale),
         })

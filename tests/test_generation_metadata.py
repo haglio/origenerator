@@ -1,6 +1,6 @@
 import json
 
-from origenerator.generation_metadata import basic_section
+from origenerator.generation_metadata import basic_section, created_item, file_item
 
 
 def _row(**overrides):
@@ -139,3 +139,37 @@ def test_a_batch_still_lists_the_siblings_no_version_claims():
     files = [i.value for i in basic_section(row).items
              if i.label == "File"]
     assert files == ["b.png", "c.png"]
+
+
+def test_a_files_row_can_be_pointed_at_a_different_output_folder(tmp_path):
+    """It resolved every path against the global `COMFYUI_OUTPUT_DIR` from
+    inside the function, so nothing in the signature said it touched the
+    filesystem at all, and it could not be pointed at another library without
+    monkeypatching a module. Its neighbours -- importer, completion, reconcile,
+    base_backfill, recovery -- all take the folder as an argument."""
+    item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"},
+                     output_dir=tmp_path / "elsewhere")
+
+    assert item.reveal == str(tmp_path / "elsewhere" / "image" / "alpha_00001_.png")
+
+
+def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
+    written = tmp_path / "elsewhere" / "image"
+    written.mkdir(parents=True)
+    (written / "alpha_00001_.png").write_bytes(b"a picture")
+
+    item = created_item({"filename": "alpha_00001_.png", "subfolder": "image"},
+                        "never", output_dir=tmp_path / "elsewhere")
+
+    assert item.value != "never"
+
+
+def test_the_output_folder_still_defaults_to_the_configured_one(tmp_path, monkeypatch):
+    """Resolved when it is called, not bound when the module was imported."""
+    from origenerator import config
+
+    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "configured")
+
+    item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"})
+
+    assert item.reveal == str(tmp_path / "configured" / "image" / "alpha_00001_.png")

@@ -21,7 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from origenerator.db import _ADDED_COLUMNS, _GENERATION_COLUMNS, Database
+from origenerator.db import Database
+from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 
 # (name, type, not_null, default, primary_key_position) per column, in
 # declaration order — exactly what `PRAGMA table_info` reports.
@@ -197,9 +198,9 @@ def test_a_read_only_open_of_the_file_sees_the_whole_generations_table(tmp_path)
 
 def test_the_replayed_column_list_is_the_tables_own_order(opened):
     """`restore_generation` re-inserts a captured row by replaying
-    `_GENERATION_COLUMNS` positionally, so a column added to the DDL and
+    `GENERATION_COLUMNS` positionally, so a column added to the DDL and
     forgotten there is silently dropped from every undone delete."""
-    assert _GENERATION_COLUMNS == tuple(
+    assert GENERATION_COLUMNS == tuple(
         column for column, *_ in SCHEMA["generations"])
 
 
@@ -208,7 +209,7 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
 # What each table held when it first shipped. This is history, so it never
 # changes again — which is exactly what makes the equality below a gate rather
 # than a restatement: a column added from here on is not in this list, so
-# `_ADDED_COLUMNS` is the only place left for it to be, and forgetting it there
+# `ADDED_COLUMNS` is the only place left for it to be, and forgetting it there
 # fails this file instead of quietly shipping a column every existing user's
 # database will never have.
 FIRST_SHIPPED = {
@@ -236,7 +237,7 @@ def test_every_column_either_shipped_with_the_table_or_the_migration_adds_it(tab
     above means one was added to the DDL and to nothing else, so it exists for a
     fresh install and for nobody who has been running the app."""
     assert {column for column, *_ in SCHEMA[table]} == (
-        FIRST_SHIPPED[table] | set(_ADDED_COLUMNS.get(table, ())))
+        FIRST_SHIPPED[table] | set(ADDED_COLUMNS.get(table, ())))
 
 
 
@@ -264,7 +265,7 @@ def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
     conn.execute(f"CREATE TABLE {table} ({', '.join(columns)})")
 
 
-@pytest.mark.parametrize("table", sorted(_ADDED_COLUMNS))
+@pytest.mark.parametrize("table", sorted(ADDED_COLUMNS))
 def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
     """``CREATE TABLE IF NOT EXISTS`` leaves a user's older table exactly as it
     was, so a column added later reaches them only through the migration. One
@@ -272,7 +273,7 @@ def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
     anybody who has been running the app."""
     path = tmp_path / f"older-{table}.db"
     with sqlite3.connect(path) as conn:
-        _create_without(conn, table, set(_ADDED_COLUMNS[table]))
+        _create_without(conn, table, set(ADDED_COLUMNS[table]))
 
     Database(path)
 
@@ -281,7 +282,7 @@ def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
     assert found == {column for column, *_ in SCHEMA[table]}
 
 
-@pytest.mark.parametrize("table", sorted(_ADDED_COLUMNS))
+@pytest.mark.parametrize("table", sorted(ADDED_COLUMNS))
 def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, table):
     """The other half: the column can arrive with the right name and the wrong
     shape. ``starred`` is ``INTEGER NOT NULL DEFAULT 0`` in the DDL, and an
@@ -289,7 +290,7 @@ def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, 
     two different tables under one name."""
     path = tmp_path / f"older-{table}.db"
     with sqlite3.connect(path) as conn:
-        _create_without(conn, table, set(_ADDED_COLUMNS[table]))
+        _create_without(conn, table, set(ADDED_COLUMNS[table]))
 
     Database(path)
 
@@ -298,5 +299,5 @@ def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, 
                     conn.execute(f"PRAGMA table_info({table})")}
     fresh = {name: (type_, not_null, default)
              for name, type_, not_null, default, _ in SCHEMA[table]}
-    for column in _ADDED_COLUMNS[table]:
+    for column in ADDED_COLUMNS[table]:
         assert migrated[column] == fresh[column], column

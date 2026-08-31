@@ -15,35 +15,33 @@ from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    EnhanceSettings, animated_preview_path,
-    build_image_config_index, config_folder_name, describe_enhance_params,
-    displayed_levels, enhance_params_for, find_source_image_id, item_label,
+    EnhanceSettings, build_image_config_index, config_folder_name, describe_enhance_params,
+    displayed_levels, enhance_params_for, item_label,
     level_matching_settings, media_type_of_row, output_file_path,
-    resolve_preview, row_output_files, rows_in_settings, settings_signature,
-    videos_from_source_image, workflow_output_type,
+    resolve_preview, rows_in_settings, settings_signature,
+    workflow_output_type,
 )
 from origenerator.generation_config import (
     ConfigSnapshot, configs_match, merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.metadata_block import MetadataBlock
+from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
-from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE, THUMB_DIR,
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE,
 )
 from origenerator.paths import ensure_shared_ui_on_path
 
@@ -52,7 +50,6 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 
-_ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
 _RANDOM_SEED_CAPTION = "Generate with Random seed"
 _RANDOM_SEED_TIP = (
@@ -371,9 +368,9 @@ class GenerateConfigPanel(QWidget):
 
     def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
         """The output file + when it was made, at the top of the scroll (shown
-        only while displaying a saved generation). Params — editable or read-only
-        — all live in the form below now, so this block carries only those two
-        facts."""
+        only while displaying a saved generation). Above the form, because it
+        names what the settings below it made. Params — editable or read-only —
+        all live in that form now, so this block carries only those two facts."""
         self._metadata_block = MetadataBlock()
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
@@ -426,9 +423,10 @@ class GenerateConfigPanel(QWidget):
         body.addWidget(self._form_host)
 
     def _build_related_media(self, body: QVBoxLayout) -> None:
-        """The displayed generation's related media, below the form: a clickable
-        source-image tile for a video, or the "animated in" strip for an image,
-        and every version an enhanced image holds. All hidden when the tab isn't
+        """What the generation on display is tied to, below the form: what it
+        was built from and what it was animated into
+        (:class:`~origenerator.gui.related_media.RelatedMedia`), and every
+        version an enhanced image holds. All of it hidden when the tab isn't
         showing a saved generation.
 
         Stacked straight under the form, with no stretch between. A stretch here
@@ -438,16 +436,10 @@ class GenerateConfigPanel(QWidget):
         they went. Every gap in this column is the layout's spacing now, the same
         as between the form's own sections.
         """
-        # One tile, one place: the start frame for a video, and for something a
-        # spoken request made, the item it was asked about — the same kind of
-        # link (this came from that) in the same spot, rather than a second tile
-        # teaching the reader a second place to look.
-        self._source_tile = SourceImageTile()
-        self._source_tile.activated.connect(self.source_activated)
-        body.addWidget(self._source_tile)
-        self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.animated_activated)
-        body.addWidget(self._animated_strip)
+        self._related = RelatedMedia()
+        self._related.source_activated.connect(self.source_activated)
+        self._related.animated_activated.connect(self.animated_activated)
+        body.addWidget(self._related)
         # The preview opens on the most-enhanced version, and this is where the
         # earlier levels (and the original) are, each captioned with what made
         # it and draggable onto the Enhance subpanel to reuse those settings.
@@ -1189,10 +1181,9 @@ class GenerateConfigPanel(QWidget):
         the state of a blank tab, or one whose preview is a bare autoshow rather than
         an explicit selection."""
         self._metadata_block.hide()
+        self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
-        self._source_tile.clear()
-        self._animated_strip.hide()
         for lane in self._lanes.values():
             lane.button.hide()
 
@@ -1210,9 +1201,8 @@ class GenerateConfigPanel(QWidget):
         # image is usually none of them — so it shows only when it has content
         # rather than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
+        self._related.show_row(row, image_rows, self._video_rows(), request)
         self._refresh_versions()
-        self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
-        self._show_source_tile(row, image_rows, request)
         self._show_request_diff(request)
         for lane in self._lanes.values():
             self._update_export_button(lane, preview)
@@ -1372,33 +1362,6 @@ class GenerateConfigPanel(QWidget):
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
 
-    def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
-        """Reveal the source tile for whatever this row was built from, else hide
-        it. The tile shows that item's thumbnail and filename and navigates to it
-        on click.
-
-        For a video that is its start frame. For something a spoken request made
-        it is the item the request was asked about — the same relation in the
-        same place, since a requested image has no start frame and a requested
-        video's start frame is the one it already had.
-        """
-        source_id = find_source_image_id(row, image_rows)
-        source_row = next(
-            (r for r in image_rows if r.get("prompt_id") == source_id), None
-        ) if source_id else None
-        heading = None
-        if source_row is None and request is not None:
-            source_row = request.get("source_row")
-            heading = "Requested from"
-        if not source_row:
-            self._source_tile.clear()
-            return
-        files = row_output_files(source_row)
-        self._source_tile.show_source(
-            source_row["prompt_id"], source_row.get("thumbnail_path"),
-            files[0]["filename"] if files else "", heading=heading,
-        )
-
     def _show_request_diff(self, request):
         """Mark the prompt fields with what a spoken request changed — struck
         through where words went, lit where they arrived.
@@ -1418,21 +1381,6 @@ class GenerateConfigPanel(QWidget):
             ("negative_prompt", request.get("old_negative"), request.get("new_negative")),
         ):
             self._param_form.show_prompt_diff(key, before or "", after or "")
-
-    def _animated_items(self, row: dict) -> list[tuple]:
-        """(prompt_id, looping-preview path, still path) for each video an image
-        was animated into — empty for anything but an image with animations."""
-        if media_type_of_row(row) != "image":
-            return []
-        videos = videos_from_source_image(row, self._video_rows())
-        if len(videos) > _ANIMATED_STRIP_LIMIT:
-            logger.info("Image %s has %d animations; showing the first %d",
-                        row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
-        return [
-            (v["prompt_id"], animated_preview_path(v, COMFYUI_OUTPUT_DIR, THUMB_DIR),
-             v.get("thumbnail_path"))
-            for v in videos[:_ANIMATED_STRIP_LIMIT]
-        ]
 
     def _video_rows(self) -> list[dict]:
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]

@@ -2694,7 +2694,7 @@ def test_committing_a_header_rename_rebuilds_after_the_click_that_ended_it(qtbot
 
 
 def _source_tile(view):
-    return view._info_tabs.current_config_panel()._source_tile
+    return view._info_tabs.current_config_panel()._related._source_tile
 
 
 def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
@@ -3552,7 +3552,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
 
 
 def _animated_strip(view):
-    return view._info_tabs.current_config_panel()._animated_strip
+    return view._info_tabs.current_config_panel()._related._animated_strip
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
@@ -11632,8 +11632,8 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     view._on_thumbnail_clicked(job.prompt_id)
 
     panel = view._info_tabs.current_config_panel()
-    assert not panel._source_tile.isHidden()
-    assert panel._source_tile._prompt_id == "orig"
+    assert not panel._related._source_tile.isHidden()
+    assert panel._related._source_tile._prompt_id == "orig"
 
 
 def test_a_request_item_marks_its_change_in_the_prompt_field(

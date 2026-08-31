@@ -244,9 +244,9 @@ def test_every_column_either_shipped_with_the_table_or_the_migration_adds_it(tab
 def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
     """The table as it was before *dropped* were added, from the snapshot above.
 
-    Reconstructed rather than written out a second time, so this stays honest as
-    the schema grows: what it builds is always today's table minus the columns
-    the migration claims to add.
+    Reconstructed rather than written out a second time, so it stays true as the
+    schema grows: what it builds is always today's table minus the columns the
+    migration claims to add.
     """
     columns = []
     for name, type_, not_null, default, pk in SCHEMA[table]:

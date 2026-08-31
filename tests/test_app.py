@@ -537,3 +537,47 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
             runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 3
+
+
+# Every line the splash shows while the library is maintained, in order. The
+# only text a launch puts on screen before the window, so a pass renamed or
+# dropped changes what the user reads; and in a hosted session, where there is
+# no splash, these are the lines that go to the log instead.
+_SPLASH_LINES = (
+    "Adopting branch-session results...",
+    "Reconnecting to running generations...",
+    "Scanning for new images...",
+    "Tidying up video previews...",
+    "Updating workflow labels...",
+    "Sorting by model and LoRA...",
+    "Linking videos to their source images...",
+    "Folding enhancements into their images...",
+    "Repairing thumbnails...",
+    "Recovering generation times...",
+    "Restoring folder bookmarks...",
+)
+
+
+def test_the_boot_says_the_same_eleven_things_it_always_has():
+    """Eleven, not thirteen: the bookmark adoption runs under the line above it
+    rather than announcing itself, which is what `status=None` on a pass means."""
+    from origenerator.app import MAINTENANCE
+
+    assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
+
+
+def test_a_branch_session_says_only_that_it_is_skipping_and_folding():
+    from origenerator.app import BRANCH_SESSION_MAINTENANCE
+
+    assert tuple(p.status for p in BRANCH_SESSION_MAINTENANCE) == (
+        "Folding enhancements into their images...",)
+
+
+def test_every_pass_says_what_went_wrong_when_something_does():
+    """The one thing all thirteen share: a failure costs one warning line naming
+    the operation, never the launch. A pass with no failure message would report
+    a genuine bug as a bare format string."""
+    from origenerator.app import BRANCH_SESSION_MAINTENANCE, MAINTENANCE
+
+    for boot_pass in (*MAINTENANCE, *BRANCH_SESSION_MAINTENANCE):
+        assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__

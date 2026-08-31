@@ -1,11 +1,8 @@
 """A config tab that is one folder's prompt rewrite rather than one generation.
 
-A tab opened this way is about a FOLDER: it shows the folder's pictures instead
-of a file, its Generate asks for one run per picture rather than one run, its
-name is the folder's, and it refuses a press that has rewritten nothing. That is
-a distinct state of the tab, and it lives here rather than in the panel because
-the panel has a dozen other things to be about and this one has four questions
-and no Qt in it.
+:class:`FolderRequest` is that state, and the words the tab wears while it is in
+it. Kept out of the panel because the panel has a dozen other things to be about
+and this has four questions and no Qt in it.
 """
 
 from __future__ import annotations

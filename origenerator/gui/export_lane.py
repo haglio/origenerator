@@ -1,11 +1,7 @@
 """The lanes a finished clip is handed down to a sibling app.
 
-Both are the same errand — copy the video on display into the inbox Evolver
-watches, then stamp the row so the send survives a restart — and they differ in
-nothing but the fields of :class:`ExportLane`. Written out twice they were fifty
-lines of code with four literals swapped, and the config panel's own docstring
-said so; a third lane would have been a third copy. It is a row of the table at
-the bottom of this module now.
+One :class:`ExportLane` per lane, and :data:`EXPORT_LANES` is all of them, in
+the order their buttons sit in the config tab's bank.
 """
 
 from __future__ import annotations
@@ -60,7 +56,7 @@ class ExportLane:
 
     @property
     def sent_caption(self) -> str:
-        return f"Sent to {self.name} \u2713"
+        return f"Sent to {self.name} ✓"
 
     @property
     def failure_title(self) -> str:

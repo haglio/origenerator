@@ -690,6 +690,7 @@ class GalleryView(QWidget):
         if app is not None:
             app.installEventFilter(self)
 
+        self._poll_inflight = False  # a tick's reads are out; don't stack more
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
@@ -2159,32 +2160,52 @@ class GalleryView(QWidget):
             self.fill_the_regions()
 
     def _poll(self):
-        # Every blocking read the tick makes of ComfyUI is batched in one fetch
-        # (see _fetch_poll_facts); what comes back is applied job by job.
+        """One tick: fetch every blocking read away from the GUI, apply here.
+
+        The tick used to make its HTTP calls inline — with a 2.0 s socket
+        timeout inside a 1.5 s timer, so a wedged ComfyUI froze the window for
+        most of every tick. The reads now run on the pool
+        (:func:`_fetch_poll_facts`) and :meth:`_finish_poll` applies them back
+        on this thread. A tick that fires while the last one's reads are still
+        out is skipped rather than stacked, so a slow server thins the refresh
+        instead of queueing freezes.
+        """
+        if self._poll_inflight:
+            return
+        self._poll_inflight = True
         jobs = self._reroll.all_jobs
-        facts = _fetch_poll_facts(self._client,
-                                  [(job.prompt_id, job.state) for job in jobs])
-        self._apply_poll_facts(jobs, facts)
-        rows = self._db.list_generations()
-        meta = self._db.folder_meta_map()
-        fingerprint = _fingerprint(rows, meta)
-        if fingerprint != self._fingerprint:
-            self._fingerprint = fingerprint
-            self._rebuild(rows, meta)
-        else:
-            # No DB change, but the in-flight cards still need each running
-            # re-roll's live frame pushed in — it advances between rebuilds.
-            # Wherever they were drawn: the Recents shelf, or a folder with a
-            # batch of them cooking in it.
-            self._browser.refresh_inflight()
-        # The bottom strip is always on screen, so refresh it every tick — its
-        # rows' live frames and progress advance between rebuilds.
-        self._update_queue()
-        # And a show's corner, for the same reason and one more: a run starting
-        # is not a change to any row, so nothing else here would tell the show
-        # its held slide went from waiting to being made.
-        self._feed_slideshow_enhancing()
-        self._refresh_wait_note()
+        targets = [(job.prompt_id, job.state) for job in jobs]
+        client = self._client
+        self._run_off_thread(lambda: _fetch_poll_facts(client, targets),
+                             lambda facts: self._finish_poll(jobs, facts))
+
+    def _finish_poll(self, jobs, facts):
+        """The GUI half of a tick, once its reads have landed."""
+        try:
+            if facts is not None:  # None only if the batched fetch itself died
+                self._apply_poll_facts(jobs, facts)
+            rows = self._db.list_generations()
+            meta = self._db.folder_meta_map()
+            fingerprint = _fingerprint(rows, meta)
+            if fingerprint != self._fingerprint:
+                self._fingerprint = fingerprint
+                self._rebuild(rows, meta)
+            else:
+                # No DB change, but the in-flight cards still need each running
+                # re-roll's live frame pushed in — it advances between rebuilds.
+                # Wherever they were drawn: the Recents shelf, or a folder with
+                # a batch of them cooking in it.
+                self._browser.refresh_inflight()
+            # The bottom strip is always on screen, so refresh it every tick —
+            # its rows' live frames and progress advance between rebuilds.
+            self._update_queue()
+            # And a show's corner, for the same reason and one more: a run
+            # starting is not a change to any row, so nothing else here would
+            # tell the show its held slide went from waiting to being made.
+            self._feed_slideshow_enhancing()
+            self._refresh_wait_note()
+        finally:
+            self._poll_inflight = False
 
     def _apply_poll_facts(self, jobs, facts: "_PollFacts"):
         """Apply one tick's fetched answers, in the order the inline calls ran.

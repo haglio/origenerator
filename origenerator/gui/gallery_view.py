@@ -2180,13 +2180,35 @@ class GalleryView(QWidget):
                              lambda facts: self._finish_poll(jobs, facts))
 
     def _finish_poll(self, jobs, facts):
-        """The GUI half of a tick, once its reads have landed."""
+        """Apply a tick's ComfyUI answers, then send its database reads out too.
+
+        Applying before reading is load-bearing: reconciliation can land a
+        completion's row, and the listing read next must see it rather than lag
+        it a tick. The listing — two whole-table SELECTs and the requests
+        table, the tick's other blocking work — is read on the pool and lands
+        in :meth:`_finish_poll_rebuild`.
+        """
         try:
             if facts is not None:  # None only if the batched fetch itself died
                 self._apply_poll_facts(jobs, facts)
-            rows = self._db.list_generations()
-            meta = self._db.folder_meta_map()
-            fingerprint = _fingerprint(rows, meta)
+        except Exception:
+            self._poll_inflight = False
+            raise
+        db = self._db
+
+        def read_listing():
+            rows = db.list_generations()
+            meta = db.folder_meta_map()
+            return rows, meta, db.list_requests(), _fingerprint(rows, meta)
+
+        self._run_off_thread(read_listing, self._finish_poll_rebuild)
+
+    def _finish_poll_rebuild(self, listing):
+        """The tick's last hop: fold the freshly read listing into the panes."""
+        try:
+            if listing is None:  # only if the read itself died
+                return
+            rows, meta, requests, fingerprint = listing
             if fingerprint != self._fingerprint:
                 self._fingerprint = fingerprint
                 self._rebuild(rows, meta)
@@ -2195,10 +2217,12 @@ class GalleryView(QWidget):
                 # re-roll's live frame pushed in — it advances between rebuilds.
                 # Wherever they were drawn: the Recents shelf, or a folder with
                 # a batch of them cooking in it.
-                self._browser.refresh_inflight()
+                self._browser.refresh_inflight(rows=rows, requests=requests)
             # The bottom strip is always on screen, so refresh it every tick —
-            # its rows' live frames and progress advance between rebuilds.
-            self._update_queue()
+            # its rows' live frames and progress advance between rebuilds. The
+            # listing already in hand feeds it, so the strip costs the tick no
+            # further table reads.
+            self._update_queue(self._inflight_items(rows=rows, requests=requests))
             # And a show's corner, for the same reason and one more: a run
             # starting is not a change to any row, so nothing else here would
             # tell the show its held slide went from waiting to being made.
@@ -6187,10 +6211,10 @@ class GalleryView(QWidget):
         # button never fires — and it went on offering a show of nothing.
         self._sync_slideshow_button()
 
-    def _inflight_items(self) -> list:
-        return self._browser.inflight_items()
+    def _inflight_items(self, rows=None, requests=None) -> list:
+        return self._browser.inflight_items(rows=rows, requests=requests)
 
-    def _update_queue(self):
+    def _update_queue(self, inflight=None):
         """Feed the bottom strip every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
@@ -6206,8 +6230,12 @@ class GalleryView(QWidget):
         covers, which is the one stretch where the line deliberately stops
         moving, and once for the slides themselves, since a run that has begun to
         look like something is a slide of that show (:meth:`_feed_slideshow_in_flight`).
+
+        ``inflight`` is the already-built card list, when the caller (the poll)
+        holds one; every other caller lets it be built fresh here.
         """
-        items = self._inflight_items() + list(self._launching.values())
+        items = (self._inflight_items() if inflight is None else inflight) \
+            + list(self._launching.values())
         self._queue.set_items(items, self._foreign_queue.total)
         if self._slideshow is not None:
             self._slideshow.set_queue(items, self._foreign_queue.total)

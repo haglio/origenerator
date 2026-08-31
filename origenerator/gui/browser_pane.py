@@ -675,7 +675,7 @@ class BrowserPane(QObject):
         self._thumb_widgets[row["prompt_id"]] = tw
         return tw
 
-    def _visible_inflight_items(self) -> list:
+    def _visible_inflight_items(self, rows=None, requests=None) -> list:
         """The in-flight items the shelf draws: what the gallery's media-type
         filter keeps and the side the shelf belongs to, less the enhancements.
         The full set still decides whether the shelf exists at all; this narrows
@@ -692,7 +692,7 @@ class BrowserPane(QObject):
         """
         media_types = self._host.media_types()
         side = self._shelf_orientation
-        return [it for it in self.inflight_items()
+        return [it for it in self.inflight_items(rows=rows, requests=requests)
                 if it.media_type in media_types
                 and it.job_kind != ENHANCE_KIND
                 and (side is None or it.orientation == side)]
@@ -719,9 +719,10 @@ class BrowserPane(QObject):
         base, _orientation = split_key(self._tree.selected_folder_key())
         return base == RECENTS_KEY
 
-    def refresh_inflight(self):
+    def refresh_inflight(self, rows=None, requests=None):
         """Between rebuilds, keep the in-flight cards live: push each tracked
-        re-roll's latest frame into its card.
+        re-roll's latest frame into its card. The poll passes the listing it
+        already read (``rows``/``requests``); left off, they are read here.
 
         Whichever pane drew them — the Recents shelf, or a settings folder with
         a batch cooking in it. Only the shelf re-renders on a change to the
@@ -732,7 +733,7 @@ class BrowserPane(QObject):
         """
         if not self._inflight_cards and not self.showing_recents():
             return
-        items = self._visible_inflight_items()
+        items = self._visible_inflight_items(rows, requests)
         if (self.showing_recents()
                 and _inflight_signature(items) != self._inflight_signature):
             self._render_recents()
@@ -743,7 +744,7 @@ class BrowserPane(QObject):
             if card is not None:
                 card.update_item(item)
 
-    def inflight_items(self) -> list:
+    def inflight_items(self, rows=None, requests=None) -> list:
         """Every queued/running generation as a card model, in the order the queue
         will work through them.
 
@@ -763,7 +764,9 @@ class BrowserPane(QObject):
         The strip's rows carry more than the shelf's cards do — a price, a kind, a
         picture of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
-        costs one listing whatever the queue is showing.
+        costs one listing whatever the queue is showing. ``rows``/``requests``
+        take a listing the caller already read (the poll reads its own on the
+        pool); left off, both tables are read here.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._reroll.jobs_by_folder.items()
@@ -774,11 +777,13 @@ class BrowserPane(QObject):
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
         requested = {r["prompt_id"]: r["source_prompt_id"]
-                     for r in self._db.list_requests()}
+                     for r in (self._db.list_requests()
+                               if requests is None else requests)}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
-        rows = self._db.list_generations()
+        if rows is None:
+            rows = self._db.list_generations()
         # Every row's thumbnail, so a combine's run can show the video its
         # settings came from. Off the listing already in hand rather than a query
         # per job: the recipe video is an ordinary finished row somewhere in it.

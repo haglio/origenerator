@@ -187,9 +187,12 @@ class BrowserPane(QObject):
     drag_ended = pyqtSignal()
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
 
-    def __init__(self, view):
+    def __init__(self, view, db, reroll, auto):
         super().__init__()
         self._v = view
+        self._db = db          # the generations the cards and corners re-read
+        self._reroll = reroll  # the live jobs and the queue's own line
+        self._auto = auto      # whether a folder is auto-generating (its card says)
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
         self._visible_ids: list[str] = []   # generations on screen, in shown order
@@ -710,19 +713,19 @@ class BrowserPane(QObject):
         costs one listing whatever the queue is showing.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
-                         for key, jobs in self._v._reroll.jobs_by_folder.items()
+                         for key, jobs in self._reroll.jobs_by_folder.items()
                          for job in jobs}
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
-        held = {job.prompt_id for job in self._v._reroll.held_jobs()}
+        held = {job.prompt_id for job in self._reroll.held_jobs()}
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
         requested = {r["prompt_id"]: r["source_prompt_id"]
-                     for r in self._v._db.list_requests()}
+                     for r in self._db.list_requests()}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
-        rows = self._v._db.list_generations()
+        rows = self._db.list_generations()
         # Every row's thumbnail, so a combine's run can show the video its
         # settings came from. Off the listing already in hand rather than a query
         # per job: the recipe video is an ordinary finished row somewhere in it.
@@ -759,7 +762,7 @@ class BrowserPane(QObject):
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another.
-                auto_generating=self._v._auto.is_active(folder_key),
+                auto_generating=self._auto.is_active(folder_key),
                 foreign_ahead=foreign,
                 held=pid in held,
                 started_at=started,
@@ -791,7 +794,7 @@ class BrowserPane(QObject):
                                   else thumb_by_id.get(row.get("recipe_video_id"))),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
-        place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
+        place = {pid: i for i, pid in enumerate(self._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    it.status != "running"))
         return items
@@ -848,7 +851,7 @@ class BrowserPane(QObject):
         since this list is rebuilt on every poll."""
         if workflow_name not in cache:
             cache[workflow_name] = timing.estimate_seconds(
-                self._v._db.recent_durations(workflow_name)
+                self._db.recent_durations(workflow_name)
             )
         return cache[workflow_name]
 
@@ -1239,7 +1242,7 @@ class BrowserPane(QObject):
         almost all of them — the listing behind the cards is only built once
         there is a card to build.
         """
-        leading = self._v._reroll.job_for(group.key)
+        leading = self._reroll.job_for(group.key)
         in_front = leading.prompt_id if leading is not None else None
         waiting = [row["prompt_id"] for row in group.rows
                    if not gallery.produced_output(row)
@@ -1417,6 +1420,6 @@ class BrowserPane(QObject):
         none of those tiles were touched, so nothing else would tell them.
         """
         for prompt_id, tile in self._thumb_widgets.items():
-            row = self._v._db.get_generation(prompt_id)
+            row = self._db.get_generation(prompt_id)
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))

@@ -592,7 +592,7 @@ class GalleryView(QWidget):
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
         # and owns the thumbnail multi-selection and in-flight cards. Its signals
         # carry every gesture made on a tile; the handlers here answer them.
-        self._browser = BrowserPane(self)
+        self._browser = BrowserPane(self, db, self._reroll, self._auto)
         self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._browser.tab_pin_requested.connect(self.pin_config_tab)
         self._browser.item_jump_requested.connect(self._on_source_link)

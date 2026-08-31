@@ -7340,11 +7340,11 @@ class _FakeRerollJob:
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
 
-    def reconcile(self):
-        pass  # the poll pings this on every tracked re-roll; nothing to do here
+    def reconcile_with(self, history):
+        pass  # the poll applies /history on every tracked re-roll; nothing here
 
-    def refresh_backlog(self):
-        pass  # the poll re-reads the queue position here; the fake's is fixed
+    def take_backlog(self, foreign_ahead):
+        pass  # the poll applies the queue position here; the fake's is fixed
 
     def cancel(self):
         self.state = "canceled"
@@ -12506,3 +12506,59 @@ def test_a_queue_items_cancel_drops_that_run(qtbot):
 
     assert view._reroll.jobs_by_folder.get(folder_key, []) == []
     assert db.get_generation("rr1") is None
+
+
+# --- the poll's batched fetch: every blocking read of one tick, in one place --
+
+
+def test_the_poll_fetch_asks_only_what_each_jobs_state_deserves():
+    calls = []
+
+    class _Client:
+        def fetch_history(self, prompt_id):
+            calls.append(("history", prompt_id))
+            return {"outputs": {}}
+
+        def foreign_backlog(self, prompt_id):
+            calls.append(("backlog", prompt_id))
+            return 2
+
+        def foreign_queue(self):
+            calls.append(("queue", None))
+            return ForeignQueue(running=[], pending=[])
+
+    facts = gallery_view_module._fetch_poll_facts(
+        _Client(),
+        [("q1", "queued"), ("r1", "running"), ("f1", "finished")])
+
+    # /history for a job that may have quietly finished; a queue position only
+    # for one still waiting; nothing at all for a terminal job; the shared
+    # queue once.
+    assert calls == [("history", "q1"), ("backlog", "q1"),
+                     ("history", "r1"), ("queue", None)]
+    assert set(facts.histories) == {"q1", "r1"}
+    assert facts.backlogs == {"q1": 2}
+
+
+def test_the_poll_fetch_fails_soft_read_by_read():
+    class _Wedged:
+        def fetch_history(self, prompt_id):
+            raise OSError("connection refused")
+
+        def foreign_backlog(self, prompt_id):
+            raise OSError("connection refused")
+
+        def foreign_queue(self):
+            raise OSError("connection refused")
+
+    facts = gallery_view_module._fetch_poll_facts(_Wedged(), [("q1", "queued")])
+
+    assert facts.histories == {}          # nothing fetched: reconcile skips it
+    assert facts.backlogs == {"q1": None}  # an unreadable position clears the count
+    assert facts.foreign.total == 0        # an unreadable queue claims nothing
+
+
+def test_the_poll_fetch_reads_nothing_with_no_client():
+    facts = gallery_view_module._fetch_poll_facts(None, [("q1", "queued")])
+
+    assert facts == gallery_view_module._PollFacts({}, {}, None)

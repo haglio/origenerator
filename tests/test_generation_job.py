@@ -173,46 +173,44 @@ def test_completion_detaches_so_later_signals_are_ignored(qtbot, tmp_path):
 
 
 def test_reconcile_finishes_a_job_whose_live_completion_was_missed(qtbot, tmp_path):
-    # The websocket completion is a one-shot; if it never arrives, reconcile()
-    # pulls /history as a backstop and finishes the job just as the signal would.
-    job, client = _started_job(tmp_path)
-    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
+    # The websocket completion is a one-shot; if it never arrives, the poll
+    # fetches /history as a backstop and this applies it, finishing the job
+    # just as the signal would have.
+    job, _client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda files, thumb, dur: finished.append(files))
 
-    job.reconcile()  # no job_completed was ever emitted
+    job.reconcile_with(SDXL_HISTORY)  # no job_completed was ever emitted
 
-    client.fetch_history.assert_called_once_with("comfy-A")
     assert finished == [[{"filename": "a.png", "subfolder": ""}]]
     assert job.state == "finished"
 
 
 def test_reconcile_is_a_noop_while_the_prompt_is_still_running(qtbot, tmp_path):
-    # A queued/running prompt isn't in /history yet, so reconcile leaves it be.
-    job, client = _started_job(tmp_path)
-    client.fetch_history = MagicMock(return_value={})
+    # A queued/running prompt isn't in /history yet, so its fetch comes back
+    # empty — and a tick that fetched nothing at all applies None.
+    job, _client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
 
-    job.reconcile()
+    job.reconcile_with({})
+    job.reconcile_with(None)
 
     assert finished == []
     assert job.state == "queued"
 
 
 def test_reconcile_does_nothing_once_the_job_has_finished(qtbot, tmp_path):
-    # After the live signal completed it, the backstop must not re-fire or re-fetch.
+    # After the live signal completed it, the backstop must not re-fire.
     job, client = _started_job(tmp_path)
     finished = []
     job.finished.connect(lambda *a: finished.append(a))
     client.job_completed.emit("comfy-A", SDXL_HISTORY)
     assert len(finished) == 1
 
-    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
-    job.reconcile()
+    job.reconcile_with(SDXL_HISTORY)
 
     assert len(finished) == 1
-    client.fetch_history.assert_not_called()
 
 
 def test_error_for_our_id_emits_failed(qtbot, tmp_path):
@@ -373,28 +371,24 @@ def test_detach_stops_reacting_without_touching_server(qtbot, tmp_path):
 
 # --- what another app is holding ComfyUI with, ahead of a job it hasn't started
 
-def test_refresh_backlog_reads_another_apps_hold_while_the_job_waits(qtbot, tmp_path):
-    job, client = _started_job(tmp_path)
-    client.foreign_backlog = MagicMock(return_value=3)
+def test_take_backlog_holds_another_apps_count_while_the_job_waits(qtbot, tmp_path):
+    job, _client = _started_job(tmp_path)
 
-    job.refresh_backlog()
+    job.take_backlog(3)
 
-    client.foreign_backlog.assert_called_once_with("comfy-A")
     assert job.foreign_ahead == 3
 
 
 def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    client.foreign_backlog = MagicMock(return_value=3)
-    job.refresh_backlog()
+    job.take_backlog(3)
 
     client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
 
     assert job.state == "running"
     assert job.foreign_ahead is None  # the count clears the moment it's ours
-    job.refresh_backlog()
+    job.take_backlog(3)  # a count fetched for a job no longer queued is dropped
     assert job.foreign_ahead is None
-    client.foreign_backlog.assert_called_once()  # and isn't asked for again
 
 
 # --- what the queue needs of a job it has not sent yet -----------------------
@@ -463,13 +457,12 @@ def test_a_re_adopted_job_reports_the_run_it_is_finally_given(qtbot, tmp_path):
 
 
 def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
-    # A count that outlived the read behind it would be a worse lie than none.
-    job, client = _started_job(tmp_path)
-    client.foreign_backlog = MagicMock(return_value=2)
-    job.refresh_backlog()
+    # A count that outlived the read behind it would be a worse lie than none:
+    # a failed fetch arrives as None, and None replaces what was showing.
+    job, _client = _started_job(tmp_path)
+    job.take_backlog(2)
     assert job.foreign_ahead == 2
 
-    client.foreign_backlog = MagicMock(side_effect=OSError("connection refused"))
-    job.refresh_backlog()
+    job.take_backlog(None)
 
     assert job.foreign_ahead is None

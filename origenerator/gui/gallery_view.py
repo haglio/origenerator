@@ -2159,16 +2159,12 @@ class GalleryView(QWidget):
             self.fill_the_regions()
 
     def _poll(self):
-        # Backstop for a missed completion frame: finish any re-roll ComfyUI has
-        # already completed so it lands here without a restart. Reconcile fires
-        # each job's own finished/failed handler, which persists and refreshes.
-        for job in self._reroll.all_jobs:
-            job.reconcile()
-            # And re-read what another app has in front of a job ComfyUI hasn't
-            # started, so that wait shows a number instead of an unmoving bar
-            # (see GenerationJob.refresh_backlog).
-            job.refresh_backlog()
-        self._refresh_foreign_queue()
+        # Every blocking read the tick makes of ComfyUI is batched in one fetch
+        # (see _fetch_poll_facts); what comes back is applied job by job.
+        jobs = self._reroll.all_jobs
+        facts = _fetch_poll_facts(self._client,
+                                  [(job.prompt_id, job.state) for job in jobs])
+        self._apply_poll_facts(jobs, facts)
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
         fingerprint = _fingerprint(rows, meta)
@@ -2189,6 +2185,23 @@ class GalleryView(QWidget):
         # its held slide went from waiting to being made.
         self._feed_slideshow_enhancing()
         self._refresh_wait_note()
+
+    def _apply_poll_facts(self, jobs, facts: "_PollFacts"):
+        """Apply one tick's fetched answers, in the order the inline calls ran.
+
+        Reconciling first is load-bearing: finishing a missed completion fires
+        the job's own finished handler, which persists its row — so the rows
+        this tick then reads see the completion rather than lagging it a tick.
+        """
+        for job in jobs:
+            # Backstop for a missed completion frame: finish any re-roll
+            # ComfyUI has already completed so it lands without a restart.
+            job.reconcile_with(facts.histories.get(job.prompt_id))
+            # And what another app has in front of a job ComfyUI hasn't
+            # started, so that wait shows a number instead of an unmoving bar.
+            job.take_backlog(facts.backlogs.get(job.prompt_id))
+        if facts.foreign is not None:
+            self._foreign_queue = facts.foreign
 
     def _rebuild(self, rows, meta):
         expanded = self._tree_view.expanded_keys()
@@ -6188,16 +6201,9 @@ class GalleryView(QWidget):
         nowhere. ComfyUI outlives every app that queues on it, so that backlog can
         be a branch preview's background experiments that outlived the preview.
         """
-        if self._client is None:
-            return
-        try:
-            self._foreign_queue = self._client.foreign_queue()
-        except Exception as e:
-            # Unreadable (server down, wedged, restarting): claim nothing rather
-            # than leave a stale count on screen offering to clear a queue we
-            # can no longer see.
-            logger.debug("Could not read ComfyUI's queue: %s", e)
-            self._foreign_queue = ForeignQueue(running=[], pending=[])
+        queue = _read_foreign_queue(self._client)
+        if queue is not None:
+            self._foreign_queue = queue
 
     def _clear_foreign_queue(self):
         """Wipe another app's work off ComfyUI, on the user's say-so.
@@ -7124,6 +7130,58 @@ def _group_workflow(group) -> str | None:
         return group.workflow_name
     rows = gallery.rows_under(group)  # model or settings folder: ask its rows
     return rows[0]["workflow_name"] if rows else None
+
+
+class _PollFacts(NamedTuple):
+    """One tick's answers from ComfyUI, fetched together and applied together."""
+
+    histories: dict  # prompt_id -> its /history, for jobs that may have finished
+    backlogs: dict   # prompt_id -> another app's jobs ahead of it (None unread)
+    foreign: object  # the shared queue's state, or None for nothing-to-read
+
+
+def _fetch_poll_facts(client, targets) -> _PollFacts:
+    """Every blocking read one poll tick makes of ComfyUI, batched.
+
+    ``targets`` is ``(prompt_id, state)`` per live job at tick time — names and
+    strings rather than the job objects, so nothing here touches GUI-owned
+    state. /history is pulled for a job whose completion could have been
+    missed, the queue position for one still waiting, and the shared queue once
+    for the strip. Each read fails soft, exactly as it did when made inline: a
+    fetch that raises leaves its entry unread rather than failing the tick.
+    """
+    histories, backlogs = {}, {}
+    if client is not None:
+        for prompt_id, state in targets:
+            if state in ("queued", "running"):
+                try:
+                    histories[prompt_id] = client.fetch_history(prompt_id)
+                except Exception as e:
+                    logger.debug("Reconcile fetch failed for %s: %s", prompt_id, e)
+            if state == "queued":
+                try:
+                    backlogs[prompt_id] = client.foreign_backlog(prompt_id)
+                except Exception as e:
+                    logger.debug("Could not read the queue position of %s: %s",
+                                 prompt_id, e)
+                    backlogs[prompt_id] = None
+    return _PollFacts(histories, backlogs, _read_foreign_queue(client))
+
+
+def _read_foreign_queue(client):
+    """The shared ComfyUI queue's current state, ``None`` with no client to ask.
+
+    Unreadable (server down, wedged, restarting) claims nothing rather than
+    leave a stale count on screen offering to clear a queue we can no longer
+    see.
+    """
+    if client is None:
+        return None
+    try:
+        return client.foreign_queue()
+    except Exception as e:
+        logger.debug("Could not read ComfyUI's queue: %s", e)
+        return ForeignQueue(running=[], pending=[])
 
 
 def _fingerprint(rows, meta) -> int:

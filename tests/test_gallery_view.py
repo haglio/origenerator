@@ -2706,7 +2706,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     view = GalleryView(FakeDB([video, image]), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs._config_panels():
+    for panel in view._info_tabs.config_panels():
         panel._preview.show_media = MagicMock()  # don't start WMF playback
 
     # Viewing the video shows a tile pointing back to the image it was built from.
@@ -3583,7 +3583,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs._config_panels():
+    for panel in view._info_tabs.config_panels():
         panel._preview.show_media = MagicMock()  # don't start WMF playback
 
     view._on_thumbnail_clicked("vid1")   # a video isn't "animated into" anything
@@ -4044,7 +4044,7 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
     view = GalleryView(FakeDB(rows), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
-    for panel in view._info_tabs._config_panels():
+    for panel in view._info_tabs.config_panels():
         panel._preview.show_media = MagicMock()
 
     view._on_thumbnail_clicked("v1")

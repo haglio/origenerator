@@ -64,7 +64,7 @@ def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
 def test_starts_with_one_editable_config_tab(tabs):
     assert tabs.count() == 1
     assert isinstance(tabs.widget(0), GenerateConfigPanel)
-    assert tabs._config_panels() == [tabs.widget(0)]
+    assert tabs.config_panels() == [tabs.widget(0)]
 
 
 def test_uses_the_eliding_tab_bar(tabs):
@@ -116,7 +116,7 @@ def test_a_double_click_on_a_tab_never_asks_for_a_name(tabs, monkeypatch):
 
 def test_config_panels_includes_the_first_tab(tabs):
     tabs._add_subtab()
-    assert len(tabs._config_panels()) == 2
+    assert len(tabs.config_panels()) == 2
 
 
 def test_add_subtab_increases_count_and_focuses_new(tabs):
@@ -128,7 +128,7 @@ def test_add_subtab_increases_count_and_focuses_new(tabs):
 def test_close_subtab_removes_the_panel(tabs):
     panel = tabs._add_subtab()
     tabs._close_subtab(tabs.indexOf(panel))
-    assert tabs._config_panels() == [tabs.widget(0)]
+    assert tabs.config_panels() == [tabs.widget(0)]
 
 
 def test_the_pane_carries_no_corner_controls(tabs):
@@ -162,7 +162,7 @@ def test_the_tab_menu_closes_everything_to_the_right(tabs):
 
     tabs._close_subtabs_to_the_right(tabs.indexOf(second))
 
-    assert tabs._config_panels() == [first, second]  # the ones at or before it
+    assert tabs.config_panels() == [first, second]  # the ones at or before it
 
 
 def test_the_tab_menu_offers_exactly_those_three_closes(tabs):
@@ -330,7 +330,7 @@ def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):
 def _two_generations(tabs):
     cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
     dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
-    for panel in tabs._config_panels():
+    for panel in tabs.config_panels():
         panel._preview.show_media = MagicMock()
     return cat, dog
 
@@ -675,7 +675,7 @@ def test_the_run_a_tab_launched_survives_a_restart(tabs, qtbot):
     qtbot.addWidget(fresh)
     fresh.restore_state(tabs.capture_state())
 
-    assert fresh._config_panels()[0].launched_runs() == ["run-77"]
+    assert fresh.config_panels()[0].launched_runs() == ["run-77"]
 
 
 def test_a_tab_that_never_generated_claims_no_run(tabs, qtbot):
@@ -683,7 +683,7 @@ def test_a_tab_that_never_generated_claims_no_run(tabs, qtbot):
     qtbot.addWidget(fresh)
     fresh.restore_state(tabs.capture_state())
 
-    assert fresh._config_panels()[0].launched_runs() == []
+    assert fresh.config_panels()[0].launched_runs() == []
 
 
 def test_capture_state_lists_every_tab_and_current(tabs):
@@ -727,7 +727,7 @@ def test_restore_state_rebuilds_config_tabs(tabs):
         _config_tab("sdxl_t2i", {"seed": 99}, seed_is_random=False),
     ], "current": 1}
     tabs.restore_state(state)
-    panels = tabs._config_panels()
+    panels = tabs.config_panels()
     assert len(panels) == 2  # every prior tab was replaced
     assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
     assert panels[0]._param_form.get_values_static()["positive_prompt"] == "a fox"
@@ -740,7 +740,7 @@ def test_restore_state_skips_unknown_workflows(tabs):
     tabs.restore_state({"tabs": [
         _config_tab("deleted_wf"), _config_tab("wan22_i2v"),
     ]})
-    panels = tabs._config_panels()
+    panels = tabs.config_panels()
     assert len(panels) == 1
     assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
 
@@ -748,7 +748,7 @@ def test_restore_state_skips_unknown_workflows(tabs):
 def test_restore_state_keeps_the_initial_tab_when_nothing_restorable(tabs):
     tabs.restore_state({})
     tabs.restore_state({"tabs": [_config_tab("gone")]})
-    assert len(tabs._config_panels()) == 1  # the initial tab is left in place
+    assert len(tabs.config_panels()) == 1  # the initial tab is left in place
     assert tabs.count() == 1
 
 
@@ -757,7 +757,7 @@ def test_restore_state_tolerates_malformed_blobs(tabs):
     tabs.restore_state("not a dict")
     tabs.restore_state({"tabs": "not a list"})
     tabs.restore_state({"tabs": ["not a dict", {"config": {"workflow_name": "wan22_i2v"}}]})
-    panels = tabs._config_panels()
+    panels = tabs.config_panels()
     assert len(panels) == 1  # only the one valid entry survived
     assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
 
@@ -789,7 +789,7 @@ def test_capture_restore_round_trips_config(tabs, qtbot):
     qtbot.addWidget(fresh)
     fresh.restore_state(captured)
 
-    panels = fresh._config_panels()
+    panels = fresh.config_panels()
     assert [p._workflow_combo.currentData() for p in panels] == ["sdxl_t2i", "wan22_i2v"]
     assert panels[1]._param_form.get_values_static()["seed"] == 7
     # A tab is named by what it shows, so its name comes back with its config.

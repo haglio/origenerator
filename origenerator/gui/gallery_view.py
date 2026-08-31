@@ -1351,7 +1351,7 @@ class GalleryView(QWidget):
         browser_box.addLayout(bottom)
 
         self._info_tabs.tab_added.connect(self._wire_config_panel)
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
         self._info_tabs.currentChanged.connect(self._on_front_tab_changed)
         # Quitting mid-drive still releases the device — park it and restore genau —
@@ -2010,7 +2010,7 @@ class GalleryView(QWidget):
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now behind another still shows there.
         """
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
                     if (job := self._reroll.job_for_origin(origin)) is not None]
             panel.forget_launched({origin for origin in panel.launched_runs()
@@ -2316,7 +2316,7 @@ class GalleryView(QWidget):
         # A generation landing or leaving can make an open tab's pinned seed one that
         # would reproduce it — or stop it being one — with nothing on the form having
         # moved, so every tab re-reads what its Generate would now do.
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             panel.refresh_generate_caption()
 
     def _build_sides(self, rows, meta, unreviewed, held, requested):
@@ -3740,7 +3740,7 @@ class GalleryView(QWidget):
         The panel holds the settings and the tabs hold the images, so the card
         can only know whether it would be making a duplicate once the two meet —
         here, on every edit and every rebuild."""
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             panel.set_enhance_settings(self._enhance_settings)
 
     def _on_enhance_settings_changed(self, settings):
@@ -4639,7 +4639,7 @@ class GalleryView(QWidget):
             # Every tab showing this image, not just the front one — the delete
             # can come from a tab that isn't in front, and a stale list would
             # still be offering a version that is gone.
-            for panel in self._info_tabs._config_panels():
+            for panel in self._info_tabs.config_panels():
                 shown = panel.displayed_row()
                 if shown is not None and shown.get("prompt_id") == prompt_id:
                     panel.show_completed_result(updated, self._image_rows)
@@ -4662,7 +4662,7 @@ class GalleryView(QWidget):
         first.
         """
         running = self._enhance_jobs()
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             row = panel.displayed_row()
             panel.set_pending_enhancement(
                 self._pending_enhancement_for(row, running) if row else None

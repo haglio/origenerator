@@ -73,7 +73,7 @@ def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
     ], "current": 2})
     win = _window(qtbot, tmp_path, state)
 
-    panels = win._gallery_view._info_tabs._config_panels()
+    panels = win._gallery_view._info_tabs.config_panels()
     assert len(panels) == 2
     assert panels[1]._workflow_combo.currentData() == "wan22_i2v"
 

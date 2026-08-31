@@ -590,8 +590,25 @@ class GalleryView(QWidget):
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
-        # and owns the thumbnail multi-selection and in-flight cards.
+        # and owns the thumbnail multi-selection and in-flight cards. Its signals
+        # carry every gesture made on a tile; the handlers here answer them.
         self._browser = BrowserPane(self)
+        self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
+        self._browser.tab_pin_requested.connect(self.pin_config_tab)
+        self._browser.item_jump_requested.connect(self._on_source_link)
+        self._browser.folder_open_requested.connect(self._open_folder_tile)
+        self._browser.reveal_reroll_requested.connect(self._reveal_reroll)
+        self._browser.folder_menu_requested.connect(self._folder_context_menu)
+        self._browser.menu_requested.connect(self.generation_menu)
+        self._browser.trash_menu_requested.connect(self._trash_menu)
+        self._browser.item_action_triggered.connect(self.run_item_action)
+        self._browser.seed_reroll_requested.connect(self._reroll_item_seed)
+        self._browser.experiment_verdict.connect(self._on_experiment_verdict)
+        self._browser.trash_action_triggered.connect(self._on_trash_action)
+        self._browser.cancel_requested.connect(self._cancel_job)
+        self._browser.drag_started.connect(self._on_generation_drag_started)
+        self._browser.drag_ended.connect(self._on_generation_drag_ended)
+        self._browser.selection_changed.connect(self._sync_action_buttons)
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
@@ -2696,6 +2713,17 @@ class GalleryView(QWidget):
             self._browser.show_custom_folder(group)
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group))
+
+    def _open_folder_tile(self, key: str):
+        """A folder tile was clicked: select its tree row, which draws the folder.
+        Clicking one is a decision to go there, so it puts a running search away
+        first — a search's results are folder tiles too, and this is how they
+        open; without it the box would still be full while the pane shows the
+        folder it drilled into."""
+        item = self._tree_item_for(key)
+        if item is not None:
+            self._leave_search()
+            self._tree.setCurrentItem(item)
 
     # --- several folders at once: the folder they would make ------------------
 
@@ -5027,7 +5055,7 @@ class GalleryView(QWidget):
         gallery.
         """
         self._slideshow = None
-        self._browser.open_in_containing_folder(prompt_id)
+        self._on_source_link(prompt_id)
         row = self._row_for(prompt_id)
         if row is not None:
             self._info_tabs.load_selection(row, self._image_rows,
@@ -5747,6 +5775,29 @@ class GalleryView(QWidget):
 
     # --- re-roll as the info-pane source ----------------------------------
 
+    def _reveal_reroll(self, key: str):
+        """Open the folder a re-roll runs in and select its live tile — an
+        in-flight card's click, relayed by the browser pane.
+
+        Leaves a running search first: results take the pane over, and picking
+        a tree row underneath them re-scopes the search rather than showing the
+        folder — so the click landed on the row and the wall of results stayed
+        up, which reads as the click doing nothing at all.
+        """
+        self._leave_search()
+        item = self._tree_item_for(key)
+        if item is None:
+            # A folder the tree has not drawn yet: the first run in a brand-new
+            # settings folder makes the node, and this click can land in the
+            # gap.  Rebuild and ask once more rather than dropping the gesture.
+            self.refresh()
+            item = self._tree_item_for(key)
+        if item is None:
+            logger.info("Nothing to reveal for %s: no folder row", key)
+            return
+        self._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
+        self._select_reroll(key)
+
     def _select_reroll(self, key: str):
         """Make a running re-roll's tile the selected item and mirror its live
         frames into the info pane.
@@ -6313,6 +6364,22 @@ class GalleryView(QWidget):
             self.restore_from_trash([prompt_id])
         else:
             self.purge_from_trash([prompt_id])
+
+    def _trash_menu(self, global_pos):
+        """Right-click on the Trash shelf: restore or permanently delete the
+        picked items — the same two actions the tiles' hover corners carry,
+        reachable for a whole selection at once. The pane has already narrowed
+        the selection to the tile under the cursor when it was outside it."""
+        ids = self.selected_prompt_ids()
+        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
+        menu = QMenu(self)
+        restore_action = menu.addAction("Restore" + suffix)
+        purge_action = menu.addAction("Delete" + suffix + " permanently")
+        chosen = menu.exec(global_pos)
+        if chosen is restore_action:
+            self.restore_from_trash(ids)
+        elif chosen is purge_action:
+            self.purge_from_trash(ids)
 
     def restore_from_trash(self, prompt_ids):
         """Bring deleted items back — files to where they were, rows to the

@@ -22,9 +22,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QMenu, QApplication, QPushButton, QScrollArea, QVBoxLayout,
+    QWidget, QLabel, QApplication, QPushButton, QScrollArea, QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, Qt, QTimer, pyqtSignal
 
 from origenerator import gallery, search, timing
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
@@ -170,12 +170,31 @@ SOURCE_FRAME_KINDS = ("I2V", "Enhance")
 ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
 
 
-class BrowserPane:
+class BrowserPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
     owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
-    which it calls back into for the info pane, tree, re-roll tile, and delete."""
+    which connects the signals below to its own handlers — a gesture on a tile is
+    the pane's to notice and the view's to answer."""
+
+    thumbnail_activated = pyqtSignal(str)   # a tile was clicked: preview this item
+    tab_pin_requested = pyqtSignal()        # an "I'm staying" gesture: keep the tab
+    item_jump_requested = pyqtSignal(str)   # go to this item, in its own folder
+    folder_open_requested = pyqtSignal(str)  # a folder tile was clicked: open it
+    reveal_reroll_requested = pyqtSignal(str)  # open this re-roll's folder + tile
+    folder_menu_requested = pyqtSignal(str, QPoint)  # right-click on a folder tile
+    menu_requested = pyqtSignal(list, QPoint)  # right-click: the generation menu
+    trash_menu_requested = pyqtSignal(QPoint)  # right-click on a deleted tile
+    item_action_triggered = pyqtSignal(str, str)   # a tile's corner control
+    seed_reroll_requested = pyqtSignal(str, str)   # an i2v tile's seed corner
+    experiment_verdict = pyqtSignal(str, str)      # a review tile's keep/reject
+    trash_action_triggered = pyqtSignal(str, str)  # a deleted tile's restore/purge
+    cancel_requested = pyqtSignal(str)      # an in-flight row's ✕: drop that run
+    drag_started = pyqtSignal(str)          # a tile began dragging (combine slots)
+    drag_ended = pyqtSignal()
+    selection_changed = pyqtSignal()        # the multi-selection moved or cleared
 
     def __init__(self, view):
+        super().__init__()
         self._v = view
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
@@ -290,7 +309,7 @@ class BrowserPane:
             level=gallery.folder_level(group), detail=gallery.folder_detail(group),
         )
         tile.clicked.connect(self._drill_into)
-        tile.context_requested.connect(self._v._folder_context_menu)
+        tile.context_requested.connect(self.folder_menu_requested)
         flow.addWidget(tile)
         self._visible_keys.append(group.key)
 
@@ -722,7 +741,7 @@ class BrowserPane:
                 frame, progress = job.last_preview, job.last_progress
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
-                cancel = lambda p=pid: self._v._cancel_job(p)
+                cancel = lambda p=pid: self.cancel_requested.emit(p)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
@@ -736,7 +755,7 @@ class BrowserPane:
                 caption=gallery.config_tab_title(workflow_name, params),
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
-                reveal=lambda k=folder_key: self._reveal_reroll(k),
+                reveal=lambda k=folder_key: self.reveal_reroll_requested.emit(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 orientation=row_orientation(row),  # the side its picture will land on
                 progress=progress,
@@ -836,50 +855,21 @@ class BrowserPane:
             )
         return cache[workflow_name]
 
-    def _reveal_reroll(self, key: str):
-        """Open the folder a re-roll runs in and select its live tile.
-
-        Leaves a running search first: results take the pane over, and picking
-        a tree row underneath them re-scopes the search rather than showing the
-        folder — so the click landed on the row and the wall of results stayed
-        up, which reads as the click doing nothing at all.
-        """
-        self._v._leave_search()
-        item = self._v._tree_item_for(key)
-        if item is None:
-            # A folder the tree has not drawn yet: the first run in a brand-new
-            # settings folder makes the node, and this click can land in the
-            # gap.  Rebuild and ask once more rather than dropping the gesture.
-            self._v.refresh()
-            item = self._v._tree_item_for(key)
-        if item is None:
-            logger.info("Nothing to reveal for %s: no folder row", key)
-            return
-        self._v._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
-        self._v._select_reroll(key)
-
     def _on_inflight_clicked(self, key: str):
         item = self._inflight_by_key.get(key)
         if item is not None:
             item.reveal()
 
-    def open_in_containing_folder(self, prompt_id: str):
-        """Jump the browser pane to ``prompt_id``'s own folder and land on the item
-        itself — its tile picked, highlighted and scrolled to, as if you'd navigated
-        in and clicked it, not just auto-previewing the folder's first item. The
-        double-click gesture on every shelf tile, and the info pane's "Go to
-        folder"; a followed link (:meth:`GalleryView._on_source_link`) lands the
-        same way."""
-        self._v._on_source_link(prompt_id)
-
     def _shelf_double_clicked(self, prompt_id: str):
         """A shelf tile's double-click: go to the item's own folder, and keep the
-        tab that lands there.
+        tab that lands there — its tile picked, highlighted and scrolled to, as
+        if you'd navigated in and clicked it (:meth:`GalleryView._on_source_link`
+        answers the jump).
 
         Double-click means the same thing everywhere in the pane — this tab is
         one I'm staying on — whether it opens a folder on the way or not."""
-        self.open_in_containing_folder(prompt_id)
-        self._v.pin_config_tab()
+        self.item_jump_requested.emit(prompt_id)
+        self.tab_pin_requested.emit()
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
@@ -909,7 +899,7 @@ class BrowserPane:
         rows = filter_rows(self._experiment_rows, self._shelf_orientation)
         for row in rows:
             tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
-            tw.corner_action_triggered.connect(self._v._on_experiment_verdict)
+            tw.corner_action_triggered.connect(self.experiment_verdict)
         self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
 
@@ -1015,7 +1005,7 @@ class BrowserPane:
         rows = filter_rows(self._trash_rows, self._shelf_orientation)
         for row in rows:
             tile = self._add_trash_thumbnail(flow, row, list(actions))
-            tile.corner_action_triggered.connect(self._v._on_trash_action)
+            tile.corner_action_triggered.connect(self.trash_action_triggered)
         self.show_widget(container if rows
                          else self._empty_state(self._trash_empty_hint()))
 
@@ -1057,19 +1047,12 @@ class BrowserPane:
         """Right-click a deleted tile: restore or permanently delete the picked
         items — the same two actions its hover corners carry, reachable for a
         whole selection at once. Right-clicking a tile outside the selection
-        first narrows to it, as the gallery's own tile menu does."""
+        first narrows to it, as the gallery's own tile menu does. The menu
+        itself is the view's (:meth:`GalleryView._trash_menu`), which owns both
+        acts."""
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-        ids = self.selected_prompt_ids()
-        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
-        menu = QMenu(self._v)
-        restore_action = menu.addAction("Restore" + suffix)
-        purge_action = menu.addAction("Delete" + suffix + " permanently")
-        chosen = menu.exec(global_pos)
-        if chosen is restore_action:
-            self._v.restore_from_trash(ids)
-        elif chosen is purge_action:
-            self._v.purge_from_trash(ids)
+        self.trash_menu_requested.emit(global_pos)
 
     @staticmethod
     def _trash_caption(row) -> str:
@@ -1271,7 +1254,7 @@ class BrowserPane:
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
             if i2v:
-                tw.corner_action_triggered.connect(self._v._reroll_item_seed)
+                tw.corner_action_triggered.connect(self.seed_reroll_requested)
             self._wire_drag(tw)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
@@ -1335,18 +1318,13 @@ class BrowserPane:
 
     def _wire_drag(self, tw: ThumbnailWidget):
         """Light the combine slot a tile fits while it's being dragged out."""
-        tw.drag_started.connect(self._v._on_generation_drag_started)
-        tw.drag_ended.connect(self._v._on_generation_drag_ended)
+        tw.drag_started.connect(self.drag_started)
+        tw.drag_ended.connect(self.drag_ended)
 
     def _drill_into(self, key: str):
-        """Open a folder tile's folder. Clicking one is a decision to go there, so
-        it puts a running search away first — a search's results are folder tiles
-        too, and this is how they open; without it the box would still be full
-        while the pane shows the folder it drilled into."""
-        item = self._v._tree_item_for(key)
-        if item is not None:
-            self._v._leave_search()
-            self._v._tree.setCurrentItem(item)
+        """Open a folder tile's folder — the view answers by selecting its tree
+        row (:meth:`GalleryView._open_folder_tile`)."""
+        self.folder_open_requested.emit(key)
 
     def visible_prompt_ids(self) -> list[str]:
         return list(self._visible_ids)
@@ -1355,7 +1333,7 @@ class BrowserPane:
 
     def _thumbnail_clicked(self, prompt_id: str):
         self.apply_selection(prompt_id, QApplication.keyboardModifiers())
-        self._v._on_thumbnail_clicked(prompt_id)  # records the visit itself
+        self.thumbnail_activated.emit(prompt_id)  # the view records the visit itself
 
     def _thumbnail_double_clicked(self, prompt_id: str):
         """Open a thumbnail as a Generate tab and keep that tab.
@@ -1364,8 +1342,8 @@ class BrowserPane:
         second says to stay there, so the tab stops being the one the next click
         replaces. Browsing costs one tab however far you go; deciding to work on
         something costs the double-click that keeps it."""
-        self._v._on_thumbnail_clicked(prompt_id)  # make it the selected generation
-        self._v.pin_config_tab()
+        self.thumbnail_activated.emit(prompt_id)  # make it the selected generation
+        self.tab_pin_requested.emit()
 
     def apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.
@@ -1417,13 +1395,13 @@ class BrowserPane:
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():
             widget.set_selected(pid in self._selected_ids)
-        self._v._sync_action_buttons()
+        self.selection_changed.emit()
 
     def clear_selection(self):
         self._selected_ids = set()
         self._selection_anchor = None
         self._thumb_widgets = {}
-        self._v._sync_action_buttons()
+        self.selection_changed.emit()
 
     def clear_thumbnail_selection(self):
         """Drop the thumbnail multi-selection and its highlights while keeping the
@@ -1452,8 +1430,8 @@ class BrowserPane:
         """
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-            self._v._on_thumbnail_clicked(prompt_id)
-        self._v.generation_menu(self.selected_prompt_ids(), global_pos)
+            self.thumbnail_activated.emit(prompt_id)
+        self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
         """A tile's corner control was pressed: bookmark, bin or enhance THIS one.
@@ -1462,7 +1440,7 @@ class BrowserPane:
         picture, in that picture's own corner, so it has already said which item
         it is about. The menu is where a whole selection is acted on.
         """
-        self._v.run_item_action(prompt_id, action)
+        self.item_action_triggered.emit(prompt_id, action)
 
     def _enhance_state(self, row) -> str | None:
         """What the plus in this row's bottom-right corner has to say, at the

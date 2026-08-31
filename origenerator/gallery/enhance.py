@@ -37,11 +37,11 @@ from origenerator.gallery.output import (
     produced_output,
     row_output_files,
 )
+from origenerator.gallery.enhance_graph import graph_level_params
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 from origenerator.workflows.detail_parts import (
-    DEFAULT_FIX_DENOISE, detail_fixes_of, detector_part_label, fixable_parts,
+    DEFAULT_FIX_DENOISE, detail_fixes_of, fixable_parts,
 )
 
 logger = logging.getLogger(__name__)
@@ -656,85 +656,6 @@ def is_enhance_product_row(row: dict) -> bool:
     return all((f.get("filename") or "").startswith(f"{stem}_") for f in files)
 
 
-def _node_order(node_id) -> int:
-    """A graph node's id as a number, for reading the order the workflow built
-    its nodes in. Non-numeric ids (a hand-authored graph) sort last, together."""
-    try:
-        return int(node_id)
-    except (TypeError, ValueError):
-        return 1 << 30
-
-
-def _graph_level_params(row: dict) -> dict:
-    """The enhance knobs a row's stored ComfyUI graph gives up.
-
-    A row the import scan reconstructed keeps the tail's numbers under the
-    generic names any sampler has — ``steps`` and ``denoise`` — and says nothing
-    at all about the upscale, so folding it on its params alone would file the
-    level with a blank settings line and leave the Enhance panel unable to tell
-    it apart from a level it has not made yet. The graph that ran is exact about
-    all of it, and it is stored on the row: the upscale model by name, the scale
-    as the fraction of the model's own 4x output the result was taken back down
-    to, and the detail pass by whether its detector nodes are there at all.
-    """
-    try:
-        graph = json.loads(row.get("workflow_json") or "{}")
-    except (TypeError, ValueError):
-        return {}
-    if not isinstance(graph, dict):
-        return {}
-    found: dict = {}
-    detailers: list[tuple[int, dict]] = []
-    for node_id, node in graph.items():
-        if not isinstance(node, dict):
-            continue
-        inputs = node.get("inputs")
-        if not isinstance(inputs, dict):
-            continue
-        node_type = node.get("class_type")
-        if node_type == "CheckpointLoaderSimple":
-            found["checkpoint"] = inputs.get("ckpt_name")
-        elif node_type == "UpscaleModelLoader":
-            found["upscale_model"] = inputs.get("model_name")
-        elif node_type == "ImageScaleBy":
-            scale = inputs.get("scale_by")
-            if isinstance(scale, (int, float)):
-                found["enhance_scale"] = scale * UPSCALE_MODEL_FACTOR
-        elif node_type == "KSampler":
-            found["enhance_steps"] = inputs.get("steps")
-            found["enhance_denoise"] = inputs.get("denoise")
-        elif node_type == "DetailerForEach":
-            # Sorted by node id below: the passes are laid out in the order they
-            # run, which the graph's own key order only happens to keep.
-            detailers.append((_node_order(node_id), inputs))
-    fixes = {}
-    for _, inputs in sorted(detailers, key=lambda pair: pair[0]):
-        # Each pass says which part it redrew only by way of the detector two
-        # nodes back, so the part is read off the model that found the regions.
-        segs = _linked_inputs(graph, inputs.get("segs"))
-        model = _linked_inputs(graph, segs.get("bbox_detector")).get("model_name")
-        denoise = inputs.get("denoise")
-        if isinstance(model, str) and isinstance(denoise, (int, float)):
-            fixes[detector_part_label(model.rsplit("/", 1)[-1])] = denoise
-    if fixes:
-        found["enhance_detail_fixes"] = fixes
-    return {k: v for k, v in found.items() if v is not None and k in ENHANCE_SETTING_KEYS}
-
-
-def _linked_inputs(graph: dict, ref) -> dict:
-    """The inputs of the node one input links to, or ``{}`` where there is none.
-
-    A ComfyUI link is ``[node_id, output_index]``; anything else on an input is
-    a literal. Every step is guarded because this reads a graph off a file —
-    written by an older version of this app, or by ComfyUI itself.
-    """
-    if not (isinstance(ref, (list, tuple)) and ref and isinstance(ref[0], (str, int))):
-        return {}
-    node = graph.get(str(ref[0]))
-    inputs = node.get("inputs") if isinstance(node, dict) else None
-    return inputs if isinstance(inputs, dict) else {}
-
-
 def enhance_level_params(row: dict) -> dict:
     """The knobs one enhancement ran at, as the keys a level records.
 
@@ -744,6 +665,6 @@ def enhance_level_params(row: dict) -> dict:
     """
     params = parse_params(row.get("params_json"))
     level = _level_knobs(params)
-    for key, value in _graph_level_params(row).items():
+    for key, value in graph_level_params(row, ENHANCE_SETTING_KEYS).items():
         level.setdefault(key, value)
     return level

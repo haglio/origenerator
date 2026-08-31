@@ -147,7 +147,8 @@ def fold_completed_enhancements(db) -> int:
     for row in rows:
         if row.get("status") != "completed":
             continue
-        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW                 and not is_enhance_product_row(row):
+        if ((row.get("workflow_name") or "") != ENHANCE_WORKFLOW
+                and not is_enhance_product_row(row)):
             continue
         source_id = fold_enhancement(db, row, image_rows=pool)
         if source_id is None:

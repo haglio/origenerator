@@ -41,8 +41,14 @@ class RelatedMedia(QWidget):
     source_activated = pyqtSignal(str)     # the source tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)   # an animation tile was clicked (prompt_id)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, video_rows=None):
+        """``video_rows`` answers the library's videos, and is asked only for a
+        row that could have animations — which is why it is a call rather than a
+        list. Reading it is a whole-table read and a parse per row, and every
+        video shown would otherwise pay for it to be told it has none.
+        """
         super().__init__(parent)
+        self._video_rows = video_rows or (lambda: [])
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -57,18 +63,16 @@ class RelatedMedia(QWidget):
         self._animated_strip.video_activated.connect(self.animated_activated)
         layout.addWidget(self._animated_strip)
 
-    def show_row(self, row: dict, image_rows: list[dict], video_rows: list[dict],
-                 request=None) -> None:
+    def show_row(self, row: dict, image_rows: list[dict], request=None) -> None:
         """Point at what ``row`` is tied to, and at nothing the last one was.
 
-        ``image_rows`` is the pool a video's start frame is matched against and
-        ``video_rows`` the pool an image's animations come out of; both are the
-        owner's, because the owner is what holds the library. ``request`` is the
-        spoken request that made this row, when one did.
+        ``image_rows`` is the pool a video's start frame is matched against —
+        the owner's, because the owner is what holds the library. ``request`` is
+        the spoken request that made this row, when one did.
         """
         self._show_source_tile(row, image_rows, request)
         # Hides itself when empty, which for anything but an animated image it is.
-        self._animated_strip.show_videos(self._animated_items(row, video_rows))
+        self._animated_strip.show_videos(self._animated_items(row))
 
     def clear(self) -> None:
         """Put both links down — a blank tab, or one showing a bare autoshow
@@ -103,12 +107,16 @@ class RelatedMedia(QWidget):
             files[0]["filename"] if files else "", heading=heading,
         )
 
-    def _animated_items(self, row: dict, video_rows: list[dict]) -> list[tuple]:
+    def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image
-        was animated into — empty for anything but an image with animations."""
+        was animated into — empty for anything but an image with animations.
+
+        The library's videos are asked for only past that first test, so showing
+        a video costs no read at all.
+        """
         if media_type_of_row(row) != "image":
             return []
-        videos = videos_from_source_image(row, video_rows)
+        videos = videos_from_source_image(row, self._video_rows())
         if len(videos) > ANIMATED_STRIP_LIMIT:
             logger.info("Image %s has %d animations; showing the first %d",
                         row["prompt_id"], len(videos), ANIMATED_STRIP_LIMIT)

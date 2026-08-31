@@ -311,7 +311,7 @@ class GenerateConfigPanel(QWidget):
         they went. Every gap in this column is the layout's spacing now, the same
         as between the form's own sections.
         """
-        self._related = RelatedMedia()
+        self._related = RelatedMedia(video_rows=self._video_rows)
         self._related.source_activated.connect(self.source_activated)
         self._related.animated_activated.connect(self.animated_activated)
         body.addWidget(self._related)
@@ -1076,7 +1076,7 @@ class GenerateConfigPanel(QWidget):
         # image is usually none of them — so it shows only when it has content
         # rather than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
-        self._related.show_row(row, image_rows, self._video_rows(), request)
+        self._related.show_row(row, image_rows, request)
         self._refresh_versions()
         self._show_request_diff(request)
         for lane in self._lanes.values():

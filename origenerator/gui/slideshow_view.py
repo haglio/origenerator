@@ -84,6 +84,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
+from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
@@ -156,13 +157,9 @@ class SlideshowView(QWidget):
         # ended on. Read in :meth:`closeEvent`, which is where every way out of
         # the show meets.
         self._land_on: str | None = None
-        # The enhancement levels of each item that has any, keyed by the file the
-        # set lists it under, so Shift+Left/Right steps the versions of whatever
-        # is on screen. The base path is remembered separately: once you have
-        # stepped onto a level, the file showing is no longer the key.
-        self._levels_by_path: dict[str, list[tuple]] = {}
-        self._level_base: str | None = None
-        self._level_index = 0
+        # The versions of each item that has any, and the place within the one
+        # being stepped: Shift+Left/Right moves there rather than along the set.
+        self._levels = LevelStepper()
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
         # same number. An explicit dwell (a double-clicked picture's nought,
@@ -276,8 +273,7 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         if item is None:
             return
-        self._level_base = None  # a new item, so its own versions from the top
-        self._level_index = 0
+        self._levels.restart()  # a new item, so its own versions from the top
         if item[1] == LIVE:
             # Still being made: what it looks like so far, rather than a file.
             self._preview.show_frame(item[0])
@@ -401,7 +397,7 @@ class SlideshowView(QWidget):
         Left/Right still steps the set; the shifted pair moves within the one
         image — its own axis, because a version is not a neighbor.
         """
-        self._levels_by_path = {str(k): list(v) for k, v in levels_by_path.items()}
+        self._levels.arm(levels_by_path)
         self._refresh_note()
 
     def queue(self) -> SlideshowQueue:
@@ -430,7 +426,7 @@ class SlideshowView(QWidget):
             order=tuple(self._playlist.order_ids()),
             current=self._current_prompt_id(),
             locked=self._playlist.locked,
-            level_index=self._level_index,
+            level_index=self._levels.index,
             enhance_on_hold=self._enhance_on_hold,
         )
 
@@ -588,14 +584,11 @@ class SlideshowView(QWidget):
         nothing to compare it against, and silently doing nothing is better
         than stepping the set when the shift was the whole point.
         """
-        base = self._level_base or self._current_base()
-        levels = self._levels_by_path.get(base) or []
-        if len(levels) <= 1:
+        level = self._levels.step(delta, base=self._current_base())
+        if level is None:
             return
         self._live = False
-        self._level_base = base
-        self._level_index = (self._level_index + delta) % len(levels)
-        self._preview.show_media(*levels[self._level_index][:2])
+        self._preview.show_media(*level[:2])
         self._refresh_note()
         self.media_changed.emit()
 
@@ -981,8 +974,7 @@ class SlideshowView(QWidget):
         self._enhance_status.pop(prompt_id, None)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
-                self._level_base = None  # its versions are a level deeper now
-                self._level_index = 0
+                self._levels.restart()  # its versions are a level deeper now
                 self._preview.show_media(path, media_type)
                 self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
@@ -1079,13 +1071,13 @@ class SlideshowView(QWidget):
                             if self._enhance_status.get(prompt_id) == "running"
                             else _ENHANCE_QUEUED)
             return
-        levels = self._levels_by_path.get(self._level_base or self._current_base()) or []
+        levels = self._levels.levels(base=self._current_base())
         if len(levels) <= 1:
             self._note.hide()
             return
-        level = levels[self._level_index]
-        label = level[2] if len(level) > 2 else f"Version {self._level_index + 1}"
-        self._show_note(f"{label} — {self._level_index + 1} of {len(levels)}")
+        index = self._levels.index
+        label = levels[index][2] if len(levels[index]) > 2 else f"Version {index + 1}"
+        self._show_note(f"{label} — {index + 1} of {len(levels)}")
 
     def _show_note(self, text: str) -> None:
         self._note.say(text)

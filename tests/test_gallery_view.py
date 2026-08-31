@@ -11114,7 +11114,12 @@ def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
 
     show = _double_click_show(view, qtbot)
 
-    (levels,) = show._levels_by_path.values()
+    # Keyed by the file the folder shows the image under, which is not the one
+    # the show happens to have opened on, so the key comes from the same place
+    # the show's did — and asking the show for it proves it took them.
+    (key, computed), = view._folder_level_playlists().items()
+    levels = show._levels.levels(base=key)
+    assert levels == computed
     assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.

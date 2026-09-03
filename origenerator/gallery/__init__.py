@@ -89,6 +89,8 @@ from origenerator.gallery.enhance import (
     displayed_levels,
     enhance_levels,
     enhance_params_for,
+    enhance_run_targets_row,
+    enhance_target_id,
     enhance_targets_row,
     enhancement_recency,
     fix_params_for,

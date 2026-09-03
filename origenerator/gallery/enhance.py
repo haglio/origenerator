@@ -400,18 +400,62 @@ def is_enhanceable_row(row: dict) -> bool:
     return media_type_of_row(row) == "image" and produced_output(row)
 
 
-def enhanced_source_names(rows) -> set[str]:
-    """The source-image names (comparison-keyed, like an i2v frame lookup) with
-    an un-folded standalone enhance among ``rows`` — normally just the jobs
-    still in flight, since a completed one folds into its source and vanishes.
-    Keeps a second button press from re-queuing an image already cooking."""
-    names = set()
+def enhance_target_id(enhance_row: dict, image_rows) -> str | None:
+    """The prompt_id of the image a standalone enhance ``enhance_row`` is of, or
+    ``None`` when that image is not among ``image_rows``.
+
+    The row's own ``enhance_of`` answers first: it was stamped at launch by the
+    code that chose the image, and it is an identity where the file name the
+    params carry is only a name — ComfyUI's counters are per prefix, a trashed
+    file frees its number, and the library has ended up with several rows
+    naming one file. Matching by file would land an enhancement on whichever
+    of those a listing happened to put first. A row from before the stamp was
+    recorded still has only the file, so that match is kept as the fallback
+    (:func:`~origenerator.gallery.source_image.source_image_id_for`).
+
+    An image no longer in ``image_rows`` — deleted while its enhance cooked —
+    answers ``None`` either way: the run has nothing to fold into.
+    """
+    stamped = enhance_row.get("enhance_of")
+    if stamped:
+        return stamped if any(r.get("prompt_id") == stamped for r in image_rows) else None
+    input_image = parse_params(enhance_row.get("params_json")).get("input_image")
+    candidates = [r for r in image_rows if r.get("prompt_id") != enhance_row.get("prompt_id")]
+    return source_image_id_for(input_image, candidates)
+
+
+def enhance_run_targets_row(enhance_of: str | None, input_image: str | None,
+                            row: dict) -> bool:
+    """Whether an enhance run is an enhance of ``row`` — by the image's id where
+    the run recorded one (``enhance_of``), else by the file it reads
+    (:func:`enhance_targets_row`).
+
+    The one predicate every live surface asks — the tile under its scrim, the
+    tab's version list, the show's corner — so they all point the same run at
+    the same picture.
+    """
+    if enhance_of:
+        return row.get("prompt_id") == enhance_of
+    return enhance_targets_row(input_image, row)
+
+
+def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
+    """``(image ids, file names)`` with an un-folded standalone enhance among
+    ``rows`` — normally just the jobs still in flight, since a completed one
+    folds into its source and vanishes. Ids where the run stamped one, names
+    for the rest. Keeps a second button press from re-queuing an image already
+    cooking."""
+    ids, names = set(), set()
     for row in rows:
-        if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
-            name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
-            if name:
-                names.add(name)
-    return names
+        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW:
+            continue
+        if row.get("enhance_of"):
+            ids.add(row["enhance_of"])
+            continue
+        name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+        if name:
+            names.add(name)
+    return ids, names
 
 
 def _knobs(params: dict) -> dict:
@@ -512,8 +556,10 @@ def enhancement_recency(rows) -> dict[str, int]:
 
     for row in rows:
         if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
-            name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
-            target = holders.get(name) if name else None
+            target = row.get("enhance_of")
+            if not target:
+                name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+                target = holders.get(name) if name else None
             if target is not None and target != row.get("prompt_id"):
                 note(target, row.get("id"))
         for entry in parse_file_list(row.get("enhance_history")):
@@ -526,13 +572,15 @@ def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     """The members of a folder its Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked
     against ``all_rows``, where the transient job rows live)."""
-    cooking = enhanced_source_names(all_rows)
+    cooking_ids, cooking_names = _enhances_in_flight(all_rows)
     awaiting = []
     for row in folder_rows:
         if not is_enhanceable_row(row) or is_enhanced_row(row):
             continue
+        if row.get("prompt_id") in cooking_ids:
+            continue
         names = {_frame_name(f.get("filename")) for f in row_output_files(row)}
-        if names & cooking:
+        if names & cooking_names:
             continue
         awaiting.append(row)
     return awaiting
@@ -798,7 +846,9 @@ def fold_enhancement(db, enhance_row: dict,
 
     Returns the upgraded source's prompt_id, or ``None`` (and folds nothing)
     when the enhance produced no file or its source image is no longer in the
-    database — such a row is left alone rather than half-migrated.
+    database — such a row is left alone rather than half-migrated. Which image
+    that is comes from the run's own ``enhance_of`` stamp where it has one, and
+    from the file it read otherwise (:func:`enhance_target_id`).
 
     ``image_rows`` is the pool the start frame is matched against, for a caller
     that already holds one: the startup sweep folds a whole backlog at once, and
@@ -808,15 +858,10 @@ def fold_enhancement(db, enhance_row: dict,
     enhanced_files = row_output_files(enhance_row)
     if not enhanced_files:
         return None
-    input_image = parse_params(enhance_row.get("params_json")).get("input_image")
     if image_rows is None:
         image_rows = db.list_generations()
-    candidates = [
-        r for r in image_rows
-        if r.get("prompt_id") != enhance_row.get("prompt_id")
-        and media_type_of_row(r) == "image"
-    ]
-    source_id = source_image_id_for(input_image, candidates)
+    source_id = enhance_target_id(
+        enhance_row, [r for r in image_rows if media_type_of_row(r) == "image"])
     if source_id is None:
         return None
     source = db.get_generation(source_id)

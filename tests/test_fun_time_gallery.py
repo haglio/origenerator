@@ -616,7 +616,15 @@ def test_a_lock_on_a_hosted_show_opens_its_generate_tab(qtbot, tmp_path, monkeyp
     opened, navigated = [], []
     monkeypatch.setattr(view._info_tabs, "load_selection",
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
-    monkeypatch.setattr(view, "_on_source_link", navigated.append)
+    # Landing on the item is what opens its tab, so the link is spied on rather
+    # than swallowed: it has to run for the tab to come of it.
+    real_link = view._on_source_link
+
+    def follow(prompt_id):
+        navigated.append(prompt_id)
+        real_link(prompt_id)
+
+    monkeypatch.setattr(view, "_on_source_link", follow)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     show = view._region_shows["portrait"]
     qtbot.addWidget(show)

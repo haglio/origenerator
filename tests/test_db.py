@@ -56,6 +56,23 @@ def test_recipe_source_records_where_a_combine_got_its_recipe(tmp_path):
     assert row["recipe_video_id"] == "vid-9"
 
 
+def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
+    # The run's params name the file it reads, and a file name can belong to
+    # more than one row; the stamp is the one thing on the run that names the row.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="enh-001", workflow_name="image_enhance", workflow_version="v001",
+        params_json="{}", workflow_json="{}",
+    )
+    assert db.get_generation("enh-001")["enhance_of"] is None
+
+    db.set_enhance_target("enh-001", "img-007")
+    assert db.get_generation("enh-001")["enhance_of"] == "img-007"
+
+    db.set_enhance_target("enh-001", None)  # cleared, as an empty value would be
+    assert db.get_generation("enh-001")["enhance_of"] is None
+
+
 def test_each_half_of_a_recipe_source_can_stand_alone(tmp_path):
     # A dropped video names no act, and an act the overlay curates a recipe for is
     # answered from no past video.
@@ -160,6 +177,7 @@ def _columns(db_path, table):
     "duration_seconds", "evolver_exported_at", "genau_exported_at",
     "genau_requested_at", "progress_json", "starred", "experiment_verdict",
     "original_files", "enhance_history", "recipe_category", "recipe_video_id",
+    "enhance_of",
 ])
 def test_an_early_database_gains_every_generations_column(tmp_path, column):
     Database(_database_as_first_written(tmp_path / "old.db"))

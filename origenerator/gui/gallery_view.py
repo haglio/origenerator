@@ -572,17 +572,14 @@ class GalleryView(QWidget):
         # frames — another folder's work, an enhancement. Asked once and kept,
         # since every frame of such a run asks again (:meth:`_show_would_play`).
         self._show_refused: set[str] = set()
-        # The folder whose running re-roll currently drives the info pane (its
-        # tile is the selected item), that tile, and the last frame shown — so
-        # live frames mirror from the browser-pane thumbnail into the full-size
-        # preview, and the frame outlives both the rebuild each stage completion
-        # triggers and an i2v's image->video job swap.
+        # The folder whose running re-roll is the gallery's selected item (its
+        # tile lit in the middle column), and that tile. Which tab shows the
+        # run's frames full size is the tabs' own affair: a tab follows the
+        # folder it launched into or was pointed at (see
+        # :meth:`GenerateConfigPanel.watch_folder`), and the frames are routed
+        # to it by folder key, never to "the tab in front".
         self._selected_reroll_key: str | None = None
         self._reroll_tile: RerollTile | None = None
-        self._last_reroll_frame: bytes | None = None
-        # The queue-wait text currently painted in the pane, so a poll repaints it
-        # only when the number actually moves.
-        self._shown_wait_note: str | None = None
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, session_trash(STATE_DIR / "trash"),
             release_files=self._release_held_media, thumb_dir=THUMB_DIR,
@@ -636,18 +633,16 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
-        # The latest streamed frame of each running enhance, keyed by the folder
-        # its job runs under, so the info pane's version list, the tab preview
-        # and the image's own tile can all show the level being made. One slot
-        # per folder is enough because ComfyUI renders one prompt at a time: a
-        # folder's other enhances are queued behind, and a queued one is shown as
-        # queued rather than lent this frame (see
-        # :meth:`_pending_enhancement_for`).
-        self._enhance_frames: dict[str, bytes] = {}
+        # Which image each live enhance is of, by that image's prompt_id — the
+        # stamp its row carries (``enhance_of``), read once per job rather than
+        # on every streamed frame. ``None`` for a run from before the stamp was
+        # recorded, which is matched by the file it reads instead (see
+        # :meth:`_enhance_of_row`).
+        self._enhance_targets: dict[str, str | None] = {}
         # Which image each running enhance is improving, and the set of runs that
         # answer was worked out from — recomputed only when that set changes, not
         # on every frame they stream.
-        self._enhancing_by_prompt: dict[str, tuple] = {}
+        self._enhancing_by_prompt: dict[str, object] = {}
         self._enhancing_signature: tuple = ()
         # What every enhance runs at, app-wide — the Enhance subpanel's value.
         # Restored from the session by set_enhance_settings; built before
@@ -2196,11 +2191,11 @@ class GalleryView(QWidget):
         if len(multi_keys) < 2:
             multi_keys = []
         selected_gen = self.selected_generation()
-        # A running re-roll drives the info pane from live frames, not a saved row,
-        # so capture it to restore afterward rather than let the folder's default
+        # A running re-roll's tile is the selected item, not a saved row, so
+        # capture it to restore afterward rather than let the folder's default
         # selection replace it. This matters because every re-roll (and each i2v
         # stage) triggers a rebuild the moment its running row lands.
-        reroll_key, reroll_frame = self._selected_reroll_key, self._last_reroll_frame
+        reroll_key = self._selected_reroll_key
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
@@ -2287,7 +2282,7 @@ class GalleryView(QWidget):
                 self._browser.show_empty()
                 self._selected_row = None  # nothing selected
             self._restore_multi_selection(multi_keys)
-            self._restore_reroll_selection(reroll_key, reroll_frame)
+            self._restore_reroll_selection(reroll_key)
         finally:
             self._suppress_history = False
         # Seed history once with wherever the gallery first lands, so Back works
@@ -2346,9 +2341,21 @@ class GalleryView(QWidget):
         return sides, starred
 
     def _reselect_generation(self, prompt_id: str | None):
-        """Re-highlight a generation after a rebuild, if it's still on screen."""
-        if prompt_id and prompt_id in self._browser.visible_prompt_ids():
-            self._on_thumbnail_clicked(prompt_id)
+        """Re-select a generation after a rebuild, if it's still on screen.
+
+        The gallery's own selection only. The tabs keep what they were showing
+        across a rebuild — one happens whenever anything lands, once per
+        variation of a running loop — and a tab is repainted only when the
+        generation it shows changes under it or goes (see
+        :meth:`InfoPaneTabs.refresh_displayed` and
+        :meth:`InfoPaneTabs.drop_previews_of_gone_rows`). Painting the selection
+        into whichever tab was in front is how a tab came to show a picture that
+        was not its own."""
+        if not prompt_id or prompt_id not in self._browser.visible_prompt_ids():
+            return
+        row = self._row_for(prompt_id)
+        if row:
+            self._select_saved_generation(row)
 
     # --- find in the open tab's prompts (Ctrl+F) ------------------------------
 
@@ -3229,10 +3236,18 @@ class GalleryView(QWidget):
         else:
             self._reroll.start(key, self._group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
-        if from_auto:
+        if not from_auto:
+            # A no-op if the launch above failed to register. The tile is lit and
+            # the tab on this folder, if any, follows the run; no other tab is
+            # made to — the press asked for a picture, not to be shown one.
+            self._select_reroll(key, land=False)
+        else:
             self._note_auto_launch(key)  # its result is the loop's, not a tab's
-        if not from_auto or self._selected_reroll_key == key:
-            self._select_reroll(key)  # a no-op if the launch above failed to register
+            if self._selected_reroll_key == key:
+                # The lit tile stands for the loop: watching one variation is
+                # watching the next, and the tab following the folder gets the
+                # new run's frames by that key without being pointed at it again.
+                self._enter_reroll_selection(key)
         return self._reroll.has(key)
 
     def _note_auto_launch(self, key: str):
@@ -3778,7 +3793,16 @@ class GalleryView(QWidget):
             index,
         )
         prepared = randomize_seeds(params, workflow.seed_keys())
-        if self._reroll.start_prepared(key, workflow, prepared):
+        prompt_id = self._reroll.start_prepared(key, workflow, prepared)
+        if prompt_id:
+            # Which image the run is of, by id: the params name only the file it
+            # reads, and a file name can belong to more than one row. Stamped on
+            # the row for the fold and for a restart, and remembered here for
+            # the tile, the version list and the show while it runs — after the
+            # launch's own reconcile, which read the row before the stamp.
+            self._db.set_enhance_target(prompt_id, row.get("prompt_id"))
+            self._enhance_targets[prompt_id] = row.get("prompt_id")
+            self._reconcile_pending_enhancements()
             logger.info("Enhance launched for %s on %s at %s, under %s",
                         row.get("prompt_id"), params.get("input_image"),
                         gallery.describe_enhance_params(params), key)
@@ -4569,33 +4593,42 @@ class GalleryView(QWidget):
         Every live job is searched, not each folder's leading one: a batch of
         enhances goes out whole and its members share a settings key, so all but
         the first would read as not-cooking off the folder-facing view."""
-        for key, job in self._enhance_jobs():
-            if gallery.enhance_targets_row(job.params.get("input_image"), row):
-                return self._enhancing_run(key, job)
+        for job in self._enhance_jobs():
+            if self._enhance_of_row(job, row):
+                return self._enhancing_run(job)
         return None
 
     def _enhance_jobs(self) -> list:
-        """Every standalone enhance in flight, as ``(folder key, job)``.
-
-        The key comes along because the frames are held per folder
-        (:attr:`_enhance_frames`), and a job on its own can't say which slot is
-        its own."""
-        return [(key, job)
-                for key, jobs in self._reroll.jobs_by_folder.items()
-                for job in jobs
+        """Every standalone enhance in flight, across every folder."""
+        return [job for job in self._reroll.all_jobs
                 if job.workflow.name == gallery.ENHANCE_WORKFLOW]
 
-    def _enhancing_run(self, key: str, job) -> EnhancingRun:
-        """One enhance in flight, as the tile of the image it improves sees it.
+    def _enhance_target(self, job) -> str | None:
+        """The prompt_id of the image a live enhance ``job`` is of — the stamp
+        its row carries (:meth:`Database.set_enhance_target`), read once and
+        kept — or ``None`` for a run from before the stamp was recorded."""
+        if job.prompt_id not in self._enhance_targets:
+            row = self._db.get_generation(job.prompt_id)
+            self._enhance_targets[job.prompt_id] = (row or {}).get("enhance_of")
+        return self._enhance_targets[job.prompt_id]
 
-        The frame goes only to a job actually rendering, for the reason
-        :meth:`_pending_enhancement_for` spells out: a batch shares one folder
-        and so one frame slot, and lending it to the ones queued behind would
-        show each of those tiles a picture of a different image."""
+    def _enhance_of_row(self, job, row: dict) -> bool:
+        """Whether a live enhance ``job`` is an enhance of ``row`` — by the image's
+        id where the run recorded one, else by the file it reads. The one
+        question every surface showing a run on its image asks
+        (:func:`gallery.enhance_run_targets_row`)."""
+        return gallery.enhance_run_targets_row(
+            self._enhance_target(job), job.params.get("input_image"), row)
+
+    def _enhancing_run(self, job) -> EnhancingRun:
+        """One enhance in flight, as the tile of the image it improves sees it:
+        the job's own latest frame — a run that hasn't started has streamed
+        none, so a batch's queued members show as queued rather than borrowing
+        the picture of the one being rendered."""
         rendering = job.state == "running"
         return EnhancingRun(
             status="running" if rendering else "queued",
-            frame=self._enhance_frames.get(key) if rendering else None,
+            frame=job.last_preview,
             progress=job.last_progress,
             started_at=job.started_at,
             typical_seconds=self._typical_run_seconds(job),
@@ -4670,7 +4703,7 @@ class GalleryView(QWidget):
             return
         self._slideshow.note_enhancing({
             prompt_id: "running" if job.state == "running" else "queued"
-            for prompt_id, (_key, job) in self._enhancing_by_prompt.items()
+            for prompt_id, job in self._enhancing_by_prompt.items()
         })
 
     def _reconcile_enhancing_tiles(self, running):
@@ -4678,27 +4711,29 @@ class GalleryView(QWidget):
 
         Which image a job targets is worked out only when the set of running
         enhances changes, not on every streamed frame: the match walks every
-        image row, and the frames arrive several times a second.
-
-        A frame goes only to a job actually rendering, for the reason
-        :meth:`_pending_enhancement_for` spells out — a batch shares one folder
-        and so one frame slot, and lending it to the ones queued behind would
-        show each of those tiles a picture of a different image.
+        image row, and the frames arrive several times a second. The set is
+        told by the runs themselves and what each is of, so a run cancelled and
+        launched again on the same image is read afresh rather than off the
+        job that is gone.
         """
+        live = {job.prompt_id for job in running}
+        self._enhance_targets = {pid: target for pid, target in self._enhance_targets.items()
+                                 if pid in live}
         signature = tuple(sorted(
-            (key, job.params.get("input_image") or "") for key, job in running
+            (job.prompt_id, self._enhance_target(job) or job.params.get("input_image") or "")
+            for job in running
         ))
         if signature != self._enhancing_signature:
             self._enhancing_signature = signature
             self._enhancing_by_prompt = {
-                row["prompt_id"]: (key, job)
-                for key, job in running
+                row["prompt_id"]: job
+                for job in running
                 for row in self._image_rows
-                if gallery.enhance_targets_row(job.params.get("input_image"), row)
+                if self._enhance_of_row(job, row)
             }
         self._browser.show_enhancing({
-            prompt_id: self._enhancing_run(key, job)
-            for prompt_id, (key, job) in self._enhancing_by_prompt.items()
+            prompt_id: self._enhancing_run(job)
+            for prompt_id, job in self._enhancing_by_prompt.items()
         })
 
     def _pending_enhancement_for(self, row: dict, running) -> tuple | None:
@@ -4710,18 +4745,14 @@ class GalleryView(QWidget):
         since the run was launched, so the job's own params are the only honest
         answer.
 
-        The frame goes only to a job actually rendering. :attr:`_enhance_frames`
-        holds one frame per folder, and a batch of enhances shares a folder — so
-        the frame there belongs to whichever of them ComfyUI is running, and
-        lending it to the ones queued behind would show each of them a picture of
-        a different image. Queued, the tile says so instead — and "queued" covers
-        both waits the same way, whether the job is still in this app's line or
-        already sitting on ComfyUI, since neither has a frame to show."""
-        for key, job in running:
-            if gallery.enhance_targets_row(job.params.get("input_image"), row):
+        The frame is the job's own latest, which a run that hasn't started has
+        none of: a batch's queued members say "queued" instead — and "queued"
+        covers both waits the same way, whether the job is still in this app's
+        line or already sitting on ComfyUI, since neither has a frame to show."""
+        for job in running:
+            if self._enhance_of_row(job, row):
                 rendering = job.state == "running"
-                frame = self._enhance_frames.get(key) if rendering else None
-                return ("running" if rendering else "queued", frame,
+                return ("running" if rendering else "queued", job.last_preview,
                         gallery.describe_enhance_params(job.params))
         return None
 
@@ -4839,14 +4870,12 @@ class GalleryView(QWidget):
         and every seed of one recipe shares that folder — so the tab that came
         up was a sibling of the held picture rather than the picture, which is
         the "wrong item, a similar one" this used to open.  So the browser is
-        navigated to the item first (its own folder, its own tile picked), and
-        the tab is then loaded from the row that navigation selected.
+        navigated to the item itself (its own folder, its own tile picked), and
+        that navigation loads the row into a tab the way a click on it would.
         """
-        row = self._row_for(prompt_id)
-        if row is None:
+        if self._row_for(prompt_id) is None:
             return
-        self._on_source_link(prompt_id)  # its folder, its tile, out of any search
-        self._info_tabs.load_selection(row, self._image_rows)
+        self._on_source_link(prompt_id)  # its folder, its tile, its tab, out of any search
 
 
     def _starred_prompt_ids(self) -> set[str]:
@@ -5130,17 +5159,12 @@ class GalleryView(QWidget):
 
         The tab matters as much as the folder: leaving a show *for* an item is a
         decision to work on it, and a folder open behind a form still holding
-        whatever was there before the show is not that. Following a link only
-        refreshes the front tab's preview, which is right for a link and wrong
-        here. The slideshow has already closed itself, so this arrives on the
-        gallery.
+        whatever was there before the show is not that — which landing on the
+        item gives it, the way a click on it would (:meth:`_on_source_link`).
+        The slideshow has already closed itself, so this arrives on the gallery.
         """
         self._slideshow = None
         self._browser.open_in_containing_folder(prompt_id)
-        row = self._row_for(prompt_id)
-        if row is not None:
-            self._info_tabs.load_selection(row, self._image_rows,
-                                           self._request_for(prompt_id))
 
     def _star_generation(self, prompt_id: str):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
@@ -5832,85 +5856,109 @@ class GalleryView(QWidget):
 
     # --- re-roll as the info-pane source ----------------------------------
 
-    def _select_reroll(self, key: str):
-        """Make a running re-roll's tile the selected item and mirror its live
-        frames into the info pane.
+    def _select_reroll(self, key: str, *, land: bool = True):
+        """Make a running re-roll's tile the selected item, and show the run
+        full size in the tab it belongs to.
 
-        The tile stands for an in-flight job with no saved file yet, so its
-        preview comes from the job's streamed frames rather than the info pane's
-        on-disk lookup.
+        That tab is never simply the one in front: it is a tab already following
+        this folder, else the tab that launched the run — a Generate, or a claim
+        on the folder's own launch (:meth:`_claim_launch`). With ``land``, a run
+        no tab is for is landed the way a clicked thumbnail is: in the front tab
+        when its settings are this very folder, else in the pane's preview tab,
+        seeded from the run's own settings
+        (:meth:`GenerateConfigPanel.show_running_generation`) so the tab is *for*
+        this run — its form is the run's recipe, its bar fills with the run's
+        progress, its button discards it, and its preview follows the run's
+        frames to the picture they land as
+        (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
+        tile or on the shelf's card asks for, and the tab comes to the front as a
+        clicked thumbnail's does. The folder tile's "+" passes ``land=False``: a
+        press there is a request to make something, not to be shown it, so a
+        tab parked on other settings is left exactly as it was and the run shows
+        on its tile until the tile is clicked.
         """
         job = self._reroll_jobs.get(key)
         if job is None:
             return
-        self._last_reroll_frame = job.last_preview
         self._enter_reroll_selection(key)
+        tabs = self._info_tabs
+        panel = tabs.panel_watching(key) or tabs.panel_that_launched(job.origin)
+        if panel is None:
+            if not land:
+                return
+            front = tabs.current_config_panel()
+            if (front is not None and front.settings_key() is not None
+                    and self._panel_reroll_key(front) == key):
+                panel = front
+            else:
+                panel = tabs.landing_panel()
+                row = self._db.get_generation(job.prompt_id)
+                if row is not None:
+                    panel.show_running_generation(row)
+            if job.origin not in panel.launched_runs():
+                panel.note_launched(job.origin)  # its Cancel and progress are this run's now
+            self._reconcile_generating()
+        panel.watch_folder(key, job.last_preview, self._wait_note(key))
+        tabs.setCurrentWidget(panel)
 
-    def _restore_reroll_selection(self, key: str | None, frame: bytes | None):
-        """After a rebuild, re-assert a still-running re-roll as the info-pane
-        source, keeping the frame it was showing (an i2v's image frame while the
-        video stage warms up) rather than the fresh video job's empty preview.
-        A no-op unless that re-roll is still running in the folder now on screen.
+    def _restore_reroll_selection(self, key: str | None):
+        """After a rebuild, re-assert a still-running re-roll as the selected
+        item — its tile lit again in the folder now on screen. The tabs following
+        the run kept their frames across the rebuild (an i2v's image frame while
+        the video stage warms up included); the tile is the one thing redrawn.
+        A no-op unless that re-roll is still running in the folder on screen.
         """
         # ``key`` is the folder the job is filed under, so what it is checked
         # against is the folder on screen rather than the row showing it.
         if (key is None or key not in self._reroll_jobs
                 or getattr(self._current_group(), "key", None) != key):
             return
-        self._last_reroll_frame = frame
         self._enter_reroll_selection(key)
 
     def _enter_reroll_selection(self, key: str):
-        """Point the info pane at re-roll ``key`` and show its last frame — or a
-        'waiting' note, never the idle 'select a generation' placeholder."""
+        """Make re-roll ``key``'s tile the gallery's selected item, in place of
+        any saved generation."""
         self._selected_reroll_key = key
         self._selected_row = None  # a running re-roll isn't a saved generation
         self._browser.clear_thumbnail_selection()
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(True)
-        self._shown_wait_note = self._wait_note(key)
-        self._info_tabs.show_reroll_frame(self._last_reroll_frame, self._shown_wait_note)
 
     def _wait_note(self, key: str) -> str | None:
         """What re-roll ``key`` is waiting on, when another app is holding ComfyUI
-        in front of it — the pane's wait text, in place of a bare 'waiting for
-        preview'. Its own folder's queue isn't a wait worth naming."""
+        in front of it — a following tab's wait text, in place of a bare 'waiting
+        for preview'. Its own folder's queue isn't a wait worth naming."""
         job = self._reroll_jobs.get(key)
         return queue_wait_text(job.foreign_ahead) if job is not None else None
 
     def _refresh_wait_note(self):
-        """Keep that wait text current between rebuilds. The count falls as the
-        queue drains, and a pane frozen on a stale number is the mystery this is
-        here to end. Only while the selected run has streamed no frame — once it
-        has, the frame itself is the answer."""
-        key = self._selected_reroll_key
-        if key is None or self._last_reroll_frame is not None:
-            return
-        note = self._wait_note(key)
-        if note != self._shown_wait_note:
-            self._shown_wait_note = note
-            self._info_tabs.show_reroll_frame(None, note)
+        """Keep that wait text current between rebuilds, in every tab standing on
+        one. The count falls as the queue drains, and a pane frozen on a stale
+        number is the mystery this is here to end. Only while the followed run
+        has streamed no frame — once it has, the frame itself is the answer."""
+        for panel in self._info_tabs._config_panels():
+            key = panel.watched_key()
+            if key is not None and panel.is_awaiting_frame():
+                panel.show_live_wait(self._wait_note(key))
 
     def _on_reroll_preview(self, key: str, prompt_id: str, data: bytes):
-        """Mirror a re-roll's live frame into the info pane while it's selected,
-        remembering it so it survives the rebuild each stage completion triggers."""
-        if key == self._selected_reroll_key:
-            self._last_reroll_frame = data
-            self._info_tabs.show_reroll_frame(data)
-        # An enhance's frames go to the version strip of whichever tab shows the
-        # image being enhanced, not to the pane — an enhancement isn't a
-        # generation taking the preview over.
-        self._enhance_frames[key] = data
+        """A run streamed a frame: put it in every tab following its folder — and
+        nowhere else. A tab that isn't following the folder is showing something
+        of its own, and a frame painted over that is the picture nobody asked for.
+        """
+        for panel in self._info_tabs.watchers_of(key):
+            panel.show_live_frame(data)
+        # An enhance's frames show on the tile of the image being enhanced and in
+        # the version list of any tab displaying it — an enhancement isn't a
+        # generation taking a preview over.
         self._reconcile_pending_enhancements()
         # And straight onto an open show, which is watching for exactly this.
         self._feed_slideshow_generating(prompt_id, data)
 
     def _clear_reroll_selection(self):
-        """Stop treating a running re-roll as the info-pane source — a real
-        generation is taking over the pane, or the re-roll has ended."""
+        """Stop treating a running re-roll's tile as the selected item — a saved
+        generation is the selection now, or the re-roll has ended."""
         self._selected_reroll_key = None
-        self._last_reroll_frame = None
-        self._shown_wait_note = None
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(False)
 
@@ -5958,12 +6006,19 @@ class GalleryView(QWidget):
         self._reconcile_generating()  # a tab's run may have stopped
 
     def _abandon_reroll_preview(self, key: str):
-        """Empty the info pane if it was mirroring a re-roll that has ended with no
-        result to show (cancelled or failed)."""
+        """A run in folder ``key`` ended with nothing to show (cancelled or
+        failed): its tile stops being the selected item and a show opened over
+        its frames closes; and once the folder has no run left, the tabs
+        following it put their own pictures back. While it still has one — the
+        next of a batch, the loop's next seed — they keep following, since that
+        run's frames are what comes next."""
         if key == self._selected_reroll_key:
             self._close_live_fullscreen()
             self._clear_reroll_selection()
-            self._clear_metadata()
+            self._selected_row = None
+        if not self._reroll.has(key):
+            for panel in self._info_tabs.watchers_of(key):
+                panel.stop_watching()
 
     def _close_live_fullscreen(self):
         """Dismiss a show that was watching a generation which ended with
@@ -6007,12 +6062,11 @@ class GalleryView(QWidget):
                 # A slideshow that asked for this one swaps the slide for it.
                 self._feed_slideshow_enhanced(finished_row)
         self._send_to_genau_if_requested(finished_row)
-        was_mirrored = key == self._selected_reroll_key  # the pane held its live frames
-        # Let go of it — unless a loop is running here and the pane was pointed at
-        # it, where the key stands for the loop rather than for this one variation:
-        # someone watching it churn is watching what it does next, so the selection
-        # waits for the variation after this one (see :meth:`_start_reroll`).
-        if was_mirrored and not self._auto.is_active(key):
+        # The tile stops being the selected item — unless a loop is running here,
+        # where the key stands for the loop rather than for this one variation:
+        # someone watching it churn is watching what it does next, so the
+        # selection waits for the variation after this one (see :meth:`_start_reroll`).
+        if key == self._selected_reroll_key and not self._auto.is_active(key):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
         self._feed_slideshow_finished(finished_row)  # a show of its folder gains it
@@ -6024,8 +6078,7 @@ class GalleryView(QWidget):
             # list only when the tab is next opened, which is a tab away and
             # back.
             self._info_tabs.refresh_displayed(finished_row, self._image_rows)
-        if was_mirrored:
-            self._show_mirrored_result(finished_row, launcher)
+        self._show_landed_to_watchers(key, finished_row, launcher)
         # A voice-steered loop that re-homed to a new-prompt folder: open it now that
         # its first generation has given the folder a node.
         if self._pending_auto_key is not None:
@@ -6040,7 +6093,7 @@ class GalleryView(QWidget):
             item = self._tree_item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
-        self._enhance_frames.pop(key, None)   # this run's frames are spent
+        self._enhance_targets.pop(prompt_id, None)  # a run that is over is nobody's enhance
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
         self._auto_enhance_if_wanted(finished_row)  # while the Auto switch is on
@@ -6062,29 +6115,26 @@ class GalleryView(QWidget):
                 and gallery.produced_output(finished_row):
             launcher.show_completed_result(finished_row, self._image_rows)
 
-    def _show_mirrored_result(self, finished_row: dict | None, launcher):
-        """The run the info pane was mirroring has landed: put its picture where its
-        live frames were, in the tab in front.
+    def _show_landed_to_watchers(self, key: str, finished_row: dict | None, launcher):
+        """The run a tab was following has landed: put its picture where its live
+        frames were, in every tab following folder ``key``.
 
-        The frames were streaming there whoever launched the run (see
-        :meth:`InfoPaneTabs.show_reroll_frame`), so without this a pane watching a
-        loop — or a fullscreen show opened over those frames — would sit on the
-        last partial frame of a run that has finished. Only the preview changes:
-        the tab holds no more of a run it didn't ask for. Skipped when the tab in
-        front is the one that launched it, which has just been given the whole
-        end-state instead.
+        Without this a tab watching a loop — or a fullscreen show opened over
+        those frames — would sit on the last partial frame of a run that has
+        finished. Only the preview changes: the tab holds no more of a run it
+        didn't ask for. The ``launcher`` is skipped, having just been given the
+        whole end-state instead.
         """
         if finished_row is None or not gallery.produced_output(finished_row):
             return
-        if launcher is not None and launcher is self._info_tabs.current_config_panel():
-            return
-        self._info_tabs.show_reroll_result(finished_row)
+        for panel in self._info_tabs.watchers_of(key):
+            if panel is not launcher:
+                panel.show_finished_media(finished_row)
 
     def _on_reroll_failed(self, key: str):
-        """A re-roll failed (recorded by the controller): release the info pane if
-        it was showing this one, and redraw the folder without its tile."""
+        """A re-roll failed (recorded by the controller): let go of it wherever it
+        was being watched, and redraw the folder without its tile."""
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
-        self._enhance_frames.pop(key, None)
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
@@ -6562,13 +6612,10 @@ class GalleryView(QWidget):
         it, so no enhanced file lands with no original to be a version of.
         """
         doomed = [row for row in rows if row]
-        for job in list(self._reroll.all_jobs):
-            if job.workflow.name != gallery.ENHANCE_WORKFLOW:
-                continue
-            source = job.params.get("input_image")
-            if any(gallery.enhance_targets_row(source, row) for row in doomed):
+        for job in list(self._enhance_jobs()):
+            if any(self._enhance_of_row(job, row) for row in doomed):
                 logger.info("Cancelling the enhance of %s: its image is being deleted",
-                            source)
+                            job.params.get("input_image"))
                 self._reroll.cancel_job(job.prompt_id)
 
     def _delete_rows(self, rows):
@@ -6592,7 +6639,6 @@ class GalleryView(QWidget):
     def _undo(self):
         if not self._actions.can_undo():
             return
-        self._info_tabs.clear_current_preview()
         focus = self._actions.undo()  # a restored generation to return to, if any
         self._browser.clear_selection()
         self.refresh()
@@ -6607,7 +6653,6 @@ class GalleryView(QWidget):
         takes something away rather than restoring it — so this only rebuilds."""
         if not self._actions.can_redo():
             return
-        self._info_tabs.clear_current_preview()
         self._actions.redo()
         self._browser.clear_selection()
         self.refresh()
@@ -6851,28 +6896,32 @@ class GalleryView(QWidget):
                                              self._db.list_generations())
 
     def _on_thumbnail_clicked(self, prompt_id: str):
+        """A generation was picked, wherever it was picked — in a folder, on a
+        shelf, among a search's hits, through a followed link, by a step Back:
+        it becomes the selected item and loads into a config tab, its output in
+        the preview, its settings in the form, a footer for its media type.
+        Which tab is :meth:`InfoPaneTabs.load_selection`'s to say — the one
+        already on this row's folder, else the pane's preview tab — and a tab is
+        only ever painted through there: no tab's preview is repainted from the
+        outside, so what a tab shows is always what that tab is for.
+        """
         row = self._row_for(prompt_id)
         if not row:
             return
-        self._clear_reroll_selection()  # a saved generation takes over the info pane
-        self._selected_row = row
-        # A genuine pick loads the generation into a config tab — its output in the
-        # preview, its settings in the form, a footer for its media type — reusing
-        # the current tab or forking one. A suppressed re-selection (a poll/rebuild,
-        # or Back/Forward) only refreshes the current tab's preview, leaving the
-        # tab set and any edited form alone.
-        if not self._suppress_history:
-            self._info_tabs.load_selection(row, self._image_rows,
-                                           self._request_for(prompt_id))
-        else:
-            self._info_tabs.show_selection_preview(
-                gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR), prompt_id
-            )
+        self._select_saved_generation(row)
+        self._info_tabs.load_selection(row, self._image_rows,
+                                       request=self._request_for(prompt_id))
         # Each generation looked at is its own browsing step, wherever it was
         # looked at: in a folder, on a shelf, or among a search's hits. The view it
         # was picked in goes on the stack with it, so Back returns to the item AND
         # to the pane it was one of — not to some other folder that also holds it.
         self._record_location(prompt_id)
+
+    def _select_saved_generation(self, row: dict):
+        """Make a saved generation the gallery's selected item, in place of any
+        running re-roll's tile — the gallery's own state, no tab touched."""
+        self._clear_reroll_selection()
+        self._selected_row = row
 
     def _animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
@@ -7093,10 +7142,10 @@ class GalleryView(QWidget):
             self._delete_btn.setToolTip("Nothing to delete")
 
     def _clear_metadata(self):
-        """Drop the info-pane selection: forget the shown generation and empty the
-        current tab's preview."""
+        """Drop the gallery's selection: no saved generation is the selected
+        item. The tabs are left as they are — each shows what it is for, and
+        nothing about the selection going was about any of them."""
         self._selected_row = None
-        self._info_tabs.clear_current_preview()
 
     def pin_config_tab(self):
         """Keep the front config tab — the double-click half of the pane's

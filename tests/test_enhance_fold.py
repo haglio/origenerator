@@ -117,6 +117,70 @@ def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     assert gallery.recent_generations(db.list_generations())[0]["prompt_id"] == "src"
 
 
+def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
+    # Two rows naming one file — ComfyUI's counter reused a number after a
+    # delete, or a completion was recorded twice — and an enhance of the second.
+    # By file, the fold would land on whichever the listing put first; the stamp
+    # names the row the user actually chose.
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "first", filename="sdxl_t2i_twin.png")
+    _add_source(db, "second", filename="sdxl_t2i_twin.png")
+    enhance = _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
+    db.set_enhance_target("e1", "second")
+
+    assert fold_enhancement(db, db.get_generation("e1")) == "second"
+
+    assert is_enhanced_row(db.get_generation("second"))
+    assert not is_enhanced_row(db.get_generation("first"))
+    assert db.get_generation("e1") is None
+
+
+def test_a_stamp_naming_a_deleted_image_folds_nothing(tmp_path):
+    # The image the run was of is gone: the run is left alone rather than
+    # landed on some other row that happens to name the same file.
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "lookalike", filename="sdxl_t2i_twin.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
+    db.set_enhance_target("e1", "deleted-long-ago")
+
+    assert fold_enhancement(db, db.get_generation("e1")) is None
+    assert not is_enhanced_row(db.get_generation("lookalike"))
+
+
+def test_an_unstamped_run_still_folds_by_the_file_it_read(tmp_path):
+    # A run from before the stamp was recorded has only the file to go by.
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "src")
+    enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]", "image_enhance_e1.png")
+    assert gallery.enhance_target_id(enhance, db.list_generations()) == "src"
+
+
+def test_a_stamped_run_is_awaited_by_id_not_by_file(tmp_path):
+    # Enhance All must skip the image whose enhance is cooking — and only that
+    # one, even when another row names the same file.
+    db = Database(tmp_path / "t.db")
+    first = _add_source(db, "first", filename="sdxl_t2i_twin.png")
+    second = _add_source(db, "second", filename="sdxl_t2i_twin.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "", status="running")
+    db.set_enhance_target("e1", "second")
+
+    awaiting = gallery.rows_awaiting_enhancement([first, second], db.list_generations())
+
+    assert [r["prompt_id"] for r in awaiting] == ["first"]
+
+
+def test_a_stamped_run_moves_its_own_image_up_the_shelf(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "first", filename="sdxl_t2i_twin.png")
+    _add_source(db, "second", filename="sdxl_t2i_twin.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "", status="running")
+    db.set_enhance_target("e1", "second")
+    rows = db.list_generations()
+    run_id = next(r["id"] for r in rows if r["prompt_id"] == "e1")
+
+    assert gallery.enhancement_recency(rows) == {"second": run_id}
+
+
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
     # The enhanced image's source was deleted: nothing to fold onto, so the row
     # stays as it is (visible and deletable) rather than half-migrated.

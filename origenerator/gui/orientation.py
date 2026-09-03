@@ -25,11 +25,14 @@ than of the side it is being looked at from.
 
 The shape is read from the item's stored thumbnail (a cheap header read that
 preserves the media's aspect), falling back to the media file itself for an
-image with no thumbnail, and then to the size the generation asked for — which
-is the only thing an in-flight row has, and without it a running portrait
-generation would appear under Landscape and jump sides the moment it landed.
-An item that answers none of the three files under Landscape, the roomier
-region — the same default the region routing uses for an unmeasurable set.
+image with no thumbnail, then to the size the generation asked for, and then
+to the start frame it is being made from — a video workflow derives its size
+from that picture in-graph and asks for none, so the frame is the only thing
+saying which way its video will come out. An in-flight row has nothing but
+those last two, and without them a running portrait generation would appear
+under Landscape and jump sides the moment it landed. An item that answers
+none of them files under Landscape, the roomier region — the same default the
+region routing uses for an unmeasurable set.
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.workflows.derived_size import resolve_input_image_path
 
 PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
@@ -95,8 +99,24 @@ def orientation_of(key: str | None) -> str | None:
 
 
 def row_orientation(row: dict) -> str:
-    """Which region *row*'s media belongs on, by its own shape."""
-    for candidate in _probe_candidates(row):
+    """Which region *row*'s media belongs on, by its own shape.
+
+    Its own files first; then, for a row with none yet, the size it asked for;
+    then the start frame it is being made from (see :func:`_frame_candidate`).
+    """
+    measured = _measure_any(_probe_candidates(row))
+    if measured is not None:
+        return measured
+    params = gallery.parse_params(row.get("params_json"))
+    asked = requested_orientation(params)
+    if asked is not None:
+        return asked
+    return _measure_any(_frame_candidate(params)) or LANDSCAPE
+
+
+def _measure_any(candidates) -> str | None:
+    """The shape of the first of *candidates* that can be read, or ``None``."""
+    for candidate in candidates:
         path = str(candidate)
         remembered = _measured.get(path)
         if remembered is not None:
@@ -110,7 +130,7 @@ def row_orientation(row: dict) -> str:
         measured = PORTRAIT if height > width else LANDSCAPE
         _remember(path, measured)
         return measured
-    return requested_orientation(gallery.parse_params(row.get("params_json"))) or LANDSCAPE
+    return None
 
 
 def _remember(path: str, measured: str) -> None:
@@ -130,6 +150,15 @@ def _probe_candidates(row: dict) -> list[Path]:
     if resolved is not None and resolved[1] == "image":
         candidates.append(Path(resolved[0]))
     return candidates
+
+
+def _frame_candidate(params: dict) -> list[Path]:
+    """The start frame a run is built from, as the one file that says which way
+    its output will come: the video workflows keep the frame's aspect at a fixed
+    pixel budget (:mod:`origenerator.workflows.derived_size`), so a portrait
+    frame makes a portrait video. Empty for a run made from nothing."""
+    frame = resolve_input_image_path(params.get("input_image"))
+    return [frame] if frame is not None else []
 
 
 def requested_orientation(params: dict) -> str | None:

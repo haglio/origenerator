@@ -3893,19 +3893,26 @@ def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
     assert panel._displayed_row["prompt_id"] == "i1"
 
 
-def test_a_suppressed_reselection_leaves_the_active_tab_alone(qtbot):
-    # A poll/rebuild re-selects the current generation with history suppressed; that
-    # must not yank the user off a config tab they're editing or fork a new one.
+def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
+    # A poll/rebuild re-selects the current generation; that must not yank the
+    # user off a config tab they're editing, fork a new one, or paint the
+    # selection into the tab in front — the selection is the gallery's, and a
+    # tab shows only what it is for.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # its folder on screen
     editing = view._info_tabs._add_subtab()  # config tab at index 1, current
+    editing._preview.show_media = MagicMock()
     count = view._info_tabs.count()
-    view._suppress_history = True
-    view._on_thumbnail_clicked("i1")
-    view._suppress_history = False
+
+    view._reselect_generation("i1")  # what a rebuild does with the selection
+
+    assert view._selected_row["prompt_id"] == "i1"     # the gallery re-selected it
     assert view._info_tabs.currentWidget() is editing  # stayed on the config tab
     assert view._info_tabs.count() == count            # no new tab forked
     assert editing._displayed_row is None              # its form/footer untouched
+    editing._preview.show_media.assert_not_called()    # nor its preview
 
 
 def _current_form(view):
@@ -3933,9 +3940,9 @@ def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
     assert values["seed"] == 123
 
 
-def test_a_suppressed_reselection_does_not_reload_the_form(qtbot, tmp_path):
-    # A poll/rebuild re-selects the current generation with history suppressed; that
-    # must not wipe edits the user has made in the form.
+def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
+    # A poll/rebuild re-selects the current generation; that must not wipe edits
+    # the user has made in the form.
     db = Database(tmp_path / "t.db")
     params = dict(_SDXL.default_params(), positive_prompt="a wizard")
     db.insert_generation(
@@ -3945,12 +3952,11 @@ def test_a_suppressed_reselection_does_not_reload_the_form(qtbot, tmp_path):
     view = GalleryView(db, client=ComfyUIClient())
     qtbot.addWidget(view)
     view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["g1"])  # its folder on screen
     view._on_thumbnail_clicked("g1")           # loads the form
     _current_form(view).set_values({"positive_prompt": "my edit"})
 
-    view._suppress_history = True
-    view._on_thumbnail_clicked("g1")
-    view._suppress_history = False
+    view.refresh()  # the rebuild a poll makes, re-selecting the same generation
 
     assert _current_form(view).get_values_static()["positive_prompt"] == "my edit"
 
@@ -7094,13 +7100,17 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)  # no preview frame has arrived yet
-    view._preview.clear = MagicMock()
-    view._preview.show_message = MagicMock()
+    painted = []  # what the pane is told to show, in order
+    view._preview.clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
+    view._preview.show_message = MagicMock(
+        side_effect=lambda text, **kwargs: painted.append(text))
 
     _reroll_tile(view).selected.emit()
 
-    view._preview.clear.assert_not_called()
-    view._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
+    # Seeding the landing tab from the run's settings may pass through the
+    # placeholder; what the pane ends on is the point.
+    assert painted[-1] == "Waiting for preview…"
+    assert view._preview.show_message.call_args == (("Waiting for preview…",), {"live": True})
 
 
 def _waiting_view(qtbot, tmp_path, backlog):
@@ -7113,8 +7123,8 @@ def _waiting_view(qtbot, tmp_path, backlog):
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
+    view._preview.show_message = MagicMock()  # the resting tab, where the click lands
     _reroll_tile(view).selected.emit()
-    view._preview.show_message = MagicMock()
     return view, client
 
 
@@ -7173,13 +7183,16 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     frame = _png_bytes()
     client.preview_image.emit(job.prompt_id, frame)
     _reroll_tile(view).selected.emit()
-    view._preview.show_frame = MagicMock()
+    panel = view._info_tabs.current_config_panel()
+    assert panel.watched_key() == key and panel._preview._live_frame == frame
 
     view._poll()  # the rebuild the new running row triggers
 
     assert view._selected_reroll_key == key
     assert _reroll_tile(view).is_selected()
-    view._preview.show_frame.assert_called_with(frame)
+    # The tab following the run kept its frame: a rebuild repaints no tab.
+    assert view._info_tabs.current_config_panel() is panel
+    assert panel.watched_key() == key and panel._preview._live_frame == frame
 
 
 def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
@@ -7201,12 +7214,13 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image done -> video starts
     assert view._reroll_jobs[key].workflow.name == "wan22_i2v"
-    view._preview.show_frame = MagicMock()
 
     view._poll()  # the rebuild the finished image row triggers
 
     assert view._selected_reroll_key == key
-    view._preview.show_frame.assert_called_with(image_frame)
+    panel = view._info_tabs.current_config_panel()
+    assert panel.watched_key() == key
+    assert panel._preview._live_frame == image_frame  # still the image's frame
 
 
 def _seeded_i2v_db(tmp_path):
@@ -7586,6 +7600,7 @@ class _FakeRerollJob:
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
                  progress=(0, 0), foreign_ahead=None, started_at=None):
         self.prompt_id = prompt_id
+        self.origin = prompt_id  # a run of its own, not a chained stage
         self.state = state
         self.last_preview = frame
         self.last_progress = progress

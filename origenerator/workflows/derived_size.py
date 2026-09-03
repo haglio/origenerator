@@ -23,19 +23,13 @@ from pathlib import Path
 from PIL import Image
 
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR
+from origenerator.file_refs import reference_path
 
 # The default pixel budget (what the video workflows scale to in-graph) and the
 # shared stride, matched here so an image yields the same proportions the graph
 # will produce. A workflow on a different budget (SDXL's ~1 MP) passes its own.
 TARGET_MEGAPIXELS = 0.4
 RESOLUTION_STEPS = 16
-
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]"
-# (the same convention gallery/signatures.py strips); an unannotated value names
-# a file in the input dir.
-_OUTPUT_TAG = "[output]"
-_INPUT_TAG = "[input]"
-
 
 def scale_to_total_pixels(
     src_width: int, src_height: int, megapixels: float = TARGET_MEGAPIXELS,
@@ -58,22 +52,12 @@ def scale_to_total_pixels(
 
 def resolve_input_image_path(input_image: str | None) -> Path | None:
     """The on-disk file a LoadImage value names, or ``None`` when it's empty or
-    absent. A ``"name [output]"`` value lives under the ComfyUI output dir and an
-    ``"[input]"`` (or unannotated) one under the input dir — matching how
+    absent — :func:`origenerator.file_refs.reference_path` under this app's
+    ComfyUI directories. A ``"name [output]"`` value lives under the output dir
+    and an ``"[input]"`` (or unannotated) one under the input dir, matching how
     ComfyUI's LoadImage routes the reference. An absolute path is taken as-is."""
-    ref = (input_image or "").strip()
-    if not ref:
-        return None
-    stem, _, tag = ref.rpartition(" ")
-    if stem and tag == _OUTPUT_TAG:
-        path = COMFYUI_OUTPUT_DIR / stem
-    elif stem and tag == _INPUT_TAG:
-        path = COMFYUI_INPUT_DIR / stem
-    else:
-        path = Path(ref)
-        if not path.is_absolute():
-            path = COMFYUI_INPUT_DIR / ref
-    return path if path.is_file() else None
+    return reference_path(input_image, output_dir=COMFYUI_OUTPUT_DIR,
+                          input_dir=COMFYUI_INPUT_DIR)
 
 
 def override_size(params: dict) -> tuple[int, int] | None:

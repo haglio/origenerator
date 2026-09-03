@@ -12,7 +12,19 @@ their place, which is what "close all" means where one tab is always open.
 
 Tabs open the way an IDE opens files, so browsing doesn't leave a row of them
 behind. A single-clicked generation lands in the *preview* tab, drawn in italic:
-the next single click replaces it. A double-click on the tab pins it upright, and
+the next single click replaces it. A click on a folder's live tile lands the
+same way — the run's own settings on the form, its frames in the preview — unless
+a tab is already that run's, having launched it or been pointed at its folder,
+in which case that tab comes forward instead.
+
+What a tab's preview shows is only ever the tab's own: the generation it was
+opened on, the run it launched or was pointed at (which it follows by folder
+key, frame by frame, to the picture it lands as), or its settings' newest
+result. Nothing here paints "the tab in front" from outside — the gallery's
+selection, a rebuild, a run some other tab is for — which is how a tab used to
+end up showing a picture it was not about.
+
+A double-click on the tab pins it upright, and
 the click after it opens a new preview tab beside it. Opening a configuration by
 name — a history-strip click, a queue row, the combine panel's "Open in
 generator" — lands the same way, since it is the same "show me this" gesture;
@@ -489,65 +501,27 @@ class InfoPaneTabs(QTabWidget):
         """Whether a preview built now should open held."""
         return self._previews_paused
 
-    def show_selection_preview(self, preview, prompt_id: str):
-        """Point the current tab's preview at ``preview`` (a resolved
-        ``(path, media_type)``, or ``None``) without touching its form or the tab
-        set — the light-touch update a suppressed poll/rebuild re-selection makes.
+    # --- the tabs following a run in flight --------------------------------
 
-        ``prompt_id`` is the shown generation, so the tab can hang everything the
-        picture carries back off it: the drag onto a combine slot, and the corner
-        controls and right-click menu, both of which showing media clears. That
-        is the tab's own business, so it does it
-        (:meth:`~origenerator.gui.generate_config_panel.GenerateConfigPanel.show_selection_media`)
-        rather than being reached into from here — which is what left the preview
-        bare of its corners on every launch, since the restored selection comes
-        through this path and not through a click.
+    def watchers_of(self, key: str) -> list[GenerateConfigPanel]:
+        """Every tab whose preview follows the run leading folder ``key`` (see
+        :meth:`GenerateConfigPanel.watched_key`) — where that run's frames and
+        the picture it lands as go, and nowhere else. Usually one tab; two when
+        a Generate was pressed in one and the folder's live tile clicked into
+        another, and both are the tab's own business to show."""
+        return [panel for panel in self._config_panels()
+                if panel.watched_key() == key]
 
-        The pane's resting tab is left alone: a tab with no workflow picked and
-        nothing on display holds no generation, so there is no preview of its own
-        to refresh, and giving it one shows a picture over a form still asking
-        which workflow to run. That is what reopening the app on the resting tab
-        used to do — the restored gallery selection re-selects itself through here,
-        and its image landed in a "New generation" tab. A genuine click doesn't
-        come this way: it goes through :meth:`load_selection`, which fills such a
-        tab whole — form, preview and footer together.
-        """
-        panel = self.current_config_panel()
-        if panel is None:
-            return
-        if preview is None:
-            panel._preview.clear()  # nothing to show disarms the drag itself
-        elif not panel.is_blank():
-            panel.show_selection_media(preview, prompt_id)
+    def panel_watching(self, key: str) -> GenerateConfigPanel | None:
+        """The first tab following folder ``key``'s run, or ``None``."""
+        watching = self.watchers_of(key)
+        return watching[0] if watching else None
 
-    def show_reroll_frame(self, frame: bytes | None, note: str | None = None):
-        """Mirror a running re-roll's live frame into the current tab's preview —
-        or a 'waiting' note when no frame has arrived yet, never the idle
-        placeholder. The note is marked live, so double-clicking the pane opens
-        the run fullscreen even before its first frame streams.
-
-        ``note`` replaces the generic wait when something more useful can be said —
-        how much of ComfyUI's queue is in front of this run — so a pane that sits
-        unchanged for minutes reads as a queue rather than a hang."""
-        panel = self.current_config_panel()
-        if panel is None:
-            return
-        if frame:
-            panel._preview.show_frame(frame)
-        else:
-            panel._preview.show_message(note or "Waiting for preview…", live=True)
-
-    def show_reroll_result(self, row: dict):
-        """The re-roll whose frames the front tab was mirroring has landed: its
-        saved output takes their place there, so a run watched to the end shows the
-        picture it made instead of freezing on its last partial frame.
-
-        The preview alone — the tab keeps its own form, footer and generation (see
-        :meth:`GenerateConfigPanel.show_finished_media`); the whole end-state goes
-        to the tab that launched the run, if a tab did."""
-        panel = self.current_config_panel()
-        if panel is not None:
-            panel.show_finished_media(row)
+    def landing_panel(self) -> GenerateConfigPanel:
+        """The tab a "show me this" gesture lands in — a clicked thumbnail, a
+        clicked live tile — so that opening things doesn't leave a trail of tabs
+        (see :meth:`_landing_panel`)."""
+        return self._landing_panel()
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
         """A row has changed: re-show it in every tab displaying it.
@@ -571,13 +545,6 @@ class InfoPaneTabs(QTabWidget):
             row = panel.displayed_row()
             if row is not None and row.get("prompt_id") not in live_ids:
                 panel._preview.clear()
-
-    def clear_current_preview(self):
-        """Empty the current tab's preview (a re-roll ended with nothing to show,
-        or the selection was deleted)."""
-        panel = self.current_config_panel()
-        if panel is not None:
-            panel._preview.clear()
 
     def release_media(self, paths):
         """Let every tab go of any of ``paths`` it's showing — files about to be

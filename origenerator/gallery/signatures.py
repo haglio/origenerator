@@ -12,6 +12,7 @@ configuration into the settings key.
 import json
 from functools import lru_cache
 
+from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import is_no_lora
 
@@ -38,10 +39,6 @@ INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 # (:meth:`WorkflowTemplate.enhance_keys`), so a workflow growing another enhance
 # knob can't silently start splitting folders by it.
 ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})
-
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
-_TYPE_ANNOTATION = frozenset({"[output]", "[input]", "[temp]"})
-
 
 def parse_params(params_json: str | None) -> dict:
     """Parse a row's ``params_json`` into a dict, tolerating bad data."""
@@ -236,24 +233,12 @@ def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
     return _keyed_signature(keys, _named_loras(keys, parse_params(params_json)))
 
 
-def _basename(path: str) -> str:
-    """Final path segment, tolerant of either OS separator."""
-    return path.replace("\\", "/").rsplit("/", 1)[-1]
-
-
-def _unannotated(image_ref: str) -> str:
-    """A LoadImage value stripped of any trailing "[output]"-style type tag, so a
-    re-roll's annotated output reference compares by plain filename."""
-    stem, _, tag = image_ref.rpartition(" ")
-    return stem if stem and tag in _TYPE_ANNOTATION else image_ref
-
-
-def _frame_name(image_ref: str | None) -> str:
-    """The comparison key for an i2v start frame: its basename, lowercased, with
-    any ``[output]``-style annotation stripped — so a LoadImage reference, an
-    annotated re-roll output, and a stored output filename all match by the plain
-    file they name."""
-    return _basename(_unannotated(image_ref or "")).lower()
+# The reference-reading trio, under the names this module's callers grew up
+# with. One reading of a file reference serves the whole app now
+# (:mod:`origenerator.file_refs`); these stay so nothing here has to be re-said.
+_basename = reference_basename
+_unannotated = unannotated
+_frame_name = frame_name
 
 
 def _outputs_video(workflow_name: str | None) -> bool:

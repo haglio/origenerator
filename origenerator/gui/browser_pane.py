@@ -874,9 +874,9 @@ class BrowserPane:
         itself — its tile picked, highlighted and scrolled to, as if you'd navigated
         in and clicked it, not just auto-previewing the folder's first item. The
         double-click gesture on every shelf tile, and the info pane's "Go to
-        folder"; a followed link (:meth:`GalleryView._on_source_link`) lands the
+        folder"; a followed link (:meth:`GalleryView._follow_link`) lands the
         same way."""
-        self._v._on_source_link(prompt_id)
+        self._v._follow_link(prompt_id)
 
     def _shelf_double_clicked(self, prompt_id: str):
         """A shelf tile's double-click: go to the item's own folder, and keep the

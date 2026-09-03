@@ -2920,6 +2920,72 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
     assert _source_tile(view).isHidden()
 
 
+def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
+    """A move always ends with the item on screen, drawn from its own folder.
+
+    The pane can be showing something other than the row the tree has current —
+    a search's hits, a shelf — and setting a row Qt already holds current fires
+    no signal to draw anything. The move draws it itself in that case rather than
+    trusting the signal, which is how a click came to fill the info pane while
+    the middle pane behind it stood still.
+    """
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)                 # that folder's row is now the current one
+    assert "i1" in view.visible_prompt_ids()
+    view._browser.show_empty()               # the pane goes off it, the row stays current
+    assert "i1" not in view.visible_prompt_ids()
+
+    view._go_to_generation("i1")
+
+    assert "i1" in view.visible_prompt_ids()          # the folder is drawn again
+    assert view._selected["prompt_id"] == "i1"        # and the item is picked in it
+
+
+def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
+    """A generation that failed with no file has no row of its own in the tree —
+    a terminal file-less row is dropped from it — so the move falls back to the
+    row its settings key names. Opening no folder at all is what left the middle
+    pane where it was while the item filled the info pane beside it."""
+    done = _image("i1", "a cat", 50, 1)
+    failed = dict(done, prompt_id="x1", status="error", output_files="[]",
+                  thumbnail_path=None)
+    view = GalleryView(FakeDB([done, failed]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    assert "x1" not in view._leaf_by_id       # no settings row of its own
+
+    view._go_to_generation("x1")
+
+    # Its folder is the one its finished sibling sits in, and that is what opened.
+    assert "i1" in view.visible_prompt_ids()
+    assert view._selected["prompt_id"] == "x1"
+
+
+def test_following_a_link_lands_in_one_tab(qtbot):
+    """A followed link fills the tab a click would, rather than forking one: going
+    to look at something costs no more tabs than browsing to it."""
+    image = _image("img1", "a cat", 50, 1)
+    video = _row("vid1", "wan22_i2v",
+                 {"positive_prompt": "dance", "seed": 5,
+                  "input_image": "sdxl_t2i_img1.png"},
+                 "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient())
+    qtbot.addWidget(view)
+    view.refresh()
+    for panel in view._info_tabs._config_panels():
+        panel._preview.show_media = MagicMock()  # don't start WMF playback
+    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._thumbnail_clicked("vid1")
+    tabs = view._info_tabs.count()
+
+    view._follow_link("img1")
+
+    assert view._info_tabs.count() == tabs
+    assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == "img1"
+
+
 def test_back_and_forward_walk_the_viewed_generations(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
@@ -2947,7 +3013,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     view._thumbnail_clicked("vid1")   # viewing the video
-    view._on_source_link("img1")      # follow its input-image link
+    view._follow_link("img1")      # follow its input-image link
 
     assert view._selected["prompt_id"] == "img1"
     view._go_back()
@@ -3380,7 +3446,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
     view._thumbnail_clicked("vid1")               # viewing the video
     assert view._selected["prompt_id"] == "vid1"
 
-    view._on_source_link("img1")                  # follow its source-image link
+    view._follow_link("img1")                  # follow its source-image link
     assert view._selected["prompt_id"] == "img1"
     view._go_back()
     assert view._selected["prompt_id"] == "vid1"  # Back to where we were
@@ -3411,7 +3477,7 @@ def test_following_a_source_link_lands_on_the_image_itself(qtbot):
     # and scrolled to rather than left off the bottom of the pane.
     view, scrolled = _linked_view(qtbot)
 
-    view._on_source_link("i7")                    # follow its source-image link
+    view._follow_link("i7")                    # follow its source-image link
 
     assert view.selected_prompt_ids() == ["i7"]
     assert view._thumb_widgets["i7"].is_selected()
@@ -3424,7 +3490,7 @@ def test_a_followed_link_scrolls_again_once_the_folder_is_laid_out(qtbot):
     # this turn's layout has run, is what actually puts the tile on screen.
     view, scrolled = _linked_view(qtbot)
 
-    view._on_source_link("i7")
+    view._follow_link("i7")
     qtbot.wait(1)
 
     tile = view._thumb_widgets["i7"]
@@ -3436,7 +3502,7 @@ def test_a_followed_link_does_not_scroll_a_folder_moved_on_from(qtbot):
     # tile is gone, and the view the user chose instead isn't ours to move.
     view, scrolled = _linked_view(qtbot)
 
-    view._on_source_link("i7")
+    view._follow_link("i7")
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])  # back off before layout
     scrolled.clear()
     qtbot.wait(1)

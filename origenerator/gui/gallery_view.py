@@ -1469,8 +1469,8 @@ class GalleryView(QWidget):
         its preview opens the folder behind it as a held slideshow,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
-        panel.source_activated.connect(self._on_source_link)
-        panel.animated_activated.connect(self._on_source_link)
+        panel.source_activated.connect(self._follow_link)
+        panel.animated_activated.connect(self._follow_link)
         # Its preview's corners and its right-click are the same acts, on the same
         # generation, as a browser thumbnail's — so they land in the same places.
         panel.item_action_requested.connect(self.run_item_action)
@@ -2615,11 +2615,12 @@ class GalleryView(QWidget):
         """
         if not self._search_query:
             return
+        recording = self._suppress_history
         self._suppress_history = True
         try:
             self._search_edit.clear()
         finally:
-            self._suppress_history = False
+            self._suppress_history = recording
 
     def _on_search_sort_changed(self, _index=0):
         """Re-lay the results in the newly picked order (a no-op off a search)."""
@@ -4873,7 +4874,7 @@ class GalleryView(QWidget):
         """
         if self._row_for(prompt_id) is None:
             return
-        self._on_source_link(prompt_id)  # its folder, its tile, its tab, out of any search
+        self._follow_link(prompt_id)  # its folder, its tile, its tab, out of any search
 
 
     def _starred_prompt_ids(self) -> set[str]:
@@ -5179,7 +5180,7 @@ class GalleryView(QWidget):
         The tab matters as much as the folder: leaving a show *for* an item is a
         decision to work on it, and a folder open behind a form still holding
         whatever was there before the show is not that — which landing on the
-        item gives it, the way a click on it would (:meth:`_on_source_link`).
+        item gives it, the way a click on it would (:meth:`_follow_link`).
         The slideshow has already closed itself, so this arrives on the gallery.
         """
         self._slideshow = None
@@ -6411,7 +6412,7 @@ class GalleryView(QWidget):
         delete_action = menu.addAction("Delete" + suffix)
         chosen = menu.exec(global_pos)
         if folder_action is not None and chosen is folder_action:
-            self._on_source_link(rows[0]["prompt_id"])
+            self._follow_link(rows[0]["prompt_id"])
         elif chosen is star_action:
             self.set_items_starred([row["prompt_id"] for row in rows], not all_starred)
         elif enhance_action is not None and chosen is enhance_action:
@@ -6521,8 +6522,8 @@ class GalleryView(QWidget):
             return
         self._browser.clear_selection()
         self.refresh()
-        if restored and restored in self._leaf_by_id:
-            self._show_generation(restored)
+        if restored:
+            self._go_to_generation(restored)
 
     def purge_from_trash(self, prompt_ids):
         """End deleted items now instead of waiting out their window. Confirmed
@@ -6663,8 +6664,8 @@ class GalleryView(QWidget):
         self.refresh()
         # After undoing a delete, go back to the folder it emptied (now restored),
         # rather than leaving the user on the parent we'd navigated to.
-        if focus and focus in self._leaf_by_id:
-            self._show_generation(focus)
+        if focus:
+            self._go_to_generation(focus)
         self._sync_history_buttons()
 
     def _redo(self):
@@ -6949,36 +6950,79 @@ class GalleryView(QWidget):
         strip resolves the same path through :func:`gallery.animated_preview_path`)."""
         return gallery.animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR)
 
-    def _on_source_link(self, prompt_id: str):
-        """Follow a link to another generation — a video's source image, an image's
-        animation, a "Go to folder". Opens the target's folder and lands on the
-        item itself: previewed, its tile picked and scrolled into view, so which of
-        the folder's items the link meant is visible rather than guessed at.
+    def _follow_link(self, prompt_id: str):
+        """Follow a link to another generation — a video's source image, an
+        image's animation, a "Go to folder", a search hit's double-click.
 
-        Following a link is a decision to go somewhere, so it puts a running
-        search away first — this is the gesture a search result's double-click
-        makes, and the folder it opens has to be what ends up on screen."""
+        Only the search handling is its own: following a link is a decision to go
+        somewhere, so a running query is put away first, or the folder the move
+        opens is drawn straight over by the results the link was clicked among.
+        The going itself is the one move every other gesture makes.
+        """
         self._leave_search()
-        self._show_generation(prompt_id)
-        self._record_location(prompt_id)
-        # After the navigation, which renders the folder's tiles fresh.
-        self._browser.reveal_tile(prompt_id)
+        self._go_to_generation(prompt_id)
+
+    def _go_to_generation(self, prompt_id: str):
+        """Go to a generation: open the folder holding it, draw that folder, pick
+        the item's own tile in it, and show the item in the info pane.
+
+        The single move behind every "take me to this picture" — a link, a
+        right-click "Go to folder", Back and Forward, a hosted show's lock, an
+        undo landing on what it brought back. There is no lighter version of it
+        and no separate path for any of them: a move that did some of those and
+        not the others is how the middle pane came to be standing still while the
+        tab beside it filled with the item that was asked for.
+
+        The folder it opens on the way is not a stop of its own — passing
+        through somewhere to reach an item is not somewhere you went — so that
+        step records nothing, and the arrival at the item records itself. Whether
+        the move is a stop at all is the caller's business: Back and Forward walk
+        history rather than add to it, and suppress it around this.
+        """
+        item = self._folder_row_for(prompt_id)
+        if item is not None:
+            recording = self._suppress_history
+            self._suppress_history = True
+            try:
+                # Setting a row that is already its half's current one fires no
+                # signal, and the pane would go on showing whatever it holds —
+                # the shelf or the search hits the move was made from. So the
+                # drawing is done here in that case rather than waited for.
+                drawn_by_the_signal = not self._tree.is_current(item)
+                self._tree.setCurrentItem(item)
+                if not drawn_by_the_signal:
+                    self._on_folder_selected(item, None)
+            finally:
+                self._suppress_history = recording
+        self._on_thumbnail_clicked(prompt_id)   # the arrival: its tab, and its stop
+        self._browser.reveal_tile(prompt_id)    # once the folder's tiles are drawn
+        logger.info("Went to %s: folder %s, %d tiles drawn, tile shown %s",
+                    prompt_id, self._selected_folder_key(),
+                    len(self._browser.visible_prompt_ids()),
+                    prompt_id in self._browser.visible_prompt_ids())
+
+    def _folder_row_for(self, prompt_id: str):
+        """The tree row of the folder a generation lives in: its settings row, or
+        — for one the tree holds no row for, a generation that failed with no
+        file, or one held in the trash — the row its settings key names.
+
+        ``None`` only when the tree has nowhere at all to put it, which is the
+        one case a move has no folder to open. Answering ``None`` for anything
+        less than that is what left a move opening no folder while the item it
+        named went on to fill the info pane, so the click read as having done
+        nothing.
+        """
+        leaf = self._leaf_by_id.get(prompt_id)
+        if leaf is not None:
+            return leaf
+        row = self._row_for(prompt_id)
+        if row is None:
+            return None
+        key = gallery.settings_folder_key(
+            row, gallery.build_image_config_index(self._image_rows))
+        return self._tree_item_for(key) if key else None
 
     # --- back/forward navigation ------------------------------------------
-
-    def _show_generation(self, prompt_id: str):
-        """Select a generation and its folder without recording — the move
-        Back/Forward and a link both make. Opens the target's folder, then clicks
-        the generation itself; suppressing keeps that off the history, and a
-        recording caller (a link) adds the real target itself afterward."""
-        self._suppress_history = True
-        try:
-            leaf = self._leaf_by_id.get(prompt_id)
-            if leaf is not None:
-                self._tree.setCurrentItem(leaf)  # shows that folder's thumbnails
-            self._on_thumbnail_clicked(prompt_id)
-        finally:
-            self._suppress_history = False
 
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen — one side's Latest, Favorites,
@@ -7073,7 +7117,7 @@ class GalleryView(QWidget):
             row = self._tree_item_for(location.view)
             if row is None:
                 if location.item is not None:
-                    self._show_generation(location.item)
+                    self._go_to_generation(location.item)
                 return
             if self._tree.currentItem() is row:
                 # Already standing on that row, so setting it fires nothing — and

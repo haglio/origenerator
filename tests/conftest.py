@@ -31,6 +31,27 @@ import pytest
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
+
+@pytest.fixture(autouse=True)
+def _unscaled_between_tests():
+    """No test leaves this process drawing at another size than it found it.
+
+    QT_SCALE_FACTOR is read by Qt per widget, and it is an ENVIRONMENT variable
+    -- process-global, outliving whatever set it. A test that runs the hosted
+    launch (main(["--fun-time", ...]), which scales the app on purpose) would
+    otherwise hand every later test in the session a scaled Qt, and the tests
+    that assert a window landed on the rect it was given fail hundreds of cases
+    downstream of the one that actually set it.
+    """
+    before = os.environ.get("QT_SCALE_FACTOR")
+    try:
+        yield
+    finally:
+        if before is None:
+            os.environ.pop("QT_SCALE_FACTOR", None)
+        else:
+            os.environ["QT_SCALE_FACTOR"] = before
+
 # Render Qt offscreen for the whole suite. Agents run these GUI tests on every
 # commit; without this, each test that shows a widget throws a real window onto
 # the screen for a few milliseconds, so a run flashes a burst of windows. Must

@@ -60,6 +60,7 @@ class FunTimeSession:
 class AppArgs:
     fun_time: FunTimeSession | None
     taskbar_identity: str | None
+    check_launch: bool = False
 
 
 def _add_rect_arguments(parser: argparse.ArgumentParser, prefix: str) -> None:
@@ -80,6 +81,15 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("command-file", "paused-file", "status-file", "dashboard-cmd-file"):
         parser.add_argument(f"--{name}", type=Path, default=None)
     parser.add_argument("--taskbar-identity", default=None)
+    # Boot far enough to prove this launch works, then exit 0 without opening
+    # anything.  A hosting session's integration suite runs the REAL launch
+    # command it would use in production through this, which is how a break
+    # that kills the process before it can log — an import that cannot resolve
+    # under the launch interpreter, a bad argv contract — is caught by a test
+    # instead of by a session coming up with a window missing.  It stops short
+    # of the database, ComfyUI and any window, so a run costs the machine
+    # nothing and contends with no live app.
+    parser.add_argument("--check-launch", action="store_true")
     return parser
 
 
@@ -176,4 +186,5 @@ def parse_app_args(argv: list[str]) -> AppArgs:
             status_file=args.status_file,
             dashboard_cmd_file=args.dashboard_cmd_file,
         )
-    return AppArgs(fun_time=session, taskbar_identity=args.taskbar_identity)
+    return AppArgs(fun_time=session, taskbar_identity=args.taskbar_identity,
+                   check_launch=args.check_launch)

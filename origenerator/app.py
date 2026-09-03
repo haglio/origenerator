@@ -177,6 +177,12 @@ def main(argv: list[str] | None = None):
 
     app_args = parse_app_args(sys.argv[1:] if argv is None else argv)
     fun_time = app_args.fun_time
+    if fun_time is not None:
+        # Hosted, draw at the session's HUD scale (origenerator.ui_scale says
+        # why). Here and not later: Qt reads QT_SCALE_FACTOR as the platform
+        # plugin starts, so it has to be set before PyQt6 is imported at all.
+        from origenerator.ui_scale import apply_hosted_scale
+        apply_hosted_scale()
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
     _init_windows_taskbar_identity(app_args.taskbar_identity)
     _name_this_process()
@@ -219,6 +225,20 @@ def main(argv: list[str] | None = None):
     # palette — which renders them unreadable, i.e. effectively missing.
     from origenerator.gui.stylesheet import build_stylesheet
     app.setStyleSheet(build_stylesheet())
+
+    if app_args.check_launch:
+        # Everything the launch imports, imported -- including the modules that
+        # are only reached further down, which are where a break hides.  Nothing
+        # is opened or shown: this returns before the database, ComfyUI and the
+        # first window, so a hosting session's test can run the real command
+        # against a live machine without touching either.
+        from origenerator.app_state import AppState  # noqa: F401
+        from origenerator.branch_session import is_branch_session  # noqa: F401
+        from origenerator.comfyui_client import ComfyUIClient  # noqa: F401
+        from origenerator.db import Database  # noqa: F401
+        from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
+        logger.info("Launch check passed (%s)", sys.executable)
+        return 0
 
     # Show the splash before the slow imports/boot work below so the user gets
     # immediate feedback. Each phase updates its status line; app.processEvents

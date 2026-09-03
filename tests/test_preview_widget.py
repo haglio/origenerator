@@ -962,7 +962,7 @@ def test_resizing_re_places_the_notice(make_preview, tmp_path):
 # --- a combination, before anything has been made from it --------------------
 
 def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, tmp_path):
-    # "Open in generator" hands a tab a picture and a past video's settings. The
+    # "Edit…" hands a tab a picture and a past video's settings. The
     # idle line ("select a generation to preview") describes a tab pointed at
     # nothing, which is exactly what this is not.
     w = make_preview()

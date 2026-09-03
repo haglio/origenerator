@@ -12,6 +12,7 @@ from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.experiments.background import cancel_experiments
+from origenerator.win32 import place_window_in_device_pixels
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.prompt_box import PROMPT_HEIGHTS
@@ -76,7 +77,18 @@ class OrigeneratorWindow(QMainWindow):
                 | Qt.WindowType.WindowStaysOnTopHint
             )
             rect = fun_time.main_rect
+            # Set here so the window opens near the right size, then pinned to
+            # the exact DEVICE rect once it is shown (see showEvent): a scaled
+            # process cannot say a second monitor's coordinates in Qt's space at
+            # all (origenerator.win32.place_window_in_device_pixels).
             self.setGeometry(rect.x, rect.y, rect.width, rect.height)
+
+        # The rect this window is pinned to once shown, or None standalone.
+        self._device_rect = (
+            (fun_time.main_rect.x, fun_time.main_rect.y,
+             fun_time.main_rect.width, fun_time.main_rect.height)
+            if fun_time is not None else None
+        )
 
         # One unified view: the gallery, whose info pane now holds the editable
         # config tabs that used to be a separate Generate tab. A clicked
@@ -146,6 +158,20 @@ class OrigeneratorWindow(QMainWindow):
             self.restoreGeometry(QByteArray(base64.b64decode(blob)))
         except ValueError:
             pass  # corrupt/hand-edited state — fall back to the default size
+
+    def showEvent(self, event):
+        """Pin the window to the DEVICE rect the session named.
+
+        Qt has already placed it by then, in its own coordinates, which in a
+        scaled process cannot name a point on a second monitor unambiguously
+        (origenerator.win32.place_window_in_device_pixels says why).  So the
+        rect is re-applied through Win32 every time the window is shown --
+        cheap, and it survives a reparent or a flag change putting Qt's own
+        geometry back.
+        """
+        super().showEvent(event)
+        if self._device_rect is not None:
+            place_window_in_device_pixels(int(self.winId()), *self._device_rect)
 
     def closeEvent(self, event):
         """Hand ComfyUI the background experiments for the coming absence and

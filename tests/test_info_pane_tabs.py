@@ -425,7 +425,7 @@ def test_an_open_takes_over_a_blank_tab_that_is_not_in_front(tabs):
 
 
 def test_open_config_replaces_the_preview_tab_rather_than_forking(tabs):
-    # A second "Open in generator" costs no more tabs than the first: it lands in
+    # A second "Edit…" costs no more tabs than the first: it lands in
     # the italic tab the last one left.
     tabs.currentWidget().prefill("sdxl_t2i", {})
     first = tabs.open_config("wan22_i2v", {"positive_prompt": "a fox"})

@@ -315,7 +315,7 @@ class PreviewWidget(QWidget):
         and the gray looping clip whose settings go with it
         (:class:`~origenerator.gui.combination_view.CombinationView`).
 
-        What "Open in generator" leaves a tab holding. Nothing has been generated
+        What "Edit…" leaves a tab holding. Nothing has been generated
         from it yet, so there is no media to show and the idle placeholder — the
         line a tab pointed at nothing wears — said only that, when the two things
         the tab is actually about were both on hand to be shown.
@@ -584,6 +584,23 @@ class PreviewWidget(QWidget):
     def current_media_path(self) -> str:
         """The file on screen, or "" while showing a placeholder or live frame."""
         return str(self._media[0]) if self._media is not None else ""
+
+    def media_size(self) -> tuple[int, int] | None:
+        """The shown media's own ``(width, height)``, or ``None`` for nothing.
+
+        The MEDIA's shape, not the widget's — what a caller laying out around it
+        needs, and the widget's shape is the answer to a different question.
+        A video's frame is measured off its player where one is up, and an image
+        off the pixmap the label was scaled from rather than the scaled copy.
+        """
+        if self._movie is not None:
+            frame = self._movie.currentPixmap()
+            if not frame.isNull():
+                return frame.width(), frame.height()
+        if self._pixmap is not None and not self._pixmap.isNull():
+            return self._pixmap.width(), self._pixmap.height()
+        video = getattr(self, "_video_size", None)
+        return tuple(video) if video else None
 
     def set_actions(self, prompt_id: str | None, *, starred: bool = False,
                     enhance: str | None = None) -> None:

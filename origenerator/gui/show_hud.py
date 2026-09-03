@@ -38,6 +38,9 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.ui_scale import (
+    to_bitmap_pos, to_logical_size, unscaled_pixmap,
+)
 from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
@@ -119,10 +122,16 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
 class ShowHud(QLabel):
     """One show's HUD: model from the host, bitmap from the shared renderer."""
 
-    def __init__(self, host: QWidget, *, side: str, dashboard_cmd_file):
+    def __init__(self, host: QWidget, *, side: str, dashboard_cmd_file,
+                 label_for=None):
         super().__init__(host)
         self._host = host
         self._side = side
+        # What to call the item on screen, in the app's OWN vocabulary — a
+        # callable taking the media path, or None to say nothing.  The gallery
+        # supplies it because naming a generation takes the database (see
+        # GalleryView._show_item_label).
+        self._label_for = label_for
         # The session's command channel, or ``None`` standalone — which is also
         # how this HUD knows which of the two it is on (see :meth:`_deliver`).
         self._dashboard_cmd_file = dashboard_cmd_file
@@ -140,7 +149,12 @@ class ShowHud(QLabel):
         # symptom position_caption.py fixed the same way).  Native itself, it
         # stacks against the media by Z-order like any other window.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-        self.move(MARGIN, MARGIN)
+        # The players' own inset, in DEVICE pixels: this panel swaps in and out
+        # with the player's HUD under it, so the two have to sit on the same
+        # corner or the swap reads as a jump.  move() takes logical pixels, and
+        # left unconverted the scale pulled this one 4px in from the corner
+        # against the player's 12.
+        self.move(to_logical_size(MARGIN), to_logical_size(MARGIN))
         self._timer = QTimer(self)
         self._timer.setInterval(_REFRESH_MS)
         self._timer.timeout.connect(self._tick)
@@ -168,13 +182,35 @@ class ShowHud(QLabel):
         if due:
             self._deliver(due)
 
+    def _file_on_screen(self) -> str:
+        """The muted line under the status: what is on this region right now.
+
+        The players print the file they are decoding there, and this panel left
+        it blank — the one line of the HUD that says WHAT you are looking at.
+
+        Named the way THIS app names things, not the way the disk does.  Naming
+        a generation off its path gives "image / ComfyUI_00123_" — the folder is
+        the media type, which says nothing, and the file is a counter no one has
+        ever seen in this UI.  The app calls the folder by what the tree calls
+        it ("615F7744", or whatever the user typed onto it) and the item by its
+        seed, which is what its tile in the browser is captioned with.
+        """
+        prompt_id = getattr(self._host, "hud_prompt_id", "")
+        if not prompt_id or self._label_for is None:
+            return ""
+        try:
+            return self._label_for(prompt_id) or ""
+        except Exception:  # naming is decoration; it never costs the panel
+            return ""
+
     def _draw(self) -> None:
         if self._model is None:
             self._targets = None
             self.hide()
             return
         rendered = self._renderer.render(
-            self._model, hover_loop=self._hover_loop,
+            self._model, video=self._file_on_screen(),
+            hover_loop=self._hover_loop,
             hover_tip=self._hover_tip, hover_pos=self._hover_pos,
         )
         self._targets = rendered.targets
@@ -182,8 +218,11 @@ class ShowHud(QLabel):
         height, width, _ = bgra.shape
         image = QImage(bgra.tobytes(), width, height, width * 4,
                        QImage.Format.Format_ARGB32)
-        self.setPixmap(QPixmap.fromImage(image))
-        self.resize(width, height)
+        # The app-wide scale shrinks the core window's panes; this panel is
+        # already drawn at the family's own sizes and must not shrink with it.
+        pixmap = unscaled_pixmap(QPixmap.fromImage(image))
+        self.setPixmap(pixmap)
+        self.resize(pixmap.deviceIndependentSize().toSize())
         self.raise_()
         if self.isHidden():
             self.show()
@@ -193,8 +232,10 @@ class ShowHud(QLabel):
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton or self._targets is None:
             return
-        pos = event.position()
-        command = self._clicks.press(self._targets, int(pos.x()), int(pos.y()),
+        # Bitmap pixels, not logical ones: the panel is drawn unscaled over a
+        # scaled window, so its control rects are indexed in its own pixels.
+        px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        command = self._clicks.press(self._targets, px, py,
                                      now=time.monotonic())
         if command:
             self._deliver(command)
@@ -204,8 +245,7 @@ class ShowHud(QLabel):
             return
         from player_core.satellite_hud import button_tooltip, hit_test_targets
 
-        pos = event.position()
-        px, py = int(pos.x()), int(pos.y())
+        px, py = to_bitmap_pos(event.position().x(), event.position().y())
         hover = hit_test_targets(self._targets.loop, px, py)
         tip = button_tooltip(self._targets, px, py)
         if hover == self._hover_loop and tip == self._hover_tip:

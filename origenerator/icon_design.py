@@ -15,6 +15,12 @@ from PIL import Image
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QImage, QPainter, QPainterPath
 
+from origenerator.paths import ensure_shared_ui_on_path
+
+# Before any shared_ui import: that checkout is a sibling on the path, not a
+# dependency the launch interpreter has installed (see tests/test_sibling_imports).
+ensure_shared_ui_on_path()
+
 from shared_ui.colors import PINK
 
 CANVAS = 256  # icon master size

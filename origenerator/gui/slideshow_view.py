@@ -782,6 +782,17 @@ class SlideshowView(QWidget):
     # --- what this show's HUD says, in the players' vocabulary -------------
 
     @property
+    def hud_prompt_id(self) -> str:
+        """The generation on screen, by id — what names it on the HUD.
+
+        The id rather than the file, because what the panel prints is this
+        app's own name for the item (its folder and its seed), and only the
+        row behind the id carries either.
+        """
+        current = self._playlist.current()
+        return current[2] if current and len(current) > 2 else ""
+
+    @property
     def hud_is_favorite(self) -> bool:
         """Whether the item on screen is a favorite (starred) — the players'
         star readout, over the same collection the Favorites shelf lists."""

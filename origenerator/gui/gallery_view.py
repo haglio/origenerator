@@ -25,6 +25,7 @@ from origenerator.config import (
     VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
+from origenerator.win32 import place_window_in_device_pixels
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
 from origenerator.experiments.background import queue_experiments
@@ -123,7 +124,9 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
 from shared_ui.colors import BORDER_SUBTLE
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, BUTTON_ROW_GAP
+from shared_ui.spacing import (
+    BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ICON, BUTTON_ROW_GAP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +175,11 @@ _SEARCH_MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
 _SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
 _TOOL_ICON_PX = BUTTON_ICON  # the family's icon size — see GalleryView._tool_button
-_TOOLBAR_GROUP_GAP = 14  # the space that separates one group of the button bank from the next
+# Between two groups of the button bank.  Three times the gap between
+# buttons inside a group, which is what makes a boundary read as one
+# without a rule drawn there — and it is that ratio rather than a number
+# of its own, so a change to the family's gap carries the grouping with it.
+_TOOLBAR_GROUP_GAP = BUTTON_GROUP_GAP
 # Said the same way by the button and by the settings panel it would run, because
 # both go dark together the moment what's in front of you is a video.
 _NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
@@ -1045,9 +1052,8 @@ class GalleryView(QWidget):
         self._combine.intent_changed.connect(self._on_combine_intent_changed)
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
-        # Hosted, the tree is the upright column's own left edge (collapsible,
-        # see _toc_toggle) rather than a member of the folder row, so it goes
-        # straight into the outer splitter.
+        # Hosted, the tree is the upright column's own left edge rather than a
+        # member of the folder row, so it goes straight into the outer splitter.
         (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
 
         # Browser pane: a header (the folder's path, then a back/forward/undo
@@ -1056,16 +1062,6 @@ class GalleryView(QWidget):
         browser = QWidget()
         browser_box = QVBoxLayout(browser)
         browser_box.setContentsMargins(*_PANE_MARGINS)
-        # Fun Time's column is narrow, so the folder tree earns a collapse
-        # toggle at the head of the button bank: the tree's width goes to the
-        # browser while it's away, and the divider can be dragged shut too.
-        self._toc_toggle = None
-        if self._fun_time is not None:
-            self._toc_toggle = QToolButton()
-            self._toc_toggle.setObjectName("iconButton")
-            self._toc_toggle.setArrowType(Qt.ArrowType.LeftArrow)
-            self._toc_toggle.setToolTip("Collapse or restore the folder tree")
-            self._toc_toggle.clicked.connect(self._toggle_toc)
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
@@ -1198,7 +1194,6 @@ class GalleryView(QWidget):
                              row_spacing=BUTTON_ROW_GAP)
         self._toolbar_groups = []
         for buttons in (
-            (self._toc_toggle,),                                    # the tree itself
             (self._back_btn, self._forward_btn),                    # where you are
             (self._undo_btn, self._redo_btn),                       # what you did
             (self._group_btn,),                                     # …to the picked folders
@@ -1309,7 +1304,7 @@ class GalleryView(QWidget):
         # into a tab (its output in the preview, its settings in the form, a footer
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
-        self._info_tabs = InfoPaneTabs(self._client, self._db)
+        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time)
         # One OSR2 driver for the whole view, under the one global toggle
         # (self._osr2_btn): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
@@ -1331,7 +1326,7 @@ class GalleryView(QWidget):
         # main player — so the Enhance settings take the row alone.
         bottom = QHBoxLayout()
         bottom.setContentsMargins(0, 0, 0, 0)
-        bottom.setSpacing(12)
+        bottom.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
         self._stroke_panel = None
         if self._osr2_stroke is not None:
             self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace,
@@ -1444,19 +1439,6 @@ class GalleryView(QWidget):
             self._panes.setSizes([780, 440])
 
         layout.addWidget(self._stack if self._stack is not None else self._panes, 1)
-
-    def _toggle_toc(self):
-        """Collapse or restore the folder tree (the Fun Time column's toggle).
-
-        Hiding the splitter child hands its width to the browser stack; the
-        arrow flips to show which way the next press moves it.
-        """
-        toc = self._panes.widget(0)
-        showing = not toc.isVisible()
-        toc.setVisible(showing)
-        self._toc_toggle.setArrowType(
-            Qt.ArrowType.LeftArrow if showing else Qt.ArrowType.RightArrow
-        )
 
     def _tool_button(self, icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
         """An icon-only button for the browser-pane header's bank. A
@@ -4906,8 +4888,17 @@ class GalleryView(QWidget):
         if hasattr(view, "set_audio_muted"):
             view.set_audio_muted(True)
         rect = self._fun_time.region_rect(side)
+        # The rect as given, so the window opens at the right size and an
+        # unscaled process is already correct here.
         view.setGeometry(rect.x, rect.y, rect.width, rect.height)
         view.show()
+        # Then pinned in DEVICE pixels through Win32.  In a scaled process the
+        # screens' logical rects overlap, so there is no logical x that lands
+        # this window on a second monitor's edge at all -- see
+        # origenerator.win32.place_window_in_device_pixels.  After show(),
+        # because an unrealized window has no handle to place.
+        place_window_in_device_pixels(int(view.winId()),
+                                      rect.x, rect.y, rect.width, rect.height)
         # The show answers its own keys (a slideshow's arrows, a fullscreen
         # view's paging), so it takes the keyboard the moment it opens —
         # left unfocused, those keys land in the main window and the view
@@ -4922,6 +4913,31 @@ class GalleryView(QWidget):
         if self._session_paused and hasattr(view, "set_session_paused"):
             view.set_session_paused(True)
         self._wear_the_hud(view, side)
+
+    def _show_item_label(self, prompt_id: str) -> str:
+        """What to call *media_path* on a show's HUD, in this app's vocabulary.
+
+        ``<folder> / seed <n>`` — the folder by the name the tree gives it (the
+        one the user typed, else its short code) and the item by its seed, which
+        is exactly what its tile in the browser is captioned with.  Off the
+        disk's own names on purpose: those read "image / ComfyUI_00123_", a
+        media type and a counter that appear nowhere in this UI.
+
+        Falls back to whichever half it can find, and to nothing at all for a
+        file no row claims — a still being written, say.
+        """
+        row = self._row_for(prompt_id) if prompt_id else None
+        if not row:
+            return ""
+        seed = row.get("seed")
+        item = f"seed {seed}" if seed is not None else ""
+        folder = gallery.config_folder_name(
+            row.get("workflow") or "",
+            gallery.settings_signature(row.get("workflow"), row.get("params"),
+                               gallery.build_image_config_index(self._image_rows)),
+            self._db.folder_meta_map(),
+        )
+        return " / ".join(part for part in (folder, item) if part)
 
     def _wear_the_hud(self, view, side: str) -> None:
         """Put the players' own HUD on *view* — the same panel, rendered by the
@@ -4944,7 +4960,8 @@ class GalleryView(QWidget):
         view.adopt_hud()
         hud(view, side=side,
             dashboard_cmd_file=(None if self._fun_time is None
-                                else self._fun_time.dashboard_cmd_file))
+                                else self._fun_time.dashboard_cmd_file),
+            label_for=self._show_item_label)
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and
@@ -5340,7 +5357,7 @@ class GalleryView(QWidget):
 
     def _open_combination(self, image_id: str, video_id: str, category: str = ""):
         """Open a dropped image + video's recipe as an editable generate tab instead
-        of running it — the combine panel's "Open in generator" path. The tab is
+        of running it — the combine panel's "Edit…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
         built = self._combined_params(image_id, video_id)

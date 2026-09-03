@@ -8,7 +8,7 @@ to be made. The two are mutually exclusive: picking an act clears a dropped vide
 (and relabels the slot as the override path), and dropping a video wipes the
 dropdown back to "-".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
-image now, while Open in generator hands it to a generate tab to edit before running.
+image now, while “Edit…” hands it to a generate tab to change first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video for the players (the default), or a Genau clip — one complete stroke, looping.
@@ -30,6 +30,14 @@ routing, and both the generation and the generator tab.
 """
 
 from collections.abc import Callable, Collection
+
+from origenerator.paths import ensure_shared_ui_on_path
+
+# Before any shared_ui import: that checkout is a sibling on the path, not a
+# dependency the launch interpreter has installed (see tests/test_sibling_imports).
+ensure_shared_ui_on_path()
+
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
@@ -92,7 +100,7 @@ class CombinePanel(QWidget):
         self._video_part = QWidget()
         video_box = QHBoxLayout(self._video_part)
         video_box.setContentsMargins(0, 0, 0, 0)
-        video_box.setSpacing(6)
+        video_box.setSpacing(BUTTON_GAP)  # the family's gap inside a group
         video_box.addWidget(self._category, 1)  # each takes half the video part's width
         video_box.addWidget(self.video_slot, 1)
 
@@ -116,7 +124,7 @@ class CombinePanel(QWidget):
         self._intent_part = QWidget()
         intent_box = QHBoxLayout(self._intent_part)
         intent_box.setContentsMargins(0, 0, 0, 0)
-        intent_box.setSpacing(8)
+        intent_box.setSpacing(BUTTON_GAP)  # two radios are one group
         intent_box.addWidget(self._players_radio)
         intent_box.addWidget(self._genau_radio)
         intent_box.addStretch(1)
@@ -125,7 +133,7 @@ class CombinePanel(QWidget):
         # generator to tweak first. Both gate on the same "image + recipe" readiness.
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
-        self._open_btn = QPushButton("Open in generator")
+        self._open_btn = QPushButton("Edit…")
         self._open_btn.setToolTip(
             "Load this combination into a generate tab to edit before running it."
         )
@@ -133,6 +141,7 @@ class CombinePanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(BUTTON_GAP)  # rows of one group sit a group's gap apart
         heading = QLabel("Combine")
         heading.setObjectName("combineHeading")
         heading.setToolTip(
@@ -140,7 +149,9 @@ class CombinePanel(QWidget):
         )
         layout.addWidget(heading)
         layout.addWidget(self.image_slot)
-        layout.addSpacing(8)  # set the video part apart from the image slot above it
+        # One group apart from the next, the same distance the button bank
+        # puts between its groups.
+        layout.addSpacing(BUTTON_GROUP_GAP)
         layout.addWidget(self._video_part)
         layout.addWidget(self._intent_part)
         layout.addWidget(self._generate_btn)
@@ -247,7 +258,7 @@ class CombinePanel(QWidget):
         self._dispatch(self.generate_requested, self.category_requested)
 
     def _emit_open(self):
-        """Open in generator: hand the chosen recipe to a generate tab to edit first."""
+        """“Edit…”: hand the chosen recipe to a generate tab to change first."""
         self._dispatch(self.open_requested, self.open_category_requested)
 
     def _dispatch(self, video_signal, category_signal):

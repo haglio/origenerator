@@ -1,6 +1,6 @@
 """The two halves of a combination, shown as the sum they are: image + recipe.
 
-What "Open in generator" hands a tab is not a generation — it is a picture and a
+What "Edit…" hands a tab is not a generation — it is a picture and a
 past video's settings, and nothing has been made from them yet. The form below
 holds the settings, but the pane above it had nothing to show and said so, with
 the same "select a generation to preview" a tab that had been pointed at nothing

@@ -19,6 +19,13 @@ from pathlib import Path
 _shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
 _ole32 = ctypes.windll.ole32  # type: ignore[attr-defined]
 _user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+# HWND/HANDLE argtypes declared so ctypes passes them as 64-bit pointers rather
+# than truncating to c_int -- the same rule fun_time/win32.py follows.
+_user32.SetWindowPos.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, ctypes.c_uint,
+]
+_user32.SetWindowPos.restype = ctypes.c_bool
 _kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
 
 APP_USER_MODEL_ID = "FunTime.Origenerator"
@@ -230,6 +237,38 @@ def window_exists(hwnd: int) -> bool:
     behind — so anything that must reach *that* window and no other asks first.
     """
     return bool(hwnd) and bool(_user32.IsWindow(hwnd))
+
+
+def place_window_in_device_pixels(hwnd: int, x: int, y: int,
+                                  width: int, height: int) -> bool:
+    """Put *hwnd* on exactly this DEVICE rect, whatever Qt is scaled to.
+
+    Qt's own ``setGeometry`` cannot do this in a scaled process on a multi-
+    monitor desktop, and the failure is not a rounding error.  With
+    ``QT_SCALE_FACTOR`` below 1 the screens' logical rects OVERLAP -- measured
+    here, the primary reports logical (0, 0, 3982, 2240) while the second
+    monitor's logical origin is 2560, inside it -- and Qt maps a logical point
+    through whichever screen's rect contains it.  So a logical x of 3982 was
+    read against the second screen and landed 914px too far right, and a logical
+    x of 2560 was read against the PRIMARY and landed 914px too far left.  There
+    is no logical x that satisfies both readings; the coordinate is genuinely
+    ambiguous, so the whole space is the wrong place to say this in.
+
+    Win32 has no such ambiguity: ``SetWindowPos`` is device pixels on the
+    virtual desktop, which is the space Fun Time measured these rects in and
+    the space it places its own windows in.  So the rects it hands over are
+    used verbatim, and nothing is converted at all.
+
+    Call it AFTER the window is shown -- an unrealized window has no handle to
+    place, and Qt re-applies its own geometry when it creates one.
+    """
+    if not window_exists(hwnd):
+        return False
+    # SWP_NOZORDER | SWP_NOACTIVATE: banding and focus belong to whoever asked
+    # for them, and a move must not quietly take either.
+    return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
+                                     int(x), int(y), int(width), int(height),
+                                     0x0004 | 0x0010))
 
 
 def force_foreground_window(hwnd: int) -> bool:

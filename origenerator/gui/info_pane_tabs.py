@@ -73,9 +73,16 @@ class InfoPaneTabs(QTabWidget):
     # run per picture in that folder rather than one run of these settings.
     changes_requested = pyqtSignal(str, str, dict)
 
-    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
+    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
+                 *, fun_time=None):
         super().__init__(parent)
         self._client = client
+        # The hosting session, or None standalone: a tab lays its picture out
+        # differently in Fun Time's upright column (GenerateConfigPanel).
+        self._fun_time = fun_time
+        # A tab coming to the front re-asks what shape its picture is: the
+        # hosted layout depends on it, and nothing in the tab itself resized.
+        self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
         # Install the eliding bar before setTabsClosable: swapping the bar
         # afterwards drops that setting (it doesn't carry to a new bar).
@@ -106,6 +113,13 @@ class InfoPaneTabs(QTabWidget):
 
     # --- config tabs -------------------------------------------------------
 
+    def _front_tab_relayout(self, _index: int = -1) -> None:
+        """Let the tab now in front lay itself out for the picture it holds."""
+        panel = self.currentWidget()
+        refresh = getattr(panel, "refresh_media_layout", None)
+        if callable(refresh):
+            refresh()
+
     def _config_panels(self) -> list[GenerateConfigPanel]:
         """Every open config panel, in tab order."""
         return [
@@ -129,7 +143,7 @@ class InfoPaneTabs(QTabWidget):
         disabled. The tab's source-link / animation signals are wired so a click
         in either of them reaches the gallery.
         """
-        panel = GenerateConfigPanel(self._client, self._db)
+        panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         panel.generate_requested.connect(  # relay every tab's Generate
@@ -371,7 +385,7 @@ class InfoPaneTabs(QTabWidget):
 
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel | None:
         """Open (and select) an editable config tab prefilled from a generation —
-        a history-strip click, a queue row, or "Open in generator".
+        a history-strip click, a queue row, or "Edit…".
 
         Lands where a browsed click lands (:meth:`_landing_panel`), and wears the
         same italic mark: naming a configuration is still "show me this", not a

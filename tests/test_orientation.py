@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image
-from PyQt6.QtWidgets import QLabel, QSplitter
+from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY, TRASH_LABEL,
@@ -24,6 +24,7 @@ from origenerator.gui.orientation import (
 )
 
 from tests.test_gallery_view import FakeDB, _image, _row, _side_rows
+from tests.test_icons import _ink_bounds  # the mark is measured the way the icons' own tests measure one
 
 
 def _thumbed(row: dict, tmp_path: Path, width: int, height: int) -> dict:
@@ -121,13 +122,62 @@ def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_pat
     qtbot.addWidget(view)
     view.refresh()
 
-    splitter = view._tree.findChild(QSplitter)
-    halves = [splitter.widget(i) for i in range(splitter.count())]
-    assert [half.findChild(QLabel).text() for half in halves] == [
+    assert [_heading_name(half).text() for half in _halves(view)] == [
         ORIENTATION_LABELS["portrait"], ORIENTATION_LABELS["landscape"]]
     # And the label belongs to the pane, not to the scrolling list under it.
     for orientation in ("portrait", "landscape"):
         assert view._tree.tree_for(orientation).findChildren(QLabel) == []
+
+
+def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
+    """Which library a heading names is a shape, and a shape reads faster drawn
+    than spelled: an upright mark over Portrait, a lying-down one over
+    Landscape, each the transpose of the other so the pair reads at a glance."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    marks = [_heading_mark(half).pixmap() for half in _halves(view)]
+    assert [mark.isNull() for mark in marks] == [False, False]
+    portrait, landscape = (_ink_bounds(mark) for mark in marks)
+    assert portrait[1] > portrait[0]          # the upright one is taller than wide
+    assert landscape[0] > landscape[1]        # and the other is its quarter turn
+    assert portrait == landscape[::-1]
+
+
+def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp_path):
+    """The mark and the word are two labels in one heading, so the description
+    hangs off the heading rather than off whichever half the cursor found."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    for half, orientation in zip(_halves(view), ("portrait", "landscape")):
+        heading = _heading(half)
+        assert orientation in heading.toolTip()
+        # Neither child claims one of its own, which is what lets the frame's
+        # reach the cursor over either of them.
+        assert [child.toolTip() for child in heading.findChildren(QLabel)] == ["", ""]
+
+
+def _halves(view):
+    splitter = view._tree.findChild(QSplitter)
+    return [splitter.widget(i) for i in range(splitter.count())]
+
+
+def _heading(half) -> QFrame:
+    return next(child for child in half.findChildren(QFrame)
+                if child.objectName() == "treeSectionLabel")
+
+
+def _heading_mark(half) -> QLabel:
+    return _heading(half).findChild(QLabel, "treeSectionMark")
+
+
+def _heading_name(half) -> QLabel:
+    return _heading(half).findChild(QLabel, "treeSectionName")
 
 
 def test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it(qtbot, tmp_path):

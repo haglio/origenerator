@@ -66,6 +66,44 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     assert image_badge.toImage() != video_badge.toImage()
 
 
+def test_the_orientation_marks_are_one_frame_and_its_quarter_turn(qtbot):
+    # The pair over the table of contents' two halves says which shape each half
+    # holds, and it says it by BEING that shape: an upright frame and a
+    # lying-down one, each the other transposed. Both are drawn in one square
+    # box, so the words beside them start at the same x.
+    portrait = icons.orientation_mark("portrait")
+    landscape = icons.orientation_mark("landscape")
+    assert portrait.size() == landscape.size()
+    assert portrait.width() == portrait.height()
+
+    tall, wide = _ink_bounds(portrait), _ink_bounds(landscape)
+    assert tall[1] > tall[0]
+    assert wide[0] > wide[1]
+    assert tall == wide[::-1]
+
+
+def test_an_orientation_mark_is_a_frame_and_not_a_filled_block(qtbot):
+    # A frame, like the family's screen and photo marks -- what it stands for is
+    # a region a picture goes in. Filled, it would read as a swatch, and the
+    # rounded corners that say "screen" would be lost against the heading's word.
+    from shared_ui.colors import TEXT_PRIMARY
+
+    image = icons.orientation_mark("portrait").toImage()
+    middle = image.pixelColor(image.width() // 2, image.height() // 2)
+    assert middle.alpha() == 0                       # hollow through the center
+    assert _dominant_color(icons.orientation_mark("portrait")) == TEXT_PRIMARY.rgb()
+
+
+def _ink_bounds(pixmap) -> tuple[int, int]:
+    """How wide and how tall what is drawn in *pixmap* actually is."""
+    image = pixmap.toImage()
+    drawn = [(x, y)
+             for y in range(image.height()) for x in range(image.width())
+             if image.pixelColor(x, y).alpha() > 40]
+    xs, ys = [x for x, _ in drawn], [y for _, y in drawn]
+    return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
 def _corner_image(icon):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon

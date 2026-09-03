@@ -13,6 +13,10 @@ of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
+:func:`orientation_mark` is the pair over the table of contents' two halves: a
+frame of the proportions each half holds, drawn here because what it says is the
+difference between the two rather than any one named mark.
+
 The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks a generation's picture wears in its
 own corners, wherever it is shown.  Each is drawn twice -- at rest, and armed
@@ -30,6 +34,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QColor
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
 
+from origenerator.gui.orientation import PORTRAIT
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -38,7 +43,7 @@ from shared_ui.colors import (
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER,
     GREEN, RED,
 )
-from shared_ui.icons import CANVAS, draw_glyph, glyph_icon, glyph_pixmap
+from shared_ui.icons import CANVAS, STROKE, draw_glyph, glyph_icon, glyph_pixmap
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
@@ -240,6 +245,56 @@ def media_type_icon(media_type: str) -> QIcon:
     return glyph_icon("play" if media_type == "video" else "photo", size=_SIZE)
 
 
+# --- the shape a half of the table of contents holds -----------------------
+
+# The mark over each half of the TOC pane: a frame of the very proportions that
+# half holds, so which library a heading names is answered by its shape before
+# the word beside it is read.
+#
+# Drawn here rather than added to the family's glyph list, which is where a
+# named mark belongs: this is not one mark but a pair whose whole content is the
+# difference between them -- one drawing and its transpose -- and it says
+# something only this app has to say, since no other window in the family shows
+# the two libraries side by side. A shared "portrait" glyph would be a rectangle
+# that means nothing on its own, and the drift the shared list exists to prevent
+# needs two apps drawing one mark.
+#
+# A 2:3 frame, which is near enough what both sides actually come out at, on the
+# shared square canvas: same box either way, so the two headings' words start at
+# the same x and the pair reads as one control turned a quarter.
+_PROPORTION_LONG = 42.0
+_PROPORTION_SHORT = 28.0
+_PROPORTION_RADIUS = 5.0
+_PROPORTION_DISPLAY = 15  # on-screen size, to sit level with the heading's word
+
+
+@lru_cache(maxsize=None)
+def orientation_mark(orientation: str) -> QPixmap:
+    """An upright or a lying-down frame -- the shape one half of the TOC holds.
+
+    Stated in canvas units, so its stroke is the family's weight rather than a
+    hairline of its own -- but painted straight onto the pixmap the heading
+    shows, where the badges render large and resample down. At this size that
+    route costs the mark its edges: a stroke a pixel and a half wide, drawn at
+    the canvas and then resampled, arrives as a gray smear of one.
+    """
+    tall = orientation == PORTRAIT
+    width = _PROPORTION_SHORT if tall else _PROPORTION_LONG
+    height = _PROPORTION_LONG if tall else _PROPORTION_SHORT
+
+    def draw(painter: QPainter):
+        painter.scale(_PROPORTION_DISPLAY / _SIZE, _PROPORTION_DISPLAY / _SIZE)
+        pen = QPen(TEXT_PRIMARY)
+        pen.setWidthF(STROKE)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(
+            QRectF((_SIZE - width) / 2, (_SIZE - height) / 2, width, height),
+            _PROPORTION_RADIUS, _PROPORTION_RADIUS)
+
+    return _painted(draw, _PROPORTION_DISPLAY)
+
+
 # --- the controls a picture wears in its corners --------------------------
 
 # What the plus in a picture's bottom-right corner is saying. The three are the
@@ -337,9 +392,9 @@ def _mark(painter: QPainter, glyph: str, ink):
                x=_CORNER_MARK_AT, y=_CORNER_MARK_AT)
 
 
-def _painted(draw) -> QPixmap:
+def _painted(draw, size: int = _SIZE) -> QPixmap:
     """A transparent canvas with ``draw`` painting into it."""
-    pixmap = QPixmap(_SIZE, _SIZE)
+    pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)

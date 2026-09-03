@@ -122,6 +122,19 @@ def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
     assert (panel.x(), panel.y()) == (12, 12 + 140 + 12)
 
 
+def test_the_console_is_a_native_window_that_does_not_ask_for_a_translucent_surface(qtbot):
+    # Native, so it stacks over a clip's video surface like the HUD does; and
+    # like the HUD it leaves the translucent-surface flag alone.  A native child
+    # that asked for one drew twice over a show on Windows -- once where Qt
+    # painted it and once more at double its offset -- while its see-through
+    # ground needs nothing but the RGBA picture over the parent's own paint.
+    from PyQt6.QtCore import Qt
+
+    panel, _stroke, _host = _panel(qtbot)
+    assert panel.testAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+    assert not panel.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+
 def test_the_console_is_here_whether_or_not_a_stroke_is_running(qtbot):
     # Part of what is on it is not about a running stroke at all — the pace an
     # unheld slide moves on at. A panel that appeared only once the device was

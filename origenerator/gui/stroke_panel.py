@@ -158,13 +158,22 @@ class StrokePanel(QWidget):
         self._host = host if host is not None else PaceOnlyHost(
             pace if pace is not None else SlideshowPace(parent=self))
         self._painter = ConsolePainter()
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         # A video surface is a native window on Windows, and a plain sibling
         # widget cannot paint over one however it is stacked — which is why
         # every other panel floated over a show (the HUD, the toast, the queue)
         # is native too.  Native itself, this stacks against the media by
         # Z-order like any other window, so the console is reachable over a
         # clip that fills the corner it sits in, not only over a still.
+        #
+        # Native and NOT translucent, exactly like the HUD beside it.  The
+        # slab's rounded corners and see-through ground come from the RGBA
+        # picture the painter hands over, composited onto whatever the parent
+        # paints beneath — Qt does that for any child that neither fills its
+        # own background nor claims to paint opaquely.  Asking for a
+        # translucent surface as well used to be harmless on a plain child
+        # widget, but on a native child it asks Windows for an alpha surface,
+        # and the console then came out TWICE over a show: once where Qt drew
+        # it and once more at double its offset, where that surface ended up.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
         self.setFixedSize(*panel_size(stroke, self._host))

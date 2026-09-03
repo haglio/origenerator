@@ -19,6 +19,21 @@ def _panel(qtbot):
     return panel
 
 
+def _pick_act(panel, act):
+    """Choose an act in the dropdown, as a click on its row would; "" is the
+    neutral "-" and so is an act the list does not carry."""
+    index = panel._category.findText(act)
+    panel._category.setCurrentIndex(index if index >= 1 else 0)
+
+
+def _pick_lane(panel, intent):
+    """Click the lane's radio; the group's exclusivity releases the other."""
+    radio = (panel._genau_radio if intent == recipe_match.GENAU
+             else panel._players_radio)
+    radio.setChecked(True)
+
+
+
 def test_only_the_video_slot_is_drained_of_color(qtbot):
     # The video is here for its settings — never for what it looks like — while
     # the image is the very thing being animated.
@@ -79,7 +94,7 @@ def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("delta")
+    _pick_act(panel, "delta")
     opened = []
     panel.open_category_requested.connect(lambda i, c, n: opened.append((i, c, n)))
 
@@ -159,10 +174,10 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
     panel.image_slot.set_item("img1")
     assert not panel._generate_btn.isEnabled()  # image alone, no recipe chosen yet
 
-    panel.set_category("alpha")
+    _pick_act(panel, "alpha")
     assert panel._generate_btn.isEnabled()      # a category is a recipe — no video needed
 
-    panel.set_category("")                       # back to neutral
+    _pick_act(panel, "")                       # back to neutral
     assert not panel._generate_btn.isEnabled()
 
 
@@ -170,7 +185,7 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
 
-    panel.set_category("alpha")
+    _pick_act(panel, "alpha")
 
     assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
     assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
@@ -178,7 +193,7 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     panel = _panel(qtbot)
-    panel.set_category("delta")
+    _pick_act(panel, "delta")
 
     panel.video_slot.set_item("vid1")
 
@@ -190,17 +205,17 @@ def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
     panel = _panel(qtbot)
     assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral prompt
 
-    panel.set_category("gamma")
+    _pick_act(panel, "gamma")
     assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
 
-    panel.set_category("")
+    _pick_act(panel, "")
     assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral again
 
 
 def test_generate_emits_the_picked_act(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("delta")
+    _pick_act(panel, "delta")
     cats = []
     panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
 
@@ -242,8 +257,8 @@ def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
 def test_generate_carries_the_chosen_lane(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("delta")
-    panel.set_intent(recipe_match.GENAU)
+    _pick_act(panel, "delta")
+    _pick_lane(panel, recipe_match.GENAU)
     cats = []
     panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
 
@@ -259,16 +274,16 @@ def test_switching_the_lane_announces_it_once(qtbot):
     heard = []
     panel.intent_changed.connect(heard.append)
 
-    panel.set_intent(recipe_match.GENAU)
+    _pick_lane(panel, recipe_match.GENAU)
     assert heard == [recipe_match.GENAU]
 
-    panel.set_intent(recipe_match.PLAYERS)
+    _pick_lane(panel, recipe_match.PLAYERS)
     assert heard == [recipe_match.GENAU, recipe_match.PLAYERS]
 
 
 def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel = _panel(qtbot)
-    panel.set_intent(recipe_match.GENAU)
+    _pick_lane(panel, recipe_match.GENAU)
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
@@ -282,7 +297,7 @@ def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):
     # click can only end in "no recipe yet".
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
-    panel.set_category("gamma")
+    _pick_act(panel, "gamma")
     assert panel._generate_btn.isEnabled()
 
     panel.set_available_categories({"beta"})  # gamma just went unanswerable

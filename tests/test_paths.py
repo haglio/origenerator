@@ -3,17 +3,17 @@ import subprocess
 import sys
 from pathlib import Path
 
-from origenerator.paths import ensure_shared_ui_on_path, projects_root
+from origenerator.paths import ensure_shared_ui_on_path, sibling_checkout
 
 
-def test_projects_root_contains_shared_ui():
-    root = projects_root()
-    assert (root / "shared_ui" / "__init__.py").exists()
+def test_the_shared_ui_checkout_holds_the_package_of_the_same_name():
+    checkout = sibling_checkout("shared_ui")
+    assert (checkout / "shared_ui" / "__init__.py").exists()
 
 
 def test_ensure_shared_ui_on_path_makes_it_importable_and_is_idempotent():
     ensure_shared_ui_on_path()
-    root = str(projects_root())
+    root = str(sibling_checkout("shared_ui"))
     assert root in sys.path
 
     before = list(sys.path)
@@ -57,3 +57,28 @@ def test_player_core_is_found_the_same_way_and_is_importable():
     ensure_player_core_on_path()  # idempotent
     import player_core.direct_control  # noqa: F401
     import player_core.drive_layout  # noqa: F401
+
+
+def test_every_module_importing_a_sibling_puts_it_on_the_path_itself():
+    """`shared_ui` and `player_core` are not installed -- each module that
+    imports one calls the matching `ensure_*_on_path()` above the import and
+    marks it `# noqa: E402`.
+
+    Not a style rule. A module that leaves the call out imports today only
+    because some earlier import in the same file did it as a side effect, so an
+    isort or ruff pass that groups the sibling imports away from the
+    `origenerator.gui` ones turns it into an ImportError at launch.
+    """
+    package = Path(__file__).resolve().parents[1] / "origenerator"
+    missing = []
+    for path in sorted(package.rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        for sibling, ensure in (("shared_ui", "ensure_shared_ui_on_path"),
+                                ("player_core", "ensure_player_core_on_path")):
+            imports = f"\nfrom {sibling}" in source or f"\nimport {sibling}" in source
+            if imports and f"{ensure}()" not in source:
+                missing.append(f"{path.relative_to(package.parent)} -> {sibling}")
+
+    assert not missing, (
+        "imports a sibling checkout without putting it on sys.path first:\n  "
+        + "\n  ".join(missing))

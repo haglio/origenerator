@@ -106,21 +106,24 @@ class FunTimeBridge(QObject):
         self._apply_side(side, action)
 
     def _apply_side(self, side: str, action: str) -> None:
-        """One transport verb onto whatever holds *side* — the shows answer the
-        same host protocol the on-video console uses, and a view without one of
-        its verbs (a fullscreen view has nothing to cull) just drops it."""
+        """One transport verb onto whatever holds *side*.
+
+        Whatever holds it answers :class:`~origenerator.gui.show_host.ShowHost`,
+        so the verb is handed straight over; an unknown verb is what falls
+        through, not an unanswered one.
+        """
         show = self._gallery.region_show(side)
         if show is None:
             return  # an empty region has nothing to drive
-        if action == "NEXT" and hasattr(show, "stroke_step"):
+        if action == "NEXT":
             show.stroke_step(1)
-        elif action == "PREV" and hasattr(show, "stroke_step"):
+        elif action == "PREV":
             show.stroke_step(-1)
-        elif action == "TRASH" and hasattr(show, "stroke_cull"):
+        elif action == "TRASH":
             show.stroke_cull()
-        elif action == "LOCK" and hasattr(show, "stroke_toggle_hold"):
+        elif action == "LOCK":
             show.stroke_toggle_hold()
-        elif action == "RESET" and hasattr(show, "stroke_reset"):
+        elif action == "RESET":
             show.stroke_reset()
 
     # --- the paused flag ----------------------------------------------------
@@ -146,11 +149,9 @@ class FunTimeBridge(QObject):
         for side in _SIDES:
             show = self._gallery.region_show(side)
             lines.append(f"{side}_active={'1' if show is not None else '0'}")
-            path = ""
-            if show is not None and hasattr(show, "current_media_path"):
-                path = show.current_media_path()
+            path = show.current_media_path() if show is not None else ""
             lines.append(f"{side}_video={path}")
-            locked = show is not None and bool(getattr(show, "locked", False))
+            locked = show is not None and bool(show.locked)
             lines.append(f"{side}_locked={'1' if locked else '0'}")
         text = "".join(f"{line}\n" for line in lines)
         if text == self._last_status:

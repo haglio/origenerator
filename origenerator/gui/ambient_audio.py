@@ -36,10 +36,6 @@ class AmbientAudio(QObject):
         self._players: list = []
         self._rotation: AmbientRotation | None = None
 
-    def is_running(self) -> bool:
-        """Whether the bed currently holds players (i.e. is making sound)."""
-        return bool(self._players)
-
     def start(self) -> None:
         """Fill every voice and play.
 

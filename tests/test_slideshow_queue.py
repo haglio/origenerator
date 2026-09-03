@@ -44,9 +44,9 @@ def test_it_is_the_strip_itself_rows_buttons_and_all(plate):
                            job_kind="T2V", held=True)])
 
     assert plate.keys() == ["running-one", "waiting-one"]
-    assert plate.running_preview().key == "running-one"
-    assert plate.rows()[1].lead() == "~10 min · T2V"
-    assert plate.rows()[1].note() == "Held until the slideshow closes"
+    assert plate._running.key == "running-one"
+    assert plate.rows()[1]._lead.text() == "~10 min · T2V"
+    assert plate.rows()[1]._note_text == "Held until the slideshow closes"
     assert plate.rows()[1].findChild(QPushButton) is not None  # its Cancel
 
 

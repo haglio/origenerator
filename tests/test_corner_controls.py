@@ -146,7 +146,7 @@ def test_the_star_says_which_way_it_would_go(qtbot):
     star = controls.buttons()[0]
     assert star.toolTip() == "Star this item"
 
-    controls.set_starred(True)
+    controls.show_for(starred=True, enhance=None)
     assert star.toolTip() == "Unstar this item"
 
 

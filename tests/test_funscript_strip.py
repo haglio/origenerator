@@ -2,16 +2,6 @@ from origenerator.funscript import synthesize_actions
 from origenerator.gui.funscript_strip import FunscriptStrip
 
 
-def test_has_script_reflects_whether_actions_were_set(qtbot):
-    strip = FunscriptStrip()
-    qtbot.addWidget(strip)
-    assert strip.has_script() is False
-    strip.set_actions(synthesize_actions(2.0, hz=1.0, loop=False))
-    assert strip.has_script() is True
-    strip.set_actions([])
-    assert strip.has_script() is False
-
-
 def test_strip_is_a_thin_fixed_height_bar(qtbot):
     strip = FunscriptStrip()
     qtbot.addWidget(strip)

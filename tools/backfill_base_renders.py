@@ -19,46 +19,29 @@ this are the live install's and a worktree's copy is a throwaway.
 
 Interrupting is safe: each row is folded as it lands, and a re-run — or the next
 absence — picks up whatever is left.
+
+Nothing about a repair is decided here. Which rows need one, what recipe
+reproduces it, how one is run and how the result is attached are all
+:mod:`origenerator.base_backfill`, so this cannot answer a question differently
+from the way the app answers it; what is here is the argument parsing and the
+report.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-import time
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from origenerator.base_backfill import (  # noqa: E402
-    attach_base, base_params_for, rows_missing_their_base,
+    attach_base, base_params_for, render_base_now, rows_missing_their_base,
 )
 from origenerator.comfyui_client import ComfyUIClient  # noqa: E402
-from origenerator.completion import extract_completion  # noqa: E402
-from origenerator.config import COMFYUI_OUTPUT_DIR, DB_PATH, THUMB_DIR  # noqa: E402
+from origenerator.config import DB_PATH  # noqa: E402
 from origenerator.db import Database  # noqa: E402
 from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: E402
-
-_POLL_SECONDS = 2.0
-_TIMEOUT_SECONDS = 900  # a single still, however slow the model
-
-
-def run_one(client: ComfyUIClient, workflow, params: dict) -> list[dict]:
-    """Submit one base render and wait for its files. ``[]`` on failure."""
-    prompt_id = str(uuid.uuid4())
-    client.submit_job(workflow.build_api_payload(params), prompt_id)
-    deadline = time.monotonic() + _TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        time.sleep(_POLL_SECONDS)
-        history = client.fetch_history(prompt_id)
-        if not history:
-            continue
-        files, _thumb, _duration = extract_completion(
-            workflow, history, COMFYUI_OUTPUT_DIR, THUMB_DIR, prompt_id, params=params
-        )
-        return files
-    return []
 
 
 def main(argv=None) -> int:
@@ -94,7 +77,7 @@ def main(argv=None) -> int:
               end="", flush=True)
         params = base_params_for(row, workflow)
         try:
-            files = run_one(client, workflow, params)
+            files = render_base_now(client, workflow, params)
         except Exception as e:
             print(f" failed: {e}")
             failed += 1

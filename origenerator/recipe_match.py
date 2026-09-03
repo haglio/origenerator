@@ -58,7 +58,6 @@ _CATEGORY_KEYWORDS = {
 # that only a looping workflow's videos can be mined.
 PLAYERS = "players"
 GENAU = "genau"
-INTENTS: tuple[str, ...] = (PLAYERS, GENAU)
 
 # Optional hand-tuned recipes, also overlay vocabulary: an act named here runs
 # its pinned workflow+params instead of whatever the gallery mining would pick.

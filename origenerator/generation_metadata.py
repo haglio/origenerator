@@ -21,9 +21,9 @@ Kept Qt-free so the section/item model is unit-testable directly;
 
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
-from origenerator import gallery
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator import config, gallery
 
 
 @dataclass
@@ -70,8 +70,13 @@ def _held_prefix(held_days: int | None) -> str:
     return f"({held_days} day{'s' if held_days != 1 else ''} in trash) "
 
 
+def _output_dir(given: Path | None) -> Path:
+    """The folder a file is resolved against: the caller's, or the configured one."""
+    return config.COMFYUI_OUTPUT_DIR if given is None else given
+
+
 def file_item(file: dict, label: str = "File", *,
-              held_days: int | None = None) -> MetaItem:
+              held_days: int | None = None, output_dir: Path | None = None) -> MetaItem:
     """One output file as a row: its path, a copy of just its filename (dropping
     the image/ or video/ subfolder the displayed path carries), and a reveal of
     its absolute location — under ComfyUI's output folder, or wherever the
@@ -81,22 +86,28 @@ def file_item(file: dict, label: str = "File", *,
     in the trash in front of the path.
 
     Shared with the version strip, which puts this exact row beside the level it
-    belongs to — the same file information, wherever the file is listed."""
+    belongs to — the same file information, wherever the file is listed.
+
+    ``output_dir`` defaults to the configured ComfyUI output folder, resolved
+    when this is called rather than when the module was imported — so the
+    signature says this touches the filesystem, the way every neighbour that
+    does takes the folder as an argument."""
     filename = file.get("filename") or ""
-    full = gallery.output_file_path(file, COMFYUI_OUTPUT_DIR)
+    full = gallery.output_file_path(file, _output_dir(output_dir))
     return MetaItem(label, _held_prefix(held_days) + _output_path(file),
                     copy=filename, reveal=str(full))
 
 
-def created_item(file: dict, fallback: str = "") -> MetaItem:
+def created_item(file: dict, fallback: str = "", *,
+                 output_dir: Path | None = None) -> MetaItem:
     """When one output file was written, from the file itself.
 
     Per file rather than per row, because an image's versions were made at
     different moments — the enhancement you queued this evening sits beside a
     render from last week, and one ``created_at`` on the row can only be honest
     about one of them. Falls back to the row's own timestamp when the file is
-    gone from disk."""
-    full = gallery.output_file_path(file, COMFYUI_OUTPUT_DIR)
+    gone from disk. ``output_dir`` is :func:`file_item`'s."""
+    full = gallery.output_file_path(file, _output_dir(output_dir))
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime)
     except OSError:
@@ -104,7 +115,7 @@ def created_item(file: dict, fallback: str = "") -> MetaItem:
     return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def _basic(row: dict) -> MetaSection | None:
+def basic_section(row: dict) -> MetaSection | None:
     """The at-a-glance facts kept at the top: what this run produced, and when.
 
     ``None`` — no block at all — once every file the row holds is listed as a
@@ -121,7 +132,3 @@ def _basic(row: dict) -> MetaSection | None:
     items.append(MetaItem("Created", str(row.get("created_at", ""))))
     return MetaSection("Basic", items)
 
-
-def build_sections(row: dict) -> list[MetaSection]:
-    basic = _basic(row)
-    return [basic] if basic is not None else []

@@ -127,10 +127,6 @@ class ElidingTabBar(QTabBar):
         self._preview_index = index
         self.update()
 
-    def preview_index(self) -> int:
-        """Which tab is drawn in italic, or ``-1`` when none is."""
-        return self._preview_index
-
     def rect_is_preview_tab(self, rect) -> bool:
         """Is ``rect`` — a label about to be painted — inside the preview tab?
 

@@ -62,10 +62,6 @@ class AmbientRotation:
     def voices(self) -> int:
         return len(self._orders)
 
-    def playing(self) -> list:
-        """What each voice has on air -- ``None`` where a voice has nothing."""
-        return list(self._playing)
-
     def next_clip(self, voice: int):
         """Advance *voice* to its next clip and return it (``None`` with no clips)."""
         if not self._clips:
@@ -81,10 +77,6 @@ class AmbientRotation:
                 return clip
         self._playing[voice] = fallback  # fewer clips than voices -- double up
         return fallback
-
-    def release(self, voice: int) -> None:
-        """Take *voice* off air, freeing whatever it held for the other voices."""
-        self._playing[voice] = None
 
     def _step(self, voice: int) -> int:
         """Move *voice* one place along its pass -- reshuffling into a new pass at

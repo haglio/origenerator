@@ -269,10 +269,6 @@ class Osr2StrokeDriver(QObject):
             else:
                 stroke_engine.disable_cruise_control(self._state)
 
-    @property
-    def cruising(self) -> bool:
-        return self._state.cruise.active
-
     def quarter_offset(self) -> None:
         r"""Shift the stroke a quarter cycle (genau's ``\``)."""
         with self._lock:

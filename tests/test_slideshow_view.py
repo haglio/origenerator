@@ -16,6 +16,7 @@ from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
@@ -40,9 +41,22 @@ def _png_bytes():
 
 def _view(qtbot, items=_ITEMS, **kw):
     kw.setdefault("shuffle", lambda order: None)  # deterministic order for these tests
-    view = SlideshowView(items, player=MagicMock(), **kw)
+    view = SlideshowView(items, player=MagicMock(), **_wired(kw))
     qtbot.addWidget(view)
     return view
+
+
+def _wired(kw: dict) -> dict:
+    """The show takes its HUD facts and its gallery actions as two records;
+    these cases name the facts and the actions flat, the way the words read."""
+    facts = {k: kw.pop(k) for k in ("order_label", "looping", "starred_ids", "enhanced_ids") if k in kw}
+    if facts:
+        kw["hud"] = HudFacts(**facts)
+    acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
+    if acts:
+        kw["actions"] = ShowActions(**acts)
+    return kw
+
 
 
 def _named(tmp_path, *names):
@@ -264,7 +278,7 @@ def test_the_consoles_transport_releases_the_lock_too(qtbot):
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None,
-                         on_delete=lambda prompt_id: None)
+                         actions=ShowActions(delete=lambda prompt_id: None))
     qtbot.addWidget(view)
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)             # the held slide is the one condemned
@@ -317,13 +331,13 @@ def test_up_deletes_the_current_item_and_advances(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
     view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None,
-                         on_delete=deleted.append)
+                         actions=ShowActions(delete=deleted.append))
     qtbot.addWidget(view)
     assert view._playlist.current()[2] == "id-a"
 
     _press(view, Qt.Key.Key_Up)
 
-    assert deleted == ["id-a"]                     # culled via the on_delete hook
+    assert deleted == ["id-a"]                     # culled via the delete act
     assert len(view._playlist) == 2
     assert view._playlist.current()[2] == "id-b"   # advanced to the next
 
@@ -416,7 +430,7 @@ def test_culling_the_last_slide_hands_nothing_over(qtbot):
     # nowhere to land.
     deleted = []
     view = SlideshowView([("a.png", "image", "id-a")], player=MagicMock(),
-                         shuffle=lambda order: None, on_delete=deleted.append)
+                         shuffle=lambda order: None, actions=ShowActions(delete=deleted.append))
     qtbot.addWidget(view)
     view.show()
     opened = []
@@ -510,7 +524,7 @@ def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
     # Stopping on a picture is the gesture that says you want it, so it is also
     # the one that asks for the better version.
     asked = []
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_Down)
 
@@ -523,7 +537,7 @@ def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
 
 def test_releasing_the_hold_asks_for_nothing(qtbot):
     asked = []
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
     _press(view, Qt.Key.Key_Down)   # hold
     _press(view, Qt.Key.Key_Down)   # release
     assert asked == ["id-a"]        # only the stop asked, not the resume
@@ -532,14 +546,14 @@ def test_releasing_the_hold_asks_for_nothing(qtbot):
 def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     # It already has a version at these settings, or it is a video: the refusal
     # comes from the side that holds the settings, and the corner stays quiet.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: False)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: False))
     _press(view, Qt.Key.Key_Down)
     assert view._note.isHidden()
 
 
 def test_e_turns_the_whole_behavior_off(qtbot):
     asked = []
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: asked.append(pid) or True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_E)
     _press(view, Qt.Key.Key_Down)
@@ -555,7 +569,7 @@ def test_e_turns_the_whole_behavior_off(qtbot):
 def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):
     # Holding several slides sends out several runs and ComfyUI takes them one at
     # a time, so a slide the show comes back around to is usually still waiting.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)        # ask for this one
     _press(view, Qt.Key.Key_Down)        # let go, so the show can move
     _press(view, Qt.Key.Key_Right)
@@ -570,7 +584,7 @@ def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot)
 
 
 def test_the_note_follows_the_run_from_the_line_onto_the_gpu(qtbot):
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
     assert view._note.text() == "Enhancement queued"
 
@@ -590,7 +604,7 @@ def test_a_run_of_an_item_this_show_never_asked_about_says_nothing(qtbot):
 def test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer(qtbot):
     # The statuses arrive every poll; a spoken command's answer is on screen for
     # a beat, and losing it to one would leave the speaker with no reply.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.note_voice_run("id-a", "🎤 fixing teeth…")
 
     view.note_enhancing({"id-a": "running"})
@@ -601,7 +615,7 @@ def test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer(qtbot):
 
 
 def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
     better = _png(tmp_path / "a_enhanced.png")
 
@@ -616,7 +630,7 @@ def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(
     # It arrives minutes later, by which time the show has moved — and the show
     # plays a set fixed when it opened, so an arrival dropped for being late
     # would replay the pre-enhance file every pass from here on.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Right)
     better = _png(tmp_path / "a_enhanced.png")
@@ -631,7 +645,7 @@ def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(
 def test_an_enhancement_of_another_folders_item_changes_nothing(qtbot, tmp_path):
     # Every landed enhancement is offered to every open show; this one belongs
     # to a folder this show isn't playing.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
 
     view.note_enhanced("id-elsewhere", _png(tmp_path / "other.png"))
 
@@ -642,7 +656,7 @@ def test_the_upgraded_item_is_drawn_as_its_new_still_beside_the_slide(
         qtbot, tmp_path):
     # An item rides along as a small still while its neighbor is on screen; the
     # thumbnail it arrived with is of the version the swap just retired.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.resize(800, 600)
     better_thumb = _png(tmp_path / "b_enhanced_thumb.png")
 
@@ -653,7 +667,7 @@ def test_the_upgraded_item_is_drawn_as_its_new_still_beside_the_slide(
 
 
 def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
-    view = _view(qtbot, _KEYED)     # no on_enhance wired
+    view = _view(qtbot, _KEYED)     # nothing wired to enhance with
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.locked
     assert view._note.isHidden()
@@ -664,7 +678,7 @@ def test_the_enhancing_note_is_a_toast_across_the_top(qtbot):
     # same shape: this surface wears the players' own HUD, so what it says for
     # itself is said in the players' own toast rather than in a second dialect
     # at the far end of the screen.
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.resize(800, 600)
     _press(view, Qt.Key.Key_Down)
 
@@ -698,7 +712,7 @@ def test_the_queue_rides_along_in_the_shows_bottom_left(qtbot):
 
     plate = view._queue.geometry()
     assert view._queue.keys() == ["j1", "j2"]        # the rows themselves
-    assert view._queue.running_preview().key == "j1"  # and the live half
+    assert view._queue._running.key == "j1"  # and the live half
     assert plate.left() < view.width() // 2      # left…
     assert plate.top() > view.height() // 2      # …and low, clear of the console
     assert not plate.intersects(view._counter.geometry())  # beside it, not over it
@@ -737,7 +751,7 @@ def test_locking_stars_the_item_on_screen(qtbot):
     # it once they should not have to say it again in a second way.
     starred = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
-    view = _view(qtbot, items=items, on_star=starred.append)
+    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
 
     _press(view, Qt.Key.Key_Down)
 
@@ -748,7 +762,7 @@ def test_locking_stars_the_item_on_screen(qtbot):
 def test_letting_go_of_the_lock_does_not_unstar(qtbot):
     starred = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, on_star=starred.append)
+    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
 
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Down)
@@ -770,7 +784,7 @@ def test_asking_for_a_hold_holds_and_asking_again_changes_nothing(qtbot):
     # and cannot see the counter's padlock to know which the flip would give.
     starred = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
-    view = _view(qtbot, items=items, on_star=starred.append)
+    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
 
     assert view.set_held(True) is True
     assert view.locked and starred == ["gen-a"]
@@ -784,7 +798,7 @@ def test_a_spoken_hold_stars_the_slide_like_a_pressed_one(qtbot):
     # less than a pressed one.
     starred = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, on_star=starred.append)
+    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
 
     view.set_held(True)
 
@@ -803,7 +817,7 @@ def test_asking_to_let_go_releases_only_what_was_held(qtbot):
 def test_starring_the_slide_on_screen_without_holding_it(qtbot):
     starred = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, on_star=starred.append)
+    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
 
     assert view.star() is True
 
@@ -821,7 +835,7 @@ def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):
     culled = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None),
              ("c.png", "image", "gen-c", None)]
-    view = _view(qtbot, items=items, on_delete=culled.append)
+    view = _view(qtbot, items=items, actions=ShowActions(delete=culled.append))
 
     view.step(1)
     assert view._playlist.current()[2] == "gen-b"
@@ -863,7 +877,7 @@ def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):
 
 
 def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
-    view = _view(qtbot, _KEYED, on_enhance=lambda pid: True)
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.note_voice_run("id-a", "🎤 fixing teeth…")
     assert "fixing teeth" in view._note.text()
     # The flash fades into the same note a hold's enhance earns, which follows
@@ -1300,7 +1314,7 @@ def test_a_scripted_clip_shows_its_strip(qtbot, tmp_path):
     write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
     view = _view(qtbot, [(str(vid), "video")])
     assert view._preview._strip is not None
-    assert view._preview._strip.has_script() is True
+    assert view._preview._strip._actions
 
 
 def test_it_does_not_nest_another_fullscreen_view(qtbot):
@@ -1560,11 +1574,11 @@ def test_a_reopened_show_shows_the_version_that_was_on_screen(qtbot, tmp_path):
 def test_a_reopened_show_keeps_the_enhance_on_hold_switch(qtbot):
     # Turned off because it was in the way; a show that came back with it on
     # would fire a run on the next hold.
-    closed = _view(qtbot, _THREE, on_enhance=lambda pid: True)
+    closed = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: True))
     _press(closed, Qt.Key.Key_E)
 
     asked = []
-    reopened = _view(qtbot, _THREE, on_enhance=lambda pid: asked.append(pid) or True)
+    reopened = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
     reopened.resume(closed.state())
     _press(reopened, Qt.Key.Key_Down)
 
@@ -1662,7 +1676,7 @@ def test_culling_a_slide_being_made_calls_nothing_off(qtbot, tmp_path):
     # has been judged. Up takes it off the show and leaves the run alone.
     condemned = []
     view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")],
-                 on_delete=condemned.append)
+                 actions=ShowActions(delete=condemned.append))
     view.note_generating("id-run", _png_bytes())
     _press(view, Qt.Key.Key_Right)
 
@@ -1688,7 +1702,7 @@ def test_holding_a_slide_being_made_asks_for_no_enhancement(qtbot, tmp_path):
     # There is no file yet to make a better version of; the hold still holds.
     asked = []
     view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")],
-                 on_enhance=lambda pid: asked.append(pid) or True)
+                 actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
     view.note_generating("id-run", _png_bytes())
     _press(view, Qt.Key.Key_Right)
 

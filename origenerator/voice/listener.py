@@ -11,12 +11,9 @@ fixed gate sits on top of the background and never endpoints — still works.
 """
 
 import logging
-import wave
 
 import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal
-
-from origenerator.config import STATE_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +21,6 @@ SAMPLE_RATE = 16000  # what faster-whisper expects
 
 _FRAME_MS = 30  # a mic block; ~30 ms is the usual granularity for speech endpointing
 _FRAME_SAMPLES = SAMPLE_RATE * _FRAME_MS // 1000
-
-
-def _save_utterance(audio) -> None:
-    """Write the captured utterance to state/last_utterance.wav, for diagnosing why
-    a transcription came back empty (is the audio speech, or noise?)."""
-    try:
-        pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype(np.int16)
-        with wave.open(str(STATE_DIR / "last_utterance.wav"), "wb") as wav:
-            wav.setnchannels(1)
-            wav.setsampwidth(2)
-            wav.setframerate(SAMPLE_RATE)
-            wav.writeframes(pcm.tobytes())
-    except Exception as exc:
-        logger.warning("Voice: could not save utterance wav: %s", exc)
 
 
 class UtteranceSegmenter:
@@ -150,7 +133,6 @@ class Listener(QObject):
         completed = self._segmenter.push(frame)
         if completed is not None:
             logger.info("Voice: utterance captured (%d samples)", len(completed))
-            _save_utterance(completed)
             self.utterance.emit(completed)  # queued to the owner's thread
 
     def stop(self):

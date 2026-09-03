@@ -9,18 +9,19 @@ uses, since it is a full render per row and there are a great many of them.
 
 import json
 
-from origenerator import gallery
+from origenerator import base_backfill, gallery
 from origenerator.app_state import AppState
 from origenerator.base_backfill import (
     SOURCE, TARGET_KEY, UNTIMED_SECONDS, attach_base, base_params_for,
     cancel_base_renders, fold_base_render, fold_completed_base_renders,
-    queue_base_renders, rows_missing_their_base, typical_seconds,
+    queue_base_renders, render_base_now, rows_missing_their_base, typical_seconds,
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tools import backfill_base_renders as backfill_tool
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 
@@ -390,3 +391,141 @@ def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
     window.close()
 
     assert json.loads(state_path.read_text())["gallery_selection"] == "xyz"
+
+
+# --- the tool: the same repair, run to completion in one sitting -------------
+
+class _PollingClient:
+    """A ComfyUI that takes a payload and hands back history after ``after`` polls."""
+
+    def __init__(self, *, after=1, history=None, submit_error=None):
+        self.submitted = []
+        self._after = after
+        self._history = {} if history is None else history
+        self._submit_error = submit_error
+        self.polls = 0
+
+    def submit_job(self, payload, prompt_id):
+        if self._submit_error is not None:
+            raise self._submit_error
+        self.submitted.append((payload, prompt_id))
+
+    def fetch_history(self, prompt_id):
+        self.polls += 1
+        return self._history if self.polls >= self._after else {}
+
+
+def _base_params():
+    return dict(_SDXL.default_params(), seed=7)
+
+
+def _clock():
+    """A monotonic clock a sleep can wind forward, so a wait costs no real time."""
+    now = [0.0]
+
+    def monotonic():
+        return now[0]
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    return monotonic, sleep
+
+
+def test_a_repair_run_now_submits_the_base_recipe_and_returns_its_files(tmp_path,
+                                                                        monkeypatch):
+    monkeypatch.setattr(
+        base_backfill, "extract_completion",
+        lambda *a, **k: ([_file("base.png")], None, 4.0))
+    client = _PollingClient(history={"anything": True})
+    monotonic, sleep = _clock()
+
+    files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
+
+    assert files == [_file("base.png")]
+    assert len(client.submitted) == 1
+
+
+def test_a_repair_run_now_waits_for_history_rather_than_reading_an_empty_one(
+        tmp_path, monkeypatch):
+    # ComfyUI answers /history with nothing at all until the prompt finishes, so
+    # an empty answer is "not yet", never "produced nothing".
+    monkeypatch.setattr(
+        base_backfill, "extract_completion",
+        lambda *a, **k: ([_file("base.png")], None, 4.0))
+    client = _PollingClient(after=3, history={"anything": True})
+    monotonic, sleep = _clock()
+
+    files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
+
+    assert files == [_file("base.png")] and client.polls == 3
+
+
+def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
+    # One still, however slow the model. A render that has not landed by then is
+    # a ComfyUI that is wedged or working on something else entirely.
+    client = _PollingClient(after=10**9)
+    monotonic, sleep = _clock()
+
+    files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
+
+    assert files == []
+    assert monotonic() >= base_backfill.RENDER_TIMEOUT_SECONDS
+
+
+def _repairable_db(tmp_path):
+    """A database holding one enhanced image whose base render was thrown away."""
+    db = Database(tmp_path / "repair.db")
+    _add(db, "gone", params=dict(_SDXL.default_params(), seed=3, enhance=True),
+         files=[_file("enhanced.png")])
+    return db
+
+
+def test_the_tool_reports_what_it_would_do_and_touches_nothing(tmp_path, capsys):
+    db = _repairable_db(tmp_path)
+
+    assert backfill_tool.main(["--db", str(tmp_path / "repair.db")]) == 0
+
+    said = capsys.readouterr().out
+    assert "1 enhanced image(s) with no base render kept" in said
+    assert "sdxl_t2i: 1" in said and "--apply" in said
+    assert not gallery.original_files_of(db.get_generation("gone"))
+
+
+def test_the_tool_folds_each_repair_into_the_row_it_belongs_to(tmp_path, monkeypatch):
+    db = _repairable_db(tmp_path)
+    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda: object())
+    monkeypatch.setattr(backfill_tool, "render_base_now",
+                        lambda client, workflow, params: [_file("base.png")])
+
+    code = backfill_tool.main(["--apply", "--db", str(tmp_path / "repair.db")])
+
+    assert code == 0
+    originals = gallery.original_files_of(db.get_generation("gone"))
+    assert [f["filename"] for f in originals] == ["base.png"]
+
+
+def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
+        tmp_path, monkeypatch, capsys):
+    # A wedged ComfyUI must not leave the row looking repaired, and the exit
+    # code has to say so: this is run unattended over a long backlog.
+    db = _repairable_db(tmp_path)
+    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda: object())
+    monkeypatch.setattr(backfill_tool, "render_base_now",
+                        lambda client, workflow, params: [])
+
+    code = backfill_tool.main(["--apply", "--db", str(tmp_path / "repair.db")])
+
+    assert code == 1
+    assert "produced nothing" in capsys.readouterr().out
+    assert not gallery.original_files_of(db.get_generation("gone"))
+
+
+def test_the_tool_stops_at_the_limit_it_is_given(tmp_path, capsys):
+    db = _repairable_db(tmp_path)
+    _add(db, "gone2", params=dict(_SDXL.default_params(), seed=4, enhance=True),
+         files=[_file("enhanced2.png")])
+
+    backfill_tool.main(["--db", str(tmp_path / "repair.db"), "--limit", "1"])
+
+    assert "1 enhanced image(s)" in capsys.readouterr().out

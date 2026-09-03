@@ -79,24 +79,22 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     that is what every reading of a region's model wants; :class:`ShowHud`
     passes its own.
     """
-    if not hasattr(host, "hud_items"):
-        return None
     cells, position, locked = host.hud_items()
     if not cells:
-        return None
+        return None  # a host with no set behind it, and so nothing to map
     hud_cells = tuple(
         HudCell(path=str(path), thumb=str(thumb) if thumb else "")
         for path, thumb in cells
     )
-    f_mode = bool(getattr(host, "hud_f_mode", False))
-    enhanced = bool(getattr(host, "hud_enhanced_mode", False))
-    order_label = getattr(host, "hud_order_label", "")
+    f_mode = host.hud_f_mode
+    enhanced = host.hud_enhanced_mode
+    order_label = host.hud_order_label
     order_label = SHUFFLE_LABEL if order_label == "Shuffle" else order_label
     # A show someone ASKED for is a loop -- this set, played round and round --
     # and the map's loop button is lit for it.  A region's base state is not:
     # it is that side browsing its whole library, exactly what a satellite does
     # with no loop on, so the button is dark and the line just names the order.
-    looping = bool(getattr(host, "hud_looping", True))
+    looping = host.hud_looping
     # The line says what the light says, in the words a satellite says it in --
     # the two HUDs are one HUD in two places.  Nothing playing_set when nothing
     # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
@@ -117,7 +115,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         # The players' favorite star and F-mode, over the same collection the
         # Favorites shelf lists: the star lights when the item on screen is a
         # favorite, and F-mode narrows the set to them.
-        is_favorite=bool(getattr(host, "hud_is_favorite", False)),
+        is_favorite=host.hud_is_favorite,
         f_mode=f_mode,
         corner=hud_cells[0],
         seeds=hud_cells[1:],
@@ -287,7 +285,7 @@ class ShowHud(QLabel):
         if verb == f"{self._side}_lock_video":
             self._jump(path, hold=True)
             return
-        if verb == f"{self._side}_fmode" and hasattr(self._host, "toggle_f_mode"):
+        if verb == f"{self._side}_fmode":
             # The players' F-mode, meaning here what it means there: narrow
             # the set to the favorites.  Handled on the show itself — the
             # session's player-side F-mode is about a blacked player's browse.
@@ -306,11 +304,11 @@ class ShowHud(QLabel):
             # place its reset button leads, and the same thing the press means
             # on a player.  Pressed while nothing is looping it is the dark
             # button it looks like: a show cannot start a loop it is not in.
-            if getattr(self._host, "hud_looping", True):
+            if self._host.hud_looping:
                 self._host.stroke_reset()
                 self._tick()
             return
-        if verb == f"{self._side}_reset" and hasattr(self._host, "stroke_reset"):
+        if verb == f"{self._side}_reset":
             # The players' reset, meaning here what it means there: put the
             # side back how it started.  The show owns what that is, and the
             # session's spoken "reset" reaches the same method.
@@ -366,5 +364,4 @@ class ShowHud(QLabel):
         self._tick()  # the readout answers the press without waiting for the beat
 
     def _jump(self, path: str, *, hold: bool) -> None:
-        if hasattr(self._host, "show_item"):
-            self._host.show_item(path, hold=hold)
+        self._host.show_item(path, hold=hold)

@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 class VoiceWorker(QObject):
     rewritten = pyqtSignal(object)  # the revised {positive, negative} pair
     failed = pyqtSignal(str)      # a human-readable reason (nothing heard, no server, …)
-    busy = pyqtSignal(bool)       # work started / finished
     heard = pyqtSignal(str)       # the raw transcription, for on-screen feedback
     command = pyqtSignal(object)  # a recognized spoken command's matched value
 
@@ -34,7 +33,6 @@ class VoiceWorker(QObject):
         is emitted. ``prompts`` is ``None`` while nothing is steering — command
         listening alone must never invent a rewrite. Runs on a pool thread;
         never raises."""
-        self.busy.emit(True)
         try:
             instruction = self._transcribe(audio)
             logger.info("Voice: transcribed %r", instruction)
@@ -55,8 +53,6 @@ class VoiceWorker(QObject):
             self.rewritten.emit({"positive": new_positive, "negative": new_negative})
         except Exception as exc:
             self.failed.emit(str(exc))
-        finally:
-            self.busy.emit(False)
 
 
 class ProcessTask(QRunnable):

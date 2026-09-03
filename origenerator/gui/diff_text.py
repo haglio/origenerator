@@ -74,7 +74,12 @@ def show_diff(edit: QPlainTextEdit, before: str, after: str) -> None:
 
 
 def added_format() -> QTextCharFormat:
-    """How arriving words are lit."""
+    """How arriving words are lit.
+
+    Public because a field being rewritten by hand draws the same change as it
+    is typed (:mod:`origenerator.gui.tracked_prompt`), and the two surfaces have
+    to mark the same thing the same way.
+    """
     fmt = QTextCharFormat()
     fmt.setBackground(_ADDED_BG)
     fmt.setForeground(_ADDED_COLOR)
@@ -82,16 +87,16 @@ def added_format() -> QTextCharFormat:
 
 
 def removed_format() -> QTextCharFormat:
-    """How departing words are struck through."""
+    """How departing words are struck through.
+
+    Public for the same reason :func:`added_format` is.
+    """
     fmt = QTextCharFormat()
     fmt.setFontStrikeOut(True)
     fmt.setForeground(_REMOVED_COLOR)
     return fmt
 
 
-# Both are public because a field being rewritten by hand draws the same change
-# as it is typed (:mod:`origenerator.gui.tracked_prompt`), and the two surfaces
-# have to mark the same thing the same way.
 def _format_for(kind: str) -> QTextCharFormat:
     return added_format() if kind == ADDED else removed_format()
 
@@ -106,11 +111,6 @@ def hold_value(edit: QPlainTextEdit, value: str | None) -> None:
     form reading the struck-out words as part of the prompt.
     """
     edit.setProperty(_VALUE_PROPERTY, value)
-
-
-def showing_diff(edit: QPlainTextEdit) -> bool:
-    """Whether ``edit`` is currently showing a change rather than a plain prompt."""
-    return edit.property(_VALUE_PROPERTY) is not None
 
 
 def live_text(edit: QPlainTextEdit) -> str:

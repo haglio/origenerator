@@ -1,16 +1,11 @@
-"""Which rows are enhanced, which await enhancement, how to enhance one — and
-folding a finished enhance back into the image it upgraded.
+"""Which rows are enhanced, which await enhancement, and how to enhance one.
 
 An enhancement is not a generation of its own: its result is an upgraded layer
-on an existing image. The standalone ``image_enhance`` workflow is machinery —
-its job runs under a transient row (so in-flight cards and restart reconnection
-work), and the moment it completes, :func:`fold_enhancement` moves its output
-onto the source row: the source keeps its folder, star and identity, its
-thumbnail and preview become the enhanced pixels, its pre-enhance file stays
-listed (and on disk) as the original, and the transient row is deleted.
-:func:`fold_completed_enhancements` runs the same fold at startup, healing
-completions that landed while the app was closed — and retroactively converting
-any older rows recorded as ``image_enhance`` generations.
+on an existing image. The standalone ``image_enhance`` workflow is machinery,
+and the moment one of its jobs completes its output is folded onto the source
+row — see :mod:`origenerator.gallery.enhance_fold`, which owns that half and is
+the only module in this package that touches a database. Everything here takes
+rows and answers questions about them.
 
 Enhancement is a *layer*, and a row can carry several: each fold prepends its
 file and records the settings that made it (:func:`enhance_levels`), so an image
@@ -42,155 +37,29 @@ from origenerator.gallery.output import (
     produced_output,
     row_output_files,
 )
+from origenerator.gallery.enhance_graph import graph_level_params
+from origenerator.gallery.enhance_settings import (
+    ENHANCE_SETTING_KEYS,
+    ENHANCE_WORKFLOW,
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
+    describe_enhance_params,
+    level_knobs,
+)
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 from origenerator.workflows.detail_parts import (
-    DEFAULT_FIX_DENOISE, detail_fixes_of, detector_part_label, fixable_parts,
+    DEFAULT_FIX_DENOISE, detail_fixes_of, fixable_parts,
 )
 
 logger = logging.getLogger(__name__)
 
-ENHANCE_WORKFLOW = "image_enhance"
-
-# The ``source`` a re-derived base render carries (see
-# :mod:`origenerator.base_backfill`). Lives here rather than there because the
-# tree filters on it and importing the backfill from the gallery would make a
-# cycle — the backfill reads the gallery to decide what needs repairing.
 BASE_RENDER_SOURCE = "base_render"
 
 # The workflows that ran the enhance tail unconditionally, before it became a
 # toggle: their rows carry the tail's params but no ``enhance`` flag.
 _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
-
-# The knobs the Enhance subpanel offers, and so the only params a folder's
-# settings may override on an enhance run. Everything else about the job — the
-# input file, the prompts steering the added texture — is read off the image
-# being enhanced, and the seed is re-rolled per launch like any variation.
-ENHANCE_SETTING_KEYS = (
-    "checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
-    "enhance_denoise", "enhance_detail_fixes",
-)
-
-# Everything a finished level is identified by. This used to carry the detail
-# pass's two detector files on top of the panel's knobs, because a level made by
-# a spoken "fix teeth" and one made by the generic faces-&-hands pass differed
-# by nothing else; ``enhance_detail_fixes`` names the parts itself, so the
-# panel's knobs are now the whole identity.
-ENHANCE_LEVEL_KEYS = ENHANCE_SETTING_KEYS
-
-# What a folder's settings leave to the source image rather than pinning: the
-# refining checkpoint, which by default is whichever one made the image, so an
-# enhanced image stays in its own style. The subpanel offers this as an option
-# on its model picker; picking a real checkpoint pins it instead.
-MATCH_SOURCE_MODEL = "(match the source image)"
-
-
-def default_enhance_params() -> dict:
-    """The ``image_enhance`` workflow's own defaults, narrowed to the knobs a
-    folder may set — what the subpanel shows for a folder that has never been
-    configured."""
-    defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
-    params = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
-    params["checkpoint"] = MATCH_SOURCE_MODEL
-    return params
-
-
-def _level_knobs(params: dict) -> dict:
-    """The knobs one enhancement is remembered by, out of whatever it recorded.
-
-    :data:`ENHANCE_LEVEL_KEYS` filtered off ``params``, with the detail pass
-    read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
-    so a level recorded under the old tick-and-two-detectors shape comes back as
-    the parts it fixed, and captions, re-runs and duplicate checks all see one
-    thing. A level that recorded no pass keeps none rather than an empty dict:
-    an enhancement whose knobs are unknown must stay indistinguishable from one
-    that recorded nothing at all, which is what an empty ``params`` means.
-    """
-    knobs = {k: v for k, v in params.items() if k in ENHANCE_LEVEL_KEYS}
-    fixes = detail_fixes_of(params)
-    if fixes:
-        knobs["enhance_detail_fixes"] = fixes
-    else:
-        knobs.pop("enhance_detail_fixes", None)
-    return knobs
-
-
-@dataclass(frozen=True)
-class EnhanceSettings:
-    """One folder's enhancement configuration.
-
-    ``auto`` is the subpanel's box: with it on, every image the folder newly
-    generates is enhanced as it lands, so a folder can be left to produce
-    finished images rather than raw ones. ``params`` holds the knobs
-    (:data:`ENHANCE_SETTING_KEYS`); a key absent from it falls back to the
-    workflow default, and a ``checkpoint`` of :data:`MATCH_SOURCE_MODEL` falls
-    back to whichever model made the image.
-    """
-
-    auto: bool = False
-    params: dict = field(default_factory=default_enhance_params)
-
-    @classmethod
-    def parse(cls, raw: str | None) -> "EnhanceSettings":
-        """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
-        an unconfigured folder is simply the defaults, box off.
-
-        A folder configured before the detail pass became a number per part is
-        read as what it asked for (:func:`~origenerator.workflows.detail_parts.
-        detail_fixes_of`) rather than as a key this no longer knows: dropping it
-        would quietly switch that folder's fix off, and a setting that stops
-        applying without saying so is the one thing a stored configuration must
-        never do.
-        """
-        try:
-            data = json.loads(raw) if raw else {}
-        except (json.JSONDecodeError, TypeError):
-            data = {}
-        if not isinstance(data, dict):
-            data = {}
-        stored = data.get("params")
-        params = default_enhance_params()
-        if isinstance(stored, dict):
-            params.update({k: v for k, v in stored.items() if k in ENHANCE_SETTING_KEYS})
-            params["enhance_detail_fixes"] = detail_fixes_of(stored)
-        return cls(auto=bool(data.get("auto")), params=params)
-
-    def to_json(self) -> str:
-        return json.dumps({"auto": self.auto, "params": self.params})
-
-
-def describe_enhance_params(params: dict) -> str:
-    """A one-line summary of an enhancement's knobs, for the levels list.
-
-    Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
-    distinguish one experiment from another, then each part the detail pass
-    redrew at the denoise it redrew it at. A pinned model is named after them;
-    the default (source-matched) one says nothing, since it is not a choice —
-    and neither does a part left at zero, for the same reason.
-    """
-    bits = []
-    scale = params.get("enhance_scale")
-    if scale is not None:
-        bits.append(f"{float(scale):g}x")
-    steps = params.get("enhance_steps")
-    if steps is not None:
-        bits.append(f"{steps} steps")
-    denoise = params.get("enhance_denoise")
-    if denoise is not None:
-        bits.append(f"{float(denoise):g} denoise")
-    # Each part the pass redrew, at its own denoise — "teeth 0.5", or
-    # "faces 0.45 & hands 0.6" where several ran.
-    fixes = detail_fixes_of(params)
-    if fixes:
-        bits.append(" & ".join(f"{name} {value:g}"
-                               for name, value in fixes.items()))
-    checkpoint = params.get("checkpoint")
-    if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
-        bits.append(str(checkpoint))
-    return " · ".join(bits)
-
 
 @dataclass(frozen=True)
 class EnhanceLevel:
@@ -276,12 +145,12 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     # a folded standalone enhance ran at its own settings, which live in the
     # history, and the source row's knobs would be a plausible-looking lie.
     inline = ({} if row.get("original_files")
-              else _level_knobs(parse_params(row.get("params_json"))))
+              else level_knobs(parse_params(row.get("params_json"))))
 
     def level(index: int, f: dict) -> EnhanceLevel:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceLevel(index, f"Enhance {index}", f, _level_knobs(params))
+        return EnhanceLevel(index, f"Enhance {index}", f, level_knobs(params))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):
@@ -463,9 +332,9 @@ def _knobs(params: dict) -> dict:
     gaps — the parts its detail pass redrew included, since a targeted fix and
     a plain enhancement differ by nothing else."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
-    base = {k: defaults[k] for k in ENHANCE_LEVEL_KEYS if k in defaults}
+    base = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
     base["checkpoint"] = MATCH_SOURCE_MODEL
-    base.update(_level_knobs(params))
+    base.update(level_knobs(params))
     return base
 
 
@@ -717,85 +586,6 @@ def is_enhance_product_row(row: dict) -> bool:
     return all((f.get("filename") or "").startswith(f"{stem}_") for f in files)
 
 
-def _node_order(node_id) -> int:
-    """A graph node's id as a number, for reading the order the workflow built
-    its nodes in. Non-numeric ids (a hand-authored graph) sort last, together."""
-    try:
-        return int(node_id)
-    except (TypeError, ValueError):
-        return 1 << 30
-
-
-def _graph_level_params(row: dict) -> dict:
-    """The enhance knobs a row's stored ComfyUI graph gives up.
-
-    A row the import scan reconstructed keeps the tail's numbers under the
-    generic names any sampler has — ``steps`` and ``denoise`` — and says nothing
-    at all about the upscale, so folding it on its params alone would file the
-    level with a blank settings line and leave the Enhance panel unable to tell
-    it apart from a level it has not made yet. The graph that ran is exact about
-    all of it, and it is stored on the row: the upscale model by name, the scale
-    as the fraction of the model's own 4x output the result was taken back down
-    to, and the detail pass by whether its detector nodes are there at all.
-    """
-    try:
-        graph = json.loads(row.get("workflow_json") or "{}")
-    except (TypeError, ValueError):
-        return {}
-    if not isinstance(graph, dict):
-        return {}
-    found: dict = {}
-    detailers: list[tuple[int, dict]] = []
-    for node_id, node in graph.items():
-        if not isinstance(node, dict):
-            continue
-        inputs = node.get("inputs")
-        if not isinstance(inputs, dict):
-            continue
-        node_type = node.get("class_type")
-        if node_type == "CheckpointLoaderSimple":
-            found["checkpoint"] = inputs.get("ckpt_name")
-        elif node_type == "UpscaleModelLoader":
-            found["upscale_model"] = inputs.get("model_name")
-        elif node_type == "ImageScaleBy":
-            scale = inputs.get("scale_by")
-            if isinstance(scale, (int, float)):
-                found["enhance_scale"] = scale * UPSCALE_MODEL_FACTOR
-        elif node_type == "KSampler":
-            found["enhance_steps"] = inputs.get("steps")
-            found["enhance_denoise"] = inputs.get("denoise")
-        elif node_type == "DetailerForEach":
-            # Sorted by node id below: the passes are laid out in the order they
-            # run, which the graph's own key order only happens to keep.
-            detailers.append((_node_order(node_id), inputs))
-    fixes = {}
-    for _, inputs in sorted(detailers, key=lambda pair: pair[0]):
-        # Each pass says which part it redrew only by way of the detector two
-        # nodes back, so the part is read off the model that found the regions.
-        segs = _linked_inputs(graph, inputs.get("segs"))
-        model = _linked_inputs(graph, segs.get("bbox_detector")).get("model_name")
-        denoise = inputs.get("denoise")
-        if isinstance(model, str) and isinstance(denoise, (int, float)):
-            fixes[detector_part_label(model.rsplit("/", 1)[-1])] = denoise
-    if fixes:
-        found["enhance_detail_fixes"] = fixes
-    return {k: v for k, v in found.items() if v is not None and k in ENHANCE_LEVEL_KEYS}
-
-
-def _linked_inputs(graph: dict, ref) -> dict:
-    """The inputs of the node one input links to, or ``{}`` where there is none.
-
-    A ComfyUI link is ``[node_id, output_index]``; anything else on an input is
-    a literal. Every step is guarded because this reads a graph off a file —
-    written by an older version of this app, or by ComfyUI itself.
-    """
-    if not (isinstance(ref, (list, tuple)) and ref and isinstance(ref[0], (str, int))):
-        return {}
-    node = graph.get(str(ref[0]))
-    inputs = node.get("inputs") if isinstance(node, dict) else None
-    return inputs if isinstance(inputs, dict) else {}
-
-
 def enhance_level_params(row: dict) -> dict:
     """The knobs one enhancement ran at, as the keys a level records.
 
@@ -804,125 +594,7 @@ def enhance_level_params(row: dict) -> dict:
     everything but the sampler numbers on a row the import scan reconstructed.
     """
     params = parse_params(row.get("params_json"))
-    level = _level_knobs(params)
-    for key, value in _graph_level_params(row).items():
+    level = level_knobs(params)
+    for key, value in graph_level_params(row, ENHANCE_SETTING_KEYS).items():
         level.setdefault(key, value)
     return level
-
-
-def _history_entries(files: list[dict], params: dict,
-                     run_id: int | None) -> list[dict]:
-    """One ``enhance_history`` entry per file this enhance produced: the file's
-    name, the knobs that made it — so a level can name its own settings even
-    after the transient job row is gone — and ``run_id``, the id that row had.
-
-    The id is kept for the same reason: the row about to be deleted is what said
-    where this enhancement falls in the library's order, and the image it
-    upgraded sorts on the shelf by the newest one it has received
-    (:func:`enhancement_recency`)."""
-    settings = _level_knobs(params)
-    return [
-        {"filename": f.get("filename"), "params": settings, "run_id": run_id}
-        for f in files if f.get("filename")
-    ]
-
-
-def fold_enhancement(db, enhance_row: dict,
-                     image_rows: list[dict] | None = None) -> str | None:
-    """Fold a finished standalone enhance into the image it enhanced.
-
-    The source row becomes the enhanced image in place: the enhanced file
-    leads its ``output_files`` (so previews, thumbnails, and anything built
-    from the row use the upgraded pixels), every earlier file stays listed —
-    the pre-enhance original remains on disk, reachable from the metadata
-    block, and no later import scan finds an orphan — and ``original_files``
-    records what the row held before its first enhance, which is also what
-    marks it enhanced. The settings this run used are appended to
-    ``enhance_history``, so the level it just added can be told apart from the
-    ones already there (:func:`enhance_levels`). Folder membership, star,
-    params and identity are untouched: enhancing never moves or duplicates a
-    node. The transient enhance row is deleted (row only — its file now
-    belongs to the source).
-
-    Returns the upgraded source's prompt_id, or ``None`` (and folds nothing)
-    when the enhance produced no file or its source image is no longer in the
-    database — such a row is left alone rather than half-migrated. Which image
-    that is comes from the run's own ``enhance_of`` stamp where it has one, and
-    from the file it read otherwise (:func:`enhance_target_id`).
-
-    ``image_rows`` is the pool the start frame is matched against, for a caller
-    that already holds one: the startup sweep folds a whole backlog at once, and
-    re-reading every generation (graphs included) per fold is the difference
-    between a launch and a wait.
-    """
-    enhanced_files = row_output_files(enhance_row)
-    if not enhanced_files:
-        return None
-    if image_rows is None:
-        image_rows = db.list_generations()
-    source_id = enhance_target_id(
-        enhance_row, [r for r in image_rows if media_type_of_row(r) == "image"])
-    if source_id is None:
-        return None
-    source = db.get_generation(source_id)
-    updates = {
-        "output_files": json.dumps(enhanced_files + row_output_files(source)),
-        "enhance_history": json.dumps(
-            _history_entries(enhanced_files, enhance_level_params(enhance_row),
-                             enhance_row.get("id"))
-            + parse_file_list(source.get("enhance_history"))
-        ),
-    }
-    if not source.get("original_files"):
-        # First enhance: what the row holds now is the true original. A
-        # re-enhance keeps this — the original is the pre-ANY-enhance file.
-        updates["original_files"] = source.get("output_files")
-    if enhance_row.get("thumbnail_path"):
-        updates["thumbnail_path"] = enhance_row["thumbnail_path"]
-    db.update_generation(source_id, **updates)
-    db.delete_generation(enhance_row["prompt_id"])
-    return source_id
-
-
-def fold_completed_enhancements(db) -> int:
-    """Fold every finished enhancement standing as a row of its own into the
-    image it upgraded.
-
-    The startup half of the fold: completions that landed while the app was
-    closed (reconciled from /history), rows from before enhancement folded at
-    all — the retroactive fix that turns old "Image Enhance generations" into
-    upgrades of the images they enhanced — and the ones the import scan
-    reconstructed from bare files, which is how a branch session's enhance
-    arrives (:func:`is_enhance_product_row`). In-flight rows are left for their
-    live completion; sourceless rows (the enhanced image was deleted) are left
-    as they are. Returns how many rows were folded.
-
-    Oldest first, so a stack of enhancements lands in the order it was made and
-    an enhance *of* an enhance finds its input already folded onto the image it
-    belongs to. The pool each fold matches against is read once and kept current
-    as folds land, because reading it per row would mean pulling every stored
-    graph in the library through memory for each one.
-    """
-    rows = sorted(db.list_generations(), key=lambda r: r.get("id") or 0)
-    pool = [r for r in rows if media_type_of_row(r) == "image"]
-    folded = 0
-    for row in rows:
-        if row.get("status") != "completed":
-            continue
-        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW                 and not is_enhance_product_row(row):
-            continue
-        source_id = fold_enhancement(db, row, image_rows=pool)
-        if source_id is None:
-            continue
-        folded += 1
-        # The pool's own copies go stale the moment a fold rewrites the source:
-        # refresh the one that changed (so the file it just gained can be found
-        # by an enhance made from it) and drop the row that no longer exists.
-        upgraded = db.get_generation(source_id)
-        pool = [r for r in pool if r.get("prompt_id") != row.get("prompt_id")]
-        for candidate in pool:
-            if candidate.get("prompt_id") == source_id and upgraded is not None:
-                candidate.update(upgraded)
-    if folded:
-        logger.info("Folded %d enhancements into their source images", folded)
-    return folded

@@ -236,6 +236,46 @@ class PreviewWidget(QWidget):
             if app is not None:
                 app.aboutToQuit.connect(self._release)
 
+    def _take_the_pane(self, media, *, stop_player: bool = True,
+                       keep_notice: bool = False,
+                       live: bool = False, live_frame: bytes | None = None) -> None:
+        """Put down everything the pane is holding, ready for new content.
+
+        This is what showing anything means, said once: the movie and the still
+        are retired and the other pages put down (:meth:`_set_movie` clears the
+        combination and the wall), the stroke strip drops, the playback stops,
+        the notice and the corner controls — both of which are about the picture
+        being replaced, and so can no more outlive it than it can — go, and the
+        pane records what it is about to be showing (``media``, or ``None`` for
+        anything that is not a file on disk) and hands a fullscreen view opened
+        over a running generation the file it landed as.
+
+        The drag follows ``media`` rather than a switch of its own: a view with
+        no file on disk has nothing to drag out, and a view that has one leaves
+        the arming to its owner, since only the owner knows which generation the
+        file belongs to.
+
+        The two switches are the deliberate exceptions, one caller each.
+        ``stop_player`` — a clip does not stop the player it is about to hand a
+        new source to. ``keep_notice`` — frames of an enhancement of the picture
+        on screen are the coming state of that picture, so what a notice says
+        about it is just as true of them.
+        """
+        self._set_movie(None)
+        self._pixmap = None
+        self._hide_strip()
+        if stop_player:
+            self._player.stop()
+        if not keep_notice:
+            self.set_notice(None)
+        self.set_actions(None)
+        self._media = media
+        self._end_live(media)
+        if live:
+            self._live, self._live_frame = True, live_frame
+        if media is None:
+            self._draggable_id = None
+
     def show_media(self, path, media_type: str) -> None:
         """Display ``path`` as an image or video per ``media_type``."""
         if media_type == "video":
@@ -244,36 +284,24 @@ class PreviewWidget(QWidget):
             self.show_image(path)
 
     def show_image(self, path) -> None:
-        self._player.stop()
-        self.set_notice(None)  # a new picture, so any notice about the last one goes
-        self.set_actions(None)  # …and the corners are about the last one too
-        self._media = (path, "image")
-        self._end_live(self._media)
+        self._take_the_pane((path, "image"))
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
-            self._pixmap = None
             self._set_movie(QMovie(str(path)), reader.size())
         else:
-            self._set_movie(None)
             self._pixmap = QPixmap(str(path))
             self._rescale()
         self._stack.setCurrentWidget(self._image_label)
-        self._hide_strip()  # an image carries no stroke script
 
     def show_video(self, path) -> None:
-        self._set_movie(None)
-        self.set_notice(None)  # a new clip, so any notice about the last one goes
-        self.set_actions(None)  # …and the corners are about the last one too
-        self._media = (path, "video")
-        self._end_live(self._media)
-        self._pixmap = None
+        self._take_the_pane((path, "video"), stop_player=False)
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
         self._player.play()
         if self._playback_paused:
             self._player.pause()  # a clip loaded into a frozen room opens held
-        self._update_strip(path)
+        self._update_strip(path)  # …and wears its stroke script, if it has one
 
     def show_frame(self, data: bytes, *, keep_notice: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
@@ -281,7 +309,8 @@ class PreviewWidget(QWidget):
         ComfyUI streams live previews as encoded images over the websocket
         rather than writing a file, so this loads straight from memory. Bytes
         that don't decode (a truncated frame) are ignored, leaving the current
-        view untouched.
+        view untouched — which is why the decode happens before the pane is put
+        down rather than after.
 
         ``keep_notice`` marks the frames as the coming state of the picture
         already on display — an enhancement of it — rather than a run of the
@@ -293,19 +322,11 @@ class PreviewWidget(QWidget):
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
-        self._player.stop()
-        if not keep_notice:
-            self.set_notice(None)  # the run on screen is what these settings are making
-        self._media = None  # a transient live frame, not a file to open fullscreen
-        self._live, self._live_frame = True, data  # …but a running generation to watch
-        self._draggable_id = None  # nor a saved generation to drag out
-        self.set_actions(None)     # nor one to star, bin or enhance
-        self._set_movie(None)
+        self._take_the_pane(None, keep_notice=keep_notice, live=True, live_frame=data)
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
         self._raise_notice()  # a kept notice, back over the frame that just landed
-        self._hide_strip()  # a live in-progress frame has no script yet
         win = self._following_fullscreen()
         if win is not None:
             win.show_frame(data)  # keep a view watching this generation up to date
@@ -320,18 +341,10 @@ class PreviewWidget(QWidget):
         line a tab pointed at nothing wears — said only that, when the two things
         the tab is actually about were both on hand to be shown.
         """
-        self._player.stop()
-        self.set_notice(None)  # no picture of a past run left for a notice to be about
-        self._media = None     # a pair to be made, not a file to open fullscreen
-        self._end_live(None)
-        self._draggable_id = None  # nor a saved generation to drag out
-        self.set_actions(None)     # nor one to star, bin or enhance
-        self._set_movie(None)
-        self._pixmap = None
+        self._take_the_pane(None)
         self._image_label.clear()
         self._combination.show_pair(image_path, video_path)
         self._stack.setCurrentWidget(self._combination)
-        self._hide_strip()  # nothing made yet, so no script to lay under it
 
     def show_folder(self, paths) -> None:
         """Show a whole folder at once: every picture in ``paths``, tiled to fill.
@@ -339,19 +352,14 @@ class PreviewWidget(QWidget):
         What a tab about a folder rather than a generation puts in the pane —
         the rewrite a folder's Request card opens. There is no one file on display, so
         nothing here is draggable, openable fullscreen, or scripted; the wall is
-        the folder, and the folder is what the settings below it are about.
+        the folder, and the folder is what the settings below it are about — and
+        no one of them is what the corner controls would act on, which is why
+        they come down here as they do everywhere else.
         """
-        self._player.stop()
-        self.set_notice(None)  # no single picture left for a notice to be about
-        self._media = None     # a folder, not a file to open fullscreen
-        self._end_live(None)
-        self._draggable_id = None
-        self._set_movie(None)
-        self._pixmap = None
+        self._take_the_pane(None)
         self._image_label.clear()
         self._sheet.show_pictures(paths)
         self._stack.setCurrentWidget(self._sheet)
-        self._hide_strip()  # a wall of pictures has no one script to lay under it
 
     def show_message(self, text: str, *, live: bool = False) -> None:
         """Show a plain text message in place of any media.
@@ -363,18 +371,9 @@ class PreviewWidget(QWidget):
         opens fullscreen over it all the same — the view comes up saying it's
         generating and fills in as the frames arrive.
         """
-        self._player.stop()
-        self.set_notice(None)  # no picture left for a notice to be about
-        self._media = None  # a message, not a file to open fullscreen
-        self._end_live(None)  # a message is no result to hand a following view
-        self._live = live
-        self._draggable_id = None  # nor a saved generation to drag out
-        self.set_actions(None)     # nor one to star, bin or enhance
-        self._set_movie(None)
-        self._pixmap = None
+        self._take_the_pane(None, live=live)
         self._image_label.setText(text)
         self._stack.setCurrentWidget(self._image_label)
-        self._hide_strip()
 
     def set_notice(self, text: str | None) -> None:
         """Dim the media behind ``text``, or take the notice away (``None``).

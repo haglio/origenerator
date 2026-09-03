@@ -178,7 +178,7 @@ def _painted_label_font(bar, index):
 
 def test_no_tab_is_the_preview_tab_to_begin_with(qtbot):
     bar = _closable_bar(qtbot)
-    assert bar.preview_index() == -1
+    assert bar._preview_index == -1
     assert _painted_label_font(bar, 0).italic() is False
 
 

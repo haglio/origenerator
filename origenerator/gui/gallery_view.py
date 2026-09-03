@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import replace
 import random
 from typing import NamedTuple
 from functools import partial
@@ -10,7 +11,7 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
     QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
 )
-from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize
 
 from origenerator import (
     evolver_export, gallery, prompt_edit, recipe_match, recovery, search, timing,
@@ -48,22 +49,16 @@ from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.request_worker import RevisionWorker, ReviseTask
+from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
-from origenerator.voice.app_commands import (
-    AppCommand, DialSetting, app_command_bias, match_app_command,
-)
+from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
 from origenerator.voice.commands import (
     ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
     sided_app_command, split_side, voice_command_bias,
 )
 from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import (
-    ShowCommand, match_show_command, show_command_bias,
-)
-from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.voice.steering import VoiceSteering
 from origenerator.gui.reroll_prompt import (
@@ -88,7 +83,8 @@ from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.browser_pane import (
-    BrowserPane, BrowserScrollArea, SEARCH_DRAW_LIMIT, SearchTile,
+    BrowserPane, BrowserScrollArea, PaneHost, SEARCH_DRAW_LIMIT, SearchTile,
+    TreeNavigation,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -314,25 +310,6 @@ ALREADY_GENAUD = "🎤 already Genau'd"
 _VOICE_WANTS = {
     gallery.GENAU_COMMAND: "a Genau clip",
 }
-
-
-def _match_voice_command(text: str):
-    """The one command an utterance is, or ``None`` — the vocabularies that
-    tolerate a filler word or two, in the order they are tried.
-
-    The show's own controls, then everything said about the picture on screen
-    (:func:`~origenerator.gallery.voice_commands.match_command`, which owns that
-    half's order). Each matcher is strict about its own shape and none can claim
-    another's — a show command names the slideshow, a fix leads with "fix" — so
-    the order only decides which is asked first. Everything unclaimed falls
-    through to a prompt rewrite, which is why none of them may be loose.
-
-    The bare vocabulary (:mod:`origenerator.voice.app_commands`) is not here.
-    It matches whole utterances only, which is strict enough to be asked ahead
-    of an opening request — so the mic is given it separately, as its
-    ``bare_matcher``.
-    """
-    return match_show_command(text) or gallery.match_command(text)
 
 
 # The shelf each spoken shelf name stands you in. What to call it back comes
@@ -624,8 +601,48 @@ class GalleryView(QWidget):
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
         # The browser pane renders the middle column (tiles / thumbnails / shelves)
-        # and owns the thumbnail multi-selection and in-flight cards.
-        self._browser = BrowserPane(self)
+        # and owns the thumbnail multi-selection and in-flight cards. Its signals
+        # carry every gesture made on a tile; the handlers here answer them. The
+        # scroll area is its canvas — built here so it can be handed over, placed
+        # into the layout by _build_ui.
+        self._scroll = BrowserScrollArea()
+        self._browser = BrowserPane(
+            self._scroll, db, self._reroll, self._auto,
+            TreeNavigation(
+                selected_folder_key=self._selected_folder_key,
+                folder_context=self._folder_context,
+                group_for_key=self._group_for_key,
+            ),
+            # Each answer looks itself up through self at call time, as the
+            # pane's old view reads did — so a per-instance stub (tests fake
+            # _animated_preview this way) still lands.
+            PaneHost(
+                media_types=lambda: self._media_types(),
+                image_rows=lambda: self._image_rows,
+                animated_preview=lambda row: self._animated_preview(row),
+                enhancing_run=lambda row: self.enhancing_run(row),
+                enhance_settings=lambda: self._enhance_settings,
+                experiments_enabled=lambda: self.experiments_enabled(),
+                add_lead_tiles=lambda flow, group: self._add_lead_tiles(flow, group),
+            ),
+        )
+        self._browser.pane_reset.connect(self._forget_reroll_tile)
+        self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
+        self._browser.tab_pin_requested.connect(self.pin_config_tab)
+        self._browser.item_jump_requested.connect(self._follow_link)
+        self._browser.folder_open_requested.connect(self._open_folder_tile)
+        self._browser.reveal_reroll_requested.connect(self._reveal_reroll)
+        self._browser.folder_menu_requested.connect(self._folder_context_menu)
+        self._browser.menu_requested.connect(self.generation_menu)
+        self._browser.trash_menu_requested.connect(self._trash_menu)
+        self._browser.item_action_triggered.connect(self.run_item_action)
+        self._browser.seed_reroll_requested.connect(self._reroll_item_seed)
+        self._browser.experiment_verdict.connect(self._on_experiment_verdict)
+        self._browser.trash_action_triggered.connect(self._on_trash_action)
+        self._browser.cancel_requested.connect(self._cancel_job)
+        self._browser.drag_started.connect(self._on_generation_drag_started)
+        self._browser.drag_ended.connect(self._on_generation_drag_ended)
+        self._browser.selection_changed.connect(self._sync_action_buttons)
         self._fingerprint = None
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
@@ -680,6 +697,7 @@ class GalleryView(QWidget):
         # showEvent for a view shown after one.
         self._intercept_the_rooms_keys(True)
 
+        self._poll_inflight = False  # a tick's reads are out; don't stack more
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
@@ -935,17 +953,14 @@ class GalleryView(QWidget):
         # Hosted by Fun Time the rect is an upright column, so the panes fold
         # into _stack instead of sitting side by side: the info pane on top, the
         # tree and browser as one row under it, and the queue across the foot of
-        # all three.  _left_column goes unused there — hosted, the queue belongs
-        # to the window rather than to the folder column.
+        # all three: hosted, the queue belongs to the window rather than to the
+        # folder column, so there is no _left_column at all on that side.
         self._panes = QSplitter(Qt.Orientation.Horizontal)
         self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
         self._panes.setHandleWidth(6)
         self._folder_panes = QSplitter(Qt.Orientation.Horizontal)
         self._folder_panes.setChildrenCollapsible(False)
         self._folder_panes.setHandleWidth(6)
-        self._left_column = QSplitter(Qt.Orientation.Vertical)
-        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
-        self._left_column.setHandleWidth(6)
         self._stack = None
         if self._fun_time is not None:
             self._stack = QSplitter(Qt.Orientation.Vertical)
@@ -1254,7 +1269,6 @@ class GalleryView(QWidget):
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
         browser_box.addWidget(self._avg_label)
-        self._scroll = BrowserScrollArea()
         self._scroll.setWidgetResizable(True)
         # A click on the background between the tiles puts the selection down,
         # as it does in a file browser — and here it is also the only way back
@@ -1286,6 +1300,9 @@ class GalleryView(QWidget):
             # reason to move it.  The folder panes go straight beside the tree.
             self._panes.addWidget(self._folder_panes)
         else:
+            self._left_column = QSplitter(Qt.Orientation.Vertical)
+            self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
+            self._left_column.setHandleWidth(6)
             self._left_column.addWidget(self._folder_panes)
             self._left_column.addWidget(self._queue)
             self._panes.addWidget(self._left_column)
@@ -1343,7 +1360,7 @@ class GalleryView(QWidget):
         browser_box.addLayout(bottom)
 
         self._info_tabs.tab_added.connect(self._wire_config_panel)
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
         self._info_tabs.currentChanged.connect(self._on_front_tab_changed)
         # Quitting mid-drive still releases the device — park it and restore genau —
@@ -1611,8 +1628,9 @@ class GalleryView(QWidget):
         return self._open_slideshow(items, start=index, frame=frame,
                                     image_dwell_ms=0, shuffle=in_order,
                                     folder_items=self._folder_media(),
-                                    order_label="", looping=False,
-                                    starred_ids=self._starred_prompt_ids())
+                                    hud=HudFacts(
+                                        order_label="", looping=False,
+                                        starred_ids=self._starred_prompt_ids()))
 
     def _open_slideshow(self, items, *, folder_items=None, location=None,
                         side=None, resume=None, **kwargs):
@@ -1634,19 +1652,27 @@ class GalleryView(QWidget):
         """
         self._show_refused = set()  # a new show, a new set to be judged against
         self._slideshow = SlideshowView(
-            items, on_delete=self._trash_generation,
-            on_enhance=self._enhance_from_slideshow,
-            on_star=self._star_generation,
-            on_lock=(self._open_generate_tab_for
-                     if self._fun_time is not None else None),
-            on_reset=(self.reset_region if self._fun_time is not None else None),
+            items,
+            actions=ShowActions(
+                delete=self._trash_generation,
+                enhance=self._enhance_from_slideshow,
+                star=self._star_generation,
+                # Two of the six are a session's: a lock opens the held item as
+                # a generate tab, and a reset means the REGION's base state.
+                lock=(self._open_generate_tab_for
+                      if self._fun_time is not None else None),
+                reset=(self.reset_region if self._fun_time is not None else None),
+                # Space reaches the one OSR2 switch, like every other surface's.
+                drive_toggle=self._toggle_osr2_drive,
+            ),
             pace=self._pace, stroke=self._osr2_stroke,
             # Which of its items carry an enhancement, for the switch beside
             # F-mode on its HUD -- over the set it plays and the folder a live
             # show is armed with, since either is what the switch narrows.
-            enhanced_ids=self._enhanced_prompt_ids([*items, *(folder_items or [])]),
-            # Its Space reaches the one OSR2 switch, like every other surface's.
-            on_drive_toggle=self._toggle_osr2_drive, **kwargs)
+            hud=replace(kwargs.pop("hud", HudFacts()),
+                        enhanced_ids=self._enhanced_prompt_ids(
+                            [*items, *(folder_items or [])])),
+            **kwargs)
         self._live_shows.append((self._slideshow, location))
         if folder_items and self._slideshow.is_live():
             # Watching something render is no reason to lose the folder it is
@@ -1986,7 +2012,7 @@ class GalleryView(QWidget):
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now behind another still shows there.
         """
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
                     if (job := self._reroll.job_for_origin(origin)) is not None]
             panel.forget_launched({origin for origin in panel.launched_runs()
@@ -2150,36 +2176,93 @@ class GalleryView(QWidget):
             self.fill_the_regions()
 
     def _poll(self):
-        # Backstop for a missed completion frame: finish any re-roll ComfyUI has
-        # already completed so it lands here without a restart. Reconcile fires
-        # each job's own finished/failed handler, which persists and refreshes.
-        for job in self._reroll.all_jobs:
-            job.reconcile()
-            # And re-read what another app has in front of a job ComfyUI hasn't
-            # started, so that wait shows a number instead of an unmoving bar
-            # (see GenerationJob.refresh_backlog).
-            job.refresh_backlog()
-        self._refresh_foreign_queue()
-        rows = self._db.list_generations()
-        meta = self._db.folder_meta_map()
-        fingerprint = _fingerprint(rows, meta)
-        if fingerprint != self._fingerprint:
-            self._fingerprint = fingerprint
-            self._rebuild(rows, meta)
-        else:
-            # No DB change, but the in-flight cards still need each running
-            # re-roll's live frame pushed in — it advances between rebuilds.
-            # Wherever they were drawn: the Recents shelf, or a folder with a
-            # batch of them cooking in it.
-            self._browser.refresh_inflight()
-        # The bottom strip is always on screen, so refresh it every tick — its
-        # rows' live frames and progress advance between rebuilds.
-        self._update_queue()
-        # And a show's corner, for the same reason and one more: a run starting
-        # is not a change to any row, so nothing else here would tell the show
-        # its held slide went from waiting to being made.
-        self._feed_slideshow_enhancing()
-        self._refresh_wait_note()
+        """One tick: fetch every blocking read away from the GUI, apply here.
+
+        The tick used to make its HTTP calls inline — with a 2.0 s socket
+        timeout inside a 1.5 s timer, so a wedged ComfyUI froze the window for
+        most of every tick. The reads now run on the pool
+        (:func:`_fetch_poll_facts`) and :meth:`_finish_poll` applies them back
+        on this thread. A tick that fires while the last one's reads are still
+        out is skipped rather than stacked, so a slow server thins the refresh
+        instead of queueing freezes.
+        """
+        if self._poll_inflight:
+            return
+        self._poll_inflight = True
+        jobs = self._reroll.all_jobs
+        targets = [(job.prompt_id, job.state) for job in jobs]
+        client = self._client
+        self._run_off_thread(lambda: _fetch_poll_facts(client, targets),
+                             lambda facts: self._finish_poll(jobs, facts))
+
+    def _finish_poll(self, jobs, facts):
+        """Apply a tick's ComfyUI answers, then send its database reads out too.
+
+        Applying before reading is load-bearing: reconciliation can land a
+        completion's row, and the listing read next must see it rather than lag
+        it a tick. The listing — two whole-table SELECTs and the requests
+        table, the tick's other blocking work — is read on the pool and lands
+        in :meth:`_finish_poll_rebuild`.
+        """
+        try:
+            if facts is not None:  # None only if the batched fetch itself died
+                self._apply_poll_facts(jobs, facts)
+        except Exception:
+            self._poll_inflight = False
+            raise
+        db = self._db
+
+        def read_listing():
+            rows = db.list_generations()
+            meta = db.folder_meta_map()
+            return rows, meta, db.list_requests(), _fingerprint(rows, meta)
+
+        self._run_off_thread(read_listing, self._finish_poll_rebuild)
+
+    def _finish_poll_rebuild(self, listing):
+        """The tick's last hop: fold the freshly read listing into the panes."""
+        try:
+            if listing is None:  # only if the read itself died
+                return
+            rows, meta, requests, fingerprint = listing
+            if fingerprint != self._fingerprint:
+                self._fingerprint = fingerprint
+                self._rebuild(rows, meta)
+            else:
+                # No DB change, but the in-flight cards still need each running
+                # re-roll's live frame pushed in — it advances between rebuilds.
+                # Wherever they were drawn: the Recents shelf, or a folder with
+                # a batch of them cooking in it.
+                self._browser.refresh_inflight(rows=rows, requests=requests)
+            # The bottom strip is always on screen, so refresh it every tick —
+            # its rows' live frames and progress advance between rebuilds. The
+            # listing already in hand feeds it, so the strip costs the tick no
+            # further table reads.
+            self._update_queue(self._inflight_items(rows=rows, requests=requests))
+            # And a show's corner, for the same reason and one more: a run
+            # starting is not a change to any row, so nothing else here would
+            # tell the show its held slide went from waiting to being made.
+            self._feed_slideshow_enhancing()
+            self._refresh_wait_note()
+        finally:
+            self._poll_inflight = False
+
+    def _apply_poll_facts(self, jobs, facts: "_PollFacts"):
+        """Apply one tick's fetched answers, in the order the inline calls ran.
+
+        Reconciling first is load-bearing: finishing a missed completion fires
+        the job's own finished handler, which persists its row — so the rows
+        this tick then reads see the completion rather than lagging it a tick.
+        """
+        for job in jobs:
+            # Backstop for a missed completion frame: finish any re-roll
+            # ComfyUI has already completed so it lands without a restart.
+            job.reconcile_with(facts.histories.get(job.prompt_id))
+            # And what another app has in front of a job ComfyUI hasn't
+            # started, so that wait shows a number instead of an unmoving bar.
+            job.take_backlog(facts.backlogs.get(job.prompt_id))
+        if facts.foreign is not None:
+            self._foreign_queue = facts.foreign
 
     def _rebuild(self, rows, meta):
         expanded = self._tree_view.expanded_keys()
@@ -2313,7 +2396,7 @@ class GalleryView(QWidget):
         # A generation landing or leaving can make an open tab's pinned seed one that
         # would reproduce it — or stop it being one — with nothing on the form having
         # moved, so every tab re-reads what its Generate would now do.
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             panel.refresh_generate_caption()
 
     def _build_sides(self, rows, meta, unreviewed, held, requested, start_frames):
@@ -2468,7 +2551,7 @@ class GalleryView(QWidget):
         self._run_search()
 
     def _search_scope(self) -> _SearchScope:
-        """What the search covers: its short name, its path, and what is in it.
+        """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A shelf
         counts: Recents, Starred, Experiments and Trash are each a collection of
@@ -2706,21 +2789,8 @@ class GalleryView(QWidget):
             self._browser.show_empty()
             self._sync_action_buttons()
             return
-        if base == _RECENTS_KEY:
-            self._browser.show_recents_overview(orientation)
-            return
-        if base == _STARRED_KEY:
-            self._browser.show_starred_overview(orientation)
-            return
-        if base == _EXPERIMENTS_KEY:
-            self._sync_experiments_bar()
-            self._browser.show_experiments_overview(orientation)
-            return
-        if base == _REQUESTS_KEY:
-            self._browser.show_requests_overview(orientation)
-            return
-        if base == _TRASH_KEY:
-            self._browser.show_trash_overview(orientation)
+        if base in _SHELF_KEYS:
+            self._open_shelf(base, orientation)
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -2741,6 +2811,35 @@ class GalleryView(QWidget):
         self._show_group_contents(group)
         self._sync_action_buttons()
 
+    def _open_shelf(self, base: str, orientation: str | None):
+        """Show one side's copy of a shelf: dress the header, clear the info
+        pane (a shelf opens showing nothing until an item is picked), have the
+        browser render it, and record the visit so Back can return to it."""
+        if base == _EXPERIMENTS_KEY:
+            self._sync_experiments_bar()  # what the switch's position means
+        self._title.set_display(self._shelf_title(base, orientation))
+        self._avg_label.setText(self._browser.trash_note(orientation)
+                                if base == _TRASH_KEY else "")
+        self._clear_metadata()
+        self._browser.show_shelf(base, orientation)
+        if base == _REQUESTS_KEY:
+            self._sync_delete_button()
+        else:
+            self._sync_action_buttons()
+        self._record_location()
+
+    @staticmethod
+    def _shelf_title(base: str, orientation: str | None) -> str:
+        """A shelf's header: its side, then its name — the path shape a folder's
+        breadcrumb has, since a shelf belongs to one side like everything else.
+        Favorites keeps the star its tree row wears."""
+        label = _SHELF_LABELS[base]
+        if base == _STARRED_KEY:
+            label = "★ " + label
+        if orientation is None:
+            return label
+        return f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
+
     def _show_group_contents(self, group):
         """Fill the browser pane with what a folder holds: its generations
         (a settings leaf), the folders it gathers (one the user composed), or its
@@ -2751,6 +2850,17 @@ class GalleryView(QWidget):
             self._browser.show_custom_folder(group)
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group))
+
+    def _open_folder_tile(self, key: str):
+        """A folder tile was clicked: select its tree row, which draws the folder.
+        Clicking one is a decision to go there, so it puts a running search away
+        first — a search's results are folder tiles too, and this is how they
+        open; without it the box would still be full while the pane shows the
+        folder it drilled into."""
+        item = self._tree_item_for(key)
+        if item is not None:
+            self._leave_search()
+            self._tree.setCurrentItem(item)
 
     # --- several folders at once: the folder they would make ------------------
 
@@ -2934,12 +3044,6 @@ class GalleryView(QWidget):
         label = timing.average_label(durations)
         self._avg_label.setText(f"Average time: {label}" if label else "")
 
-    # --- main view: folder tiles or thumbnails -----------------------------
-
-    # --- the Recents shelf: in-flight work, then recently finished items ----
-
-    # --- the Starred shelf: every bookmarked folder, gathered in one place ---
-
     # --- re-roll: a new variation of a folder's settings, here in the gallery
 
     def _can_reroll(self, group) -> bool:
@@ -2976,8 +3080,9 @@ class GalleryView(QWidget):
         panel = self._info_tabs.current_config_panel()
         return panel._preview if panel is not None else None
 
-    # The folder tree's key→item / prompt→item maps and shelf rows are owned by the
-    # GalleryTree renderer; surfaced here for navigation, selection, and rebuild.
+    # The folder tree's key→item and prompt→item maps are owned by the GalleryTree
+    # renderer; surfaced here for navigation, selection, and rebuild. A shelf's row
+    # is reached separately, through _shelf_item.
     @property
     def _item_by_key(self) -> dict:
         return self._tree_view.item_by_key
@@ -3028,6 +3133,15 @@ class GalleryView(QWidget):
         """One side's copy of a shelf row — the side being browsed by default."""
         return self._tree_view.shelf_item(shelf_key, orientation or self._current_side())
 
+    def _folder_context(self, key: str) -> str:
+        """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
+        top of the tree. The caption a tile drawn far from the tree wears
+        (see :class:`~origenerator.gui.browser_pane.TreeNavigation`)."""
+        item = self._tree_item_for(key)
+        if item is None or item.parent() is None:
+            return ""
+        return self._tree_view.breadcrumb(item.parent())
+
     def _current_group(self):
         """The folder on screen, or ``None`` (a shelf, a search, or an empty
         selection).
@@ -3046,6 +3160,21 @@ class GalleryView(QWidget):
             return None
         item = self._tree.currentItem()
         return item.data(0, _GROUP_ROLE) if item else None
+
+    def _add_lead_tiles(self, flow, group):
+        """Lead a settings folder's grid with the view's own tiles — the live
+        re-roll tile and, beside it, its mirror (the same seeds again, said
+        differently) — when the folder supports each. The pane grants the spot
+        (:attr:`~origenerator.gui.browser_pane.PaneHost.add_lead_tiles`)."""
+        if self._can_reroll(group):
+            self._add_reroll_tile(flow, group)
+        if self._can_request_changes(group):
+            self._add_folder_request_tile(flow, group)
+
+    def _forget_reroll_tile(self):
+        """The pane is dropping what it holds, the re-roll tile with it — it is
+        re-created only when a re-rolling folder is next rendered."""
+        self._reroll_tile = None
 
     def _add_reroll_tile(self, flow, group):
         job = self._reroll.job_for(group.key)
@@ -3740,7 +3869,7 @@ class GalleryView(QWidget):
         The panel holds the settings and the tabs hold the images, so the card
         can only know whether it would be making a duplicate once the two meet —
         here, on every edit and every rebuild."""
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             panel.set_enhance_settings(self._enhance_settings)
 
     def _on_enhance_settings_changed(self, settings):
@@ -3932,8 +4061,9 @@ class GalleryView(QWidget):
         word about the app or the slide in front of the speaker, or an order
         about the picture — each with the side it named, if it named one.
 
-        A bare command with no wrapper round it named no side, which is what
-        every utterance was before the room had two shows to aim at.
+        An order about the picture always arrives wrapped in a
+        :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
+        how the side travels, and the matchers put every one of them in it.
         """
         if isinstance(matched, ShelfCommand):
             self._play_shelf_aloud(matched)
@@ -3944,14 +4074,15 @@ class GalleryView(QWidget):
                 self._run_app_command(matched.command, matched.side)
             else:
                 self._on_picture_command(matched)
-        elif isinstance(matched, ShowCommand):
-            self._run_show_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
         elif isinstance(matched, DialSetting):
             self._set_stroke_dial(matched)
         else:
-            self._on_picture_command(SurfaceCommand(matched))
+            # The two matchers between them produce exactly the five above. A
+            # sixth kind arriving is a new matcher nobody wired through to here,
+            # and dropping it silently is how that goes unnoticed for a release.
+            logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
 
     def _answer_command(self, message: str):
         """Say what a spoken command did, where the speaker is looking — the
@@ -3963,7 +4094,7 @@ class GalleryView(QWidget):
         else:
             self._show_voice_status(message, transient=True)
 
-    def _run_show_command(self, command: ShowCommand, side: str | None = None):
+    def _run_show_command(self, command: ShowCommand, side: str | None):
         """Get the show going, hold it, or close it — on *side*'s region when
         the utterance named one, else on the show that is up.
 
@@ -4266,8 +4397,10 @@ class GalleryView(QWidget):
                 continue
             logger.info("The %s region opens on the library of its shape: %d items",
                         side, len(items))
-            self._open_slideshow(items, location=key, side=side, looping=False,
-                                 starred_ids=self._starred_prompt_ids())
+            self._open_slideshow(items, location=key, side=side,
+                                 hud=HudFacts(
+                                     looping=False,
+                                     starred_ids=self._starred_prompt_ids()))
 
     def close_the_regions(self) -> None:
         """Give both regions back -- the session leaving origenerator mode.
@@ -4296,8 +4429,10 @@ class GalleryView(QWidget):
         items = self._slideshow_items(self._rows_at(key))
         if not items:
             return
-        self._open_slideshow(items, location=key, side=side, looping=False,
-                             starred_ids=self._starred_prompt_ids())
+        self._open_slideshow(items, location=key, side=side,
+                             hud=HudFacts(
+                                 looping=False,
+                                 starred_ids=self._starred_prompt_ids()))
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""
@@ -4327,8 +4462,7 @@ class GalleryView(QWidget):
         # a generation landing in the library must reach a reset region.
         self._live_shows = [(held, key if held is show else where)
                             for held, where in self._live_shows]
-        show.retune(items, order_label="Shuffle", looping=False,
-                    enhanced_ids=self._enhanced_prompt_ids(items))
+        show.retune(items, enhanced_ids=self._enhanced_prompt_ids(items))
 
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
@@ -4362,8 +4496,8 @@ class GalleryView(QWidget):
         self._open_slideshow(
             items, location=key, side=command.side,
             shuffle=(lambda order: None) if latest else None,
-            order_label="Latest" if latest else "Shuffle",
-            starred_ids=self._starred_prompt_ids(),
+            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
+                         starred_ids=self._starred_prompt_ids()),
         )
 
     def _toggle_f_mode_aloud(self, side) -> None:
@@ -4373,13 +4507,13 @@ class GalleryView(QWidget):
         a player, so the readout — the lit button and the status line — says so
         without anything here having to draw it."""
         show = self._voice_surface(side)
-        if show is None or not hasattr(show, "toggle_f_mode"):
+        if show is None:
             self._show_voice_status(
                 "🎤 F-mode needs a show to narrow", transient=True)
             return
         show.toggle_f_mode()
         self._show_voice_status(
-            "🎤 F-mode on" if getattr(show, "hud_f_mode", False) else "🎤 F-mode off",
+            "🎤 F-mode on" if show.hud_f_mode else "🎤 F-mode off",
             transient=True)
 
     def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
@@ -4697,7 +4831,7 @@ class GalleryView(QWidget):
             # Every tab showing this image, not just the front one — the delete
             # can come from a tab that isn't in front, and a stale list would
             # still be offering a version that is gone.
-            for panel in self._info_tabs._config_panels():
+            for panel in self._info_tabs.config_panels():
                 shown = panel.displayed_row()
                 if shown is not None and shown.get("prompt_id") == prompt_id:
                     panel.show_completed_result(updated, self._image_rows)
@@ -4720,7 +4854,7 @@ class GalleryView(QWidget):
         first.
         """
         running = self._enhance_jobs()
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             row = panel.displayed_row()
             panel.set_pending_enhancement(
                 self._pending_enhancement_for(row, running) if row else None
@@ -4832,16 +4966,16 @@ class GalleryView(QWidget):
         # set shuffles — and the show's HUD status line says which.
         base, orientation = _split_shelf_key(location)
         latest = base == _RECENTS_KEY
-        show = self._open_slideshow(
+        self._open_slideshow(
             items, location=location, side=side or orientation,
             resume=self._show_state,
             shuffle=(lambda order: None) if latest else None,
-            order_label="Latest" if latest else "Shuffle",
-            starred_ids=self._starred_prompt_ids(),
+            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
+                         starred_ids=self._starred_prompt_ids()),
         )
-        logger.info("Slideshow of %s: %d items, %s order[:10]=%s",
+        logger.info("Slideshow of %s: %d items, %s",
                     self._slideshow_subject(), len(items),
-                    "latest" if latest else "shuffled", show._playlist.order[:10])
+                    "latest" if latest else "shuffled")
 
     def _on_slideshow_closed(self, show=None):
         """A show was dismissed (however): let it go, with the hold it put on
@@ -4855,7 +4989,7 @@ class GalleryView(QWidget):
         """
         # Where it had got to, so the next one opens back on that slide: the
         # look at the folder behind a picture doesn't cost the place among them.
-        if show is not None and hasattr(show, "state"):
+        if show is not None:
             self._show_state = show.state()
         self._live_shows = [entry for entry in self._live_shows
                             if entry[0] is not show]
@@ -4976,8 +5110,7 @@ class GalleryView(QWidget):
         # Silent like every satellite: the session's main player owns the
         # room's audio, and this surface is landing on a satellite's region.
         # Standalone the same view is the deliberate foreground and plays sound.
-        if hasattr(view, "set_audio_muted"):
-            view.set_audio_muted(True)
+        view.set_audio_muted(True)
         rect = self._fun_time.region_rect(side)
         # The rect as given, so the window opens at the right size and an
         # unscaled process is already correct here.
@@ -5001,7 +5134,7 @@ class GalleryView(QWidget):
         # A show opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
-        if self._session_paused and hasattr(view, "set_session_paused"):
+        if self._session_paused:
             view.set_session_paused(True)
         self._wear_the_hud(view, side)
 
@@ -5046,7 +5179,7 @@ class GalleryView(QWidget):
         its own stills and plate still on — see :func:`_shared_hud_widget`.
         """
         hud = _shared_hud_widget()
-        if hud is None or not hasattr(view, "adopt_hud"):
+        if hud is None:
             return
         # The view is handed the panel itself rather than only told one is on:
         # its console seats itself under the panel and follows it as it resizes.
@@ -5080,8 +5213,6 @@ class GalleryView(QWidget):
         # considers VISIBLE, and a show the session has covered or parked is
         # still a show that must not go on playing through a frozen room.
         for show, _where in list(self._live_shows):
-            if not hasattr(show, "set_session_paused"):
-                continue
             try:
                 show.set_session_paused(paused)
             except Exception:
@@ -5230,7 +5361,7 @@ class GalleryView(QWidget):
         The slideshow has already closed itself, so this arrives on the gallery.
         """
         self._slideshow = None
-        self._browser.open_in_containing_folder(prompt_id)
+        self._follow_link(prompt_id)
 
     def _star_generation(self, prompt_id: str):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
@@ -5313,18 +5444,42 @@ class GalleryView(QWidget):
             return (None, None)
         return (row.get("thumbnail_path"), self._animated_preview(row))
 
-    def combine_selection(self) -> list:
-        """The ``[image_id, video_id]`` sitting in the combine slots, for session save."""
-        return [self._combine.image_slot.current_id(), self._combine.video_slot.current_id()]
+    def combine_selection(self) -> dict:
+        """Everything the combine panel is holding, for session save: the two
+        slots, the lane and the act.
+
+        All four, because all four are choices the user made and none is
+        recoverable from the others — an act says nothing about which lane
+        answers it, and a restart that put the picture back and forgot it was for
+        a Genau loop would answer the next Generate out of the wrong recipes.
+        """
+        return {
+            "image": self._combine.image_slot.current_id(),
+            "video": self._combine.video_slot.current_id(),
+            "intent": self._combine.selected_intent(),
+            "category": self._combine.selected_category(),
+        }
 
     def restore_combine_selection(self, saved) -> None:
-        """Refill the combine slots from a saved ``[image_id, video_id]``, skipping an
-        item that's since been deleted or no longer fits its slot."""
-        if not isinstance(saved, (list, tuple)) or len(saved) != 2:
+        """Put the combine panel back the way a session left it, skipping an item
+        that has since been deleted or no longer fits its slot, and an act the
+        lane can no longer answer.
+
+        The lane goes in before the act: it decides which acts are answerable,
+        and ``set_category`` refuses one that is greyed out under it.
+
+        A list of two is what sessions before this wrote — the slots alone — and
+        is still read, so an existing ``ui_state.json`` restores what it has.
+        """
+        if isinstance(saved, (list, tuple)) and len(saved) == 2:
+            saved = {"image": saved[0], "video": saved[1]}
+        if not isinstance(saved, dict):
             return
-        image_id, video_id = saved
+        image_id, video_id = saved.get("image"), saved.get("video")
         if image_id and self._combine_accepts_image(image_id):
             self._combine.image_slot.set_item(image_id)
+        self._combine.set_intent(saved.get("intent") or recipe_match.PLAYERS)
+        self._combine.set_category(saved.get("category") or "")
         if video_id and self._combine_accepts_video(video_id):
             self._combine.video_slot.set_item(video_id)
 
@@ -5922,6 +6077,29 @@ class GalleryView(QWidget):
 
     # --- re-roll as the info-pane source ----------------------------------
 
+    def _reveal_reroll(self, key: str):
+        """Open the folder a re-roll runs in and select its live tile — an
+        in-flight card's click, relayed by the browser pane.
+
+        Leaves a running search first: results take the pane over, and picking
+        a tree row underneath them re-scopes the search rather than showing the
+        folder — so the click landed on the row and the wall of results stayed
+        up, which reads as the click doing nothing at all.
+        """
+        self._leave_search()
+        item = self._tree_item_for(key)
+        if item is None:
+            # A folder the tree has not drawn yet: the first run in a brand-new
+            # settings folder makes the node, and this click can land in the
+            # gap.  Rebuild and ask once more rather than dropping the gesture.
+            self.refresh()
+            item = self._tree_item_for(key)
+        if item is None:
+            logger.info("Nothing to reveal for %s: no folder row", key)
+            return
+        self._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
+        self._select_reroll(key)
+
     def _select_reroll(self, key: str, *, land: bool = True):
         """Make a running re-roll's tile the selected item, and show the run
         full size in the tab it belongs to.
@@ -6002,7 +6180,7 @@ class GalleryView(QWidget):
         one. The count falls as the queue drains, and a pane frozen on a stale
         number is the mystery this is here to end. Only while the followed run
         has streamed no frame — once it has, the frame itself is the answer."""
-        for panel in self._info_tabs._config_panels():
+        for panel in self._info_tabs.config_panels():
             key = panel.watched_key()
             if key is not None and panel.is_awaiting_frame():
                 panel.show_live_wait(self._wait_note(key))
@@ -6215,18 +6393,6 @@ class GalleryView(QWidget):
     def visible_prompt_ids(self) -> list[str]:
         return self._browser.visible_prompt_ids()
 
-    def visible_folder_keys(self) -> list[str]:
-        return self._browser.visible_folder_keys()
-
-    # --- browser-pane facade (the shelves/inflight the view drives into it) -
-
-    @property
-    def _inflight_cards(self) -> dict:
-        return self._browser._inflight_cards
-
-    def _showing_recents(self) -> bool:
-        return self._browser.showing_recents()
-
     def _media_types(self) -> set[str]:
         """The media types the gallery's two checkboxes currently include — what
         the folder tree, every shelf, the in-flight cards and the search index are
@@ -6252,19 +6418,10 @@ class GalleryView(QWidget):
         # button never fires — and it went on offering a show of nothing.
         self._sync_slideshow_button()
 
-    def _drill_into(self, key: str):
-        self._browser._drill_into(key)
+    def _inflight_items(self, rows=None, requests=None) -> list:
+        return self._browser.inflight_items(rows=rows, requests=requests)
 
-    def _thumbnail_double_clicked(self, prompt_id: str):
-        self._browser._thumbnail_double_clicked(prompt_id)
-
-    def _on_inflight_clicked(self, key: str):
-        self._browser._on_inflight_clicked(key)
-
-    def _inflight_items(self) -> list:
-        return self._browser._inflight_items()
-
-    def _update_queue(self):
+    def _update_queue(self, inflight=None):
         """Feed the bottom strip every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
@@ -6280,8 +6437,12 @@ class GalleryView(QWidget):
         covers, which is the one stretch where the line deliberately stops
         moving, and once for the slides themselves, since a run that has begun to
         look like something is a slide of that show (:meth:`_feed_slideshow_in_flight`).
+
+        ``inflight`` is the already-built card list, when the caller (the poll)
+        holds one; every other caller lets it be built fresh here.
         """
-        items = self._inflight_items() + list(self._launching.values())
+        items = (self._inflight_items() if inflight is None else inflight) \
+            + list(self._launching.values())
         self._queue.set_items(items, self._foreign_queue.total)
         if self._slideshow is not None:
             self._slideshow.set_queue(items, self._foreign_queue.total)
@@ -6296,16 +6457,9 @@ class GalleryView(QWidget):
         nowhere. ComfyUI outlives every app that queues on it, so that backlog can
         be a branch preview's background experiments that outlived the preview.
         """
-        if self._client is None:
-            return
-        try:
-            self._foreign_queue = self._client.foreign_queue()
-        except Exception as e:
-            # Unreadable (server down, wedged, restarting): claim nothing rather
-            # than leave a stale count on screen offering to clear a queue we
-            # can no longer see.
-            logger.debug("Could not read ComfyUI's queue: %s", e)
-            self._foreign_queue = ForeignQueue(running=[], pending=[])
+        queue = _read_foreign_queue(self._client)
+        if queue is not None:
+            self._foreign_queue = queue
 
     def _clear_foreign_queue(self):
         """Wipe another app's work off ComfyUI, on the user's say-so.
@@ -6397,24 +6551,10 @@ class GalleryView(QWidget):
 
     # --- selection ---------------------------------------------------------
 
-    def _thumbnail_clicked(self, prompt_id: str):
-        self._browser._thumbnail_clicked(prompt_id)
-
-    def _apply_selection(self, prompt_id: str, modifiers):
-        self._browser.apply_selection(prompt_id, modifiers)
-
     def selected_prompt_ids(self) -> list[str]:
         return self._browser.selected_prompt_ids()
 
-    @property
-    def _thumb_widgets(self) -> dict:
-        """The on-screen thumbnail widgets, owned by the browser pane."""
-        return self._browser._thumb_widgets
-
     # --- deletion & undo ---------------------------------------------------
-
-    def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        self._browser._thumbnail_context_menu(prompt_id, global_pos)
 
     def generation_menu(self, prompt_ids: list[str], global_pos):
         """The right-click menu a generation's picture offers, wherever it is shown.
@@ -6565,6 +6705,22 @@ class GalleryView(QWidget):
             self.restore_from_trash([prompt_id])
         else:
             self.purge_from_trash([prompt_id])
+
+    def _trash_menu(self, global_pos):
+        """Right-click on the Trash shelf: restore or permanently delete the
+        picked items — the same two actions the tiles' hover corners carry,
+        reachable for a whole selection at once. The pane has already narrowed
+        the selection to the tile under the cursor when it was outside it."""
+        ids = self.selected_prompt_ids()
+        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
+        menu = QMenu(self)
+        restore_action = menu.addAction("Restore" + suffix)
+        purge_action = menu.addAction("Delete" + suffix + " permanently")
+        chosen = menu.exec(global_pos)
+        if chosen is restore_action:
+            self.restore_from_trash(ids)
+        elif chosen is purge_action:
+            self.purge_from_trash(ids)
 
     def restore_from_trash(self, prompt_ids):
         """Bring deleted items back — files to where they were, rows to the
@@ -7316,6 +7472,58 @@ def _group_workflow(group) -> str | None:
         return group.workflow_name
     rows = gallery.rows_under(group)  # model or settings folder: ask its rows
     return rows[0]["workflow_name"] if rows else None
+
+
+class _PollFacts(NamedTuple):
+    """One tick's answers from ComfyUI, fetched together and applied together."""
+
+    histories: dict  # prompt_id -> its /history, for jobs that may have finished
+    backlogs: dict   # prompt_id -> another app's jobs ahead of it (None unread)
+    foreign: object  # the shared queue's state, or None for nothing-to-read
+
+
+def _fetch_poll_facts(client, targets) -> _PollFacts:
+    """Every blocking read one poll tick makes of ComfyUI, batched.
+
+    ``targets`` is ``(prompt_id, state)`` per live job at tick time — names and
+    strings rather than the job objects, so nothing here touches GUI-owned
+    state. /history is pulled for a job whose completion could have been
+    missed, the queue position for one still waiting, and the shared queue once
+    for the strip. Each read fails soft, exactly as it did when made inline: a
+    fetch that raises leaves its entry unread rather than failing the tick.
+    """
+    histories, backlogs = {}, {}
+    if client is not None:
+        for prompt_id, state in targets:
+            if state in ("queued", "running"):
+                try:
+                    histories[prompt_id] = client.fetch_history(prompt_id)
+                except Exception as e:
+                    logger.debug("Reconcile fetch failed for %s: %s", prompt_id, e)
+            if state == "queued":
+                try:
+                    backlogs[prompt_id] = client.foreign_backlog(prompt_id)
+                except Exception as e:
+                    logger.debug("Could not read the queue position of %s: %s",
+                                 prompt_id, e)
+                    backlogs[prompt_id] = None
+    return _PollFacts(histories, backlogs, _read_foreign_queue(client))
+
+
+def _read_foreign_queue(client):
+    """The shared ComfyUI queue's current state, ``None`` with no client to ask.
+
+    Unreadable (server down, wedged, restarting) claims nothing rather than
+    leave a stale count on screen offering to clear a queue we can no longer
+    see.
+    """
+    if client is None:
+        return None
+    try:
+        return client.foreign_queue()
+    except Exception as e:
+        logger.debug("Could not read ComfyUI's queue: %s", e)
+        return ForeignQueue(running=[], pending=[])
 
 
 def _fingerprint(rows, meta) -> int:

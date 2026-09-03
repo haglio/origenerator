@@ -13,7 +13,7 @@ every repo, read at runtime through the git-ignored overlays — so this habit i
 the only remaining path for a real name to get committed, and the only thing
 stopping it is you following this rule.
 
-Do not lean on the sanitize guard to catch it. `tools/sanitize_guard.py` fails
+Do not lean on the sanitize guard to catch it. `app_support.sanitize` fails
 the suite when a **known** blocked term appears in the tracked tree, but a brand-
 new performer name it has never seen passes every check and lands. The guard is a
 backstop for names already known; it cannot see the next one.
@@ -55,6 +55,35 @@ no symptom at all, and the user cannot even tell there is something to look for.
 The near miss that still counts: tightening a signature so an unfamiliar file
 lands in a family rather than in `None` — a confident wrong answer hides the
 model, where the honest shrug only leaves it listed.
+
+## The commands in `tools/`, and why each one is not a menu item
+
+Two things live here that the app does not put in front of the user, so a
+reader who never opens the folder will not find them. They are named here
+because a command nobody can see is one nobody maintains — the base-render
+backfill went a whole audit unreferenced by CLAUDE.md, CI, any launcher and any
+test, which is how a script comes to re-implement a loop the app already owns.
+
+The pre-publication content guard is no longer among them: it is
+`app_support.sanitize`, published once for the family (backlog item 44), and the
+harvester that learned its list off the media library is deleted. What stayed
+behind is the two hooks that call the guard, below.
+
+- `tools/backfill_base_renders.py` — re-derives the base renders an inline
+  enhance threw away, run to completion in one sitting instead of a few rows per
+  absence. No `--apply` is a dry run and prints the count per workflow, which is
+  the way to ask how much of that backlog is left. Everything it decides about a
+  repair it asks `origenerator.base_backfill` — the same module the app's own
+  absence path uses, down to the submit-and-wait — so the two cannot answer
+  differently. Run it with the app closed; it is one full render per row.
+- `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
+  tree and the message with `app_support.sanitize`. Each is a shim that finds an
+  interpreter which can import it and gets out of the way; neither has a way of
+  not running that ends in a zero exit code. `install.py` points
+  `core.hooksPath` here, which is the one step that arms a clone.
+
+A new command here gets a line in this list and a test, or it is invisible by
+the time anyone needs it.
 
 ## Judging a branch before it lands
 

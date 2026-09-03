@@ -15,12 +15,6 @@ from PyQt6.QtCore import Qt
 STROKE_KEY_LEGEND = ("Space drives · J/L speed · 7/9 travel · U/O center"
                      r" · I shape · / cruise · \ nudge")
 
-# The translucent overlay style the fullscreen counters share.
-CAPTION_CSS = (
-    "color: white; background: rgba(0, 0, 0, 140);"
-    " padding: 4px 10px; border-radius: 4px;"
-)
-
 
 def apply_stroke_key(stroke, key, *, on_drive_toggle=None) -> bool:
     """Route one of genau's stroke keys to ``stroke``; ``False`` for any other

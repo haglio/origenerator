@@ -43,10 +43,6 @@ from PyQt6.QtWidgets import QPlainTextEdit
 from origenerator.gui import diff_text
 from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 
-# What the field was rewriting from. Also the mark that it is being rewritten at
-# all, which is what tells the panel's Generate it has a whole folder to run.
-_BASELINE_PROPERTY = "trackedPromptBaseline"
-
 # How long after the last keystroke the departed words are put back. Short
 # enough to read as "while I type" — the complaint this answers was a strike
 # that waited for the field to be left — and long enough that a burst of typing
@@ -248,13 +244,11 @@ def track(edit: QPlainTextEdit, baseline: str) -> None:
     typed from here on is.
     """
     untrack(edit)
-    edit.setProperty(_BASELINE_PROPERTY, baseline)
     _Tracker(edit, baseline).show_whole_change()
 
 
 def untrack(edit: QPlainTextEdit) -> None:
     """Stop tracking ``edit`` and leave it an ordinary field holding its prompt."""
-    edit.setProperty(_BASELINE_PROPERTY, None)
     for tracker in edit.findChildren(_Tracker):
         tracker.detach()
     diff_text.clear_diff(edit)
@@ -263,7 +257,3 @@ def untrack(edit: QPlainTextEdit) -> None:
     # take the format that was under the caret when the marks came off.
     edit.setCurrentCharFormat(_plain_format(edit))
 
-
-def baseline(edit: QPlainTextEdit) -> str | None:
-    """What ``edit`` is being rewritten from, or ``None`` — it isn't being."""
-    return edit.property(_BASELINE_PROPERTY)

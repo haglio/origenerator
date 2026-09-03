@@ -184,22 +184,6 @@ def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     return tuple(wf.lora_keys) if wf else ()
 
 
-@lru_cache(maxsize=None)
-def workflow_param_order(workflow_name: str | None) -> tuple[str, ...]:
-    """The param keys a workflow lays out in its form, in that order.
-
-    This is the single order both surfaces present settings in: the Generate form
-    builds its rows straight from ``param_definitions()``, and the gallery info
-    pane sorts a row's stored params by this so every generation groups the same
-    way regardless of the order its JSON was serialized in. Empty for an unknown
-    workflow (an import with no registered template), leaving the caller to fall
-    back to the stored order. Cached because the order is static per workflow —
-    so this pays ``param_definitions()``'s model-directory scan at most once each.
-    """
-    wf = _registered(workflow_name)
-    return tuple(pd.key for pd in wf.param_definitions()) if wf else ()
-
-
 def _keyed_signature(keys: tuple[str, ...], params: dict) -> str:
     """Canonical, order-stable key from the values ``params`` holds for ``keys``."""
     return json.dumps([params.get(key) for key in keys], default=str)

@@ -10,6 +10,7 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.gallery_tree import RECENTS_KEY
+from origenerator import recipe_match
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -72,7 +73,7 @@ def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
     ], "current": 2})
     win = _window(qtbot, tmp_path, state)
 
-    panels = win._gallery_view._info_tabs._config_panels()
+    panels = win._gallery_view._info_tabs.config_panels()
     assert len(panels) == 2
     assert panels[1]._workflow_combo.currentData() == "wan22_i2v"
 
@@ -651,9 +652,9 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     pid = gv._reroll_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
-    assert pid in gv._inflight_cards   # the running generation shows as a card
+    assert pid in gv._browser._inflight_cards   # the running generation shows as a card
 
-    gv._on_inflight_clicked(pid)       # click that card
+    gv._browser._on_inflight_clicked(pid)       # click that card
     assert _selected_folder(gv) == folder_key  # reveal opened the re-roll's folder
 
 
@@ -681,7 +682,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     gv = win._gallery_view
     gv.refresh()
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
-    assert "vid_run" in gv._inflight_cards
+    assert "vid_run" in gv._browser._inflight_cards
 
 
 def _seed_combine_db(tmp_path):
@@ -712,10 +713,25 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
 
     win.close()
 
-    assert AppState(path).get("gallery_combine") == ["img", "vid"]
+    saved = AppState(path).get("gallery_combine")
+    assert saved["image"] == "img" and saved["video"] == "vid"
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
+    _seed_combine_db(tmp_path)
+    state = AppState(tmp_path / "ui.json")
+    state.set("gallery_combine", {"image": "img", "video": "vid"})
+
+    win = _window(qtbot, tmp_path, state)
+
+    assert win._gallery_view._combine.image_slot.current_id() == "img"
+    assert win._gallery_view._combine.video_slot.current_id() == "vid"
+
+
+def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
+    # Earlier sessions wrote the two slots as a bare list. A user updating into
+    # this build has one of those in their ui_state.json, and it must not read as
+    # nothing saved.
     _seed_combine_db(tmp_path)
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_combine", ["img", "vid"])
@@ -727,18 +743,23 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
-    # The end-to-end round trip: pick a pair, close, and a fresh window restores it.
+    # The end-to-end round trip: pick a pair and a lane, close, and a fresh
+    # window restores all of it. The lane matters as much as the slots — it is
+    # which recipes the next Generate is answered from.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view._combine.image_slot.set_item("img")
     first._gallery_view._combine.video_slot.set_item("vid")
+    first._gallery_view._combine._genau_radio.setChecked(True)  # as a click does
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._combine.image_slot.current_id() == "img"
-    assert reopened._gallery_view._combine.video_slot.current_id() == "vid"
+    combine = reopened._gallery_view._combine
+    assert combine.image_slot.current_id() == "img"
+    assert combine.video_slot.current_id() == "vid"
+    assert combine.selected_intent() == recipe_match.GENAU
 
 
 def _fun_time_session(main=(10, 20, 800, 600)):

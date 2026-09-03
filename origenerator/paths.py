@@ -27,11 +27,6 @@ def sibling_checkout(name: str) -> Path:
     raise RuntimeError(f"Could not locate the {name} package above {here}")
 
 
-def projects_root() -> Path:
-    """Return the ``shared_ui`` checkout dir."""
-    return sibling_checkout("shared_ui")
-
-
 def ensure_sibling_on_path(name: str) -> None:
     """Put the *name* checkout on ``sys.path`` so ``name`` is importable.
 
@@ -68,7 +63,7 @@ def ensure_player_core_on_path() -> None:
     (``direct_control``), the console and the drive readout that show them, and
     where that readout's parts sit (``drive_layout``).  Genau drives the OSR2
     from exactly these, so this app does too rather than growing a second set
-    that drifts from them.  Hands-free is the one part this app keeps for
-    itself -- see :mod:`origenerator.cruise_waves`.
+    that drifts from them.  Hands-free comes from there as well; what this app
+    puts around it is :mod:`origenerator.stroke_engine`.
     """
     ensure_sibling_on_path("player_core")

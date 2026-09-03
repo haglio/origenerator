@@ -99,3 +99,25 @@ def test_nothing_stamped_at_all_reads_as_off(tmp_path):
     # all of them are "as far as anything here can tell, no device".
     assert device_on(now=1000.0, rx_file=_rx(tmp_path)) is False
     assert device_on(now=1000.0, rx_file=_rx(tmp_path, "just now")) is False
+
+
+def test_the_staleness_window_can_be_named_like_the_file_it_reads(tmp_path):
+    """It was read off the config module from inside the function while the file
+    beside it was a parameter, so a caller could point the check at a stamp but
+    not at a window. Both are arguments now, and both still default to the
+    broker's own numbers."""
+    stamped = _rx(tmp_path, 960.0)
+
+    assert device_on(now=1000.0, rx_file=stamped, stale_s=60.0) is True
+    assert device_on(now=1000.0, rx_file=stamped, stale_s=10.0) is False
+
+
+def test_the_window_defaults_to_the_brokers_own(tmp_path, monkeypatch):
+    """Named or not, the number is the broker's, so the app and the broker never
+    disagree about whether the OSR2 is there."""
+    from origenerator import config
+
+    monkeypatch.setattr(config, "OSR2_RX_STALE_S", 5.0)
+
+    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 997.0)) is True
+    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 990.0)) is False

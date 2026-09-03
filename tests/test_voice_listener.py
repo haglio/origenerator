@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from origenerator.voice import listener as listener_module
 from origenerator.voice.listener import Listener
 
 
@@ -49,3 +50,25 @@ def test_captured_audio_survives_the_reused_input_buffer(qtbot):
 
     assert captured, "no utterance emitted"
     assert float(np.sqrt(np.mean(captured[0] ** 2))) > 0.05  # the speech was copied out
+
+
+def test_a_captured_utterance_is_not_written_to_disk(qtbot, tmp_path, monkeypatch):
+    # This package promises the audio never leaves the machine, and a wav of the
+    # last thing said, left in the state dir by a probe from a finished bug hunt,
+    # is the nearest thing to breaking that promise -- written on the audio
+    # callback's own thread, for a reader that does not exist. `raising=False`
+    # because the point is that the module needs no state dir at all now.
+    monkeypatch.setattr(listener_module, "STATE_DIR", tmp_path, raising=False)
+    sd = FakeSoundDevice()
+    listener = Listener(floor=0.001, sd=sd)
+    captured = []
+    listener.utterance.connect(captured.append)
+    listener.start()
+    buffer = np.zeros((480, 1), dtype=np.float32)
+    for level, count in ((0.0, 15), (0.3, 8), (0.0, 20)):
+        for _ in range(count):
+            buffer[:] = level
+            sd.stream.callback(buffer, 480, None, None)
+
+    assert captured, "no utterance emitted"
+    assert list(tmp_path.iterdir()) == []

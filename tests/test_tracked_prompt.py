@@ -246,7 +246,6 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
 
     tracked_prompt.untrack(pair.edit)
 
-    assert tracked_prompt.baseline(pair.edit) is None
     assert pair.edit.toPlainText() == "a dog on a couch"
     # And no longer marks anything typed into it.
     pair.edit.setPlainText("a dog on a rug")
@@ -254,9 +253,3 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
     assert _marks(pair.edit) == [("a dog on a rug", "plain")]
 
 
-def test_the_baseline_says_what_is_being_rewritten(pair):
-    assert tracked_prompt.baseline(pair.edit) is None
-
-    tracked_prompt.track(pair.edit, "a cat on a couch")
-
-    assert tracked_prompt.baseline(pair.edit) == "a cat on a couch"

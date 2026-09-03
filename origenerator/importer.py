@@ -367,7 +367,142 @@ def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
     return {}
 
 
+def _prompt_texts(graph: dict) -> tuple[str | None, str | None]:
+    """The positive and negative prompt a graph was run with, or ``None`` each.
+
+    Located structurally for the Wan workflows and by node title otherwise (see
+    :func:`origenerator.comfy_graph.clip_prompt_nodes`).
+    """
+    def text_of(node):
+        if node and isinstance(node.get("inputs", {}).get("text"), str):
+            return node["inputs"]["text"]
+        return None
+
+    positive, negative = clip_prompt_nodes(graph)
+    return text_of(positive), text_of(negative)
+
+
+def _conditioning_params(graph: dict) -> dict:
+    """The dimensions the conditioning node was built at: width, height, frames."""
+    node = conditioning_node(graph)
+    if not node:
+        return {}
+    inputs = node.get("inputs", {})
+    return {
+        dst: inputs[src]
+        for src, dst in (("width", "width"), ("height", "height"),
+                         ("length", "frame_count"))
+        if isinstance(inputs.get(src), int)
+    }
+
+
+def _input_image_params(graph: dict) -> dict:
+    """The image an image-to-video graph animated, when it names one."""
+    name = input_image_name(graph)
+    return {} if name is None else {"input_image": name}
+
+
+def _sampler_settings(graph: dict) -> tuple[int | None, dict]:
+    """The seed the run used, and every scalar its samplers were given.
+
+    One pass over the graph, because the two sampler kinds decide the seed
+    together: a plain KSampler's seed wins outright, while a KSamplerAdvanced's
+    is taken only when nothing has claimed the seed yet or when this is the
+    noise-adding (stage-1) sampler.
+    """
+    skip = {id(node) for node in _refine_passes(graph)}
+    seed = None
+    params: dict = {}
+    for node in graph.values():
+        class_type = node.get("class_type", "")
+        inputs = node.get("inputs", {})
+
+        if class_type == "KSampler":
+            if id(node) in skip:
+                continue
+            if isinstance(inputs.get("seed"), int):
+                seed = inputs["seed"]
+            params.update(_scalars(inputs))
+
+        if class_type == "KSamplerAdvanced":
+            noise_seed = inputs.get("noise_seed")
+            if isinstance(noise_seed, int) and (
+                    seed is None or inputs.get("add_noise") == "enable"):
+                seed = noise_seed
+            params.update(_scalars(inputs))
+    return seed, params
+
+
+def _refine_passes(graph: dict) -> list[dict]:
+    """The KSamplers whose settings describe a refinement rather than the recipe.
+
+    The SDXL workflows end in a second, low-denoise KSampler over a re-encoded
+    image (the enhance pass), recognized by sampling a VAEEncode'd latent. Its
+    steps/denoise are the refinement's, so they are skipped — but only when a
+    base sampler exists too, since a graph that is nothing BUT a refinement has
+    no other settings to report.
+    """
+    def is_refinement(node: dict) -> bool:
+        source = follow(graph, node.get("inputs", {}).get("latent_image"))
+        return bool(source) and source.get("class_type") == "VAEEncode"
+
+    samplers = [n for n in graph.values() if n.get("class_type") == "KSampler"]
+    refinements = [n for n in samplers if is_refinement(n)]
+    return refinements if len(refinements) < len(samplers) else []
+
+
+def _scalars(inputs: dict) -> dict:
+    """The plainly-valued inputs of a node — the ones worth recording as params."""
+    return {k: v for k, v in inputs.items() if isinstance(v, (int, float, str, bool))}
+
+
+# Which registered workflow a graph's node classes name, MOST SPECIFIC FIRST.
+# The order is load-bearing and cannot come from the registry, whose own order
+# runs the other way (sdxl_t2i first): a graph can satisfy more than one entry —
+# an flf2v graph also carries the i2v conditioning, a Flux one can also load a
+# checkpoint — and the first match wins. Nor can it be derived from the
+# signatures, since flf2v and i2v are each one node class and neither is a
+# superset of the other; what orders them is that an flf2v graph contains both.
+#
+# Each entry is a workflow name and the node-class sets that identify it: any
+# one set being wholly present is enough. tests/test_importer.py holds every
+# case with the losers named; tests/test_workflows.py holds these names against
+# the registry, and holds what every registered workflow's own graph reads as.
+_GRAPH_SIGNATURES = (
+    ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
+    ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),
+    # A Wan/Hunyuan video latent saved as a still image: text-to-image.
+    ("wan22_t2i", (frozenset({"EmptyHunyuanLatentVideo", "SaveImage"}),)),
+    # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders and a
+    # FluxGuidance node — none of which the other workflows use.
+    ("flux_t2i_upscaled", (frozenset({"FluxGuidance"}),
+                           frozenset({"UnetLoaderGGUF", "DualCLIPLoader"}))),
+    ("sdxl_t2i", (frozenset({"CheckpointLoaderSimple"}),)),
+)
+
+
+def _workflow_from_nodes(graph: dict) -> str | None:
+    """Which registered workflow built this graph, from its node classes.
+
+    ``None`` when nothing matches, which leaves the filename's guess standing.
+    """
+    node_types = {n.get("class_type") for n in graph.values()}
+    return next(
+        (name for name, signatures in _GRAPH_SIGNATURES
+         if any(signature <= node_types for signature in signatures)),
+        None,
+    )
+
+
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
+    """What an output file says about the run that made it.
+
+    Seven readings of one embedded graph, each its own function above: the
+    prompts, the conditioning dimensions, the input image, the sampler settings
+    and the seed, the model files, and which workflow the node classes name. The
+    filename's prefix is the first guess at that last one and the graph overrules
+    it, because a file can be renamed and a prefix reused.
+    """
     result: dict = {
         "workflow_name": infer_workflow_name(fpath.name) or "unknown",
         "workflow_version": "imported",
@@ -378,88 +513,29 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         "prompt_data": {},
     }
 
-    prompt_data = _read_prompt_graph(fpath, suffix)
-    if not prompt_data:
+    graph = _read_prompt_graph(fpath, suffix)
+    if not graph:
         return result
-    result["prompt_data"] = prompt_data
 
-    # Locate the prompt nodes (structurally for Wan workflows, else by title).
-    pos_node, neg_node = clip_prompt_nodes(prompt_data)
-    if pos_node and isinstance(pos_node.get("inputs", {}).get("text"), str):
-        result["positive_prompt"] = pos_node["inputs"]["text"]
-    if neg_node and isinstance(neg_node.get("inputs", {}).get("text"), str):
-        result["negative_prompt"] = neg_node["inputs"]["text"]
+    seed, sampler_params = _sampler_settings(graph)
+    params = {}
+    params.update(_conditioning_params(graph))
+    params.update(_input_image_params(graph))
+    params.update(sampler_params)
+    # Whichever model files the graph loads (SDXL checkpoint, Flux GGUF UNET,
+    # WAN dual-noise high/low UNET + LoRA), so the gallery can nest the import
+    # by model the same way it does a run generated here.
+    params.update(graph_model_params(graph))
 
-    cond = conditioning_node(prompt_data)
-    if cond:
-        ci = cond.get("inputs", {})
-        for src, dst in (("width", "width"), ("height", "height"), ("length", "frame_count")):
-            if isinstance(ci.get(src), int):
-                result["params"][dst] = ci[src]
-
-    image_name = input_image_name(prompt_data)
-    if image_name is not None:
-        result["params"]["input_image"] = image_name
-
-    # The SDXL workflows end in a second, low-denoise KSampler over a re-encoded
-    # image (the enhance pass). Its steps/denoise describe the refinement, not
-    # the recipe, so when a base sampler exists too, only the base one is read —
-    # a refinement pass is recognized by sampling a VAEEncode'd latent.
-    def _is_refine_pass(node: dict) -> bool:
-        src = follow(prompt_data, node.get("inputs", {}).get("latent_image"))
-        return bool(src) and src.get("class_type") == "VAEEncode"
-
-    has_base_ksampler = any(
-        n.get("class_type") == "KSampler" and not _is_refine_pass(n)
-        for n in prompt_data.values()
+    positive, negative = _prompt_texts(graph)
+    result.update(
+        prompt_data=graph,
+        positive_prompt=positive,
+        negative_prompt=negative,
+        seed=seed,
+        params=params,
+        workflow_name=_workflow_from_nodes(graph) or result["workflow_name"],
     )
-
-    for node in prompt_data.values():
-        class_type = node.get("class_type", "")
-        inputs = node.get("inputs", {})
-
-        if class_type == "KSampler":
-            if has_base_ksampler and _is_refine_pass(node):
-                continue
-            seed = inputs.get("seed")
-            if isinstance(seed, int):
-                result["seed"] = seed
-            result["params"].update({
-                k: v for k, v in inputs.items()
-                if isinstance(v, (int, float, str, bool))
-            })
-
-        if class_type == "KSamplerAdvanced":
-            seed = inputs.get("noise_seed")
-            # Prefer the noise-adding (stage-1) sampler's seed.
-            if isinstance(seed, int) and (result["seed"] is None or inputs.get("add_noise") == "enable"):
-                result["seed"] = seed
-            result["params"].update({
-                k: v for k, v in inputs.items()
-                if isinstance(v, (int, float, str, bool))
-            })
-
-    # Record whichever model files the graph loads (SDXL checkpoint, Flux GGUF
-    # UNET, WAN dual-noise high/low UNET + LoRA) so the gallery can nest the
-    # import by model the same way it does a run generated here.
-    result["params"].update(graph_model_params(prompt_data))
-
-    # The embedded graph is authoritative; refine the filename guess.
-    node_types = {n.get("class_type") for n in prompt_data.values()}
-    if "WanFirstLastFrameToVideo" in node_types:
-        result["workflow_name"] = "wan22_flf2v_loop"
-    elif "WanImageToVideo" in node_types:
-        result["workflow_name"] = "wan22_i2v"
-    elif {"EmptyHunyuanLatentVideo", "SaveImage"} <= node_types:
-        # A Wan/Hunyuan video latent saved as a still image: text-to-image.
-        result["workflow_name"] = "wan22_t2i"
-    elif "FluxGuidance" in node_types or {"UnetLoaderGGUF", "DualCLIPLoader"} <= node_types:
-        # Flux samples off a GGUF UNET with dual (clip_l + t5xxl) text encoders
-        # and a FluxGuidance node — none of which the other workflows use.
-        result["workflow_name"] = "flux_t2i_upscaled"
-    elif "CheckpointLoaderSimple" in node_types:
-        result["workflow_name"] = "sdxl_t2i"
-
     return result
 
 

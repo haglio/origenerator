@@ -1,12 +1,15 @@
 """Branch sessions — the env flag, the one-time DB seed, and the launcher."""
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 from origenerator.branch_session import (
-    ENV_FLAG, is_branch_session, seed_branch_db, session_trash,
+    ENV_FLAG, adopt_branch_curation, adopt_branch_rows, is_branch_session,
+    seed_branch_db, session_trash,
 )
+from origenerator.db import Database
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -414,3 +417,83 @@ def test_bookmark_adoption_ignores_a_star_on_something_not_here(tmp_path):
 
     assert _adopt(live, tmp_path) == 0
     assert live.get_generation("only-there") is None
+
+
+# --- a worktree's database is read, and only read ------------------------------
+
+
+def test_nothing_here_carries_sql_over_the_apps_own_tables():
+    """The column vocabulary of `generations`, `requests` and `folder_meta` used
+    to live in two modules: db.py, which owns those tables, and this one, whose
+    four readers restated them in raw SELECTs — including a hand-maintained copy
+    of `folder_meta_full`'s five columns, and a `SELECT *` unpacked straight into
+    `record_request(**row)`, an implicit contract between two files that a launch
+    would have discovered as a TypeError.
+
+    Held at zero. What is left is the online backup that seeds a worktree, which
+    is a whole-file operation no query can express, and it is counted below.
+    """
+    source = (_REPO_ROOT / "origenerator" / "branch_session.py").read_text(
+        encoding="utf-8")
+
+    statements = re.findall(r"\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\b", source)
+
+    assert statements == []
+
+
+def test_the_one_raw_connection_left_is_the_seeds_online_backup():
+    """Two: the read-only source and the destination it is copied into. Every
+    other database this module touches, it reaches through a store."""
+    source = (_REPO_ROOT / "origenerator" / "branch_session.py").read_text(
+        encoding="utf-8")
+
+    assert len(re.findall(r"sqlite3\.connect\(", source)) == 2
+
+
+def _a_worktree_with_something_to_adopt(tmp_path):
+    """A worktree database holding one generated row, starred, and a bookmark."""
+    branch_db = Database(tmp_path / "worktrees" / "example-branch" / "state"
+                         / "origenerator.db")
+    branch_db.insert_generation(
+        prompt_id="gen-alpha", workflow_name="sdxl_t2i", workflow_version="v1",
+        params_json="{}", workflow_json="{}",
+    )
+    branch_db.set_generation_starred("gen-alpha", True)
+    branch_db.rename_folder("folder/alpha", "Scene One")
+    return branch_db
+
+
+def test_a_worktree_database_is_only_ever_opened_read_only(tmp_path, monkeypatch):
+    """The promise this module's docstrings make -- a branch is unfinished code,
+    and the live session's library is not its to corrupt -- read the other way
+    round: nor is the worktree's copy the live app's to write. Every connection
+    made to one names `?mode=ro`, so sqlite refuses the write rather than the
+    reader having to remember not to make one."""
+    live = Database(tmp_path / "live" / "origenerator.db")
+    _a_worktree_with_something_to_adopt(tmp_path)
+    opened = []
+    connect = sqlite3.connect
+    monkeypatch.setattr(sqlite3, "connect", lambda target, *a, **k: (
+        opened.append(str(target)), connect(target, *a, **k))[1])
+
+    adopt_branch_rows(live, tmp_path / "worktrees",
+                      tmp_path / "output", tmp_path / "thumbs")
+    adopt_branch_curation(live, tmp_path / "worktrees")
+
+    worktree_opens = [target for target in opened if "example-branch" in target]
+    assert worktree_opens
+    assert all("mode=ro" in target for target in worktree_opens), worktree_opens
+
+
+def test_adopting_from_a_worktree_leaves_its_database_byte_for_byte(tmp_path):
+    """The same promise, read off the file afterwards."""
+    live = Database(tmp_path / "live" / "origenerator.db")
+    branch_db = _a_worktree_with_something_to_adopt(tmp_path)
+    before = branch_db.path.read_bytes()
+
+    adopt_branch_rows(live, tmp_path / "worktrees",
+                      tmp_path / "output", tmp_path / "thumbs")
+    adopt_branch_curation(live, tmp_path / "worktrees")
+
+    assert branch_db.path.read_bytes() == before
+    assert not list(branch_db.path.parent.glob("*.db-*"))  # no journal, no wal

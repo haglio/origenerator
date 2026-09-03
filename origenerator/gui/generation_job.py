@@ -173,23 +173,18 @@ class GenerationJob(QObject):
         none are — read by whatever displays the job."""
         return self._foreign_ahead
 
-    def refresh_backlog(self) -> None:
-        """Re-read what another app is holding ComfyUI with, ahead of this job.
+    def take_backlog(self, foreign_ahead: int | None) -> None:
+        """Take a re-read of what another app holds ComfyUI with, ahead of this
+        job — fetched by the poll, applied here.
 
-        A caller that polls invokes this while the job waits. ComfyUI is a shared
-        server that outlives the app, so a submit can sit behind work this session
-        never launched, and with no word of it that wait is indistinguishable from
-        a hang. The user's own jobs ahead aren't counted — those are what they
-        asked for — and a job ComfyUI has already started waits on nothing.
+        The poll re-reads this while the job waits. ComfyUI is a shared server
+        that outlives the app, so a submit can sit behind work this session
+        never launched, and with no word of it that wait is indistinguishable
+        from a hang. The user's own jobs ahead aren't counted — those are what
+        they asked for — and a job ComfyUI has already started waits on nothing,
+        so anything fetched for one no longer queued is dropped here.
         """
-        if self._state != "queued":
-            self._foreign_ahead = None
-            return
-        try:
-            self._foreign_ahead = self._client.foreign_backlog(self.prompt_id)
-        except Exception as e:
-            logger.debug("Could not read the queue position of %s: %s", self.prompt_id, e)
-            self._foreign_ahead = None
+        self._foreign_ahead = foreign_ahead if self._state == "queued" else None
 
     def progress_state(self) -> dict:
         """A JSON-able snapshot of this job's live progress, to persist on its row.
@@ -284,27 +279,20 @@ class GenerationJob(QObject):
             logger.warning("Failed to cancel job %s: %s", self.prompt_id, e)
         self._state = "canceled"
 
-    def detach(self):
-        """Stop reacting to the client without touching the server-side job."""
-        self._detach()
-
-    def reconcile(self):
-        """Finish this job from /history if its live completion was missed.
+    def reconcile_with(self, history) -> None:
+        """Finish this job from an already-fetched /history if its live
+        completion was missed.
 
         The websocket ``job_completed`` is a one-shot: a dropped frame or a
         reconnect at the wrong moment loses it, and the job would then hang and
-        its output stay out of the gallery until a restart re-imports it. A caller
-        that polls invokes this as a backstop — it pulls the prompt's /history and,
-        once ComfyUI has finished it (its outputs are present), completes the job
-        exactly as the signal would have. A no-op while the prompt is still queued
-        or running (absent from /history) or once the job is already terminal.
+        its output stay out of the gallery until a restart re-imports it. The
+        poll fetches the prompt's /history as a backstop and applies it here —
+        once ComfyUI has finished it (its outputs are present), the job
+        completes exactly as the signal would have. A no-op with nothing
+        fetched (``None``), while the prompt is still queued or running (absent
+        from /history), or once the job is already terminal.
         """
-        if self._state not in ("queued", "running"):
-            return
-        try:
-            history = self._client.fetch_history(self.prompt_id)
-        except Exception as e:
-            logger.debug("Reconcile fetch failed for %s: %s", self.prompt_id, e)
+        if history is None or self._state not in ("queued", "running"):
             return
         if self.workflow.extract_output_info(history):
             self._complete(history)

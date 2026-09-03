@@ -142,7 +142,7 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
 
 def _rows(tree, orientation) -> list[str]:
     """The top-level rows of one half of the pane."""
-    half = tree.tree_for(orientation)
+    half = tree._halves[orientation]
     return [half.topLevelItem(i).text(0) for i in range(half.topLevelItemCount())]
 
 
@@ -172,7 +172,7 @@ def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_pat
         ORIENTATION_LABELS["portrait"], ORIENTATION_LABELS["landscape"]]
     # And the label belongs to the pane, not to the scrolling list under it.
     for orientation in ("portrait", "landscape"):
-        assert view._tree.tree_for(orientation).findChildren(QLabel) == []
+        assert view._tree._halves[orientation].findChildren(QLabel) == []
 
 
 def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
@@ -258,7 +258,7 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
 
     assert view._selected_folder_key() == oriented_key("__all__", "landscape")
     assert view._tree.selected_folder_keys() == [oriented_key("__all__", "landscape")]
-    assert view._tree.tree_for("portrait").selectedItems() == []
+    assert view._tree._halves["portrait"].selectedItems() == []
 
 
 def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
@@ -351,7 +351,7 @@ def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    bars = [view._tree.tree_for(o).verticalScrollBar() for o in ("portrait", "landscape")]
+    bars = [view._tree._halves[o].verticalScrollBar() for o in ("portrait", "landscape")]
     assert bars[0] is not bars[1]
 
 

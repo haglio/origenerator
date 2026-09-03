@@ -7745,6 +7745,100 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     assert _selected_folder(view) == folder_key
 
 
+def _menu_offering(monkeypatch, module, pick=None):
+    """Stand in for a raised menu: record its entries, and choose one by prefix.
+
+    Returns the list each raised menu's labels land in — empty if no menu was
+    ever raised at all, which is how "a right-click that offers nothing" is told
+    apart from one that offers something.
+    """
+    raised = []
+
+    def fake_exec(menu, *_args):
+        labels = [action.text() for action in menu.actions()]
+        raised.append(labels)
+        if pick is None:
+            return None
+        return next(a for a in menu.actions() if a.text().startswith(pick))
+
+    monkeypatch.setattr(f"origenerator.gui.{module}.QMenu.exec", fake_exec)
+    return raised
+
+
+def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
+        qtbot, tmp_path, monkeypatch):
+    # A card is the whole of what the shelf shows of a run being made, and it used
+    # to answer a right-click with nothing at all: stopping the run meant finding
+    # it again among the bottom strip's rows.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    view.refresh()          # the launch's running row is in the DB now
+    _open_recents(view)
+    assert job.prompt_id in view._inflight_cards
+    labels = _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
+
+    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+
+    assert labels == [["Cancel"]]
+    assert view._reroll.all_jobs == []      # the run really stopped
+
+
+def test_an_auto_looping_folders_card_offers_the_next_seed_instead(
+        qtbot, tmp_path, monkeypatch):
+    # The press ends nothing while the loop is on — it discards this seed and the
+    # loop launches another — so the menu says what the press actually gets you,
+    # in the same words the tile's button and the strip's row use.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._toggle_auto(True)          # the loop launches the first variation
+    (job,) = view._reroll.all_jobs
+    view.refresh()
+    _open_recents(view)
+    labels = _menu_offering(monkeypatch, "browser_pane")
+
+    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+
+    assert labels == [["Next seed"]]
+
+
+def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
+    # A running row this session never adopted (a restart mid-generation) has
+    # nothing here to stop it with — the strip hides the same button — so the
+    # right-click raises nothing rather than a menu that cannot act.
+    db = FakeDB([_image("done", "a cat", 50, 1)])
+    db.add(_running_row("gen1"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+    assert "gen1" in view._inflight_cards      # the card is there...
+    labels = _menu_offering(monkeypatch, "browser_pane")
+
+    view._browser._inflight_context_menu("gen1", QPoint(0, 0))
+
+    assert labels == []                        # ...but it offers nothing
+
+
+def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
+        qtbot, tmp_path, monkeypatch):
+    # The same act as the button on the tile's face, on the gesture the rest of
+    # the grid answers.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+
+    view._reroll_tile_menu(key, QPoint(0, 0))
+
+    assert labels == [["Cancel"]]
+    assert view._reroll.all_jobs == []
+
+
 def _running_in_folder(prompt_id, prompt, steps, seed):
     """A running sdxl row sharing the settings folder of _image(prompt, steps, …) —
     same settings, fresh seed, no output — as a tab's Generate inserts up front."""
@@ -9725,6 +9819,64 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     view._reroll._jobs.clear()
     view._reconcile_pending_enhancements()
     assert not tile.is_enhancing()
+
+
+def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
+        qtbot, tmp_path, monkeypatch):
+    # An enhancement gets no card of its own — it shows on the tile of the image
+    # it improves — so that tile's menu is the only thing in the middle column
+    # that can be asked to stop it. Without the entry the run had to be hunted
+    # down among the bottom strip's rows.
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+    assert view._browser._thumb_widgets["g0"].is_enhancing()
+    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+
+    view._thumbnail_context_menu("g0", QPoint(0, 0))
+
+    assert "Cancel 1 enhancement" in labels[0]
+    assert view._reroll.all_jobs == []                     # the run stopped
+    assert db.get_generation("g0") is not None             # the image is untouched
+    assert not view._browser._thumb_widgets["g0"].is_enhancing()  # and the scrim is off
+
+
+def test_canceling_one_enhancement_leaves_the_others_alone(
+        qtbot, tmp_path, monkeypatch):
+    # A batch shares one settings folder, so the run to stop is the one made of
+    # the picked image — not whichever of them the folder happens to lead with.
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view.enhance_items(["g0", "g1"])
+    leader, follower = view._reroll.all_jobs
+    _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+
+    view._thumbnail_context_menu("g1", QPoint(0, 0))
+
+    assert view._reroll.all_jobs == [leader]
+    assert follower not in view._reroll.all_jobs
+
+
+def test_a_tile_with_nothing_cooking_offers_no_cancel(qtbot, tmp_path, monkeypatch):
+    # The entry appears only while there is a run to stop; an image sitting still
+    # is offered the four acts it has always had.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    labels = _menu_offering(monkeypatch, "gallery_view")
+
+    view._thumbnail_context_menu("g0", QPoint(0, 0))
+
+    assert not any(label.startswith("Cancel") for label in labels[0])
 
 
 def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):

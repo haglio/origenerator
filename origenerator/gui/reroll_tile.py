@@ -19,7 +19,7 @@ import time
 
 from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QTimer, pyqtSignal
 
 from origenerator.gui import grid_card
 from origenerator.gui.blurred import blurred_backdrop
@@ -44,6 +44,7 @@ class RerollTile(QFrame):
     add_requested = pyqtSignal()
     cancel_requested = pyqtSignal()
     selected = pyqtSignal()  # a running tile was clicked to drive the info pane
+    context_requested = pyqtSignal(QPoint)  # global position — only while bound
 
     def __init__(self, job=None, parent=None, *, auto_generating=False,
                  typical_seconds=None, source_picture=None):
@@ -60,6 +61,11 @@ class RerollTile(QFrame):
         self.setObjectName("rerollTile")
         self.setFixedSize(*grid_card.card_size())
         self.set_selected(False)
+        # Right-click asks the gallery for the run's menu, the way every other
+        # card in the grid answers that gesture. Only while bound: the idle ``+``
+        # box has nothing under way to offer anything about.
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_requested)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
@@ -101,6 +107,10 @@ class RerollTile(QFrame):
             self._show_idle()
         else:
             self._bind(job)
+
+    def _on_context_requested(self, pos: QPoint):
+        if self._job is not None:
+            self.context_requested.emit(self.mapToGlobal(pos))
 
     def _show_idle(self):
         self.setCursor(Qt.CursorShape.PointingHandCursor)

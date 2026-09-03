@@ -64,25 +64,34 @@ Every show wears the players' own HUD (:meth:`SlideshowView.adopt_hud`,
 :mod:`origenerator.gui.show_hud`) — hosted on a satellite region and fullscreen
 alike — so its map replaces the view's own position plate and the small stills
 riding either side of the picture (:mod:`origenerator.gui.neighbor_previews`).
-What it has left to say for itself, it says in a Fun Time toast across the top
-(:mod:`origenerator.gui.toast`).
+The two switches on that HUD's control band are this show's own narrowing, the
+way F-mode is a player's own: F-mode keeps the favorites and the switch beside
+it keeps the pictures that have been enhanced, each over the whole set the show
+was handed and both at once meaning what answers both
+(:meth:`SlideshowView.toggle_f_mode`, :meth:`SlideshowView.toggle_enhanced_mode`).
+They start off, and reset drops them.  What the view has left to say for itself,
+it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
 
 The bottom strip's queue is floated into the bottom-left corner
 (:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
 their buttons — since the strip that carries it is behind this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
 shared OSR2 stroke keys ride along too (Space and friends — see
-:mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated up top, so
-the device can run over a show of stills; a clip that carries a funscript instead
-offers itself as an :meth:`osr2_drive_target`. Being the deliberate foreground
-view, it plays sound — the inline preview stays muted.
+:mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated up top,
+directly under the HUD (:meth:`SlideshowView._place_console`) — Fun Time puts
+each of the two in a top-left corner of its own window, and a show wearing both
+has one corner, so the console takes the slot beneath the map rather than the
+same slot, where the map covered it — so the device can run over a show of
+stills; a clip that carries a funscript instead offers itself as an
+:meth:`osr2_drive_target`. Being the deliberate foreground view, it plays sound
+— the inline preview stays muted.
 """
 
 import logging
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
 
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
@@ -118,9 +127,9 @@ class SlideshowView(QWidget):
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
                  shuffle=None, on_delete=None, on_enhance=None, on_star=None,
                  on_lock=None, player=None, stroke=None, pace=None,
-                 on_drive_toggle=None, filters=None, parent=None,
-                 order_label="Shuffle", starred_ids=None, on_reset=None,
-                 looping=True):
+                 on_drive_toggle=None, parent=None,
+                 order_label="Shuffle", starred_ids=None, enhanced_ids=None,
+                 on_reset=None, looping=True):
         super().__init__(parent)
         self._on_delete = on_delete
         # Where reset means something bigger than this show: hosted, a region
@@ -142,7 +151,17 @@ class SlideshowView(QWidget):
         # or say "Looping seeds" over it.
         self.hud_looping = looping
         self._starred_ids = set(starred_ids or ())
+        # Which items carry an enhancement, for the switch beside F-mode: the
+        # same shape as the favorites, over the same set.  Both sets follow the
+        # show as it runs — a hold stars, an enhancement lands — so the two
+        # switches keep answering for what is on screen now.
+        self._enhanced_ids = set(enhanced_ids or ())
+        # The two narrowing switches the HUD carries, this show's own the way a
+        # player's F-mode is the player's own: off on opening, dropped by reset.
         self._f_mode = False
+        self._enhanced_mode = False
+        # Everything this show has been handed, whatever the switches keep of
+        # it; the pass is dealt from what survives them (:meth:`_set_modes`).
         self._all_items = list(items)
         # Holding a slide is also how you ask for it: Down enhances what is on
         # screen if it has never been enhanced, so the one you stopped on is the
@@ -254,12 +273,12 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        # The console carries the show filters, so it has to be handed the ones
-        # the gallery owns: the same switches on both surfaces, the way the pace
-        # is the same number on both.
-        self._stroke_panel = StrokePanel(
-            stroke, self, host=self, filters=filters,
-        ) if stroke is not None else None
+        # Genau's console, seated under the players' HUD once the show wears
+        # one (see :meth:`adopt_hud`): the two share the corner Fun Time puts
+        # each in, and the console used to sit UNDER the map, unreachable.
+        self._stroke_panel = StrokePanel(stroke, self, host=self) if stroke is not None else None
+        self._hud = None
+        self._preview.media_resized.connect(self._place_console)
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -310,6 +329,7 @@ class SlideshowView(QWidget):
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
+        self._place_console()  # back over whatever media widget the slide put up
         if self._session_paused:
             self._preview.set_playback_paused(True)  # arrive holding
             return
@@ -367,40 +387,12 @@ class SlideshowView(QWidget):
             items, image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
             start=index,
         )
+        self._all_items = list(items)
         if self._live:
             self._update_counter()
             self._update_neighbors()
         else:
             self._show_current()
-
-    def refilter(self, items) -> None:
-        """Re-seed the running pass from ``items`` — what a filter turned on or
-        off over an open show leaves it playing.
-
-        The slide on screen stays when it survives the change: a filter is a
-        narrowing of what you are looking through, not a new show, and taking
-        the picture away as well would make the switch impossible to try. The
-        rest is a fresh pass, the set being a different set — shuffled, as one
-        opened now would be.
-
-        A show still following a running generation is left alone: it has no set
-        of its own to narrow, and the frames it is watching are one item.
-        """
-        if self._live:
-            return
-        current = self._playlist.current()
-        held = current[2] if current is not None and len(current) > 2 else None
-        start = next((index for index, item in enumerate(items)
-                      if held is not None and len(item) > 2 and item[2] == held), None)
-        kwargs = {"image_dwell_ms": self._dwell_s * 1000, "start": start}
-        if self._shuffle is not None:
-            kwargs["shuffle"] = self._shuffle
-        self._playlist = SlideshowPlaylist(items, **kwargs)
-        if start is None:
-            self._show_current()  # what it was on is gone; show what is here now
-        else:
-            self._update_counter()
-            self._update_neighbors()
 
     def playing_now(self):
         """This pass as another show could take it up — its items in the order it
@@ -484,9 +476,11 @@ class SlideshowView(QWidget):
             self._step_level(state.level_index)
         return True
 
-    def note_added(self, path, media_type: str, prompt_id: str, still=None) -> None:
+    def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
+                   starred: bool = False, enhanced: bool = False) -> None:
         """A generation that belongs to what this show is playing has landed: it
-        joins the set, queued to come up next.
+        joins the set, queued to come up next.  ``starred`` and ``enhanced`` are
+        what the gallery knows of its row, so the two switches can judge it.
 
         A folder that is auto-generating is the case this is for. Without it the
         show plays the fixed set it opened with, so the very items being made
@@ -498,12 +492,21 @@ class SlideshowView(QWidget):
         own frames, and finishing is not a second slide: it keeps its place in
         the pass and simply becomes the file.
         """
+        if starred:
+            self._starred_ids.add(prompt_id)
+        if enhanced:
+            self._enhanced_ids.add(prompt_id)
+        item = (path, media_type, prompt_id, still)
+        self._remember(item)
         if self._playlist.replace_live(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._show_current()  # the file itself now, and on a clock again
             self._update_neighbors()  # it may be the still riding either side
             return
-        if self._playlist.add((path, media_type, prompt_id, still)):
+        # Into the pass only past the switches: a show narrowed to its favorites
+        # must not fill back up with every unstarred thing the loop makes.  The
+        # whole set remembers it either way, for when the switch comes off.
+        if self._passes(item) and self._playlist.add(item):
             self._update_counter()
             self._update_neighbors()
 
@@ -531,7 +534,12 @@ class SlideshowView(QWidget):
         if prompt_id in self._seen_live:
             return
         self._seen_live.add(prompt_id)
-        if self._playlist.add((frame, LIVE, prompt_id, None)):
+        live = (frame, LIVE, prompt_id, None)
+        self._remember(live)
+        # A run still being made is neither a favorite nor enhanced, so a
+        # narrowed show leaves its frames out of the pass and takes them in
+        # when the switch comes off, the way it takes in anything else it has.
+        if self._passes(live) and self._playlist.add(live):
             self._update_counter()
             self._update_neighbors()
 
@@ -542,10 +550,10 @@ class SlideshowView(QWidget):
         of this set too, but by then it is a file (:meth:`note_added`) and no
         longer a live slide to drop.
         """
-        for prompt_id in [pid for pid in self._playlist.live_ids()
-                          if pid not in prompt_ids]:
+        for prompt_id in [pid for pid in self._live_ids() if pid not in prompt_ids]:
             showing = self._current_prompt_id() == prompt_id
             self._playlist.drop(prompt_id)
+            self._forget_id(prompt_id)
             if self._playlist.is_empty():
                 self.close()  # a show of nothing but that run has nothing left
                 return
@@ -583,8 +591,8 @@ class SlideshowView(QWidget):
             return
         if self._on_delete is not None and len(item) > 2 and item[1] != LIVE:
             self._on_delete(item[2])
-        # Out of the full set too, so widening F-mode back cannot resurrect it.
-        self._all_items = [kept for kept in self._all_items if kept is not item]
+        # Out of the whole set too, so widening a switch back cannot resurrect it.
+        self._forget(item)
         self._playlist.remove_current()
         if self._playlist.is_empty():
             self.close()
@@ -646,6 +654,7 @@ class SlideshowView(QWidget):
         self._playlist = SlideshowPlaylist(
             [media], image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
         )
+        self._all_items = [media]
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
@@ -680,8 +689,8 @@ class SlideshowView(QWidget):
         self._delete_current()
 
     def stroke_reset(self) -> None:
-        """Put the side back how it started, the players' own reset: F-mode
-        dropped, the hold released, and the base set on screen again.
+        """Put the side back how it started, the players' own reset: both
+        switches dropped, the hold released, and the base set on screen again.
 
         Hosted, "how it started" is the REGION's base state, not this show's
         own: a player's reset drops its filter and leaves it browsing its whole
@@ -696,29 +705,35 @@ class SlideshowView(QWidget):
         self.reset_in_place()
 
     def reset_in_place(self) -> None:
-        """This show's own reset: F-mode dropped, the hold released, and the top
-        of the set it is already playing back on screen."""
-        if self._f_mode:
-            self.toggle_f_mode()
+        """This show's own reset: both switches dropped, the hold released, and
+        the top of the set it is already playing back on screen."""
         self._playlist.unlock()
+        if self._f_mode or self._enhanced_mode:
+            self._f_mode = self._enhanced_mode = False
+            self._replace_items(self._all_items, keep_slide=False)
+            return
         self._playlist.restart()
         self._show_current()
 
-    def retune(self, items, *, order_label="Shuffle", looping=False) -> None:
+    def retune(self, items, *, order_label="Shuffle", looping=False,
+               enhanced_ids=None) -> None:
         """Point this show at *items* instead, back at its own defaults.
 
         What a hosted reset does with the region's base set.  The window stays
         up rather than being closed and reopened: it covers a satellite player,
         and a region that blinks black between two shows is the thing the base
-        state exists to avoid.  F-mode and the hold come off the way any reset
-        takes them off, and the pass is a fresh shuffle.
+        state exists to avoid.  Both switches and the hold come off the way any
+        reset takes them off, and the pass is a fresh shuffle.  ``enhanced_ids``
+        is which of the new items carry an enhancement — a new set, so a new
+        answer; the favorites are the same collection whatever the set.
         """
-        self._f_mode = False
+        self._f_mode = self._enhanced_mode = False
         self._all_items = list(items)
+        self._enhanced_ids = set(enhanced_ids or ())
         self.hud_order_label = order_label
         self.hud_looping = looping
         self._live = not items
-        self._replace_items(self._all_items)
+        self._replace_items(self._all_items, keep_slide=False)
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does
@@ -751,6 +766,7 @@ class SlideshowView(QWidget):
         if self._on_star is None or item is None or len(item) <= 2:
             return False
         self._on_star(item[2])
+        self._starred_ids.add(item[2])  # the star readout and F-mode follow it
         return True
 
     # The stroke console reaches the three above by its own names: it drives this
@@ -803,26 +819,135 @@ class SlideshowView(QWidget):
     def hud_f_mode(self) -> bool:
         return self._f_mode
 
-    def toggle_f_mode(self) -> None:
-        """Narrow the set to the favorites, or widen it back — the players' own
-        F-mode, over the starred items.  Ignored when no item of the set is a
-        favorite: an empty show is not a mode."""
-        if self._f_mode:
-            self._f_mode = False
-            self._replace_items(self._all_items)
-            return
-        narrowed = [item for item in self._all_items
-                    if len(item) > 2 and item[2] in self._starred_ids]
-        if not narrowed:
-            return
-        self._f_mode = True
-        self._replace_items(narrowed)
+    @property
+    def hud_enhanced_mode(self) -> bool:
+        """Whether the show is narrowed to the pictures that have been enhanced
+        — the switch beside F-mode on its HUD."""
+        return self._enhanced_mode
 
-    def _replace_items(self, items) -> None:
-        """Stand a fresh pass up over *items*, keeping the pace and the pause."""
-        self._playlist = SlideshowPlaylist(
-            items, image_dwell_ms=self._playlist.image_dwell_ms)
-        self._show_current()
+    def toggle_f_mode(self) -> bool:
+        """Narrow the set to the favorites, or widen it back — the players' own
+        F-mode, over the starred items.  ``True`` when the switch moved."""
+        return self.set_f_mode(not self._f_mode)
+
+    def toggle_enhanced_mode(self) -> bool:
+        """Narrow the set to the pictures that have been enhanced, or widen it
+        back — the HUD's switch beside F-mode.  ``True`` when the switch moved."""
+        return self.set_enhanced_mode(not self._enhanced_mode)
+
+    def set_f_mode(self, on: bool) -> bool:
+        return self._set_modes(f_mode=bool(on), enhanced=self._enhanced_mode)
+
+    def set_enhanced_mode(self, on: bool) -> bool:
+        """Said which way rather than flipped — a speaker mid-show is not
+        looking at the HUD to see which way it stands."""
+        return self._set_modes(f_mode=self._f_mode, enhanced=bool(on))
+
+    def clear_modes(self) -> bool:
+        """Both switches off at once — what "clear filter" has to mean once
+        there is more than one to clear, and what it means on every satellite."""
+        return self._set_modes(f_mode=False, enhanced=False)
+
+    def _set_modes(self, *, f_mode: bool, enhanced: bool) -> bool:
+        """Deal the pass from what answers the switches as asked — both on
+        meaning what answers both, the way every pair of filters in this family
+        stacks — and say whether anything moved.
+
+        A switch that would leave nothing is refused rather than obeyed: an
+        empty show is not a mode, and the HUD's button staying dark is the
+        answer.  Widening can never empty a set, so the way back is always open.
+        """
+        if (f_mode, enhanced) == (self._f_mode, self._enhanced_mode):
+            return False
+        narrowed = [item for item in self._all_items
+                    if self._passes(item, f_mode=f_mode, enhanced=enhanced)]
+        if not narrowed:
+            return False
+        self._f_mode, self._enhanced_mode = f_mode, enhanced
+        self._replace_items(narrowed, keep_slide=True)
+        return True
+
+    def _passes(self, item, *, f_mode=None, enhanced=None) -> bool:
+        """Whether *item* survives the switches — the ones on, unless asked
+        about a setting the show is not in yet.  An item with no id (a test's,
+        or a run's frames) is neither starred nor enhanced, so any switch that
+        is on leaves it out."""
+        f_mode = self._f_mode if f_mode is None else f_mode
+        enhanced = self._enhanced_mode if enhanced is None else enhanced
+        prompt_id = item[2] if len(item) > 2 else None
+        if f_mode and prompt_id not in self._starred_ids:
+            return False
+        if enhanced and prompt_id not in self._enhanced_ids:
+            return False
+        return True
+
+    def _replace_items(self, items, *, keep_slide: bool) -> None:
+        """Stand a fresh pass up over *items*, keeping the pace and the pause.
+
+        *keep_slide* keeps the slide on screen when it is among them: a switch
+        is a narrowing of what you are looking through, not a new show, and
+        taking the picture away as well would make the switch impossible to
+        try.  A reset says otherwise — it starts the set over from the top.
+        """
+        current = self._playlist.current()
+        held = current[2] if keep_slide and current is not None and len(current) > 2 else None
+        start = next((index for index, item in enumerate(items)
+                      if held is not None and len(item) > 2 and item[2] == held), None)
+        kwargs = {"image_dwell_ms": self._playlist.image_dwell_ms, "start": start}
+        if self._shuffle is not None:
+            kwargs["shuffle"] = self._shuffle
+        paused = self._playlist.paused
+        self._playlist = SlideshowPlaylist(items, **kwargs)
+        self._playlist.set_paused(paused)
+        if start is None:
+            self._show_current()  # what it was on is gone; show what is here now
+        else:
+            self._update_counter()
+            self._update_neighbors()
+
+    # --- the whole set, behind whatever the switches keep of it -------------
+    # Kept in step with the pass by id where an item has one, so an arrival,
+    # a cull or an enhancement landing while a switch is on is still there —
+    # or still gone — when the switch comes off.
+
+    @staticmethod
+    def _same(kept, item) -> bool:
+        kept_id = kept[2] if len(kept) > 2 else None
+        item_id = item[2] if len(item) > 2 else None
+        return kept is item or (kept_id is not None and kept_id == item_id)
+
+    def _remember(self, item) -> None:
+        """Take *item* into the whole set, in place of the entry with its id."""
+        for index, kept in enumerate(self._all_items):
+            if self._same(kept, item):
+                self._all_items[index] = item
+                return
+        self._all_items.append(item)
+
+    def _forget(self, item) -> None:
+        self._all_items = [kept for kept in self._all_items if not self._same(kept, item)]
+
+    def _forget_id(self, prompt_id) -> None:
+        self._all_items = [kept for kept in self._all_items
+                           if not (len(kept) > 2 and kept[2] == prompt_id)]
+
+    def _live_ids(self) -> list:
+        """Every run the whole set holds as frames rather than as a file — in
+        the pass or kept out of it by a switch."""
+        return [kept[2] for kept in self._all_items if len(kept) > 2 and kept[1] == LIVE]
+
+    def _upgrade_remembered(self, prompt_id, path, media_type, still):
+        """Point the whole set's entry for *prompt_id* at a better version of
+        itself, and return it — or ``None`` when the set never held it."""
+        for index, kept in enumerate(self._all_items):
+            if len(kept) > 2 and kept[2] == prompt_id:
+                fields = list(kept) + [None] * (4 - len(kept))
+                fields[0] = path
+                fields[1] = media_type if media_type is not None else fields[1]
+                fields[3] = still if still is not None else fields[3]
+                self._all_items[index] = tuple(fields)
+                return self._all_items[index]
+        return None
 
     def hud_items(self):
         """The set for this show's HUD: ``(path, still)`` per item in
@@ -1019,6 +1144,8 @@ class SlideshowView(QWidget):
         """
         self._enhancing.discard(prompt_id)
         self._enhance_status.pop(prompt_id, None)
+        self._enhanced_ids.add(prompt_id)  # it carries an enhancement now
+        upgraded = self._upgrade_remembered(prompt_id, path, media_type, still)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._level_base = None  # its versions are a level deeper now
@@ -1026,6 +1153,11 @@ class SlideshowView(QWidget):
                 self._preview.show_media(path, media_type)
                 self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
+        elif upgraded is not None and self._passes(upgraded) and self._playlist.add(upgraded):
+            # Kept out of an enhanced-only pass until now, being unenhanced; the
+            # better version is exactly what that pass plays, so in it goes.
+            self._update_counter()
+            self._update_neighbors()
         self._refresh_note()
 
     def note_enhancing(self, statuses: dict) -> None:
@@ -1177,7 +1309,7 @@ class SlideshowView(QWidget):
 
     # --- the neighboring items ---------------------------------------------
 
-    def adopt_hud(self):
+    def adopt_hud(self, hud=None):
         """The players' HUD went on this show: its map now says where in the
         set this is and what is around it, so the view's own furnishings — the
         neighbor stills, the position plate — come off.
@@ -1185,10 +1317,46 @@ class SlideshowView(QWidget):
         Every show wears it, hosted on a satellite region or fullscreen on its
         own: the map is the same map either way, and a show that kept its own
         stills and plate beside it would be saying everything twice.
+
+        *hud* is the panel itself, when the caller has it: the console seats
+        itself under it and follows it — the map grows and shrinks with the
+        set, and a console placed once would end up under it again.
         """
         self._hud_dressed = True
         self._neighbors.set_neighbors(None, None)
         self._counter.hide()
+        if hud is not None:
+            self._hud = hud
+            hud.installEventFilter(self)
+        self._place_console()
+
+    def eventFilter(self, watched, event):
+        """Follow the HUD: every change to where it is or how big it is moves
+        the console with it."""
+        if watched is self._hud and event.type() in (
+                QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show, QEvent.Type.Hide):
+            self._place_console()
+        return super().eventFilter(watched, event)
+
+    def _place_console(self) -> None:
+        """Seat genau's console: under the HUD while the show wears one, in the
+        corner itself otherwise — and back on top of the media either way.
+
+        Fun Time draws its console on the main player and the satellite HUD on
+        the satellites, two windows with a top-left corner each; a show wears
+        both in one window, and two panels in one corner is one panel, the HUD
+        re-raising itself over the console every tick.  So the console takes
+        the slot beneath.  Raised as well as moved: the media widgets are
+        native windows that come and go above it as slides change, the same
+        reason the HUD re-asserts its own place on every tick.
+        """
+        if self._stroke_panel is None:
+            return
+        below = None
+        if self._hud is not None and not self._hud.isHidden():
+            below = self._hud.geometry()
+        self._stroke_panel.reposition(below=below)
+        self._stroke_panel.raise_()
 
     def _update_neighbors(self):
         """Draw the items either side of this one — nothing on a set too short
@@ -1265,8 +1433,7 @@ class SlideshowView(QWidget):
         self._reposition_queue()
         self._reposition_neighbors()
         self._reposition_note()
-        if self._stroke_panel is not None:
-            self._stroke_panel.reposition()
+        self._place_console()
 
     def closeEvent(self, event):
         """Leave, handing the gallery the item the show ended on if there is one.

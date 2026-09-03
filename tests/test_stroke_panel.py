@@ -6,7 +6,6 @@ lookalike), and that each command it posts reaches the right thing here.
 """
 
 from origenerator import stroke_engine
-from origenerator.gui.show_filters import ShowFilters
 from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
 from origenerator.stroke_engine import Stroke
 from player_core import wave_stack
@@ -75,10 +74,10 @@ class FakeHost:
         self.calls.append(("dwell", self.dwell_s))
 
 
-def _panel(qtbot, stroke=None, host=None, filters=None):
+def _panel(qtbot, stroke=None, host=None):
     stroke = stroke if stroke is not None else FakeStroke()
     host = host if host is not None else FakeHost()
-    panel = StrokePanel(stroke, host=host, filters=filters)
+    panel = StrokePanel(stroke, host=host)
     qtbot.addWidget(panel)
     return panel, stroke, host
 
@@ -95,60 +94,39 @@ def _press(panel, action):
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
 
 
-def test_the_filters_are_offered_only_where_there_are_some(qtbot):
-    # Genau's own console draws this console too, and its clips are neither
-    # bookmarked nor enhanced — so the buttons appear because this app handed
-    # over its switches, not because the console is in genau mode.
-    bare, _stroke, _host = _panel(qtbot)
-    bare.render_console()
-    for action in ("main_fmode", "genau_filter_enhanced"):
-        assert action not in [b.action for _r, b in bare._painter.buttons]
-
-    panel, _stroke, _host = _panel(qtbot, filters=ShowFilters())
+def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
+    # Over a show the two switches saying what it may play are on the players'
+    # HUD this panel sits under, and a second pair here would be two switches
+    # for one thing — so the console offers neither, the way Genau's own does.
+    panel, _stroke, _host = _panel(qtbot)
     panel.render_console()
     for action in ("main_fmode", "genau_filter_enhanced"):
-        assert action in [b.action for _r, b in panel._painter.buttons]
+        assert action not in [b.action for _r, b in panel._painter.buttons]
 
 
-def test_pressing_a_filter_button_flips_that_switch(qtbot):
-    filters = ShowFilters()
-    panel, _stroke, _host = _panel(qtbot, filters=filters)
-    panel.render_console()
+def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
+    # A show wears the players' HUD in the corner this console takes, so given
+    # that HUD's rect the console goes directly beneath it, flush with its left
+    # edge and a panel-inset apart — one column of panels, neither over the other.
+    from PyQt6.QtCore import QRect
+    from PyQt6.QtWidgets import QWidget
 
-    _press(panel, "genau_filter_enhanced")
-    assert (filters.enhanced, filters.favorites) == (True, False)
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    panel = StrokePanel(FakeStroke(), parent, host=FakeHost())
 
-    panel.render_console()  # the rects move with the fill, so re-read them
-    _press(panel, "main_fmode")
-    assert (filters.enhanced, filters.favorites) == (True, True)
+    panel.reposition()
+    assert (panel.x(), panel.y()) == (StrokePanel.MARGIN, StrokePanel.MARGIN)
 
-    panel.render_console()
-    _press(panel, "genau_filter_enhanced")
-    assert (filters.enhanced, filters.favorites) == (False, True)
-
-
-def test_the_console_names_each_filter_while_it_is_on(qtbot):
-    # The status line is the HUD's own answer to "what am I looking at", and a
-    # narrowed show is exactly the thing it must not leave unsaid.
-    filters = ShowFilters()
-    _panel_off, stroke, host = _panel(qtbot, filters=filters)
-
-    def line():
-        return console_hud(stroke, host, filters=filters).status_line
-
-    assert "Enhanceds" not in line() and "F-Mode" not in line()
-
-    filters.set_enhanced(True)
-    filters.set_favorites(True)
-
-    assert "F-Mode" in line() and "Enhanceds" in line()
+    panel.reposition(below=QRect(12, 12, 300, 140))
+    assert (panel.x(), panel.y()) == (12, 12 + 140 + 12)
 
 
 def test_the_console_is_here_whether_or_not_a_stroke_is_running(qtbot):
-    # Half of what is on it is not about a running stroke at all — the pace, and
-    # the two switches saying what a show may play. A panel that appeared only
-    # once the device was driven made those reachable only by starting a stroke.
-    panel, stroke, _host = _panel(qtbot, filters=ShowFilters())
+    # Part of what is on it is not about a running stroke at all — the pace an
+    # unheld slide moves on at. A panel that appeared only once the device was
+    # driven made that reachable only by starting a stroke.
+    panel, stroke, _host = _panel(qtbot)
     panel.show()
 
     assert stroke.active is False

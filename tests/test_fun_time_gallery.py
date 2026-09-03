@@ -979,3 +979,75 @@ def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
     view = _fun_time_view(qtbot)
     assert view._show_item_label("nobody") == ""
     assert view._show_item_label("") == ""
+
+
+def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp_path, monkeypatch):
+    """The two filters a show has are the two switches its HUD carries: F-mode
+    over the favorites, and beside it the switch keeping only the pictures the
+    show has enhanced.  A press lands on the show itself, hosted like standalone
+    — it is the show's own narrowing, not the session's — and the status line
+    names the cut beside the rest."""
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view._region_shows["portrait"]
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+    names = [name for _rect, name in hud._targets.control]
+    assert names.index("enhanced") == names.index("fmode") + 1
+
+    hud._deliver("portrait_enhanced")
+
+    assert show.hud_enhanced_mode is True
+    assert len(show.hud_items()[0]) == 1          # narrowed to the one enhanced
+    model = show_hud_model("portrait", show)
+    assert model.enhanced_filter is True and "Enhanceds" in model.lock_label
+    # Nothing went out on the session's channel: the switch is the show's own.
+    assert not (tmp_path / "dashboard_cmd.txt").exists()
+
+    hud._deliver("portrait_enhanced")
+    assert len(show.hud_items()[0]) == 3          # widened back
+
+
+def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, monkeypatch):
+    """Hosted, the session hears "portrait enhanced only" and hands the words
+    over; they turn that region's own switch, and "portrait clear filter" turns
+    it — and F-mode — back off, which is what the phrase means on a satellite."""
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+
+    assert view.run_spoken_command("portrait enhanced only")
+    assert show.hud_enhanced_mode is True
+    assert len(show.hud_items()[0]) == 1
+
+    assert view.run_spoken_command("portrait favorites")
+    assert (show.hud_f_mode, show.hud_enhanced_mode) == (True, True)
+
+    assert view.run_spoken_command("portrait clear filter")
+    assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
+    assert len(show.hud_items()[0]) == 3
+
+
+def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
+    """Reset puts the side back how it started, and the new switch is one more
+    thing it drops — a reset that left the show narrowed would not be one."""
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view._region_shows["portrait"]
+    qtbot.addWidget(show)
+    show.toggle_enhanced_mode()
+    assert show.hud_enhanced_mode is True
+
+    show.stroke_reset()
+
+    assert show.hud_enhanced_mode is False

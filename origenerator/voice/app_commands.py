@@ -78,10 +78,12 @@ class AppCommand(Enum):
     # back — the toolbar's switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
 
-    # What a show may play. Said either way round rather than as one toggle: a
-    # speaker mid-show is not looking at the console to see which way it is set,
-    # and "filter enhanced" that turned the filter OFF half the time would be a
-    # command nobody could rely on.
+    # What a show may play: the switch beside F-mode on its HUD, which keeps
+    # only the pictures it has enhanced. Said either way round rather than as
+    # one toggle: a speaker mid-show is not looking at the HUD to see which way
+    # it is set, and "filter enhanced" that turned the filter OFF half the time
+    # would be a command nobody could rely on. "clear filter" is the way back
+    # out of both switches at once.
     FILTER_ENHANCED = "filter_enhanced"
     FILTER_OFF = "filter_off"
 
@@ -200,9 +202,13 @@ _say(AppCommand.MIC_OFF, "mic off", "voice off")
 # The show's own narrowing filter, in Fun Time's own grammar: "filter <what to
 # keep>" turns one on, and "clear filter" is the way back to all of it — the
 # very phrase the satellites answer, so one gesture has one wording in both
-# rooms.
+# rooms. "Upscales" is what the enhanced pictures are called at the desk, so it
+# is heard too; inside a Fun Time session the room's recognizer has no such
+# word (see fun_time's ORIGENERATOR_PHRASES), and "enhanced only" is the one
+# that carries there.
 _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
-     "filter enhanced only", "enhanced only")
+     "filter enhanced only", "enhanced only",
+     "upscales", "upscales only", "filter upscales", "upscaled only")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
 # The stroke's knobs, said the way Fun Time says them, so the muscle memory

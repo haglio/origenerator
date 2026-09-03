@@ -4,13 +4,15 @@ Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering, filling the strip's height out of its
 bottom-left corner, and beside it a column no wider than a bar needs to be — the
 job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
-bar it measures. A job ComfyUI hasn't started has no reading to write and that bar
-only sweeps, so where another app's work is what it is stuck behind, the line
-under the bar says so: a bar sweeping with nothing said about it is exactly the
-thing a user is owed an explanation for. Whatever is true of the shared *server*
-is this half's to say — a row on the right is about one job of ours and nothing
-else. With nothing of ours in flight the same half says what that server is busy
-with instead, and offers a Clear for it.
+bar it measures. That frame opens the folder its run will land in, the way the
+row of the same job on the right does: it is a picture of a job, and a picture of
+a job goes where the job goes. A job ComfyUI hasn't started has no reading to
+write and that bar only sweeps, so where another app's work is what it is stuck
+behind, the line under the bar says so: a bar sweeping with nothing said about it
+is exactly the thing a user is owed an explanation for. Whatever is true of the
+shared *server* is this half's to say — a row on the right is about one job of
+ours and nothing else. With nothing of ours in flight the same half says what
+that server is busy with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click or a double-click, and each draggable to a new
@@ -90,7 +92,54 @@ _TICK_MS = 1000
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 
-class RunningPreview(QWidget):
+class OpensAFolder:
+    """Going from a job to where its result will land: a press and its release,
+    or a double-click.
+
+    Both halves of the strip stand for a job you can go to — the live frame of
+    the one being made, and the rows of the ones waiting — so both answer the
+    same two gestures, written once here.
+
+    The double-click is answered outright rather than through the release that
+    trails it. Qt hands the second press of a double over as a double-click
+    event, not as a press, so a surface without this reaches the folder only if a
+    further release arrives — one event too many to rest on for what is, to
+    anyone reading a listing, the obvious way to open a row.
+
+    A subclass says what is under the cursor through :meth:`folder_of`. The
+    pending press is :attr:`_press_at`, left where a subclass can call the
+    gesture off: the queue's rows clear it once a press has travelled far enough
+    to be a drag, and the row then reorders rather than opening anything.
+    """
+
+    _press_at = None  # where a left press landed, until it clicks or turns into a drag
+
+    def folder_of(self, position):
+        """How to reach the folder of whatever sits at ``position``, or ``None``
+        where nothing there goes anywhere."""
+        raise NotImplementedError
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_at = event.position().toPoint()
+
+    def mouseReleaseEvent(self, event):
+        if self._press_at is not None:
+            self._open_folder(self._press_at)
+        self._press_at = None
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_at = None  # answered here, not again on the release
+            self._open_folder(event.position().toPoint())
+
+    def _open_folder(self, position):
+        reveal = self.folder_of(position)
+        if reveal is not None:
+            reveal()
+
+
+class RunningPreview(OpensAFolder, QWidget):
     """What is being made: its live frame, and beside it a fat bar with the clock
     written across it — and, under the bar, what is holding the whole line up.
 
@@ -99,12 +148,19 @@ class RunningPreview(QWidget):
     While the head of the line is stuck behind another app's work its bar has no
     reading to write and only sweeps, and the line under it is the explanation
     that sweeping is owed.
+
+    The frame goes where the row of the same job goes — a click or a double-click
+    on it opens the folder the run will land in (:class:`OpensAFolder`). Only the
+    frame: the bar beside it is a reading of this job rather than a picture of it,
+    and the note under that bar is about the shared server, so neither is
+    something to click through to a folder.
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.key = None
         self._item = None
+        self._press_at = None
 
         layout = QHBoxLayout(self)
         # No margins: the frame is meant to reach the strip's edges, and the
@@ -174,16 +230,26 @@ class RunningPreview(QWidget):
             self._progress.caption() if self._item is not None else ""
         )
 
+    def folder_of(self, position):
+        """Where the running job will land — for a press on its frame alone."""
+        if self._item is None or not self._frame.geometry().contains(position):
+            return None
+        return self._item.reveal
+
     def show_item(self, item):
         """Render ``item``, or blank the half (keeping its space) when nothing runs."""
         self.key = item.key if item is not None else None
         self._item = item
         if item is None:
+            self._frame.unsetCursor()  # nothing to go to, so nothing to invite a click
             self._frame.clear()
             self._progress.hide()
             self._caption.show()
             self._tick.stop()
             return
+        # The hand rides on the frame rather than on the half, so it appears over
+        # the one thing here that goes anywhere.
+        self._frame.setCursor(Qt.CursorShape.PointingHandCursor)
         # A job of ours takes the slot back for its own bar — except while another
         # app's work is what is holding it up, which is the one thing that bar
         # cannot say for itself, and the reason it is sweeping rather than filling.
@@ -242,7 +308,7 @@ class RunningPreview(QWidget):
             self._render_frame(None if self._item is None else self._item.frame)
 
 
-class QueueRow(QWidget):
+class QueueRow(OpensAFolder, QWidget):
     """One job in the line: what it costs, what it is, what it is made from, and
     the button that throws it away.
 
@@ -273,10 +339,10 @@ class QueueRow(QWidget):
     auto-generating — where the press discards the seed and the loop starts
     another (:func:`inflight.discard_run_text`).
 
-    A press-and-release opens the job's folder, and so does a double-click —
-    the gesture a listing invites; a press that travels starts a drag, which the
-    strip turns into a reorder. The row being made is the head of the line and
-    does not move.
+    A press-and-release opens the job's folder, and so does a double-click
+    (:class:`OpensAFolder`); a press that travels starts a drag instead, which
+    the strip turns into a reorder. The row being made is the head of the line
+    and does not move.
     """
 
     HEIGHT = 34  # about two of these fit beside the progress bar
@@ -289,7 +355,7 @@ class QueueRow(QWidget):
         super().__init__(parent)
         self.key = item.key
         self.movable = movable
-        self._press_at = None  # where a left press landed, until it clicks or drags
+        self._press_at = None
         self.setObjectName("queueRow")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setProperty("dragging", False)
@@ -408,9 +474,10 @@ class QueueRow(QWidget):
         if self._item.cancel is not None:
             self._item.cancel()
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._press_at = event.position().toPoint()
+    def folder_of(self, position):
+        """Where this job will land — the whole row goes there, wherever it was
+        pressed, the Cancel in front of it being a button of its own."""
+        return self._item.reveal
 
     def mouseMoveEvent(self, event):
         """A press that travels far enough becomes a drag, carrying this row's id."""
@@ -430,27 +497,6 @@ class QueueRow(QWidget):
             drag.exec(Qt.DropAction.MoveAction)
         finally:
             self.set_dragging(False)
-
-    def mouseReleaseEvent(self, event):
-        if self._press_at is not None:
-            self._open_folder()
-        self._press_at = None
-
-    def mouseDoubleClickEvent(self, event):
-        """The second click of a double opens the folder as the first one did.
-
-        Qt hands that second press over as this event rather than as a press, so
-        a row without this answers the gesture only through the release that
-        follows it — which is one event too many to rely on for what is, to
-        anyone using a listing, the obvious way to open a row.
-        """
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._press_at = None  # answered here, not again on the release
-            self._open_folder()
-
-    def _open_folder(self):
-        if self._item.reveal is not None:
-            self._item.reveal()
 
 
 class GenerationQueue(QWidget):

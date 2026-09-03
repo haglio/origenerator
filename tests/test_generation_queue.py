@@ -355,6 +355,37 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
     assert revealed and set(revealed) == {"a"}
 
 
+def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
+    """The picture of what is being made is a picture of a job, so it goes where
+    that job's row goes — the same click, the same folder."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication
+
+    revealed = []
+    queue.set_items([_item(key="a", reveal=lambda: revealed.append("a"))])
+    QApplication.processEvents()
+
+    frame = queue.running_preview()._frame
+    qtbot.mouseClick(frame, Qt.MouseButton.LeftButton)
+    qtbot.mouseDClick(frame, Qt.MouseButton.LeftButton)
+    assert revealed and set(revealed) == {"a"}
+
+
+def test_the_bar_beside_the_live_frame_is_not_a_way_into_a_folder(queue, qtbot):
+    """The bar is a reading of the job rather than a picture of it, and the note
+    under it is about the shared server — neither is something you click through
+    to a folder."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication
+
+    revealed = []
+    queue.set_items([_item(key="a", reveal=lambda: revealed.append("a"))])
+    QApplication.processEvents()
+
+    qtbot.mouseClick(queue.running_preview()._progress, Qt.MouseButton.LeftButton)
+    assert revealed == []
+
+
 def test_clicking_cancel_does_not_also_reveal_the_folder(queue):
     revealed, stopped = [], []
     queue.set_items([_item(key="a", reveal=lambda: revealed.append(True),

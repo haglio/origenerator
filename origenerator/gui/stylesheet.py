@@ -353,13 +353,19 @@ def build_stylesheet() -> str:
     /* The standing label over each half of the TOC pane, naming the shape that
        half holds. Outside the tree rather than a row in it, so it is still on
        screen when the rows under it have scrolled; ruled off below so it reads
-       as the head of the list rather than as its first entry. */
-    QLabel#treeSectionLabel {{
-        color: {_h(TEXT_PRIMARY)};
-        font-weight: bold;
+       as the head of the list rather than as its first entry. The frame carries
+       the rule and the padding because its proportion mark and its word both sit
+       inside them. */
+    QFrame#treeSectionLabel {{
         background: transparent;
         border-bottom: 1px solid {_h(BORDER_SUBTLE)};
         padding: 4px 2px 3px 2px;
+    }}
+    /* Qt style sheets do not hand a parent's color down to its children, so the
+       heading's word states its own; the mark beside it is drawn, not styled. */
+    QLabel#treeSectionName {{
+        color: {_h(TEXT_PRIMARY)};
+        font-weight: bold;
     }}
     QLabel#dropSlot {{
         border: 1px dashed {_h(BORDER_PANEL)};

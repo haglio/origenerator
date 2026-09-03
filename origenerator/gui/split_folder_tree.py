@@ -12,7 +12,9 @@ narrowest column of the window, hides which side you are in the moment that row
 scrolls off, and makes the two libraries share one scrollbar — so reaching a
 settings folder deep in Landscape scrolls the whole of Portrait away first.
 Each half scrolling on its own keeps both readable, and the labels are the
-answer to "which one am I in" without looking up.
+answer to "which one am I in" without looking up — each one led by a small
+frame of its own shape, upright or lying down, which answers it a beat before
+the word does.
 
 The two are mutually exclusive: a row picked in one half clears the other's
 selection, so "the folder on screen" is always one folder, and a set picked
@@ -24,14 +26,54 @@ owns the row.
 """
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QSplitter, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QSplitter, QVBoxLayout, QWidget,
+)
 
+from origenerator.gui import icons
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.orientation import ORIENTATION_LABELS, ORIENTATIONS
 
 # Neither half is allowed to shrink to nothing: a half with no rows visible is
 # a side of the library that looks like it isn't there.
 _MIN_HALF_HEIGHT = 90
+
+
+def _heading(orientation: str) -> QFrame:
+    """One half's standing label: the shape's proportion mark, then its name.
+
+    The mark is there because the two halves differ by a shape, and a shape is
+    read faster as one — the eye lands on an upright frame or a lying-down one
+    and is already in the right library before the word is spelled out.
+
+    A frame carrying two labels rather than one label carrying a word, so the
+    mark sits beside the name inside the rule the stylesheet draws under the
+    whole heading. Only the frame gets the tooltip: Qt hands a tooltip event up
+    from a child that has none of its own, so one description covers the
+    heading wherever in it the cursor stops.
+    """
+    heading = QFrame()
+    heading.setObjectName("treeSectionLabel")
+    heading.setToolTip(
+        f"Everything {orientation}-shaped — its own shelves, folders and "
+        "library. A slideshow started here plays on the "
+        f"{orientation} screen."
+    )
+
+    row = QHBoxLayout(heading)
+    row.setContentsMargins(0, 0, 0, 0)  # the stylesheet's padding insets this
+    row.setSpacing(6)
+
+    mark = QLabel()
+    mark.setObjectName("treeSectionMark")
+    mark.setPixmap(icons.orientation_mark(orientation))
+    row.addWidget(mark)
+
+    name = QLabel(ORIENTATION_LABELS[orientation])
+    name.setObjectName("treeSectionName")
+    row.addWidget(name)
+    row.addStretch(1)  # the pair reads as a heading, not as a centered caption
+    return heading
 
 
 class SplitFolderTree(QWidget):
@@ -87,15 +129,7 @@ class SplitFolderTree(QWidget):
         box = QVBoxLayout(half)
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(2)
-
-        heading = QLabel(ORIENTATION_LABELS[orientation])
-        heading.setObjectName("treeSectionLabel")
-        heading.setToolTip(
-            f"Everything {orientation}-shaped — its own shelves, folders and "
-            "library. A slideshow started here plays on the "
-            f"{orientation} screen."
-        )
-        box.addWidget(heading)
+        box.addWidget(_heading(orientation))
 
         tree = FolderTree(group_role)
         tree.setHeaderHidden(True)

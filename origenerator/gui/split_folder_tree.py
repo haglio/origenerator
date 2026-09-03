@@ -175,6 +175,20 @@ class SplitFolderTree(QWidget):
         return next((tree.currentItem() for tree in self._halves.values()
                      if tree.currentItem() is not None), None)
 
+    def is_current(self, item) -> bool:
+        """Whether a row is already the current one of its own half — where
+        setting it again fires no signal, so a caller who needs the pane drawn
+        from it has to draw it itself.
+
+        Asked of the row's half rather than of the pane: each half keeps its own
+        current row, so a row can be its half's current one while the other half
+        is the active one, and setting it then moves the selection across without
+        the row itself changing.
+        """
+        orientation = self.orientation_of_item(item)
+        return (orientation is not None
+                and self._halves[orientation].currentItem() is item)
+
     def setCurrentItem(self, item, column=0, command=None) -> None:
         """Go to a row, wherever it lives, and let the other half go."""
         orientation = self.orientation_of_item(item)

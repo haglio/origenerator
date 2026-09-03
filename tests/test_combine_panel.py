@@ -52,7 +52,7 @@ def test_clicking_generate_emits_the_two_ids(qtbot):
 
 
 def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
-    # "Open in generator" needs the same ingredients as Generate — a source image
+    # "Edit…" needs the same ingredients as Generate — a source image
     # and a recipe — so it lights and dims in lockstep with the Generate button.
     panel = _panel(qtbot)
     assert not panel._open_btn.isEnabled()

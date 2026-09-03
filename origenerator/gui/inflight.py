@@ -103,7 +103,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     The act follows the kind, for a run the Combine panel launched from its
     dropdown: "I2V" says a video is being made from a frame, and the act says
     which video — the whole of what the user chose, and the one thing separating
-    two runs on the same picture. It rides through "Open in generator" too, so a
+    two runs on the same picture. It rides through "Edit…" too, so a
     combination edited before launching still says what it was asked for.
 
     The two marks at the end are only ever *added*: a job nobody typed a prompt

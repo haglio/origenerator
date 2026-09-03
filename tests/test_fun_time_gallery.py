@@ -105,14 +105,14 @@ def test_fun_time_gallery_gives_the_bottom_corner_to_the_queue(qtbot):
     )  # and the queue reaches the left edge the tree used to own
 
 
-def test_fun_time_gallery_left_pane_collapses_on_its_toggle(qtbot):
+def test_fun_time_gallery_has_no_collapse_toggle_on_its_left_pane(qtbot):
+    """No chevron for the tree.  It sat beside the back/forward chevrons and
+    read as a third one of those, and folding the tree away bought a column
+    this narrow very little — the divider still drags shut for anyone who
+    wants the room."""
     view = _fun_time_view(qtbot)
-    view.show()
-    toc = view._panes.widget(0)
-    view._toc_toggle.click()
-    assert not toc.isVisible()
-    view._toc_toggle.click()
-    assert toc.isVisible()
+    assert not hasattr(view, "_toc_toggle")
+    assert view._panes.isCollapsible(0)
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
@@ -125,7 +125,6 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
     # The second pane is the info-pane wrapper (tabs + the find bar).
     assert view._panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
     assert view._folder_panes.count() == 2  # the tree, then the browser
-    assert view._toc_toggle is None  # the collapse toggle is Fun Time mode's
 
 
 def _open_slideshow(view, monkeypatch, tmp_path, name, width, height, count=1):
@@ -875,3 +874,100 @@ def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, mo
     show._preview.video_unplayable.emit()
 
     assert show._playlist.index == at
+
+
+def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
+    """In the RFB's upright column a portrait picture stacked over the settings
+    pushes every prompt field off the bottom, so the two go side by side —
+    settings left, picture right, the order they are read in."""
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
+
+    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(panel)
+    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+
+    panel._preview._pixmap = QPixmap(400, 900)   # taller than it is wide
+    panel._reflow_for_the_media()
+
+    assert panel._media_split.orientation() == Qt.Orientation.Horizontal
+    assert panel._media_split.indexOf(panel._scroll) == 0    # settings lead
+    assert panel._media_split.indexOf(panel._preview) == 1
+
+
+def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
+    """A wide picture beside a form gets a column too narrow to show it, and the
+    form loses the width its prompt boxes need."""
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
+
+    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(panel)
+
+    panel._preview._pixmap = QPixmap(1200, 700)
+    panel._reflow_for_the_media()
+
+    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+    assert panel._media_split.indexOf(panel._preview) == 0
+
+
+def test_standalone_never_stands_them_side_by_side(qtbot):
+    """The pane is wide there; stacking is right at any shape."""
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
+
+    panel = GenerateConfigPanel(None, FakeDB([]))
+    qtbot.addWidget(panel)
+
+    panel._preview._pixmap = QPixmap(400, 900)
+    panel._reflow_for_the_media()
+
+    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+
+
+def test_a_tab_coming_to_the_front_lays_out_for_its_own_picture(qtbot):
+    """The shape belongs to the tab, so switching to one holding a landscape
+    picture stands the panes back up — without waiting for something else to
+    nudge the splitter, which is all that used to bring them back."""
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.info_pane_tabs import InfoPaneTabs
+
+    tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tabs)
+    portrait_tab = tabs.currentWidget()
+    portrait_tab._preview._pixmap = QPixmap(400, 900)
+    portrait_tab.refresh_media_layout()
+    assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal
+
+    # A second tab holding a landscape picture; switching to it stands it up.
+    tabs._add_subtab()
+    landscape_tab = tabs.currentWidget()
+    landscape_tab._preview._pixmap = QPixmap(1200, 700)
+    tabs.setCurrentWidget(portrait_tab)
+    tabs.setCurrentWidget(landscape_tab)
+
+    assert landscape_tab._media_split.orientation() == Qt.Orientation.Vertical
+
+
+def test_the_shows_hud_names_the_item_the_way_this_app_does(qtbot):
+    """Not the way the disk does.  Off the path it reads "image / ComfyUI_00123_"
+    — a media type and a counter that appear nowhere in this UI — where the tree
+    calls the folder "615F7744" and the browser captions the tile "seed 7"."""
+    row = _image("p1", "a cat", 50, 1)
+    view = _fun_time_view(qtbot, rows=[row])
+
+    label = view._show_item_label("p1")
+
+    assert "seed" in label and "/" in label
+    assert "image /" not in label       # never the media type as a folder
+    assert "ComfyUI" not in label       # never the counter off the disk
+
+
+def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
+    view = _fun_time_view(qtbot)
+    assert view._show_item_label("nobody") == ""
+    assert view._show_item_label("") == ""

@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QSplitter,
     QPushButton, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal
@@ -149,7 +149,8 @@ class GenerateConfigPanel(QWidget):
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
-    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None):
+    def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
+                 *, fun_time=None):
         super().__init__(parent)
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
@@ -185,6 +186,10 @@ class GenerateConfigPanel(QWidget):
         self._caption_timer.setSingleShot(True)
         self._caption_timer.setInterval(_CAPTION_DELAY_MS)
         self._caption_timer.timeout.connect(self._apply_generate_caption)
+        # The hosting session, or None standalone.  Hosted, this tab lives in
+        # the RFB's upright column, where a portrait picture stacked over the
+        # form pushes every prompt field off the bottom (_reflow_for_the_media).
+        self._fun_time = fun_time
         self._build_ui()
 
     def _build_ui(self):
@@ -209,7 +214,15 @@ class GenerateConfigPanel(QWidget):
         # pane's thumbnails take, so an act means the same thing either side.
         self._preview.action_triggered.connect(self.item_action_requested)
         self._preview.context_requested.connect(self.context_menu_requested)
-        layout.addWidget(self._preview, 3)
+        # The preview and the settings under it share a splitter, so the line
+        # between them is a drag handle like every other pane boundary in this
+        # app: a tall picture can be given the room it wants without the form
+        # being pinned to a ratio someone else chose.
+        self._media_split = QSplitter(Qt.Orientation.Vertical)
+        self._media_split.setChildrenCollapsible(False)
+        self._media_split.setHandleWidth(6)
+        self._media_split.addWidget(self._preview)
+        self._preview.media_resized.connect(self._reflow_for_the_media)
         # One scroll under the preview holds everything else: the read-only info on
         # top, the editable form below it, so they scroll together. This replaces the
         # old split — a cramped form-only scroll above a separate, non-scrolling info
@@ -312,7 +325,11 @@ class GenerateConfigPanel(QWidget):
         body.addStretch(1)
 
         self._scroll.setWidget(body_host)
-        layout.addWidget(self._scroll, 4)
+        self._media_split.addWidget(self._scroll)
+        self._media_split.setStretchFactor(0, 3)
+        self._media_split.setStretchFactor(1, 4)
+        layout.addWidget(self._media_split, 1)
+        self._media_side_by_side = False
 
         # One button bank, fixed under the scroll so Generate is always reachable.
         # Send-to-Evolver shows only while displaying a saved
@@ -615,6 +632,7 @@ class GenerateConfigPanel(QWidget):
         a plus, and the gray clip whose settings came with it. Nothing has been
         made from the pair yet, so there is no result for the pane to show."""
         self._preview.show_combination(image_path, video_path)
+        self._reflow_for_the_media()
 
     def launched_runs(self) -> list[str]:
         """The runs this tab's Generate started, oldest first.
@@ -689,6 +707,55 @@ class GenerateConfigPanel(QWidget):
         params = self._param_form.get_values_static()
         index = build_image_config_index(self._image_rows())
         return key, settings_signature(key, json.dumps(params), index)
+
+    def refresh_media_layout(self) -> None:
+        """Re-ask what shape the picture is and lay out for it.
+
+        Called when this tab comes to the front as well as when its media
+        changes: the shape belongs to the tab, so switching to one holding a
+        landscape picture has to stand the panes back up even though nothing in
+        THIS tab resized.  Left to the resize signal alone the old arrangement
+        stayed until something else nudged the splitter.
+        """
+        self._reflow_for_the_media()
+
+    def _reflow_for_the_media(self) -> None:
+        """Stand the picture beside the settings when it is a PORTRAIT one.
+
+        Only hosted by Fun Time, where this tab lives in the Random Favs
+        Browser's upright rect: stacked there, a portrait picture takes the
+        whole column and pushes every prompt field off the bottom.  Side by side
+        it keeps its height and the form keeps its place — settings left,
+        picture right, which is the order they are read in.
+
+        Landscape media stays stacked: a wide picture beside a form gets a
+        column too narrow to show it, and the form loses the width its prompt
+        boxes need.
+        """
+        if self._fun_time is None:
+            return  # standalone the pane is wide; stacking is right at any shape
+        beside = self._media_is_portrait()
+        if beside == self._media_side_by_side:
+            return
+        self._media_side_by_side = beside
+        sizes = self._media_split.sizes()
+        if beside:
+            self._media_split.setOrientation(Qt.Orientation.Horizontal)
+            self._media_split.insertWidget(0, self._scroll)  # settings lead
+            self._media_split.setStretchFactor(0, 3)
+            self._media_split.setStretchFactor(1, 4)
+        else:
+            self._media_split.setOrientation(Qt.Orientation.Vertical)
+            self._media_split.insertWidget(0, self._preview)
+            self._media_split.setStretchFactor(0, 3)
+            self._media_split.setStretchFactor(1, 4)
+        if sum(sizes) > 0:
+            self._media_split.setSizes(sorted(sizes, reverse=beside))
+
+    def _media_is_portrait(self) -> bool:
+        """Whether what the preview is showing is taller than it is wide."""
+        size = self._preview.media_size()
+        return bool(size and size[1] > size[0])
 
     def show_recent_preview(self):
         """Fill the preview with the newest saved generation matching this tab's
@@ -840,6 +907,7 @@ class GenerateConfigPanel(QWidget):
         self._displayed_row = None     # a folder, not a generation on display
         self._displayed_config = None  # ...so no settings for a notice to deviate from
         self._preview.show_folder(pictures)
+        self._reflow_for_the_media()
         if self._param_form is not None:
             self._param_form.track_prompt_rewrites()
         self._apply_generate_caption()

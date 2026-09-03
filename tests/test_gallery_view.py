@@ -3285,17 +3285,14 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    # The tree's own collapse toggle leads the bank, and is Fun Time mode's
-    # alone — standalone that group is empty and takes no room.
     groups = [buttons for _gap, buttons in view._toolbar_groups]
-    assert groups[0] == ()
-    assert groups[1] == (view._back_btn, view._forward_btn)
-    assert groups[2] == (view._undo_btn, view._redo_btn)
-    assert groups[4] == (view._star_btn, view._enhance_btn, view._delete_btn)
-    assert view._osr2_btn in groups[5] and view._auto_btn in groups[5]
+    assert groups[0] == (view._back_btn, view._forward_btn)
+    assert groups[1] == (view._undo_btn, view._redo_btn)
+    assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
+    assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
     # The mic has a space of its own: the group beside it is what Esc turns off,
     # and the mic is the one switch it leaves listening.
-    assert groups[6] == (view._mic_btn,) and view._mic_btn not in groups[5]
+    assert groups[5] == (view._mic_btn,) and view._mic_btn not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -3309,10 +3306,10 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     _select_first_leaf(view)
 
     gaps = {id(gap): gap for gap, _ in view._toolbar_groups}
-    leading, group_gap = view._toolbar_groups[1][0], view._toolbar_groups[3][0]
+    leading, group_gap = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
     assert not leading.isVisible()          # nothing to separate from, at the front
     assert view._group_btn.isHidden() and not group_gap.isVisible()
-    assert view._toolbar_groups[4][0].isVisible()  # the trio is always there
+    assert view._toolbar_groups[3][0].isVisible()  # the trio is always there
     assert len(gaps) == len(view._toolbar_groups)
 
 
@@ -8333,7 +8330,7 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
 
 
 def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_path):
-    # "Open in generator" builds the same combination Generate would, but hands it to
+    # "Edit…" builds the same combination Generate would, but hands it to
     # an editable tab to tweak first — so no job runs and the form is prefilled.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -8350,7 +8347,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
-    # "Open in generator" is the same "show me this" gesture a thumbnail click is:
+    # "Edit…" is the same "show me this" gesture a thumbnail click is:
     # it lands in the pane's untouched "New generation" tab rather than beside it,
     # and wears the slant that says the next open may replace it.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
@@ -8400,7 +8397,7 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
 
 
 def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
-    # The panel's two "Open in generator" signals reach the view's open handlers, so
+    # The panel's two "Edit…" signals reach the view's open handlers, so
     # clicking Open with a dropped video (or a picked act) opens an editable tab.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

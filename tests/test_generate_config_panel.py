@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QPixmap
 
@@ -54,18 +55,33 @@ def _is_descendant(widget, ancestor) -> bool:
 # --- layout: one preview-over-form column ----------------------------------
 
 def test_the_panel_is_one_column_with_no_side_pane(panel):
-    # The tab is a single column now — no splitter, no second pane beside it.
+    """Still one column — the split between the preview and the settings is a
+    drag handle, not a second pane beside the tab."""
     from PyQt6.QtWidgets import QSplitter
-    assert panel.findChildren(QSplitter) == []
+
+    assert panel.findChildren(QSplitter) == [panel._media_split]
+    assert panel._media_split.orientation() == Qt.Orientation.Vertical
 
 
 def test_preview_leads_the_column_over_the_form_and_generate(panel):
     # Preview-over-form: the preview sits on top of the settings, with the
     # Generate button under them, all in the panel's own column.
-    column = panel.layout()
-    assert column.indexOf(panel._preview) == 0
-    assert column.indexOf(panel._preview) < column.indexOf(panel._scroll)
+    split = panel._media_split
+    assert split.indexOf(panel._preview) == 0
+    assert split.indexOf(panel._preview) < split.indexOf(panel._scroll)
+    assert panel.layout().indexOf(split) == 0
     assert _is_descendant(panel._generate_btn, panel)
+
+
+def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(panel):
+    """So a tall picture can be given the room it wants without the form being
+    pinned to a ratio someone else chose — like every other pane boundary."""
+    split = panel._media_split
+
+    assert split.handleWidth() > 0
+    assert not split.childrenCollapsible()  # neither can be dragged away entirely
+    split.setSizes([500, 200])
+    assert split.sizes()[0] > split.sizes()[1]
 
 
 def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):

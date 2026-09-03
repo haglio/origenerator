@@ -104,9 +104,8 @@ EVOLVER_SOURCE = "origenerator"
 # already there.
 #
 # From the overlay, not from source, because naming a folder in the library makes
-# that name library vocabulary: the sanitize harvester reads the library's folder
-# names into its blocklist, so a name hardcoded here comes back and fails the guard
-# on the very line that created it. Evolver reads the same key from its own overlay
+# that name library vocabulary: the sanitize blocklist exists to keep exactly that
+# out of a public commit, so hardcoding one here writes it into the tracked tree. Evolver reads the same key from its own overlay
 # and the two have to agree — the folder is the only thing passing between them.
 GENAU_SOURCE = _CONTENT["genau_source"]
 

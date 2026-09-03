@@ -8,6 +8,7 @@ an entry for every file the app has looked at since it launched and no way for
 one to leave: a generation deleted an hour ago still holds its slot.
 """
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -62,5 +63,8 @@ def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
 
     _measure("late")  # one over: something has to go
 
-    assert "/library/m0.png" in orientation._measured
-    assert "/library/m1.png" not in orientation._measured
+    # ``row_orientation`` keys the cache by ``str(Path(thumbnail_path))``, so the
+    # separator is the platform's -- backslashes on Windows.  Assert against the
+    # same normalization the cache stores, not a raw POSIX literal.
+    assert str(Path("/library/m0.png")) in orientation._measured
+    assert str(Path("/library/m1.png")) not in orientation._measured

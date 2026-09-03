@@ -146,6 +146,13 @@ def test_the_mic_can_be_shut_by_voice_but_not_opened():
     assert match_app_command("mic on") is None
 
 
+def test_the_enhanced_filter_answers_to_upscales_as_well():
+    # "Upscales" is what the enhanced pictures are called at the desk, so the
+    # word turns the same switch on; the way back is the same "clear filter".
+    for phrase in ("upscales", "upscales only", "filter upscales", "upscaled only"):
+        assert match_app_command(phrase) is AppCommand.FILTER_ENHANCED, phrase
+
+
 def test_the_show_filter_is_said_either_way_round_not_toggled():
     # A speaker mid-show is not looking at the console to see which way it is
     # set, so a single word that flipped it would do the opposite half the time.

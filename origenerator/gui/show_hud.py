@@ -25,9 +25,12 @@ click jumps the show to that item, the way a map click switches a player.
 
 Presses that mean something to the session — the mode pair, this side's
 prev/next/lock/trash — post onto the dashboard command file, the channel the
-players' HUDs and the global hotkeys share.  Presses whose concepts a hosted
-show does not have (F-mode, minimize, the loops) are drawn for sameness but
-swallowed there, so they can never reach the blacked player underneath.
+players' HUDs and the global hotkeys share.  The two filter switches — F-mode,
+and the enhanced-only switch beside it that only a show's HUD grows — are the
+show's own and land on it directly, hosted or not (:meth:`ShowHud._deliver`).
+Presses whose concepts a hosted show does not have (minimize, the loops) are
+drawn for sameness but swallowed there, so they can never reach the blacked
+player underneath.
 """
 
 from __future__ import annotations
@@ -57,6 +60,15 @@ from player_core.satellite_hud_paint import HudRenderer
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
+# Whether this player_core's HUD knows the enhanced-only switch: the model field
+# that grows the button, and the status line's slot that names it (one change
+# there, so one question here).  Asked rather than assumed, for the reason
+# :func:`~origenerator.gui.gallery_view._shared_hud_widget` asks whether there
+# is a shared HUD at all: the switch lives in the newest player_core, and a show
+# opened over an older checkout must come up without the button rather than not
+# come up.
+_HUD_HAS_ENHANCED_SWITCH = "enhanced_filter" in HudModel.__dataclass_fields__
+
 
 def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
@@ -77,6 +89,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         for path, thumb in cells
     )
     f_mode = bool(getattr(host, "hud_f_mode", False))
+    enhanced = bool(getattr(host, "hud_enhanced_mode", False))
     order_label = getattr(host, "hud_order_label", "")
     order_label = SHUFFLE_LABEL if order_label == "Shuffle" else order_label
     # A show someone ASKED for is a loop -- this set, played round and round --
@@ -84,16 +97,23 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     # it is that side browsing its whole library, exactly what a satellite does
     # with no loop on, so the button is dark and the line just names the order.
     looping = bool(getattr(host, "hud_looping", True))
+    # The line says what the light says, in the words a satellite says it in --
+    # the two HUDs are one HUD in two places.  Nothing playing_set when nothing
+    # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
+    # satellite browsing its library does.
+    line = dict(playing_set=looping_label("seed") if looping else "",
+                locked=locked, order=order_label, f_mode=f_mode)
+    switches = {}
+    if _HUD_HAS_ENHANCED_SWITCH:
+        # Named on or off, never None: a show HAS the switch, so its HUD grows
+        # the button -- where a player, publishing nothing for it, does not --
+        # and the line names the narrowing beside F-mode while it is on.
+        line["enhanced"] = enhanced
+        switches["enhanced_filter"] = enhanced
     return HudModel(
         side=side,
         locked=locked,
-        # The line says what the light says, in the words a satellite says it
-        # in -- the two HUDs are one HUD in two places.  Nothing playing_set
-        # when nothing is looping, so the base state reads "Unlocked · Shuffle"
-        # exactly as a satellite browsing its library does.
-        lock_label=status_line(
-            playing_set=looping_label("seed") if looping else "",
-            locked=locked, order=order_label, f_mode=f_mode),
+        lock_label=status_line(**line),
         # The players' favorite star and F-mode, over the same collection the
         # Favorites shelf lists: the star lights when the item on screen is a
         # favorite, and F-mode narrows the set to them.
@@ -116,6 +136,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         # would be the one place on this panel where a lit button is a picture
         # of a button.
         satellites_mode="origenerator" if hosted else "",
+        **switches,
     )
 
 
@@ -273,6 +294,12 @@ class ShowHud(QLabel):
             self._host.toggle_f_mode()
             self._tick()
             return
+        if verb == f"{self._side}_enhanced" and hasattr(self._host, "toggle_enhanced_mode"):
+            # The switch beside F-mode, and the show's own the same way: keep
+            # only the pictures this show has enhanced, or widen back.
+            self._host.toggle_enhanced_mode()
+            self._tick()
+            return
         if verb in (f"{self._side}_no_loop", f"{self._side}_seed_loop"):
             # Stop looping this row: the region goes back to what it does when
             # nothing is looping, which is browse its whole library — the same
@@ -300,9 +327,10 @@ class ShowHud(QLabel):
         )
         if command in allowed:
             append_command(self._dashboard_cmd_file, command)
-        # Anything else (minimize, the loops, F-mode on a show without one) is
-        # a player concept a hosted show has no counterpart for: drawn for
-        # sameness, swallowed here so it can never reach the player underneath.
+        # Anything else (minimize, the loops, a filter switch on a show without
+        # one) is a player concept a hosted show has no counterpart for: drawn
+        # for sameness, swallowed here so it can never reach the player
+        # underneath.
 
     def _act_here(self, verb: str) -> None:
         """A press with no session behind it: the show answers it itself.

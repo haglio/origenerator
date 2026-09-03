@@ -143,6 +143,22 @@ class VoiceSteering(QObject):
             with self._lock:
                 self._dictation.reset()
 
+    def bare_command(self, text: str):
+        """The whole-utterance command *text* is, or ``None`` — asked of a
+        transcription the HOSTING session heard, the way :meth:`_interpret`
+        asks it of this app's own mic: first, and only while no request is
+        being said.  Without this the session's "enhanced only" reached the
+        looser picture matcher, which reads it as "enhance" with a word after
+        it and spends a generation on it.  Same lock as :meth:`push_dictation`,
+        for the same reason.
+        """
+        if self._bare_matcher is None:
+            return None
+        with self._lock:
+            if self._dictation is not None and self._dictation.listening:
+                return None
+            return self._bare_matcher(text)
+
     def push_dictation(self, text: str):
         """Feed the open request one transcription heard somewhere else, and
         answer what it meant (``None`` when it is not part of a request).

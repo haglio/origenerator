@@ -45,31 +45,127 @@ def _view(qtbot, items=_ITEMS, **kw):
     return view
 
 
-def test_a_filter_narrows_the_running_pass_and_keeps_the_slide_showing(qtbot, tmp_path):
-    # A filter is a narrowing of what you are looking through, not a new show:
+def _named(tmp_path, *names):
+    return [(_png(tmp_path / f"{name}.png"), "image", name, None) for name in names]
+
+
+def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot, tmp_path):
+    # A switch is a narrowing of what you are looking through, not a new show:
     # taking the picture away as well would make the switch impossible to try.
-    items = [(_png(tmp_path / f"{name}.png"), "image", name, None)
-             for name in ("a", "b", "c")]
-    view = _view(qtbot, items)
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"b", "c"})
     view.step(1)
     assert view._playlist.current()[2] == "b"
 
-    view.refilter([items[1], items[2]])
+    assert view.toggle_enhanced_mode() is True
 
+    assert view.hud_enhanced_mode is True
     assert [item[2] for item in view._playlist._items] == ["b", "c"]
     assert view._playlist.current()[2] == "b"     # still the one on screen
     assert view._counter.text().startswith("1 / 2")
 
+    assert view.toggle_enhanced_mode() is True     # and back to all of them
+    assert view.hud_enhanced_mode is False
+    assert len(view._playlist) == 3
+    assert view._playlist.current()[2] == "b"
 
-def test_a_filter_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_path):
-    items = [(_png(tmp_path / f"{name}.png"), "image", name, None)
-             for name in ("a", "b", "c")]
-    view = _view(qtbot, items)
+
+def test_a_switch_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"b", "c"})
     assert view._playlist.current()[2] == "a"
 
-    view.refilter([items[1], items[2]])
+    view.set_enhanced_mode(True)
 
     assert view._playlist.current()[2] == "b"
+
+
+def test_a_switch_that_would_leave_nothing_is_refused(qtbot, tmp_path):
+    # An empty show is not a mode: the button stays dark and the set stays whole.
+    view = _view(qtbot, _named(tmp_path, "a", "b"))
+
+    assert view.set_enhanced_mode(True) is False
+
+    assert view.hud_enhanced_mode is False
+    assert len(view._playlist) == 2
+
+
+def test_both_switches_together_keep_what_answers_both(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
+                 starred_ids={"a", "b"}, enhanced_ids={"b", "c"})
+
+    view.toggle_f_mode()
+    view.toggle_enhanced_mode()
+
+    assert [item[2] for item in view._playlist._items] == ["b"]
+    assert view.clear_modes() is True              # the way out of both at once
+    assert (view.hud_f_mode, view.hud_enhanced_mode) == (False, False)
+    assert len(view._playlist) == 3
+
+
+def test_a_narrowed_show_takes_in_only_what_passes_its_switches(qtbot, tmp_path):
+    # The show keeps up with the folder it plays; the switches decide that too,
+    # or a narrowed show would fill back up with the very items it left out.
+    view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
+    view.set_enhanced_mode(True)
+
+    view.note_added(_png(tmp_path / "c.png"), "image", "c", None)                 # plain
+    view.note_added(_png(tmp_path / "d.png"), "image", "d", None, enhanced=True)  # enhanced
+
+    assert sorted(item[2] for item in view._playlist._items) == ["a", "d"]
+    view.clear_modes()
+    assert sorted(item[2] for item in view._playlist._items) == ["a", "b", "c", "d"]
+
+
+def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
+    view.set_enhanced_mode(True)
+    assert [item[2] for item in view._playlist._items] == ["a"]
+
+    better = _png(tmp_path / "b_enhanced.png")
+    view.note_enhanced("b", better, "image")
+
+    assert sorted(item[2] for item in view._playlist._items) == ["a", "b"]
+    assert next(item for item in view._playlist._items if item[2] == "b")[0] == better
+    view.clear_modes()
+    assert next(item for item in view._playlist._items if item[2] == "b")[0] == better
+
+
+def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"a", "b"})
+    view.set_enhanced_mode(True)
+    assert view._playlist.current()[2] == "a"
+
+    view.cull()
+    view.clear_modes()
+
+    assert sorted(item[2] for item in view._playlist._items) == ["b", "c"]
+
+
+def test_holding_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path):
+    # Down stars the slide; the star readout and F-mode follow, not only the
+    # database the gallery writes.
+    starred = []
+    view = _view(qtbot, _named(tmp_path, "a", "b"), on_star=starred.append)
+    assert view.hud_is_favorite is False
+
+    view.toggle_hold()
+
+    assert starred == ["a"]
+    assert view.hud_is_favorite is True
+    assert view.set_f_mode(True) is True
+    assert [item[2] for item in view._playlist._items] == ["a"]
+
+
+def test_reset_drops_both_switches(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
+                 starred_ids={"a"}, enhanced_ids={"a"})
+    view.toggle_f_mode()
+    view.toggle_enhanced_mode()
+    assert len(view._playlist) == 1
+
+    view.reset_in_place()
+
+    assert (view.hud_f_mode, view.hud_enhanced_mode) == (False, False)
+    assert len(view._playlist) == 3
 
 
 def test_a_show_following_a_running_generation_has_no_set_to_narrow(qtbot, tmp_path):
@@ -77,7 +173,7 @@ def test_a_show_following_a_running_generation_has_no_set_to_narrow(qtbot, tmp_p
     view = _view(qtbot, [], frame=_png_bytes())
     assert view.is_live()
 
-    view.refilter([(_png(tmp_path / "a.png"), "image", "a", None)])
+    assert view.set_enhanced_mode(True) is False
 
     assert view.is_live()
     assert len(view._playlist) == 0

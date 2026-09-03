@@ -14,7 +14,10 @@ window, so it is not one of those three and has no borderless window of its own
 to park.
 
 The on/off switch is not on it either. That is a button in the toolbar, and this
-panel is what appears once it is pressed.
+panel is what appears once it is pressed.  Nor are the two switches saying what
+a show may play: over a show those are on the players' HUD this panel sits
+under (:mod:`origenerator.gui.show_hud`), the same buttons a satellite's HUD
+carries, and a second pair here would be two switches for one thing.
 """
 
 from __future__ import annotations
@@ -86,7 +89,7 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def console_hud(stroke, host, *, device_on: bool = True, filters=None) -> ConsoleHud:
+def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated stroke over
@@ -104,12 +107,9 @@ def console_hud(stroke, host, *, device_on: bool = True, filters=None) -> Consol
     thing standing between a switched-off OSR2 and a console animating a blue
     wave nothing is riding.
 
-    ``filters`` is this app's
-    :class:`~origenerator.gui.show_filters.ShowFilters`, or ``None`` where
-    whoever built the panel has none to offer. The console draws those two
-    buttons only where there is a set behind them — Genau's own clips are
-    neither bookmarked nor enhanced, so its console shows neither — and names
-    each in its status line while it is on.
+    Neither filter switch is offered (both ``None``): the console draws those
+    only where the host hands over a set to narrow, and here the show's own HUD
+    carries them instead.
     """
     driving = stroke.active and device_on
     return ConsoleHud(
@@ -120,47 +120,36 @@ def console_hud(stroke, host, *, device_on: bool = True, filters=None) -> Consol
             cruise=stroke.state.cruise.active,
             shape=stroke.state.state.shape.value,
             advance_interval=host.dwell_s,
-            favorites_filter=(None if filters is None else filters.favorites),
-            enhanced_filter=(None if filters is None else filters.enhanced),
         ),
         drive=drive_hud(stroke.state, driving, host.dwell_s),
         modes_row=False,
     )
 
 
-def panel_size(stroke, host, filters=None) -> tuple[int, int]:
-    """How big the console draws, which is what the widget has to be.
-
-    Told about the filters the way the drawing is: their buttons widen the
-    transport row, and a widget built two buttons short would show a cropped
-    console until the first repaint resized it.
-    """
-    return ConsolePainter().rgba(console_hud(stroke, host, filters=filters))[1]
+def panel_size(stroke, host) -> tuple[int, int]:
+    """How big the console draws, which is what the widget has to be."""
+    return ConsolePainter().rgba(console_hud(stroke, host))[1]
 
 
 class StrokePanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
-    It is always here, stroke or no stroke. Half of what is on it is not about a
-    running stroke at all — the pace an unheld slide moves on at, and the two
-    switches saying what a show may play — and a panel that appeared only once
-    the device was being driven made those reachable only by starting a stroke
-    first. With nothing driving, it draws itself exactly as Fun Time's does with
-    the OSR2 off: the OSR2 row reads "Off", the readout greys, and the trace
-    holds still rather than animating a wave nobody is riding.
+    It is always here, stroke or no stroke. Part of what is on it is not about a
+    running stroke at all — the pace an unheld slide moves on at — and a panel
+    that appeared only once the device was being driven made that reachable
+    only by starting a stroke first. With nothing driving, it draws itself
+    exactly as Fun Time's does with the OSR2 off: the OSR2 row reads "Off", the
+    readout greys, and the trace holds still rather than animating a wave
+    nobody is riding.
     """
 
     # Fun Time insets its HUD from the window's top-left corner by this much, and
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None,
-                 filters=None):
+    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None):
         super().__init__(parent)
         self._stroke = stroke
-        # The narrowing switches this console carries, or None where the surface
-        # that built the panel has none — see console_hud.
-        self._filters = filters
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -170,8 +159,15 @@ class StrokePanel(QWidget):
             pace if pace is not None else SlideshowPace(parent=self))
         self._painter = ConsolePainter()
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        # A video surface is a native window on Windows, and a plain sibling
+        # widget cannot paint over one however it is stacked — which is why
+        # every other panel floated over a show (the HUD, the toast, the queue)
+        # is native too.  Native itself, this stacks against the media by
+        # Z-order like any other window, so the console is reachable over a
+        # clip that fills the corner it sits in, not only over a still.
+        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(stroke, self._host, filters))
+        self.setFixedSize(*panel_size(stroke, self._host))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
         # second is the same picture at Pillow's price, and with the panel now
@@ -208,11 +204,25 @@ class StrokePanel(QWidget):
         else:
             self._repaint.stop()
 
-    def reposition(self) -> None:
-        """The parent's top-left corner, where Fun Time puts the same console."""
+    def reposition(self, below=None) -> None:
+        """The parent's top-left corner, where Fun Time puts the same console —
+        or, given the rect of a panel already in that corner, directly under
+        it, in the same column and a panel-inset apart.
+
+        *below* is the players' HUD a show wears: Fun Time draws its console on
+        the main player and that HUD on the satellites, two windows, but a show
+        wears both in one, and the two are in the same corner, so the console
+        takes the slot beneath.  It follows the HUD's left edge rather than its
+        own margin, so the two read as one column of panels rather than as two
+        panels that missed each other.
+        """
         parent = self.parentWidget()
-        if parent is not None:
+        if parent is None:
+            return
+        if below is None:
             self.move(self.MARGIN, self.MARGIN)
+        else:
+            self.move(below.x(), below.bottom() + 1 + below.x())
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -277,13 +287,6 @@ class StrokePanel(QWidget):
             host.stroke_toggle_hold()
         elif action == "genau_weird_clip":
             host.stroke_cull()
-        elif action in ("genau_filter_enhanced", "main_fmode") and self._filters is not None:
-            # The console draws these buttons only where there are filters behind
-            # them, so the guard is against a stale press rather than a real one.
-            if action == "main_fmode":
-                self._filters.toggle_favorites()
-            else:
-                self._filters.toggle_enhanced()
         elif action in ("genau_advance_up", "genau_advance_down"):
             delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
             host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
@@ -296,8 +299,7 @@ class StrokePanel(QWidget):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         return self._painter.rgba(
-            console_hud(self._stroke, self._host, device_on=self._device_on(),
-                        filters=self._filters))
+            console_hud(self._stroke, self._host, device_on=self._device_on()))
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device

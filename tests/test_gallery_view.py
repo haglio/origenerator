@@ -6174,27 +6174,10 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     assert view._slideshow_btn.isHidden()
 
 
-def test_the_enhanced_filter_narrows_what_a_show_would_play(qtbot, monkeypatch):
+def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, monkeypatch):
     # A folder enhanced through carries both versions of everything, and a pass
-    # of that is every picture twice — the second time being the point.
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
-                               _enhanced_image("i2", "a cat", 50, 2)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_recents(view)
-    view._filters.set_enhanced(True)
-
-    view._start_slideshow()
-
-    qtbot.addWidget(view._slideshow)
-    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
-    view._slideshow.close()
-
-
-def test_the_enhanced_filter_narrows_a_show_that_is_already_up(qtbot, monkeypatch):
-    # The console carrying the switch is drawn OVER the show, so a press that
-    # only took effect on the next one would look like a button doing nothing.
+    # of that is every picture twice — the second time being the point.  The
+    # switch is the show's own, beside F-mode on the HUD it wears.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a cat", 50, 2)]))
@@ -6202,126 +6185,116 @@ def test_the_enhanced_filter_narrows_a_show_that_is_already_up(qtbot, monkeypatc
     view.refresh()
     _open_recents(view)
     view._start_slideshow()
-    qtbot.addWidget(view._slideshow)
-    assert len(view._slideshow._playlist) == 2
+    show = view._slideshow
+    qtbot.addWidget(show)
+    assert len(show._playlist) == 2
 
-    view._filters.set_enhanced(True)
+    show.toggle_enhanced_mode()
 
-    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
-    view._filters.set_enhanced(False)   # and back again, all of them
-    assert len(view._slideshow._playlist) == 2
-    view._slideshow.close()
+    assert [item[2] for item in show._playlist._items] == ["i2"]
+    show.toggle_enhanced_mode()   # and back again, all of them
+    assert len(show._playlist) == 2
+    show.close()
 
 
-def test_the_slideshow_button_goes_away_when_nothing_here_is_enhanced(qtbot, monkeypatch):
+def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
+    # The button sits beside F-mode on the HUD every show wears, and pressing it
+    # lands on the show itself, hosted or not; the status line names the cut.
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    assert not view._slideshow_btn.isHidden()
+    view._start_slideshow()
+    show = view._slideshow
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+    names = [name for _rect, name in hud._targets.control]
+    assert names.index("enhanced") == names.index("fmode") + 1
 
-    view._filters.set_enhanced(True)
+    hud._deliver(f"{hud._side}_enhanced")
 
-    assert view._slideshow_btn.isHidden()
+    assert show.hud_enhanced_mode is True
+    assert [item[2] for item in show._playlist._items] == ["i2"]
+    model = show_hud_model(hud._side, show, hosted=False)
+    assert model.enhanced_filter is True and "Enhanceds" in model.lock_label
+    show.close()
 
 
-def test_a_generation_that_lands_unenhanced_stays_out_of_a_filtered_show(
-        qtbot, monkeypatch):
-    # The show takes in what lands while it runs; the filter decides that too,
+def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_show(qtbot, monkeypatch):
+    # The show takes in what lands while it runs; the switch decides that too,
     # or a narrowed show would fill back up with the very rows it left out.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._filters.set_enhanced(True)
     view._start_slideshow()
-    qtbot.addWidget(view._slideshow)
+    show = view._slideshow
+    qtbot.addWidget(show)
+    show.set_enhanced_mode(True)
+    plain, better = _image("i3", "a cat", 50, 3), _enhanced_image("i4", "a cat", 50, 4)
+    monkeypatch.setattr(view, "_rows_at", lambda location: [plain, better])
 
-    view._feed_slideshow_finished(_image("i3", "a cat", 50, 3))
+    view._feed_slideshow_finished(plain)
+    view._feed_slideshow_finished(better)
 
-    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
-    view._slideshow.close()
+    assert sorted(item[2] for item in show._playlist._items) == ["i2", "i4"]
+    show.clear_modes()
+    assert sorted(item[2] for item in show._playlist._items) == ["i2", "i3", "i4"]
+    show.close()
 
 
-def test_the_favorites_filter_narrows_a_show_to_the_starred_ones(qtbot, monkeypatch):
-    # A folder you have been through once has stars on the ones worth coming
-    # back to — a different question from which came out best.
+def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch):
+    # With two switches on the HUD, the phrase has to mean both — which is what
+    # it means on every satellite in this family.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _row("i2", "sdxl_t2i",
-                                    {"positive_prompt": "a cat", "steps": 50, "seed": 2},
+                                    {"positive_prompt": "a cat", "steps": 50, "seed": 2,
+                                     "enhance": True},
                                     "sdxl_t2i_i2.png", starred=1)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-
-    view._filters.set_favorites(True)
     view._start_slideshow()
-
-    qtbot.addWidget(view._slideshow)
-    assert [item[2] for item in view._slideshow._playlist._items] == ["i2"]
-    view._slideshow.close()
-
-
-def test_both_filters_at_once_keep_only_what_answers_both(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
-    starred_plain = _row("i2", "sdxl_t2i",
-                         {"positive_prompt": "a cat", "steps": 50, "seed": 2},
-                         "sdxl_t2i_i2.png", starred=1)
-    starred_enhanced = _row("i3", "sdxl_t2i",
-                            {"positive_prompt": "a cat", "steps": 50, "seed": 3,
-                             "enhance": True},
-                            "sdxl_t2i_i3.png", starred=1)
-    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
-                               starred_plain, starred_enhanced]))
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_recents(view)
-
-    view._filters.set_favorites(True)
-    view._filters.set_enhanced(True)
-    view._start_slideshow()
-
-    qtbot.addWidget(view._slideshow)
-    assert [item[2] for item in view._slideshow._playlist._items] == ["i3"]
-    view._slideshow.close()
-
-
-def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch):
-    # With more than one switch to clear, the phrase has to mean all of them —
-    # which is what it means on every satellite in this family.
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_recents(view)
-    view._filters.set_favorites(True)
-    view._filters.set_enhanced(True)
+    show = view._slideshow
+    qtbot.addWidget(show)
+    show.toggle_f_mode()
+    show.toggle_enhanced_mode()
+    assert [item[2] for item in show._playlist._items] == ["i2"]
 
     view._run_app_command(AppCommand.FILTER_OFF)
 
-    assert view._filters.any_on is False
+    assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
+    assert len(show._playlist) == 2
+    show.close()
 
 
-def test_filter_enhanced_turns_it_on_and_says_what_is_left(qtbot, monkeypatch):
+def test_filter_enhanced_turns_the_shows_switch_on_and_says_what_is_left(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
+    view._start_slideshow()
+    show = view._slideshow
+    qtbot.addWidget(show)
 
     view._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert view._filters.enhanced is True
-    assert "1 to play" in view._voice_status.text()
+    assert show.hud_enhanced_mode is True
+    assert "1 to play" in show._note.text()
 
     view._run_app_command(AppCommand.FILTER_OFF)
 
-    assert view._filters.enhanced is False
-    assert "all of them" in view._voice_status.text()
+    assert show.hud_enhanced_mode is False
+    assert "all of them" in show._note.text()
+    show.close()
 
 
 def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypatch):
@@ -6330,10 +6303,51 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
+    view._start_slideshow()
+    show = view._slideshow
+    qtbot.addWidget(show)
 
     view._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert "nothing here is enhanced" in view._voice_status.text()
+    assert show.hud_enhanced_mode is False
+    assert "nothing here is enhanced" in show._note.text()
+    show.close()
+
+
+def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
+    # The switch is a show's: with none up there is nothing for the word to
+    # narrow, and it says so rather than arming something for later.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_recents(view)
+
+    view._run_app_command(AppCommand.FILTER_ENHANCED)
+
+    assert "needs a show" in view._voice_status.text()
+    assert not view._slideshow_btn.isHidden()   # everything is still there to play
+
+
+def test_the_console_sits_under_the_hud_rather_than_beneath_it(qtbot, monkeypatch):
+    # Both panels take the corner Fun Time puts each in, and the HUD -- native,
+    # re-raised every tick -- covered the console entirely, OSR2 controls and
+    # all.  The console now seats itself directly under the HUD, flush with its
+    # left edge, and follows it when the map changes size.
+    from origenerator.gui.show_hud import ShowHud
+
+    show = _standalone_show(qtbot, monkeypatch)
+    hud, = show.findChildren(ShowHud)
+    console = show._stroke_panel
+    assert console is not None
+
+    assert console.x() == hud.x()
+    assert console.y() == hud.geometry().bottom() + 1 + hud.x()
+    assert not console.geometry().intersects(hud.geometry())
+
+    hud.resize(hud.width(), hud.height() + 40)   # the map grew: the console follows
+    assert console.y() == hud.geometry().bottom() + 1 + hud.x()
+    show.close()
 
 
 def test_slideshow_plays_the_experiments_shelf(qtbot, monkeypatch):

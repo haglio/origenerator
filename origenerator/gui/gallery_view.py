@@ -38,7 +38,6 @@ from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
-from origenerator.gui.show_filters import ShowFilters
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.inflight import EnhancingRun, InFlightItem
 from origenerator.gui.flow_layout import FlowLayout
@@ -402,8 +401,10 @@ _VOICE_BANK_ACTIONS = {
     AppCommand.GROUP: ("_group_btn", "_group_selection", "pick some folders first"),
 }
 
-# What a spoken word does to the enhanced-only filter. Both ways round rather
-# than one toggle — see AppCommand.FILTER_ENHANCED.
+# What a spoken word does to a show's enhanced-only switch — the one beside
+# F-mode on its HUD. Both ways round rather than one toggle (see
+# AppCommand.FILTER_ENHANCED); off takes F-mode with it, "clear filter" being
+# the way out of all of the narrowing on every satellite in this family.
 _VOICE_FILTERS = {
     AppCommand.FILTER_ENHANCED: True,
     AppCommand.FILTER_OFF: False,
@@ -455,11 +456,6 @@ class GalleryView(QWidget):
         # is on — including this one, with nothing playing, where it is what
         # the next slideshow opens at.
         self._pace = SlideshowPace(parent=self)
-        # What a show may play — the favorites, the enhanced ones, or all of
-        # it. The console's own switches, app-wide for the same reason the pace
-        # is, and read wherever a show is decided from.
-        self._filters = ShowFilters(parent=self)
-        self._filters.changed.connect(self._on_show_filters_changed)
         # Guards the one reconcile that owns both drive sources: starting or
         # stopping the stroke is something it does, not something it reacts to.
         self._reconciling_osr2 = False
@@ -1324,8 +1320,7 @@ class GalleryView(QWidget):
         bottom.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
         self._stroke_panel = None
         if self._osr2_stroke is not None:
-            self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace,
-                                             filters=self._filters)
+            self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
             bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its box on) each image the app newly generates.
@@ -1643,7 +1638,10 @@ class GalleryView(QWidget):
                      if self._fun_time is not None else None),
             on_reset=(self.reset_region if self._fun_time is not None else None),
             pace=self._pace, stroke=self._osr2_stroke,
-            filters=self._filters,
+            # Which of its items carry an enhancement, for the switch beside
+            # F-mode on its HUD -- over the set it plays and the folder a live
+            # show is armed with, since either is what the switch narrows.
+            enhanced_ids=self._enhanced_prompt_ids([*items, *(folder_items or [])]),
             # Its Space reaches the one OSR2 switch, like every other surface's.
             on_drive_toggle=self._toggle_osr2_drive, **kwargs)
         self._live_shows.append((self._slideshow, location))
@@ -3497,36 +3495,15 @@ class GalleryView(QWidget):
 
     def _slideshow_rows(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
-        shelf's collection on a shelf, else everything under the selected folder
-        — narrowed by whichever of the show filters are on.
-
-        The one place they are applied, so everything a show is decided by goes
-        through it: what one opens with, whether the button has anything to
-        play, and whether a generation that lands mid-show joins it.
+        shelf's collection on a shelf, else everything under the selected
+        folder.  All of it: narrowing a show to its favorites or its enhanced
+        pictures is the show's own doing, from the two switches on its HUD.
         """
         rows = self._browser.shelf_rows()
         if rows is None:
             group = self._current_group()
             rows = gallery.rows_under(group) if group is not None else []
-        if not self._filters.any_on:
-            return rows
-        return [row for row in rows if self._filters.keeps(row)]
-
-    def _on_show_filters_changed(self):
-        """A show filter moved — from the console, or from a word.
-
-        A show that is up narrows (or widens) where it stands, the way turning
-        the pace changes a running show under you: the console is on screen over
-        that show, so a switch that only took effect on the NEXT one would look
-        like a button that does nothing. The bank follows too, since what there
-        is to play has changed.
-        """
-        self._sync_action_buttons()
-        self._sync_slideshow_button()
-        if self._slideshow is not None:
-            self._slideshow.refilter(self._slideshow_items(self._slideshow_rows()))
-        logger.info("Show filters: favorites=%s enhanced=%s",
-                    self._filters.favorites, self._filters.enhanced)
+        return rows
 
     def _slideshow_subject(self) -> str:
         """What the slideshow button would play, named for its tooltip."""
@@ -3874,15 +3851,23 @@ class GalleryView(QWidget):
         app's own vocabulary: the session cannot know which shelves this tree
         has or which detail parts have detectors installed.
 
-        A request has first refusal, exactly as it does on this app's own mic.
-        "Request … over" runs to as many utterances as the speaker takes
+        The order is this app's own mic's (``VoiceSteering._interpret``).  A
+        whole-utterance word is that command first — "landscape enhanced only"
+        turns the show's switch, and left to the looser picture matcher it
+        would read as "enhance" with a word after it — so long as no request
+        is being said.  Then the request, which has first refusal over the
+        rest: "Request … over" runs to as many utterances as the speaker takes
         breaths, so a matcher that only ever saw one at a time could not hear a
         sentence said in three; while one is open the dictation swallows what
         it hears, which is what keeps the words of a request from also matching
-        a command.  The side is split off first — it rides every utterance the
-        session posts, and fed in it would become the first word of the
-        request instead of the region the request is about.
+        a command.  The side is split off for the dictation — it rides every
+        utterance the session posts, and fed in it would become the first word
+        of the request instead of the region the request is about.
         """
+        bare = self._voice.bare_command(text)
+        if bare is not None:
+            self._on_voice_command(bare)
+            return True
         side, rest = split_side(text)
         spoken = self._voice.push_dictation(rest)
         if spoken is not None:
@@ -3982,7 +3967,7 @@ class GalleryView(QWidget):
         if command in _VOICE_SHELVES:
             self._go_to_shelf(command, side)
         elif command in _VOICE_FILTERS:
-            self._set_enhanced_filter(_VOICE_FILTERS[command])
+            self._filter_show_aloud(_VOICE_FILTERS[command], side)
         elif command in _VOICE_SWITCHES:
             self._flip_switch(command)
         elif command in _VOICE_STROKE:
@@ -4035,8 +4020,15 @@ class GalleryView(QWidget):
         button.setChecked(on)  # its toggled signal is what does the work
         self._answer_command(f"🎤 {name} {'on' if on else 'off'}")
 
-    def _set_enhanced_filter(self, active: bool):
-        """Narrow a show to the enhanced pictures, or put them all back.
+    def _filter_show_aloud(self, enhanced_only: bool, side: str | None = None):
+        """Narrow the show in front of the speaker to its enhanced pictures, or
+        put them all back — the switch beside F-mode on its HUD, spoken.
+
+        The show's own switch, like the spoken "favorites": a word that set
+        some other filter would leave the HUD's button dark over a narrowed
+        show. Hosted, a named side takes that region's show, since two run at
+        once and neither is the active window. With no show up there is nothing
+        for the word to narrow, and it says so rather than arming something.
 
         Answered with what is left rather than with the switch's name: a speaker
         who has just narrowed a show wants to know there is still something in
@@ -4044,19 +4036,23 @@ class GalleryView(QWidget):
         once. Said even when the switch was already that way — a word that did
         nothing and said nothing reads as a mic that missed it.
 
-        Turning it off clears the other switch with it: "clear filter" is the
-        way out of ALL of the narrowing, which is what the same phrase means on
-        every satellite in this family.
+        Turning it off takes F-mode with it: "clear filter" is the way out of
+        ALL of the narrowing, which is what the same phrase means on every
+        satellite in this family.
         """
-        if not active:
-            self._filters.clear()
-            self._answer_command("🎤 showing all of them")
+        show = self._voice_surface(side)
+        if show is None or not hasattr(show, "set_enhanced_mode"):
+            self._show_voice_status("🎤 the filter needs a show to narrow", transient=True)
             return
-        self._filters.set_enhanced(True)
-        count = len(self._slideshow_items(self._slideshow_rows()))
-        self._answer_command(
-            f"🎤 enhanced only — {count} to play" if count
-            else "🎤 nothing here is enhanced")
+        if not enhanced_only:
+            show.clear_modes()
+            show.note_voice_command("🎤 showing all of them")
+            return
+        if show.set_enhanced_mode(True) or show.hud_enhanced_mode:
+            show.note_voice_command(
+                f"🎤 enhanced only — {len(show.hud_items()[0])} to play")
+        else:
+            show.note_voice_command("🎤 nothing here is enhanced")
 
     def _turn_stroke_knob(self, command: AppCommand):
         """Turn one of the stroke's knobs — the move its key makes.
@@ -4284,7 +4280,8 @@ class GalleryView(QWidget):
         # a generation landing in the library must reach a reset region.
         self._live_shows = [(held, key if held is show else where)
                             for held, where in self._live_shows]
-        show.retune(items, order_label="Shuffle", looping=False)
+        show.retune(items, order_label="Shuffle", looping=False,
+                    enhanced_ids=self._enhanced_prompt_ids(items))
 
     def _play_shelf_aloud(self, command) -> None:
         """A spoken shelf name, on the named side.
@@ -4886,6 +4883,23 @@ class GalleryView(QWidget):
         return {row["prompt_id"] for row in self._db.list_generations()
                 if row.get("starred")}
 
+    def _enhanced_prompt_ids(self, items) -> set[str]:
+        """Which of *items* carry an enhancement, for the switch beside F-mode
+        on a show's HUD — the question the thumbnails' yellow plus answers,
+        asked of the set a show plays.
+
+        Of that set rather than of the whole library: reading whether a row is
+        enhanced means parsing its params, and a library of thousands would
+        pay that on every show opened for the sake of rows the show never
+        plays.  What lands mid-show is judged as it arrives
+        (:meth:`_feed_slideshow_finished`).
+        """
+        wanted = {item[2] for item in items if len(item) > 2 and item[2] is not None}
+        if not wanted:
+            return set()
+        return {row["prompt_id"] for row in self._db.list_generations()
+                if row["prompt_id"] in wanted and gallery.is_enhanced_row(row)}
+
     def _present_surface(self, view, side: str):
         """Put a full-screen surface on screen: over the whole monitor
         standalone, or — inside Fun Time — on the satellite region *side*,
@@ -4986,11 +5000,12 @@ class GalleryView(QWidget):
         hud = _shared_hud_widget()
         if hud is None or not hasattr(view, "adopt_hud"):
             return
-        view.adopt_hud()
-        hud(view, side=side,
-            dashboard_cmd_file=(None if self._fun_time is None
-                                else self._fun_time.dashboard_cmd_file),
-            label_for=self._show_item_label)
+        # The view is handed the panel itself rather than only told one is on:
+        # its console seats itself under the panel and follows it as it resizes.
+        view.adopt_hud(hud(view, side=side,
+                           dashboard_cmd_file=(None if self._fun_time is None
+                                               else self._fun_time.dashboard_cmd_file),
+                           label_for=self._show_item_label))
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and
@@ -5071,7 +5086,10 @@ class GalleryView(QWidget):
                        for r in self._rows_at(location)):
                 continue
             for item in self._slideshow_items([row]):
-                show.note_added(*item)
+                # With what the show's two switches judge it by: whether it is
+                # starred, and whether it carries an enhancement.
+                show.note_added(*item, starred=bool(row.get("starred")),
+                                enhanced=gallery.is_enhanced_row(row))
 
     def _feed_slideshow_generating(self, prompt_id: str, frame: bytes):
         """A run streamed a frame: an open show playing its folder takes it in as

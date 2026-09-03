@@ -200,6 +200,14 @@ class FakeVoiceSteering(QObject):
             self._execute(matched)
         return matched
 
+    def bare_command(self, text):
+        """The whole-utterance command *text* is, asked first of a phrase the
+        hosting session heard -- the live steering's own method, mirrored."""
+        collecting = self._dictation is not None and self._dictation.listening
+        if collecting or self._bare_matcher is None:
+            return None
+        return self._bare_matcher(text)
+
     def speak(self, text):
         """One utterance through the real dictation, as the mic would feed it.
 

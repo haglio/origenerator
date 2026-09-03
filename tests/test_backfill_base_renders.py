@@ -21,7 +21,13 @@ from origenerator.db import Database
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
-from tools import backfill_base_renders as backfill_tool
+
+from ._repo_tools import load_repo_tool
+
+# Not ``from tools import ...``: the bare ``tools`` package is shadowed by
+# sibling ``player_core``'s own ``tools`` on the windows-latest layout.  Loaded
+# by file path so it binds to this checkout's module on either platform.
+backfill_tool = load_repo_tool("backfill_base_renders")
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 

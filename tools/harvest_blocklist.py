@@ -39,9 +39,16 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Reach ``sanitize_guard`` beside this file by its bare name, not through the
+# ``tools`` package.  A suite that runs with sibling ``player_core`` on
+# ``sys.path`` carries a second top-level ``tools`` package, and on the
+# windows-latest layout that one wins -- so ``from tools.sanitize_guard`` binds
+# to the wrong checkout, which lacks this module.  Putting this checkout's
+# ``tools/`` dir on the path and importing the module directly cannot resolve
+# anywhere but here.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from tools.sanitize_guard import blocklist_path, load_blocklist  # noqa: E402
+from sanitize_guard import blocklist_path, load_blocklist  # noqa: E402
 
 ROOTS_NAME = "library_roots.local.txt"
 STAMP_NAME = "harvest_stamp.local.txt"
@@ -163,7 +170,7 @@ def already_in_code(candidates: set[str], repos: list[Path]) -> set[str]:
     One pass over each tree with all candidates at once, since the alternative is
     hundreds of passes over the same files.
     """
-    from tools.sanitize_guard import scan_files
+    from sanitize_guard import scan_files
 
     terms = sorted(candidates)
     if not terms:

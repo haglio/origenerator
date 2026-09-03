@@ -10,20 +10,25 @@ from pathlib import Path
 
 import subprocess
 
-from tools.harvest_blocklist import (
-    EXCLUDED,
-    _stale_hours,
-    already_in_code,
-    candidates_from,
-    harvest,
-    hours_since_harvest,
-    merge,
-    normalize,
-    primary_of,
-    read_roots,
-    siblings_of,
-    stamp_path,
-)
+from ._repo_tools import load_repo_tool
+
+# Not ``from tools.harvest_blocklist import ...``: the bare ``tools`` package is
+# shadowed by sibling ``player_core``'s own ``tools`` on the windows-latest
+# layout.  Loaded by file path so it binds to this checkout's module on either
+# platform.
+_harvest = load_repo_tool("harvest_blocklist")
+EXCLUDED = _harvest.EXCLUDED
+_stale_hours = _harvest._stale_hours
+already_in_code = _harvest.already_in_code
+candidates_from = _harvest.candidates_from
+harvest = _harvest.harvest
+hours_since_harvest = _harvest.hours_since_harvest
+merge = _harvest.merge
+normalize = _harvest.normalize
+primary_of = _harvest.primary_of
+read_roots = _harvest.read_roots
+siblings_of = _harvest.siblings_of
+stamp_path = _harvest.stamp_path
 
 
 def _git(cwd: Path, *args: str) -> None:

@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMenu
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -496,98 +497,154 @@ def test_current_config_panel_is_the_front_tab(tabs):
     assert tabs.current_config_panel() is first
 
 
-def test_show_selection_preview_updates_only_the_current_preview(tabs):
-    panel = _pick_workflow(tabs.currentWidget())  # a tab in use, not the resting one
-    panel._preview.show_media = MagicMock()
-    panel.prefill = MagicMock()
+# --- a tab follows the run it launched into, or was pointed at ------------------
 
-    tabs.show_selection_preview(("x.png", "image"), "g1")
-
-    panel._preview.show_media.assert_called_once_with("x.png", "image")
-    panel.prefill.assert_not_called()  # no form change
-    assert panel._preview._draggable_id == "g1"  # its preview drags onto combine
-
-
-def test_a_re_selected_preview_keeps_its_corner_controls(tabs):
-    # This is the path a launch and every poll take — the gallery re-selects what
-    # it restored with history suppressed — and showing media is what clears the
-    # corners. Miss the re-arm and the preview comes up bare on startup and stays
-    # that way until a real click goes through load_selection instead.
-    cat, _dog = _two_generations(tabs)
-    panel = _pick_workflow(tabs.currentWidget())
-
-    tabs.show_selection_preview(("cat.png", "image"), cat["prompt_id"])
-
-    assert panel._preview._actions_id == cat["prompt_id"]
-
-
-def test_a_re_selected_preview_carries_the_shown_row_not_the_tabs_own(tabs):
-    # A suppressed re-selection puts another item's output in the tab without the
-    # tab taking it on, so the corners have to be about the picture rather than
-    # about the row still behind it.
-    cat, dog = _two_generations(tabs)
-    tabs.load_selection(cat, [cat, dog])
-    panel = tabs.current_config_panel()
-
-    tabs.show_selection_preview(("dog.png", "image"), dog["prompt_id"])
-
-    assert panel.displayed_row()["prompt_id"] == cat["prompt_id"]  # the tab held on
-    assert panel._preview._actions_id == dog["prompt_id"]          # the picture won
-
-
-def test_show_selection_preview_leaves_the_resting_tab_empty(tabs):
-    # The resting tab holds no generation at all, so a re-selection has nothing to
-    # refresh in it: filling its preview would show a picture over a form still
-    # asking which workflow to run. Only a tab in use follows the selection.
-    panel = tabs.currentWidget()
-    assert panel.is_blank()
-    panel._preview.show_media = MagicMock()
-
-    tabs.show_selection_preview(("x.png", "image"), "g1")
-
-    panel._preview.show_media.assert_not_called()
-    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
-
-
-def test_show_selection_preview_of_nothing_disarms_the_drag(tabs):
-    panel = tabs.currentWidget()
-    panel._preview.set_draggable_id("stale")  # a prior selection left it armed
-
-    tabs.show_selection_preview(None, "g1")  # the file is gone: clear the preview
-
-    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
-
-
-def test_show_reroll_frame_shows_a_waiting_note_without_a_frame(tabs):
+def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
+    # "Select a generation to preview" would misdescribe a running run, so a
+    # queued one with no frame yet says it is waiting — marked live, so the pane
+    # can be double-clicked open before the first frame.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
-    tabs.show_reroll_frame(None)
-    panel._preview.show_message.assert_called_once()
-    # Marked live, so the pane can be double-clicked open before the first frame.
-    assert panel._preview.show_message.call_args.kwargs == {"live": True}
+    panel.watch_folder("image/sdxl_t2i/abc", None)
+    panel._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
+    assert panel.watched_key() == "image/sdxl_t2i/abc"
+    assert panel.is_awaiting_frame()
 
 
-def test_show_reroll_frame_prefers_a_given_wait_note(tabs):
+def test_watching_prefers_a_given_wait_note(tabs):
     # "Waiting for preview…" says nothing about why. When the caller knows what the
     # run is stuck behind, that replaces it.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
-    tabs.show_reroll_frame(None, "Waiting behind 3 jobs from another app")
+    panel.watch_folder("k", None, "Waiting behind 3 jobs from another app")
     assert panel._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs from another app"
 
 
-def test_show_reroll_frame_mirrors_a_frame(tabs):
+def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
+    # The poll re-reads the wait every tick; the same words must not be painted
+    # over themselves each time, and a frame ends the wait for good.
+    panel = tabs.currentWidget()
+    panel._preview.show_message = MagicMock()
+    panel._preview.show_frame = MagicMock()
+    panel.watch_folder("k", None, "Waiting behind 3 jobs from another app")
+    panel.show_live_wait("Waiting behind 3 jobs from another app")
+    assert panel._preview.show_message.call_count == 1
+    panel.show_live_wait("Waiting behind 1 job from another app")
+    assert panel._preview.show_message.call_count == 2
+
+    panel.show_live_frame(b"frame")
+
+    panel._preview.show_frame.assert_called_once_with(b"frame")
+    assert not panel.is_awaiting_frame()  # the frame is the answer now
+
+
+def test_watching_with_a_frame_puts_it_up_at_once(tabs):
     panel = tabs.currentWidget()
     panel._preview.show_frame = MagicMock()
-    tabs.show_reroll_frame(b"frame")
+    panel.watch_folder("k", b"frame")
     panel._preview.show_frame.assert_called_once_with(b"frame")
 
 
-def test_clear_current_preview_clears_the_front_tab(tabs):
+def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):
+    first = tabs.currentWidget()
+    second = tabs._add_subtab()
+    third = tabs._add_subtab()
+    first.watch_folder("k1", b"f")
+    second.watch_folder("k2", b"f")
+    third.watch_folder("k1", b"f")
+
+    assert tabs.watchers_of("k1") == [first, third]
+    assert tabs.panel_watching("k2") is second
+    assert tabs.watchers_of("elsewhere") == [] and tabs.panel_watching("elsewhere") is None
+
+
+def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):
+    # A run that ended with nothing to show leaves the tab where it was: on the
+    # generation it was displaying, rather than on a stale partial frame.
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat, dog])
+    panel = tabs.current_config_panel()
+    panel._preview.show_media = MagicMock()
+    panel.watch_folder("k", b"frame")
+
+    panel.stop_watching()
+
+    assert panel.watched_key() is None
+    panel._preview.show_media.assert_called_once_with("cat.png", "image")
+
+
+def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
     panel = tabs.currentWidget()
     panel._preview.clear = MagicMock()
-    tabs.clear_current_preview()
+    panel.watch_folder("k", b"frame")
+
+    panel.stop_watching()
+
     panel._preview.clear.assert_called_once()
+    assert panel.is_blank()
+
+
+def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monkeypatch):
+    # Nothing on display but a recipe on the form: the tab goes back to what a
+    # tab with those settings idles on, the newest thing they made.
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, _dog = _two_generations(tabs)
+    panel = tabs.currentWidget()
+    panel.prefill("sdxl_t2i", json.loads(cat["params_json"]))
+    panel.watch_folder("k", b"frame")
+    panel._preview.show_media = MagicMock()
+
+    panel.stop_watching()
+
+    panel._preview.show_media.assert_called_once_with("cat.png", "image")
+
+
+def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
+    # The next frame would land over the picture just put here.
+    cat, dog = _two_generations(tabs)
+    panel = tabs.currentWidget()
+    panel.watch_folder("k", b"frame")
+
+    panel.show_saved_generation(dog, [cat, dog])
+
+    assert panel.watched_key() is None
+
+
+def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
+    # What a click on a folder's live tile lands in a tab: the run's own settings
+    # on the form, as a clicked thumbnail's would be, and no picture, footer or
+    # generation on display until the run lands. The tab is named after the
+    # folder the run will land in, so it is not blank and the next open forks.
+    cat, _dog = _two_generations(tabs)
+    running = dict(cat, prompt_id="live", status="running", output_files="[]",
+                   thumbnail_path=None)
+    panel = tabs.currentWidget()
+    panel._preview.clear = MagicMock()
+
+    panel.show_running_generation(running)
+
+    assert panel._param_form.get_values_static()["positive_prompt"] == "cat"
+    assert panel.displayed_row() is None
+    assert panel._metadata_block.isHidden()
+    panel._preview.clear.assert_called()
+    assert not panel.is_blank()
+
+
+def test_a_landed_picture_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
+    # show_finished_media puts the landed file where the frames were; the tab
+    # is no longer waiting for anything, so a later poll must not paint a wait
+    # note over the picture.
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, _dog = _two_generations(tabs)
+    panel = tabs.currentWidget()
+    panel._preview.show_media = MagicMock()
+    panel.watch_folder("k", None)
+
+    panel.show_finished_media(cat)
+
+    assert not panel.is_awaiting_frame()
+    panel._preview.show_media.assert_called_once_with("cat.png", "image")
 
 
 def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):

@@ -63,6 +63,30 @@ def test_a_generation_with_no_picture_yet_goes_by_the_size_it_asked_for():
     assert row_orientation(cooking) == "portrait"
 
 
+def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path):
+    # An i2v asks for no size — it keeps its start frame's aspect at a fixed
+    # pixel budget in-graph — so the frame is the only thing saying which way
+    # the video will come out. Without it a running portrait video sat on the
+    # Landscape side's Latest shelf and jumped sides the moment it landed.
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (90, 160)).save(frame)  # a tall start frame, named absolutely
+    cooking = _row("v1", "wan22_i2v",
+                   {"positive_prompt": "scene four", "input_image": str(frame)},
+                   "wan22_i2v_v1.mp4", status="running", output_files="[]")
+    assert row_orientation(cooking) == "portrait"
+
+
+def test_a_size_asked_for_outranks_the_start_frame(tmp_path):
+    # Unlocking the Dimensions field pins the output's shape whatever the frame's.
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (90, 160)).save(frame)
+    cooking = _row("v2", "wan22_i2v",
+                   {"positive_prompt": "scene five", "input_image": str(frame),
+                    "width": 1280, "height": 720},
+                   "wan22_i2v_v2.mp4", status="running", output_files="[]")
+    assert row_orientation(cooking) == "landscape"
+
+
 def test_an_unreadable_shape_files_under_landscape():
     # The same default the region routing uses for an unmeasurable set.
     bare = _image("b1", "scene three", 50, 3)  # no thumbnail, no file, no size

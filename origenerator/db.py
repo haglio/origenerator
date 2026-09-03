@@ -62,7 +62,16 @@ CREATE TABLE IF NOT EXISTS generations (
     -- came from or what the user called the act. Stamped at launch, because a
     -- queue row is read while the run is still pending.
     recipe_category TEXT,
-    recipe_video_id TEXT
+    recipe_video_id TEXT,
+    -- The image a standalone enhance run is *of*, by that image's prompt_id.
+    -- The run's params name the file it reads, and a file name is not an
+    -- identity: ComfyUI's counters are per prefix, a trashed file frees its
+    -- number, and several rows have ended up naming one file. Stamped at
+    -- launch, so every surface that shows the run on its image's tile, and the
+    -- fold that lands its result there, agree on which image that is (see
+    -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
+    -- before this was recorded, which falls back to matching the file.
+    enhance_of TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -164,6 +173,7 @@ _GENERATION_COLUMNS = (
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
     "genau_exported_at", "genau_requested_at", "recipe_category", "recipe_video_id",
+    "enhance_of",
 )
 
 
@@ -211,6 +221,8 @@ class Database:
             conn.execute("ALTER TABLE generations ADD COLUMN recipe_category TEXT")
         if "recipe_video_id" not in existing:
             conn.execute("ALTER TABLE generations ADD COLUMN recipe_video_id TEXT")
+        if "enhance_of" not in existing:
+            conn.execute("ALTER TABLE generations ADD COLUMN enhance_of TEXT")
         folder_cols = {row[1] for row in conn.execute("PRAGMA table_info(folder_meta)")}
         if "level" not in folder_cols:
             conn.execute("ALTER TABLE folder_meta ADD COLUMN level TEXT")
@@ -318,6 +330,22 @@ class Database:
                 "UPDATE generations SET recipe_category = ?, recipe_video_id = ? "
                 "WHERE prompt_id = ?",
                 (category or None, video_prompt_id or None, prompt_id),
+            )
+
+    def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
+        """Record which image the standalone enhance ``prompt_id`` is of.
+
+        Written straight after the launch, like :meth:`set_recipe_source`: the
+        row goes in as the job is submitted, and only the caller that chose the
+        image knows which row it was. The run's params name a *file*, and a
+        file name can belong to more than one row; this is the one thing on the
+        run that names the row. Separate from ``update_generation``, whose
+        allowlist excludes provenance fields.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET enhance_of = ? WHERE prompt_id = ?",
+                (source_prompt_id or None, prompt_id),
             )
 
     def set_generation_starred(self, prompt_id: str, starred: bool):

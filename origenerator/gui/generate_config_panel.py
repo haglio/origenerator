@@ -74,6 +74,10 @@ _FLOOR_CAP = 330
 # on it: that picture was generated, these settings have not been.
 _MODIFIED_NOTICE = "(not yet generated with modifications)"
 
+# What the preview says while following a run that has streamed no frame yet,
+# where the gallery has nothing more specific to say about the wait.
+_WAITING_NOTE = "Waiting for preview…"
+
 # What a tab opened on a folder-wide request says on its Generate and above
 # its tabs. The count is in the hover rather than on the face: the press does
 # submit that many runs at once, which is worth being able to read, but what
@@ -157,6 +161,13 @@ class GenerateConfigPanel(QWidget):
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
+        # The settings folder whose live run this tab's preview follows — its
+        # own Generate's, or the run it was pointed at by a click on that
+        # folder's live tile (see watch_folder). None while the preview is the
+        # tab's own picture. Beside it, the wait text standing in for a frame
+        # that hasn't streamed yet, so the same text isn't re-painted every poll.
+        self._watched_key: str | None = None
+        self._live_note: str | None = None
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
@@ -846,8 +857,12 @@ class GenerateConfigPanel(QWidget):
         # Seeding the form with one configuration is the end of any folder-wide
         # rewrite this tab was holding: the prompts it lands are a recipe to run,
         # not a change to a folder's. (:meth:`open_folder_request` prefills first and
-        # arms the rewrite afterwards, so it is not undoing itself.)
+        # arms the rewrite afterwards, so it is not undoing itself.) It is the end
+        # of following a run, too: the next frame would land over the picture
+        # these settings just put up. (A tab pointed at a run is re-seeded first
+        # and told to follow afterwards, so that is not undoing itself either.)
         self._end_folder_request()
+        self._forget_watch()
         # Switch to the matching workflow. A registered workflow the picker
         # normally hides (machinery, selectable False) is added on demand, so
         # reusing such a row still lands on the right form instead of silently
@@ -942,24 +957,50 @@ class GenerateConfigPanel(QWidget):
 
         The form is seeded first so its recent-preview autoshow doesn't override
         the selection's own output. A workflow the app can't rebuild leaves the
-        form as it was but still shows the preview and info.
+        form as it was but still shows the preview and info. Whatever the tab
+        was about before — a run it launched or followed, a combination Combine
+        opened here — it lets go of (:meth:`_point_elsewhere`).
+        """
+        self._point_elsewhere(row)
+        # Prefill's autoshow just set _displayed_row to this tab's recent result; the
+        # browsed selection is what's actually on display, so _display_result (below)
+        # overrides it.
+        self._display_result(row, image_rows, request)
+
+    def show_running_generation(self, row: dict):
+        """Point this tab at a generation still being made: its settings fill the
+        form the way a saved generation's would, and nothing else — there is no
+        file to show and no footer to reveal until the run lands. The run itself
+        is what the preview follows from here (:meth:`watch_folder`), and the tab
+        is named after the folder the run will land in.
+
+        What a click on a folder's live tile lands in a tab, the way a click on
+        a thumbnail lands a saved generation: the tab is *for* this run now.
+        """
+        self._point_elsewhere(row)
+        self._hide_footer()
+        self._displayed_row = None     # a running generation isn't a saved one
+        self._displayed_config = None  # ...so no settings for a notice to deviate from
+        self._emit_title()
+
+    def _point_elsewhere(self, row: dict):
+        """Aim this tab at ``row``'s settings, letting go of what it was about.
 
         Pointing the tab at someone else's generation ends its claim on the runs
-        it launched: the bar would otherwise sit mid-run over a picture that has
-        nothing to do with it, and its Cancel would stop something off screen.
-        The same goes for a combination Combine opened here — the tab is about
-        this row now, and a launch from it is not the combination's.
+        it launched and the run it was watching: the bar would otherwise sit
+        mid-run over a picture that has nothing to do with it, its Cancel would
+        stop something off screen, and the next frame would paint over the
+        picture just put here. The same goes for a combination Combine opened
+        here — the tab is about this row now, and a launch from it is not the
+        combination's.
         """
         self.forget_launched()
+        self._forget_watch()
         self._recipe_source = ("", None)
         self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
             self.prefill(workflow_name, merge_denormalized(row))
-        # Prefill's autoshow just set _displayed_row to this tab's recent result; the
-        # browsed selection is what's actually on display, so _display_result (below)
-        # overrides it.
-        self._display_result(row, image_rows, request)
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         """Show a generation this tab's own Generate just produced: swap the live
@@ -1012,9 +1053,77 @@ class GenerateConfigPanel(QWidget):
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return  # nothing to look at; leave the frames rather than blank the pane
+        self._live_note = None
         self._preview.show_media(*preview)
         self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
         self._arm_preview_actions(row["prompt_id"])  # …and wears its corners
+
+    # --- following a run in flight ------------------------------------------
+
+    def watched_key(self) -> str | None:
+        """The settings folder whose live run this tab's preview follows, or
+        ``None`` while the preview is the tab's own picture.
+
+        A tab follows a folder rather than one run because a folder's runs come
+        one after another — an auto-generate loop's variations, a second
+        Generate queued behind the first — and watching one is watching the
+        next. Set by this tab's own Generate and by a click on the folder's live
+        tile; ended by pointing the tab at a saved generation, or by the folder
+        running out of runs (:meth:`stop_watching`).
+        """
+        return self._watched_key
+
+    def watch_folder(self, key: str, frame: bytes | None, note: str | None = None):
+        """Follow the run leading folder ``key``: its latest ``frame`` now, each
+        later one as it streams (:meth:`show_live_frame`), and the picture it
+        lands as. With no frame yet the preview says it is waiting — ``note``
+        where the caller knows what for, marked live so a double-click opens
+        the run fullscreen before its first frame arrives."""
+        self._watched_key = key
+        self._live_note = None
+        if frame:
+            self.show_live_frame(frame)
+        else:
+            self.show_live_wait(note)
+
+    def show_live_frame(self, frame: bytes):
+        """The run this tab follows streamed a frame: put it up."""
+        self._live_note = None
+        self._preview.show_frame(frame)
+
+    def show_live_wait(self, note: str | None):
+        """Say what the followed run is waiting on, in place of a frame it has
+        not streamed yet. Repainted only when the text changes, since the poll
+        re-reads the wait every tick."""
+        text = note or _WAITING_NOTE
+        if text == self._live_note:
+            return
+        self._live_note = text
+        self._preview.show_message(text, live=True)
+
+    def is_awaiting_frame(self) -> bool:
+        """Whether the preview is standing on a wait for the followed run's first
+        frame — the one state a fresher wait text should replace."""
+        return self._watched_key is not None and self._live_note is not None
+
+    def stop_watching(self):
+        """Let go of the folder this tab was following — its run ended with
+        nothing to show — and put the tab's own picture back: the generation on
+        display, else the newest result of the settings on the form, else the
+        idle placeholder."""
+        if self._watched_key is None:
+            return
+        self._forget_watch()
+        if self._displayed_row is not None:
+            self._restore_preview()
+        elif self._workflow_combo.currentData() is not None:
+            self.show_recent_preview()
+        else:
+            self._preview.clear()
+
+    def _forget_watch(self):
+        self._watched_key = None
+        self._live_note = None
 
     def _display_result(self, row: dict, image_rows: list[dict], request=None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
@@ -1059,9 +1168,9 @@ class GenerateConfigPanel(QWidget):
         what starring it anywhere means.
 
         ``prompt_id`` names the generation when it is NOT the row this tab holds —
-        a suppressed re-selection puts another item's output in the preview
-        without the tab taking it on (:meth:`show_selection_media`), and the
-        corners have to be about the picture rather than about the row behind it.
+        the picture a followed run landed as (:meth:`show_finished_media`) goes
+        up without the tab taking it on, and the corners have to be about the
+        picture rather than about the row behind it.
         """
         row = (self._displayed_row if prompt_id is None
                else self._db.get_generation(prompt_id))
@@ -1072,24 +1181,6 @@ class GenerateConfigPanel(QWidget):
             row["prompt_id"], starred=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
         )
-
-    def show_selection_media(self, preview, prompt_id: str):
-        """Put ``prompt_id``'s output in this tab's preview and nothing else — no
-        form, no footer, and the row the tab holds left alone.
-
-        The light-touch refresh a suppressed re-selection makes: the rebuild after
-        every poll, and a Back/Forward that never re-seeded the form. Everything
-        the picture carries is re-asserted here, because showing media clears the
-        lot — the drag payload, the modified notice, and the corner controls. The
-        gallery reaches for this rather than the preview directly, so a surface
-        the tab owns is only ever driven through the tab.
-        """
-        self._preview.show_media(*preview)
-        self._preview.set_draggable_id(prompt_id)
-        self._arm_preview_actions(prompt_id)
-        # Re-showing the media clears whatever the pane was saying about it, so
-        # put this tab's own notice back if its form still deviates.
-        self.refresh_modified_notice()
 
     def _note_displayed_config(self):
         """Take the settings a generation arriving in this tab is being shown under
@@ -1116,9 +1207,9 @@ class GenerateConfigPanel(QWidget):
         the preview says so instead of standing there as a silent one. Putting the
         settings back takes the notice away again.
 
-        Public because the preview is also driven from outside (a suppressed
-        re-selection re-shows the same row's media), and anything that changes
-        what's on screen clears the notice — so whoever did that re-asserts it.
+        Public because the version list re-shows a level of the same row from
+        outside the form, and anything that changes what's on screen clears the
+        notice — so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
                     and not configs_match(self._displayed_config, self.current_config()))

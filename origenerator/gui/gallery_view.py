@@ -2211,7 +2211,12 @@ class GalleryView(QWidget):
         # folders has to see every image whichever way the boxes stand.
         media_types = self._media_types()
         listed = gallery.rows_of_media_types(rows, media_types)
-        tree_model = gallery.build_gallery_tree(rows, meta, media_types)
+        # Built once here off the whole library and handed to every tree below —
+        # the split trees included, which are the ones that cannot build it for
+        # themselves (see :func:`gallery.start_frame_index`).
+        start_frames = gallery.start_frame_index(rows)
+        tree_model = gallery.build_gallery_tree(rows, meta, media_types,
+                                                image_index=start_frames)
         unreviewed = self._review_queue(listed)
         # The bin holds every kind, so a restore can still resolve a row of a type
         # the boxes are hiding; only what the Trash shelf lists is narrowed.
@@ -2241,7 +2246,8 @@ class GalleryView(QWidget):
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
         # Every side is built from the rows the media filter keeps, so switching
         # videos off empties both halves of them rather than one.
-        sides, starred_by_side = self._build_sides(listed, meta, unreviewed, held, requested)
+        sides, starred_by_side = self._build_sides(listed, meta, unreviewed, held,
+                                                   requested, start_frames)
         self._browser.set_model(
             gallery.recent_generations(listed),
             starred_by_side,
@@ -2307,7 +2313,7 @@ class GalleryView(QWidget):
         for panel in self._info_tabs._config_panels():
             panel.refresh_generate_caption()
 
-    def _build_sides(self, rows, meta, unreviewed, held, requested):
+    def _build_sides(self, rows, meta, unreviewed, held, requested, start_frames):
         """The two sides of the tree, and the starred folders each one holds.
 
         A side is the whole table of contents over one shape's rows: its own
@@ -2316,6 +2322,10 @@ class GalleryView(QWidget):
         number covering both sides would send you to a shelf that then showed
         you nothing.  Built from a single deal of the rows, because measuring
         each row's shape is the expensive part and a rebuild runs on every poll.
+
+        ``start_frames`` is the whole library's, not the side's: what a side
+        holds decides which folders it draws, never what they are called (see
+        :func:`gallery.start_frame_index`).
         """
         dealt = split_rows(rows)
         custom_records = self._db.list_custom_folders()
@@ -2323,7 +2333,8 @@ class GalleryView(QWidget):
         inflight = self._browser.inflight_orientations()
         sides, starred = [], {}
         for orientation in _ORIENTATIONS:
-            model = gallery.build_gallery_tree(dealt[orientation], meta)
+            model = gallery.build_gallery_tree(dealt[orientation], meta,
+                                               image_index=start_frames)
             starred[orientation] = gallery.starred_folders(model)
             sides.append(SideModel(
                 orientation=orientation,

@@ -342,6 +342,19 @@ def test_clicking_a_row_reveals_that_jobs_folder(queue, qtbot):
     assert revealed == ["b"]
 
 
+def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
+    """A row opens on the first click, and the gesture people reach for on a
+    listing is a double one — which must land on the same folder rather than
+    fall between the two presses."""
+    from PyQt6.QtCore import Qt
+
+    revealed = []
+    queue.set_items([_item(key="a", status="queued",
+                           reveal=lambda: revealed.append("a"))])
+    qtbot.mouseDClick(queue.rows()[0], Qt.MouseButton.LeftButton)
+    assert revealed and set(revealed) == {"a"}
+
+
 def test_clicking_cancel_does_not_also_reveal_the_folder(queue):
     revealed, stopped = [], []
     queue.set_items([_item(key="a", reveal=lambda: revealed.append(True),

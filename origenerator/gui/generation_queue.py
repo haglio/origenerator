@@ -13,14 +13,15 @@ else. With nothing of ours in flight the same half says what that server is busy
 with instead, and offers a Clear for it.
 On the right, taking the rest of the strip, *what is queued*: every in-flight job
 as a row of its own — the one being made at the top — each led by a Cancel, each
-opening its folder on a click, and each draggable to a new place in the line. A
-row says what the job will cost and what kind of thing it is, and nothing else
-("~2 min · I2V · dancing · Auto · Request"): a line of waiting work is read to
-find out how long the wait is, and the workflow-and-prompt name that used to be
-here is the same on every row of a folder being re-rolled. Beside that, a picture
-— the frame an image-to-video animates, the gray clip a dropped-video combine
-takes its settings from, or a four-up of the folder the run will land in —
-because the one picture a queued job cannot show is its own.
+opening its folder on a click or a double-click, and each draggable to a new
+place in the line. A row says what the job will cost and what kind of thing it
+is, and nothing else ("~2 min · I2V · dancing · Auto · Request"): a line of
+waiting work is read to find out how long the wait is, and the
+workflow-and-prompt name that used to be here is the same on every row of a
+folder being re-rolled. Beside that, a picture — the frame an image-to-video
+animates, the gray clip a dropped-video combine takes its settings from, or a
+four-up of the folder the run will land in — because the one picture a queued
+job cannot show is its own.
 Only the top row is fixed: nothing can be moved in front of what is already
 rendering.
 With nothing queued at all, the strip says so in dim letters across the middle of
@@ -272,9 +273,10 @@ class QueueRow(QWidget):
     auto-generating — where the press discards the seed and the loop starts
     another (:func:`inflight.discard_run_text`).
 
-    A press-and-release opens the job's folder; a press that travels starts a
-    drag, which the strip turns into a reorder. The row being made is the head of
-    the line and does not move.
+    A press-and-release opens the job's folder, and so does a double-click —
+    the gesture a listing invites; a press that travels starts a drag, which the
+    strip turns into a reorder. The row being made is the head of the line and
+    does not move.
     """
 
     HEIGHT = 34  # about two of these fit beside the progress bar
@@ -430,9 +432,25 @@ class QueueRow(QWidget):
             self.set_dragging(False)
 
     def mouseReleaseEvent(self, event):
-        if self._press_at is not None and self._item.reveal is not None:
-            self._item.reveal()
+        if self._press_at is not None:
+            self._open_folder()
         self._press_at = None
+
+    def mouseDoubleClickEvent(self, event):
+        """The second click of a double opens the folder as the first one did.
+
+        Qt hands that second press over as this event rather than as a press, so
+        a row without this answers the gesture only through the release that
+        follows it — which is one event too many to rely on for what is, to
+        anyone using a listing, the obvious way to open a row.
+        """
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_at = None  # answered here, not again on the release
+            self._open_folder()
+
+    def _open_folder(self):
+        if self._item.reveal is not None:
+            self._item.reveal()
 
 
 class GenerationQueue(QWidget):

@@ -723,6 +723,7 @@ class BrowserPane:
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
+                pass_progress = job.last_pass_progress  # the band along the bar's foot
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = lambda p=pid: self._v._cancel_job(p)
@@ -731,6 +732,7 @@ class BrowserPane:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
+                pass_progress = None
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
@@ -743,6 +745,7 @@ class BrowserPane:
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 orientation=row_orientation(row),  # the side its picture will land on
                 progress=progress,
+                pass_progress=pass_progress,
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another.

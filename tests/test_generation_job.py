@@ -88,6 +88,25 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
 
     assert seen == [(10, 70), (11, 70)]       # continues past the first pass's end
     assert job.last_progress == (11, 70)
+    # And the pass in hand is reported alongside, for the band along the bar's
+    # foot: the whole-run reading above it is what must never restart, so the
+    # restarting count has to live somewhere.
+    assert job.last_pass_progress == (1, 10)
+
+
+def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
+    # One sampler end to end: a band under the bar would count the same steps
+    # the bar is already counting.
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    client = _client()
+    job = GenerationJob(client, wf, wf.default_params(),
+                        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
+    job.prompt_id = "comfy-A"
+    job.start()
+
+    client.progress.emit("comfy-A", 5, 20)
+    assert job.last_progress == (5, 20)
+    assert job.last_pass_progress is None
 
 
 def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):
@@ -347,6 +366,10 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs", progress_state=state,
     )
     assert job.last_progress == (13, 20)     # bar resumes at its last spot immediately
+    # Its band comes back with it, so the bar isn't whole for a tick and then
+    # split. The snapshot predates the recorded pass count; the payload's own
+    # (three, for this workflow) stands in.
+    assert job.last_pass_progress == (3, 10)
 
     job._on_progress("pid", 4, 10)           # next real tick from ComfyUI
     assert job.last_progress == (14, 20)     # carries on, not back to 4/20

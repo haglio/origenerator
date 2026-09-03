@@ -4630,6 +4630,7 @@ class GalleryView(QWidget):
             status="running" if rendering else "queued",
             frame=job.last_preview,
             progress=job.last_progress,
+            pass_progress=job.last_pass_progress,
             started_at=job.started_at,
             typical_seconds=self._typical_run_seconds(job),
         )

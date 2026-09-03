@@ -19,10 +19,11 @@ class FakeJob(QObject):
     preview = pyqtSignal(bytes)
 
     def __init__(self, state="queued", last_progress=(0, 0), last_preview=None,
-                 started_at=None):
+                 started_at=None, last_pass_progress=None):
         super().__init__()
         self._state = state
         self._last_progress = last_progress
+        self._last_pass_progress = last_pass_progress
         self._last_preview = last_preview
         self._started_at = started_at
 
@@ -33,6 +34,10 @@ class FakeJob(QObject):
     @property
     def last_progress(self):
         return self._last_progress
+
+    @property
+    def last_pass_progress(self):
+        return self._last_pass_progress
 
     @property
     def last_preview(self):

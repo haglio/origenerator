@@ -485,6 +485,28 @@ def test_an_enhancing_tile_says_so_over_the_picture_and_on_a_bar(qtbot):
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
 
 
+def test_the_fix_being_applied_gets_the_band_under_the_run_s_own_reading(qtbot):
+    # An enhance with detail fixes is several sampler passes, and this tile is
+    # where the user watches one. The bar is the whole enhancement; the band
+    # along its foot is the fix in hand — which is the reading that restarts,
+    # and used to be the only one there was.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(
+        progress=(45, 60), pass_progress=(5, 20)))
+    qtbot.addWidget(tw)
+
+    assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (45, 60)
+    assert tw._enhancing_bar.pass_progress() == (5, 20)
+
+
+def test_an_enhance_still_queued_draws_no_band(qtbot):
+    # Nothing is being sampled yet, so there is no pass to be part-way through.
+    tw = ThumbnailWidget("p1", None, "label", enhancing=_run(
+        status="queued", progress=(45, 60), pass_progress=(5, 20)))
+    qtbot.addWidget(tw)
+
+    assert tw._enhancing_bar.pass_progress() is None
+
+
 def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
     # Overlaid rather than laid out beneath, so an enhancing tile is the same
     # size and shape as a resting one and still flows with them.

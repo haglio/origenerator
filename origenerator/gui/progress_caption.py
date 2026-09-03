@@ -29,8 +29,10 @@ reading asks :func:`origenerator.timing.progress_status_label` for its compact
 one instead, and eliding is what happens when even that overruns.
 """
 
-from PyQt6.QtWidgets import QProgressBar
-from PyQt6.QtGui import QFontMetrics, QPainter, QPainterPath
+from PyQt6.QtWidgets import (
+    QProgressBar, QStyle, QStyleOptionProgressBar, QStylePainter,
+)
+from PyQt6.QtGui import QFontMetrics, QPainterPath
 from PyQt6.QtCore import Qt, QRect, QRectF
 
 from origenerator.paths import ensure_shared_ui_on_path
@@ -104,14 +106,34 @@ class ProgressCaption(QProgressBar):
         self.update()
 
     def paintEvent(self, event):
-        """The styled bar, then the current pass's band over its foot.
+        """Groove and fill, then the current pass's band, then the caption.
 
-        Painted on top rather than laid out beside, so every surface holding one
-        of these keeps the height it already allots — the band takes its few
-        pixels out of the fill, not out of the caption, which stays centered on
-        the bar as a whole.
+        Three layers in that order, because the caption has to be the top one:
+        the band is painted over the foot of the bar, which is where a line of
+        text keeps its descenders, and a band drawn last strikes the bottom of
+        every letter out. So the style is asked for the bar without its label
+        (the caption it would draw is taken out of the option), and the writing
+        goes on by hand once the band is down.
+
+        The band is painted over the bar rather than laid out beside it, so
+        every surface holding one of these keeps the height it already allots:
+        the band takes its few pixels out of the fill, and the caption stays
+        centered on the bar as a whole.
         """
-        super().paintEvent(event)
+        painter = QStylePainter(self)
+        option = QStyleOptionProgressBar()
+        self.initStyleOption(option)
+        caption, option.text = option.text, ""
+        option.textVisible = False
+        painter.drawControl(QStyle.ControlElement.CE_ProgressBar, option)
+        self._paint_pass_band(painter)
+        if self.isTextVisible() and caption:
+            painter.drawItemText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                                 self.palette(), self.isEnabled(), caption,
+                                 self.foregroundRole())
+
+    def _paint_pass_band(self, painter):
+        """Lay the current pass's band along the foot of the bar, if there is one."""
         if self._pass_progress is None or self.maximum() <= 0:
             return  # nothing to split, or a sweeping bar with no foot to split
         done, total = self._pass_progress
@@ -120,7 +142,7 @@ class ProgressCaption(QProgressBar):
         inner = self.rect().adjusted(1, 1, -1, -1)  # inside the styled border
         if inner.height() <= _BAND_PX or inner.width() <= 0:
             return  # too short to give any of itself away
-        painter = QPainter(self)
+        painter.save()
         clip = QPainterPath()
         clip.addRoundedRect(QRectF(inner), _BAND_RADIUS, _BAND_RADIUS)
         painter.setClipPath(clip)
@@ -131,4 +153,4 @@ class ProgressCaption(QProgressBar):
         if filled > 0:
             painter.fillRect(QRect(band.x(), band.y(), filled, band.height()),
                              _BAND_FILL)
-        painter.end()
+        painter.restore()

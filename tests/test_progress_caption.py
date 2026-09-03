@@ -1,5 +1,6 @@
 import pytest
 
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.gui.progress_caption import ProgressCaption
@@ -122,6 +123,32 @@ def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
 
     assert styled_bar.pass_progress() is None
     assert image.pixelColor(8, _foot(styled_bar)) == BLUE
+
+
+def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
+    # The band lies along the foot of the bar, which is where a line of text
+    # keeps the bottom third of its letters. Painted last it strikes them out —
+    # which is what it did, until the caption was moved to the top layer.
+    #
+    # Offscreen has no real fonts, so the glyphs come out as boxes; the point
+    # size is raised until a box reaches into the band, which is what a
+    # descender does at the app's own size on a real display. Only the middle of
+    # the band is read: the rounded ends carry border pixels of their own, which
+    # would answer "something other than the band is here" whatever happened to
+    # the caption.
+    font = QFont(styled_bar.font())
+    font.setPointSize(16)
+    styled_bar.setFont(font)
+    styled_bar.setFixedHeight(26)  # the height every surface gives one of these
+    styled_bar.parent().layout().activate()
+    styled_bar.show_progress("50%", (30, 60), (20, 20))  # band filled end to end
+    image = styled_bar.grab().toImage()
+
+    band = range(styled_bar.height() - 7, styled_bar.height() - 1)
+    middle = range(styled_bar.width() // 3, styled_bar.width() * 2 // 3)
+    written = [(x, y) for y in band for x in middle
+               if image.pixelColor(x, y) not in (TIMELINE_ACTIVE, BG_PRIMARY)]
+    assert written
 
 
 def test_a_sweeping_bar_grows_no_band(styled_bar):

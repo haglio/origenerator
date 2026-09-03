@@ -34,7 +34,9 @@ from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import (
+    InFlightItem, discard_run_text, discard_run_tooltip,
+)
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.gui.gallery_tree import (
@@ -516,6 +518,7 @@ class BrowserPane:
         for item in items:
             card = InFlightCard(item)
             card.clicked.connect(self._on_inflight_clicked)
+            card.context_requested.connect(self._inflight_context_menu)
             flow.addWidget(card)
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item
@@ -869,6 +872,31 @@ class BrowserPane:
         if item is not None:
             item.reveal()
 
+    def _inflight_context_menu(self, key: str, global_pos):
+        """Right-click a card of work still being made: throw that run away.
+
+        The one act a queued or running card has, and until now the one act it
+        offered nowhere: a finished tile answers a right-click with its own menu,
+        and a card answered with nothing, so stopping a run meant finding it again
+        among the bottom strip's rows. The wording is the strip's
+        (:func:`inflight.discard_run_text`) — "Next seed" while the folder is
+        auto-looping, where the press starts another rather than stopping
+        anything.
+
+        No menu at all for a running row this session holds no job for — one a
+        restart hasn't re-adopted — for the reason its strip row hides the same
+        button: there is nothing here to cancel it with, and a menu saying so
+        would be a menu that cannot act.
+        """
+        item = self._inflight_by_key.get(key)
+        if item is None or item.cancel is None:
+            return
+        menu = QMenu(self._v)
+        discard = menu.addAction(discard_run_text(item.auto_generating))
+        discard.setToolTip(discard_run_tooltip(item.auto_generating))
+        if menu.exec(global_pos) is discard:
+            item.cancel()
+
     def open_in_containing_folder(self, prompt_id: str):
         """Jump the browser pane to ``prompt_id``'s own folder and land on the item
         itself — its tile picked, highlighted and scrolled to, as if you'd navigated
@@ -971,6 +999,7 @@ class BrowserPane:
             if live is not None:
                 card = InFlightCard(live)
                 card.clicked.connect(self._on_inflight_clicked)
+                card.context_requested.connect(self._inflight_context_menu)
                 flow.addWidget(card)
                 self._inflight_cards[live.key] = card
                 self._inflight_by_key[live.key] = live
@@ -1315,6 +1344,7 @@ class BrowserPane:
                 continue  # a row no longer in flight by the time this drew
             card = InFlightCard(item)
             card.clicked.connect(self._on_inflight_clicked)
+            card.context_requested.connect(self._inflight_context_menu)
             flow.addWidget(card)
             self._inflight_cards[item.key] = card
             self._inflight_by_key[item.key] = item

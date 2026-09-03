@@ -71,7 +71,9 @@ from origenerator.gui.reroll_prompt import (
 )
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.inflight import queue_wait_text
+from origenerator.gui.inflight import (
+    discard_run_text, discard_run_tooltip, queue_wait_text,
+)
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.no_wheel import NoWheelComboBox
@@ -3042,9 +3044,27 @@ class GalleryView(QWidget):
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
+        tile.context_requested.connect(
+            lambda pos, k=group.key: self._reroll_tile_menu(k, pos))
         tile.selected.connect(lambda k=group.key: self._select_reroll(k))
         flow.addWidget(tile)
         self._reroll_tile = tile
+
+    def _reroll_tile_menu(self, key: str, global_pos):
+        """Right-click a folder's live tile: throw away the run it is showing.
+
+        The same act as the button on its face, on the gesture the rest of the
+        grid answers — a right-click that worked on every other card and died on
+        this one read as a tile that wasn't listening. The wording is the
+        button's (:func:`inflight.discard_run_text`), so both say the same thing
+        about the same press.
+        """
+        menu = QMenu(self)
+        auto = self._auto.is_active(key)
+        discard = menu.addAction(discard_run_text(auto))
+        discard.setToolTip(discard_run_tooltip(auto))
+        if menu.exec(global_pos) is discard:
+            self._cancel_reroll(key)
 
     # --- the folder-wide request: same seeds, changed words ----------------
 
@@ -6387,6 +6407,13 @@ class GalleryView(QWidget):
         corner's plus is where "you already have this one" is said. The star entry
         reads Unstar only when every picked item is already starred, and toggles
         the whole selection to the opposite state.
+
+        A fifth act appears only while something is being made of a picked image:
+        cancel the enhancement in flight. An enhancement has no card of its own —
+        it is shown on the tile of the image it improves, under a scrim — so this
+        menu is the only thing that tile can be asked to stop it with, and without
+        it the run had to be hunted down among the bottom strip's rows. It sits
+        beside Enhance, the act that started it.
         """
         rows = [row for pid in prompt_ids
                 if (row := self._db.get_generation(pid)) is not None]
@@ -6409,6 +6436,13 @@ class GalleryView(QWidget):
             enhance_action = menu.addAction(
                 f"Enhance {n} image{'s' if n != 1 else ''}"
             )
+        cooking = self._enhance_jobs_targeting(rows)
+        cancel_action = None
+        if cooking:
+            n = len(cooking)
+            cancel_action = menu.addAction(
+                f"Cancel {n} enhancement{'s' if n != 1 else ''}"
+            )
         delete_action = menu.addAction("Delete" + suffix)
         chosen = menu.exec(global_pos)
         if folder_action is not None and chosen is folder_action:
@@ -6417,6 +6451,8 @@ class GalleryView(QWidget):
             self.set_items_starred([row["prompt_id"] for row in rows], not all_starred)
         elif enhance_action is not None and chosen is enhance_action:
             self.enhance_items(enhanceable)
+        elif cancel_action is not None and chosen is cancel_action:
+            self.cancel_enhancements_of(rows)
         elif chosen is delete_action:
             self._delete_rows(rows)
 
@@ -6615,28 +6651,56 @@ class GalleryView(QWidget):
         for surface in self._open_surfaces():
             surface.release_media(paths)
 
+    def _enhance_jobs_targeting(self, rows) -> list:
+        """Every standalone enhance in flight whose image is one of ``rows``.
+
+        :meth:`enhancing_run`'s question asked the other way round — over a set
+        of images rather than one — for the two callers that act on a whole
+        selection: the tile menu's Cancel, and the delete about to take those
+        images out from under their runs.
+        """
+        wanted = [row for row in rows if row]
+        return [job for job in self._enhance_jobs()
+                if any(self._enhance_of_row(job, row) for row in wanted)]
+
     def _cancel_enhancements_of(self, rows):
         """Stop every standalone enhance still being made of ``rows`` — the items
         a delete is about to take.
 
         Wired into :class:`GalleryActions` beside the media release, so it runs
         for every delete there is: a picked tile, a whole folder, a rejected
-        experiment, a slideshow's Up key. The jobs are the gallery's, so the
-        match is made here — the same "is this run an enhance of this image?"
-        question :meth:`enhancing_run` asks, over every live job of every folder
-        (a batch of enhances shares one settings key, so all but its leader
-        would be missed by the folder-facing view).
+        experiment, a slideshow's Up key.
 
-        Cancelling frees the queue — a video-length wait can sit behind an
+        Canceling frees the queue — a video-length wait can sit behind an
         enhance nobody wants any more — and takes the run's transient row with
         it, so no enhanced file lands with no original to be a version of.
         """
-        doomed = [row for row in rows if row]
-        for job in list(self._enhance_jobs()):
-            if any(self._enhance_of_row(job, row) for row in doomed):
-                logger.info("Cancelling the enhance of %s: its image is being deleted",
-                            job.params.get("input_image"))
-                self._reroll.cancel_job(job.prompt_id)
+        for job in self._enhance_jobs_targeting(rows):
+            logger.info("Canceling the enhance of %s: its image is being deleted",
+                        job.params.get("input_image"))
+            self._reroll.cancel_job(job.prompt_id)
+
+    def cancel_enhancements_of(self, rows):
+        """Throw away the enhancements being made of ``rows``, keeping the images.
+
+        The tile menu's Cancel (:meth:`generation_menu`). Everything the delete
+        path's cancel does, minus the delete: the runs stop, their transient rows
+        go with them, and the images they were being made of are left exactly as
+        they were — the picture on screen is the one that was already there.
+
+        Not a re-roll's cancel, which is why it doesn't go through
+        :meth:`_cancel_job`: an auto-generating folder takes that as a discarded
+        seed and launches the next one, and nobody asking to stop an enhancement
+        is asking for a fresh variation. The redraw afterwards is what takes the
+        scrim off the tile and the pending row out of the info pane.
+        """
+        jobs = self._enhance_jobs_targeting(rows)
+        for job in jobs:
+            logger.info("Canceling the enhance of %s: asked to, from its tile",
+                        job.params.get("input_image"))
+            self._reroll.cancel_job(job.prompt_id)
+        if jobs:
+            self._reconcile_pending_enhancements()
 
     def _delete_rows(self, rows):
         if not rows:

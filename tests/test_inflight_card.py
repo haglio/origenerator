@@ -2,7 +2,7 @@ import io
 import time
 
 from PIL import Image
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPoint
 
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard
@@ -191,3 +191,18 @@ def test_the_run_s_own_frame_replaces_what_it_came_from(qtbot, tmp_path):
 
     assert backdrop._image.pixmap().toImage() != standing_in
 
+
+def test_right_click_requests_a_menu_for_this_card(qtbot):
+    # The card is the only thing on the shelf standing for a run still being made,
+    # so a right-click on it has to reach that run. It hands the gesture up with
+    # its key rather than answering it, the way a finished tile does — what the
+    # menu offers is the pane's business, not the card's.
+    card = InFlightCard(_item(status="running"))
+    qtbot.addWidget(card)
+    received = []
+    card.context_requested.connect(lambda key, pos: received.append(key))
+
+    # What a right-click on the card triggers (custom context-menu policy).
+    card.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert received == ["p1"]

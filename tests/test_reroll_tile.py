@@ -2,7 +2,7 @@ import time
 from io import BytesIO
 
 from PIL import Image
-from PyQt6.QtCore import Qt, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, QPoint, pyqtSignal
 
 from origenerator.gui.reroll_tile import RerollTile
 
@@ -225,3 +225,30 @@ def test_tile_rebinds_to_running_job_from_cached_state(qtbot):
     assert _has_image(tile)
     assert tile._scrim.text() == "Generating…"
     assert tile._bar.caption().startswith("50% · ")
+
+
+def test_right_clicking_a_running_tile_asks_for_its_menu(qtbot):
+    # The live tile is a card in the grid like any other, and every other one
+    # answers a right-click. It hands the gesture up for the gallery to answer
+    # with the run's own menu.
+    tile = RerollTile(FakeJob(state="running"))
+    qtbot.addWidget(tile)
+    asked = []
+    tile.context_requested.connect(lambda pos: asked.append(pos))
+
+    tile.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert len(asked) == 1
+
+
+def test_the_idle_plus_tile_asks_for_no_menu(qtbot):
+    # Nothing is being made there, so there is nothing a menu could offer to
+    # stop — and an empty menu is worse than none.
+    tile = RerollTile()
+    qtbot.addWidget(tile)
+    asked = []
+    tile.context_requested.connect(lambda pos: asked.append(pos))
+
+    tile.customContextMenuRequested.emit(QPoint(5, 5))
+
+    assert asked == []

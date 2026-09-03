@@ -17,14 +17,15 @@ left the card and the strip each telling half of one story.
 
 A card is fed by an :class:`origenerator.gui.inflight.InFlightItem`, so this
 widget stays unaware of where a job comes from or how it is revealed. The gallery
-holds the items and calls ``reveal`` on a click.
+holds the items and calls ``reveal`` on a click; a right-click is handed up the
+same way, for the pane to answer with the run's own menu.
 """
 
 import time
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QTimer, pyqtSignal
 
 from origenerator.gui import grid_card
 from origenerator.gui.blurred import blurred_backdrop
@@ -48,6 +49,7 @@ class InFlightCard(QWidget):
     """A clickable card mirroring one in-flight generation's live frame and status."""
 
     clicked = pyqtSignal(str)   # the item's key
+    context_requested = pyqtSignal(str, QPoint)  # the item's key, global position
 
     def __init__(self, item: InFlightItem, parent=None):
         super().__init__(parent)
@@ -56,6 +58,13 @@ class InFlightCard(QWidget):
         self.setObjectName("thumbnailTile")  # share the finished-tile background
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Right-click anywhere on the card asks the pane for a context menu, the
+        # way a finished tile's does — the run this card stands for is otherwise
+        # only stoppable from the bottom strip's queue.
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(
+            lambda pos: self.context_requested.emit(self._key, self.mapToGlobal(pos))
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)

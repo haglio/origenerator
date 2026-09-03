@@ -8,7 +8,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import BLUE
+from shared_ui.colors import BG_PRIMARY, BLUE, TIMELINE_ACTIVE
 
 
 @pytest.fixture
@@ -85,3 +85,49 @@ def test_the_fill_is_the_flat_blue_behind_the_writing(styled_bar):
     image = styled_bar.grab().toImage()
 
     assert image.pixelColor(4, styled_bar.height() // 2) == BLUE
+
+
+def _foot(bar) -> int:
+    """A row inside the band along the bar's foot, clear of the caption."""
+    return bar.height() - 4
+
+
+def test_the_pass_being_taken_reads_as_a_band_along_the_foot(styled_bar):
+    # The whole point of the split: the run's own reading is nearly full while
+    # the fix in hand has barely started, and one bar cannot say both.
+    styled_bar.show_progress("83%", (50, 60), (1, 20))
+    image = styled_bar.grab().toImage()
+    middle = styled_bar.width() // 2
+
+    assert image.pixelColor(middle, styled_bar.height() // 2) == BLUE  # the run, most of the way
+    assert image.pixelColor(middle, _foot(styled_bar)) == BG_PRIMARY   # the fix, barely begun
+
+
+def test_the_band_fills_with_the_pass_it_measures(styled_bar):
+    styled_bar.show_progress("83%", (50, 60), (18, 20))
+    image = styled_bar.grab().toImage()
+    foot = _foot(styled_bar)
+
+    assert image.pixelColor(8, foot) == TIMELINE_ACTIVE
+    # Its own count, not the bar's: nearly through this fix, and the far end of
+    # the band is the little that is left of it.
+    assert image.pixelColor(styled_bar.width() - 9, foot) == BG_PRIMARY
+
+
+def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
+    # Nothing to split: a band tracking the same steps as the fill above it
+    # would spend a sixth of the bar's height saying it twice.
+    styled_bar.show_progress("50%", (1, 1))
+    image = styled_bar.grab().toImage()
+
+    assert styled_bar.pass_progress() is None
+    assert image.pixelColor(8, _foot(styled_bar)) == BLUE
+
+
+def test_a_sweeping_bar_grows_no_band(styled_bar):
+    # A job ComfyUI hasn't started has no run to measure, so there is nothing
+    # for a band under it to be a part of.
+    styled_bar.show_progress("Waiting behind 2 jobs from another app", None, (3, 20))
+    image = styled_bar.grab().toImage()
+
+    assert image.pixelColor(8, _foot(styled_bar)) != TIMELINE_ACTIVE

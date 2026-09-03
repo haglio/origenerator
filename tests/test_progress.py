@@ -1,5 +1,28 @@
-from origenerator.progress import ProgressTracker, expected_progress_steps
-from origenerator.workflows import WORKFLOW_REGISTRY
+import pytest
+
+from origenerator.progress import (
+    ProgressTracker, expected_pass_count, expected_progress_steps,
+)
+from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
+
+
+@pytest.fixture
+def enhance_payload(monkeypatch):
+    """Builds ``image_enhance`` payloads — the multi-pass run, and the one the
+    detail fixes belong to.
+
+    The detectors are stood in for: a part with no installed detector builds no
+    pass at all, so what the suite's machine happens to have under ComfyUI would
+    otherwise decide how many passes these budget.
+    """
+    monkeypatch.setattr(detail_parts, "list_detector_files",
+                        lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
+    wf = WORKFLOW_REGISTRY["image_enhance"]
+
+    def build(**params):
+        return wf.build_api_payload({**wf.default_params(), **params})
+
+    return build
 
 
 def test_expected_steps_single_ksampler_is_its_step_count():
@@ -38,6 +61,105 @@ def test_expected_steps_counts_the_audio_pass_of_every_video_workflow():
         assert expected_progress_steps(payload) == 54, name
 
 
+def test_expected_steps_budgets_each_detail_fix_at_one_region(enhance_payload):
+    # An enhance that fixes faces and hands runs three sampler passes: the tail,
+    # then a detailer per part. How many regions each detailer finds isn't
+    # knowable up front, but one is — and budgeting that floor is what keeps the
+    # bar from filling and emptying once per fix.
+    payload = enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    assert expected_progress_steps(payload) == 60
+
+
+def test_expected_pass_count_is_one_for_a_lone_sampler():
+    # Nothing to split a bar over: this job is one pass from end to end.
+    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
+    assert expected_pass_count(wf.build_api_payload(wf.default_params())) == 1
+
+
+def test_expected_pass_count_counts_the_tail_and_each_fix(enhance_payload):
+    payload = enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    assert expected_pass_count(payload) == 3
+    # A detailer counts once however many regions it goes on to sample: the
+    # extra ones are found by a detector, not budgeted by anyone.
+    assert expected_pass_count(enhance_payload(enhance_detail_fixes={})) == 1
+
+
+def test_the_bar_does_not_refill_once_per_fix(enhance_payload):
+    # The complaint this fixes: a multi-fix enhance used to fill to 100%, snap
+    # back near zero and fill again for every fix, so one job read as a queue of
+    # them. Each pass now starts where the last ended.
+    tracker = ProgressTracker.for_payload(enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
+    assert tracker.update(20, 20) == (20, 60)   # the upscale tail finishes: a third
+    assert tracker.update(1, 20) == (21, 60)    # faces begins from there, not from 1/60
+    assert tracker.update(20, 20) == (40, 60)
+    assert tracker.update(1, 20) == (41, 60)    # and so does hands
+    assert tracker.update(20, 20) == (60, 60)
+
+
+def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_payload):
+    # The one dip left: a detector that finds two hands runs a pass nobody
+    # budgeted. The bar rescales to admit it — which says there is more to do —
+    # rather than sitting at 100% through it.
+    tracker = ProgressTracker.for_payload(enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
+    for _ in range(3):                          # tail, faces, the first hand
+        tracker.update(1, 20)
+        tracker.update(20, 20)
+    assert tracker.update(1, 20) == (61, 80)    # a second hand turns up
+    assert tracker.update(20, 20) == (80, 80)
+
+
+def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
+    # The lower band: it restarts per pass, which is exactly what the reading
+    # above it must not do.
+    tracker = ProgressTracker(60, passes=3)
+    tracker.update(5, 20)
+    assert tracker.current_pass() == (5, 20)
+    tracker.update(20, 20)
+    tracker.update(3, 20)                        # the next pass begins
+    assert tracker.current_pass() == (3, 20)     # band back to 3/20...
+    assert tracker.current() == (23, 60)         # ...while the run reads 23/60
+
+
+def test_a_single_pass_run_has_no_band():
+    # A band counting the same steps as the bar above it says nothing twice.
+    tracker = ProgressTracker(30, passes=1)
+    tracker.update(10, 30)
+    assert tracker.current_pass() is None
+
+
+def test_a_band_grows_when_an_unbudgeted_second_pass_turns_up():
+    # A run budgeted for one pass that runs two: there IS something to say now,
+    # so the band appears rather than staying hidden for the rest of the job.
+    tracker = ProgressTracker(20, passes=1)
+    tracker.update(10, 10)
+    assert tracker.current_pass() is None
+    tracker.update(1, 200)
+    assert tracker.current_pass() == (1, 200)
+
+
+def test_no_band_before_the_first_step_or_without_a_recognized_sampler():
+    assert ProgressTracker(60, passes=3).current_pass() is None  # nothing reported yet
+    unknown = ProgressTracker(0)
+    unknown.update(3, 10)
+    # Its bar is already showing raw per-node numbers, which ARE this reading.
+    assert unknown.current_pass() is None
+
+
+def test_snapshot_restore_brings_the_band_back_with_the_ramp():
+    # A reconnected multi-pass job must show which pass it is in, not a whole
+    # bar until its next tick.
+    tracker = ProgressTracker(60, passes=3)
+    tracker.update(20, 20)
+    tracker.update(7, 20)
+    resumed = ProgressTracker(60, passes=3)
+    resumed.restore(tracker.snapshot())
+    assert resumed.current_pass() == (7, 20)
+    assert resumed.current() == (27, 60)
+
+
 def test_tracker_single_stage_reports_value_over_total():
     tracker = ProgressTracker(50)
     assert tracker.update(1, 50) == (1, 50)
@@ -56,8 +178,8 @@ def test_tracker_second_stage_continues_instead_of_resetting():
 
 
 def test_tracker_widens_the_total_for_a_pass_it_could_not_budget():
-    # Some passes can't be counted up front — a detailer samples once per region
-    # it detects, a tiled upscale is sized off the image. Pinning the bar at 100%
+    # Some passes can't be counted up front — every region past the first a
+    # detailer finds, a tiled upscale sized off the image. Pinning the bar at 100%
     # for the length of one says the job is done when it isn't; the total widens
     # to admit it instead, so the bar keeps moving.
     tracker = ProgressTracker(20)

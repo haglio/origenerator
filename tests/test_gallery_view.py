@@ -7584,11 +7584,13 @@ class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
 
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
-                 progress=(0, 0), foreign_ahead=None, started_at=None):
+                 progress=(0, 0), foreign_ahead=None, started_at=None,
+                 pass_progress=None):
         self.prompt_id = prompt_id
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
+        self.last_pass_progress = pass_progress  # the pass in hand, for the bar's band
         self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
         self.started_at = started_at        # when ComfyUI began it; None while queued
         self.params = params

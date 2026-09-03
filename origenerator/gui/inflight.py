@@ -39,6 +39,10 @@ class InFlightItem:
     # to sit on the shelf its picture will land on rather than move there later.
     orientation: str = "landscape"
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for a progress bar
+    # The one sampler pass running right now, on its own count — the band along
+    # the foot of that bar. ``None`` for a job of a single pass, which has
+    # nothing to say the whole-run reading doesn't.
+    pass_progress: tuple[int, int] | None = None
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
@@ -173,6 +177,11 @@ class EnhancingRun:
     status: str                              # "running" or "queued"
     frame: bytes | None                      # latest live frame, if one has arrived
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps
+    # The pass running right now, on its own count, for the band along the foot
+    # of the bar. An enhancement is the run that most needs it: the upscale and
+    # each detail fix is a pass of its own, and one bar between them can only
+    # restart per fix.
+    pass_progress: tuple[int, int] | None = None
     # When ComfyUI began executing it (None while it's still queued), and what
     # this workflow's recent runs say a whole one takes — the two halves of the
     # countdown on the bar.

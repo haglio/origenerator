@@ -171,6 +171,8 @@ class RerollTile(QFrame):
             progress_status_label(elapsed, progress, self._typical_seconds,
                                   compact=True),
             progress if self._job.state == "running" else None,
+            (self._job.last_pass_progress
+             if self._job.state == "running" else None),
         )
 
     def _place_overlays(self):

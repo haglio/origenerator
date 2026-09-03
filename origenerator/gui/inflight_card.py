@@ -164,6 +164,7 @@ class InFlightCard(QWidget):
             progress_status_label(elapsed, self._item.progress,
                                   self._item.typical_seconds, compact=True),
             self._item.progress if self._item.status == "running" else None,
+            self._item.pass_progress if self._item.status == "running" else None,
         )
 
     def _place_overlays(self):

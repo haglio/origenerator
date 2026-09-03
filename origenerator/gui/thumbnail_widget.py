@@ -293,6 +293,7 @@ class ThumbnailWidget(QWidget):
             progress_status_label(elapsed, run.progress, run.typical_seconds,
                                   compact=True),
             run.progress if run.status == "running" else None,
+            run.pass_progress if run.status == "running" else None,
         )
 
     def _place_enhancing_bar(self):

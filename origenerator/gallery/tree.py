@@ -510,9 +510,63 @@ def _build_source_image_groups(
     )
 
 
+def placeable_rows(rows: list[dict]) -> list[dict]:
+    """The rows a tree has somewhere to put — what :func:`build_gallery_tree`
+    nests, and what :func:`start_frame_index` reads the start frames out of.
+
+    A row is included once it has something to place: it either
+    :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
+    running/pending generation whose folder must appear at once, its live tile
+    standing in until its output lands). A terminal file-less row — a failed
+    generation, or a rejected experiment whose files went to the trash — is
+    dropped.
+
+    A running standalone enhance is machinery, not a generation: its result folds
+    into the image it upgrades, so its transient row must not grow an "Image
+    Enhance" folder while it cooks (its progress shows on the tile of the image
+    it is upgrading, under that tile's "Enhancing…" scrim — the Recents shelf
+    gives it no card of its own either). A completed one still in the DB — its
+    source image deleted before it could fold — stays visible, so it can be found
+    and deleted rather than haunting the disk invisibly. A re-derived base render
+    is a repair of an existing image, not an image of its own: it folds into its
+    target and vanishes, so it never earns a tile — least of all a duplicate one
+    beside what it repairs.
+    """
+    return [
+        row for row in rows
+        if (produced_output(row) or is_in_progress(row))
+        and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
+        and row.get("source") != BASE_RENDER_SOURCE
+    ]
+
+
+def start_frame_index(rows: list[dict]) -> dict:
+    """The start-frame configurations ``rows`` offer, for keying and naming the
+    source-image and settings folders under an image-conditioned workflow.
+
+    Only finished images have a file to condition an i2v's frame on, so it is
+    built from those alone.
+
+    Hand this to :func:`build_gallery_tree` wherever the tree is built from a
+    *slice* of the library — one shape's rows, say. The key of a video's folder
+    names the picture it animates, and that picture can perfectly well be on the
+    other side of the split (a portrait frame with the size unlocked to a
+    landscape clip, or a run placed by the size it asked for while its frame is
+    measured). An index built from the slice alone misses it, and keys the folder
+    to something nothing else in the app computes. The folder is still drawn — it
+    is simply unreachable: every reveal, star and custom name resolves a folder
+    through :func:`settings_folder_key` over the whole library, so a click on the
+    queue row for a job in it finds no row and does nothing at all.
+    """
+    return build_image_config_index(
+        [row for row in placeable_rows(rows)
+         if media_type_of_row(row) == "image" and produced_output(row)]
+    )
+
+
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
-    media_types: set[str] | None = None,
+    media_types: set[str] | None = None, *, image_index: dict | None = None,
 ) -> list[WorkflowGroup]:
     """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
     folders.
@@ -525,17 +579,18 @@ def build_gallery_tree(
     whichever way the filter stands, so hiding images can't re-key, and so
     re-shuffle, the video folders that name them.
 
+    ``image_index`` is that index, for a caller who narrowed ``rows`` itself
+    rather than through ``media_types`` — see :func:`start_frame_index`, which is
+    what it must be built with. Left out, it is read from ``rows``, which is the
+    right answer only where ``rows`` is the whole library.
+
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
     it to a single "(no LoRA)" folder. The source-image level appears only under
     a video workflow folder (a still an image-conditioned workflow output is
-    grouped like any other image). A row is included once it has something to place: it either
-    :func:`produced_output` (a finished result) or :func:`is_in_progress` (a
-    running/pending generation whose folder must appear at once, its live tile
-    standing in until its output lands). A terminal file-less row — a failed
-    generation, or a rejected experiment whose files went to the trash — is
-    dropped. Folders appear in the order their first member appears in ``rows``
-    (the caller orders rows newest-first); a star never moves a folder —
-    bookmarks are gathered by :func:`starred_folders` instead. ``folder_meta``
+    grouped like any other image). Which rows are nested at all is
+    :func:`placeable_rows`. Folders appear in the order their first member appears
+    in ``rows`` (the caller orders rows newest-first); a star never moves a folder
+    — bookmarks are gathered by :func:`starred_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 
@@ -545,28 +600,9 @@ def build_gallery_tree(
     holding pen outside the tree.
     """
     folder_meta = folder_meta or {}
-    # A running standalone enhance is machinery, not a generation: its result
-    # folds into the image it upgrades, so its transient row must not grow an
-    # "Image Enhance" folder while it cooks (its progress shows on the tile of
-    # the image it is upgrading, under that tile's "Enhancing…" scrim — the
-    # Recents shelf gives it no card of its own either). A completed one still
-    # in the DB — its source image deleted before it could fold — stays visible,
-    # so it can be found and deleted rather than haunting the disk invisibly.
-    rows = [
-        row for row in rows
-        if (produced_output(row) or is_in_progress(row))
-        and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
-        # A re-derived base render is a repair of an existing image, not an
-        # image of its own: it folds into its target and vanishes, so it never
-        # earns a tile — least of all a duplicate one beside what it repairs.
-        and row.get("source") != BASE_RENDER_SOURCE
-    ]
-    # Only finished images have a file to condition an i2v's frame on, so the
-    # index that keys image-conditioned folders is built from those alone.
-    image_index = build_image_config_index(
-        [row for row in rows
-         if media_type_of_row(row) == "image" and produced_output(row)]
-    )
+    rows = placeable_rows(rows)
+    if image_index is None:
+        image_index = start_frame_index(rows)
     tree = []
     # Media type is still the outer grouping, and still the first part of every
     # key below — it just no longer earns a folder of its own. So a workflow that

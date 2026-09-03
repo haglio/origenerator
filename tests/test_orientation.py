@@ -12,8 +12,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 
+from origenerator import gallery
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY, TRASH_LABEL,
 )
@@ -92,6 +94,50 @@ def test_an_unreadable_shape_files_under_landscape():
     # The same default the region routing uses for an unmeasurable set.
     bare = _image("b1", "scene three", 50, 3)  # no thumbnail, no file, no size
     assert row_orientation(bare) == "landscape"
+
+
+def _start_frame(tmp_path: Path, name: str, width: int, height: int) -> Path:
+    """A picture on disk for a run to be conditioned on, named as an image row's
+    own output is — which is how a start frame resolves back to its generation."""
+    path = tmp_path / name
+    Image.new("RGB", (width, height)).save(path)
+    return path
+
+
+def _cooking_video(prompt_id: str, frame: Path, **params) -> dict:
+    """A wan22_i2v row still in flight: queued, with no file of its own yet."""
+    return _row(prompt_id, "wan22_i2v",
+                {"positive_prompt": "scene four", "seed": 4,
+                 "input_image": str(frame), **params},
+                f"wan22_i2v_{prompt_id}.mp4",
+                status="pending", output_files="[]")
+
+
+def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
+    """A folder's key names the picture the run animates, and that picture can be
+    on the other side — here a portrait frame with the size unlocked to a
+    landscape clip. Each side draws its own tree, but from the whole library's
+    start frames: keyed off its own side's pictures alone, the Landscape tree
+    would draw this folder under a name nothing else in the app computes, and the
+    click on its queue row would find no row and do nothing at all."""
+    frame = _start_frame(tmp_path, "sdxl_t2i_p3.png", 90, 160)
+    portrait_image = _thumbed(
+        _row("p3", "sdxl_t2i",
+             {"positive_prompt": "scene three", "steps": 50, "seed": 3},
+             "sdxl_t2i_p3.png"),
+        tmp_path, 90, 160)
+    cooking = _cooking_video("v3", frame, width=1280, height=720)
+
+    view = GalleryView(FakeDB([portrait_image, cooking]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._update_queue()
+
+    folder = gallery.settings_folder_key(
+        cooking, gallery.build_image_config_index([portrait_image]))
+    (row,) = view._queue.rows()
+    qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
+    assert view._selected_folder_key() == oriented_key(folder, "landscape")
 
 
 def _rows(tree, orientation) -> list[str]:

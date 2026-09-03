@@ -135,6 +135,7 @@ from origenerator.gallery.tree import (
     recent_generations,
     requested_generations,
     settings_folder_key,
+    start_frame_index,
     starred_folders,
     starred_generations,
     unreviewed_experiments,

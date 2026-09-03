@@ -75,9 +75,11 @@ def _reveal_btns(block):
 
 def test_file_row_reveals_the_output_file_in_explorer(block, monkeypatch, tmp_path):
     import origenerator.gui.metadata_block as mb
-    import origenerator.generation_metadata as gm
+    from origenerator import config
 
-    monkeypatch.setattr(gm, "COMFYUI_OUTPUT_DIR", tmp_path)  # reveal points into tmp
+    # The configured folder, not a constant copied into generation_metadata: it
+    # resolves the folder when it is called now, so this is where to point it.
+    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path)
     (tmp_path / "out.mp4").write_bytes(b"x")                 # ...at a real file
     revealed = []
     monkeypatch.setattr(mb, "show_in_explorer", lambda p: revealed.append(p))
@@ -91,9 +93,9 @@ def test_file_row_reveals_the_output_file_in_explorer(block, monkeypatch, tmp_pa
 
 
 def test_reveal_button_is_disabled_when_the_output_is_gone(block, monkeypatch, tmp_path):
-    import origenerator.generation_metadata as gm
+    from origenerator import config
 
-    monkeypatch.setattr(gm, "COMFYUI_OUTPUT_DIR", tmp_path)  # nothing created here
+    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path)  # nothing created here
     block.show_row(_row(output_files=json.dumps(
         [{"filename": "gone.mp4", "subfolder": ""}])))
     btns = _reveal_btns(block)

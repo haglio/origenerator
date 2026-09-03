@@ -24,7 +24,6 @@ is the slow one.
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator import recovery
@@ -35,21 +34,9 @@ from origenerator.gallery import (
     resolve_preview,
 )
 from origenerator.thumbnail import generate_thumbnail
+from origenerator.undo_stack import UndoEntry, UndoStack
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class _UndoEntry:
-    # ``undo`` returns a prompt_id to navigate back to (a restored generation), or
-    # ``None`` when there's nowhere in particular to go (e.g. a rename).
-    label: str
-    undo: Callable[[], str | None]
-    commit: Callable[[], None] | None = None  # run when dropped without undoing
-    # Re-applies the mutation, pushing its own fresh undo entry as it goes. An
-    # entry without one can be undone but not redone, and simply doesn't reach
-    # the redo stack.
-    redo: Callable[[], None] | None = None
 
 
 class GalleryActions:
@@ -60,7 +47,6 @@ class GalleryActions:
         self._db = db
         self._output_dir = Path(output_dir)
         self._trash = trash
-        self._limit = limit
         self._release_files = release_files
         # Told which rows are losing their files, so an enhancement still being
         # made of one can be stopped before it outlives the image it improves.
@@ -70,12 +56,9 @@ class GalleryActions:
         # from can redraw it from whichever version now leads. Optional: without
         # it the row keeps a picture of a file that is no longer there.
         self._thumb_dir = Path(thumb_dir) if thumb_dir else None
-        self._stack: list[_UndoEntry] = []
-        self._redo_stack: list[_UndoEntry] = []
-        # True while a redo is re-running a mutation, so the entry it pushes
-        # doesn't clear the redo stack it came off — the older redos behind it
-        # are still good.
-        self._redoing = False
+        # Every mutation below records how to reverse itself here. Generic and
+        # entirely unaware of what it is undoing (see origenerator.undo_stack).
+        self._history = UndoStack(limit)
 
     # --- deletion ----------------------------------------------------------
 
@@ -107,7 +90,7 @@ class GalleryActions:
         # bin goes on holding the files until they expire or the user says so.
         # Redo re-deletes the same rows: undo restored them exactly as captured,
         # so the dicts still describe what is there to take away again.
-        self._push(_UndoEntry(_delete_label(len(rows)), undo,
+        self._history.push(UndoEntry(_delete_label(len(rows)), undo,
                               redo=lambda: self.delete_rows(rows)))
 
     def delete_enhance_levels(self, row: dict, filenames: list[str]) -> bool:
@@ -150,7 +133,7 @@ class GalleryActions:
             self._redraw_thumbnail(prompt_id)
             return prompt_id
 
-        self._push(_UndoEntry(_level_label(len(filenames)), undo, batch.purge,
+        self._history.push(UndoEntry(_level_label(len(filenames)), undo, batch.purge,
                               redo=lambda: self.delete_enhance_levels(row, filenames)))
         return True
 
@@ -317,7 +300,7 @@ class GalleryActions:
             )
             return None  # back on the review shelf, not in any folder
 
-        self._push(_UndoEntry("Reject experiment", undo, batch.purge,
+        self._history.push(UndoEntry("Reject experiment", undo, batch.purge,
                               redo=lambda: self.reject_experiment(row)))
 
     # --- rename ------------------------------------------------------------
@@ -332,7 +315,7 @@ class GalleryActions:
             return
         previous = self._db.folder_meta_map().get(key, {}).get("custom_name")
         self._db.rename_folder(key, name)
-        self._push(_UndoEntry(
+        self._history.push(UndoEntry(
             "Rename folder", lambda: self._db.rename_folder(key, previous),
             redo=lambda: self.rename_folder(key, name),
         ))
@@ -345,7 +328,7 @@ class GalleryActions:
             return
         previous = record["name"]
         self._db.rename_custom_folder(folder_id, name)
-        self._push(_UndoEntry(
+        self._history.push(UndoEntry(
             "Rename folder",
             lambda: self._db.rename_custom_folder(folder_id, previous),
             redo=lambda: self._rename_custom_folder(folder_id, name),
@@ -372,7 +355,7 @@ class GalleryActions:
             self._db.add_custom_folder_members(folder_id, members)
             self._record_folder_creation(name, folder_id, members)
 
-        self._push(_UndoEntry(
+        self._history.push(UndoEntry(
             f"Create folder “{name}”",
             lambda: self._db.delete_custom_folder(folder_id),
             redo=redo,
@@ -395,7 +378,7 @@ class GalleryActions:
                 self._db.remove_custom_folder_member(folder_id, folder_key)
             return None
 
-        self._push(_UndoEntry(_add_label(len(added), record["name"]), undo,
+        self._history.push(UndoEntry(_add_label(len(added), record["name"]), undo,
                               redo=lambda: self.add_to_custom_folder(folder_id, added)))
 
     def remove_from_custom_folder(self, folder_id: int, folder_key: str,
@@ -403,7 +386,7 @@ class GalleryActions:
         """Drop one gathered folder out of a custom folder. The folder itself and
         its generations are untouched — only the grouping loses it."""
         self._db.remove_custom_folder_member(folder_id, folder_key)
-        self._push(_UndoEntry(
+        self._history.push(UndoEntry(
             "Remove from folder",
             lambda: self._db.add_custom_folder_members(
                 folder_id, [(folder_key, level, ref_prompt_id)]),
@@ -435,7 +418,7 @@ class GalleryActions:
             self._db.add_custom_folder_members(folder_id, members)
             return None
 
-        self._push(_UndoEntry(f"Remove folder “{name}”", undo,
+        self._history.push(UndoEntry(f"Remove folder “{name}”", undo,
                               redo=lambda: self.delete_custom_folder(folder_id)))
 
     def _custom_folder(self, folder_id: int) -> dict | None:
@@ -444,54 +427,28 @@ class GalleryActions:
                 return record
         return None
 
-    # --- the two stacks ----------------------------------------------------
+    # --- what the gallery's Undo and Redo drive ----------------------------
 
     def can_undo(self) -> bool:
-        return bool(self._stack)
+        return self._history.can_undo()
 
     def undo_label(self) -> str | None:
-        return self._stack[-1].label if self._stack else None
+        return self._history.undo_label()
 
     def undo(self) -> str | None:
         """Reverse the most recent mutation, returning a prompt_id to navigate
         back to (a restored generation) when the undone step has one."""
-        if not self._stack:
-            return None
-        entry = self._stack.pop()
-        focus = entry.undo()
-        if entry.redo is not None:
-            self._redo_stack.append(entry)
-        return focus
+        return self._history.undo()
 
     def can_redo(self) -> bool:
-        return bool(self._redo_stack)
+        return self._history.can_redo()
 
     def redo_label(self) -> str | None:
-        return self._redo_stack[-1].label if self._redo_stack else None
+        return self._history.redo_label()
 
     def redo(self) -> None:
-        """Re-apply the most recently undone mutation, by running it again.
-
-        The re-run files its own undo entry, so the step lands back on the undo
-        stack able to be undone (and redone) as many times as the user likes.
-        """
-        if not self._redo_stack:
-            return
-        entry = self._redo_stack.pop()
-        self._redoing = True
-        try:
-            entry.redo()
-        finally:
-            self._redoing = False
-
-    def _push(self, entry: _UndoEntry) -> None:
-        if not self._redoing:
-            self._redo_stack.clear()  # a new step forks history; the branch is gone
-        self._stack.append(entry)
-        while len(self._stack) > self._limit:
-            evicted = self._stack.pop(0)
-            if evicted.commit is not None:
-                evicted.commit()
+        """Re-apply the most recently undone mutation, by running it again."""
+        self._history.redo()
 
 
 def _delete_label(count: int) -> str:

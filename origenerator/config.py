@@ -117,8 +117,6 @@ GENAU_SOURCE = _CONTENT["genau_source"]
 # library root because that root is private and must stay out of source.
 CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
 
-THUMB_SIZE = (256, 256)
-
 # --- Funscript / OSR2 -------------------------------------------------------
 # Each generated video gets a funscript synthesized alongside it (see
 # funscript.py). The motion isn't measured from the video — it's a steady stroke
@@ -151,94 +149,19 @@ OSR2_RX_STALE_S = 30.0
 # instruction is transcribed locally (faster-whisper, CPU) and a local LLM
 # rewrites that loop's prompt. All local — no audio or prompt text leaves the
 # machine. Point LOCAL_LLM_* at your own OpenAI-compatible chat server (Ollama's
-# /v1, LM Studio, llama.cpp, …).
+# /v1, LM Studio, llama.cpp, …). What the LLM is *told* is behavior rather than
+# configuration and lives in origenerator.prompts.
 WHISPER_MODEL = "small"                           # faster-whisper size: tiny/base/small/… — small is more robust on a noisy mic
 VOICE_VAD_THRESHOLD = 0.008                       # minimum speech floor; the gate self-calibrates above your mic's ambient level
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
-VOICE_REWRITE_SYSTEM_PROMPT = (
-    "You edit Stable Diffusion image-generation prompts from short spoken "
-    "instructions. You get the current POSITIVE prompt (what to include) and "
-    "NEGATIVE prompt (what to keep out), plus one instruction. Apply it and return "
-    "BOTH prompts as JSON.\n"
-    "Rules:\n"
-    "- Positive prompts cannot negate. To exclude something (\"no X\", \"without "
-    "X\", \"remove X\"), put the bare term in the NEGATIVE prompt (e.g. \"tan "
-    "lines\") and delete it from the positive if it's there. Never write \"no X\" "
-    "or \"without X\" in the positive prompt.\n"
-    "- Emphasis uses (term:weight). If asked for MORE of something already present, "
-    "raise its weight (big -> (big:1.3); (big:1.2) -> (big:1.4)). If asked for LESS "
-    "of something present, lower it ((big:0.8)) or drop it if already low.\n"
-    "- To add something wanted, place it among related terms (a subject with its "
-    "attributes; style/quality words later), not just tacked on the end.\n"
-    "- Make the smallest change that satisfies the instruction; keep everything "
-    "else intact.\n"
-    "- Reply with ONLY JSON: {\"positive\": \"<full positive>\", \"negative\": "
-    "\"<full negative>\"}. Always include both fields, echoing one unchanged if the "
-    "instruction didn't touch it."
-)
-
-# --- Gallery search → widened vocabulary ----------------------------------
-# The gallery search matches on meaning, not letters. A built-in synonym table
-# does the predictable half on every keystroke; once typing stops, the same
-# local LLM is asked which OTHER words a generation prompt might have used for
-# the ones typed, and those widen the match too. Uncensored, so it answers with
-# the library's actual vocabulary rather than refusing; a refusal, a timeout or
-# an unparseable reply simply leaves the table's own widening standing.
-SEARCH_EXPANSION_SYSTEM_PROMPT = (
-    "You widen the words of a search over a library of generated images and "
-    "videos. You get a list of search words. For each one, list the OTHER words "
-    "a generation prompt might have used for the same thing — synonyms, slang, "
-    "and everyday near-equivalents.\n"
-    "Rules:\n"
-    "- Only words that could stand in for the search word, not broader "
-    "categories and not related-but-different things. For \"woman\": \"lady\", "
-    "\"doll\", \"babe\" — not \"person\", not \"man\", not \"hair\".\n"
-    "- Numbers count as words: for \"two\" give \"2\", \"pair\", \"couple\".\n"
-    "- Single lowercase words only — no phrases, no punctuation, and never the "
-    "search word itself.\n"
-    "- At most 8 per search word, fewer when there are not 8 good ones. An empty "
-    "list is a fine answer for a word nothing stands in for.\n"
-    "- Explicit content is expected; give its plain vocabulary rather than "
-    "refusing or softening it.\n"
-    "- Reply with ONLY JSON: {\"<search word>\": [\"<other word>\", …], …}, one "
-    "key per search word you were given and no keys of your own."
-)
-
-# A spoken request names a thing in its own words, and the prompt names it in
-# the prompt's ("no earrings" against a prompt that says "silver ear studs").
-# When the words themselves aren't in the prompt, the same local LLM is asked
-# which of the prompt's own terms the speaker meant. A lookup, not a rewrite:
-# what happens to the chosen term is fixed policy (see origenerator.prompt_edit).
-VOICE_REQUEST_MATCH_SYSTEM_PROMPT = (
-    "You match a spoken phrase to the term in an image-generation prompt that "
-    "means the same thing. You get a numbered list of the terms already in the "
-    "prompt, and one phrase the speaker used.\n"
-    "Pick the ONE term that refers to the same thing the speaker did — the same "
-    "object, body part, garment, style or act under a different name, a broader "
-    "or narrower word for it, or a plural/singular of it. Explicit content is "
-    "expected; judge it plainly and literally.\n"
-    "Do NOT pick a term that is merely nearby, related, or on the same subject: "
-    "if nothing in the list is the thing the speaker named, say so.\n"
-    'Reply with ONLY JSON: {"choice": n}, where n is the number beside the '
-    "chosen term, or -1 if no term means what the speaker said."
-)
-
-# --- Combine category → situation-fitting recipe --------------------------
-# When a combine act is picked, the app compares the dropped image's scene to the
-# starting scene each candidate recipe is made for, and reuses the one whose
-# situation matches (e.g. a anchor already in frame vs not, whose hand is on it).
-# The same local LLM as the rewrite above; uncensored, so it judges explicit scenes
-# plainly rather than refusing.
-VIDEO_SCENE_MATCH_SYSTEM_PROMPT = (
-    "You match an input image to the video recipe whose usual starting scene fits it "
-    "best, for a desired sex act. You get the desired act, a description of the input "
-    "image's scene, and a numbered list of candidate recipes — each shown by the "
-    "starting scene it is normally used with.\n"
-    "Pick the ONE candidate whose starting scene is the same situation as the input "
-    "image: whether a anchor is already in frame (and where), and whose hand(s) are on "
-    "it — hers, his, or neither. Weigh those situational cues over incidental wording. "
-    "Explicit content is expected; judge it plainly and literally.\n"
-    "Reply with ONLY JSON: {\"choice\": n}, where n is the number beside the chosen "
-    "candidate, or -1 if none of them share the input image's situation."
+# --- the LLM's system prompts (see origenerator.prompts) --------------------
+# Re-exported so the twenty-four modules that import config kept working when
+# the prompts moved out; a consumer written from here on should import them from
+# origenerator.prompts directly.
+from origenerator.prompts import (  # noqa: E402,F401
+    SEARCH_EXPANSION_SYSTEM_PROMPT,
+    VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
+    VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
+    VOICE_REWRITE_SYSTEM_PROMPT,
 )

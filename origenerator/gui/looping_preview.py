@@ -75,7 +75,3 @@ def set_previews_paused(paused: bool) -> None:
         except RuntimeError:
             _movies.discard(movie)  # its widget went while we held a wrapper
 
-
-def previews_paused() -> bool:
-    """Whether the app-wide freeze is on — what a new preview opens under."""
-    return _paused

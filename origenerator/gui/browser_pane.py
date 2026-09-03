@@ -11,52 +11,56 @@ That is the whole point of searching here rather than in the tree — the answer
 "where is the one with the two of them on the couch" is a wall of thumbnails you
 recognize, not a list of folder names you have to open one by one.
 
-It drives the surrounding pieces it doesn't own — the info pane on a click, the
-tree on a drill, the re-roll tile, the delete action — so it holds a reference to
-the GalleryView and calls back into it rather than standing alone. The view keeps
-thin delegates so the pane's rendering and selection are one concern in one place.
+It stands alone: everything it works with arrives at construction — its scroll
+area, the database, the re-roll and auto-generate controllers, and two narrow
+records of what it may ask the gallery around it (:class:`TreeNavigation`,
+:class:`PaneHost`). Every gesture made on a tile leaves as a signal; the view
+connects them and answers — the info pane on a click, the tree on a drill, the
+delete on a menu.
 """
 
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from PyQt6.QtCore import QObject, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QMenu, QApplication, QPushButton, QScrollArea, QVBoxLayout,
+    QApplication,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from origenerator import gallery, search, timing
-from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
-from origenerator.gui.corner_controls import enhance_state
 from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
+from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
+from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    STARRED_KEY,
+    TRASH_KEY,
+)
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip,
     stop_loop_text, stop_loop_tooltip,
 )
 from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.orientation import filter_rows, row_orientation, split_key
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
-from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, EXPERIMENTS_LABEL,
-    RECENTS_KEY, RECENTS_LABEL, REQUESTS_KEY, REQUESTS_LABEL,
-    STARRED_KEY, STARRED_LABEL,
-    TRASH_KEY, TRASH_LABEL,
-)
-from origenerator.gui.orientation import (
-    ORIENTATION_LABELS, filter_rows, row_orientation, split_key,
-)
+from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
-logger = logging.getLogger(__name__)
-
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
-_STARRED_TITLE = "★ " + STARRED_LABEL  # the browser-pane heading for the shelf
 # The Recents shelf lists every generation ever made, so it draws a page of tiles
 # at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
 # end — far enough ahead (three tile rows) that the next page is there before the
@@ -163,6 +167,57 @@ def _inflight_signature(items) -> tuple:
     return tuple(sorted(it.key for it in items))
 
 
+@dataclass(frozen=True)
+class PaneHost:
+    """The questions the pane may ask the gallery it fills, bound to the view's
+    answers at construction — plus the one favor it grants back.
+
+    Callables rather than pushed values so each is read at the moment a tile is
+    built: the media filter, the enhance settings and the in-flight runs all
+    move between renders, and several tiles are built mid-rebuild, where a
+    value captured earlier would already be the old one.
+    """
+
+    # The media types the gallery's two checkboxes currently include.
+    media_types: Callable[[], set]
+    # Every image row of the current model — what places an untracked run and
+    # decides whether an i2v item's start frame can itself be re-drawn.
+    image_rows: Callable[[], list]
+    # The looping-preview path for a video row, or None (the tile shows its still).
+    animated_preview: Callable[[dict], str | None]
+    # The standalone enhance being made of this image right now, or None.
+    enhancing_run: Callable[[dict], object]
+    # What every enhance runs at, app-wide — the Enhance subpanel's value.
+    enhance_settings: Callable[[], object]
+    # Whether the background experimenter is on (the empty shelf teaches off it).
+    experiments_enabled: Callable[[], bool]
+    # The favor: lead a settings folder's grid with the view's own tiles — the
+    # live re-roll tile and its request mirror — before the finished pictures.
+    add_lead_tiles: Callable[[object, object], None]
+
+
+@dataclass(frozen=True)
+class TreeNavigation:
+    """The whole of what the pane may ask about the folder tree, as three
+    questions bound to the view's own answers at construction.
+
+    A record of callables rather than a back-reference: the pane used to walk
+    ``view._tree_view`` and ``view._tree_item_for`` for these, which put the
+    tree's item model and the view's cross-side key resolution inside the
+    pane's reach. Three named questions are the actual dependency — and a test
+    can stand the pane up by answering them alone.
+    """
+
+    # The tree key of the selected row (a folder's, or a shelf's), or ``None``.
+    selected_folder_key: Callable[[], str | None]
+    # Where folder ``key`` lives — the breadcrumb of its parent, "" at the top.
+    # What a tile drawn far from the tree is captioned with, so identically
+    # named folders from opposite corners stay tellable apart.
+    folder_context: Callable[[str], str]
+    # The folder ``key`` names, as the side being browsed holds it, or ``None``.
+    group_for_key: Callable[[str], object]
+
+
 # The job kinds whose queue row shows what they are made from rather than what
 # their folder holds (:func:`gallery.job_kind_label`).
 SOURCE_FRAME_KINDS = ("I2V", "Enhance")
@@ -173,21 +228,44 @@ SOURCE_FRAME_KINDS = ("I2V", "Enhance")
 ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
 
 
-class BrowserPane:
+class BrowserPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
     owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
-    which it calls back into for the info pane, tree, re-roll tile, and delete."""
+    which connects the signals below to its own handlers — a gesture on a tile is
+    the pane's to notice and the view's to answer."""
 
-    def __init__(self, view):
-        self._v = view
+    thumbnail_activated = pyqtSignal(str)   # a tile was clicked: preview this item
+    tab_pin_requested = pyqtSignal()        # an "I'm staying" gesture: keep the tab
+    item_jump_requested = pyqtSignal(str)   # go to this item, in its own folder
+    folder_open_requested = pyqtSignal(str)  # a folder tile was clicked: open it
+    reveal_reroll_requested = pyqtSignal(str)  # open this re-roll's folder + tile
+    folder_menu_requested = pyqtSignal(str, QPoint)  # right-click on a folder tile
+    menu_requested = pyqtSignal(list, QPoint)  # right-click: the generation menu
+    trash_menu_requested = pyqtSignal(QPoint)  # right-click on a deleted tile
+    item_action_triggered = pyqtSignal(str, str)   # a tile's corner control
+    seed_reroll_requested = pyqtSignal(str, str)   # an i2v tile's seed corner
+    experiment_verdict = pyqtSignal(str, str)      # a review tile's keep/reject
+    trash_action_triggered = pyqtSignal(str, str)  # a deleted tile's restore/purge
+    cancel_requested = pyqtSignal(str)      # an in-flight row's ✕: drop that run
+    drag_started = pyqtSignal(str)          # a tile began dragging (combine slots)
+    drag_ended = pyqtSignal()
+    selection_changed = pyqtSignal()        # the multi-selection moved or cleared
+    pane_reset = pyqtSignal()  # the outgoing pane's state is being dropped
+
+    def __init__(self, scroll, db, reroll, auto, tree: TreeNavigation,
+                 host: PaneHost):
+        super().__init__()
+        self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
+        self._db = db          # the generations the cards and corners re-read
+        self._reroll = reroll  # the live jobs and the queue's own line
+        self._auto = auto      # whether a folder is auto-generating (its card says)
+        self._tree = tree      # the three questions the pane may ask the tree
+        self._host = host      # the rest of what it asks the gallery (see PaneHost)
         self._selected_ids: set[str] = set()
         self._selection_anchor: str | None = None
         self._visible_ids: list[str] = []   # generations on screen, in shown order
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
-        # Whether the room is OmniPaused: the tiles loop little clips of
-        # themselves, and a rebuild draws new ones, so this is remembered and
-        # re-applied rather than edged onto whatever was on screen at the time.
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
@@ -239,7 +317,7 @@ class BrowserPane:
     # --- folder-tile overview ----------------------------------------------
 
     def show_widget(self, widget: QWidget):
-        self._v._scroll.setWidget(widget)  # replaces & deletes the previous widget
+        self._scroll.setWidget(widget)  # replaces & deletes the previous widget
 
     def show_empty(self):
         """Clear the pane to nothing on screen — no folder selected."""
@@ -257,7 +335,7 @@ class BrowserPane:
         would otherwise outlive the tiles it referred to.
         """
         self.clear_selection()
-        self._v._reroll_tile = None  # re-created below only when this folder re-rolls
+        self.pane_reset.emit()  # the view drops its re-roll tile with the old pane
         self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
         self._inflight_by_key = {}
         self._visible_ids = []
@@ -296,7 +374,7 @@ class BrowserPane:
             level=gallery.folder_level(group), detail=gallery.folder_detail(group),
         )
         tile.clicked.connect(self._drill_into)
-        tile.context_requested.connect(self._v._folder_context_menu)
+        tile.context_requested.connect(self.folder_menu_requested)
         flow.addWidget(tile)
         self._visible_keys.append(group.key)
 
@@ -320,10 +398,8 @@ class BrowserPane:
         members = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
         for member in members:
-            item = self._v._tree_item_for(member.key)
-            context = (self._v._tree_view.breadcrumb(item.parent())
-                       if item is not None and item.parent() is not None else "")
-            self._add_folder_tile(flow, member, starred=member.starred, context=context)
+            self._add_folder_tile(flow, member, starred=member.starred,
+                                  context=self._tree.folder_context(member.key))
         self.show_widget(container if members else self._empty_state(
             f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
             "pick several folders with Shift/Ctrl and group them."
@@ -452,11 +528,8 @@ class BrowserPane:
         than the order the search scored them.
         """
         if tile.group is not None:
-            item = self._v._tree_item_for(tile.group.key)
-            context = (self._v._tree_view.breadcrumb(item.parent())
-                       if item is not None and item.parent() is not None else "")
             self._add_folder_tile(flow, tile.group, starred=tile.group.starred,
-                                  context=context)
+                                  context=self._tree.folder_context(tile.group.key))
         else:
             self._add_shelf_thumbnail(flow, tile.row)
         self._search_rows.extend(tile.rows or [tile.row])
@@ -467,41 +540,44 @@ class BrowserPane:
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the Recents shelf: in-flight work, then recently finished items ----
+    # --- the shelves: Recents / Starred / Experiments / Requests / Trash -----
 
-    def show_recents_overview(self, orientation: str | None = None):
-        """Render the Recents shelf: a card for every in-flight generation (queued
-        or running, from a Generate tab or a gallery re-roll) atop the recently
-        finished items. Clicking an in-flight card reveals where its job runs; a
-        finished one previews in the info pane, right here on the shelf, the way a
-        thumbnail does inside a folder — and double-clicking it jumps to its own
-        folder. Opens with the info pane cleared, so it shows nothing until an
-        item is picked.
+    def show_shelf(self, base: str, orientation: str | None = None):
+        """Render one side's copy of shelf ``base``.
 
         *orientation* is the side whose shelf this is. A job that has produced
         nothing yet still has a side — the shape it was asked to come out — so
         its card sits on the shelf its picture will land on rather than moving
-        there once it has."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(RECENTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_recents()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
+        there once it has.
 
-    @staticmethod
-    def _oriented_title(label: str, orientation: str | None) -> str:
-        """A shelf's header: its side, then its name — the path shape a folder's
-        breadcrumb has, since a shelf belongs to one side like everything else."""
-        if orientation is None:
-            return label
-        return f"{ORIENTATION_LABELS[orientation]}  ›  {label}"
+        The view dresses the shelf around this call — the header, the cleared
+        info pane, the button sync and the Back record all happen there
+        (:meth:`GalleryView._open_shelf`); this renders the pane itself.
+        """
+        self._shelf_orientation = orientation
+        if base == RECENTS_KEY:
+            self._render_recents()
+        elif base == EXPERIMENTS_KEY:
+            self._render_experiments()
+        elif base == REQUESTS_KEY:
+            self._render_requests()
+        elif base == TRASH_KEY:
+            self._render_trash()
+        elif base == STARRED_KEY:
+            self._show_starred(self._starred_groups.get(orientation, ()),
+                               filter_rows(self._starred_rows, orientation))
 
     def _render_recents(self):
-        """Draw the shelf: in-flight cards first (the newest, still-cooking work),
-        then the finished thumbnails a page at a time; a hint when the media-type
-        filter leaves neither. Both the cards and the thumbnails obey that filter.
+        """The Recents shelf: a card for every in-flight generation (queued or
+        running, from a Generate tab or a gallery re-roll) atop the recently
+        finished items. Clicking an in-flight card reveals where its job runs; a
+        finished one previews in the info pane, right here on the shelf, the way
+        a thumbnail does inside a folder — and double-clicking it jumps to its
+        own folder.
+
+        In-flight cards first (the newest, still-cooking work), then the
+        finished thumbnails a page at a time; a hint when the media-type filter
+        leaves neither. Both the cards and the thumbnails obey that filter.
 
         The shelf has no end — it lists every generation ever made — so it opens on
         one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
@@ -566,7 +642,7 @@ class BrowserPane:
     def _scroll_bar(self):
         """The browser pane's vertical scroll bar: what the shelf grows off, and
         what a redraw puts back where the user was reading."""
-        return self._v._scroll.verticalScrollBar()
+        return self._scroll.verticalScrollBar()
 
     def _restore_scroll(self, offset: int):
         """Scroll the freshly drawn shelf back to ``offset``. The new pane hasn't
@@ -592,10 +668,10 @@ class BrowserPane:
         tw = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             enhance=self._enhance_state(row),           # the plus in the picture's corner
-            enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
+            enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
         tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
@@ -610,7 +686,7 @@ class BrowserPane:
         self._thumb_widgets[row["prompt_id"]] = tw
         return tw
 
-    def _visible_inflight_items(self) -> list:
+    def _visible_inflight_items(self, rows=None, requests=None) -> list:
         """The in-flight items the shelf draws: what the gallery's media-type
         filter keeps and the side the shelf belongs to, less the enhancements.
         The full set still decides whether the shelf exists at all; this narrows
@@ -625,9 +701,9 @@ class BrowserPane:
         strip's queue still lists the job, which is where a run that has the GPU
         belongs.
         """
-        media_types = self._v._media_types()
+        media_types = self._host.media_types()
         side = self._shelf_orientation
-        return [it for it in self._inflight_items()
+        return [it for it in self.inflight_items(rows=rows, requests=requests)
                 if it.media_type in media_types
                 and it.job_kind != ENHANCE_KIND
                 and (side is None or it.orientation == side)]
@@ -636,12 +712,12 @@ class BrowserPane:
         """Which sides have work in flight — what keeps a Recents shelf up on a
         side with no folders yet, so a first-ever generation of that shape is
         visible while it runs."""
-        return {item.orientation for item in self._inflight_items()}
+        return {item.orientation for item in self.inflight_items()}
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the current filter —
         which media types (if any) it's looking for."""
-        media_types = self._v._media_types()
+        media_types = self._host.media_types()
         if not media_types:
             return ("No media types selected.\n\nCheck Images or Videos over the "
                     "folder list to bring your recent generations back.")
@@ -651,12 +727,13 @@ class BrowserPane:
                 "gallery re-roll — collect here, newest first.")
 
     def showing_recents(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == RECENTS_KEY
 
-    def refresh_inflight(self):
+    def refresh_inflight(self, rows=None, requests=None):
         """Between rebuilds, keep the in-flight cards live: push each tracked
-        re-roll's latest frame into its card.
+        re-roll's latest frame into its card. The poll passes the listing it
+        already read (``rows``/``requests``); left off, they are read here.
 
         Whichever pane drew them — the Recents shelf, or a settings folder with
         a batch cooking in it. Only the shelf re-renders on a change to the
@@ -667,7 +744,7 @@ class BrowserPane:
         """
         if not self._inflight_cards and not self.showing_recents():
             return
-        items = self._visible_inflight_items()
+        items = self._visible_inflight_items(rows, requests)
         if (self.showing_recents()
                 and _inflight_signature(items) != self._inflight_signature):
             self._render_recents()
@@ -678,7 +755,7 @@ class BrowserPane:
             if card is not None:
                 card.update_item(item)
 
-    def _inflight_items(self) -> list:
+    def inflight_items(self, rows=None, requests=None) -> list:
         """Every queued/running generation as a card model, in the order the queue
         will work through them.
 
@@ -698,22 +775,26 @@ class BrowserPane:
         The strip's rows carry more than the shelf's cards do — a price, a kind, a
         picture of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
-        costs one listing whatever the queue is showing.
+        costs one listing whatever the queue is showing. ``rows``/``requests``
+        take a listing the caller already read (the poll reads its own on the
+        pool); left off, both tables are read here.
         """
         reroll_by_pid = {job.prompt_id: (key, job)
-                         for key, jobs in self._v._reroll.jobs_by_folder.items()
+                         for key, jobs in self._reroll.jobs_by_folder.items()
                          for job in jobs}
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
-        held = {job.prompt_id for job in self._v._reroll.held_jobs()}
+        held = {job.prompt_id for job in self._reroll.held_jobs()}
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
         requested = {r["prompt_id"]: r["source_prompt_id"]
-                     for r in self._v._db.list_requests()}
+                     for r in (self._db.list_requests()
+                               if requests is None else requests)}
         image_index = None  # built lazily, only to place an untracked row's folder
         typical: dict[str, float | None] = {}  # workflow -> its usual run time
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
-        rows = self._v._db.list_generations()
+        if rows is None:
+            rows = self._db.list_generations()
         # Every row's thumbnail, so a combine's run can show the video its
         # settings came from. Off the listing already in hand rather than a query
         # per job: the recipe video is an ordinary finished row somewhere in it.
@@ -730,11 +811,11 @@ class BrowserPane:
                 pass_progress = job.last_pass_progress  # the band along the bar's foot
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
-                cancel = lambda p=pid: self._v._cancel_job(p)
-                stop_auto = lambda k=folder_key: self._v._auto.stop(k)
+                cancel = lambda p=pid: self.cancel_requested.emit(p)
+                stop_auto = lambda k=folder_key: self._auto.stop(k)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
-                    image_index = gallery.build_image_config_index(self._v._image_rows)
+                    image_index = gallery.build_image_config_index(self._host.image_rows())
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
                 pass_progress, stop_auto = None, None
@@ -746,7 +827,7 @@ class BrowserPane:
                 caption=gallery.config_tab_title(workflow_name, params),
                 status="running" if row.get("status") == "running" else "queued",
                 frame=frame,
-                reveal=lambda k=folder_key: self._reveal_reroll(k),
+                reveal=lambda k=folder_key: self.reveal_reroll_requested.emit(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 orientation=row_orientation(row),  # the side its picture will land on
                 progress=progress,
@@ -755,7 +836,7 @@ class BrowserPane:
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another. A menu can
                 # offer the real stop beside it, which is what stop_auto is for.
-                auto_generating=self._v._auto.is_active(folder_key),
+                auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
                 held=pid in held,
@@ -788,7 +869,7 @@ class BrowserPane:
                                   else thumb_by_id.get(row.get("recipe_video_id"))),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
-        place = {pid: i for i, pid in enumerate(self._v._reroll.queue_order)}
+        place = {pid: i for i, pid in enumerate(self._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    it.status != "running"))
         return items
@@ -830,7 +911,7 @@ class BrowserPane:
         fills the line with jobs from a single folder.
         """
         if folder_key not in cache:
-            group = self._v._group_for_key(folder_key)
+            group = self._tree.group_for_key(folder_key)
             rows = gallery.rows_under(group) if group is not None else []
             # Only what is finished and has a picture — the job asking, and
             # every other row still in the line, is exactly what has none.
@@ -845,31 +926,9 @@ class BrowserPane:
         since this list is rebuilt on every poll."""
         if workflow_name not in cache:
             cache[workflow_name] = timing.estimate_seconds(
-                self._v._db.recent_durations(workflow_name)
+                self._db.recent_durations(workflow_name)
             )
         return cache[workflow_name]
-
-    def _reveal_reroll(self, key: str):
-        """Open the folder a re-roll runs in and select its live tile.
-
-        Leaves a running search first: results take the pane over, and picking
-        a tree row underneath them re-scopes the search rather than showing the
-        folder — so the click landed on the row and the wall of results stayed
-        up, which reads as the click doing nothing at all.
-        """
-        self._v._leave_search()
-        item = self._v._tree_item_for(key)
-        if item is None:
-            # A folder the tree has not drawn yet: the first run in a brand-new
-            # settings folder makes the node, and this click can land in the
-            # gap.  Rebuild and ask once more rather than dropping the gesture.
-            self._v.refresh()
-            item = self._v._tree_item_for(key)
-        if item is None:
-            logger.info("Nothing to reveal for %s: no folder row", key)
-            return
-        self._v._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
-        self._v._select_reroll(key)
 
     def _on_inflight_clicked(self, key: str):
         item = self._inflight_by_key.get(key)
@@ -902,7 +961,7 @@ class BrowserPane:
         item = self._inflight_by_key.get(key)
         if item is None or item.cancel is None:
             return
-        menu = QMenu(self._v)
+        menu = QMenu(self._scroll)
         discard = menu.addAction(discard_run_text(item.auto_generating))
         discard.setToolTip(discard_run_tooltip(item.auto_generating))
         stop = None
@@ -916,42 +975,26 @@ class BrowserPane:
             item.stop_auto()
             item.cancel()
 
-    def open_in_containing_folder(self, prompt_id: str):
-        """Jump the browser pane to ``prompt_id``'s own folder and land on the item
-        itself — its tile picked, highlighted and scrolled to, as if you'd navigated
-        in and clicked it, not just auto-previewing the folder's first item. The
-        double-click gesture on every shelf tile, and the info pane's "Go to
-        folder"; a followed link (:meth:`GalleryView._follow_link`) lands the
-        same way."""
-        self._v._follow_link(prompt_id)
-
     def _shelf_double_clicked(self, prompt_id: str):
         """A shelf tile's double-click: go to the item's own folder, and keep the
-        tab that lands there.
+        tab that lands there — its tile picked, highlighted and scrolled to, as
+        if you'd navigated in and clicked it (:meth:`GalleryView._follow_link`
+        answers the jump).
 
         Double-click means the same thing everywhere in the pane — this tab is
         one I'm staying on — whether it opens a folder on the way or not."""
-        self.open_in_containing_folder(prompt_id)
-        self._v.pin_config_tab()
+        self.item_jump_requested.emit(prompt_id)
+        self.tab_pin_requested.emit()
 
     # --- the Experiments shelf: unreviewed background experiments ------------
 
-    def show_experiments_overview(self, orientation: str | None = None):
-        """Render the Experiments shelf: what the background experimenter has come
-        up with since the user last looked, newest first, each tile wearing
-        keep/reject hover controls. A kept item just leaves the queue — it has been
-        in its own folder since it ran; a rejected one is trashed and teaches the
-        policy what to avoid. Clicking previews the item right here and
-        double-clicking opens its folder, like the other shelves."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(EXPERIMENTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_experiments()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
-
     def _render_experiments(self):
+        """The Experiments shelf: what the background experimenter has come up
+        with since the user last looked, newest first, each tile wearing
+        keep/reject hover controls. A kept item just leaves the queue — it has
+        been in its own folder since it ran; a rejected one is trashed and
+        teaches the policy what to avoid. Clicking previews the item right here
+        and double-clicking opens its folder, like the other shelves."""
         container, flow = self._new_tile_pane()
         actions = [
             ("keep", icons.experiment_verdict_icon("up"),
@@ -962,12 +1005,12 @@ class BrowserPane:
         rows = filter_rows(self._experiment_rows, self._shelf_orientation)
         for row in rows:
             tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
-            tw.corner_action_triggered.connect(self._v._on_experiment_verdict)
+            tw.corner_action_triggered.connect(self.experiment_verdict)
         self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
 
     def showing_experiments(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == EXPERIMENTS_KEY
 
     def _experiments_empty_hint(self) -> str:
@@ -976,7 +1019,7 @@ class BrowserPane:
                     "database is a copy, so a verdict recorded here would never "
                     "reach the live app — and rejecting would delete files its "
                     "own gallery still shows. The results are waiting there.")
-        if self._v.experiments_enabled():
+        if self._host.experiments_enabled():
             return ("Nothing to review yet.\n\nEach time you close the app, "
                     "variations of your own generations are queued up and run "
                     "while you're away; they collect here for your verdict.")
@@ -988,27 +1031,18 @@ class BrowserPane:
 
     # --- the Requests shelf: what you asked for out loud ---------------------
 
-    def show_requests_overview(self, orientation: str | None = None):
-        """Render the Requests shelf: what your spoken requests made, newest
-        first — ordinary tiles, since what a request produced is an ordinary
-        generation that happens to have been asked for out loud. What was heard
-        and what it changed in the prompt show where the prompt does, in the
-        config tab a click loads.
+    def _render_requests(self):
+        """The Requests shelf: what your spoken requests made, newest first —
+        ordinary tiles, since what a request produced is an ordinary generation
+        that happens to have been asked for out loud. What was heard and what it
+        changed in the prompt show where the prompt does, in the config tab a
+        click loads.
 
         One still generating shows as the live card the Recents shelf gives
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(REQUESTS_LABEL, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._render_requests()
-        self._v._sync_delete_button()
-        self._v._record_location()  # so Back can return to the shelf
-
-    def _render_requests(self):
         container, flow = self._new_tile_pane()
-        cooking = {item.key: item for item in self._inflight_items()}
+        cooking = {item.key: item for item in self.inflight_items()}
         shown = [item for item in self._request_items
                  if self._shelf_orientation is None
                  or row_orientation(item["row"]) == self._shelf_orientation]
@@ -1028,7 +1062,7 @@ class BrowserPane:
                          else self._empty_state(self._requests_empty_hint()))
 
     def showing_requests(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == REQUESTS_KEY
 
     @staticmethod
@@ -1043,22 +1077,13 @@ class BrowserPane:
 
     # --- the Trash shelf: deleted items, still recoverable -------------------
 
-    def show_trash_overview(self, orientation: str | None = None):
-        """Render the Trash shelf: every deleted item the recovery bin is still
+    def _render_trash(self):
+        """The Trash shelf: every deleted item the recovery bin is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
         returns to its own folder, files and all; a purged one is gone for good,
         which is what the whole shelf exists to make deliberate rather than
         automatic."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(TRASH_LABEL, orientation))
-        self._v._avg_label.setText(self._trash_note())
-        self._v._clear_metadata()
-        self._render_trash()
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
-
-    def _render_trash(self):
         container, flow = self._new_tile_pane()
         actions = [
             ("restore", icons.recovery_action_icon("restore"),
@@ -1069,7 +1094,7 @@ class BrowserPane:
         rows = filter_rows(self._trash_rows, self._shelf_orientation)
         for row in rows:
             tile = self._add_trash_thumbnail(flow, row, list(actions))
-            tile.corner_action_triggered.connect(self._v._on_trash_action)
+            tile.corner_action_triggered.connect(self.trash_action_triggered)
         self.show_widget(container if rows
                          else self._empty_state(self._trash_empty_hint()))
 
@@ -1094,7 +1119,7 @@ class BrowserPane:
         tile = ThumbnailWidget(
             row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
-            movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+            movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners
             corner_actions=corner_actions,
@@ -1111,19 +1136,12 @@ class BrowserPane:
         """Right-click a deleted tile: restore or permanently delete the picked
         items — the same two actions its hover corners carry, reachable for a
         whole selection at once. Right-clicking a tile outside the selection
-        first narrows to it, as the gallery's own tile menu does."""
+        first narrows to it, as the gallery's own tile menu does. The menu
+        itself is the view's (:meth:`GalleryView._trash_menu`), which owns both
+        acts."""
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-        ids = self.selected_prompt_ids()
-        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
-        menu = QMenu(self._v)
-        restore_action = menu.addAction("Restore" + suffix)
-        purge_action = menu.addAction("Delete" + suffix + " permanently")
-        chosen = menu.exec(global_pos)
-        if chosen is restore_action:
-            self._v.restore_from_trash(ids)
-        elif chosen is purge_action:
-            self._v.purge_from_trash(ids)
+        self.trash_menu_requested.emit(global_pos)
 
     @staticmethod
     def _trash_caption(row) -> str:
@@ -1136,10 +1154,11 @@ class BrowserPane:
         return f"{BrowserPane._thumbnail_caption(row)} · {days}d left" if days \
             else f"{BrowserPane._thumbnail_caption(row)} · expiring"
 
-    def _trash_note(self) -> str:
-        """The line under the header stating the retention promise — shown only
-        with something on the shelf, since the empty state already says it."""
-        if not filter_rows(self._trash_rows, self._shelf_orientation):
+    def trash_note(self, orientation: str | None) -> str:
+        """The line under the Trash header stating the retention promise — shown
+        only with something on that side's shelf, since the empty state already
+        says it."""
+        if not filter_rows(self._trash_rows, orientation):
             return ""
         return (f"Deleted items are held here for {RETENTION_DAYS} days, then "
                 "removed for good.")
@@ -1156,25 +1175,10 @@ class BrowserPane:
                 "they're removed for good.")
 
     def showing_trash(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == TRASH_KEY
 
     # --- the Starred shelf: every bookmark — items and folders — in one place ---
-
-    def show_starred_overview(self, orientation: str | None = None):
-        """Render the Starred shelf: the individual starred images and videos as
-        thumbnails, then one tile per bookmarked folder (each captioned with its
-        breadcrumb so identically-named folders stay tellable apart). A starred
-        item previews here on click and opens its own folder on double-click; a
-        folder tile lists its sub-folders."""
-        self._shelf_orientation = orientation
-        self._v._title.set_display(self._oriented_title(_STARRED_TITLE, orientation))
-        self._v._avg_label.setText("")
-        self._v._clear_metadata()
-        self._show_starred(self._starred_groups.get(orientation, ()),
-                           filter_rows(self._starred_rows, orientation))
-        self._v._sync_action_buttons()
-        self._v._record_location()  # so Back can return to the shelf
 
     def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
         """Everything one side's Favorites shelf stands for: its starred items,
@@ -1185,13 +1189,17 @@ class BrowserPane:
         ])
 
     def _show_starred(self, groups, rows):
+        """The Starred shelf: the individual starred images and videos as
+        thumbnails, then one tile per bookmarked folder (each captioned with its
+        breadcrumb so identically-named folders stay tellable apart). A starred
+        item previews here on click and opens its own folder on double-click; a
+        folder tile lists its sub-folders."""
         container, flow = self._new_tile_pane()
         for row in rows:
             self._add_shelf_thumbnail(flow, row)
         for group in groups:
-            item = self._v._tree_item_for(group.key)
-            context = self._v._tree_view.breadcrumb(item.parent()) if item and item.parent() else ""
-            self._add_folder_tile(flow, group, starred=False, context=context)
+            self._add_folder_tile(flow, group, starred=False,
+                                  context=self._tree.folder_context(group.key))
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         self.show_widget(container if (rows or groups) else self._empty_state(
             "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
@@ -1199,7 +1207,7 @@ class BrowserPane:
         ))
 
     def showing_starred(self) -> bool:
-        base, _orientation = split_key(self._v._tree_view.selected_folder_key())
+        base, _orientation = split_key(self._tree.selected_folder_key())
         return base == STARRED_KEY
 
     @staticmethod
@@ -1303,21 +1311,17 @@ class BrowserPane:
         # a re-roll, which is also what a tab's Generate now is — is this tile: it
         # shows the live frame, so the running row is left out of the static grid
         # below rather than drawn as a broken, output-less thumbnail.
-        if self._v._can_reroll(group):
-            self._v._add_reroll_tile(flow, group)
-        # ...and beside it its mirror: the same seeds again, said differently.
-        if self._v._can_request_changes(group):
-            self._v._add_folder_request_tile(flow, group)
+        self._host.add_lead_tiles(flow, group)
         self._add_folder_inflight_cards(flow, group)
         for row in group.rows:
             if not gallery.produced_output(row):
                 continue  # still in flight — represented by the RerollTile, not a tile
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                movie_path=self._v._animated_preview(row),  # videos loop; images stay still
+                movie_path=self._host.animated_preview(row),  # videos loop; images stay still
                 starred=bool(row.get("starred")),
                 enhance=self._enhance_state(row),           # the plus in the picture's corner
-                enhancing=self._v.enhancing_run(row),       # scrim + bar while one cooks
+                enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
             )
             tw.clicked.connect(self._thumbnail_clicked)
@@ -1325,7 +1329,7 @@ class BrowserPane:
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
             if i2v:
-                tw.corner_action_triggered.connect(self._v._reroll_item_seed)
+                tw.corner_action_triggered.connect(self.seed_reroll_requested)
             self._wire_drag(tw)
             flow.addWidget(tw)
             self._visible_ids.append(row["prompt_id"])
@@ -1349,7 +1353,7 @@ class BrowserPane:
         almost all of them — the listing behind the cards is only built once
         there is a card to build.
         """
-        leading = self._v._reroll.job_for(group.key)
+        leading = self._reroll.job_for(group.key)
         in_front = leading.prompt_id if leading is not None else None
         waiting = [row["prompt_id"] for row in group.rows
                    if not gallery.produced_output(row)
@@ -1373,7 +1377,7 @@ class BrowserPane:
         seed (new motion of the same frame), plus the image seed (a new frame)
         when the item's start frame is itself a re-buildable generation."""
         actions = [("video", icons.reroll_seed_icon("video"), "Randomize video seed")]
-        if gallery.find_source_image_id(row, self._v._image_rows) is not None:
+        if gallery.find_source_image_id(row, self._host.image_rows()) is not None:
             actions.append(("image", icons.reroll_seed_icon("image"), "Randomize image seed"))
         return actions
 
@@ -1390,30 +1394,22 @@ class BrowserPane:
 
     def _wire_drag(self, tw: ThumbnailWidget):
         """Light the combine slot a tile fits while it's being dragged out."""
-        tw.drag_started.connect(self._v._on_generation_drag_started)
-        tw.drag_ended.connect(self._v._on_generation_drag_ended)
+        tw.drag_started.connect(self.drag_started)
+        tw.drag_ended.connect(self.drag_ended)
 
     def _drill_into(self, key: str):
-        """Open a folder tile's folder. Clicking one is a decision to go there, so
-        it puts a running search away first — a search's results are folder tiles
-        too, and this is how they open; without it the box would still be full
-        while the pane shows the folder it drilled into."""
-        item = self._v._tree_item_for(key)
-        if item is not None:
-            self._v._leave_search()
-            self._v._tree.setCurrentItem(item)
+        """Open a folder tile's folder — the view answers by selecting its tree
+        row (:meth:`GalleryView._open_folder_tile`)."""
+        self.folder_open_requested.emit(key)
 
     def visible_prompt_ids(self) -> list[str]:
         return list(self._visible_ids)
-
-    def visible_folder_keys(self) -> list[str]:
-        return list(self._visible_keys)
 
     # --- multi-selection ---------------------------------------------------
 
     def _thumbnail_clicked(self, prompt_id: str):
         self.apply_selection(prompt_id, QApplication.keyboardModifiers())
-        self._v._on_thumbnail_clicked(prompt_id)  # records the visit itself
+        self.thumbnail_activated.emit(prompt_id)  # the view records the visit itself
 
     def _thumbnail_double_clicked(self, prompt_id: str):
         """Open a thumbnail as a Generate tab and keep that tab.
@@ -1422,8 +1418,8 @@ class BrowserPane:
         second says to stay there, so the tab stops being the one the next click
         replaces. Browsing costs one tab however far you go; deciding to work on
         something costs the double-click that keeps it."""
-        self._v._on_thumbnail_clicked(prompt_id)  # make it the selected generation
-        self._v.pin_config_tab()
+        self.thumbnail_activated.emit(prompt_id)  # make it the selected generation
+        self.tab_pin_requested.emit()
 
     def apply_selection(self, prompt_id: str, modifiers):
         """Update the multi-select set the way the held modifiers dictate.
@@ -1470,18 +1466,18 @@ class BrowserPane:
             self._scroll_to(widget)
 
     def _scroll_to(self, widget):
-        self._v._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
+        self._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():
             widget.set_selected(pid in self._selected_ids)
-        self._v._sync_action_buttons()
+        self.selection_changed.emit()
 
     def clear_selection(self):
         self._selected_ids = set()
         self._selection_anchor = None
         self._thumb_widgets = {}
-        self._v._sync_action_buttons()
+        self.selection_changed.emit()
 
     def clear_thumbnail_selection(self):
         """Drop the thumbnail multi-selection and its highlights while keeping the
@@ -1510,8 +1506,8 @@ class BrowserPane:
         """
         if prompt_id not in self._selected_ids:
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
-            self._v._on_thumbnail_clicked(prompt_id)
-        self._v.generation_menu(self.selected_prompt_ids(), global_pos)
+            self.thumbnail_activated.emit(prompt_id)
+        self.menu_requested.emit(self.selected_prompt_ids(), global_pos)
 
     def _on_tile_control(self, prompt_id: str, action: str):
         """A tile's corner control was pressed: bookmark, bin or enhance THIS one.
@@ -1520,12 +1516,12 @@ class BrowserPane:
         picture, in that picture's own corner, so it has already said which item
         it is about. The menu is where a whole selection is acted on.
         """
-        self._v.run_item_action(prompt_id, action)
+        self.item_action_triggered.emit(prompt_id, action)
 
     def _enhance_state(self, row) -> str | None:
         """What the plus in this row's bottom-right corner has to say, at the
         Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
-        return enhance_state(row, self._v._enhance_settings)
+        return enhance_state(row, self._host.enhance_settings())
 
     def refresh_enhance_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.
@@ -1536,6 +1532,6 @@ class BrowserPane:
         none of those tiles were touched, so nothing else would tell them.
         """
         for prompt_id, tile in self._thumb_widgets.items():
-            row = self._v._db.get_generation(prompt_id)
+            row = self._db.get_generation(prompt_id)
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))

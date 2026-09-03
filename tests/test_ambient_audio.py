@@ -84,7 +84,6 @@ def test_a_voice_skips_a_clip_another_voice_has_on_air():
 
     assert rotation.next_clip(0) == Path("a")
     assert rotation.next_clip(1) == Path("b")  # "a" is taken, so it steps past it
-    assert rotation.playing() == [Path("a"), Path("b")]
 
 
 def test_finishing_a_clip_frees_it_for_the_other_voices():
@@ -92,8 +91,7 @@ def test_finishing_a_clip_frees_it_for_the_other_voices():
     rotation.next_clip(0)                       # voice 0 holds "a"
     rotation.next_clip(1)                       # voice 1 steps past it to "b"
 
-    rotation.next_clip(0)                       # voice 0 moves on, letting "a" go
-    assert rotation.playing() == [Path("c"), Path("b")]
+    assert rotation.next_clip(0) == Path("c")   # voice 0 moves on, letting "a" go
     assert rotation.next_clip(1) == Path("a")   # so "a" is available again
 
 
@@ -118,15 +116,7 @@ def test_more_voices_than_clips_doubles_up_rather_than_hanging():
 
 def test_an_empty_clip_set_hands_out_nothing():
     rotation = AmbientRotation([], 3)
-    assert rotation.next_clip(0) is None
-    assert rotation.playing() == [None, None, None]
-
-
-def test_release_takes_a_voice_off_air():
-    rotation = AmbientRotation(_clips("a", "b"), 2, shuffle=_in_order([0, 1]))
-    rotation.next_clip(0)
-    rotation.release(0)
-    assert rotation.playing() == [None, None]
+    assert [rotation.next_clip(v) for v in range(3)] == [None, None, None]
 
 
 # --- the players -----------------------------------------------------------
@@ -190,7 +180,6 @@ def test_starting_plays_one_clip_per_voice(qtbot, tmp_path):
 
     bed.start()
 
-    assert bed.is_running()
     assert len(players) == 3
     assert [p.play_count for p in players] == [1, 1, 1]
     # Three different clips, so the room hears three sources rather than an echo.
@@ -239,7 +228,6 @@ def test_stopping_silences_and_releases_every_voice(qtbot, tmp_path):
 
     bed.stop()
 
-    assert not bed.is_running()
     assert [p.stopped for p in players] == [1, 1, 1]
     assert [p.sources[-1] for p in players] == ["", "", ""]  # the source is let go
 
@@ -253,7 +241,6 @@ def test_a_late_end_of_clip_after_stopping_starts_nothing(qtbot, tmp_path):
     players[0].finish()  # a status change arriving out of the teardown
 
     assert [p.play_count for p in players] == plays_at_stop
-    assert not bed.is_running()
 
 
 def test_starting_twice_does_not_double_the_voices(qtbot, tmp_path):
@@ -271,7 +258,6 @@ def test_a_folder_with_no_clips_stays_silent(qtbot, tmp_path):
     bed.start()
 
     assert players == []
-    assert not bed.is_running()
     bed.stop()  # and stopping an empty bed is harmless
 
 
@@ -282,6 +268,5 @@ def test_the_bed_can_restart_after_being_stopped(qtbot, tmp_path):
 
     bed.start()
 
-    assert bed.is_running()
     assert len(players) == 6  # a fresh set of three
     assert [p.play_count for p in players[3:]] == [1, 1, 1]

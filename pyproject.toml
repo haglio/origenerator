@@ -25,14 +25,17 @@ dependencies = [
 origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt", "pytest-timeout", "vulture"]
+dev = ["pytest", "pytest-qt", "pytest-timeout", "vulture", "ruff"]
 # Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
 # optional — the mic button degrades gracefully when these aren't installed.
 # Install with:  pip install -e .[voice]
 voice = ["faster-whisper", "sounddevice"]
 
 [tool.pytest.ini_options]
-# A ceiling on a hang, not a performance budget. The slowest test on a
+# The content guard's enforcement check, adopted the way every repo in the
+# family adopts it: one line, and no copy of the check to drift.
+#
+# The timeout is a ceiling on a hang, not a performance budget. The slowest test on a
 # developer machine is the tracked-tree content scan, but it is not the
 # slowest on a runner: it returns early when no blocklist is reachable, and
 # the blocklist is git-ignored, so a fresh checkout has none. Nothing CI runs
@@ -43,7 +46,7 @@ voice = ["faster-whisper", "sounddevice"]
 # the half that pays for itself: it dumps the hung stack, which turns a
 # stalled required check into a one-line diagnosis. tests/test_timeouts.py
 # holds all three halves of it.
-addopts = "--timeout=240 --timeout-method=thread"
+addopts = "-p app_support.sanitize.pytest_plugin --timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

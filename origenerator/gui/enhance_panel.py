@@ -40,12 +40,11 @@ from origenerator.gui.no_wheel import (
     NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
+from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE, DETAIL_PARTS, detail_fixes_of, detector_for_part,
 )
-from origenerator.paths import ensure_shared_ui_on_path
-
 # Before any shared_ui import: that checkout is a sibling on the path, not a
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()

@@ -166,7 +166,7 @@ def test_stop_all_ends_the_loop_that_is_running(qtbot):
 
     assert not auto.is_active("a")
     assert stopped == ["a"]
-    assert not auto.any_active()
+    assert auto.active_key() is None
 
 
 def test_rekey_moves_an_active_loop_to_a_new_key(qtbot):

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, DB_PATH, STROKE_DEFAULT_HZ
+from origenerator import config
 from origenerator.db import Database
 from origenerator.funscript import ensure_funscript, funscript_path_for
 from origenerator.gallery import media_type_of_row, resolve_preview
@@ -22,14 +22,22 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 logger = logging.getLogger(__name__)
 
 
-def backfill(db, output_dir: Path = COMFYUI_OUTPUT_DIR, *, hz: float = STROKE_DEFAULT_HZ,
+def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
              ensure=ensure_funscript, resolve=resolve_preview) -> dict:
     """Script every video generation missing a sidecar. Returns a counts summary.
 
     ``ensure``/``resolve`` are injectable so the sweep logic can be tested without
     real videos. The loop flag for each row comes from its workflow, so loop clips
     get a seamlessly-tiling script.
+
+    ``output_dir`` and ``hz`` resolve from config when the caller names neither.
+    Resolved HERE rather than as signature defaults: a default is evaluated at
+    import, from constants that were themselves built by reading the content
+    overlay at import, so the sweep could not be pointed anywhere this module had
+    not decided on before anything called it.
     """
+    output_dir = config.COMFYUI_OUTPUT_DIR if output_dir is None else output_dir
+    hz = config.STROKE_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "skipped": 0, "missing": 0, "failed": 0}
     for row in db.list_generations():
         if media_type_of_row(row) != "video":
@@ -53,7 +61,7 @@ def backfill(db, output_dir: Path = COMFYUI_OUTPUT_DIR, *, hz: float = STROKE_DE
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    result = backfill(Database(DB_PATH))
+    result = backfill(Database(config.DB_PATH))
     logger.info(
         "Funscript backfill: %d written, %d already present, %d missing file, %d failed",
         result["written"], result["skipped"], result["missing"], result["failed"],

@@ -157,10 +157,6 @@ class SplitFolderTree(QWidget):
 
     # --- the halves ---------------------------------------------------------
 
-    def tree_for(self, orientation: str) -> FolderTree:
-        """One side's tree widget."""
-        return self._halves[orientation]
-
     def root_for(self, orientation: str):
         """Where one side's rows are hung — what the tree builder fills."""
         return self._halves[orientation].invisibleRootItem()

@@ -1999,3 +1999,57 @@ def test_a_workflow_with_the_tail_off_saves_only_its_own_render():
         saves = [node for node in wf.build_api_payload(params).values()
                  if node.get("class_type") == "SaveImage"]
         assert len(saves) == 1, wf.name
+
+
+# --- what the importer reads a workflow's own graph as ------------------------
+#
+# A re-import reads the graph embedded in an output file and names the workflow
+# from its node classes, overruling what the filename said. The chain that does
+# it names six ComfyUI node classes and five of the eight registered workflows,
+# so what the other three read as is decided by accident. This runs every
+# registered workflow's OWN payload through it and writes the answer down.
+
+#: workflow name -> what the importer reads its own graph as. Held as an
+#: equality against the registry, so a ninth workflow has to answer this too.
+READS_AS = {
+    "sdxl_t2i": "sdxl_t2i",
+    "flux_t2i_upscaled": "flux_t2i_upscaled",
+    "wan22_t2i": "wan22_t2i",
+    "wan22_flf2v_loop": "wan22_flf2v_loop",
+    "wan22_i2v": "wan22_i2v",
+    # WRONG, and pinned as wrong rather than fixed here (backlog §3.5, found
+    # 2026-08-31). Both build an SDXL checkpoint graph, so the chain's last
+    # branch claims them — and because the graph overrules the filename, a
+    # re-imported pose-transfer or standalone-enhance output is filed under
+    # sdxl_t2i even though its own filename prefix names it correctly.
+    "sdxl_pose_transfer": "sdxl_t2i",
+    "image_enhance": "sdxl_t2i",
+    # Not recognized at all, which here is the right answer: nothing in the
+    # chain matches, so the filename's guess stands, and it is correct.
+    "wan21_ati_i2v": None,
+}
+
+
+def test_every_registered_workflow_says_what_its_own_graph_reads_as():
+    """An equality against the registry: a ninth workflow cannot be added
+    without someone deciding what a re-import of its output would call it."""
+    assert set(READS_AS) == set(WORKFLOW_REGISTRY)
+
+
+@pytest.mark.parametrize("name", sorted(READS_AS))
+def test_a_workflows_own_graph_reads_as_it_always_has(name):
+    from origenerator.importer import _workflow_from_nodes
+
+    workflow = WORKFLOW_REGISTRY[name]
+    graph = workflow.build_api_payload(dict(workflow.default_params()))
+
+    assert _workflow_from_nodes(graph) == READS_AS[name]
+
+
+def test_the_graph_signatures_only_ever_name_a_registered_workflow():
+    """The chain hardcodes workflow names; a rename or a removal on one side
+    would leave it writing a name no gallery folder is ever built for, and the
+    value is persisted into every row."""
+    from origenerator.importer import _GRAPH_SIGNATURES
+
+    assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY)

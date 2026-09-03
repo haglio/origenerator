@@ -14,6 +14,15 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
 * :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
+* :mod:`.enhance_settings` — what a folder's enhancement is configured with,
+  and how one enhancement is described.
+* :mod:`.enhance_graph` — the same knobs read back off a row's stored ComfyUI
+  graph, for a row whose own params are vague about them.
+* :mod:`.enhance` — what an enhancement is, which rows have had one and which
+  want one.
+* :mod:`.enhance_fold` — folding a finished enhancement onto the image it
+  upgraded. The one module here that takes a database and changes what is in it;
+  everything else takes rows and answers questions about them.
 
 This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
@@ -59,7 +68,6 @@ from origenerator.gallery.output import (
     output_disk_files,
     output_file_path,
     output_file_reference,
-    parse_file_list,
     produced_output,
     resolve_preview,
     row_output_files,
@@ -78,14 +86,7 @@ from origenerator.gallery.voice_commands import (
 )
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
-    ENHANCE_LEVEL_KEYS,
-    ENHANCE_SETTING_KEYS,
-    ENHANCE_WORKFLOW,
-    MATCH_SOURCE_MODEL,
     EnhanceLevel,
-    EnhanceSettings,
-    default_enhance_params,
-    describe_enhance_params,
     displayed_levels,
     enhance_levels,
     enhance_params_for,
@@ -97,13 +98,23 @@ from origenerator.gallery.enhance import (
     level_matching_params,
     level_matching_settings,
     original_files_of,
-    fold_completed_enhancements,
-    fold_enhancement,
     is_enhance_product_row,
     is_enhanceable_row,
     is_enhanced_row,
     remove_enhance_levels,
     rows_awaiting_enhancement,
+)
+from origenerator.gallery.enhance_fold import (
+    fold_completed_enhancements,
+    fold_enhancement,
+)
+from origenerator.gallery.enhance_settings import (
+    ENHANCE_SETTING_KEYS,
+    ENHANCE_WORKFLOW,
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
+    default_enhance_params,
+    describe_enhance_params,
 )
 from origenerator.gallery.signatures import (
     is_image_conditioned,
@@ -113,7 +124,6 @@ from origenerator.gallery.signatures import (
     rows_in_settings,
     settings_signature,
     workflow_output_type,
-    workflow_param_order,
 )
 from origenerator.gallery.source_image import (
     build_image_config_index,
@@ -140,3 +150,44 @@ from origenerator.gallery.tree import (
     starred_generations,
     unreviewed_experiments,
 )
+
+# The surface outside code may import from this package, rather than left to be
+# inferred from the import list above -- which reads to a linter as ninety-odd
+# unused imports, so a genuinely accidental one could never be seen among them.
+# A name kept for the package's own use is imported from its submodule and is
+# not here.
+__all__ = [
+    "ALL_KEY", "ALL_LABEL", "AllGroup", "BASE_RENDER_SOURCE", "CustomGroup",
+    "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
+    "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "LoraGroup",
+    "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "SettingsGroup",
+    "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_path",
+    "build_custom_folders", "build_gallery_tree", "build_image_config_index",
+    "child_groups", "combined_params", "command_bias", "config_folder_name",
+    "config_tab_title", "curated_params", "custom_folder_id",
+    "custom_folder_key", "default_enhance_params", "describe_enhance_params",
+    "displayed_levels", "enhance_levels", "enhance_params_for",
+    "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",
+    "enhancement_recency", "find_source_image_id", "fix_params_for",
+    "fold_completed_enhancements", "fold_enhancement", "folder_detail",
+    "folder_id", "folder_key_at_level", "folder_level", "group_level",
+    "is_custom_key", "is_enhance_product_row", "is_enhanceable_row",
+    "is_enhanced_row", "is_image_conditioned", "is_in_progress",
+    "is_renamable", "item_label", "job_kind_label",
+    "legacy_preenhance_settings_folder_keys",
+    "legacy_preframe_settings_folder_key",
+    "legacy_preversion_settings_folder_key", "legacy_settings_folder_key",
+    "level_matching_params", "level_matching_settings", "lora_label",
+    "lora_signature", "match_command", "match_fix_command",
+    "media_type_of_row", "model_label", "model_signature", "name_parts",
+    "named_folders_by_row", "original_files_of", "output_disk_files",
+    "output_file_path", "output_file_reference", "parse_params",
+    "produced_output", "recent_generations", "recognized_spelling",
+    "remove_enhance_levels", "requested_generations", "resolve_preview",
+    "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
+    "rows_of_media_types", "rows_under", "selection_group",
+    "settings_folder_key", "settings_signature", "source_image_id_for",
+    "starred_folders", "starred_generations", "start_frame_index",
+    "unreviewed_experiments",
+    "videos_from_source_image", "workflow_output_type",
+]

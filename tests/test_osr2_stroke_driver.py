@@ -209,7 +209,7 @@ def test_cruise_control_takes_the_stroke_over_and_it_is_what_is_streamed(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
     driver.toggle_cruise()
-    assert driver.cruising
+    assert driver.state.cruise.active
     assert not driver.state.cruise.stack  # drawn on the next tick, from the dials
     for _ in range(60):
         clock.t += 0.025
@@ -220,4 +220,4 @@ def test_cruise_control_takes_the_stroke_over_and_it_is_what_is_streamed(qtbot):
     assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
     assert driver.state.cruise.stack.waves
     driver.toggle_cruise()
-    assert not driver.cruising and not driver.state.cruise.stack.waves
+    assert not driver.state.cruise.active and not driver.state.cruise.stack.waves

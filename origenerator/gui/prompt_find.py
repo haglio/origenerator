@@ -83,9 +83,6 @@ class PromptFind:
         self._fields = list(fields)
         return self._run(reset=True)
 
-    def fields(self) -> list:
-        return list(self._fields)
-
     # --- searching ------------------------------------------------------------
 
     def search(self, query: str) -> int:
@@ -137,10 +134,6 @@ class PromptFind:
     def position(self) -> int:
         """Which match is current, counting from one; 0 when there are none."""
         return self._index + 1 if self._index >= 0 else 0
-
-    def current_field(self):
-        """The field the current match sits in, or ``None`` with no match."""
-        return self._matches[self._index][0] if self._matches else None
 
     def step(self, delta: int):
         """Move ``delta`` matches along, wrapping at either end, and show where you

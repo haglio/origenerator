@@ -132,7 +132,7 @@ class InfoPaneTabs(QTabWidget):
         if callable(refresh):
             refresh()
 
-    def _config_panels(self) -> list[GenerateConfigPanel]:
+    def config_panels(self) -> list[GenerateConfigPanel]:
         """Every open config panel, in tab order."""
         return [
             w for i in range(self.count())
@@ -316,7 +316,7 @@ class InfoPaneTabs(QTabWidget):
         """
         if self._preview_panel is not None:
             return self._preview_panel
-        return next((p for p in self._config_panels() if p.is_blank()), None)
+        return next((p for p in self.config_panels() if p.is_blank()), None)
 
     def _sync_preview_tab(self):
         """Tell the bar which tab to draw in italic, after anything that could
@@ -341,7 +341,7 @@ class InfoPaneTabs(QTabWidget):
         """
         cur = self.current_config_panel()
         blank = cur if cur is not None and cur.is_blank() else next(
-            (p for p in self._config_panels() if p.is_blank()), None
+            (p for p in self.config_panels() if p.is_blank()), None
         )
         if blank is not None:
             self._set_preview_panel(blank)
@@ -479,7 +479,7 @@ class InfoPaneTabs(QTabWidget):
         """
         if not origin:
             return None
-        return next((panel for panel in self._config_panels()
+        return next((panel for panel in self.config_panels()
                      if origin in panel.launched_runs()), None)
 
     def set_previews_paused(self, paused: bool) -> None:
@@ -488,18 +488,14 @@ class InfoPaneTabs(QTabWidget):
         showing a still takes it inertly; one showing a video stops.
 
         Remembered, not just applied: a tab opened (or re-pointed at a video)
-        while the room is frozen has to open frozen too, which is why
-        :meth:`preview_paused` exists for a panel to ask on the way up.  The
-        looping thumbnails around these previews are held elsewhere and
-        app-wide — see :mod:`origenerator.gui.looping_preview`.
+        while the room is frozen has to open frozen too, so ``_add_subtab``
+        pushes the remembered flag into every panel it builds.  The looping
+        thumbnails around these previews are held elsewhere and app-wide — see
+        :mod:`origenerator.gui.looping_preview`.
         """
         self._previews_paused = paused
-        for panel in self._config_panels():
+        for panel in self.config_panels():
             panel.set_preview_paused(paused)
-
-    def preview_paused(self) -> bool:
-        """Whether a preview built now should open held."""
-        return self._previews_paused
 
     # --- the tabs following a run in flight --------------------------------
 
@@ -509,7 +505,7 @@ class InfoPaneTabs(QTabWidget):
         the picture it lands as go, and nowhere else. Usually one tab; two when
         a Generate was pressed in one and the folder's live tile clicked into
         another, and both are the tab's own business to show."""
-        return [panel for panel in self._config_panels()
+        return [panel for panel in self.config_panels()
                 if panel.watched_key() == key]
 
     def panel_watching(self, key: str) -> GenerateConfigPanel | None:
@@ -530,7 +526,7 @@ class InfoPaneTabs(QTabWidget):
         generation (:meth:`GenerateConfigPanel.refresh_displayed`) — a change to
         one image must not touch a tab looking at another.
         """
-        for panel in self._config_panels():
+        for panel in self.config_panels():
             panel.refresh_displayed(row, image_rows)
 
     def drop_previews_of_gone_rows(self, live_ids):
@@ -541,7 +537,7 @@ class InfoPaneTabs(QTabWidget):
         lands, so blanking more than that takes the picture out of a tab the user
         left open and is looking at.
         """
-        for panel in self._config_panels():
+        for panel in self.config_panels():
             row = panel.displayed_row()
             if row is not None and row.get("prompt_id") not in live_ids:
                 panel._preview.clear()
@@ -554,7 +550,7 @@ class InfoPaneTabs(QTabWidget):
         generation spreads them across tabs, and a tab out of sight holds its
         video's file open exactly as firmly as the front one does.
         """
-        for panel in self._config_panels():
+        for panel in self.config_panels():
             panel._preview.release_media(paths)
 
     def capture_state(self) -> dict:
@@ -572,7 +568,7 @@ class InfoPaneTabs(QTabWidget):
                 "config": panel.current_config().to_dict(),
                 "launched_runs": panel.launched_runs(),
             }
-            for panel in self._config_panels()
+            for panel in self.config_panels()
         ]
         return {"tabs": tabs, "current": self.currentIndex()}
 

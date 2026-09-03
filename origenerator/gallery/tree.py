@@ -33,9 +33,9 @@ import json
 
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
-    ENHANCE_WORKFLOW,
     enhancement_recency,
 )
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     AllGroup,
     LoraGroup,

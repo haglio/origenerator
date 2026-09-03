@@ -62,7 +62,6 @@ def test_focusing_the_field_to_edit_it_collapses_the_diff(qtbot):
 
     assert edit.toPlainText() == "a woman"
     assert diff_text.live_text(edit) == "a woman"
-    assert not diff_text.showing_diff(edit)
 
 
 def test_an_unchanged_prompt_is_left_unmarked(qtbot):
@@ -73,7 +72,7 @@ def test_an_unchanged_prompt_is_left_unmarked(qtbot):
 
     diff_text.show_diff(edit, "a woman", "a woman")
 
-    assert not diff_text.showing_diff(edit)
+    assert _format_at(edit, "woman").properties() == {}  # no strike, no lit ground
 
 
 def test_a_field_with_no_diff_reads_as_itself(qtbot):

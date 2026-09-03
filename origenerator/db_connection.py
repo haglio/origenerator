@@ -1,0 +1,75 @@
+"""The database file, and the one way this package opens it.
+
+`db.py` is a 626-line class holding the schema, the connection policy and every
+query for six unrelated tables. The queries are coming out one table to a
+module; what every one of them shares is exactly this — the file, and how a
+connection to it is opened, used and closed.
+"""
+from __future__ import annotations
+
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+
+
+class SqliteFile:
+    """One sqlite database on disk.
+
+    ``connect`` commits on the way out, and always closes. Closing is what the
+    plain ``with sqlite3.connect(...)`` this replaced never did -- that one
+    commits and then leaves the connection to the garbage collector, which on
+    Windows keeps the file open long enough for the next rename or replace of it
+    to be refused (see :mod:`origenerator.db_salvage`).
+    """
+
+    def __init__(self, path: Path | str):
+        self.path = Path(path)
+
+    @contextmanager
+    def connect(self):
+        conn = sqlite3.connect(self.path)
+        conn.row_factory = sqlite3.Row
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+
+
+class ReadOnlySqliteFile(SqliteFile):
+    """A database this app may read and must not write.
+
+    A branch session's worktree database is one: it belongs to another install
+    of this app, and adoption reads it and never writes it (see
+    :mod:`origenerator.branch_session`, whose docstrings promise exactly that).
+    Opened ``?mode=ro``, so sqlite refuses the write rather than the reader
+    having to remember not to make one.
+
+    A worktree that is half-deleted, mid-write, or predates a column raises
+    ``sqlite3.Error`` here as anywhere, which is what lets adoption yield
+    nothing rather than fail a launch.
+    """
+
+    @contextmanager
+    def connect(self):
+        conn = sqlite3.connect(f"file:{self.path.as_posix()}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
+
+class Store:
+    """A group of queries over one table of a :class:`SqliteFile`.
+
+    Whole on its own: ``DeletionStore(SqliteFile(path))`` is a working object, so
+    a unit that touches one table can be handed that table rather than the whole
+    database. Making the file and its schema is not a store's job -- that is the
+    whole database's, and :class:`origenerator.db.Database` does it once.
+    """
+
+    def __init__(self, file: SqliteFile):
+        self._connect = file.connect

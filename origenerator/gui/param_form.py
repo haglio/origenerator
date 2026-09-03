@@ -141,8 +141,6 @@ class ParamForm(QWidget):
         # when absent, so callers can tell whether the control exists. It floats as
         # a free child of the Dimensions section, so it folds away with it.
         self._swap_dimensions_btn: QPushButton | None = None
-        self._width_label: QWidget | None = None
-        self._height_label: QWidget | None = None
         # Params a config carries but this form has no widget for — the workflow's
         # remaining hidden settings (VAE, CLIP…), or an import's extras. The form
         # round-trips whatever value it was given (so reusing a generation
@@ -358,9 +356,6 @@ class ParamForm(QWidget):
         btn.clicked.connect(self.swap_dimensions)
         btn.adjustSize()
         self._swap_dimensions_btn = btn
-        form = self._sections["Dimensions"].content_form()
-        self._width_label = form.labelForField(self._widgets["width"])
-        self._height_label = form.labelForField(self._widgets["height"])
         # The section's content lays its rows out on its own resize/show; follow
         # those so the free-floating button tracks them even when it unfolds.
         content.installEventFilter(self)
@@ -659,10 +654,8 @@ class ParamForm(QWidget):
                 w.addItems(pd.options)
             _select_combo_value(w, str(pd.default))
             return w
-        if pd.type == "image":
-            w = QLineEdit()
-            w.setText(str(pd.default))
-            return w
+        # An "image" field is a plain path box like any other -- what makes it an
+        # image field is the Browse button beside it, added above.
         w = QLineEdit()
         w.setText(str(pd.default))
         return w

@@ -125,8 +125,8 @@ class ThumbnailWidget(QWidget):
         self._apply_styles()
 
         # In a mixed listing (the Recents shelf) a corner badge names the kind;
-        # inside a single-type folder the caller leaves it off as redundant. It
-        # takes the top-right, the one corner the controls below leave alone.
+        # inside a single-type folder the caller leaves it off as redundant. Which
+        # corner it takes is MediaBadge's own business, and it says so.
         if media_type:
             MediaBadge(media_type, self)
 
@@ -178,16 +178,6 @@ class ThumbnailWidget(QWidget):
         self._selected = selected
         self._apply_styles()
 
-    def is_starred(self) -> bool:
-        return self._starred
-
-    def set_starred(self, starred: bool):
-        """Fill or hollow the corner star as the item's bookmark is toggled."""
-        if starred == self._starred:
-            return
-        self._starred = starred
-        self._sync_controls()
-
     def enhance_state(self) -> str | None:
         """What this tile's enhance corner is saying, or ``None`` where it has no
         plus at all (:mod:`origenerator.gui.corner_controls`)."""
@@ -216,9 +206,6 @@ class ThumbnailWidget(QWidget):
             self._controls.hide_all()
         else:
             self._controls.show_for(starred=self._starred, enhance=self._enhance)
-
-    def is_enhancing(self) -> bool:
-        return self._enhancing is not None
 
     def set_enhancing(self, run: EnhancingRun | None):
         """Show the enhancement being made of this image, or clear it away.

@@ -121,7 +121,12 @@ class SlideshowPlaylist:
 
     @property
     def order(self) -> list:
-        """The shuffled play order (item indices) — exposed for diagnostics."""
+        """The pass's item indices — how a slide's place in the set is named.
+
+        Read for the position readout ("picture 3 of 40") and for the hosting
+        session's HUD map, both of which have to say where in the *set* the
+        slide on screen is, not where in the shuffled pass.
+        """
         return list(self._order)
 
     @property

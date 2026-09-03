@@ -217,6 +217,12 @@ def test_seed_copy_button_sits_left_of_the_random_checkbox(qtbot):
     assert 0 <= copy_i < random_i
 
 
+def _row_label(form, key):
+    """The "Width"/"Height" word beside a field, as its section's form lays it."""
+    return form._sections["Dimensions"].content_form().labelForField(
+        form._widgets[key])
+
+
 def _dimension_defs():
     return [
         ParamDef("width", "Width", "int", 1280, min_val=64, max_val=4096, step=64),
@@ -278,8 +284,8 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # On the left — entirely clear of the input column.
     assert btn.right() <= width.left()
     # And clear of the words themselves: the labels start after its lane.
-    assert btn.right() <= form._width_label.geometry().left()
-    assert btn.right() <= form._height_label.geometry().left()
+    assert btn.right() <= _row_label(form, "width").geometry().left()
+    assert btn.right() <= _row_label(form, "height").geometry().left()
 
 
 # --- derived dimensions: the input-image size, shown locked & unlockable ----

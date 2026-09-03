@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.prompt_find import PromptFind
+from origenerator.gui.prompt_find import _CURRENT_BG, PromptFind
 
 
 def _fields(qtbot, *texts):
@@ -18,6 +18,18 @@ def _fields(qtbot, *texts):
     return host, made
 
 
+def _standing_on(*fields):
+    """The field carrying the current match's amber -- how the user sees which
+    of the results the find is standing on. ``_paint`` re-lays every field's
+    highlights on each step, so exactly one of them can carry it."""
+    for field in fields:
+        for selection in field.extraSelections():
+            if selection.format.background().color() == _CURRENT_BG:
+                return field
+    return None
+
+
+
 def test_a_search_counts_every_match_across_the_fields(qtbot):
     _host, (positive, negative) = _fields(qtbot, "a cat and a cat", "no cat")
     find = PromptFind()
@@ -25,7 +37,7 @@ def test_a_search_counts_every_match_across_the_fields(qtbot):
 
     assert find.search("cat") == 3
     assert find.position() == 1
-    assert find.current_field() is positive
+    assert _standing_on(positive, negative) is positive
 
 
 def test_matching_is_case_insensitive_and_non_overlapping(qtbot):
@@ -57,12 +69,13 @@ def test_stepping_walks_forward_and_wraps_both_ways(qtbot):
     find.set_fields([positive, negative])
     find.search("cat")
 
+    fields = (positive, negative)
     find.step(1)
-    assert (find.position(), find.current_field()) == (2, negative)
+    assert (find.position(), _standing_on(*fields)) == (2, negative)
     find.step(1)
-    assert (find.position(), find.current_field()) == (1, positive)  # wrapped on
+    assert (find.position(), _standing_on(*fields)) == (1, positive)  # wrapped on
     find.step(-1)
-    assert (find.position(), find.current_field()) == (2, negative)  # and back
+    assert (find.position(), _standing_on(*fields)) == (2, negative)  # and back
 
 
 def test_the_cursor_lands_on_the_current_match_without_selecting_it(qtbot):

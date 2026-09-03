@@ -12,7 +12,7 @@ name, which the tree and the folder tiles show on hover.
 
 import json
 
-from origenerator.gallery.enhance import ENHANCE_WORKFLOW
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (

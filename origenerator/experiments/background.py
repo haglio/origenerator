@@ -32,7 +32,9 @@ def queue_experiments(rows, policy, launch) -> int:
 
     Asks ``policy`` for one proposal at a time and submits it through ``launch``
     (the gallery's adapter, which returns the launched row's prompt_id, or
-    ``None`` when the launch didn't take). Returns how many were queued.
+    ``None`` when the launch didn't take). Each one that takes is logged with
+    the row it was bred from and the params it varies. Returns how many were
+    queued.
     """
     launched = misses = 0
     while launched < BATCH_SIZE and misses < _MAX_CONSECUTIVE_MISSES:
@@ -43,6 +45,14 @@ def queue_experiments(rows, policy, launch) -> int:
             misses += 1
         else:
             launched, misses = launched + 1, 0
+            # The provenance, once per launch. The app is shut while this batch
+            # runs, so a log line is the only place what it explored is written
+            # down -- a count alone cannot say which experiment varied what.
+            logger.info(
+                "Experiment %d: bred from %s, varying %s", launched,
+                proposal.base_prompt_id,
+                ", ".join(proposal.mutated_keys) or "nothing",
+            )
     logger.info("Queued %d experiment(s) to run while the app is closed", launched)
     return launched
 

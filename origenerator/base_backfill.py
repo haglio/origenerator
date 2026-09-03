@@ -31,8 +31,12 @@ from __future__ import annotations
 import json
 import logging
 import statistics
+import time
+import uuid
 
 from origenerator import gallery
+from origenerator.completion import extract_completion
+from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery.enhance import BASE_RENDER_SOURCE as SOURCE
 from origenerator.gallery.output import is_in_progress
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -164,6 +168,59 @@ def queue_base_renders(rows: list[dict], launch, limit: int | None = None,
     return queued
 
 
+# How often the run-it-now path asks ComfyUI whether a repair has landed, and how
+# long it waits before giving up on one. A repair is a single still, so the
+# timeout is generous for any model rather than tuned to one.
+RENDER_POLL_SECONDS = 2.0
+RENDER_TIMEOUT_SECONDS = 900
+
+
+def render_base_now(client, workflow, params: dict, *,
+                    now=time.monotonic, sleep=time.sleep) -> list[dict]:
+    """Run one repair to completion and return its output files; ``[]`` if it
+    never lands.
+
+    *client* is only ever asked for HTTP -- a
+    :class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt, and which a
+    ``ComfyUIClient`` forwards every call of. The polling below is why this one
+    is not on the app's own Qt loop.
+
+    The absence path does not block: it hands ComfyUI a batch through the app's
+    own :class:`~origenerator.gui.generation_job.GenerationJob`, which follows
+    each run over the websocket, and the next launch folds whatever finished.
+    That needs a Qt loop and a running app, and ``tools/backfill_base_renders``
+    has neither -- it is the same repair done in one sitting, with the app shut
+    -- so it submits and polls ``/history`` itself.
+
+    It lives here rather than in the tool because everything either path decides
+    about a repair is decided in this module: which rows need one
+    (:func:`rows_missing_their_base`), what recipe reproduces it
+    (:func:`base_params_for`), and how the result is attached
+    (:func:`attach_base`). A submit loop kept alone in ``tools/`` is the one
+    piece nothing here would notice going out of step.
+
+    ``now`` and ``sleep`` are injected so the wait can be tested without one.
+    """
+    prompt_id = str(uuid.uuid4())
+    client.submit_job(workflow.build_api_payload(params), prompt_id)
+    deadline = now() + RENDER_TIMEOUT_SECONDS
+    while now() < deadline:
+        sleep(RENDER_POLL_SECONDS)
+        # ComfyUI answers with nothing at all until the prompt finishes, so an
+        # empty history is "not yet", never "produced nothing".
+        history = client.fetch_history(prompt_id)
+        if not history:
+            continue
+        files, _thumb, _duration = extract_completion(
+            workflow, history, COMFYUI_OUTPUT_DIR, THUMB_DIR, prompt_id,
+            params=params,
+        )
+        return files
+    logger.warning("Base re-render %s did not land within %ss",
+                   prompt_id, RENDER_TIMEOUT_SECONDS)
+    return []
+
+
 def attach_base(db, target_id: str, files: list[dict]) -> bool:
     """Record ``files`` as the pre-enhance version of the image ``target_id``.
 
@@ -220,6 +277,8 @@ def fold_completed_base_renders(db) -> int:
 
 def cancel_base_renders(db, client) -> int:
     """Clear ComfyUI of the re-renders the last absence queued but didn't reach.
+
+    *client* is asked for HTTP only, as in :func:`render_base_now`.
 
     The app is open now, so the GPU is the user's. Mirrors the experimenter's
     own cancel: every one still queued is dropped and its abandoned row deleted,

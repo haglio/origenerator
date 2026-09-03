@@ -63,3 +63,39 @@ def test_backfill_counts_a_video_whose_file_is_missing(tmp_path):
     result = backfill(db, tmp_path, ensure=_recording_ensure(seen))
     assert seen == []  # nothing to script
     assert result["missing"] == 1 and result["written"] == 0
+
+
+def test_the_output_folder_is_resolved_when_the_sweep_runs(tmp_path, monkeypatch):
+    """It was a signature default -- ``output_dir: Path = COMFYUI_OUTPUT_DIR`` --
+    evaluated at import, from a constant that was itself built by reading the
+    content overlay at import. So the sweep could not be pointed anywhere the
+    module had not already decided on before anything called it."""
+    from origenerator import config, funscript_backfill
+
+    monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "elsewhere")
+    seen = []
+
+    funscript_backfill.backfill(
+        FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
+        resolve=lambda row, output_dir: seen.append(output_dir) or None,
+    )
+
+    assert seen == [tmp_path / "elsewhere"]
+
+
+def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
+    """The same defect on the same line: the stroke rate was bound at import."""
+    from origenerator import config, funscript_backfill
+
+    monkeypatch.setattr(config, "STROKE_DEFAULT_HZ", 2.5)
+    clip = tmp_path / "alpha.mp4"
+    clip.write_bytes(b"not really a video")
+    rates = []
+
+    funscript_backfill.backfill(
+        FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
+        resolve=lambda row, output_dir: (clip, "video"),
+        ensure=lambda path, *, loop, hz: rates.append(hz) or None,
+    )
+
+    assert rates == [2.5]

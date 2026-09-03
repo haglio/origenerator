@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 PARK_TCODE = "L00000I500"
 
 
-def device_on(*, now: float | None = None, rx_file=None) -> bool:
+def device_on(*, now: float | None = None, rx_file=None,
+              stale_s: float | None = None) -> bool:
     """Whether the OSR2 is there — the broker's own rule, off the broker's own stamp.
 
     The device speaking is the only evidence that it is switched on: the USB
@@ -47,11 +48,12 @@ def device_on(*, now: float | None = None, rx_file=None) -> bool:
     """
     current = time.time() if now is None else now
     path = Path(rx_file if rx_file is not None else config.OSR2_SERIAL_RX_FILE)
+    window = config.OSR2_RX_STALE_S if stale_s is None else stale_s
     try:
         spoke_at = float(path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return False
-    return (current - spoke_at) < config.OSR2_RX_STALE_S
+    return (current - spoke_at) < window
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:

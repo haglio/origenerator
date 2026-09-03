@@ -1,9 +1,10 @@
 import json
 import logging
+from dataclasses import replace
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QSplitter,
+    QWidget, QVBoxLayout, QFormLayout, QLabel, QSplitter,
     QPushButton, QScrollArea, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal
@@ -13,35 +14,35 @@ from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    EnhanceSettings, animated_preview_path,
-    build_image_config_index, config_folder_name, describe_enhance_params,
-    displayed_levels, enhance_params_for, find_source_image_id, item_label,
+    EnhanceSettings, build_image_config_index, config_folder_name, describe_enhance_params,
+    displayed_levels, enhance_params_for, item_label,
     level_matching_settings, media_type_of_row, output_file_path,
-    resolve_preview, row_output_files, rows_in_settings, settings_signature,
-    videos_from_source_image, workflow_output_type,
+    resolve_preview, rows_in_settings, settings_signature,
+    workflow_output_type,
 )
 from origenerator.generation_config import (
     ConfigSnapshot, configs_match, merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.enhance_versions import EnhanceVersions
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.export_lane import EXPORT_LANES
+from origenerator.gui.folder_request import FolderRequest
+from origenerator.gui.metadata_block import MetadataBlock
+from origenerator.gui.related_media import RelatedMedia
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
-from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.source_image_tile import SourceImageTile
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE, THUMB_DIR,
+    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR,
 )
 from origenerator.paths import ensure_shared_ui_on_path
 
@@ -50,7 +51,6 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 
-_ANIMATED_STRIP_LIMIT = 8  # most animation previews shown for one image at once
 _CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
 _RANDOM_SEED_CAPTION = "Generate with Random seed"
 _RANDOM_SEED_TIP = (
@@ -82,20 +82,7 @@ _WAITING_NOTE = "Waiting for preview…"
 # its tabs. The count is in the hover rather than on the face: the press does
 # submit that many runs at once, which is worth being able to read, but what
 # the button asks for is one thing — this folder, said the way it now reads.
-_REQUEST_CAPTION = "Request changes"
-_REQUEST_TIP = (
-    "Run all {count} images in this folder again, each with its own seed and "
-    "the prompt as you have rewritten it, landing them together in a new "
-    "folder."
-)
-# Its own wording rather than a plural switched off, which left "Run all 1
-# image ... each with its own seed" on a folder holding one.
-_REQUEST_TIP_ONE = (
-    "Run this folder's one image again with its own seed and the prompt as "
-    "you have rewritten it, landing it in a new folder."
-)
 _REQUEST_GUARD = "Rewrite the prompt first"
-_REQUEST_TITLE = "Request {folder}"
 
 
 class GenerateConfigPanel(QWidget):
@@ -107,10 +94,10 @@ class GenerateConfigPanel(QWidget):
     File/Created block above the editable form and, at its bottom, the displayed
     generation's related media, then a single button bank
     (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
-    There's no status line —
-    Generate itself doubles as the progress bar, filling as a run advances, and its
-    caption says when a press will draw a fresh seed rather than re-create a
-    generation these settings have already made. The
+    There's no status line: Generate only ever submits, and a run in flight is
+    watched in the strip's queue and on the browser pane's card. Its caption says
+    when a press will draw a fresh seed rather than re-create a generation these
+    settings have already made. The
     preview is driven from outside: a browsed selection's output, a running
     re-roll's live frames, or this config's newest matching result when idle.
 
@@ -184,7 +171,7 @@ class GenerateConfigPanel(QWidget):
         # configuration: the folder being rewritten, what to call it, how many
         # pictures the press will run, and the settings it opened on — which is
         # what says whether anything has actually been rewritten yet.
-        self._folder_request: dict | None = None
+        self._folder_request: FolderRequest | None = None
         # Where this tab's settings came from, when the Combine panel opened them
         # here: the act picked in its dropdown and the video whose recipe they
         # are, as (category, video_prompt_id). Carried so a run launched from this
@@ -204,17 +191,47 @@ class GenerateConfigPanel(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        # One column: the preview over the settings form and the Generate button.
-        # The preview leads (a running re-roll's frames, then the finished output);
-        # the button bank sits at the bottom, under the settings.
+        """The column, in the order it reads: the preview, then one scroll
+        holding everything that is about the settings -- the two on a splitter
+        -- then the button bank.
+
+        Each region below builds itself and says why it is the way it is; this
+        is only their order, which is the one thing about them a reader has to
+        take in at once. Two orderings inside them are load-bearing and are
+        noted where they happen: the picker takes its index before its signal is
+        connected, and _on_workflow_changed runs last, once everything it lays
+        out below the picker exists.
+        """
         layout = QVBoxLayout(self)
         # A margin round the whole tab, so nothing in it — the preview, the form's
         # headings, the button bank — sits flush against the pane's edge.
         layout.setContentsMargins(_PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN)
         layout.setSpacing(8)
-        # The preview leads the column: it mirrors a running re-roll's frames (driven
-        # from outside), shows the browsed generation's output when one is loaded, and
-        # the newest matching result otherwise.
+        self._build_preview()
+        body = self._build_body_scroll()
+        self._build_saved_generation_block(body)
+        self._build_workflow_header(body)
+        self._build_related_media(body)
+        # The slack goes here, under everything, so a short column rests at the
+        # top of the scroll rather than spreading itself out.
+        body.addStretch(1)
+        # The preview leads the splitter and the scroll follows it; hosted, a
+        # portrait picture stands the pair side by side (_reflow_for_the_media).
+        self._media_split.addWidget(self._scroll)
+        self._media_split.setStretchFactor(0, 3)
+        self._media_split.setStretchFactor(1, 4)
+        layout.addWidget(self._media_split, 1)
+        self._media_side_by_side = False
+        layout.addLayout(self._build_button_bank())
+        # Lays out the empty state on a fresh panel — no form, no estimate, and a
+        # Generate with nothing to run — and everything below the picker once a
+        # workflow is chosen. Last, because everything it lays out has to exist.
+        self._on_workflow_changed()
+
+    def _build_preview(self) -> PreviewWidget:
+        """The pane leading the column: a running re-roll's frames (driven from
+        outside), the browsed generation's output when one is loaded, and the
+        newest matching result otherwise."""
         self._preview = PreviewWidget(show_funscript_strip=True)
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
@@ -234,10 +251,17 @@ class GenerateConfigPanel(QWidget):
         self._media_split.setHandleWidth(6)
         self._media_split.addWidget(self._preview)
         self._preview.media_resized.connect(self._reflow_for_the_media)
-        # One scroll under the preview holds everything else: the read-only info on
-        # top, the editable form below it, so they scroll together. This replaces the
-        # old split — a cramped form-only scroll above a separate, non-scrolling info
-        # footer — that buried the form (width/height, the swap button) out of reach.
+        return self._preview
+
+    def _build_body_scroll(self) -> QVBoxLayout:
+        """One scroll under the preview for everything else, and the column
+        inside it that the three regions below fill.
+
+        The read-only info on top, the editable form below it, so they scroll
+        together. This replaces the old split — a cramped form-only scroll above
+        a separate, non-scrolling info footer — that buried the form
+        (width/height, the swap button) out of reach.
+        """
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         body_host = QWidget()
@@ -246,16 +270,21 @@ class GenerateConfigPanel(QWidget):
         # running under it; the pane's own margin covers the other three sides.
         body.setContentsMargins(0, 0, _PANE_MARGIN, 0)
         body.setSpacing(8)
+        self._scroll.setWidget(body_host)
+        return body
 
-        # The output file + when it was made, at the top of the scroll (shown only
-        # while displaying a saved generation). Params — editable or read-only — all
-        # live in the form below now, so this block carries only those two facts.
+    def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
+        """The output file + when it was made, at the top of the scroll (shown
+        only while displaying a saved generation). Above the form, because it
+        names what the settings below it made. Params — editable or read-only —
+        all live in that form now, so this block carries only those two facts."""
         self._metadata_block = MetadataBlock()
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
 
-        # Editable: the workflow picker, its typical-time estimate, and the param
-        # form (swapped into _form_host whenever the workflow changes).
+    def _build_workflow_header(self, body: QVBoxLayout) -> None:
+        """The editable half: the workflow picker, its typical-time estimate, and
+        the host the param form is swapped into whenever the workflow changes."""
         self._form_workflow_key = None  # which workflow the installed form belongs to
         # A form row rather than a plain side-by-side pair, so that squeezed past
         # what the word and the picker can share, the picker drops onto its own
@@ -300,29 +329,25 @@ class GenerateConfigPanel(QWidget):
         self._form_host_box.setContentsMargins(0, 0, 0, 0)
         body.addWidget(self._form_host)
 
-        # The displayed generation's related media, below the form: a clickable
-        # source-image tile for a video, or the "animated in" strip for an image.
-        # Mutually exclusive; both hidden when the tab isn't showing a saved
-        # generation.
-        #
-        # Stacked straight under it, with no stretch between. A stretch here used
-        # to push these to the bottom of the viewport, which meant folding a form
-        # section opened an elastic gap above them — the space growing by exactly
-        # what the fold saved, so the closer the form got the further away they
-        # went. Every gap in this column is the layout's spacing now, the same as
-        # between the form's own sections.
-        # One tile, one place: the start frame for a video, and for something a
-        # spoken request made, the item it was asked about — the same kind of
-        # link (this came from that) in the same spot, rather than a second tile
-        # teaching the reader a second place to look.
-        self._source_tile = SourceImageTile()
-        self._source_tile.activated.connect(self.source_activated)
-        body.addWidget(self._source_tile)
-        self._animated_strip = AnimatedVideoStrip()
-        self._animated_strip.video_activated.connect(self.animated_activated)
-        body.addWidget(self._animated_strip)
-        # Every version an enhanced image holds, alongside the other cross-links:
-        # the preview opens on the most-enhanced one, and this is where the
+    def _build_related_media(self, body: QVBoxLayout) -> None:
+        """What the generation on display is tied to, below the form: what it
+        was built from and what it was animated into
+        (:class:`~origenerator.gui.related_media.RelatedMedia`), and every
+        version an enhanced image holds. All of it hidden when the tab isn't
+        showing a saved generation.
+
+        Stacked straight under the form, with no stretch between. A stretch here
+        used to push these to the bottom of the viewport, which meant folding a
+        form section opened an elastic gap above them — the space growing by
+        exactly what the fold saved, so the closer the form got the further away
+        they went. Every gap in this column is the layout's spacing now, the same
+        as between the form's own sections.
+        """
+        self._related = RelatedMedia(video_rows=self._video_rows)
+        self._related.source_activated.connect(self.source_activated)
+        self._related.animated_activated.connect(self.animated_activated)
+        body.addWidget(self._related)
+        # The preview opens on the most-enhanced version, and this is where the
         # earlier levels (and the original) are, each captioned with what made
         # it and draggable onto the Enhance subpanel to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
@@ -331,62 +356,45 @@ class GenerateConfigPanel(QWidget):
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_levels_delete_requested)
         body.addWidget(self._versions)
-        # The slack goes here, under everything, so a short column rests at the
-        # top of the scroll rather than spreading itself out.
-        body.addStretch(1)
 
-        self._scroll.setWidget(body_host)
-        self._media_split.addWidget(self._scroll)
-        self._media_split.setStretchFactor(0, 3)
-        self._media_split.setStretchFactor(1, 4)
-        layout.addWidget(self._media_split, 1)
-        self._media_side_by_side = False
+    def _build_button_bank(self) -> FlowLayout:
+        """One bank, fixed under the scroll so Generate is always reachable.
 
-        # One button bank, fixed under the scroll so Generate is always reachable.
-        # Send-to-Evolver shows only while displaying a saved
-        # generation (and only for a video); the discard button only while a run
-        # this tab launched is in flight (the gallery owns the job and drives
-        # set_generating), throwing it away from the tab like the folder's tile —
-        # "Cancel", or "Next seed" while that folder is auto-generating. Generate
-        # only ever submits: a run in flight is watched in the strip's queue and on
-        # the browser pane's card, so the button says nothing about one.
-        # A flow rather than a row: the bank wraps onto a second line when the pane
-        # is too narrow to hold it, instead of squeezing every label down to an
-        # unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
-        # the corner it has always sat in, and at the family's two gaps — close
-        # along a row, wider between wrapped rows — like the gallery's own bank.
+        An export lane's button shows only while displaying a saved generation,
+        and only for a video; the discard button only while a run this tab
+        launched is in flight (the gallery owns the job and drives
+        set_generating), throwing it away from the tab like the folder's tile —
+        "Cancel", or "Next seed" while that folder is auto-generating. Generate
+        only ever submits: a run in flight is watched in the strip's queue and on
+        the browser pane's card, so the button says nothing about one.
+
+        A flow rather than a row: the bank wraps onto a second line when the pane
+        is too narrow to hold it, instead of squeezing every label down to an
+        unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
+        the corner it has always sat in, and at the family's two gaps — close
+        along a row, wider between wrapped rows — like the gallery's own bank.
+        """
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
-        self._evolver_btn = QPushButton("Send to Evolver")
-        self._evolver_btn.setToolTip(
-            "Copy this video into Evolver's inbox for sorting and upscaling."
-        )
-        self._evolver_btn.clicked.connect(self._on_send_to_evolver)
-        self._evolver_btn.hide()  # shown only for a video the tab is displaying
-        self._genau_btn = QPushButton("Send to Genau")
-        self._genau_btn.setToolTip(
-            "Send this clip down the Genau lane: Evolver upscales it on its usual "
-            "schedule, then delivers it to the folder Genau plays from."
-        )
-        self._genau_btn.clicked.connect(self._on_send_to_genau)
-        self._genau_btn.hide()  # shown only for a video the tab is displaying
+        # One button per lane, in the order EXPORT_LANES lists them: a third lane
+        # is a row of that table and appears here without another line of this.
+        self._lanes = {lane.name: replace(lane, button=QPushButton(lane.send_caption))
+                       for lane in EXPORT_LANES}
+        for lane in self._lanes.values():
+            lane.button.setToolTip(lane.tooltip)
+            lane.button.clicked.connect(
+                lambda _checked=False, lane=lane: self._on_send(lane))
+            lane.button.hide()  # shown only for a video the tab is displaying
+            btn_row.addWidget(lane.button)
         self._cancel_btn = QPushButton(discard_run_text(False))
         self._cancel_btn.setObjectName("cancelBtn")
         self._cancel_btn.clicked.connect(self.cancel_requested)
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
-        btn_row.addWidget(self._evolver_btn)
-        btn_row.addWidget(self._genau_btn)
         btn_row.addWidget(self._cancel_btn)
         btn_row.addWidget(self._generate_btn)
-        layout.addLayout(btn_row)
-
-
-        # Lays out the empty state on a fresh panel — no form, no estimate, and a
-        # Generate with nothing to run — and everything below the picker once a
-        # workflow is chosen.
-        self._on_workflow_changed()
+        return btn_row
 
     def minimumSizeHint(self):
         """Never narrower than the settings can be squeezed into.
@@ -565,11 +573,8 @@ class GenerateConfigPanel(QWidget):
     def _apply_generate_caption(self):
         """Say on the button what a press will do, and why, or leave it plain."""
         if self._folder_request is not None:
-            count = self._folder_request["count"]
-            self._generate_btn.set_caption(_REQUEST_CAPTION)
-            self._generate_btn.setToolTip(
-                _REQUEST_TIP_ONE if count == 1
-                else _REQUEST_TIP.format(count=count))
+            self._generate_btn.set_caption(self._folder_request.caption())
+            self._generate_btn.setToolTip(self._folder_request.tooltip())
             return
         wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
         config = self.current_config()
@@ -616,10 +621,10 @@ class GenerateConfigPanel(QWidget):
             # A request that asked for nothing would re-run every seed in the
             # folder to re-create the folder, so the press says what it still
             # needs rather than filling the queue with copies.
-            if configs_match(self._folder_request["opened_on"], self.current_config()):
+            if self._folder_request.is_unchanged(self.current_config()):
                 self._generate_btn.flash_guard(_REQUEST_GUARD)
                 return
-            self.changes_requested.emit(self._folder_request["folder_key"], key, params)
+            self.changes_requested.emit(self._folder_request.folder_key, key, params)
             return
         self.generate_requested.emit(key, params)
 
@@ -830,7 +835,7 @@ class GenerateConfigPanel(QWidget):
         folder wears in the tree, code or typed.
         """
         if self._folder_request is not None:
-            return _REQUEST_TITLE.format(folder=self._folder_request["label"])
+            return self._folder_request.title()
         name = item_label(self._displayed_row)
         if not name:
             key = self.settings_key()
@@ -910,14 +915,12 @@ class GenerateConfigPanel(QWidget):
         the number of images rather than of readable files.
         """
         self.prefill(workflow_name, params)  # ends any rewrite already here
-        self._folder_request = {
-            "folder_key": folder_key,
-            "label": label,
-            "count": len(pictures),
+        self._folder_request = FolderRequest(
+            folder_key=folder_key, label=label, count=len(pictures),
             # What the tab opened on, so a press can tell a rewrite from a
             # re-run of the folder it was rewriting.
-            "opened_on": self.current_config(),
-        }
+            opened_on=self.current_config(),
+        )
         self._hide_footer()
         self._displayed_row = None     # a folder, not a generation on display
         self._displayed_config = None  # ...so no settings for a notice to deviate from
@@ -941,10 +944,6 @@ class GenerateConfigPanel(QWidget):
         if self._param_form is not None:
             self._param_form.clear_prompt_rewrites()
         self._apply_generate_caption()
-
-    def requesting_changes(self) -> str | None:
-        """The folder this tab is rewriting the prompt of, or ``None``."""
-        return None if self._folder_request is None else self._folder_request["folder_key"]
 
     # --- displaying a saved generation (the browsed selection) ----------------
 
@@ -1220,12 +1219,11 @@ class GenerateConfigPanel(QWidget):
         the state of a blank tab, or one whose preview is a bare autoshow rather than
         an explicit selection."""
         self._metadata_block.hide()
+        self._related.clear()
         self._versions.hide()
         self._pending_enhancement = None  # nothing on display to be enhancing
-        self._source_tile.clear()
-        self._animated_strip.hide()
-        self._evolver_btn.hide()
-        self._genau_btn.hide()
+        for lane in self._lanes.values():
+            lane.button.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
         """Reveal the info and actions for the generation on display: the read-only
@@ -1241,12 +1239,11 @@ class GenerateConfigPanel(QWidget):
         # image is usually none of them — so it shows only when it has content
         # rather than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
+        self._related.show_row(row, image_rows, request)
         self._refresh_versions()
-        self._animated_strip.show_videos(self._animated_items(row))  # hides itself when empty
-        self._show_source_tile(row, image_rows, request)
         self._show_request_diff(request)
-        self._update_evolver_button(preview)
-        self._update_genau_button(preview)
+        for lane in self._lanes.values():
+            self._update_export_button(lane, preview)
 
     def displayed_row(self) -> dict | None:
         """The saved generation this tab is showing, or ``None``.
@@ -1403,33 +1400,6 @@ class GenerateConfigPanel(QWidget):
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
 
-    def _show_source_tile(self, row: dict, image_rows: list[dict], request=None):
-        """Reveal the source tile for whatever this row was built from, else hide
-        it. The tile shows that item's thumbnail and filename and navigates to it
-        on click.
-
-        For a video that is its start frame. For something a spoken request made
-        it is the item the request was asked about — the same relation in the
-        same place, since a requested image has no start frame and a requested
-        video's start frame is the one it already had.
-        """
-        source_id = find_source_image_id(row, image_rows)
-        source_row = next(
-            (r for r in image_rows if r.get("prompt_id") == source_id), None
-        ) if source_id else None
-        heading = None
-        if source_row is None and request is not None:
-            source_row = request.get("source_row")
-            heading = "Requested from"
-        if not source_row:
-            self._source_tile.clear()
-            return
-        files = row_output_files(source_row)
-        self._source_tile.show_source(
-            source_row["prompt_id"], source_row.get("thumbnail_path"),
-            files[0]["filename"] if files else "", heading=heading,
-        )
-
     def _show_request_diff(self, request):
         """Mark the prompt fields with what a spoken request changed — struck
         through where words went, lit where they arrived.
@@ -1450,86 +1420,53 @@ class GenerateConfigPanel(QWidget):
         ):
             self._param_form.show_prompt_diff(key, before or "", after or "")
 
-    def _animated_items(self, row: dict) -> list[tuple]:
-        """(prompt_id, looping-preview path, still path) for each video an image
-        was animated into — empty for anything but an image with animations."""
-        if media_type_of_row(row) != "image":
-            return []
-        videos = videos_from_source_image(row, self._video_rows())
-        if len(videos) > _ANIMATED_STRIP_LIMIT:
-            logger.info("Image %s has %d animations; showing the first %d",
-                        row["prompt_id"], len(videos), _ANIMATED_STRIP_LIMIT)
-        return [
-            (v["prompt_id"], animated_preview_path(v, COMFYUI_OUTPUT_DIR, THUMB_DIR),
-             v.get("thumbnail_path"))
-            for v in videos[:_ANIMATED_STRIP_LIMIT]
-        ]
-
     def _video_rows(self) -> list[dict]:
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]
 
-    # --- Send to Genau: hand a clip to the lane that ends in Genau's folder ---
+    # --- the export lanes: hand a displayed clip to a sibling app -----------
 
-    def _update_genau_button(self, preview):
-        """Reflect the displayed generation on the Send-to-Genau button.
+    def _update_export_button(self, lane, preview):
+        """Reflect the displayed generation on *lane*'s button.
 
-        Shown only for a video with a file on disk — the Genau lane carries clips.
-        One already sent shows a persistent, disabled "Sent ✓", read from the row
-        rather than the button's state so it survives a restart. ``preview`` is the
-        resolved ``(path, media_type)``, or ``None``.
+        Shown only for a video with a file on disk — every lane carries clips,
+        and Evolver is a video pipeline — so an image or a missing file hides it.
+        One already sent shows a persistent, disabled "Sent \u2713", read from the
+        row rather than from the button's own state so it survives a restart.
+        ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
         is_video = preview is not None and preview[1] == "video"
-        self._genau_btn.setVisible(is_video)
+        lane.button.setVisible(is_video)
         if not is_video:
             return
-        already_sent = bool(self._displayed_row and self._displayed_row.get("genau_exported_at"))
-        self._genau_btn.setText("Sent to Genau ✓" if already_sent else "Send to Genau")
-        self._genau_btn.setEnabled(not already_sent)
+        already_sent = bool(self._displayed_row and self._displayed_row.get(lane.flag))
+        lane.button.setText(lane.sent_caption if already_sent else lane.send_caption)
+        lane.button.setEnabled(not already_sent)
 
-    def _on_send_to_genau(self):
-        """Copy the displayed video into the Genau lane's inbox and remember the send.
+    def _on_send(self, lane):
+        """Copy the displayed video into *lane*'s inbox folder and remember it.
 
-        The same handoff as :meth:`_on_send_to_evolver` down to the re-read of the
-        persisted flag and the loud failure — only the source folder differs, which
-        is what tells Evolver to deliver the upscaled result to Genau.
+        Re-checks the persisted flag rather than the button's disabled state, so
+        the handoff cannot be repeated. The copy lands in another app's inbox
+        with no other visible result here, so a failure that reached only the log
+        would look exactly like a success — hence the dialog.
         """
-        if not self._displayed_row or self._displayed_row.get("genau_exported_at"):
+        if not self._displayed_row or self._displayed_row.get(lane.flag):
             return
         path = self._displayed_video_path()
         if path is None:
             return
         try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / GENAU_SOURCE)
+            evolver_export.export_video(path, EVOLVER_INBOX_DIR / lane.source)
         except Exception as e:
-            logger.exception("Failed to send %s to Genau", path)
-            QMessageBox.warning(
-                self._preview, "Send to Genau failed",
-                f"Could not send this clip to Genau:\n\n{e}",
-            )
+            logger.exception("Failed to send %s to %s", path, lane.name)
+            QMessageBox.warning(self._preview, lane.failure_title,
+                                lane.failure_body(e))
             return
         prompt_id = self._displayed_row["prompt_id"]
-        self._db.mark_genau_exported(prompt_id)
+        lane.mark(self._db, prompt_id)
         # Re-read so the row (and thus the button) reflects the persisted send.
         self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_genau_button((path, "video"))
-
-    # --- Send to Evolver: hand a displayed video to the sibling pipeline -------
-
-    def _update_evolver_button(self, preview):
-        """Reflect the displayed generation on the Send-to-Evolver button.
-
-        Shown only when the generation is a video with a file on disk; Evolver is
-        a video pipeline, so for an image or a missing file the button is hidden.
-        A video already sent shows a persistent, disabled "Sent ✓" (the flag is
-        read from the row, which the DB persists). ``preview`` is the resolved
-        ``(path, media_type)``, or ``None``."""
-        is_video = preview is not None and preview[1] == "video"
-        self._evolver_btn.setVisible(is_video)
-        if not is_video:
-            return
-        already_sent = bool(self._displayed_row and self._displayed_row.get("evolver_exported_at"))
-        self._evolver_btn.setText("Sent to Evolver ✓" if already_sent else "Send to Evolver")
-        self._evolver_btn.setEnabled(not already_sent)
+        self._update_export_button(lane, (path, "video"))
 
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
@@ -1560,29 +1497,3 @@ class GenerateConfigPanel(QWidget):
         media player to follow, and the funscript actions beside it. ``None`` when the
         tab isn't showing a video, or that video has no funscript."""
         return drive_target_for(self._displayed_video_path(), self._preview.player())
-
-    def _on_send_to_evolver(self):
-        """Copy the displayed video into Evolver's inbox and remember the send.
-
-        Re-checks the persisted flag (not just the button's disabled state) so the
-        handoff can't be repeated. The copy lands in another app's inbox with no
-        other visible result here, so a failure must surface loudly."""
-        if not self._displayed_row or self._displayed_row.get("evolver_exported_at"):
-            return
-        path = self._displayed_video_path()
-        if path is None:
-            return
-        try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
-        except Exception as e:
-            logger.exception("Failed to send %s to Evolver", path)
-            QMessageBox.warning(
-                self._preview, "Send to Evolver failed",
-                f"Could not send this video to Evolver:\n\n{e}",
-            )
-            return
-        prompt_id = self._displayed_row["prompt_id"]
-        self._db.mark_evolver_exported(prompt_id)
-        # Re-read so the row (and thus the button) reflects the persisted send.
-        self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_evolver_button((path, "video"))

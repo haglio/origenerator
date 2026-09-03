@@ -1,5 +1,8 @@
 import sys
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
 # The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -42,11 +45,10 @@ def _name_this_process() -> None:
     """
     try:
         from app_support.process_identity import ProcessNamer
-        from pathlib import Path as _Path
 
-        icon = _Path(__file__).resolve().parent.parent / "icon.ico"
+        icon = Path(__file__).resolve().parent.parent / "icon.ico"
         ProcessNamer("Origenerator", icon=icon).prepare_launcher(
-            "Origenerator", _Path(sys.executable).with_name("python.exe"))
+            "Origenerator", Path(sys.executable).with_name("python.exe"))
     except Exception:
         pass  # Cosmetic: costs a name in the task list, never a launch.
 
@@ -172,7 +174,384 @@ def _warm_voice_runtimes() -> None:
             pass  # no voice extra (or a broken one): the app still boots
 
 
-def main(argv: list[str] | None = None):
+@dataclass(frozen=True)
+class Library:
+    """What the maintenance passes below work on.
+
+    The live database and the ComfyUI client, plus the four folders they read
+    and write. One record rather than four more parameters on every pass: they
+    all draw from the same set, and a pass that needs none of it still has to be
+    callable the same way as the one that needs all of it.
+    """
+    db: object
+    client: object
+    output_dir: Path
+    thumb_dir: Path
+    log_dir: Path
+    worktrees: Path
+
+
+@dataclass(frozen=True)
+class BootPass:
+    """One best-effort pass over the library, and everything the boot says about it.
+
+    These were eleven copies of the same seven lines with two words changed --
+    a status line, a call, a count logged when there was one, and a warning that
+    swallowed whatever went wrong -- so adding a twelfth meant editing the boot
+    rather than registering a pass. What varies between them is exactly this
+    record: the splash line (``None`` to run under the previous pass's line, for
+    a pass that is a second half rather than a step of its own), what to call,
+    the message for a non-zero count, and the message for a failure.
+
+    Every pass is best effort. A library the app cannot finish tidying is still
+    a library it must open, so each is guarded on its own and a failure costs
+    one warning line rather than the launch.
+    """
+    status: str | None
+    run: Callable[[Library], object]
+    failure: str
+    counted: str | None = None
+
+
+def _adopt_branch_rows(library: Library):
+    """What a preview branch generated comes home as the rows that session
+    recorded -- generated, full params -- before the import scan below can find
+    the bare files and reconstruct lesser "imported" rows for them."""
+    from origenerator.branch_session import adopt_branch_rows
+
+    return adopt_branch_rows(
+        library.db, library.worktrees, library.output_dir, library.thumb_dir)
+
+
+def _adopt_branch_curation(library: Library):
+    """And the bookmarks that session made on everything else. Separately
+    guarded: a worktree database that defeats one pass has no bearing on the
+    other, and neither is worth a failed launch."""
+    from origenerator.branch_session import adopt_branch_curation
+
+    return adopt_branch_curation(library.db, library.worktrees)
+
+
+def _reconnect_to_running_generations(library: Library):
+    """Resolve any generation left mid-run by a previous session against ComfyUI
+    (finished-while-away, still-running, or gone). Runs before the import below
+    so a finalized job's output is already recorded and isn't imported twice."""
+    from origenerator.inflight import reconcile_in_flight
+
+    reconcile_in_flight(library.db, library.client, library.output_dir, library.thumb_dir)
+
+
+def _import_new_files(library: Library):
+    from origenerator.importer import import_comfyui_output
+
+    return import_comfyui_output(library.output_dir, library.db, library.thumb_dir)
+
+
+def _merge_video_sidecars(library: Library):
+    """Fold each video's metadata-PNG sidecar into one playable gallery entry."""
+    from origenerator.importer import merge_video_sidecar_rows
+
+    return merge_video_sidecar_rows(library.db)
+
+
+def _backfill_workflow_labels(library: Library):
+    """Relabel any imports that predate filename-based workflow inference."""
+    from origenerator.importer import backfill_unknown_workflows
+
+    return backfill_unknown_workflows(library.db)
+
+
+def _backfill_model_and_lora(library: Library):
+    """Fill the base model and LoRA onto imports that predate reading them from
+    the embedded graph, so they nest into the gallery's model/LoRA folders."""
+    from origenerator.importer import backfill_model_and_lora_params
+
+    return backfill_model_and_lora_params(library.db)
+
+
+def _backfill_input_images(library: Library):
+    """Fill input_image onto image-to-video imports that predate reading it from
+    the embedded graph, so each video links back to the gallery image it was
+    animated from (the same link a freshly generated i2v/flf2v already carries)."""
+    from origenerator.importer import backfill_input_image
+
+    return backfill_input_image(library.db)
+
+
+def _fold_enhancements(library: Library):
+    """A standalone enhance is an upgrade of an existing image, not its own
+    generation: fold every finished one onto its source. After the scan, because
+    an enhance the live app never recorded -- a branch session's above all --
+    reaches here as a bare file, and the standalone image the scan just
+    reconstructed from it is exactly what there is to fold away."""
+    from origenerator.gallery import fold_completed_enhancements
+
+    fold_completed_enhancements(library.db)
+
+
+def _repair_thumbnails(library: Library):
+    """Re-render any thumbnail an old filename-stem collision left wrong or
+    missing, so each generation's thumbnail matches its own preview again."""
+    from origenerator.importer import backfill_shared_thumbnails
+
+    return backfill_shared_thumbnails(library.db, library.output_dir, library.thumb_dir)
+
+
+def _recover_generation_times(library: Library):
+    """Recover how long past generations took from ComfyUI's console logs, so
+    estimates have history to draw on before any new run is timed live."""
+    from origenerator.log_backfill import backfill_durations_from_logs
+
+    return backfill_durations_from_logs(
+        library.db, sorted(library.log_dir.glob("comfyui*.log")))
+
+
+def _reconcile_bookmarks(library: Library):
+    """Heal stars, custom names and hand-composed folders whose folder key
+    drifted after a key formula change, and stamp identity onto live ones so the
+    next change is handled automatically. Runs after the backfills above -- they
+    can move a generation's folder by filling in its workflow/model/LoRA -- so
+    the tree it reconciles against is final, and it is read once for both."""
+    from origenerator.bookmark_reconcile import reconcile_bookmarks
+
+    reconcile_bookmarks(library.db)
+
+
+#: The library maintenance a live launch performs, in order. The order is
+#: load-bearing: adoption before the import scan, the enhancement fold after it,
+#: and the folder reconciles last because every backfill above can move a
+#: generation's folder. tests/test_app.py reads this sequence back.
+MAINTENANCE = (
+    BootPass("Adopting branch-session results...", _adopt_branch_rows,
+             counted="Adopted %d generations from branch sessions",
+             failure="Branch-session adoption failed: %s"),
+    BootPass(None, _adopt_branch_curation,
+             counted="Adopted %d bookmark(s) from branch sessions",
+             failure="Branch-session bookmark adoption failed: %s"),
+    BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
+             failure="Reconcile of in-flight generations failed: %s"),
+    BootPass("Scanning for new images...", _import_new_files,
+             counted="Imported %d existing files from ComfyUI output",
+             failure="Import failed: %s"),
+    BootPass("Tidying up video previews...", _merge_video_sidecars,
+             counted="Consolidated %d video sidecar previews",
+             failure="Sidecar consolidation failed: %s"),
+    BootPass("Updating workflow labels...", _backfill_workflow_labels,
+             counted="Relabelled %d previously-unknown imports",
+             failure="Workflow backfill failed: %s"),
+    BootPass("Sorting by model and LoRA...", _backfill_model_and_lora,
+             counted="Backfilled model/LoRA for %d imports",
+             failure="Model/LoRA backfill failed: %s"),
+    BootPass("Linking videos to their source images...", _backfill_input_images,
+             counted="Backfilled source image for %d video imports",
+             failure="Input-image backfill failed: %s"),
+    BootPass("Folding enhancements into their images...", _fold_enhancements,
+             failure="Enhancement fold failed: %s"),
+    BootPass("Repairing thumbnails...", _repair_thumbnails,
+             counted="Repaired %d colliding thumbnails",
+             failure="Thumbnail repair failed: %s"),
+    BootPass("Recovering generation times...", _recover_generation_times,
+             counted="Backfilled generation time for %d imports from logs",
+             failure="Duration backfill failed: %s"),
+    BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
+             failure="Folder bookmark reconcile failed: %s"),
+)
+
+#: What a branch session maintains instead: nothing but the enhancement fold.
+#: Every pass above already ran on the database it was seeded from, and re-running
+#: them would only slow the preview down (the import scan alone reads the whole
+#: output history) and write records the live install then imports as duplicates
+#: of its own. The fold is the exception because it is not maintenance of the
+#: library at all: it rewrites rows the seeded copy already holds, touching no
+#: file and reading no output history. Left out, a preview would show
+#: enhancements standing as images of their own long after the live app stopped
+#: doing that -- a difference in the copy, not in the code.
+BRANCH_SESSION_MAINTENANCE = (
+    BootPass("Folding enhancements into their images...", _fold_enhancements,
+             failure="Enhancement fold failed: %s"),
+)
+
+
+def _run_maintenance(library: Library, passes, status, logger) -> None:
+    """Run each pass, saying what it is doing and surviving what it cannot do."""
+    for boot_pass in passes:
+        if boot_pass.status is not None:
+            status(boot_pass.status)
+        try:
+            count = boot_pass.run(library)
+            if boot_pass.counted and count:
+                logger.info(boot_pass.counted, count)
+        except Exception as e:
+            logger.warning(boot_pass.failure, e)
+
+
+def _configure_logging(state_dir: Path):
+    """The app's log: the console the launcher redirects, and a rotating file."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    log_handlers = [logging.StreamHandler()]
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        log_handlers.append(RotatingFileHandler(
+            state_dir / "origenerator.log", maxBytes=1_000_000, backupCount=2,
+            encoding="utf-8",
+        ))
+    except OSError:
+        pass  # console logging still works if the file can't be opened
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=log_handlers,
+    )
+    return logging.getLogger(__name__)
+
+
+def _open_the_splash(fun_time, app):
+    """The boot's own window, or ``None`` when the session owns that job.
+
+    Shown before the slow imports and boot work so the user gets immediate
+    feedback; each phase updates its status line, and ``processEvents`` keeps the
+    busy sweep animating while the main thread is blocked.
+
+    Hosted by Fun Time there is NO splash at all: the session's own loading
+    screen owns the boot experience and this app boots parked, so a splash here
+    has no audience -- and it is an always-on-top window whose lifetime is the
+    boot, which on a slow boot left it sitting over a satellite region after the
+    session revealed ("the landscape player is behind other windows on startup":
+    the covering window was this splash). The boot phases still land in the log.
+    """
+    if fun_time is not None:
+        return None
+    from origenerator.gui.loading_screen import LoadingScreen
+
+    loading = LoadingScreen()
+    loading.show()
+    _bring_to_front(loading)
+    app.processEvents()
+    return loading
+
+
+def _status_line(loading, app, logger):
+    """Where a phase says what it is doing: the splash, or the log without one."""
+    def status(message: str) -> None:
+        if loading is not None:
+            loading.set_status(message)
+        else:
+            logger.info("Boot: %s", message)
+        app.processEvents()
+
+    return status
+
+
+def _open_database(db_path: Path, *, branch_session: bool, logger):
+    """The live database -- seeded from the primary install first in a preview.
+
+    A branch session (a worktree run via launch_preview_branch.vbs) is here to
+    show unlanded code, not to maintain the library, so it starts from the
+    primary install's database rather than re-scanning ComfyUI's whole history
+    into a fresh one (see origenerator.branch_session).
+    """
+    if branch_session:
+        from origenerator.branch_session import seed_branch_db
+        from origenerator.config import project_dir
+        try:
+            primary_db = project_dir("origenerator") / "state" / db_path.name
+            if seed_branch_db(primary_db, db_path):
+                logger.info("Branch session: database seeded from %s", primary_db)
+        except Exception as e:
+            logger.warning("Branch DB seed failed (starting empty): %s", e)
+    from origenerator.db import Database
+
+    return Database(db_path)
+
+
+def _sweep_the_recovery_bin(db, state_dir: Path, logger) -> None:
+    """Age out the recovery bin: deletions past their window are ended for good
+    and any trash folder no surviving record names is reclaimed (see
+    origenerator.recovery).
+
+    Never in a branch session -- its database is a copy, so the deletions it
+    inherited point at the *live* install's held files, and both purging and
+    restoring them from there would reach into the library the live app is
+    still showing.
+    """
+    from origenerator import recovery
+    from origenerator.branch_session import session_trash
+    try:
+        expired = recovery.sweep(db, session_trash(state_dir / "trash"))
+        if expired:
+            logger.info("Recovery bin: ended %d expired deletion(s)", expired)
+    except Exception as e:
+        logger.warning("Recovery-bin sweep failed: %s", e)
+
+
+def _build_window(client, db, app_state, fun_time):
+    """The main window, shown -- or parked, when a session hosts it."""
+    from origenerator.gui.main_window import OrigeneratorWindow
+
+    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
+    if fun_time is not None:
+        # The session's channels: its verbs onto the region shows, the paused
+        # flag over them, and the occupancy status back.  Parented to the
+        # window so it lives exactly as long as the app.
+        from origenerator.gui.fun_time_bridge import FunTimeBridge
+        FunTimeBridge(fun_time, window._gallery_view, parent=window)
+        # Parked until the session's own mode switch restores it: the session
+        # may be in player mode, where popping over the RFB would be wrong.
+        window.showMinimized()
+    else:
+        window.show()
+    return window
+
+
+def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
+    """Say which keys `content.local.json` is short of, and stop the launch.
+
+    That file is git-ignored and hand-maintained, so it does not gain a key when
+    the app does -- and the committed example it is written from has gone from
+    three keys to nine in six weeks. Three of those nine are read with a bare
+    subscript, so an overlay one release behind used to be a dead icon: no
+    window, and the traceback in a launcher log nobody opens. The other six went
+    quietly one feature at a time, which is worse in its own way -- a stroke
+    aimed at the wrong part of the frame reads as the model having a bad day.
+
+    One rule for all nine, then: name what is missing and do not start. A key
+    can be left EMPTY to switch that feature off, so this is not a demand to
+    configure what you do not use.
+
+    Nothing has been logged yet at this point -- logging is configured from
+    ``config``, which is what a missing key stops from importing -- so this goes
+    to the console the launcher redirects into ``state/origenerator_launcher.log``,
+    and to a dialog when there is a screen to put one on. Hosted by Fun Time
+    there is not: nobody is at this window to dismiss a modal and it would sit
+    over one of the session's players, which is why the splash is suppressed
+    there too.
+    """
+    from origenerator.content import EXAMPLE_CONTENT, LOCAL_CONTENT
+
+    message = (
+        f"{LOCAL_CONTENT} is missing {len(missing)} key(s) this version needs:\n\n"
+        + "\n".join(f"    {key}" for key in missing)
+        + f"\n\nCopy them from {EXAMPLE_CONTENT.name}. A key can be left empty "
+          "to switch that feature off."
+    )
+    print(f"Origenerator: {message}", file=sys.stderr)
+    if fun_time is None:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.critical(None, "Origenerator: incomplete content overlay", message)
+    return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Boot the app and run it; return the code the process should exit with.
+
+    ``sys.exit`` is ``__main__.py``'s, not this function's: both .vbs launchers
+    run ``python -m origenerator`` and read the code back out of a hidden
+    console, so the value has to reach the process either way -- but a ``main``
+    that returns it can be called and read by a test, where one that raises
+    can only be caught.
+    """
     from origenerator.fun_time_mode import parse_app_args
 
     app_args = parse_app_args(sys.argv[1:] if argv is None else argv)
@@ -187,37 +566,25 @@ def main(argv: list[str] | None = None):
     _init_windows_taskbar_identity(app_args.taskbar_identity)
     _name_this_process()
 
-    import logging
-
     from PyQt6.QtWidgets import QApplication
-
-    from origenerator.config import (
-        DB_PATH, STATE_DIR, COMFYUI_HOST, COMFYUI_PORT,
-        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
-    )
-    from origenerator.gui.loading_screen import LoadingScreen
-
-    from logging.handlers import RotatingFileHandler
-    log_handlers = [logging.StreamHandler()]
-    try:
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
-        log_handlers.append(RotatingFileHandler(
-            STATE_DIR / "origenerator.log", maxBytes=1_000_000, backupCount=2,
-            encoding="utf-8",
-        ))
-    except OSError:
-        pass  # console logging still works if the file can't be opened
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        handlers=log_handlers,
-    )
-    logger = logging.getLogger(__name__)
-    logger.info("BUILD MARKERS: slideshow=random, voice=always-listening (Auto = voice on)")
 
     # Qt gets no argv of ours: the launch contract (see fun_time_mode) is parsed
     # above, and letting Qt re-read those flags would only invite collisions.
     app = QApplication.instance() or QApplication(sys.argv[:1])
+
+    # Before config, because config is the first thing a missing key stops from
+    # importing, and before the splash, because there is nothing to put one over.
+    from origenerator.content import missing_overlay_keys
+    missing = missing_overlay_keys()
+    if missing:
+        return _refuse_an_incomplete_overlay(missing, fun_time)
+
+    from origenerator.config import (
+        DB_PATH, PROJECT_DIR, STATE_DIR, COMFYUI_HOST, COMFYUI_PORT,
+        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
+    )
+
+    logger = _configure_logging(STATE_DIR)
 
     # The one place the stylesheet is applied, and it must be the application:
     # QToolTip popups are top-level widgets a window-level sheet never reaches,
@@ -240,29 +607,8 @@ def main(argv: list[str] | None = None):
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
 
-    # Show the splash before the slow imports/boot work below so the user gets
-    # immediate feedback. Each phase updates its status line; app.processEvents
-    # keeps the busy sweep animating while the main thread is blocked.
-    #
-    # Hosted by Fun Time there is NO splash at all: the session's own loading
-    # screen owns the boot experience and this app boots parked, so a splash
-    # here has no audience — and it is an always-on-top window whose lifetime
-    # is the boot, which on a slow boot left it sitting over a satellite
-    # region after the session revealed ("the landscape player is behind other
-    # windows on startup": the covering window was this splash).  The boot
-    # phases still land in the log.
-    loading = LoadingScreen() if fun_time is None else None
-    if loading is not None:
-        loading.show()
-        _bring_to_front(loading)
-        app.processEvents()
-
-    def status(message: str) -> None:
-        if loading is not None:
-            loading.set_status(message)
-        else:
-            logger.info("Boot: %s", message)
-        app.processEvents()
+    loading = _open_the_splash(fun_time, app)
+    status = _status_line(loading, app, logger)
 
     status("Starting ComfyUI server...")
     _ensure_comfyui_server(
@@ -270,41 +616,13 @@ def main(argv: list[str] | None = None):
         on_status=status, pump_events=app.processEvents,
     )
 
-    # A branch session (a worktree run via launch_preview_branch.vbs) is here to
-    # show unlanded code, not to maintain the library — so it starts from the
-    # primary install's database rather than re-scanning ComfyUI's whole history
-    # into a fresh one, and skips the maintenance passes below (see
-    # origenerator.branch_session).
-    from origenerator.branch_session import is_branch_session, seed_branch_db
+    from origenerator.branch_session import is_branch_session
     branch_session = is_branch_session()
 
     status("Opening the image library...")
-    if branch_session:
-        from origenerator.config import project_dir
-        try:
-            primary_db = project_dir("origenerator") / "state" / DB_PATH.name
-            if seed_branch_db(primary_db, DB_PATH):
-                logger.info("Branch session: database seeded from %s", primary_db)
-        except Exception as e:
-            logger.warning("Branch DB seed failed (starting empty): %s", e)
-    from origenerator.db import Database
-    db = Database(DB_PATH)
-
-    # Age out the recovery bin: deletions past their window are ended for good
-    # and any trash folder no surviving record names is reclaimed (see
-    # origenerator.recovery). A branch session sweeps nothing at all — its
-    # database is a copy, so the deletions it inherited point at the *live*
-    # install's held files, and both purging and restoring them from here would
-    # reach into the library the live app is still showing.
+    db = _open_database(DB_PATH, branch_session=branch_session, logger=logger)
     if not branch_session:
-        from origenerator.branch_session import session_trash
-        from origenerator import recovery
-        try:
-            expired = recovery.sweep(db, session_trash(STATE_DIR / "trash"))
-            if expired:
-                logger.info("Recovery bin: ended %d expired deletion(s)", expired)
-        except Exception as e:
-            logger.warning("Recovery-bin sweep failed: %s", e)
+        _sweep_the_recovery_bin(db, STATE_DIR, logger)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -319,180 +637,21 @@ def main(argv: list[str] | None = None):
     )
 
     if branch_session:
-        # The seeded database is already maintained — every pass below ran on it
-        # in the live app. Re-running them here would only slow the preview down
-        # (the import scan alone reads the whole output history) and write
-        # records the live install then imports as duplicates of its own.
         status("Skipping library maintenance (branch session)...")
         logger.info("Branch session: library maintenance left to the live app")
-        # The enhancement fold is the exception, because it is not maintenance
-        # of the library at all: it rewrites rows the seeded copy already holds,
-        # touching no file and reading no output history. Left out, a preview
-        # would show enhancements standing as images of their own long after the
-        # live app stopped doing that — a difference in the copy, not the code.
-        status("Folding enhancements into their images...")
-        from origenerator.gallery import fold_completed_enhancements
-        try:
-            fold_completed_enhancements(db)
-        except Exception as e:
-            logger.warning("Enhancement fold failed: %s", e)
-    else:
-        status("Adopting branch-session results...")
-        # What a preview branch generated comes home as the rows that session
-        # recorded — generated, full params — before the import scan below can
-        # find the bare files and reconstruct lesser "imported" rows for them.
-        from origenerator.branch_session import adopt_branch_rows
-        from origenerator.config import PROJECT_DIR
-        try:
-            adopted = adopt_branch_rows(
-                db, PROJECT_DIR / ".claude" / "worktrees", COMFYUI_OUTPUT_DIR, THUMB_DIR)
-            if adopted:
-                logger.info("Adopted %d generations from branch sessions", adopted)
-        except Exception as e:
-            logger.warning("Branch-session adoption failed: %s", e)
-
-        # And the bookmarks that session made on everything else. Separately
-        # guarded: a worktree database that defeats one pass has no bearing on
-        # the other, and neither is worth a failed launch.
-        from origenerator.branch_session import adopt_branch_curation
-        try:
-            marked = adopt_branch_curation(db, PROJECT_DIR / ".claude" / "worktrees")
-            if marked:
-                logger.info("Adopted %d bookmark(s) from branch sessions", marked)
-        except Exception as e:
-            logger.warning("Branch-session bookmark adoption failed: %s", e)
-
-        status("Reconnecting to running generations...")
-        # Resolve any generation left mid-run by a previous session against ComfyUI
-        # (finished-while-away, still-running, or gone). Runs before the import below
-        # so a finalized job's output is already recorded and isn't imported twice.
-        from origenerator.reconcile import reconcile_in_flight
-        try:
-            reconcile_in_flight(db, client, COMFYUI_OUTPUT_DIR, THUMB_DIR)
-        except Exception as e:
-            logger.warning("Reconcile of in-flight generations failed: %s", e)
-
-        status("Scanning for new images...")
-        from origenerator.importer import (
-            backfill_input_image,
-            backfill_model_and_lora_params,
-            backfill_shared_thumbnails,
-            backfill_unknown_workflows,
-            import_comfyui_output,
-            merge_video_sidecar_rows,
-        )
-        try:
-            count = import_comfyui_output(COMFYUI_OUTPUT_DIR, db, THUMB_DIR)
-            if count:
-                logger.info("Imported %d existing files from ComfyUI output", count)
-        except Exception as e:
-            logger.warning("Import failed: %s", e)
-
-        status("Tidying up video previews...")
-        # Fold each video's metadata-PNG sidecar into one playable gallery entry.
-        try:
-            consolidated = merge_video_sidecar_rows(db)
-            if consolidated:
-                logger.info("Consolidated %d video sidecar previews", consolidated)
-        except Exception as e:
-            logger.warning("Sidecar consolidation failed: %s", e)
-
-        status("Updating workflow labels...")
-        # Relabel any imports that predate filename-based workflow inference.
-        try:
-            relabeled = backfill_unknown_workflows(db)
-            if relabeled:
-                logger.info("Relabelled %d previously-unknown imports", relabeled)
-        except Exception as e:
-            logger.warning("Workflow backfill failed: %s", e)
-
-        status("Sorting by model and LoRA...")
-        # Fill the base model and LoRA onto imports that predate reading them from
-        # the embedded graph, so they nest into the gallery's model/LoRA folders.
-        try:
-            sorted_ = backfill_model_and_lora_params(db)
-            if sorted_:
-                logger.info("Backfilled model/LoRA for %d imports", sorted_)
-        except Exception as e:
-            logger.warning("Model/LoRA backfill failed: %s", e)
-
-        status("Linking videos to their source images...")
-        # Fill input_image onto image-to-video imports that predate reading it from
-        # the embedded graph, so each video links back to the gallery image it was
-        # animated from (the same link a freshly generated i2v/flf2v already carries).
-        try:
-            linked = backfill_input_image(db)
-            if linked:
-                logger.info("Backfilled source image for %d video imports", linked)
-        except Exception as e:
-            logger.warning("Input-image backfill failed: %s", e)
-
-        status("Folding enhancements into their images...")
-        # A standalone enhance is an upgrade of an existing image, not its own
-        # generation: fold every finished one onto its source. After the scan,
-        # because an enhance the live app never recorded — a branch session's
-        # above all — reaches here as a bare file, and the standalone image the
-        # scan just reconstructed from it is exactly what there is to fold away.
-        from origenerator.gallery import fold_completed_enhancements
-        try:
-            fold_completed_enhancements(db)
-        except Exception as e:
-            logger.warning("Enhancement fold failed: %s", e)
-
-        status("Repairing thumbnails...")
-        # Re-render any thumbnail an old filename-stem collision left wrong or
-        # missing, so each generation's thumbnail matches its own preview again.
-        try:
-            fixed = backfill_shared_thumbnails(db, COMFYUI_OUTPUT_DIR, THUMB_DIR)
-            if fixed:
-                logger.info("Repaired %d colliding thumbnails", fixed)
-        except Exception as e:
-            logger.warning("Thumbnail repair failed: %s", e)
-
-        status("Recovering generation times...")
-        # Recover how long past generations took from ComfyUI's console logs, so
-        # estimates have history to draw on before any new run is timed live.
-        from origenerator.log_backfill import backfill_durations_from_logs
-        try:
-            log_paths = sorted(COMFYUI_LOG_DIR.glob("comfyui*.log"))
-            timed = backfill_durations_from_logs(db, log_paths)
-            if timed:
-                logger.info("Backfilled generation time for %d imports from logs", timed)
-        except Exception as e:
-            logger.warning("Duration backfill failed: %s", e)
-
-        status("Restoring folder bookmarks...")
-        # Heal stars and custom names whose folder key drifted after a key formula
-        # change, and stamp identity onto live ones so the next change is handled
-        # automatically. Runs after the backfills above — they can move a generation's
-        # folder by filling in its workflow/model/LoRA — so the tree it reconciles
-        # against is final.
-        from origenerator.reconcile import reconcile_custom_folders, reconcile_folder_meta
-        try:
-            reconcile_folder_meta(db)
-            # The folders the user composed by hand gather members by the same
-            # keys, so they drift the same way and heal the same way.
-            reconcile_custom_folders(db)
-        except Exception as e:
-            logger.warning("Folder bookmark reconcile failed: %s", e)
+    _run_maintenance(
+        Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
+                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR,
+                worktrees=PROJECT_DIR / ".claude" / "worktrees"),
+        BRANCH_SESSION_MAINTENANCE if branch_session else MAINTENANCE,
+        status, logger,
+    )
 
     status("Connecting to ComfyUI...")
     client.start()
 
     status("Building the interface...")
-    from origenerator.gui.main_window import OrigeneratorWindow
-    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
-    if fun_time is not None:
-        # The session's channels: its verbs onto the region shows, the paused
-        # flag over them, and the occupancy status back.  Parented to the
-        # window so it lives exactly as long as the app.
-        from origenerator.gui.fun_time_bridge import FunTimeBridge
-        FunTimeBridge(fun_time, window._gallery_view, parent=window)
-        # Parked until the session's own mode switch restores it: the session
-        # may be in player mode, where popping over the RFB would be wrong.
-        window.showMinimized()
-    else:
-        window.show()
+    window = _build_window(client, db, app_state, fun_time)
 
     if loading is not None:
         loading.close()
@@ -510,4 +669,4 @@ def main(argv: list[str] | None = None):
     exit_code = app.exec()
     client.stop()
     client.wait(3000)
-    sys.exit(exit_code)
+    return exit_code

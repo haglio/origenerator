@@ -7,6 +7,14 @@ measuring the finished video, this authors a stroke *with* it from what the gene
 already knows: the clip's duration, and whether it loops. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
 measured (FunGen) or authored (ATI) source touches nothing else.
+
+The scripts have a folder of their own -- ``<output dir>/funscript`` -- rather
+than sitting beside the clips they belong to. ComfyUI's output folder is sorted
+by kind, and a script is a kind; a name is what ties one to its video. So the two
+questions a caller has are separate functions: :func:`funscript_path_for` says
+where a script GOES, and :func:`funscript_of` says where the one this video HAS
+actually IS -- the folder, or, for every script written before the folder
+existed, still beside the clip.
 """
 
 from __future__ import annotations
@@ -18,9 +26,40 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def funscript_path_for(video_path) -> Path:
-    """The sidecar path for a video: same stem, ``.funscript`` extension."""
+#: Where the scripts live, under the ComfyUI output dir.
+FUNSCRIPT_SUBFOLDER = "funscript"
+
+
+def funscript_path_for(video_path, *, output_dir) -> Path:
+    """Where this video's script goes: ``<output_dir>/funscript/<stem>.funscript``.
+
+    ``output_dir`` is keyword-only and has no default. The folder cannot be
+    worked out from the video's own path -- a video sits at whatever depth under
+    the output dir its workflow's prefix puts it -- and a signature default would
+    be read at import, from a constant itself built by reading the content
+    overlay, pinning every caller to wherever this module was first told to look.
+    """
+    name = Path(video_path).with_suffix(".funscript").name
+    return Path(output_dir) / FUNSCRIPT_SUBFOLDER / name
+
+
+def legacy_funscript_path_for(video_path) -> Path:
+    """Where this video's script sat before the scripts had a folder: beside it.
+
+    Hundreds were written that way and are still there, so every read tries here
+    too. Nothing writes here any more.
+    """
     return Path(video_path).with_suffix(".funscript")
+
+
+def funscript_of(video_path, *, output_dir) -> Path | None:
+    """The script this video HAS -- the folder first, then the old place beside
+    it -- or ``None`` when it has none."""
+    dest = funscript_path_for(video_path, output_dir=output_dir)
+    if dest.is_file():
+        return dest
+    beside = legacy_funscript_path_for(video_path)
+    return beside if beside.is_file() else None
 
 
 def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:
@@ -51,8 +90,15 @@ def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict
 
 
 def write_funscript(path, actions: list[dict]) -> None:
-    """Write ``actions`` as a minimal funscript JSON document."""
-    Path(path).write_text(
+    """Write ``actions`` as a minimal funscript JSON document.
+
+    Makes the folder it writes into: the scripts' folder is one this app owns
+    and a user tidying the output dir can leave it out, so every writer would
+    otherwise need the same guard.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps({"version": "1.0", "inverted": False, "range": 100, "actions": actions}),
         encoding="utf-8",
     )
@@ -111,7 +157,13 @@ def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, in
 
 
 def read_actions(path) -> list[dict] | None:
-    """The ``actions`` list from a funscript file, or ``None`` if absent/unreadable."""
+    """The ``actions`` list from a funscript file, or ``None`` if absent/unreadable.
+
+    ``None`` in is ``None`` out, so whatever :func:`funscript_of` answered can be
+    handed straight here without a caller checking first.
+    """
+    if path is None:
+        return None
     p = Path(path)
     if not p.exists():
         return None
@@ -145,19 +197,21 @@ def video_duration_seconds(video_path) -> float | None:
     return None
 
 
-def ensure_funscript(video_path, *, loop: bool, hz: float,
+def ensure_funscript(video_path, *, loop: bool, hz: float, output_dir,
                      duration_provider=video_duration_seconds) -> Path | None:
-    """Write the sidecar for ``video_path`` if it doesn't already have one.
+    """Write ``video_path``'s script into the scripts folder if it has none.
 
-    Idempotent: an existing ``.funscript`` is left untouched (and not even probed),
-    so this is safe to call after every generation and to sweep across old videos.
+    Idempotent: a script it already has is left untouched (and not even probed),
+    wherever that is -- including the old place beside the clip, which is what
+    keeps this from writing a second copy of every script predating the folder.
     Best-effort — a video whose duration can't be read is skipped with a log line
     rather than raising, so it never strands a completing generation.
     """
     video_path = Path(video_path)
-    dest = funscript_path_for(video_path)
-    if dest.exists():
-        return dest
+    existing = funscript_of(video_path, output_dir=output_dir)
+    if existing is not None:
+        return existing
+    dest = funscript_path_for(video_path, output_dir=output_dir)
     duration = duration_provider(video_path)
     if not duration or duration <= 0:
         logger.warning("No readable duration for %s; skipping funscript", video_path)

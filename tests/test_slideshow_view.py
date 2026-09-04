@@ -15,7 +15,9 @@ from PyQt6.QtCore import Qt, QEvent, QSize, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.funscript import (
+    legacy_funscript_path_for, synthesize_actions, write_funscript,
+)
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -1311,7 +1313,8 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
 
 def test_a_scripted_clip_shows_its_strip(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
-    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    write_funscript(legacy_funscript_path_for(vid),
+                    synthesize_actions(2.0, hz=1.0, loop=False))
     view = _view(qtbot, [(str(vid), "video")])
     assert view._preview._strip is not None
     assert view._preview._strip._actions
@@ -1351,7 +1354,8 @@ def test_releasing_another_file_leaves_the_show_alone(qtbot, tmp_path):
 
 def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
-    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    write_funscript(legacy_funscript_path_for(vid),
+                    synthesize_actions(2.0, hz=1.0, loop=False))
     player = MagicMock()
     view = SlideshowView([(str(vid), "video")], player=player,
                          shuffle=lambda order: None)

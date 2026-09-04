@@ -1,4 +1,4 @@
-"""One-shot: synthesize a funscript beside every already-generated video.
+"""One-shot: synthesize a funscript for every already-generated video without one.
 
 New videos get a funscript at completion (see ``completion.py``); this sweeps the
 videos that predate that. It's GPU-free (the script is authored from each clip's
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from origenerator import config
 from origenerator.db import Database
-from origenerator.funscript import ensure_funscript, funscript_path_for
+from origenerator.funscript import ensure_funscript, funscript_of
 from origenerator.gallery import media_type_of_row, resolve_preview
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
              ensure=ensure_funscript, resolve=resolve_preview) -> dict:
-    """Script every video generation missing a sidecar. Returns a counts summary.
+    """Script every video generation that has none. Returns a counts summary.
 
     ``ensure``/``resolve`` are injectable so the sweep logic can be tested without
     real videos. The loop flag for each row comes from its workflow, so loop clips
@@ -48,8 +48,9 @@ def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
             continue
         path = preview[0]
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        existed = funscript_path_for(path).exists()
-        dest = ensure(path, loop=bool(workflow and workflow.looping), hz=hz)
+        existed = funscript_of(path, output_dir=output_dir) is not None
+        dest = ensure(path, loop=bool(workflow and workflow.looping), hz=hz,
+                      output_dir=output_dir)
         if dest is None:
             result["failed"] += 1
         elif existed:

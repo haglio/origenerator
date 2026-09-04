@@ -69,15 +69,18 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
         "origenerator.completion.ensure_funscript",
-        lambda video_path, *, loop, hz: calls.append((Path(video_path), loop, hz)),
+        lambda video_path, *, loop, hz, output_dir: calls.append(
+            (Path(video_path), loop, hz, Path(output_dir))),
     )
     extract_completion(
         I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
         out, tmp_path / "thumbs", "n1",
     )
-    # The synthesized script rides next to the real output file, one-shot (not looped),
-    # at the configured cadence.
-    assert calls == [(out / "video" / "wan22_i2v_00001_.mp4", False, STROKE_DEFAULT_HZ)]
+    # The synthesized script is asked for by the real output file and the output
+    # root it sits under (the scripts have a folder of their own), one-shot (not
+    # looped), at the configured cadence.
+    assert calls == [
+        (out / "video" / "wan22_i2v_00001_.mp4", False, STROKE_DEFAULT_HZ, out)]
 
 
 def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypatch):
@@ -87,7 +90,7 @@ def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypa
     calls = []
     monkeypatch.setattr(
         "origenerator.completion.ensure_funscript",
-        lambda video_path, *, loop, hz: calls.append(loop),
+        lambda video_path, *, loop, hz, output_dir: calls.append(loop),
     )
     extract_completion(
         FLF2V, _video_history("16", "gifs", "flf2v_loop_00001.mp4"),
@@ -116,7 +119,7 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
         ati, _video_history("15", "images", "wan21_ati_i2v_00001_.mp4"),
         out, tmp_path / "thumbs", "n1", params=params,
     )
-    written = read_actions(out / "video" / "wan21_ati_i2v_00001_.funscript")
+    written = read_actions(out / "funscript" / "wan21_ati_i2v_00001_.funscript")
     assert written == ati.authored_actions(params)
     assert metronome == []
 

@@ -33,7 +33,8 @@ from PyQt6.QtCore import (
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
-from origenerator.funscript import funscript_path_for, read_actions
+from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.funscript import funscript_of, read_actions
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
@@ -655,12 +656,13 @@ class PreviewWidget(QWidget):
         self._draggable_id = prompt_id
 
     def _update_strip(self, video_path) -> None:
-        """Aim the funscript strip at ``video_path``'s sidecar, showing it only when
+        """Aim the funscript strip at ``video_path``'s script, showing it only when
         one exists — so the strip's presence is itself the "this clip has a script"
         cue (the same script the OSR2 drive would read for this video)."""
         if self._strip is None:
             return
-        actions = read_actions(funscript_path_for(video_path)) if video_path else None
+        actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
+                   if video_path else None)
         self._strip.set_actions(actions or [])
         self._strip.setVisible(bool(actions))
 

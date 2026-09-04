@@ -9,7 +9,10 @@ from PyQt6.QtWidgets import QWidget, QApplication
 from PyQt6.QtMultimedia import QMediaPlayer, QVideoFrame
 
 import origenerator.gui.preview_widget as preview_widget
-from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.funscript import (
+    funscript_path_for, legacy_funscript_path_for, synthesize_actions,
+    write_funscript,
+)
 from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
@@ -19,9 +22,11 @@ from PyQt6.QtCore import Qt
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):
-    """A temp video path with a real funscript sidecar written beside it."""
+    """A temp video with its script in the old place, beside it -- where every
+    script written before the scripts had a folder of their own still sits."""
     vid = tmp_path / name
-    write_funscript(funscript_path_for(vid), synthesize_actions(2.0, hz=1.0, loop=False))
+    write_funscript(legacy_funscript_path_for(vid),
+                    synthesize_actions(2.0, hz=1.0, loop=False))
     return vid
 
 
@@ -541,6 +546,22 @@ def test_no_strip_unless_opted_in(make_preview, tmp_path):
 def test_scripted_video_shows_its_heatmap_strip(qtbot, tmp_path):
     w = _strip_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
+    assert w._strip._actions
+    assert not w._strip.isHidden()
+
+
+def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeypatch):
+    """Where new scripts go: a folder under the output dir, keyed by the clip's
+    name rather than by sitting next to it."""
+    monkeypatch.setattr(preview_widget, "COMFYUI_OUTPUT_DIR", tmp_path)
+    vid = tmp_path / "video" / "filed.mp4"
+    vid.parent.mkdir()
+    write_funscript(funscript_path_for(vid, output_dir=tmp_path),
+                    synthesize_actions(2.0, hz=1.0, loop=False))
+
+    w = _strip_preview(qtbot)
+    w.show_video(vid)
+
     assert w._strip._actions
     assert not w._strip.isHidden()
 

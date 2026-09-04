@@ -132,7 +132,7 @@ def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
     assert params["positive_prompt"] == "gamma form scene"          # from the spec
     assert params["steps"] == 24                                    # from the spec
     assert params["lora_high"] == "example-act-high.safetensors"    # from the spec
-    assert params["cfg"] == _I2V.default_params()["cfg"]            # unnamed → default
+    assert params["shift_high"] == _I2V.default_params()["shift_high"]  # unnamed → default
 
 
 def test_curated_params_rerolls_every_seed():
@@ -149,3 +149,17 @@ def test_curated_params_rerolls_every_seed():
 def test_curated_params_returns_none_when_image_has_no_output_file():
     assert gallery.curated_params(_SPEC, _image_row([]), _I2V) is None
     assert gallery.curated_params(_SPEC, _image_row(None), _I2V) is None
+
+
+def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
+    # A curated recipe stored before the stages had their own strength names one
+    # shared number and a zero per stage; the workflow reads those the way it
+    # always did, so the recipe keeps producing what it was tuned to produce.
+    spec = {"workflow": "wan22_i2v",
+            "params": {"cfg": 1.0, "cfg_high": 0.0, "cfg_low": 0.0, "steps": 8}}
+
+    params = gallery.curated_params(spec, _image_row([{"filename": "a.png", "subfolder": ""}]), _I2V)
+    samplers = [n for n in _I2V.build_api_payload(params).values()
+                if n["class_type"] == "KSamplerAdvanced"]
+
+    assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]

@@ -4,6 +4,7 @@ from origenerator.workflows.base import (
     ParamDef,
     WorkflowTemplate,
 )
+from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
@@ -14,11 +15,13 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     Reproduces the ``wan22_14b_i2v_dual_noise_template`` ComfyUI graph: a single
     input image is encoded with CLIP-Vision and fed to ``WanImageToVideo``, then
     denoised by two ``KSamplerAdvanced`` passes (high-noise model first, low-noise
-    model after) and written with the native ``CreateVideo`` + ``SaveVideo``
-    nodes. The stages hand off at ``split_step`` (0 = half the steps), and each
-    can run its own guidance via ``cfg_high``/``cfg_low`` (0 = the shared
-    ``cfg``) — LoRA authors tune these per stage (motion lives in the high pass,
-    texture in the low), so a recipe can follow their numbers exactly. The output resolution is
+    model after), interpolated up to the chosen playback rate
+    (:meth:`~WorkflowTemplate.interpolation_nodes`) and written with the native
+    ``CreateVideo`` + ``SaveVideo`` nodes. The stages hand off at ``split_step``
+    (0 = half the steps), and each can run its own guidance via
+    ``cfg_high``/``cfg_low`` (0 = the shared ``cfg``) — LoRA authors tune these
+    per stage (motion lives in the high pass, texture in the low), so a recipe
+    can follow their numbers exactly. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
@@ -27,7 +30,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_i2v"
-    version = "v004"
+    version = "v005"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     derives_size_from_input = True
@@ -42,7 +45,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "input_image": "",
             "noise_seed": 0,
             "seed": 0,
-            "frame_count": 121,
+            "frame_count": 81,
             "batch_size": 1,
             "steps": 20,
             "split_step": 0,
@@ -55,7 +58,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "shift_low": 8.0,
             "lora_strength_high": 1.0,
             "lora_strength_low": 1.0,
-            "frame_rate": 24.0,
+            "frame_rate": NATIVE_FPS,
             "filename_prefix": "video/wan22_i2v",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -95,8 +98,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
-            ParamDef("frame_count", "Duration", "int", 121, min_val=5, max_val=161, step=4,
-                     options=DURATION_OPTIONS, unit="s", rate_key="frame_rate"),
+            ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
+                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("split_step", "Split Step (0 = half)", "int", 0, min_val=0, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
@@ -110,7 +113,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0, step=1.0,
+            ParamDef("frame_rate", "Frame Rate", "float", NATIVE_FPS,
+                     min_val=NATIVE_FPS, max_val=128.0, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
@@ -127,6 +131,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "7", ["5", 0], params["lora_low"], params["lora_strength_low"]
         )
         foley, audio_ref = self.foley_audio_nodes("22", "23", "24", ["17", 0], params)
+        # The decode's frames are the clip's motion; the writer's are that motion
+        # shown more often. Foley above watches the former, CreateVideo below
+        # encodes the latter, and at the native rate they are the same frames.
+        interpolate, frames_ref = self.interpolation_nodes("25", ["17", 0], params)
         # Size the video off the input image: derived in-graph by default, or
         # scaled to the user's explicit WxH when the derived size was unlocked.
         size_nodes, start_ref, width_ref, height_ref = self.image_size_nodes(
@@ -134,6 +142,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         )
         return {
             **foley,
+            **interpolate,
             **size_nodes,
             "1": {
                 "class_type": "CLIPLoader",
@@ -246,8 +255,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "18": {
                 "class_type": "CreateVideo",
                 "inputs": {
-                    "images": ["17", 0],
-                    "fps": params["frame_rate"],
+                    "images": frames_ref,
+                    "fps": playback_rate(params["frame_rate"]),
                     "audio": audio_ref,
                 },
             },

@@ -3,8 +3,9 @@ import json
 import pytest
 
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import RIFE_CHECKPOINT, ParamDef
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
+from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
@@ -2083,13 +2084,165 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 @pytest.mark.parametrize("name", [
     n for n, wf in WORKFLOW_REGISTRY.items() if "frame_count" in wf.default_params()
 ])
-def test_a_video_workflow_offers_its_length_in_seconds_and_common_frame_rates(name):
+def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
-    assert frames.rate_key == "frame_rate"
+    # Seconds are counted at the rate the MODEL paces motion at, never at the
+    # playback rate: that is what makes a clip's length hold when its rate moves.
+    assert frames.rate == NATIVE_FPS
     assert frames.options == [1, 5, 10, 15, 30]
     assert frames.unit == "s"
     assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
-    assert rate.options == [8, 12, 16, 24, 30, 48, 60, 120]
+    # Every rate offered is a whole multiple of the native one, because those are
+    # the only rates the interpolator can actually produce the frames for.
+    assert rate.options == [16, 32, 48, 64, 80, 96, 112, 128]
+    assert all(playback_rate(r) == r for r in rate.options)
     assert rate.unit == "fps"
+    assert (rate.min_val, rate.step) == (NATIVE_FPS, NATIVE_FPS)
     assert rate.max_val >= max(rate.options)
+
+
+# ---- the frames between the frames ----
+
+_VIDEO_WORKFLOWS = [
+    n for n, wf in WORKFLOW_REGISTRY.items() if "frame_count" in wf.default_params()
+]
+
+
+def _video_writer(payload: dict) -> tuple[dict, str]:
+    """The node that encodes the file, and the name of its playback-rate input.
+
+    The native writer (CreateVideo) calls it ``fps``; VHS_VideoCombine calls it
+    ``frame_rate``. Every video workflow writes with one of the two.
+    """
+    node = _find_node(payload, "CreateVideo") or _find_node(payload, "VHS_VideoCombine")
+    return node, "fps" if node["class_type"] == "CreateVideo" else "frame_rate"
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
+    # At 16 fps every frame the file needs already exists, so the graph is the
+    # one it always was: the decode feeds the writer directly, and no second
+    # model is loaded to synthesize frames nobody asked for.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=NATIVE_FPS))
+
+    assert _find_node(payload, "RIFE VFI") is None
+    writer, rate_input = _video_writer(payload)
+    assert writer["inputs"]["images"] == [_node_id(payload, "VAEDecode"), 0]
+    assert writer["inputs"][rate_input] == 16.0
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(name):
+    # 48 fps is three frames out of each generated one. The interpolator sits
+    # between the decode and the writer, and the writer's rate is that same
+    # multiple, so a file can never claim a rate its frames weren't made for.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=48.0))
+
+    rife_id = _node_id(payload, "RIFE VFI")
+    rife = payload[rife_id]["inputs"]
+    assert rife["frames"] == [_node_id(payload, "VAEDecode"), 0]
+    assert rife["multiplier"] == 3
+    assert rife["ckpt_name"] == RIFE_CHECKPOINT
+
+    writer, rate_input = _video_writer(payload)
+    assert writer["inputs"]["images"] == [rife_id, 0]
+    assert writer["inputs"][rate_input] == 48.0
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
+    # The whole point: the model authors the same seconds of motion whatever the
+    # rate, and the rate only decides how many frames a second of it is shown
+    # in. Same length conditioned, same sampling cost, at every rate.
+    wf = WORKFLOW_REGISTRY[name]
+    lengths = set()
+    for rate in (16.0, 32.0, 128.0):
+        payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=rate))
+        conditioning = (_find_node(payload, "WanImageToVideo")
+                        or _find_node(payload, "WanFirstLastFrameToVideo")
+                        or _find_node(payload, "WanTrackToVideo"))
+        lengths.add(conditioning["inputs"]["length"])
+    assert lengths == {wf.default_params()["frame_count"]}
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
+    # A rate typed by hand — or carried in by a recipe saved before the rates
+    # were multiples — doesn't get to skew the tempo: the graph interpolates to
+    # the nearest reachable rate and writes at THAT, so the clip lands a little
+    # off the rate asked for and exactly on time.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
+
+    assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 4
+    writer, rate_input = _video_writer(payload)
+    assert writer["inputs"][rate_input] == 64.0
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
+    # Foley scores the DECODED frames — the motion the model actually authored,
+    # at the rate it authored them in — so the track is the clip's real seconds
+    # and lands on the same beats however many frames the file ends up holding.
+    wf = WORKFLOW_REGISTRY[name]
+    params = dict(wf.default_params(), frame_count=81, frame_rate=128.0)
+    payload = wf.build_api_payload(params)
+
+    sampler = _find_node(payload, "HunyuanFoleySampler")["inputs"]
+    assert sampler["image"] == [_node_id(payload, "VAEDecode"), 0]
+    assert sampler["frame_rate"] == NATIVE_FPS
+    assert sampler["duration"] == pytest.approx(81 / NATIVE_FPS)
+
+
+def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
+    # The loop's seam is that its first and last frames are the same image. The
+    # interpolator fills gaps and hands the endpoints through untouched, so the
+    # seam sits exactly where it did — and the writer is still told to play the
+    # sequence straight through rather than bounce it back.
+    wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+    payload = wf.build_api_payload(
+        dict(wf.default_params(), frame_count=81, frame_rate=64.0))
+
+    combine = _find_node(payload, "VHS_VideoCombine")["inputs"]
+    assert combine["loop_count"] == 0 and combine["pingpong"] is False
+    # multiplier new frames per GAP, so 81 frames become (81-1)*4+1 — the two
+    # generated endpoints handed through, everything new strictly between them.
+    multiplier = payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"]
+    assert (81 - 1) * multiplier + 1 == 321
+    # …and those 321 frames at 64 fps span the same motion the 81 did at 16.
+    interpolated_span = (321 - 1) / 64.0
+    assert interpolated_span == pytest.approx((81 - 1) / NATIVE_FPS)
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
+    """The form snaps a typed rate onto the Frame Rate field's grid; the payload
+    picks its multiplier straight from the number. Those are two roundings of
+    one question, and if they ever disagreed the field would be advertising a
+    rate the file isn't written at — so this walks every rate a person could
+    type and holds them to the same answer."""
+    from origenerator.gui.param_form import ParamForm
+
+    rate_def = next(pd for pd in WORKFLOW_REGISTRY[name].param_definitions()
+                    if pd.key == "frame_rate")
+    for typed in range(200):
+        shown = ParamForm._clamped_number(rate_def, float(typed))
+        assert shown == min(rate_def.max_val, playback_rate(typed)), typed
+        # …and a rate already on the grid is left exactly where it is.
+        assert ParamForm._clamped_number(rate_def, shown) == shown
+
+
+def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
+    # The stroke was authored over the clip's seconds, and those don't move when
+    # the rate does — so one generation drives the device identically at 16 fps
+    # and at 128, matching a video whose motion is likewise unchanged.
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    base = dict(wf.default_params(), frame_count=81, seed=42)
+    slow = wf.authored_actions(dict(base, frame_rate=NATIVE_FPS))
+    fast = wf.authored_actions(dict(base, frame_rate=128.0))
+
+    assert slow == fast
+    assert slow[-1]["at"] <= round(81 / NATIVE_FPS * 1000)

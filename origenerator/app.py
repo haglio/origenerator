@@ -241,6 +241,18 @@ def _reconnect_to_running_generations(library: Library):
     reconcile_in_flight(library.db, library.client, library.output_dir, library.thumb_dir)
 
 
+def _follow_moved_files(library: Library):
+    """Repoint every recorded output file the user has since moved on disk.
+
+    Before the scan below, which keys what it has already seen by path under the
+    output dir: a file that moved reads there as one it has never seen, and it
+    would rebuild a bare "imported" row beside the generated row that still
+    holds the prompt and the settings."""
+    from origenerator.relocate import relocate_moved_outputs
+
+    return relocate_moved_outputs(library.db, library.output_dir)
+
+
 def _import_new_files(library: Library):
     from origenerator.importer import import_comfyui_output
 
@@ -330,6 +342,9 @@ MAINTENANCE = (
              failure="Branch-session bookmark adoption failed: %s"),
     BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
              failure="Reconcile of in-flight generations failed: %s"),
+    BootPass("Finding files that moved...", _follow_moved_files,
+             counted="Followed %d output file(s) to where they moved",
+             failure="Relocating moved output files failed: %s"),
     BootPass("Scanning for new images...", _import_new_files,
              counted="Imported %d existing files from ComfyUI output",
              failure="Import failed: %s"),
@@ -357,16 +372,21 @@ MAINTENANCE = (
              failure="Folder bookmark reconcile failed: %s"),
 )
 
-#: What a branch session maintains instead: nothing but the enhancement fold.
-#: Every pass above already ran on the database it was seeded from, and re-running
-#: them would only slow the preview down (the import scan alone reads the whole
-#: output history) and write records the live install then imports as duplicates
-#: of its own. The fold is the exception because it is not maintenance of the
-#: library at all: it rewrites rows the seeded copy already holds, touching no
-#: file and reading no output history. Left out, a preview would show
-#: enhancements standing as images of their own long after the live app stopped
-#: doing that -- a difference in the copy, not in the code.
+#: What a branch session maintains instead: the two passes that are not
+#: maintenance of the library at all. Every pass above already ran on the
+#: database it was seeded from, and re-running them would only slow the preview
+#: down (the import scan alone reads the whole output history) and write records
+#: the live install then imports as duplicates of its own. These two write no
+#: record and touch no file -- each only rewrites rows the seeded copy already
+#: holds -- and left out, each shows a difference in the copy rather than in the
+#: code: enhancements standing as images of their own long after the live app
+#: stopped doing that, and a generation drawing its thumbnail and nothing else
+#: because its file moved. The moved-file pass reads the output *tree* (one
+#: listing, not the history behind it), which is what keeps it affordable here.
 BRANCH_SESSION_MAINTENANCE = (
+    BootPass("Finding files that moved...", _follow_moved_files,
+             counted="Followed %d output file(s) to where they moved",
+             failure="Relocating moved output files failed: %s"),
     BootPass("Folding enhancements into their images...", _fold_enhancements,
              failure="Enhancement fold failed: %s"),
 )

@@ -23,7 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -39,6 +39,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
 from origenerator.gui.corner_controls import enhance_state
+from origenerator.gui.deferred import defer
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_tree import (
@@ -654,7 +655,7 @@ class BrowserPane(QObject):
             return
         self._scroll_bar().setValue(offset)
         if self._scroll_bar().value() != offset:
-            QTimer.singleShot(0, lambda: self._reapply_scroll(offset))
+            defer(self, lambda: self._reapply_scroll(offset))
 
     def _reapply_scroll(self, offset: int):
         if self.showing_recents():  # unless the user has since navigated off it
@@ -1438,7 +1439,7 @@ class BrowserPane(QObject):
         # The pane it was just drawn in hasn't been laid out yet, so that first
         # attempt had no real tile position to aim at — hence a second one once
         # this turn's layout has run (as :meth:`_restore_scroll` does).
-        QTimer.singleShot(0, lambda: self._reapply_reveal(prompt_id, widget))
+        defer(self, lambda: self._reapply_reveal(prompt_id, widget))
 
     def _reapply_reveal(self, prompt_id: str, widget):
         """Scroll to a revealed tile again after layout — unless the pane has since

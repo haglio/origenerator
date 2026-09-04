@@ -10,11 +10,11 @@ This holds the matches, paints them, and walks between them.
 it; neither knows about the other, and the gallery view wires the two together.
 """
 
-from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QScrollArea, QTextEdit
 
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.deferred import defer
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -167,8 +167,9 @@ class PromptFind:
         _scroll_into_view(field)
         # A section unfolded a line ago hasn't been laid out yet, so that scroll
         # aimed at where the field used to be. Aim again once this turn's layout
-        # has run — by which time a tab closing may have taken the field with it.
-        QTimer.singleShot(0, lambda: self._reapply_reveal(field))
+        # has run — owned by the field, since a tab closing before then takes the
+        # field with it and there is nothing left to scroll to.
+        defer(field, lambda: self._reapply_reveal(field))
 
     def _reapply_reveal(self, field):
         try:

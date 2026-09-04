@@ -51,14 +51,10 @@ from origenerator.funscript import (
     video_duration_seconds,
     write_funscript,
 )
+from origenerator.gallery.output import STROKE_TRIM_SOURCE
 from origenerator.thumbnail import generate_thumbnail
 
 logger = logging.getLogger(__name__)
-
-#: What a cut's ``source`` column says. Its own value rather than ``"generated"``
-#: because no run made it -- it is a pair of scissors applied to a run's output --
-#: and rows are read by source in several places that should not count it twice.
-STROKE_TRIM_SOURCE = "stroke_trim"
 
 #: Appended to the source clip's stem to name the cut.
 _TRIM_SUFFIX = "_stroke"

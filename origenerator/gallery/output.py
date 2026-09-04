@@ -19,6 +19,16 @@ from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
 
+#: What a single-stroke cut's ``source`` column says. Its own value rather than
+#: ``"generated"`` because no run made it -- it is a pair of scissors applied to
+#: a run's output (:mod:`origenerator.stroke_trim`) -- and rows are read by
+#: source in several places that should not count it twice. Defined here rather
+#: than beside the cutting, so the shelves that ask what a row is do not have to
+#: import ffmpeg's neighbourhood to find out; the same way
+#: :data:`~origenerator.gallery.enhance.BASE_RENDER_SOURCE` sits beside the rows
+#: rather than beside the renderer.
+STROKE_TRIM_SOURCE = "stroke_trim"
+
 
 def parse_file_list(raw) -> list[dict]:
     """Parse a stored file-list JSON (``output_files``/``original_files``) into

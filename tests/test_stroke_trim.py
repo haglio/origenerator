@@ -275,6 +275,23 @@ def test_the_cut_is_a_row_beside_the_clip_it_came_out_of(library):
 
 
 @needs_ffmpeg
+def test_a_cut_is_listed_on_the_recents_shelf(library):
+    """Where someone looks for what the app just made. A cut lands in the
+    settings folder of the clip it came from rather than anywhere you would
+    think to go looking, so left off this shelf there is nowhere at all that
+    says it happened."""
+    from origenerator.gallery import recent_generations
+
+    db, row, clip, output_dir, thumbs = library
+    single_stroke_clip(row, clip, db, output_dir=output_dir, thumb_dir=thumbs)
+
+    listed = recent_generations(db.list_generations())
+
+    cut = db.trim_of("clip1")
+    assert [r["prompt_id"] for r in listed] == [cut["prompt_id"], "clip1"]
+
+
+@needs_ffmpeg
 def test_cutting_the_same_clip_again_hands_back_the_cut_it_already_has(library):
     """Pressing the button after a spoken send already went must not leave a
     second file and a second row for one clip."""

@@ -2076,3 +2076,20 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
     from origenerator.importer import _GRAPH_SIGNATURES
 
     assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY)
+
+
+# ---- video length and rate, as the form offers them ----
+
+@pytest.mark.parametrize("name", [
+    n for n, wf in WORKFLOW_REGISTRY.items() if "frame_count" in wf.default_params()
+])
+def test_a_video_workflow_offers_its_length_in_seconds_and_common_frame_rates(name):
+    defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    frames, rate = defs["frame_count"], defs["frame_rate"]
+    assert frames.rate_key == "frame_rate"
+    assert frames.options == [1, 5, 10, 15, 30]
+    assert frames.unit == "s"
+    assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
+    assert rate.options == [8, 12, 16, 24, 30, 48, 60, 120]
+    assert rate.unit == "fps"
+    assert rate.max_val >= max(rate.options)

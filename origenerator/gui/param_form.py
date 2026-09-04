@@ -26,10 +26,12 @@ from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import param_help
+from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_box import PromptBox
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
+from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
@@ -204,7 +206,15 @@ class ParamForm(QWidget):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             self._wire_changed(widget)
+            if isinstance(widget, PresetComboBox):
+                widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
+        for pd in defs:
+            if pd.rate_key:
+                # Seconds follow the rate: shown once both fields exist, and
+                # shown again whenever a rate edit ends.
+                self._widgets[pd.rate_key].edited.connect(lambda pd=pd: self._settle(pd))
+                self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()
         self._refresh_section_visibility()
@@ -358,6 +368,12 @@ class ParamForm(QWidget):
 
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)
+
+    def _def_for(self, key: str) -> ParamDef:
+        return next(pd for pd in self._param_defs if pd.key == key)
+
+    def _rate_for(self, pd: ParamDef) -> float:
+        return self._read_field(self._def_for(pd.rate_key), randomize_seed=False)
 
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
@@ -624,6 +640,8 @@ class ParamForm(QWidget):
         """Re-emit ``changed`` whenever this input's value changes."""
         if isinstance(widget, (QPlainTextEdit, QLineEdit)):
             widget.textChanged.connect(self.changed)
+        elif isinstance(widget, PresetComboBox):
+            widget.editTextChanged.connect(self.changed)
         elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
             widget.valueChanged.connect(self.changed)
         elif isinstance(widget, QComboBox):
@@ -653,6 +671,11 @@ class ParamForm(QWidget):
             w = QLineEdit()
             w.setText(str(pd.default))
             w.setPlaceholderText("64-bit integer seed")
+            return w
+        if pd.type in ("int", "float") and pd.options:
+            w = PresetComboBox(pd.options, unit=pd.unit)
+            if not pd.rate_key:
+                w.set_value(pd.default)
             return w
         if pd.type == "int":
             w = NoWheelSpinBox()
@@ -728,6 +751,12 @@ class ParamForm(QWidget):
             return _clean_image_ref(w.text())
         if pd.type == "str":
             return w.text()
+        if pd.rate_key:
+            seconds = w.value()
+            return (frames_for_seconds(seconds, self._rate_for(pd), pd)
+                    if seconds is not None else pd.default)
+        if isinstance(w, PresetComboBox):
+            return self._clamped_number(pd, w.value())
         if pd.type in ("int", "float"):
             return w.value()
         if pd.type == "combo":
@@ -753,12 +782,33 @@ class ParamForm(QWidget):
             w.setPlainText(str(value))
         elif pd.type == "str" or pd.type == "image":
             w.setText(str(value))
+        elif pd.rate_key:
+            frames = self._clamped_number(pd, value)
+            w.set_value(seconds_for_frames(frames, self._rate_for(pd), pd))
+        elif isinstance(w, PresetComboBox):
+            w.set_value(self._clamped_number(pd, value))
         elif pd.type == "int":
             w.setValue(int(value))
         elif pd.type == "float":
             w.setValue(float(value))
         elif pd.type == "combo":
             _select_combo_value(w, str(value))
+
+    @staticmethod
+    def _clamped_number(pd: ParamDef, value):
+        """``value`` within ``pd``'s range, as its type; the default when there
+        is no value (an emptied field)."""
+        if value is None:
+            value = pd.default
+        if pd.min_val is not None:
+            value = max(pd.min_val, value)
+        if pd.max_val is not None:
+            value = min(pd.max_val, value)
+        return int(round(value)) if pd.type == "int" else float(value)
+
+    def _settle(self, pd: ParamDef) -> None:
+        """Show a field the value it will emit, once an edit of it has ended."""
+        self._write_field(pd, self._read_field(pd, randomize_seed=False))
 
     def _collect(self, randomize_seed: bool) -> dict:
         # Start from the params this form carries without showing — the extras it
@@ -788,7 +838,9 @@ class ParamForm(QWidget):
             {k: v for k, v in self._passthrough.items()
              if k not in param_sections.HIDDEN_KEYS}
         )
-        for pd in self._param_defs:
+        # A duration is written after the rest: its seconds are figured at the
+        # rate the loaded config carries, not the one the form showed before.
+        for pd in sorted(self._param_defs, key=lambda d: d.rate_key is not None):
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
         # The derived width/height aren't declared params, so apply them here:

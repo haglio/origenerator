@@ -2,7 +2,12 @@ import json
 import math
 import random
 
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import (
+    DURATION_OPTIONS,
+    FRAME_RATE_OPTIONS,
+    ParamDef,
+    WorkflowTemplate,
+)
 from origenerator.workflows.derived_size import (
     measure_derived_size,
     override_size,
@@ -124,7 +129,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("stroke_bottom", "Stroke Bottom Y", "int", 650, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
-            ParamDef("frame_count", "Frames", "int", 81, min_val=5, max_val=113, step=4),
+            ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=113, step=4,
+                     options=DURATION_OPTIONS, unit="s", rate_key="frame_rate"),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
@@ -133,7 +139,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
+            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=120.0, step=1.0,
+                     options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
     # The aim params auto-detection may fill; leaving ALL of them untouched is

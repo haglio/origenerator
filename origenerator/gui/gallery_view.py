@@ -2148,7 +2148,9 @@ class GalleryView(QWidget):
 
     def closeEvent(self, event):
         """Put down everything this view arms application-wide, however it was
-        let go: the poll, and the filter that takes the room's keys.
+        let go: the poll, the filter that takes the room's keys, and the shows,
+        each a window of its own that would otherwise outlive the view that
+        answers for it.
 
         ``hideEvent`` alone is not enough for either: a widget that was never
         shown is never hidden, so ``close()`` on one left the 1.5 s poll running
@@ -2158,6 +2160,7 @@ class GalleryView(QWidget):
         """
         self._poll_timer.stop()
         self._intercept_the_rooms_keys(False)
+        self.close_the_shows()
         super().closeEvent(event)
 
     # --- data loading & live update ---------------------------------------
@@ -4402,18 +4405,17 @@ class GalleryView(QWidget):
                                      looping=False,
                                      starred_ids=self._starred_prompt_ids()))
 
-    def close_the_regions(self) -> None:
-        """Give both regions back -- the session leaving origenerator mode.
+    def close_the_shows(self) -> None:
+        """Give every show back -- the session leaving origenerator mode, or
+        this view going away with shows still up.
 
         The wanting is dropped first: a show closing while the mode still wants
         its regions is refilled with the base state, and these closes must not
         be.
         """
         self._regions_wanted = False
-        for side in ("portrait", "landscape"):
-            show = self.region_show(side)
-            if show is not None:
-                show.close()
+        for show, _location in list(self._live_shows):
+            show.close()
 
     def _refill_region(self, side: str) -> None:
         """Put *side* back on its base state, if the mode still wants it there.

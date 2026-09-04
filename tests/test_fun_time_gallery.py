@@ -556,7 +556,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     assert later is not None and later is not show
     qtbot.addWidget(later)
 
-    view.close_the_regions()         # until the session says it is done with them
+    view.close_the_shows()         # until the session says it is done with them
     assert view.region_show("portrait") is None
 
 
@@ -661,6 +661,20 @@ def test_a_standalone_show_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     view._slideshow._toggle_lock()
 
     assert opened == []
+
+
+def test_closing_the_gallery_closes_the_show_it_opened(qtbot, tmp_path, monkeypatch):
+    """A show is a window of its own: a gallery let go with one up would leave
+    it on the monitor, answering to nobody."""
+    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+    show = view._slideshow
+
+    view.close()
+
+    assert not show.isVisible()
+    assert view._live_shows == []
 
 
 def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):

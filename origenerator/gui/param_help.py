@@ -119,13 +119,13 @@ PARAM_HELP: dict[str, str] = {
         "low drifts off it; too high burns contrast and flattens detail."
     ),
     "cfg_high": (
-        "Prompt strength for the high-noise stage on its own, where the motion "
-        "is settled. 0 means use the shared Prompt Strength; LoRA authors often "
-        "publish a different CFG for each stage."
+        "Prompt strength (the CFG scale underneath) for the high-noise stage, "
+        "where the motion is settled. LoRA authors often publish a different "
+        "number for each stage; where they publish one, put it in both."
     ),
     "cfg_low": (
-        "Prompt strength for the low-noise stage on its own, where the texture "
-        "is settled. 0 means use the shared Prompt Strength."
+        "Prompt strength (the CFG scale underneath) for the low-noise stage, "
+        "where the texture is settled."
     ),
     "split_step": (
         "Which step the high-noise stage hands over to the low-noise one (the "

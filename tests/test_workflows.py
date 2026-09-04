@@ -992,7 +992,7 @@ def test_wan22_i2v_default_params_has_required_keys():
         "positive_prompt", "negative_prompt", "input_image",
         "noise_seed", "seed",
         "frame_count", "frame_rate",
-        "steps", "cfg", "shift_high", "shift_low",
+        "steps", "cfg_high", "cfg_low", "shift_high", "shift_low",
         "lora_strength_high", "lora_strength_low",
     }
     assert required.issubset(params.keys())
@@ -1065,30 +1065,9 @@ def test_wan22_i2v_build_api_payload_structure():
     assert _find_node(payload, "VHS_VideoCombine") is None
 
 
-def test_wan22_i2v_split_step_and_per_stage_cfg_override_the_shared_values():
-    # A LoRA author's recommended settings can be per-stage (e.g. 24 steps split
-    # at 3, cfg 3.5 high / 6.0 low). split_step moves the handoff; cfg_high/
-    # cfg_low replace the shared cfg for their sampler only.
+def test_wan22_i2v_zero_split_still_hands_off_at_half_the_steps():
     wf = Wan22I2vWorkflow()
-    params = dict(wf.default_params(), steps=24, split_step=3,
-                  cfg=3.5, cfg_high=2.0, cfg_low=6.0)
-    payload = wf.build_api_payload(params)
-
-    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
-    high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
-    low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
-    assert high["inputs"]["end_at_step"] == 3
-    assert low["inputs"]["start_at_step"] == 3
-    assert high["inputs"]["cfg"] == 2.0
-    assert low["inputs"]["cfg"] == 6.0
-
-
-def test_wan22_i2v_zero_split_and_cfg_overrides_keep_the_shared_behavior():
-    # The 0 sentinels — the defaults — reproduce the classic graph: a steps//2
-    # handoff and one cfg for both stages, so every stored recipe re-runs as it
-    # originally ran.
-    wf = Wan22I2vWorkflow()
-    params = dict(wf.default_params(), steps=20, cfg=1.0)
+    params = dict(wf.default_params(), steps=20)
     payload = wf.build_api_payload(params)
 
     samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
@@ -1096,8 +1075,26 @@ def test_wan22_i2v_zero_split_and_cfg_overrides_keep_the_shared_behavior():
     low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
     assert high["inputs"]["end_at_step"] == 10
     assert low["inputs"]["start_at_step"] == 10
-    assert high["inputs"]["cfg"] == 1.0
-    assert low["inputs"]["cfg"] == 1.0
+
+
+def test_a_recipe_stored_with_one_shared_strength_still_renders_at_that_strength():
+    # Generations made before the stages had their own strength carry cfg 1.0
+    # with a zero for each stage, which meant "use the shared one". Read as no
+    # guidance at all, every one of them would re-run as a different video.
+    wf = Wan22I2vWorkflow()
+    stored = dict(wf.default_params(), steps=20, cfg=1.0, cfg_high=0.0, cfg_low=0.0)
+    payload = wf.build_api_payload(stored)
+
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
+
+    # A stored per-stage number still wins over the shared one.
+    tuned = dict(stored, cfg_high=2.0)
+    tuned_payload = wf.build_api_payload(tuned)
+    high = next(n for n in tuned_payload.values()
+                if n["class_type"] == "KSamplerAdvanced"
+                and n["inputs"]["add_noise"] == "enable")
+    assert high["inputs"]["cfg"] == 2.0
 
 
 def test_wan22_i2v_payload_generates_synced_foley_audio():
@@ -2280,3 +2277,20 @@ def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
     labels = [pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()]
     jargon = [label for label in labels if any(word in label for word in _GRAPH_JARGON)]
     assert jargon == []
+
+
+def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():
+    wf = Wan22I2vWorkflow()
+    keys = [pd.key for pd in wf.param_definitions()]
+    assert "cfg" not in keys and "cfg" not in wf.default_params()
+
+    params = dict(wf.default_params(), steps=24, split_step=3,
+                  cfg_high=2.0, cfg_low=6.0)
+    payload = wf.build_api_payload(params)
+    samplers = [n for n in payload.values() if n["class_type"] == "KSamplerAdvanced"]
+    high = next(n for n in samplers if n["inputs"]["add_noise"] == "enable")
+    low = next(n for n in samplers if n["inputs"]["add_noise"] == "disable")
+    assert high["inputs"]["end_at_step"] == 3
+    assert low["inputs"]["start_at_step"] == 3
+    assert high["inputs"]["cfg"] == 2.0
+    assert low["inputs"]["cfg"] == 6.0

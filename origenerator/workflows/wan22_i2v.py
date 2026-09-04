@@ -22,10 +22,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     model after), interpolated up to the chosen playback rate
     (:meth:`~WorkflowTemplate.interpolation_nodes`) and written with the native
     ``CreateVideo`` + ``SaveVideo`` nodes. The stages hand off at ``split_step``
-    (0 = half the steps), and each can run its own guidance via
-    ``cfg_high``/``cfg_low`` (0 = the shared ``cfg``) — LoRA authors tune these
-    per stage (motion lives in the high pass, texture in the low), so a recipe
-    can follow their numbers exactly. The output resolution is
+    (0 = half the steps), and each runs at its own ``cfg_high``/``cfg_low`` —
+    LoRA authors tune these per stage (motion lives in the high pass, texture in
+    the low), so a recipe can follow their numbers exactly. The output resolution is
     derived in-graph from the input image (see :meth:`build_api_payload`): it
     keeps the image's aspect ratio at a fixed pixel budget rather than a
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
@@ -53,9 +52,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "batch_size": 1,
             "steps": 20,
             "split_step": 0,
-            "cfg": 3.5,
-            "cfg_high": 0.0,
-            "cfg_low": 0.0,
+            "cfg_high": 3.5,
+            "cfg_low": 3.5,
             "sampler_name": "euler",
             "scheduler": "simple",
             "shift_high": 8.0,
@@ -106,9 +104,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("split_step", "Handoff Step (0 = half)", "int", 0, min_val=0, max_val=50),
-            ParamDef("cfg", "Prompt Strength", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("cfg_high", "Prompt Strength (High)", "float", 0.0, min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("cfg_low", "Prompt Strength (Low)", "float", 0.0, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg_high", "Prompt Strength (High)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg_low", "Prompt Strength (Low)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=high),
@@ -122,10 +119,20 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                      options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
+    @staticmethod
+    def _stage_strengths(params: dict) -> tuple[float, float]:
+        """Each sampler's prompt strength. A recipe stored before the stages had
+        their own carries one ``cfg`` and a zero for each stage; that zero meant
+        "use the shared one", so it still does — reading it as no guidance at all
+        would re-run every such generation as a different video."""
+        shared = params.get("cfg")
+        if shared is None:
+            return params["cfg_high"], params["cfg_low"]
+        return params["cfg_high"] or shared, params["cfg_low"] or shared
+
     def build_api_payload(self, params: dict) -> dict:
         split_step = params["split_step"] or params["steps"] // 2
-        cfg_high = params["cfg_high"] or params["cfg"]
-        cfg_low = params["cfg_low"] or params["cfg"]
+        cfg_high, cfg_low = self._stage_strengths(params)
         # Each LoRA is optional: "None" adds no LoraLoader for that stage, so its
         # sampler runs the base UNET unmodified (WorkflowTemplate.lora_model_input).
         lora_high, model_high = self.lora_model_input(

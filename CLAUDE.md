@@ -76,6 +76,12 @@ behind is the two hooks that call the guard, below.
   repair it asks `origenerator.base_backfill` — the same module the app's own
   absence path uses, down to the submit-and-wait — so the two cannot answer
   differently. Run it with the app closed; it is one full render per row.
+- `tools/backfill_genau_trims.py` — cuts the clips that went down the Genau
+  lane before it learned to send one stroke (`origenerator.stroke_trim`), which
+  is every clip in Genau's folder from before that. No `--apply` is a dry run
+  and names them. It cuts and records; it does not send, because those clips are
+  already in Genau's folder whole and putting a second version of each beside
+  them is a decision about that folder. Seconds a row, so the app may stay open.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

@@ -239,6 +239,31 @@ def _record_cut(db, row: dict, dest: Path, output_dir: Path, thumb_dir: Path) ->
     return prompt_id
 
 
+def clips_sent_whole(rows: list[dict]) -> list[dict]:
+    """The clips handed to Genau before the lane learned to cut, oldest send first.
+
+    Everything sent down that lane until now went whole, so Genau has been
+    steering four strokes as one for every clip in its folder. These are the rows
+    a backfill has work to do on: sent, not themselves a cut, and with no cut of
+    them yet -- so a re-run, or a clip the button has since cut, has nothing left
+    to do here.
+
+    Oldest send first, because a backfill interrupted halfway should have got
+    through the clips that have been wrong the longest. The stamp is only to the
+    second and two clips can go down the lane inside one, so the row's own order
+    breaks the tie -- otherwise a ``--limit`` run picks whichever of them the
+    listing happened to hand over first, and picks a different one next time.
+    """
+    already_cut = {r["trimmed_from"] for r in rows if r.get("trimmed_from")}
+    return sorted(
+        (r for r in rows
+         if r.get("genau_exported_at")
+         and not r.get("trimmed_from")
+         and r.get("prompt_id") not in already_cut),
+        key=lambda r: (r["genau_exported_at"], r.get("id") or 0),
+    )
+
+
 def single_stroke_clip(row: dict, video_path, db, *, output_dir, thumb_dir) -> Path:
     """The one-stroke cut of ``row``'s clip, made now if it does not exist yet.
 

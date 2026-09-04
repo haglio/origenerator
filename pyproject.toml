@@ -38,7 +38,7 @@ voice = ["faster-whisper", "sounddevice"]
 # The timeout is a ceiling on a hang, not a performance budget. The slowest test on a
 # developer machine is the tracked-tree content scan, but it is not the
 # slowest on a runner: it returns early when no blocklist is reachable, and
-# the blocklist is git-ignored, so a fresh checkout has none. Nothing CI runs
+# the list sits beside the checkouts, so a fresh CI clone has none. Nothing CI runs
 # here goes much past a second. The ceiling stays the family's highest because
 # this is its largest suite, and because a session-scoped fixture's teardown
 # is charged to whichever test ran last -- here a full widget-count sweep and

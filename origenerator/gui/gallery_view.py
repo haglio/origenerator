@@ -72,6 +72,7 @@ from origenerator.gui.browser_pane import (
     TreeNavigation,
 )
 from origenerator.gui.combine_panel import CombinePanel
+from origenerator.gui.deferred import defer
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.find_bar import FindBar
@@ -5611,7 +5612,7 @@ class GalleryView(QWidget):
         this with a straight-through version, so a test can press and inspect in
         one breath rather than pumping an event loop for every launch.
         """
-        QTimer.singleShot(0, work)
+        defer(self, work)
 
     def _show_launching(self, image_id: str, *, category: str = "",
                         video_id: str | None = None) -> str:
@@ -7161,7 +7162,7 @@ class GalleryView(QWidget):
         self._actions.rename_folder(key, name.strip() or None)
         self._sync_history_buttons()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
-        QTimer.singleShot(0, self.refresh)
+        defer(self, self.refresh)
 
     def _begin_title_rename(self):
         """Double-clicking the title bar edits the selected folder's name — but not
@@ -7191,7 +7192,7 @@ class GalleryView(QWidget):
         # editor's own focus-out deletes the browser pane that Qt is still
         # delivering that click to, and the app goes down with an access
         # violation. The tree's inline rename defers for the same reason.
-        QTimer.singleShot(0, self.refresh)
+        defer(self, self.refresh)
 
     def _toggle_star(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,

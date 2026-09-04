@@ -10,6 +10,11 @@ Deliberately tiny: a callable to run and a callable to hand the result to. Qt's
 global pool does the running, and the result crosses back through a queued signal,
 so ``done`` runs on the thread that called this — free to touch widgets, the
 database, and everything else the caller owns.
+
+Queued is what makes the carrier's lifetime the whole problem here: between the
+pool thread's emit and the delivery a turn later, anything that frees the
+handler leaves Qt to call a function that no longer exists. See
+:func:`run_off_thread`.
 """
 
 import logging
@@ -17,6 +22,10 @@ import logging
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 logger = logging.getLogger(__name__)
+
+# Every carrier still waiting for its answer. Touched only on the thread that
+# calls run_off_thread, since that is also the thread the result is delivered on.
+_in_flight = set()
 
 
 class _Result(QObject):
@@ -46,14 +55,28 @@ class _Task(QRunnable):
 def run_off_thread(work, done) -> None:
     """Call ``work()`` on the global pool, then ``done(result)`` back on this thread.
 
-    ``done`` is called exactly once, with ``None`` when ``work`` raised. The
-    carrier keeps itself alive by parenting nothing and being closed over by its
-    own handler, which is released when the connection is torn down after firing.
+    ``done`` is called exactly once, with ``None`` when ``work`` raised.
+
+    The carrier is held in :data:`_in_flight` until it delivers, which is the
+    whole of what keeps it and its handler alive. It used to rely on being a
+    reference *cycle* instead -- the handler closed over the carrier, and the
+    carrier's own connection held the handler -- and a cycle nothing outside
+    points at is precisely what Python's cyclic collector takes. Collected
+    mid-flight, the handler was freed while the pool thread's emit was still
+    queued; the queued call then arrived at a function object that had been
+    freed and its memory reused. That is not an exception. It is an access
+    violation inside the interpreter's own frame setup, no traceback, the
+    process simply gone -- and once the 1.5 s poll started running two of these
+    per tick it was a crash every few minutes (2026-09-03/04, seven of them
+    across the live app and four branch previews, all faulting on the same
+    instruction: the free-variable copy at the entry of a closure, reached
+    through a queued Qt metacall).
     """
     result = _Result()
+    _in_flight.add(result)
 
     def deliver(value):
-        result.ready.disconnect(deliver)  # release the carrier and this closure
+        _in_flight.discard(result)  # its last turn; the carrier can go now
         done(value)
 
     result.ready.connect(deliver)

@@ -61,7 +61,12 @@ from origenerator.gallery.labels import (
     settings_label,
     workflow_label,
 )
-from origenerator.gallery.output import is_in_progress, media_type_of_row, produced_output
+from origenerator.gallery.output import (
+    STROKE_TRIM_SOURCE,
+    is_in_progress,
+    media_type_of_row,
+    produced_output,
+)
 from origenerator.gallery.signatures import (
     _grouping_version,
     _input_image_config,
@@ -298,12 +303,23 @@ def named_folders_by_row(
     return named
 
 
+#: The sources that mean "this app made this row" -- what the Recents shelf lists.
+_APP_MADE_SOURCES = frozenset({"generated", STROKE_TRIM_SOURCE})
+
+
 def recent_generations(rows: list[dict]) -> list[dict]:
     """Every generated row, newest first — the whole of the Recents shelf's list.
 
     "Generated" means this app produced the row, from a Generate tab or a gallery
-    re-roll; an imported file discovered on disk (``source`` ``"imported"``) is not
-    a recent *generation* and is left out. As in the tree, only rows that produced
+    re-roll -- or, with no run behind it at all, cut a single stroke out of a clip
+    for the Genau lane (:data:`~origenerator.gallery.output.STROKE_TRIM_SOURCE`).
+    That last one is the shelf's whole reason for not being a list of *runs*: a
+    cut is something the app just made for you, it lands in the settings folder
+    of the clip it came from rather than anywhere you would think to go looking,
+    and left off here there is nowhere at all that says it happened. An imported
+    file discovered on disk (``source`` ``"imported"``) is not this app's work and
+    is left out; an experiment has a shelf of its own. As in the tree, only rows
+    that produced
     an output file appear — the shelf is a gallery of results, so a failed or
     in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
@@ -326,7 +342,8 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     """
     listed = [
         row for row in rows
-        if (row.get("source") or "generated") == "generated" and produced_output(row)
+        if (row.get("source") or "generated") in _APP_MADE_SOURCES
+        and produced_output(row)
     ]
     # Ids are the order the caller already handed them in, so a row with no
     # enhancement sorts exactly where it arrived, and rows that tie (a caller

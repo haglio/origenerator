@@ -8,7 +8,7 @@ lookalike), and that each command it posts reaches the right thing here.
 from player_core import wave_stack
 from player_core.console import console_rows
 from player_core.console_hud import ConsoleHud, ConsolePainter
-from player_core.direct_control import POSITION_MAX
+from player_core.robot_hand import POSITION_MAX
 
 from origenerator import stroke_engine
 from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
@@ -173,8 +173,8 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     assert not any(a.endswith("_activate") for a in actions)
     for kept in ("genau_prev_clip", "genau_next_clip", "main_lock",
                  "genau_weird_clip", "genau_advance_down", "genau_advance_up",
-                 "genau_toggle_cruise", "genau_cycle_shape", "quarter_button",
-                 "genau_speed_up", "genau_amplitude_up", "genau_center_up"):
+                 "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button",
+                 "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
 
 
@@ -184,8 +184,8 @@ def test_the_stroke_buttons_reach_the_driver(qtbot):
     # A full-travel stroke has its center pinned, and a pinned mark is dim too.
     stroke.state.state.amplitude = 40
     panel.render_console()
-    for action in ("genau_speed_up", "genau_amplitude_down", "genau_center_up",
-                   "genau_toggle_cruise", "genau_cycle_shape", "quarter_button"):
+    for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
+                   "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button"):
         _press(panel, action)
     assert stroke.calls == [("speed", 5), ("amp", -10), ("center", 5),
                             "cruise", "shape", "quarter"]
@@ -210,7 +210,7 @@ def test_a_parked_device_offers_none_of_the_strokes_marks(qtbot):
     panel, stroke, _host = _panel(qtbot)
     panel.render_console()
     marks = [b for _r, b in panel._painter.buttons
-             if b.action.startswith(("genau_speed", "genau_amplitude", "genau_center"))]
+             if b.action.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
     assert marks and all(b.dim for b in marks)
 
 
@@ -240,14 +240,14 @@ def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
 
 
 def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
-    from player_core.drive_readout import DRIVEN_BY_GENAU, DRIVEN_BY_NOTHING
+    from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 
     stroke = FakeStroke()
     assert drive_hud(stroke.state, False).driven == DRIVEN_BY_NOTHING
-    assert drive_hud(stroke.state, True).driven == DRIVEN_BY_GENAU
+    assert drive_hud(stroke.state, True).driven == DRIVEN_BY_ROBOT_HAND
     assert console_hud(stroke, FakeHost()).console.osr2 == "off"
     stroke.active = True
-    assert console_hud(stroke, FakeHost()).console.osr2 == "genau"
+    assert console_hud(stroke, FakeHost()).console.osr2 == "robot_hand"
 
 
 def test_a_stroke_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):

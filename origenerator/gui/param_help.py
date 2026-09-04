@@ -45,7 +45,7 @@ PARAM_HELP: dict[str, str] = {
         "same image exactly; Random draws a fresh one on every Generate."
     ),
     "noise_seed": (
-        "The starting noise for the first (high-noise) sampling stage, which "
+        "The starting noise for the high-noise stage, the first one, which "
         "settles the composition. Random draws a fresh one on every Generate."
     ),
     "audio_seed": (
@@ -115,26 +115,26 @@ PARAM_HELP: dict[str, str] = {
         "model has converged."
     ),
     "cfg": (
-        "How strictly the model obeys the prompt. Too low drifts off it; too high "
-        "burns contrast and flattens detail."
+        "How strictly the model obeys the prompt (the CFG scale underneath). Too "
+        "low drifts off it; too high burns contrast and flattens detail."
     ),
     "cfg_high": (
-        "Prompt adherence for the high-noise stage on its own, where the motion "
-        "is settled. 0 means use the shared CFG; LoRA authors often publish a "
-        "different number for each stage."
+        "Prompt strength for the high-noise stage on its own, where the motion "
+        "is settled. 0 means use the shared Prompt Strength; LoRA authors often "
+        "publish a different CFG for each stage."
     ),
     "cfg_low": (
-        "Prompt adherence for the low-noise stage on its own, where the texture "
-        "is settled. 0 means use the shared CFG."
+        "Prompt strength for the low-noise stage on its own, where the texture "
+        "is settled. 0 means use the shared Prompt Strength."
     ),
     "split_step": (
-        "Which step the high-noise stage hands over to the low-noise one — "
-        "earlier leaves more of the work to the refining pass. 0 splits at half "
-        "the steps."
+        "Which step the high-noise stage hands over to the low-noise one (the "
+        "split step) — earlier leaves more of the work to the refining pass. 0 "
+        "splits at half the steps."
     ),
     "guidance": (
-        "Flux's own prompt-adherence dial. It behaves like CFG but wants much "
-        "smaller numbers — this model's usable range sits low."
+        "How strictly Flux obeys the prompt (its guidance value). It behaves like "
+        "CFG but wants much smaller numbers — this model's usable range sits low."
     ),
     "sampler_name": (
         "The algorithm that walks the noise down to an image. They differ in look "
@@ -145,8 +145,9 @@ PARAM_HELP: dict[str, str] = {
         "detail lands more than whether the image is good."
     ),
     "denoise": (
-        "How much of the starting image is thrown away. 1.0 generates from pure "
-        "noise; lower keeps more of what was there and only re-imagines the rest."
+        "How much of the starting image is redrawn (the denoise strength). 1.0 "
+        "generates from pure noise; lower keeps more of what was there and only "
+        "re-imagines the rest."
     ),
     "shift": (
         "Where this model spends its sampling effort — higher favors composition, "
@@ -165,9 +166,9 @@ PARAM_HELP: dict[str, str] = {
         "Around 20 is enough to build texture without redrawing anything."
     ),
     "enhance_denoise": (
-        "How far the enhance may stray from the picture it is refining. 0.15 adds "
-        "skin and fabric texture; by 0.3 it starts re-imagining anatomy, which is "
-        "where creases turn into wounds."
+        "How far the enhance may stray from the picture it is refining (its "
+        "denoise). 0.15 adds skin and fabric texture; by 0.3 it starts re-imagining "
+        "anatomy, which is where creases turn into wounds."
     ),
     "enhance_detail_fixes": (
         "Which parts the enhance goes back over and redraws on their own, and "

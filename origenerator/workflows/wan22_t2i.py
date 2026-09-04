@@ -60,19 +60,19 @@ class Wan22T2iWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
-            ParamDef("seed", "Seed (Stage 2)", "seed", 0),
+            ParamDef("noise_seed", "Seed (High)", "seed", 0),
+            ParamDef("seed", "Seed (Low)", "seed", 0),
             ParamDef("width", "Width", "int", 1088, min_val=64, max_val=2048, step=16),
             ParamDef("height", "Height", "int", 1920, min_val=64, max_val=2048, step=16),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
-            ParamDef("cfg", "CFG Scale", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg", "Prompt Strength", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
                      min_val=1.0, max_val=4.0, step=0.25),
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

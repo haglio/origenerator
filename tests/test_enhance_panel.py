@@ -8,6 +8,7 @@ already received.
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
+from PyQt6.QtWidgets import QLabel
 
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
@@ -929,3 +930,12 @@ def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
     host.resize(row.minimumSizeHint().width(), 400)   # room for one
     QApplication.processEvents()
     assert row._title.y() >= row._picture.y() + row._picture.height()
+
+
+def test_the_panels_captions_use_plain_words(qtbot):
+    # The graph's word for the third number is denoise; the caption says what
+    # it does, and the tooltip keeps the graph's word.
+    panel, _edits = _panel(qtbot)
+    captions = [w.text() for w in panel.findChildren(QLabel)]
+    assert "Redraw Amount" in captions
+    assert not any("Denoise" in caption for caption in captions)

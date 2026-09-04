@@ -124,7 +124,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("input_image", "Input Image", "image", ""),
+            ParamDef("input_image", "Start Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
             ParamDef("seed", "Seed", "seed", 0),
@@ -141,7 +141,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=113, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
-            ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("cfg", "Prompt Strength", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet", "Model", "combo", defaults["unet"], options=models),
             ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras_high),

@@ -1134,7 +1134,9 @@ class GalleryView(QWidget):
         # and a button that seems to do nothing reads as an app that has died.
         self._combine.generate_requested.connect(self._combine_generate)
         self._combine.category_requested.connect(self._combine_generate_category)
-        self._combine.open_requested.connect(self._open_combination)
+        self._combine.open_requested.connect(
+            lambda image_id, video_id, category="": self._open_combination(
+                image_id, video_id, category, self._combine.selected_intent()))
         self._combine.open_category_requested.connect(self._open_category)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video behind it may have no loop at all.
@@ -5590,9 +5592,11 @@ class GalleryView(QWidget):
         """
         key = self._show_launching(image_id, video_id=video_id)
 
+        intent = self._combine.selected_intent()
+
         def run():
             try:
-                self._generate_combination(image_id, video_id)
+                self._generate_combination(image_id, video_id, intent=intent)
             finally:
                 self._drop_launching(key)
 
@@ -5662,10 +5666,18 @@ class GalleryView(QWidget):
         if key is not None and self._launching.pop(key, None) is not None:
             self._update_queue()
 
-    def _combined_params(self, image_id: str, video_id: str):
+    def _combined_params(self, image_id: str, video_id: str,
+                         intent: str = recipe_match.PLAYERS):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
         seed with only the input image swapped to the dropped one.
+
+        Under ``GENAU`` the recipe is then re-cut to hold one stroke and smoothed
+        back out (:func:`~origenerator.gallery.combine.stroke_shaped`). The lane
+        used to choose only WHICH recipe was mined, and from there a Genau clip
+        was made exactly like any other video; it can't be, because what Genau
+        needs of a clip is a property of the clip's own length, and the past clip
+        being mined was made before anyone knew that.
 
         ``None`` when the pair can't be combined: either row is gone, the video
         isn't a rebuildable image-conditioned recipe, or the image has no output
@@ -5682,14 +5694,17 @@ class GalleryView(QWidget):
         params = gallery.combined_params(video_row, image_row, workflow)
         if params is None:
             return None  # the dropped image has no output file to seed from
+        if intent == recipe_match.GENAU:
+            params = gallery.stroke_shaped(params, workflow)
         return workflow, params, video_row, image_row
 
-    def _open_combination(self, image_id: str, video_id: str, category: str = ""):
+    def _open_combination(self, image_id: str, video_id: str, category: str = "",
+                          intent: str = recipe_match.PLAYERS):
         """Open a dropped image + video's recipe as an editable generate tab instead
         of running it — the combine panel's "Edit…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
-        built = self._combined_params(image_id, video_id)
+        built = self._combined_params(image_id, video_id, intent)
         if built is None:
             return
         workflow, params, video_row, image_row = built
@@ -5724,7 +5739,8 @@ class GalleryView(QWidget):
         return row.get("thumbnail_path")
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
-                              category: str = ""):
+                              category: str = "",
+                              intent: str = recipe_match.PLAYERS):
         """Generate a new video from a dropped image + a dropped video's recipe.
 
         Reuses the video's workflow, settings and seed, swapping only the input
@@ -5737,8 +5753,10 @@ class GalleryView(QWidget):
         video isn't a rebuildable image-conditioned recipe, the image has no
         output file, or that folder is already generating.
 
-        No lane reaches here: the lane chose which recipe ``video_id`` names, and
-        from that point a Genau clip is made exactly like any other video. ``send``
+        The lane reaches here now: it chose which recipe ``video_id`` names, and
+        it also re-cuts that recipe to the length one stroke fits in (see
+        :meth:`_combined_params`), which is the one thing a mined clip cannot
+        carry — it was made before anyone knew Genau needed it. ``send``
         is the one thing that still rides along — a spoken "genau it" wants its
         clip handed on the moment it exists, and wants no dialog at all: it is
         answered in the show's corner and nothing runs, so the re-roll answers
@@ -5748,7 +5766,7 @@ class GalleryView(QWidget):
         frame first and the clip second, under an id this never sees, so such a
         clip's row goes without the recipe mark the queue reads.
         """
-        built = self._combined_params(image_id, video_id)
+        built = self._combined_params(image_id, video_id, intent)
         if built is None:
             return
         workflow, params, video_row, image_row = built
@@ -5927,6 +5945,8 @@ class GalleryView(QWidget):
         params = gallery.curated_params(spec, image_row, workflow)
         if params is None:
             return None
+        if intent == recipe_match.GENAU:
+            params = gallery.stroke_shaped(params, workflow)
         return workflow, params
 
     def _generate_curated(self, image_id: str, category: str, intent: str,
@@ -5991,11 +6011,11 @@ class GalleryView(QWidget):
             return
         self._resolve_category(
             image_id, category, intent,
-            partial(self._combine_resolved, image_id, send, category, launching),
+            partial(self._combine_resolved, image_id, send, category, intent, launching),
         )
 
     def _combine_resolved(self, image_id: str, send: bool, category: str,
-                          launching: str | None, video_id: str | None):
+                          intent: str, launching: str | None, video_id: str | None):
         """The recipe match came back: run what it found on the image, if it
         found anything. ``category`` is the act it was asked for, which the
         launched row records — the mined video answers it, but only the act says
@@ -6008,7 +6028,7 @@ class GalleryView(QWidget):
         """
         try:
             if video_id is not None:
-                self._generate_combination(image_id, video_id, send, category)
+                self._generate_combination(image_id, video_id, send, category, intent)
         finally:
             self._genau_resolving.discard(image_id)
             self._drop_launching(launching)
@@ -6033,7 +6053,7 @@ class GalleryView(QWidget):
         self._resolve_category(
             image_id, category, intent,
             lambda video_id: video_id is not None
-            and self._open_combination(image_id, video_id, category),
+            and self._open_combination(image_id, video_id, category, intent),
         )
 
     def _on_combine_intent_changed(self, _intent: str):

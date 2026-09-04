@@ -2,7 +2,10 @@
 
 import json
 
+import pytest
+
 from origenerator import gallery
+from origenerator.config import STROKE_DEFAULT_HZ
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -163,3 +166,59 @@ def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
                 if n["class_type"] == "KSamplerAdvanced"]
 
     assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
+
+# --- shaping a recipe into one stroke, for the lane that scrubs it ------------
+
+_LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+
+
+def _shaped(**over):
+    return gallery.stroke_shaped(dict(_LOOP.default_params(), **over), _LOOP)
+
+
+def test_a_genau_recipe_is_cut_to_the_length_one_stroke_fits_in():
+    """The lane's whole problem: at 16fps a 21-frame loop is 1.3 seconds, and a
+    stroke at the app's own cadence is 0.83 — so the model has room for a stroke
+    and a half and Genau steers whatever it fits as one. 13 frames is 0.81."""
+    shaped = _shaped()
+
+    assert shaped["frame_count"] == 13
+    assert shaped["frame_count"] / shaped["frame_rate"] == pytest.approx(
+        1 / STROKE_DEFAULT_HZ, abs=0.05)
+
+
+def test_the_length_lands_on_one_the_sampler_will_take():
+    # 4n+1 and nothing else, whatever the rate makes of the arithmetic.
+    for rate in (8.0, 12.0, 16.0, 24.0, 30.0, 60.0):
+        assert (_shaped(frame_rate=rate)["frame_count"] - 1) % 4 == 0
+
+
+def test_the_frames_taken_out_are_filled_back_in():
+    """Few frames is the point AND the cost: the same clip that reads as one
+    stroke is too coarse to scrub slowly. The pass fills it back up, which costs
+    an interpolation rather than sampler time -- and gives the model no extra
+    room to fit a second stroke in."""
+    shaped = _shaped()
+
+    frames_out = (shaped["frame_count"] - 1) * shaped["interpolation"] + 1
+    assert frames_out >= 48
+    # The seconds are unchanged: the writer's rate rises with the frames.
+    assert shaped["frame_rate"] == _LOOP.default_params()["frame_rate"]
+
+
+def test_the_smoothing_stays_inside_what_the_form_can_show():
+    """A recipe sampling slowly enough needs a big multiplier, and a value past
+    the workflow's own ceiling is one the user could not turn back down."""
+    ceiling = next(pd.max_val for pd in _LOOP.param_definitions()
+                   if pd.key == "interpolation")
+
+    for rate in (4.0, 8.0, 16.0, 60.0):
+        assert 1 <= _shaped(frame_rate=rate)["interpolation"] <= ceiling
+
+
+def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():
+    # This shapes a recipe; it does not invent one. A workflow with no length to
+    # set and no pass to run has neither.
+    params = {"positive_prompt": "alpha", "seed": 3}
+
+    assert gallery.stroke_shaped(params, _I2V) == params

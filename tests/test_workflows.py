@@ -167,6 +167,21 @@ def test_workflows_expose_their_seed_param_keys():
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed", "audio_seed")
 
 
+def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
+    # Reusing a still's settings pins its seed: the composition is the point of
+    # editing one. Reusing a clip's does not — a pinned video seed would ride
+    # every prompt edit out of that lineage, and one seed sampled over and over
+    # says nothing about the motion. Registry-wide, so a new video workflow is
+    # covered the day it is registered.
+    pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
+    drawing = set(WORKFLOW_REGISTRY) - pinning
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"}
+    assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
+    # ...and the split is the media, not a list anyone has to remember to add to.
+    assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
+    assert all(WORKFLOW_REGISTRY[n].output_type == "image" for n in pinning)
+
+
 def test_wan_video_workflows_expose_editable_audio_params():
     # The audio prompt/negative/seed are ordinary editable fields (the foley
     # model files stay read-only passthroughs, like clip_name/vae_name): a run

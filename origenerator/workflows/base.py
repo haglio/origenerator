@@ -137,6 +137,25 @@ class WorkflowTemplate(ABC):
         """
         return tuple(pd.key for pd in self.param_definitions() if pd.type == "seed")
 
+    def pins_reused_seed(self) -> bool:
+        """Whether loading a past generation's settings into a config tab pins its
+        seed(s) — clearing their Random boxes — so the next Generate re-creates
+        that exact output rather than drawing a fresh one.
+
+        True for an image: a still's seed is its composition, and "the same
+        picture, said differently" is most of what editing one is for. False for
+        a video, where the seed is the motion and each run of it is one sample
+        of many. A pinned video seed is quiet and it spreads: a tab picks it up
+        from whatever clip was clicked, keeps it through every prompt edit, and
+        carries it into the next workflow, so a whole lineage of videos comes
+        out on the one seed that clip happened to draw — and nothing about a
+        run's motion can be learned from a seed that never varies.
+
+        The value still fills the field either way, so locking a video's seed is
+        one click of Random rather than a number to go and find.
+        """
+        return self.output_type != "video"
+
     def enhance_keys(self) -> tuple[str, ...]:
         """Param keys that configure the enhancement rather than the recipe.
 

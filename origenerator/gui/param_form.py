@@ -103,6 +103,12 @@ class ParamForm(QWidget):
     to the Enhance subpanel, which applies enhancement as a separate layer — and
     pinning them is what stops a Generate seeded from an old enhanced run coming
     out enhanced again with the subpanel's box unticked.
+
+    ``pins_reused_seed`` is the workflow's answer to
+    :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
+    whether a seed written in by :meth:`set_values` also clears its Random box.
+    False (video) writes the value but leaves the box ticked, so the settings of
+    a clip loaded into a tab don't quietly pin every later run to its seed.
     """
 
     changed = pyqtSignal()          # any field's value changed
@@ -114,8 +120,14 @@ class ParamForm(QWidget):
         *,
         size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
         hidden_keys: tuple[str, ...] = (),
+        pins_reused_seed: bool = True,
     ):
         super().__init__(parent)
+        # Whether a written-in seed is pinned as well as shown (see the class
+        # docstring). Defaults to pinning: that is what reusing a still's
+        # settings means, and it is the answer a form built without a workflow
+        # behind it (a test's bare field list) should get.
+        self._pins_reused_seed = pins_reused_seed
         # Params carried but never shown, pinned at the definitions' own defaults
         # — a loaded config never moves them (see the class docstring).
         self._hidden_keys = frozenset(hidden_keys)
@@ -688,7 +700,7 @@ class ParamForm(QWidget):
     def set_seed_random(self, is_random: bool):
         """Set every seed's Random box, e.g. when restoring a saved tab.
 
-        ``set_values`` always unchecks Random (it pins a concrete seed); this
+        ``set_values`` unchecks Random on a form that pins reused seeds; this
         lets a caller put the box back the way the user had it.
         """
         for cb in self._randomize_checks.values():
@@ -723,15 +735,17 @@ class ParamForm(QWidget):
         return None
 
     def _write_field(self, pd: ParamDef, value) -> None:
-        """Apply one value to its widget. A seed is pinned (its Random box cleared),
-        matching how reusing a generation reproduces an exact seed."""
+        """Apply one value to its widget. A seed's value always fills its field;
+        whether that also pins it (clearing its Random box) is
+        ``pins_reused_seed`` — reusing a still's settings reproduces its exact
+        seed, reusing a clip's shows the seed and goes on drawing fresh ones."""
         w = self._widgets[pd.key]
         if pd.type == "bool":
             w.setChecked(bool(value))
         elif pd.type == "seed":
             w.setText(str(int(value)))
             cb = self._randomize_checks.get(pd.key)
-            if cb:
+            if cb and self._pins_reused_seed:
                 cb.setChecked(False)
         elif pd.type == "str" and pd.multiline:
             # A written value replaces whatever was there, marked change and all.

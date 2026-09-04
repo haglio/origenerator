@@ -481,7 +481,8 @@ class GenerateConfigPanel(QWidget):
             # doesn't — the browser pane's Enhance subpanel owns it per folder.
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
-                                         hidden_keys=wf.enhance_keys()))
+                                         hidden_keys=wf.enhance_keys(),
+                                         pins_reused_seed=wf.pins_reused_seed()))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {

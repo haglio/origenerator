@@ -153,6 +153,44 @@ def test_seed_keeps_its_random_checkbox_beside_the_copy_button(qtbot):
     assert "seed" in form._copy_buttons        # and gains a copy button alongside
 
 
+def test_a_written_seed_pins_itself_by_default(qtbot):
+    # The still's deal: reusing a generation's settings reproduces its seed, so
+    # writing one in unticks Random.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+
+    form.set_values({"seed": 12345})
+
+    assert form.seed_is_random() is False
+    assert form.get_values()["seed"] == 12345
+
+
+def test_a_form_that_does_not_pin_shows_a_written_seed_and_keeps_drawing(qtbot):
+    # The clip's deal: the seed that made it fills the field (there to read, to
+    # copy, and to lock with one click) but Random stays ticked, so the next
+    # press draws a fresh one instead of re-running that clip's motion.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
+    qtbot.addWidget(form)
+
+    form.set_values({"seed": 12345})
+
+    assert form._widgets["seed"].text() == "12345"
+    assert form.seed_is_random() is True
+    assert form.get_values_static()["seed"] == 12345   # a snapshot reads the field
+    assert form.get_values()["seed"] != 12345          # a launch draws its own
+
+
+def test_a_form_that_does_not_pin_still_locks_when_random_is_unticked(qtbot):
+    # "Of course there will be cases when you want the seed locked" — one click.
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
+    qtbot.addWidget(form)
+    form.set_values({"seed": 12345})
+
+    form.set_seed_random(False)
+
+    assert form.get_values()["seed"] == 12345
+
+
 def _readonly_texts(form):
     return {lbl.text() for lbl in form.findChildren(QLabel)
             if lbl.objectName() == "readonlyParamValue"}

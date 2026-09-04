@@ -116,7 +116,7 @@ class DialSetting:
 
     ``dial`` is the driver's own word for it — ``speed``, ``amp``, ``center`` —
     and ``value`` is on the 0-100 scale all three share
-    (:mod:`player_core.direct_control` clamps, so "min speed" landing under the
+    (:mod:`player_core.robot_hand` clamps, so "min speed" landing under the
     dial's own floor is the dial's business, not the vocabulary's).
     """
 

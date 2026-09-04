@@ -273,7 +273,7 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     assert hud._targets is not None
     # The mode pair is on it — the way back to player mode from atop a show.
     assert [command for _rect, command in hud._targets.modes] == [
-        "players_activate", "origenerator_activate"]
+        "satellites_video_activate", "origenerator_activate"]
     # The transport controls are the players' own set.
     control_names = {name for _rect, name in hud._targets.control}
     assert {"prev", "next", "lock", "trash"} <= control_names

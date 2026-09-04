@@ -3,8 +3,8 @@
 The slideshow shows images, and an image gives the device nothing to follow, so
 this supplies the motion instead. The waveform itself is not written here: the
 shapes, the speed dial's exponential map and the amplitude and center arithmetic
-are :mod:`player_core.direct_control` — genau's own, shared so both apps stroke
-the same way rather than two ways that look alike until they don't.
+are :mod:`player_core.robot_hand` — the Robot Hand, genau's own, shared so both
+apps stroke the same way rather than two ways that look alike until they don't.
 
 What genau keeps elsewhere and this has to carry is the phase. Genau's engine
 advances it against the clip's beats; here there is no clip, so the stroke
@@ -28,10 +28,10 @@ ensure_player_core_on_path()
 
 from player_core import cruise_control, wave_stack  # noqa: E402
 from player_core.cruise_control import CruiseControlState  # noqa: E402
-from player_core.direct_control import (  # noqa: E402
+from player_core.robot_hand import (  # noqa: E402
     MAX_SPEED,
     MIN_SPEED,
-    DirectControlState,
+    RobotHandState,
     WaveformShape,
     adjust_amplitude,
     adjust_center,
@@ -46,7 +46,7 @@ from player_core.direct_control import (  # noqa: E402
 )
 
 __all__ = [
-    "MAX_SPEED", "MIN_SPEED", "CruiseControlState", "DirectControlState",
+    "MAX_SPEED", "MIN_SPEED", "CruiseControlState", "RobotHandState",
     "Stroke", "WaveformShape", "adjust_amplitude", "adjust_center",
     "adjust_speed", "advance", "bpm_for_speed", "cycle_shape",
     "disable_cruise_control", "enable_cruise_control", "position",
@@ -64,7 +64,7 @@ class Stroke:
     cruise control, since everything timed against it does.
     """
 
-    state: DirectControlState = field(default_factory=DirectControlState)
+    state: RobotHandState = field(default_factory=RobotHandState)
     cruise: CruiseControlState = field(default_factory=CruiseControlState)
     phase: float = 0.0
 

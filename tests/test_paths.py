@@ -55,8 +55,8 @@ def test_player_core_is_found_the_same_way_and_is_importable():
     assert (checkout / "player_core" / "__init__.py").exists()
     ensure_player_core_on_path()
     ensure_player_core_on_path()  # idempotent
-    import player_core.direct_control
-    import player_core.drive_layout  # noqa: F401
+    import player_core.drive_layout
+    import player_core.robot_hand  # noqa: F401
 
 
 def test_every_module_importing_a_sibling_puts_it_on_the_path_itself():

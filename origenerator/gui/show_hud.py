@@ -321,7 +321,7 @@ class ShowHud(QLabel):
             self._act_here(verb)
             return
         allowed = (
-            "players_activate", "origenerator_activate",
+            "satellites_video_activate", "origenerator_activate",
             f"{self._side}_prev", f"{self._side}_next",
             f"{self._side}_lock", f"{self._side}_trash",
         )

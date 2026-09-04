@@ -60,7 +60,7 @@ def ensure_player_core_on_path() -> None:
     """Put the ``player_core`` checkout on ``sys.path``.
 
     That package holds the family's stroke: the waveform and its dials
-    (``direct_control``), the console and the drive readout that show them, and
+    (``robot_hand``), the console and the drive readout that show them, and
     where that readout's parts sit (``drive_layout``).  Genau drives the OSR2
     from exactly these, so this app does too rather than growing a second set
     that drifts from them.  Hands-free comes from there as well; what this app

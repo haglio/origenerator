@@ -37,17 +37,18 @@ ensure_player_core_on_path()
 from player_core import drive_layout  # noqa: E402
 from player_core.console import ConsoleModel  # noqa: E402
 from player_core.console_hud import (  # noqa: E402
+    OSR2_ROBOT_HAND,
     ConsoleHud,
     ConsolePainter,
     ModeHud,
     hud_xy,
 )
-from player_core.direct_control import POSITION_MAX  # noqa: E402
 from player_core.drive_readout import (  # noqa: E402
-    DRIVEN_BY_GENAU,
     DRIVEN_BY_NOTHING,
+    DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
+from player_core.robot_hand import POSITION_MAX  # noqa: E402
 
 _TRACE_SECONDS = 12.0
 _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
@@ -83,7 +84,7 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
         speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
         shape=dials.shape.value,
         position=round(POSITION_MAX * stroke_engine.position(state) / 100),
-        driven=DRIVEN_BY_GENAU if active else DRIVEN_BY_NOTHING,
+        driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
         advance_interval=dwell_s,
         trace_seconds=_TRACE_SECONDS,
         spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
@@ -121,7 +122,7 @@ def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
         modes=ModeHud(),
         console=ConsoleModel(
             mode="genau", active=True, locked=host.locked,
-            osr2="genau" if driving else "off",
+            osr2=OSR2_ROBOT_HAND if driving else "off",
             cruise=stroke.state.cruise.active,
             shape=stroke.state.state.shape.value,
             advance_interval=host.dwell_s,
@@ -272,28 +273,28 @@ class StrokePanel(QWidget):
         if not action:
             return
         stroke, host = self._stroke, self._host
-        if action.startswith("genau_") and "_" in action[6:]:
-            axis, _, value = action[6:].rpartition("_")
+        if action.startswith("robot_hand_") and "_" in action[11:]:
+            axis, _, value = action[11:].rpartition("_")
             if value.isdigit() and axis in ("amp", "center", "speed"):
                 {"amp": stroke.set_amplitude, "center": stroke.set_center,
                  "speed": stroke.set_speed}[axis](int(value))
                 self.update()
                 return
         step = {
-            "genau_speed_up": (stroke.adjust_speed, 5),
-            "genau_speed_down": (stroke.adjust_speed, -5),
-            "genau_amplitude_up": (stroke.adjust_amplitude, 10),
-            "genau_amplitude_down": (stroke.adjust_amplitude, -10),
-            "genau_center_up": (stroke.adjust_center, 5),
-            "genau_center_down": (stroke.adjust_center, -5),
+            "robot_hand_speed_up": (stroke.adjust_speed, 5),
+            "robot_hand_speed_down": (stroke.adjust_speed, -5),
+            "robot_hand_amplitude_up": (stroke.adjust_amplitude, 10),
+            "robot_hand_amplitude_down": (stroke.adjust_amplitude, -10),
+            "robot_hand_center_up": (stroke.adjust_center, 5),
+            "robot_hand_center_down": (stroke.adjust_center, -5),
             "genau_prev_clip": (host.stroke_step, -1),
             "genau_next_clip": (host.stroke_step, 1),
         }.get(action)
         if step is not None:
             step[0](step[1])
-        elif action == "genau_toggle_cruise":
+        elif action == "robot_hand_toggle_cruise":
             stroke.toggle_cruise()
-        elif action == "genau_cycle_shape":
+        elif action == "robot_hand_cycle_shape":
             stroke.cycle_shape()
         elif action == "quarter_button":
             stroke.quarter_offset()

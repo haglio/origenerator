@@ -153,17 +153,6 @@ class GenerationStore(Store):
                 (source_prompt_id or None, prompt_id),
             )
 
-    def set_trimmed_from(self, prompt_id: str, source_prompt_id: str):
-        """Record that ``prompt_id`` is one stroke cut out of ``source_prompt_id``.
-
-        Written straight after the cut is inserted, like :meth:`set_enhance_target`
-        and for the same reason: the row goes in first, and only the caller that
-        made the cut knows which clip it came from. A cut's params are copied from
-        that clip, so nothing else on the row can answer it -- the two sit in one
-        settings folder and would otherwise be told apart only by their files.
-        """
-        self._set(prompt_id, "trimmed_from", source_prompt_id)
-
     def set_generation_starred(self, prompt_id: str, starred: bool):
         """Star (or unstar) one generation — the user's per-item bookmark.
 
@@ -293,21 +282,6 @@ class GenerationStore(Store):
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM generations WHERE prompt_id = ?",
-                (prompt_id,),
-            ).fetchone()
-            return dict(row) if row else None
-
-    def trim_of(self, prompt_id: str) -> dict | None:
-        """The single-stroke cut made from ``prompt_id``'s clip, or ``None``.
-
-        What keeps a second send from cutting a second copy: the cut is a file on
-        disk and a row of its own, so once one exists it is the one to hand on.
-        Oldest first, so a library that somehow holds two answers with the one the
-        row has always meant.
-        """
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM generations WHERE trimmed_from = ? ORDER BY id LIMIT 1",
                 (prompt_id,),
             ).fetchone()
             return dict(row) if row else None

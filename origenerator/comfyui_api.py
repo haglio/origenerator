@@ -85,6 +85,34 @@ def format_prompt_error(body: str) -> str:
     return reason or body.strip() or "Bad Request"
 
 
+def format_execution_error(message: str) -> str:
+    """Turn ComfyUI's execution-error blob into a one-line, readable reason.
+
+    A run that dies partway through the graph reports a JSON object naming the
+    node that threw (``node_type``) and what it threw (``exception_message``) --
+    the latter often with a whole download log and a traceback stapled to it. The
+    first line of that is the sentence; the rest is not something to read out of
+    a dialog. The sibling of :func:`format_prompt_error`, which does the same for
+    the other kind of failure, the one that happens before the run starts.
+
+    Falls back to the message as it came when the shape is not the expected one:
+    a failure that reaches the user unreadable is still better than one that
+    never reaches them, which is what this exists to end.
+    """
+    try:
+        data = json.loads(message)
+    except (json.JSONDecodeError, TypeError):
+        data = None
+    if not isinstance(data, dict):
+        return (message or "").strip() or "The run failed."
+    lines = (data.get("exception_message") or "").strip().splitlines()
+    first = lines[0].strip() if lines else ""
+    node = data.get("node_type") or data.get("node_id")
+    if node and first:
+        return f"{node} failed: {first}"
+    return first or (f"{node} failed." if node else "The run failed.")
+
+
 def _queue_prompt_id(item):
     """The prompt id of a ``/queue`` entry — element 1 of its tuple — or ``None``."""
     if isinstance(item, (list, tuple)) and len(item) > 1:

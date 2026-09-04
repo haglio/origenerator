@@ -6,7 +6,7 @@ import pytest
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QPixmap
 
-from origenerator import evolver_export, gallery, stroke_trim
+from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -18,7 +18,6 @@ from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
-from origenerator.stroke_trim import NoSingleStroke
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -1457,70 +1456,6 @@ def test_the_two_lanes_are_sent_independently(saved_panel, monkeypatch):
     assert _lane_button(panel, "Genau").isEnabled()
 
 
-def test_genau_is_sent_one_stroke_and_evolver_the_whole_video(saved_panel,
-                                                             monkeypatch, cut_made):
-    """The difference the two lanes exist to have. Genau scrubs a clip against
-    the device's phase, so it reads whatever it is given as exactly one stroke;
-    Evolver's lane is a library pipeline and wants the video."""
-    panel, db = saved_panel
-    clip = Path("C:/out/vid1.mp4")
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
-    export = MagicMock()
-    monkeypatch.setattr(evolver_export, "export_video", export)
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-
-    panel._on_send(panel._lanes["Genau"])
-    assert export.call_args.args == (CUT, EVOLVER_INBOX_DIR / GENAU_SOURCE)
-    assert cut_made.call_args.args[1] == clip
-
-    panel._on_send(panel._lanes["Evolver"])
-    assert export.call_args.args == (clip, EVOLVER_INBOX_DIR / EVOLVER_SOURCE)
-
-
-def test_a_clip_that_cannot_be_cut_is_not_sent_to_genau_whole(saved_panel,
-                                                              monkeypatch):
-    """Sending it whole is the very thing the cut exists to stop, so a clip with
-    no whole stroke in its track goes nowhere and says why — and the row is not
-    stamped, so the button stays live to try again with."""
-    panel, db = saved_panel
-    monkeypatch.setattr(gcp_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    monkeypatch.setattr(stroke_trim, "single_stroke_clip",
-                        MagicMock(side_effect=NoSingleStroke("no whole stroke")))
-    export = MagicMock()
-    monkeypatch.setattr(evolver_export, "export_video", export)
-    warn = MagicMock()
-    monkeypatch.setattr(gcp_module.QMessageBox, "warning", warn)
-
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-    panel._on_send(panel._lanes["Genau"])   # must not raise
-
-    export.assert_not_called()
-    assert warn.call_args.args[1] == "Send to Genau failed"
-    assert "no whole stroke" in warn.call_args.args[2]
-    assert not panel._displayed_row["genau_exported_at"]
-    assert panel._lanes["Genau"].button.isEnabled()
-
-
-def test_the_cut_a_send_makes_is_a_video_the_gallery_is_told_to_relist(
-        saved_panel, monkeypatch, cut_made):
-    """The cut is a second video in the library, and this tab cannot draw a tile
-    for it — so it says the library moved and the gallery lists it."""
-    panel, db = saved_panel
-    clip = Path("C:/out/vid1.mp4")
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
-    monkeypatch.setattr(evolver_export, "export_video", MagicMock())
-    relisted = []
-    panel.library_changed.connect(lambda: relisted.append(True))
-    panel.show_saved_generation(_video_row(db, "vid1"), [])
-
-    panel._on_send(panel._lanes["Evolver"])
-    assert relisted == []           # nothing was made; the clip went as it was
-
-    panel._on_send(panel._lanes["Genau"])
-    assert relisted == [True]
-
-
 # --- the modified notice: the preview no longer answers the form -------------
 
 def _notice(panel):
@@ -1954,19 +1889,6 @@ def _lanes():
     return list(export_lane_module.EXPORT_LANES)
 
 
-#: What a lane that wants one stroke is handed in these tests -- the cut itself
-#: is origenerator.stroke_trim's business and is tested there, and stubbing it
-#: keeps these about the lanes and off ffmpeg.
-CUT = Path("C:/out/vid1_stroke.mp4")
-
-
-@pytest.fixture
-def cut_made(monkeypatch):
-    made = MagicMock(return_value=CUT)
-    monkeypatch.setattr(stroke_trim, "single_stroke_clip", made)
-    return made
-
-
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_fresh_tab_offers_no_lane_at_all(saved_panel, lane):
     panel, _db = saved_panel
@@ -1993,7 +1915,7 @@ def test_a_lane_offers_itself_for_a_video_and_not_for_an_image(saved_panel,
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
-        saved_panel, monkeypatch, cut_made, lane):
+        saved_panel, monkeypatch, lane):
     panel, db = saved_panel
     button = panel._lanes[lane.name].button
     video_path = Path("C:/out/vid1.mp4")
@@ -2006,11 +1928,8 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
     panel._on_send(panel._lanes[lane.name])
 
     # The same inbox Evolver watches, under the name that says where the result
-    # belongs — the destination is the whole of what makes a lane a lane — and
-    # what goes into it is the clip, or one stroke of it where the lane scrubs
-    # what it is given against a device.
-    sent = CUT if lane.single_stroke else video_path
-    export.assert_called_once_with(sent, EVOLVER_INBOX_DIR / lane.source)
+    # belongs — the destination is the whole of what makes a lane a lane.
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source)
     assert panel._displayed_row[lane.flag]
     assert button.text() == f"Sent to {lane.name} ✓"
     assert button.isEnabled() is False
@@ -2059,8 +1978,7 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch,
-                                                  cut_made, lane):
+def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane):
     # The copy lands in another app's inbox with no other visible result here, so
     # a failure that only reached the log would look exactly like a success.
     panel, db = saved_panel

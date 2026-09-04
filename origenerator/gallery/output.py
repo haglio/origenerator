@@ -19,14 +19,10 @@ from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
 
-#: What a single-stroke cut's ``source`` column says. Its own value rather than
-#: ``"generated"`` because no run made it -- it is a pair of scissors applied to
-#: a run's output (:mod:`origenerator.stroke_trim`) -- and rows are read by
-#: source in several places that should not count it twice. Defined here rather
-#: than beside the cutting, so the shelves that ask what a row is do not have to
-#: import ffmpeg's neighbourhood to find out; the same way
-#: :data:`~origenerator.gallery.enhance.BASE_RENDER_SOURCE` sits beside the rows
-#: rather than beside the renderer.
+#: What a single-stroke cut's ``source`` column says. Nothing makes one any more
+#: (see ``trimmed_from`` in :mod:`origenerator.db_schema`), but the ones that
+#: were made are still in the library, and the Recents shelf still has to know
+#: they are this app's own work rather than something it found on disk.
 STROKE_TRIM_SOURCE = "stroke_trim"
 
 

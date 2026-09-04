@@ -75,14 +75,17 @@ CREATE TABLE IF NOT EXISTS generations (
     -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
     -- before this was recorded, which falls back to matching the file.
     enhance_of TEXT,
-    -- The clip this row is one stroke of, by that clip's prompt_id -- set on the
-    -- cut the Genau lane sends in place of the whole video (see
-    -- origenerator.stroke_trim). An identity rather than a filename, for the
-    -- reason enhance_of is one, and the whole of what the two rows know about
-    -- each other: a cut's own params are its source's, so it sits in the same
-    -- settings folder, and nothing else on it says which of that folder's clips
-    -- it was cut from. Presence also marks the row a cut, which is what keeps a
-    -- send of a cut from trying to cut it again.
+    -- The clip this row is one stroke of, by that clip's prompt_id. Nothing
+    -- writes it any more: cutting a finished clip down was how a Genau clip was
+    -- made for one afternoon, until the lane learned to ask the sampler for a
+    -- loop one stroke long instead (origenerator.gallery.combine.stroke_shaped),
+    -- which is the same answer without a second file. The cuts that were made
+    -- are still here and still in Genau's folder, so the column stays and the
+    -- Generate tab still follows it back to the clip each came out of. An
+    -- identity rather than a filename, for the reason enhance_of is one, and the
+    -- whole of what the two rows know about each other: a cut's params are its
+    -- source's, so it sits in the same settings folder and nothing else on it
+    -- says which of that folder's clips it was cut from.
     trimmed_from TEXT
 );
 

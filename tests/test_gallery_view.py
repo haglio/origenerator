@@ -5535,8 +5535,9 @@ def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
     assert not view._auto.is_active(key)
 
 
-def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
+def test_auto_stops_when_a_variation_fails(qtbot, tmp_path, monkeypatch):
     client = _reroll_client()
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
@@ -6888,8 +6889,9 @@ def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
     assert db.get_generation(prompt_id) is None  # the abandoned run leaves no trace
 
 
-def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
+def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path, monkeypatch):
     db = _seeded_db(tmp_path)
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -6901,6 +6903,32 @@ def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
 
     assert db.get_generation(job.prompt_id)["status"] == "error"
     assert key not in view._reroll_jobs
+
+
+def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch):
+    """A failed run leaves nothing behind — no file, so no tile, and the row it
+    does leave is one every shelf filters out for having produced nothing. So it
+    used to simply disappear: minutes of GPU, the tile gone off the strip, and no
+    word anywhere but the log. Someone watching read that as a success and went
+    looking for the clip."""
+    warn = MagicMock()
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    job = view._reroll_jobs[key]
+
+    view._client.job_error.emit(job.prompt_id, json.dumps(
+        {"node_type": "RIFE VFI",
+         "exception_message": "Tried all base urls but no success"
+         + chr(10) * 2 + "long log"}))
+
+    warn.assert_called_once()
+    assert warn.call_args.args[1] == "Generation failed"
+    # The node that threw and its first line -- not the download log behind it.
+    assert warn.call_args.args[2] == "RIFE VFI failed: Tried all base urls but no success"
 
 
 def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
@@ -12920,64 +12948,22 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert match("weird") is None
 
 
-def _stub_cut(monkeypatch, cut=Path("C:/out/flf2v_loop_1_stroke.mp4")):
-    """Stand in for the single stroke cut out of a clip, which the Genau lane
-    sends in the clip's place. The cutting itself is tested in
-    tests/test_stroke_trim.py; these are about the lane the spoken send uses."""
-    from origenerator import stroke_trim
-
-    asked = []
-    monkeypatch.setattr(stroke_trim, "single_stroke_clip",
-                        lambda row, path, db, **kw: asked.append(path) or cut)
-    return cut, asked
-
-
-def test_a_spoken_genau_it_hands_one_stroke_of_its_finished_clip_on(
-        qtbot, tmp_path, monkeypatch):
-    # What goes is read off the lane, so a spoken send and a pressed one cannot
-    # differ about it: both hand Genau one stroke rather than the whole loop.
+def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
+    # The folder is read off the lane, so a spoken send and a pressed one cannot
+    # differ about where a clip lands.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
     clip = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (clip, "video"))
-    cut, asked = _stub_cut(monkeypatch)
     sent = []
     monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
                         lambda src, dest: sent.append((src, dest)) or dest / src.name)
 
     view._on_reroll_finished("k", "loop")
 
-    assert asked == [clip]
-    assert sent == [(cut, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
     assert view._db.get_generation("loop")["genau_exported_at"]
-
-
-def test_a_clip_that_cannot_be_cut_is_not_handed_on_whole(qtbot, tmp_path,
-                                                          monkeypatch):
-    # Handing over a loop of four strokes is the very thing the cut exists to
-    # stop, so a clip with no whole stroke in its track goes nowhere -- and stays
-    # unstamped, so Send-to-Genau is still there to retry with.
-    from origenerator.stroke_trim import NoSingleStroke
-
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
-    view._db.mark_genau_requested("loop")
-    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
-    from origenerator import stroke_trim
-
-    def no_stroke(*_args, **_kwargs):
-        raise NoSingleStroke("no whole stroke")
-
-    monkeypatch.setattr(stroke_trim, "single_stroke_clip", no_stroke)
-    sent = []
-    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
-                        lambda src, dest: sent.append(src))
-
-    view._on_reroll_finished("k", "loop")   # must not raise
-
-    assert sent == []
-    assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
 def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch):
@@ -13002,7 +12988,6 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     view._db.mark_genau_requested("loop")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
-    _stub_cut(monkeypatch)
 
     def boom(src, dest):
         raise OSError("the inbox is not there")

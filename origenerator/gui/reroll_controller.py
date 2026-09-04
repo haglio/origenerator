@@ -88,7 +88,7 @@ class RerollController(QObject):
     # unless a chained i2v carried it across the hand-off), which is how the view
     # finds the tab that launched it — the only tab its result belongs in.
     finished = pyqtSignal(str, str, str)
-    failed = pyqtSignal(str)          # (folder key) a re-roll failed
+    failed = pyqtSignal(str, str)     # (folder key, message) a re-roll failed
 
     def __init__(self, db, client, parent=None):
         super().__init__(parent)
@@ -636,4 +636,4 @@ class RerollController(QObject):
         self._pump()  # the machine is free: start whatever is next
         self._db.update_generation(job.prompt_id, status="error", error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
-        self.failed.emit(key)
+        self.failed.emit(key, message)

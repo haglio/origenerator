@@ -37,6 +37,7 @@ from origenerator import (
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session, session_trash
+from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
     AMBIENT_AUDIO_VOICES,
@@ -1579,9 +1580,6 @@ class GalleryView(QWidget):
         panel.context_menu_requested.connect(
             lambda prompt_id, pos: self.generation_menu([prompt_id], pos))
         panel.displayed_changed.connect(self._reconcile_osr2)
-        # A send down a lane that cuts leaves a second video in the library; the
-        # tab that made it cannot draw a tile, so the gallery relists.
-        panel.library_changed.connect(self.refresh)
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
         panel.displayed_changed.connect(self._reconcile_pending_enhancements)
@@ -6074,12 +6072,9 @@ class GalleryView(QWidget):
         is logged rather than shown — the clip is safe in the gallery either way,
         and Send-to-Genau is still there to retry with.
 
-        WHAT goes is read off the lane rather than spelled again here — one
-        stroke cut out of the clip, exactly what the button sends
-        (:meth:`~origenerator.gui.export_lane.ExportLane.clip_for`) — because a
-        spoken send and a pressed one must not be able to differ about it.
-        Cutting can fail where copying could not, and joins the failures already
-        logged here: a clip that could not be cut is still in the gallery.
+        The folder it goes to is read off the lane rather than spelled again
+        here, so a spoken send and a pressed one cannot differ about where a
+        clip lands.
         """
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
             return
@@ -6087,16 +6082,14 @@ class GalleryView(QWidget):
         if preview is None or preview[1] != "video":
             return
         try:
-            clip = GENAU_LANE.clip_for(row, preview[0], self._db,
-                                       output_dir=COMFYUI_OUTPUT_DIR,
-                                       thumb_dir=THUMB_DIR)
-            evolver_export.export_video(clip, EVOLVER_INBOX_DIR / GENAU_LANE.source)
+            evolver_export.export_video(preview[0],
+                                        EVOLVER_INBOX_DIR / GENAU_LANE.source)
         except Exception as e:
             logger.warning("Automatic send to Genau failed for %s: %s",
                            row.get("prompt_id"), e)
             return
         self._db.mark_genau_exported(row["prompt_id"])
-        logger.info("genau: sent %s down the Genau lane", clip.name)
+        logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
     def _already_genaud(self, row: dict) -> bool:
         """Whether this picture has been Genau'd — a clip made from it already,
@@ -6489,14 +6482,24 @@ class GalleryView(QWidget):
             if panel is not launcher:
                 panel.show_finished_media(finished_row)
 
-    def _on_reroll_failed(self, key: str):
+    def _on_reroll_failed(self, key: str, message: str = ""):
         """A re-roll failed (recorded by the controller): let go of it wherever it
-        was being watched, and redraw the folder without its tile."""
+        was being watched, redraw the folder without its tile, and SAY SO.
+
+        A failed run leaves nothing behind — no file, so no tile, and the row it
+        does leave is one every shelf filters out for having produced nothing. So
+        without this the whole thing simply vanished: a couple of minutes of GPU,
+        the tile disappearing off the strip, and no word anywhere but the log.
+        The user watching it took that for a success and went looking for the
+        clip. The same dialog a failed hand-off to a sibling app gets, for the
+        same reason: it is the only thing that happens, so it has to be visible.
+        """
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._reconcile_pending_enhancements()  # nothing is cooking for it now
+        QMessageBox.warning(self, "Generation failed", format_execution_error(message))
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""

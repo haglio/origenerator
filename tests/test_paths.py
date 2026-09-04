@@ -13,16 +13,14 @@ def test_the_shared_ui_checkout_holds_the_package_of_the_same_name():
 
 def test_ensure_shared_ui_on_path_makes_it_importable_and_is_idempotent():
     ensure_shared_ui_on_path()
-    root = str(sibling_checkout("shared_ui"))
-    assert root in sys.path
 
     before = list(sys.path)
     ensure_shared_ui_on_path()
     assert sys.path == before  # second call adds nothing
 
-    import shared_ui  # importable now that the root is on the path
+    import shared_ui  # importable now, from the sibling checkout
 
-    assert shared_ui.__file__ is not None
+    assert Path(shared_ui.__file__).parent.parent == sibling_checkout("shared_ui")
 
 
 def test_gui_module_imports_in_fresh_interpreter():

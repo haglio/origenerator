@@ -15,7 +15,8 @@ and a click of its own — so all it needs handed to it is how the run is going.
 :func:`queue_wait_text` is here for the same reason: what a wait on another app
 reads like is one wording, shared by every surface that has to say it — as is
 :func:`discard_run_text`, the label on the button that throws the run in flight
-away, which three panes each draw.
+away, which three panes each draw, and :func:`stop_loop_text`, the menu entry
+beside it that ends the loop as well as the run.
 """
 
 from dataclasses import dataclass
@@ -45,6 +46,11 @@ class InFlightItem:
     pass_progress: tuple[int, int] | None = None
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
+    # End the loop its folder is on. What a menu's real stop calls before
+    # :attr:`cancel`, since discarding the run under a live loop only starts the
+    # next one. ``None`` alongside a ``None`` cancel — a run this session holds no
+    # job for is not one this session can stop either.
+    stop_auto: Callable[[], None] | None = None
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
     held: bool = False           # the queue is holding it back (a video, during a slideshow)
     # The two halves of the countdown on the job being rendered: when ComfyUI
@@ -206,6 +212,27 @@ def discard_run_tooltip(auto_generating: bool) -> str:
     """The hover line for :func:`discard_run_text`'s button."""
     return ("Throw away this seed and start the next" if auto_generating
             else "Cancel this generation")
+
+
+def stop_loop_text() -> str:
+    """The menu entry that ends an auto-generate loop and the run inside it.
+
+    A button carries one act, so while the loop is on it carries the one the
+    press performs — "Next seed" — and there is nowhere left on that surface to
+    ask for a stop: the only one was the Auto switch, which is in the header
+    rather than on the card you are looking at. A menu has room for both, and
+    this is the other one.
+
+    It says the loop goes off rather than reading "Cancel", because switching a
+    standing instruction off is a bigger act than throwing one seed away, and it
+    is not something to discover afterwards.
+    """
+    return "Cancel and stop auto-generating"
+
+
+def stop_loop_tooltip() -> str:
+    """The hover line for :func:`stop_loop_text`'s entry."""
+    return "Throw this run away and switch the loop off"
 
 
 def queue_wait_text(foreign_ahead: int | None) -> str | None:

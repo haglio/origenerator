@@ -36,6 +36,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.inflight import (
     InFlightItem, discard_run_text, discard_run_tooltip,
+    stop_loop_text, stop_loop_tooltip,
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
@@ -730,12 +731,13 @@ class BrowserPane:
                 foreign = job.foreign_ahead  # another app's jobs in front of it, if any
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = lambda p=pid: self._v._cancel_job(p)
+                stop_auto = lambda k=folder_key: self._v._auto.stop(k)
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._v._image_rows)
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
-                pass_progress = None
+                pass_progress, stop_auto = None, None
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
@@ -751,8 +753,10 @@ class BrowserPane:
                 pass_progress=pass_progress,
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
-                # discards this run and the loop launches another.
+                # discards this run and the loop launches another. A menu can
+                # offer the real stop beside it, which is what stop_auto is for.
                 auto_generating=self._v._auto.is_active(folder_key),
+                stop_auto=stop_auto,
                 foreign_ahead=foreign,
                 held=pid in held,
                 started_at=started,
@@ -883,6 +887,13 @@ class BrowserPane:
         auto-looping, where the press starts another rather than stopping
         anything.
 
+        Which is exactly why a looping folder's card gets a second entry
+        (:func:`inflight.stop_loop_text`): a menu, unlike the one button those
+        surfaces have room for, can carry both the discard and a real stop, so a
+        run under a live loop can be ended without going to the header for the
+        Auto switch. The loop goes off first — a discard while it is still on is
+        the cue for the next seed, so canceling first would start one.
+
         No menu at all for a running row this session holds no job for — one a
         restart hasn't re-adopted — for the reason its strip row hides the same
         button: there is nothing here to cancel it with, and a menu saying so
@@ -894,7 +905,15 @@ class BrowserPane:
         menu = QMenu(self._v)
         discard = menu.addAction(discard_run_text(item.auto_generating))
         discard.setToolTip(discard_run_tooltip(item.auto_generating))
-        if menu.exec(global_pos) is discard:
+        stop = None
+        if item.auto_generating and item.stop_auto is not None:
+            stop = menu.addAction(stop_loop_text())
+            stop.setToolTip(stop_loop_tooltip())
+        chosen = menu.exec(global_pos)
+        if chosen is discard:
+            item.cancel()
+        elif stop is not None and chosen is stop:
+            item.stop_auto()
             item.cancel()
 
     def open_in_containing_folder(self, prompt_id: str):

@@ -73,6 +73,7 @@ from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.inflight import (
     discard_run_text, discard_run_tooltip, queue_wait_text,
+    stop_loop_text, stop_loop_tooltip,
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.off_thread import run_off_thread
@@ -3069,12 +3070,26 @@ class GalleryView(QWidget):
         this one read as a tile that wasn't listening. The wording is the
         button's (:func:`inflight.discard_run_text`), so both say the same thing
         about the same press.
+
+        With one more entry the button has no room for: while the folder is
+        looping, that press is "Next seed" and nothing on the tile stops
+        anything, so the menu carries the real stop too
+        (:func:`inflight.stop_loop_text`). The loop is ended first — a discard
+        while it is still on is the cue for the next seed.
         """
         menu = QMenu(self)
         auto = self._auto.is_active(key)
         discard = menu.addAction(discard_run_text(auto))
         discard.setToolTip(discard_run_tooltip(auto))
-        if menu.exec(global_pos) is discard:
+        stop = None
+        if auto:
+            stop = menu.addAction(stop_loop_text())
+            stop.setToolTip(stop_loop_tooltip())
+        chosen = menu.exec(global_pos)
+        if chosen is discard:
+            self._cancel_reroll(key)
+        elif stop is not None and chosen is stop:
+            self._auto.stop(key)
             self._cancel_reroll(key)
 
     # --- the folder-wide request: same seeds, changed words ----------------

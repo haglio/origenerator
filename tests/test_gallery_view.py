@@ -7785,11 +7785,13 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     assert view._reroll.all_jobs == []      # the run really stopped
 
 
-def test_an_auto_looping_folders_card_offers_the_next_seed_instead(
+def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
         qtbot, tmp_path, monkeypatch):
-    # The press ends nothing while the loop is on — it discards this seed and the
-    # loop launches another — so the menu says what the press actually gets you,
-    # in the same words the tile's button and the strip's row use.
+    # A discard ends nothing while the loop is on — it throws this seed away and
+    # the loop launches another — so the menu says what that press actually gets
+    # you, in the same words the tile's button and the strip's row use. Unlike
+    # those, it has room to offer the stop as well, which is the thing you cannot
+    # otherwise ask for without going to the header for the Auto switch.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -7802,7 +7804,28 @@ def test_an_auto_looping_folders_card_offers_the_next_seed_instead(
 
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Next seed"]]
+    assert labels == [["Next seed", "Cancel and stop auto-generating"]]
+
+
+def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
+        qtbot, tmp_path, monkeypatch):
+    # The whole point of the second entry: the loop goes off and the run in it is
+    # thrown away. The order matters — a discard under a live loop is its cue to
+    # launch the next seed, so canceling first would leave a fresh run behind.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    (job,) = view._reroll.all_jobs
+    view.refresh()
+    _open_recents(view)
+    _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
+
+    view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
+
+    assert not view._auto.is_active(key)     # the loop is off...
+    assert view._reroll.all_jobs == []       # ...and nothing was launched in its place
 
 
 def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
@@ -7836,6 +7859,24 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     view._reroll_tile_menu(key, QPoint(0, 0))
 
     assert labels == [["Cancel"]]
+    assert view._reroll.all_jobs == []
+
+
+def test_a_looping_folders_live_tile_offers_the_stop_its_button_cannot(
+        qtbot, tmp_path, monkeypatch):
+    # The tile's button reads "Next seed" while the loop is on and there is no
+    # room on it for a second act. The menu has the room, so it carries the stop.
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+
+    view._reroll_tile_menu(key, QPoint(0, 0))
+
+    assert labels == [["Next seed", "Cancel and stop auto-generating"]]
+    assert not view._auto.is_active(key)
     assert view._reroll.all_jobs == []
 
 

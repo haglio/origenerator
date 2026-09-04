@@ -9,6 +9,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 import pytest
 
 from origenerator.app import (
+    _arm_the_crash_log,
     _bring_to_front,
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
@@ -20,6 +21,16 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+
+
+@pytest.fixture(autouse=True)
+def _no_crash_log_in_the_checkout(monkeypatch):
+    """A test that runs ``main`` must not arm the crash log against the real
+    state dir: thirteen test boots once stamped the checkout's own log as
+    thirteen launches, and the one real launch in it was lost in the noise.
+    The crash-log tests below hold the real function under its own name, so
+    this leaves them untouched."""
+    monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: None)
 
 
 def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(monkeypatch):
@@ -287,6 +298,60 @@ def test_main_reconciles_in_flight_before_importing(qapp):
         assert main([]) == 0
 
     assert calls[:2] == ["reconcile", "import"]
+
+
+def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
+    """The whole point of arming it: a fault that kills the process outright
+    still says which line was running.
+
+    Run in a child, because there is no surviving this in-process. The child
+    arms the crash log the way the launch does and then faults deliberately --
+    faulthandler's own _sigsegv, so nothing is left to chance about what kind of
+    death it is -- and the file it leaves behind has to name the frame.
+    """
+    import subprocess
+    import textwrap
+
+    state = tmp_path / "state"
+    child = textwrap.dedent(f"""
+        import logging, sys
+        sys.path.insert(0, {str(Path.cwd())!r})
+        from pathlib import Path
+        from origenerator.app import _arm_the_crash_log
+        _arm_the_crash_log(Path({str(state)!r}), logging.getLogger("t"))
+        def the_frame_that_died():
+            import faulthandler
+            faulthandler._sigsegv()
+        the_frame_that_died()
+    """)
+    subprocess.run([sys.executable, "-c", child], capture_output=True, timeout=120)
+
+    written = (state / "origenerator_crash.log").read_text(encoding="utf-8")
+    assert "launched" in written                  # the run stamped itself first
+    assert "the_frame_that_died" in written       # ...and the fault named the frame
+
+
+def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
+    # A crash is worth reading after the next launch, and the next launch is the
+    # first thing that happens after one -- so opening the file must not be what
+    # destroys the evidence.
+    import logging
+
+    state = tmp_path / "state"
+    state.mkdir(parents=True)
+    (state / "origenerator_crash.log").write_text("older run\n", encoding="utf-8")
+
+    _arm_the_crash_log(state, logging.getLogger("t"))
+
+    assert "older run" in (state / "origenerator_crash.log").read_text(encoding="utf-8")
+
+
+def test_an_unwritable_state_dir_costs_the_log_and_nothing_else(tmp_path):
+    # Never the launch: a crash log that cannot be opened is a missing report,
+    # not a reason for the app not to come up.
+    import logging
+
+    _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t"))
 
 
 def test_main_reclaims_unreachable_trash_on_startup(qapp):

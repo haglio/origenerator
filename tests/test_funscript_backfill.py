@@ -22,9 +22,10 @@ def _row(prompt_id, workflow_name, filename):
 
 
 def _recording_ensure(seen):
-    def ensure(path, *, loop, hz):
+    def ensure(path, *, loop, hz, output_dir):
         seen.append((path.name, loop))
-        dest = funscript_path_for(path)
+        dest = funscript_path_for(path, output_dir=output_dir)
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text("{}", encoding="utf-8")
         return dest
     return ensure
@@ -95,7 +96,7 @@ def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
     funscript_backfill.backfill(
         FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
         resolve=lambda row, output_dir: (clip, "video"),
-        ensure=lambda path, *, loop, hz: rates.append(hz) or None,
+        ensure=lambda path, *, loop, hz, output_dir: rates.append(hz) or None,
     )
 
     assert rates == [2.5]

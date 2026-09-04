@@ -11,7 +11,9 @@ import logging
 from pathlib import Path
 
 from origenerator.config import STROKE_DEFAULT_HZ
-from origenerator.funscript import ensure_funscript, funscript_path_for, write_funscript
+from origenerator.funscript import (
+    ensure_funscript, funscript_of, funscript_path_for, write_funscript,
+)
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
@@ -56,7 +58,7 @@ def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | No
 
     Runs on the same shared path as thumbnailing, so every completion route — the
     Generate tab, a gallery re-roll, the startup reconciler — leaves a ``.funscript``
-    next to each new video. A workflow that authored its motion supplies the exact
+    in the scripts folder for each new video. A workflow that authored its motion supplies the exact
     script (``authored_actions``); the rest get the synthesized metronome. Both are
     idempotent (an existing sidecar is left alone) and swallow-and-log on failure,
     so this can never strand a real completion.
@@ -69,11 +71,12 @@ def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | No
     try:
         authored = workflow.authored_actions(params) if params else None
         if authored:
-            dest = funscript_path_for(source)
-            if not dest.exists():
-                write_funscript(dest, authored)
+            if funscript_of(source, output_dir=output_dir) is None:
+                write_funscript(
+                    funscript_path_for(source, output_dir=output_dir), authored)
         else:
-            ensure_funscript(source, loop=workflow.looping, hz=STROKE_DEFAULT_HZ)
+            ensure_funscript(source, loop=workflow.looping, hz=STROKE_DEFAULT_HZ,
+                             output_dir=output_dir)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
 

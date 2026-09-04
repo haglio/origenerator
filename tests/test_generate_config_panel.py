@@ -1207,12 +1207,17 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
     assert not _lane_button(panel).isHidden()  # still a sendable video
 
 
-def _script_beside(video_path):
+def _script_for(video_path, output_dir=None):
+    """Write a script for ``video_path`` -- in the scripts folder under
+    ``output_dir``, or, with none named, in the old place beside the clip."""
     from origenerator.funscript import (
-        funscript_path_for, synthesize_actions, write_funscript,
+        funscript_path_for, legacy_funscript_path_for, synthesize_actions,
+        write_funscript,
     )
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
-    write_funscript(funscript_path_for(video_path), actions)
+    dest = (legacy_funscript_path_for(video_path) if output_dir is None
+            else funscript_path_for(video_path, output_dir=output_dir))
+    write_funscript(dest, actions)
     return actions
 
 
@@ -1223,11 +1228,29 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
-    actions = _script_beside(vpath)
+    actions = _script_for(vpath)
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
     panel.show_saved_generation(video, [])
 
     # The global driver (owned by the view) asks the front panel what to drive.
+    assert panel.osr2_drive_target() == (vpath, panel._preview.player(), actions)
+
+
+def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
+    """The drive reads a clip's script wherever it is, which for anything
+    generated from here on is the folder, not a file beside the clip."""
+    import origenerator.gui.osr2_driver as osr2_driver
+
+    panel, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "video" / "vid1.mp4"
+    vpath.parent.mkdir()
+    vpath.write_bytes(b"v")
+    monkeypatch.setattr(osr2_driver, "COMFYUI_OUTPUT_DIR", tmp_path)
+    actions = _script_for(vpath, output_dir=tmp_path)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    panel.show_saved_generation(video, [])
+
     assert panel.osr2_drive_target() == (vpath, panel._preview.player(), actions)
 
 
@@ -1262,7 +1285,7 @@ def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
     panel, db = saved_panel
     vpath = tmp_path / "auto.mp4"
     vpath.write_bytes(b"v")
-    actions = _script_beside(vpath)
+    actions = _script_for(vpath)
     monkeypatch.setattr(panel, "_recent_matching_row",
                         lambda: {"prompt_id": "v", "workflow_name": "wan22_i2v"})
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
@@ -1278,7 +1301,7 @@ def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, 
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
-    _script_beside(vpath)
+    _script_for(vpath)
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (vpath, "video"))
     fired = []
     panel.displayed_changed.connect(lambda: fired.append(True))

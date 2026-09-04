@@ -201,8 +201,8 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
     """`restore_generation` re-inserts a captured row by replaying
     `GENERATION_COLUMNS` positionally, so a column added to the DDL and
     forgotten there is silently dropped from every undone delete."""
-    assert GENERATION_COLUMNS == tuple(
-        column for column, *_ in SCHEMA["generations"])
+    assert tuple(
+        column for column, *_ in SCHEMA["generations"]) == GENERATION_COLUMNS
 
 
 # --- upgrading a database made before a column existed ------------------------

@@ -36,9 +36,9 @@ the strip re-renders on every poll, and a start frame is a full-size render off
 disk.
 """
 
-from PyQt6.QtWidgets import QLabel
-from PyQt6.QtGui import QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPainter, QPixmap
+from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.paths import ensure_shared_ui_on_path

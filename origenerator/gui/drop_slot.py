@@ -15,14 +15,14 @@ video slot's whole purpose being the recipe rather than the clip.
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap, QMovie
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QMovie, QPixmap
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.generation_drag import GENERATION_MIME
 
 _PREVIEW_SIZE = 96  # the dropped thumbnail fits this box; small enough for a 120px pane
 

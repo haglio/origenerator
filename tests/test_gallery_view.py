@@ -7,49 +7,56 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal
-from PyQt6.QtGui import QIcon, QMovie, QKeyEvent
-from PyQt6.QtWidgets import QSplitter, QLineEdit, QMessageBox, QPushButton, QWidget
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtGui import QIcon, QKeyEvent, QMovie
+from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
 
-from origenerator import evolver_export, gallery, recipe_match, search
+from origenerator import evolver_export, gallery, recipe_match, search, stroke_engine
 from origenerator.branch_session import ENV_FLAG
-from origenerator.workflows import detail_parts
-from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, GENAU_SOURCE, THUMB_DIR,
+    COMFYUI_OUTPUT_DIR,
+    EVOLVER_INBOX_DIR,
+    GENAU_SOURCE,
+    THUMB_DIR,
 )
 from origenerator.db import Database
+from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui.inflight_card import InFlightCard
-from origenerator.gui.request_worker import RevisionWorker
-from origenerator.prompt_edit import apply_request
-from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
-from origenerator.gui.gallery_view import GalleryView, _GROUP_ROLE
-from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
-)
-from origenerator.gui.orientation import (
-    LANDSCAPE, base_of, oriented_key,
-)
-from origenerator.voice.commands import SurfaceCommand
-from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.folder_request_tile import FolderRequestTile
+from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    STARRED_KEY,
+    TRASH_KEY,
+)
+from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.orientation import (
+    LANDSCAPE,
+    base_of,
+    oriented_key,
+)
+from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.request_worker import RevisionWorker
+from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.voice.app_commands import AppCommand
-from origenerator.voice.dictation import RequestDictation
+from origenerator.prompt_edit import apply_request
 from origenerator.recovery import RETENTION_DAYS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
-from origenerator import stroke_engine
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.voice.app_commands import AppCommand
+from origenerator.voice.commands import SurfaceCommand
+from origenerator.voice.dictation import RequestDictation
+from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 _WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -3933,6 +3940,7 @@ def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     from PyQt6.QtWidgets import QTabWidget
+
     from origenerator.gui.generate_config_panel import GenerateConfigPanel
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
@@ -12920,7 +12928,6 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
 
     def slow_match(*a, **k):
         asked_on["thread"] = threading.current_thread().name
-        return None  # the model finds no fit; best_recipe answers instead
 
     monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", slow_match)
 

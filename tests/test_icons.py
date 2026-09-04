@@ -3,9 +3,9 @@ from origenerator.gui import icons
 
 def _style_tab_close_pixmap():
     """The close mark the live style paints on a tab, drawn here independently."""
+    from PyQt6.QtCore import QRect, Qt
+    from PyQt6.QtGui import QPainter, QPixmap
     from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
-    from PyQt6.QtGui import QPixmap, QPainter
-    from PyQt6.QtCore import Qt, QRect
 
     style = QApplication.style()
     size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
@@ -184,7 +184,6 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 def test_a_starred_folders_star_is_the_same_green(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon
-
     from shared_ui.colors import GREEN
 
     # The tree paints a starred leaf (and the Starred shelf) with the filled star,
@@ -336,7 +335,6 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
 def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon
-
     from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
     from shared_ui.icons import glyph_pixmap
 
@@ -372,7 +370,6 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QColor
-
     from shared_ui.icons import glyph_pixmap
 
     # The white line art on a thumbnail's hover buttons is the same family mark

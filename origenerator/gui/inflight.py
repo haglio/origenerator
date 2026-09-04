@@ -19,8 +19,8 @@ away, which three panes each draw, and :func:`stop_loop_text`, the menu entry
 beside it that ends the loop as well as the run.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from origenerator.timing import queue_estimate_label
 

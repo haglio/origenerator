@@ -4,7 +4,9 @@ through to prompt steering."""
 import pytest
 
 from origenerator.voice.show_commands import (
-    ShowCommand, match_show_command, show_command_bias,
+    ShowCommand,
+    match_show_command,
+    show_command_bias,
 )
 
 

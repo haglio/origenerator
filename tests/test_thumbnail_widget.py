@@ -1,7 +1,7 @@
 import time
 
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint, QPointF, QEvent
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
@@ -10,8 +10,7 @@ from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.stylesheet import build_stylesheet
-from PyQt6.QtGui import QMovie
-from origenerator.gui.thumbnail_widget import ThumbnailWidget, _SELECTED_BG
+from origenerator.gui.thumbnail_widget import _SELECTED_BG, ThumbnailWidget
 
 
 def _corners(tile):

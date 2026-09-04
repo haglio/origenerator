@@ -69,12 +69,11 @@ def test_submit_job_surfaces_comfyui_node_validation_detail_on_400():
     err = urllib.error.HTTPError(
         "http://127.0.0.1:8188/prompt", 400, "Bad Request", {}, io.BytesIO(body)
     )
-    with patch("urllib.request.urlopen", side_effect=err):
-        with pytest.raises(Exception) as excinfo:
-            client.submit_job(
-                {"12": {"class_type": "LoadImage", "inputs": {"image": "foo.png"}}},
-                "our-id",
-            )
+    with patch("urllib.request.urlopen", side_effect=err), pytest.raises(Exception) as excinfo:
+        client.submit_job(
+            {"12": {"class_type": "LoadImage", "inputs": {"image": "foo.png"}}},
+            "our-id",
+        )
     message = str(excinfo.value)
     assert "LoadImage" in message
     assert "Invalid image file: foo.png" in message

@@ -23,7 +23,6 @@ import json
 from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 from origenerator.workflows.detail_parts import detector_part_label
 
-
 # What each node type of the enhance tail says about the run, given its inputs.
 # One entry per node the tail lays down; anything else in the graph is scenery.
 _KNOBS_BY_NODE = {

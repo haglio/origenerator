@@ -1,121 +1,197 @@
 import json
 import logging
-from dataclasses import replace
 import random
-from typing import NamedTuple
+from dataclasses import replace
 from functools import partial
+from typing import NamedTuple
 
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QThreadPool, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel,
-    QToolButton, QSplitter,
-    QMenu, QInputDialog, QAbstractItemView, QMessageBox, QApplication,
-    QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox,
+    QAbstractItemView,
+    QAbstractSpinBox,
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPlainTextEdit,
+    QSplitter,
+    QTextEdit,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QEvent, QThreadPool, QTimer, QPoint, QSize
 
 from origenerator import (
-    evolver_export, gallery, prompt_edit, recipe_match, recovery, search, timing,
+    evolver_export,
+    gallery,
+    prompt_edit,
+    recipe_match,
+    recovery,
+    search,
+    timing,
 )
-from origenerator.gui import corner_controls, icons
+from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
+from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session, session_trash
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
-    AMBIENT_AUDIO_VOICES, COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR, GENAU_SOURCE,
-    STATE_DIR, THUMB_DIR,
-    LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
+    AMBIENT_AUDIO_VOICES,
+    COMFYUI_OUTPUT_DIR,
+    EVOLVER_INBOX_DIR,
+    GENAU_SOURCE,
+    LOCAL_LLM_BASE_URL,
+    LOCAL_LLM_MODEL,
+    STATE_DIR,
+    THUMB_DIR,
+    VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
     VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
-from origenerator.win32 import place_window_in_device_pixels
-from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
-from origenerator.base_backfill import queue_base_renders
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
+from origenerator.fun_time_mode import SHOW_TITLES, FunTimeSession, region_for_items
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_config import (
-    filled_params, randomize_seeds, would_reproduce_a_completed_run,
+    filled_params,
+    randomize_seeds,
+    would_reproduce_a_completed_run,
 )
+from origenerator.gui import corner_controls, icons
 from origenerator.gui.ambient_audio import AmbientAudio
+from origenerator.gui.auto_generate_controller import AutoGenerateController
+from origenerator.gui.browser_pane import (
+    SEARCH_DRAW_LIMIT,
+    BrowserPane,
+    BrowserScrollArea,
+    PaneHost,
+    SearchTile,
+    TreeNavigation,
+)
+from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_panel import EnhancePanel
-from origenerator.fun_time_mode import FunTimeSession, SHOW_TITLES, region_for_items
 from origenerator.gui.find_bar import FindBar
-from origenerator.gui.inflight import EnhancingRun, InFlightItem
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
-from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.gui.prompt_find import PromptFind
-from origenerator.gui.combine_panel import CombinePanel
-from origenerator.gui.auto_generate_controller import AutoGenerateController
-from origenerator.gui.reroll_controller import RerollController
-from origenerator.gui.request_worker import RevisionWorker, ReviseTask
-from origenerator.gui.show_wiring import HudFacts, ShowActions
-from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.prompt_edit import apply_request
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
-from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
-from origenerator.voice.commands import (
-    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command,
-    sided_app_command, split_side, voice_command_bias,
-)
-from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.show_commands import ShowCommand
-from origenerator.voice.steering import VoiceSteering
-from origenerator.gui.reroll_prompt import (
-    REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO, offer_reroll,
-)
 from origenerator.gui.folder_request_tile import FolderRequestTile
-from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.inflight import (
-    discard_run_text, discard_run_tooltip, queue_wait_text,
-    stop_loop_text, stop_loop_tooltip,
+from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
-from origenerator.gui.info_pane_tabs import InfoPaneTabs
-from origenerator.gui.off_thread import run_off_thread
-from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.osr2_driver import Osr2Driver
-from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
-from origenerator.gui.scope_search_edit import ScopeSearchEdit
-from origenerator.gui.search_expander import SearchExpander
-from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
-from origenerator.gui.stroke_panel import StrokePanel
-from origenerator.gui.generation_queue import GenerationQueue
-from origenerator.gui.link_tip import LinkTip, link
-from origenerator.gui.browser_pane import (
-    BrowserPane, BrowserScrollArea, PaneHost, SEARCH_DRAW_LIMIT, SearchTile,
-    TreeNavigation,
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
+)
+from origenerator.gui.gallery_tree import (
+    GROUP_ROLE as _GROUP_ROLE,
+)
+from origenerator.gui.gallery_tree import (
+    RECENTS_KEY as _RECENTS_KEY,
+)
+from origenerator.gui.gallery_tree import (
+    RECENTS_LABEL as _RECENTS_LABEL,
+)
+from origenerator.gui.gallery_tree import (
+    REQUESTS_KEY as _REQUESTS_KEY,
+)
+from origenerator.gui.gallery_tree import (
+    REQUESTS_LABEL as _REQUESTS_LABEL,
+)
+from origenerator.gui.gallery_tree import (
+    STARRED_KEY as _STARRED_KEY,
+)
+from origenerator.gui.gallery_tree import (
+    STARRED_LABEL as _STARRED_LABEL,
+)
+from origenerator.gui.gallery_tree import (
+    TRASH_KEY as _TRASH_KEY,
+)
+from origenerator.gui.gallery_tree import (
+    TRASH_LABEL as _TRASH_LABEL,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
     SideModel,
-    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
-    EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
-    GROUP_ROLE as _GROUP_ROLE,
-    RECENTS_KEY as _RECENTS_KEY,
-    RECENTS_LABEL as _RECENTS_LABEL,
-    REQUESTS_KEY as _REQUESTS_KEY,
-    REQUESTS_LABEL as _REQUESTS_LABEL,
-    STARRED_KEY as _STARRED_KEY,
-    STARRED_LABEL as _STARRED_LABEL,
-    TRASH_KEY as _TRASH_KEY,
-    TRASH_LABEL as _TRASH_LABEL,
+)
+from origenerator.gui.generation_queue import GenerationQueue
+from origenerator.gui.inflight import (
+    EnhancingRun,
+    InFlightItem,
+    discard_run_text,
+    discard_run_tooltip,
+    queue_wait_text,
+    stop_loop_text,
+    stop_loop_tooltip,
+)
+from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.link_tip import LinkTip, link
+from origenerator.gui.looping_preview import set_previews_paused
+from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.off_thread import run_off_thread
+from origenerator.gui.orientation import (
+    LANDSCAPE as _LANDSCAPE,
+)
+from origenerator.gui.orientation import (
+    ORIENTATION_LABELS as _ORIENTATION_LABELS,
 )
 from origenerator.gui.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
-    ORIENTATION_LABELS as _ORIENTATION_LABELS,
-    LANDSCAPE as _LANDSCAPE,
+)
+from origenerator.gui.orientation import (
     base_of as _base_of,
+)
+from origenerator.gui.orientation import (
     filter_rows,
     oriented_key,
-    orientation_of as _orientation_of,
     requested_orientation,
-    split_key as _split_shelf_key,
     split_rows,
 )
-from origenerator.gui.looping_preview import set_previews_paused
+from origenerator.gui.orientation import (
+    orientation_of as _orientation_of,
+)
+from origenerator.gui.orientation import (
+    split_key as _split_shelf_key,
+)
+from origenerator.gui.osr2_driver import Osr2Driver
+from origenerator.gui.osr2_stroke_driver import Osr2StrokeDriver
+from origenerator.gui.prompt_find import PromptFind
+from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.reroll_controller import RerollController
+from origenerator.gui.reroll_prompt import (
+    REROLL_BOTH,
+    REROLL_IMAGE,
+    REROLL_VIDEO,
+    offer_reroll,
+)
+from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.scope_search_edit import ScopeSearchEdit
+from origenerator.gui.search_expander import SearchExpander
+from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
+from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.prompt_edit import apply_request
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
+from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
+from origenerator.voice.commands import (
+    ShelfCommand,
+    ShowControl,
+    SurfaceCommand,
+    match_voice_command,
+    sided_app_command,
+    split_side,
+    voice_command_bias,
+)
+from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
+from origenerator.voice.show_commands import ShowCommand
+from origenerator.voice.steering import VoiceSteering
+from origenerator.win32 import place_window_in_device_pixels
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -123,7 +199,10 @@ ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import (
-    BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ICON, BUTTON_ROW_GAP,
+    BUTTON_GAP,
+    BUTTON_GROUP_GAP,
+    BUTTON_ICON,
+    BUTTON_ROW_GAP,
 )
 
 logger = logging.getLogger(__name__)

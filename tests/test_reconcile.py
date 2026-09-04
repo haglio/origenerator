@@ -3,10 +3,12 @@ import json
 from PIL import Image
 
 from origenerator import gallery
-from origenerator.db import Database
 from origenerator.bookmark_reconcile import (
-    reconcile_bookmarks, reconcile_custom_folders, reconcile_folder_meta,
+    reconcile_bookmarks,
+    reconcile_custom_folders,
+    reconcile_folder_meta,
 )
+from origenerator.db import Database
 from origenerator.inflight import reconcile_in_flight
 
 # sdxl_t2i saves under output node "7".

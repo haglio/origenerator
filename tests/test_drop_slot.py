@@ -2,12 +2,12 @@
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint, QPointF
-from PyQt6.QtGui import QDropEvent, QDragEnterEvent, QMovie
+from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMovie
 
 from origenerator.gui.drop_slot import DropSlot
-from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.media_badge import MediaBadge
 
 
 def _slot(qtbot, kind="image", accepts=lambda pid: True,

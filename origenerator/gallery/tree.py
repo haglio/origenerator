@@ -65,9 +65,9 @@ from origenerator.gallery.output import is_in_progress, media_type_of_row, produ
 from origenerator.gallery.signatures import (
     _grouping_version,
     _input_image_config,
-    is_image_conditioned,
     canonical_settings,
     enhance_settings,
+    is_image_conditioned,
     lora_signature,
     model_signature,
     parse_params,

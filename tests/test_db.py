@@ -4,8 +4,6 @@ from contextlib import closing
 
 import pytest
 
-import pytest
-
 from origenerator.db import Database
 
 

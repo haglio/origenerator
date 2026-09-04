@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from origenerator.gallery.output import parse_file_list
@@ -31,7 +31,7 @@ _SECONDS_PER_DAY = 86400
 
 def _now() -> datetime:
     """Now in the frame sqlite stamps a deletion in: UTC, without a timezone."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _deleted_at(record: dict) -> datetime | None:

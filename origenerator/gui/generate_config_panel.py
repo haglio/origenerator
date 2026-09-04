@@ -3,48 +3,66 @@ import logging
 from dataclasses import replace
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLabel, QSplitter,
-    QPushButton, QScrollArea, QMessageBox,
-)
-from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtWidgets import (
+    QFormLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR,
+    EVOLVER_INBOX_DIR,
+)
 from origenerator.db import Database
 from origenerator.gallery import (
-    EnhanceSettings, build_image_config_index, config_folder_name, describe_enhance_params,
-    displayed_levels, enhance_params_for, item_label,
-    level_matching_settings, media_type_of_row, output_file_path,
-    resolve_preview, rows_in_settings, settings_signature,
+    EnhanceSettings,
+    build_image_config_index,
+    config_folder_name,
+    describe_enhance_params,
+    displayed_levels,
+    enhance_params_for,
+    item_label,
+    level_matching_settings,
+    media_type_of_row,
+    output_file_path,
+    resolve_preview,
+    rows_in_settings,
+    settings_signature,
     workflow_output_type,
 )
 from origenerator.generation_config import (
-    ConfigSnapshot, configs_match, merge_denormalized,
+    ConfigSnapshot,
+    configs_match,
+    merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.gui.enhance_versions import EnhanceVersions
-from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.export_lane import EXPORT_LANES
-from origenerator.gui.folder_request import FolderRequest
-from origenerator.gui.metadata_block import MetadataBlock
-from origenerator.gui.related_media import RelatedMedia
-from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui import icons
+from origenerator.gui.corner_controls import enhance_state
+from origenerator.gui.eliding import ElidingLabel
+from origenerator.gui.enhance_versions import EnhanceVersions
+from origenerator.gui.export_lane import EXPORT_LANES
+from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.folder_request import FolderRequest
+from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
+from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.related_media import RelatedMedia
+from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, EVOLVER_INBOX_DIR,
-)
-from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP

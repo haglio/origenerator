@@ -13,7 +13,6 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.gallery_view import GalleryView
-
 from tests.test_gallery_view import FakeDB, _image
 
 

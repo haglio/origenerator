@@ -2,7 +2,9 @@
 
 import origenerator.workflows.derived_size as ds
 from origenerator.workflows.derived_size import (
-    measure_derived_size, override_size, resolve_input_image_path,
+    measure_derived_size,
+    override_size,
+    resolve_input_image_path,
     scale_to_total_pixels,
 )
 

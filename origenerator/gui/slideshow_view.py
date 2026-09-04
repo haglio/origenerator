@@ -89,18 +89,18 @@ stills; a clip that carries a funscript instead offers itself as an
 
 import logging
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
+from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
-from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.stroke_hud import apply_stroke_key
 from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.toast import Toast

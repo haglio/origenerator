@@ -16,8 +16,8 @@ when it knows its media type. Clicks fall through to the tile beneath it, the wa
 the tile's own image and caption do.
 """
 
-from PyQt6.QtWidgets import QLabel, QWidget
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui import icons
 

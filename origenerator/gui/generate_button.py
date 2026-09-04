@@ -17,8 +17,8 @@ generation exactly make the press draw a fresh seed instead, and the button says
 so ("Generate with Random seed") rather than a dialog asking after the click.
 """
 
-from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QPushButton
 
 _GUARD_MS = 2500  # how long a blocked-Generate guard message lingers on the button
 DEFAULT_CAPTION = "Generate"  # the plain face; the panel sets the other (set_caption)

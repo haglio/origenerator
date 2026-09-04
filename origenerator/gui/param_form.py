@@ -1,21 +1,30 @@
 import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
-    QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox,
-    QComboBox, QPushButton, QToolButton, QFileDialog,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QEvent, pyqtSignal
 
 from origenerator.config import COMFYUI_INPUT_DIR
-from origenerator.gui import diff_text, tracked_prompt
+from origenerator.gui import diff_text, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
-from origenerator.gui import param_sections
 from origenerator.gui.param_help import param_help
 from origenerator.gui.prompt_box import PromptBox
 from origenerator.paths import ensure_shared_ui_on_path

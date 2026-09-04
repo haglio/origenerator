@@ -34,7 +34,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import stroke_engine
 from origenerator.config import (
-    OSR2_BROKER_HOST, OSR2_GENAU_ENABLED_FILE, OSR2_TCODE_UDP_PORT,
+    OSR2_BROKER_HOST,
+    OSR2_GENAU_ENABLED_FILE,
+    OSR2_TCODE_UDP_PORT,
 )
 from origenerator.osr2 import Osr2Broker
 from origenerator.stroke_engine import Stroke

@@ -5,8 +5,8 @@ picture came from — so it always has somewhere in it to be. A suffix carries
 whatever else it has to add: the lock.
 """
 
-from PyQt6.QtWidgets import QLabel, QWidget
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel, QWidget
 
 _BOTTOM_MARGIN = 24  # how far the plate floats above the bottom edge
 

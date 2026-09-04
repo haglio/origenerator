@@ -6,8 +6,12 @@ import sqlite3
 from pathlib import Path
 
 from origenerator.branch_session import (
-    ENV_FLAG, adopt_branch_curation, adopt_branch_rows, is_branch_session,
-    seed_branch_db, session_trash,
+    ENV_FLAG,
+    adopt_branch_curation,
+    adopt_branch_rows,
+    is_branch_session,
+    seed_branch_db,
+    session_trash,
 )
 from origenerator.db import Database
 
@@ -230,6 +234,7 @@ def test_adoption_brings_a_spoken_request_home_with_its_generation(tmp_path):
 def test_adoption_survives_a_branch_database_predating_requests(tmp_path):
     # A worktree seeded before the table existed must still hand its rows over.
     import sqlite3
+
     from origenerator.branch_session import adopt_branch_rows
     branch_path = _branch_db_with(
         tmp_path, "wt-a", [{"prompt_id": "b6", "filename": "fox6.png"}])

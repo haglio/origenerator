@@ -19,7 +19,6 @@ from origenerator.prompt_edit import (
     parse_request,
 )
 
-
 # --- reading the request ----------------------------------------------------
 
 
@@ -224,7 +223,6 @@ def test_the_matcher_is_shown_the_prompts_own_terms_unweighted():
 
     def match(terms, term):
         seen.append(list(terms))
-        return None
 
     apply_request("a woman, (silver ear studs:1.2), soft light", "", "no earrings",
                   match=match)

@@ -174,12 +174,8 @@ class ExperimentPolicy:
         for pd in workflow.param_definitions():
             if pd.key == "batch_size":
                 continue
-            if pd.key == "positive_prompt":
-                dims.append(pd)
-            elif pd.type in ("int", "float") and pd.min_val is not None \
-                    and pd.max_val is not None and pd.max_val > pd.min_val:
-                dims.append(pd)
-            elif pd.type == "combo" and pd.options and len(pd.options) > 1:
+            if pd.key == "positive_prompt" or (pd.type in ("int", "float") and pd.min_val is not None \
+                    and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == "combo" and pd.options and len(pd.options) > 1):
                 dims.append(pd)
         return dims
 

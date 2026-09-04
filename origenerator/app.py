@@ -600,8 +600,16 @@ def main(argv: list[str] | None = None) -> int:
         return _refuse_an_incomplete_overlay(missing, fun_time)
 
     from origenerator.config import (
-        DB_PATH, PROJECT_DIR, STATE_DIR, COMFYUI_HOST, COMFYUI_PORT,
-        COMFYUI_OUTPUT_DIR, COMFYUI_DIR, COMFYUI_LOG_DIR, THUMB_DIR, UI_STATE_PATH,
+        COMFYUI_DIR,
+        COMFYUI_HOST,
+        COMFYUI_LOG_DIR,
+        COMFYUI_OUTPUT_DIR,
+        COMFYUI_PORT,
+        DB_PATH,
+        PROJECT_DIR,
+        STATE_DIR,
+        THUMB_DIR,
+        UI_STATE_PATH,
     )
 
     logger = _configure_logging(STATE_DIR)
@@ -619,9 +627,9 @@ def main(argv: list[str] | None = None) -> int:
         # is opened or shown: this returns before the database, ComfyUI and the
         # first window, so a hosting session's test can run the real command
         # against a live machine without touching either.
-        from origenerator.app_state import AppState  # noqa: F401
-        from origenerator.branch_session import is_branch_session  # noqa: F401
-        from origenerator.comfyui_client import ComfyUIClient  # noqa: F401
+        from origenerator.app_state import AppState
+        from origenerator.branch_session import is_branch_session
+        from origenerator.comfyui_client import ComfyUIClient
         from origenerator.db import Database  # noqa: F401
         from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
         logger.info("Launch check passed (%s)", sys.executable)

@@ -32,7 +32,7 @@ def block(qtbot):
 
 def _texts(block):
     """Every label's text, with the on-screen wrapping zero-width spaces removed."""
-    return [lbl.text().replace("​", "") for lbl in block.findChildren(QLabel)]
+    return [lbl.text().replace("\u200b", "") for lbl in block.findChildren(QLabel)]
 
 
 def test_shows_file_and_created(block):

@@ -1,15 +1,14 @@
 import pytest
-
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
-
-from origenerator.workflows.base import ParamDef
-from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui import param_sections
-from origenerator.gui.collapsible_section import CollapsibleSection
 from shared_ui.check_box import CheckBox
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
+
+from origenerator.gui import param_sections
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import ParamDef
 
 
 def test_field_labels_fit_the_heading_font(qtbot):

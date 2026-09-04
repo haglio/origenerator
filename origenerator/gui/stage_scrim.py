@@ -12,8 +12,8 @@ user opened the pane for. The dimming is what keeps the message readable over
 an arbitrary frame while leaving the frame legible underneath.
 """
 
-from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel
 
 # Dark enough to read white letters against any frame, light enough to leave the
 # frame itself visible — which is the reason the scrim exists rather than a

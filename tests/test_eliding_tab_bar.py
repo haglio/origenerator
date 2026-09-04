@@ -1,10 +1,14 @@
 import pytest
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication, QTabWidget, QWidget
 
 from origenerator.gui.eliding_tab_bar import (
-    EDGE, MARK, MARK_CANVAS, ElidingTabBar, tab_mark,
+    EDGE,
+    MARK,
+    MARK_CANVAS,
+    ElidingTabBar,
+    tab_mark,
 )
 
 

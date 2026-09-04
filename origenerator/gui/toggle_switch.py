@@ -13,16 +13,19 @@ indicator; the colors are the suite's shared toggle tokens, so it looks like the
 switches Fun Time and the other apps draw.
 """
 
-from PyQt6.QtWidgets import QAbstractButton
-from PyQt6.QtGui import QPainter, QPen
 from PyQt6.QtCore import QRectF, QSize, Qt
+from PyQt6.QtGui import QPainter, QPen
+from PyQt6.QtWidgets import QAbstractButton
 
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (  # noqa: E402
-    TEXT_SECONDARY, TOGGLE_KNOB, TOGGLE_OFF, TOGGLE_ON,
+    TEXT_SECONDARY,
+    TOGGLE_KNOB,
+    TOGGLE_OFF,
+    TOGGLE_ON,
 )
 
 _TRACK = QSize(38, 20)   # the pill

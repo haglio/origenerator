@@ -9,7 +9,12 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.corner_controls import (
-    CORNER_SIZE, CornerControls, ENHANCE, STAR, TRASH, enhance_state,
+    CORNER_SIZE,
+    ENHANCE,
+    STAR,
+    TRASH,
+    CornerControls,
+    enhance_state,
 )
 
 

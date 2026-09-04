@@ -39,7 +39,6 @@ def test_wears_the_familys_copy_mark(qtbot):
     # two-sheets glyph at its own proportions -- the same drift the microphone
     # had. Both now come out of shared_ui, so the mark is one drawing.
     from PyQt6.QtCore import QSize
-
     from shared_ui.colors import TEXT_SECONDARY
     from shared_ui.icons import CANVAS, glyph_pixmap
 

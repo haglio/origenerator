@@ -89,7 +89,7 @@ def test_every_workflow_param_maps_to_a_named_section(workflow_name):
 def test_the_plumbing_params_are_hidden_rather_than_sectioned():
     # They stay in every workflow's defaults so payloads and the grouping key are
     # unchanged; the form simply gives them no row, editable or read-only.
-    assert ps.HIDDEN_KEYS == {"batch_size", "crf", "filename_prefix"}
+    assert {"batch_size", "crf", "filename_prefix"} == ps.HIDDEN_KEYS
     for workflow in WORKFLOW_REGISTRY.values():
         shown = {pd.key for pd in workflow.param_definitions()}
         assert not (shown & ps.HIDDEN_KEYS)

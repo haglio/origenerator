@@ -1149,7 +1149,9 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     # sine between stroke_top and stroke_bottom, plus one static point holding
     # the anchor (e.g. a anchor base) in place.
     from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
+        REFERENCE_HEIGHT,
+        REFERENCE_WIDTH,
+        Wan21AtiI2vWorkflow,
     )
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
@@ -1393,7 +1395,9 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_stroke(tmp_path, monkeypatc
     import origenerator.workflows.derived_size as ds
     from origenerator.workflows.derived_size import scale_to_total_pixels
     from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
+        REFERENCE_HEIGHT,
+        REFERENCE_WIDTH,
+        Wan21AtiI2vWorkflow,
     )
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
@@ -1429,7 +1433,9 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
     # the 480×864 reference (scale 1.0 → the stroke coordinates pass through
     # unchanged) rather than crashing payload build.
     from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
+        REFERENCE_HEIGHT,
+        REFERENCE_WIDTH,
+        Wan21AtiI2vWorkflow,
     )
 
     wf = Wan21AtiI2vWorkflow()
@@ -1469,7 +1475,9 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
 
     import origenerator.workflows.wan21_ati_i2v as ati
     from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT, REFERENCE_WIDTH, Wan21AtiI2vWorkflow,
+        REFERENCE_HEIGHT,
+        REFERENCE_WIDTH,
+        Wan21AtiI2vWorkflow,
     )
 
     aim = {"stroke_x": 0.5, "stroke_top": 0.25, "stroke_bottom": 0.5,

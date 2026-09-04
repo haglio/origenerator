@@ -23,15 +23,27 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QWidget, QStackedLayout, QVBoxLayout, QLabel, QSizePolicy, QApplication,
-)
-from PyQt6.QtGui import QPixmap, QMovie, QImageReader, QDrag, QPainter
 from PyQt6.QtCore import (
-    Qt, QUrl, QPoint, QRect, QRectF, QSize, QEvent, pyqtSignal,
+    QEvent,
+    QPoint,
+    QRect,
+    QRectF,
+    QSize,
+    Qt,
+    QUrl,
+    pyqtSignal,
 )
-from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QAudioOutput
+from PyQt6.QtGui import QDrag, QImageReader, QMovie, QPainter, QPixmap
+from PyQt6.QtMultimedia import QAudioOutput, QMediaMetaData, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QSizePolicy,
+    QStackedLayout,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of, read_actions
@@ -39,7 +51,9 @@ from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
 from origenerator.gui.drag_thumbnail import (
-    fit_thumbnail, label_thumbnail, set_drag_thumbnail,
+    fit_thumbnail,
+    label_thumbnail,
+    set_drag_thumbnail,
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime

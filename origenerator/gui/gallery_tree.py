@@ -29,8 +29,8 @@ pane instead, exactly as the Starred shelf shows its bookmarked folders.
 
 from dataclasses import dataclass, field
 
-from PyQt6.QtWidgets import QTreeWidgetItem
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QTreeWidgetItem
 
 from origenerator import gallery
 from origenerator.gui import icons

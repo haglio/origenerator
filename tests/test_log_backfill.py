@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from origenerator.db import Database
 from origenerator.log_backfill import (
@@ -15,7 +15,7 @@ def _utc_iso_for_local(y, mo, d, h, mi, s, us=0):
     """The completed_at an importer would store for a file written at this
     local wall-clock time (mtime -> UTC isoformat)."""
     epoch = datetime(y, mo, d, h, mi, s, us).timestamp()
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(epoch, tz=UTC).isoformat()
 
 
 def _import_row(db, prompt_id, completed_at):

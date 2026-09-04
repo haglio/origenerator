@@ -22,9 +22,9 @@ carries, and a second pair here would be two switches for one thing.
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QImage, QPainter
+from PyQt6.QtWidgets import QWidget
 
 from origenerator import osr2, stroke_engine
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
@@ -37,11 +37,16 @@ ensure_player_core_on_path()
 from player_core import drive_layout  # noqa: E402
 from player_core.console import ConsoleModel  # noqa: E402
 from player_core.console_hud import (  # noqa: E402
-    ConsoleHud, ConsolePainter, ModeHud, hud_xy,
+    ConsoleHud,
+    ConsolePainter,
+    ModeHud,
+    hud_xy,
 )
 from player_core.direct_control import POSITION_MAX  # noqa: E402
 from player_core.drive_readout import (  # noqa: E402
-    DRIVEN_BY_GENAU, DRIVEN_BY_NOTHING, DriveHud,
+    DRIVEN_BY_GENAU,
+    DRIVEN_BY_NOTHING,
+    DriveHud,
 )
 
 _TRACE_SECONDS = 12.0

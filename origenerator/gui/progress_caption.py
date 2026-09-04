@@ -29,11 +29,14 @@ reading asks :func:`origenerator.timing.progress_status_label` for its compact
 one instead, and eliding is what happens when even that overruns.
 """
 
-from PyQt6.QtWidgets import (
-    QProgressBar, QStyle, QStyleOptionProgressBar, QStylePainter,
-)
+from PyQt6.QtCore import QRect, QRectF, Qt
 from PyQt6.QtGui import QFontMetrics, QPainterPath
-from PyQt6.QtCore import Qt, QRect, QRectF
+from PyQt6.QtWidgets import (
+    QProgressBar,
+    QStyle,
+    QStyleOptionProgressBar,
+    QStylePainter,
+)
 
 from origenerator.paths import ensure_shared_ui_on_path
 

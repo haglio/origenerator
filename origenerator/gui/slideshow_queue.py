@@ -35,8 +35,8 @@ the main window gets by dragging its handle, which is not a gesture there is
 anywhere to make here.
 """
 
+from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import Qt, QRect
 
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
 from origenerator.paths import ensure_shared_ui_on_path

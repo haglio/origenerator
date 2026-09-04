@@ -10,13 +10,15 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
-from pytest import approx
-from PyQt6.QtCore import Qt, QEvent, QSize, QUrl
+from PyQt6.QtCore import QEvent, QSize, Qt, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
+from pytest import approx
 
 from origenerator.funscript import (
-    legacy_funscript_path_for, synthesize_actions, write_funscript,
+    legacy_funscript_path_for,
+    synthesize_actions,
+    write_funscript,
 )
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -1474,7 +1476,6 @@ def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
     both of which would hold a clip that cannot play forever.  So this one step
     happens regardless: the item stays in the set, but the screen does not stay
     black."""
-    from PyQt6.QtMultimedia import QMediaPlayer
 
     still = tmp_path / "a.png"
     Image.new("RGB", (40, 30)).save(still)

@@ -10,7 +10,7 @@ configuration into the settings key.
 """
 
 import json
-from functools import lru_cache
+from functools import cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -82,7 +82,7 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
     return wf.version if wf else ""
 
 
-@lru_cache(maxsize=None)
+@cache
 def _workflow_instance_keys(workflow_name: str) -> frozenset:
     """A registered workflow's per-instance keys: every seed param it declares
     (sampler and foley alike — a variation re-rolls them all) plus the start
@@ -91,7 +91,7 @@ def _workflow_instance_keys(workflow_name: str) -> frozenset:
     return frozenset(_registered(workflow_name).seed_keys()) | {"input_image"}
 
 
-@lru_cache(maxsize=None)
+@cache
 def _workflow_enhance_keys(workflow_name: str) -> frozenset:
     """A registered workflow's enhancement-layer keys (see :data:`ENHANCE_KEYS`).
     Cached for the same reason as :func:`_workflow_instance_keys` — it too walks

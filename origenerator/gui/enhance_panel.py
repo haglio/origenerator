@@ -27,24 +27,38 @@ alternative being a run that fails on submit.
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QFormLayout, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget,
+    QFormLayout,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
 )
 
 from origenerator.gallery import (
-    ENHANCE_SETTING_KEYS, ENHANCE_WORKFLOW, MATCH_SOURCE_MODEL, EnhanceSettings,
+    ENHANCE_SETTING_KEYS,
+    ENHANCE_WORKFLOW,
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
 )
 from origenerator.gui.enhance_versions import params_from_mime
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.param_help import param_help
 from origenerator.gui.no_wheel import (
-    NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
+    NoWheelComboBox,
+    NoWheelDoubleSpinBox,
+    NoWheelSpinBox,
 )
+from origenerator.gui.param_help import param_help
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
-    DEFAULT_FIX_DENOISE, DETAIL_PARTS, detail_fixes_of, detector_for_part,
+    DEFAULT_FIX_DENOISE,
+    DETAIL_PARTS,
+    detail_fixes_of,
+    detector_for_part,
 )
+
 # Before any shared_ui import: that checkout is a sibling on the path, not a
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()

@@ -12,9 +12,18 @@ import json
 from origenerator import base_backfill, gallery
 from origenerator.app_state import AppState
 from origenerator.base_backfill import (
-    SOURCE, TARGET_KEY, UNTIMED_SECONDS, attach_base, base_params_for,
-    cancel_base_renders, fold_base_render, fold_completed_base_renders,
-    queue_base_renders, render_base_now, rows_missing_their_base, typical_seconds,
+    SOURCE,
+    TARGET_KEY,
+    UNTIMED_SECONDS,
+    attach_base,
+    base_params_for,
+    cancel_base_renders,
+    fold_base_render,
+    fold_completed_base_renders,
+    queue_base_renders,
+    render_base_now,
+    rows_missing_their_base,
+    typical_seconds,
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database

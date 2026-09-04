@@ -1,5 +1,8 @@
 from origenerator.workflows.base import (
-    SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
+    SAMPLER_OPTIONS,
+    SCHEDULER_OPTIONS,
+    ParamDef,
+    WorkflowTemplate,
 )
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files

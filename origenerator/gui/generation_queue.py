@@ -52,17 +52,30 @@ the thing a user goes hunting for an explanation of.
 
 import time
 
+from PyQt6.QtCore import QMimeData, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
-    QScrollArea, QApplication, QFrame, QSizePolicy,
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtGui import QPixmap, QDrag, QPainter, QPen, QColor
-from PyQt6.QtCore import Qt, QMimeData, QSize, QTimer, pyqtSignal
 
 from origenerator.gui.inflight import (
-    discard_run_text, discard_run_tooltip, foreign_queue_text,
-    held_row_text, queue_held_text, queue_lead_text, queue_lead_tooltip,
-    queue_wait_text, starting_row_text,
+    discard_run_text,
+    discard_run_tooltip,
+    foreign_queue_text,
+    held_row_text,
+    queue_held_text,
+    queue_lead_text,
+    queue_lead_tooltip,
+    queue_wait_text,
+    starting_row_text,
 )
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
@@ -70,7 +83,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import progress_status_label
 
 ensure_shared_ui_on_path()
-from shared_ui.colors import BORDER_SUBTLE, BLUE
+from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 # The strip's opening height, its floor, and so the widest the live thumbnail
 # ever gets: it takes the bottom-left corner whole, being the one thing here worth

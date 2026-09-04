@@ -28,11 +28,11 @@ borrowed from the live style, so a button that closes tabs wears the very ✕ th
 tabs themselves do.
 """
 
-from functools import lru_cache
+from functools import cache
 
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPen, QColor
+from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
-from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
 
 from origenerator.gui.orientation import PORTRAIT
 from origenerator.paths import ensure_shared_ui_on_path
@@ -40,8 +40,15 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BG_PRIMARY, BLUE, PINK, AMBER,
-    GREEN, RED,
+    AMBER,
+    BG_PRIMARY,
+    BLUE,
+    GREEN,
+    PINK,
+    RED,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
 )
 from shared_ui.icons import CANVAS, STROKE, draw_glyph, glyph_icon, glyph_pixmap
 
@@ -201,7 +208,7 @@ def custom_folder_icon() -> QIcon:
     return glyph_icon("folder", size=_SIZE)
 
 
-@lru_cache(maxsize=None)
+@cache
 def experiment_verdict_icon(verdict: str) -> QIcon:
     """An experiment tile's review hover-buttons: a check ("up" — keep it, it
     joins the gallery) or a cross ("down" — reject it and teach the experimenter
@@ -211,7 +218,7 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
                               _SIZE, _REROLL_GLYPH))
 
 
-@lru_cache(maxsize=None)
+@cache
 def recovery_action_icon(action: str) -> QIcon:
     """A Trash-shelf tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
@@ -221,7 +228,7 @@ def recovery_action_icon(action: str) -> QIcon:
     return QIcon(glyph_pixmap(name, _SIZE, _REROLL_GLYPH))
 
 
-@lru_cache(maxsize=None)
+@cache
 def media_type_badge(media_type: str) -> QPixmap:
     """A small corner badge marking a Recents tile as an image or a video.
 
@@ -233,7 +240,7 @@ def media_type_badge(media_type: str) -> QPixmap:
     return _display_size(_render_chip(_BADGE_CHIP, glyph, _BADGE_GLYPH))
 
 
-@lru_cache(maxsize=None)
+@cache
 def media_type_icon(media_type: str) -> QIcon:
     """The same play/photo mark as :func:`media_type_badge`, bare.
 
@@ -268,7 +275,7 @@ _PROPORTION_RADIUS = 5.0
 _PROPORTION_DISPLAY = 15  # on-screen size, to sit level with the heading's word
 
 
-@lru_cache(maxsize=None)
+@cache
 def orientation_mark(orientation: str) -> QPixmap:
     """An upright or a lying-down frame -- the shape one half of the TOC holds.
 
@@ -319,7 +326,7 @@ _CORNER_MARK_AT = 4.0
 _ENHANCE_SHADOW = 5.0
 
 
-@lru_cache(maxsize=None)
+@cache
 def corner_star_icon(*, starred: bool, armed: bool) -> QIcon:
     """The star in a picture's top-left corner: bookmark it, or take the
     bookmark away.
@@ -334,7 +341,7 @@ def corner_star_icon(*, starred: bool, armed: bool) -> QIcon:
                         _STAR_GLYPH if starred else _CORNER_REST, armed)
 
 
-@lru_cache(maxsize=None)
+@cache
 def corner_trash_icon(*, armed: bool) -> QIcon:
     """The trash can in a picture's bottom-left corner: delete this item.
 
@@ -344,7 +351,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
     return _corner_icon("trash", _CORNER_REST, armed, arm_color=RED)
 
 
-@lru_cache(maxsize=None)
+@cache
 def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     """The plus in a picture's bottom-right corner, reading ``state``.
 
@@ -426,7 +433,7 @@ def _display_size(pixmap: QPixmap, size: int = _BADGE_DISPLAY) -> QPixmap:
     )
 
 
-@lru_cache(maxsize=None)
+@cache
 def reroll_seed_icon(media_type: str) -> QIcon:
     """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
     mark — "re-roll this video" (its motion) or "this image" (its start frame).
@@ -489,7 +496,7 @@ def tab_close_icon(widget=None) -> QIcon:
     return QIcon(pixmap)
 
 
-@lru_cache(maxsize=None)
+@cache
 def level_badge_icon(level: str) -> QIcon:
     """The chip marking a folder's place in the hierarchy (see LEVEL_LABELS).
 

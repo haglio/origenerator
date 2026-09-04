@@ -9,8 +9,8 @@ overlay's hand-tuned spec for an act (:func:`curated_params`, seeds re-rolled â€
 there is no past run to reproduce). Qt-free so it stays unit-testable.
 """
 
-from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.gallery.output import output_file_reference, row_output_files
+from origenerator.generation_config import filled_params, randomize_seeds
 
 # What a size-deriving workflow's stored size is recorded under. Not a recipe
 # setting â€” it belongs to the frame the recipe ran on, not to the recipe.

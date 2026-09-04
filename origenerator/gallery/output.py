@@ -13,8 +13,8 @@ import json
 import logging
 from pathlib import Path
 
-from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.gallery.signatures import workflow_output_type
+from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)

@@ -5,13 +5,14 @@ things that are this app's: that the picture really is that console (not a
 lookalike), and that each command it posts reaches the right thing here.
 """
 
+from player_core import wave_stack
+from player_core.console import console_rows
+from player_core.console_hud import ConsoleHud, ConsolePainter
+from player_core.direct_control import POSITION_MAX
+
 from origenerator import stroke_engine
 from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
 from origenerator.stroke_engine import Stroke
-from player_core import wave_stack
-from player_core.direct_control import POSITION_MAX
-from player_core.console import console_rows
-from player_core.console_hud import ConsoleHud, ConsolePainter
 
 
 class FakeStroke:

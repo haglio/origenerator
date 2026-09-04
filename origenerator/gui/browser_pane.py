@@ -49,8 +49,11 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY,
 )
 from origenerator.gui.inflight import (
-    InFlightItem, discard_run_text, discard_run_tooltip,
-    stop_loop_text, stop_loop_tooltip,
+    InFlightItem,
+    discard_run_text,
+    discard_run_tooltip,
+    stop_loop_text,
+    stop_loop_tooltip,
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key

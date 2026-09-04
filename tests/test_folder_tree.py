@@ -1,10 +1,14 @@
-from PyQt6.QtCore import Qt, QMimeData, QPoint, QPointF, QRect
+from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QTreeWidgetItem
 
 from origenerator.gui import folder_tree
 from origenerator.gui.folder_tree import (
-    DROP_KEY_ROLE, FOLDER_KEYS_MIME, TREE_KEY_ROLE, FolderTree, _action_rects,
+    DROP_KEY_ROLE,
+    FOLDER_KEYS_MIME,
+    TREE_KEY_ROLE,
+    FolderTree,
+    _action_rects,
 )
 from origenerator.gui.orientation import LANDSCAPE, oriented_key
 

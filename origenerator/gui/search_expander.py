@@ -18,7 +18,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import search
 from origenerator.config import (
-    LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, SEARCH_EXPANSION_SYSTEM_PROMPT,
+    LOCAL_LLM_BASE_URL,
+    LOCAL_LLM_MODEL,
+    SEARCH_EXPANSION_SYSTEM_PROMPT,
 )
 
 logger = logging.getLogger(__name__)

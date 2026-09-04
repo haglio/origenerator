@@ -6,9 +6,9 @@ no animation is available), and clicking one navigates to that video. WebP +
 ``QMovie`` keeps many previews moving at once without a video player per tile.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.looping_preview import looping_movie

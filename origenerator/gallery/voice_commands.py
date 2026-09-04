@@ -22,7 +22,9 @@ command on rewriting a prompt.
 import re
 
 from origenerator.workflows.detail_parts import (
-    fix_command_bias, fix_command_spelling, match_fix_command,
+    fix_command_bias,
+    fix_command_spelling,
+    match_fix_command,
 )
 
 # The Genau command, as a value the dispatcher can test for. A bare marker rather

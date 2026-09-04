@@ -18,8 +18,13 @@ two model files that differ only near the end.
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QSizePolicy, QSpinBox, QStyle,
-    QStyleOptionComboBox, QStylePainter,
+    QComboBox,
+    QDoubleSpinBox,
+    QSizePolicy,
+    QSpinBox,
+    QStyle,
+    QStyleOptionComboBox,
+    QStylePainter,
 )
 
 # What the combo asks for in place of its longest item: enough to read the head of

@@ -43,19 +43,17 @@ def test_the_connection_is_closed_on_the_way_out(file):
 
 
 def test_the_connection_is_closed_even_when_the_block_raises(file):
-    with pytest.raises(ValueError):
-        with file.connect() as conn:
-            raise ValueError("something in the middle of a write")
+    with pytest.raises(ValueError), file.connect() as conn:
+        raise ValueError("something in the middle of a write")
 
     with pytest.raises(sqlite3.ProgrammingError):
         conn.execute("SELECT 1")
 
 
 def test_a_block_that_raises_writes_nothing(file):
-    with pytest.raises(ValueError):
-        with file.connect() as conn:
-            conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene two",))
-            raise ValueError("half a batch")
+    with pytest.raises(ValueError), file.connect() as conn:
+        conn.execute("INSERT INTO notes (body) VALUES (?)", ("scene two",))
+        raise ValueError("half a batch")
 
     with file.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0
@@ -98,9 +96,8 @@ class TestReadOnly:
         must yield nothing rather than fail the launch."""
         missing = ReadOnlySqliteFile(tmp_path / "no-such-worktree" / "origenerator.db")
 
-        with pytest.raises(sqlite3.Error):
-            with missing.connect() as conn:
-                conn.execute("SELECT 1")
+        with pytest.raises(sqlite3.Error), missing.connect() as conn:
+            conn.execute("SELECT 1")
 
     def test_it_is_closed_on_the_way_out_like_any_other(self, file):
         with ReadOnlySqliteFile(file.path).connect() as conn:

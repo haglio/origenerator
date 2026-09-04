@@ -37,7 +37,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from origenerator import gallery, queue_line
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.gui.generation_job import (
-    GenerationJob, insert_generation_row, mark_generation_completed,
+    GenerationJob,
+    insert_generation_row,
+    mark_generation_completed,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 

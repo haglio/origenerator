@@ -10,7 +10,6 @@ from PIL import Image
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
-
 from tests.test_gallery_view import FakeDB
 
 

@@ -24,7 +24,7 @@ this but the word. What it needs is the REST surface --
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.completion import extract_completion
@@ -80,7 +80,7 @@ def _reconcile_row(db, client, row, queued, output_dir: Path, thumb_dir: Path) -
                 status="completed",
                 output_files=json.dumps(files),
                 thumbnail_path=thumb,
-                completed_at=datetime.now(timezone.utc).isoformat(),
+                completed_at=datetime.now(UTC).isoformat(),
             )
             if duration is not None:
                 fields["duration_seconds"] = duration

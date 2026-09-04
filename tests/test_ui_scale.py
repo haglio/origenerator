@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale

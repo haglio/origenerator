@@ -135,8 +135,8 @@ def _screen_origin(x: int, y: int) -> tuple[int, int]:
     this module leans on throughout — the origin is left at the device position
     and only the size is scaled — so scaling the size back down is enough.
     """
-    from PyQt6.QtGui import QGuiApplication
     from PyQt6.QtCore import QRect
+    from PyQt6.QtGui import QGuiApplication
 
     scale = active_scale()
     for screen in QGuiApplication.screens():

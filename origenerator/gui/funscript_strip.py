@@ -7,9 +7,9 @@ like — mirroring the strip the sibling Nau player shows. Colors come from
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtWidgets import QWidget
 
 from origenerator.funscript import heatmap_colors
 

@@ -10,12 +10,12 @@ animated into. The bridge between a video's folders and its start frame's.
 from dataclasses import dataclass
 
 from origenerator.gallery.keys import folder_id, settings_key
+from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
     _frame_name,
     parse_params,
     settings_signature,
 )
-from origenerator.gallery.output import row_output_files
 
 
 @dataclass

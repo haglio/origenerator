@@ -17,16 +17,27 @@ from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 
 from origenerator import gallery
 from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY, TRASH_LABEL,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    STARRED_KEY,
+    TRASH_KEY,
+    TRASH_LABEL,
 )
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.orientation import (
-    ORIENTATION_LABELS, base_of, filter_rows, orientation_of, oriented_key,
-    row_orientation, split_key, split_rows,
+    ORIENTATION_LABELS,
+    base_of,
+    filter_rows,
+    orientation_of,
+    oriented_key,
+    row_orientation,
+    split_key,
+    split_rows,
 )
-
 from tests.test_gallery_view import FakeDB, _image, _row, _side_rows
-from tests.test_icons import _ink_bounds  # the mark is measured the way the icons' own tests measure one
+from tests.test_icons import (
+    _ink_bounds,  # the mark is measured the way the icons' own tests measure one
+)
 
 
 def _thumbed(row: dict, tmp_path: Path, width: int, height: int) -> dict:

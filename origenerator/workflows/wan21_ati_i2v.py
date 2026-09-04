@@ -4,7 +4,9 @@ import random
 
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import (
-    measure_derived_size, override_size, resolve_input_image_path,
+    measure_derived_size,
+    override_size,
+    resolve_input_image_path,
 )
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files

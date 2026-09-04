@@ -12,7 +12,10 @@ from pathlib import Path
 
 from origenerator.config import STROKE_DEFAULT_HZ
 from origenerator.funscript import (
-    ensure_funscript, funscript_of, funscript_path_for, write_funscript,
+    ensure_funscript,
+    funscript_of,
+    funscript_path_for,
+    write_funscript,
 )
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds

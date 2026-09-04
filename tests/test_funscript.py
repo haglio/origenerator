@@ -1,8 +1,13 @@
 from pathlib import Path
 
 from origenerator.funscript import (
-    ensure_funscript, funscript_of, funscript_path_for, heatmap_colors,
-    read_actions, synthesize_actions, write_funscript,
+    ensure_funscript,
+    funscript_of,
+    funscript_path_for,
+    heatmap_colors,
+    read_actions,
+    synthesize_actions,
+    write_funscript,
 )
 
 

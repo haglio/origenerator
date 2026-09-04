@@ -20,8 +20,8 @@ which one you are about to press is answered by the one that lit, not by a set
 that appeared when you crossed the tile.
 """
 
-from PyQt6.QtWidgets import QPushButton, QWidget
 from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtWidgets import QPushButton, QWidget
 
 from origenerator import gallery
 from origenerator.gui import icons

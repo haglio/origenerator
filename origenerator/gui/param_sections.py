@@ -59,7 +59,7 @@ SECTIONS: tuple[Section, ...] = (
         "anchor_x", "anchor_y",
     ), collapsed=True),
     Section("Dimensions", ("width", "height", "length"), collapsed=True),
-    Section("Frames", ("frame_count", "frame_rate"), collapsed=True),
+    Section("Video", ("frame_count", "frame_rate"), collapsed=True),
     Section("Audio", (
         "audio_prompt", "audio_negative_prompt", "audio_seed",
         "foley_model", "foley_vae", "foley_synchformer",

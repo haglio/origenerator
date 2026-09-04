@@ -604,6 +604,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.branch_session", "adopt_branch_rows"),
     ("origenerator.branch_session", "adopt_branch_curation"),
     ("origenerator.inflight", "reconcile_in_flight"),
+    ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "backfill_unknown_workflows"),
@@ -682,12 +683,13 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
     window.show.assert_called_once()
 
 
-def test_a_branch_session_maintains_nothing_but_the_enhancement_fold(qapp):
+def test_a_branch_session_maintains_only_what_is_not_library_maintenance(qapp):
     """A preview shows unlanded code, not a maintained library: its database is
-    a seeded copy the live app already maintains. The fold is the exception —
-    it rewrites rows the copy already holds, touching no file and reading no
-    output history, so leaving it out would show enhancements standing as
-    images of their own long after the live app stopped doing that."""
+    a seeded copy the live app already maintains. Two passes are the exception:
+    each rewrites rows the copy already holds, writing no record and touching
+    no file, and leaving either out would show a difference in the copy rather
+    than in the code - enhancements standing as images of their own, or a
+    generation drawing its thumbnail and nothing else because its file moved."""
     ran = []
 
     with _a_faked_boot(ran), \
@@ -695,7 +697,7 @@ def test_a_branch_session_maintains_nothing_but_the_enhancement_fold(qapp):
          patch("origenerator.branch_session.seed_branch_db", return_value=True):
         assert main([]) == 0
 
-    assert ran == ["fold_completed_enhancements"]
+    assert ran == ["relocate_moved_outputs", "fold_completed_enhancements"]
 
 
 def test_a_branch_session_sweeps_no_deletions(qapp):
@@ -740,6 +742,7 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
 _SPLASH_LINES = (
     "Adopting branch-session results...",
     "Reconnecting to running generations...",
+    "Finding files that moved...",
     "Scanning for new images...",
     "Tidying up video previews...",
     "Updating workflow labels...",
@@ -752,8 +755,8 @@ _SPLASH_LINES = (
 )
 
 
-def test_the_boot_says_the_same_eleven_things_it_always_has():
-    """Eleven, not thirteen: the bookmark adoption runs under the line above it
+def test_the_boot_says_the_same_twelve_things_it_always_has():
+    """Twelve, not fourteen: the bookmark adoption runs under the line above it
     rather than announcing itself, which is what `status=None` on a pass means."""
     from origenerator.app import MAINTENANCE
 
@@ -764,11 +767,12 @@ def test_a_branch_session_says_only_that_it_is_skipping_and_folding():
     from origenerator.app import BRANCH_SESSION_MAINTENANCE
 
     assert tuple(p.status for p in BRANCH_SESSION_MAINTENANCE) == (
-        "Folding enhancements into their images...",)
+        "Finding files that moved...",
+        "Folding enhancements into their images...")
 
 
 def test_every_pass_says_what_went_wrong_when_something_does():
-    """The one thing all thirteen share: a failure costs one warning line naming
+    """The one thing all fifteen share: a failure costs one warning line naming
     the operation, never the launch. A pass with no failure message would report
     a genuine bug as a bare format string."""
     from origenerator.app import BRANCH_SESSION_MAINTENANCE, MAINTENANCE

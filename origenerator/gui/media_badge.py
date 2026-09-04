@@ -30,10 +30,25 @@ class MediaBadge(QLabel):
     def __init__(self, media_type: str, tile: QWidget):
         super().__init__(tile)
         self.media_type = media_type  # "image"/"video" — which glyph this badge shows
-        pixmap = icons.media_type_badge(media_type)
-        self.setPixmap(pixmap)
-        self.setFixedSize(pixmap.size())
+        self._wear(media_type)
         self.move(_INSET, _INSET)
         # Transparent to clicks so selecting/opening the tile still works through it.
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()  # above the image label, which is added first
+
+    def set_media_type(self, media_type: str):
+        """Wear another type's glyph.
+
+        For a badge over a slot whose subject changes kind rather than a tile's,
+        which is one thing forever: the config tab's source tile shows a video's
+        start frame (an image) and the clip a stroke was cut out of (a video) in
+        the one place, and a badge that could not follow said "photo" over both.
+        """
+        if media_type != self.media_type:
+            self.media_type = media_type
+            self._wear(media_type)
+
+    def _wear(self, media_type: str):
+        pixmap = icons.media_type_badge(media_type)
+        self.setPixmap(pixmap)
+        self.setFixedSize(pixmap.size())

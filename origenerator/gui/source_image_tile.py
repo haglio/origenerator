@@ -40,6 +40,7 @@ class SourceImageTile(QWidget):
         super().__init__(parent)
         self._prompt_id: str | None = None
         self._default_heading = heading
+        self._default_media_type = media_type
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         box = QVBoxLayout(self)
@@ -58,7 +59,7 @@ class SourceImageTile(QWidget):
         box.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
         # A photo (or play) badge in the thumbnail's top-left corner, like the
         # gallery tiles.
-        MediaBadge(media_type, self._thumb)
+        self._badge = MediaBadge(media_type, self._thumb)
 
         self._filename = QLabel()
         self._filename.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
@@ -68,12 +69,17 @@ class SourceImageTile(QWidget):
         self.hide()
 
     def show_source(self, prompt_id: str, thumbnail_path, filename: str,
-                    heading: str | None = None):
+                    heading: str | None = None, media_type: str | None = None):
         """Point the tile at an item. ``heading`` names the relation when it
         isn't the usual one — the same slot says "from source image" for a
-        video's start frame and "requested from" for what a request revised."""
+        video's start frame, "requested from" for what a request revised, and
+        "trimmed from" for the clip a single stroke was cut out of. That last one
+        is a video, so ``media_type`` moves the badge with it; both settings are
+        per-showing, because the next row put in this slot may be a different
+        relation to a different kind of thing."""
         self._prompt_id = prompt_id
         self._heading.setText(heading or self._default_heading)
+        self._badge.set_media_type(media_type or self._default_media_type)
         # A spaceless filename can't wrap, so middle-elide it to the tile width and
         # keep the full name in the tooltip.
         elided = self._filename.fontMetrics().elidedText(

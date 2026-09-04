@@ -74,7 +74,16 @@ CREATE TABLE IF NOT EXISTS generations (
     -- fold that lands its result there, agree on which image that is (see
     -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
     -- before this was recorded, which falls back to matching the file.
-    enhance_of TEXT
+    enhance_of TEXT,
+    -- The clip this row is one stroke of, by that clip's prompt_id -- set on the
+    -- cut the Genau lane sends in place of the whole video (see
+    -- origenerator.stroke_trim). An identity rather than a filename, for the
+    -- reason enhance_of is one, and the whole of what the two rows know about
+    -- each other: a cut's own params are its source's, so it sits in the same
+    -- settings folder, and nothing else on it says which of that folder's clips
+    -- it was cut from. Presence also marks the row a cut, which is what keeps a
+    -- send of a cut from trying to cut it again.
+    trimmed_from TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -189,6 +198,7 @@ ADDED_COLUMNS = {
         "recipe_category": "TEXT",
         "recipe_video_id": "TEXT",
         "enhance_of": "TEXT",
+        "trimmed_from": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -205,7 +215,7 @@ GENERATION_COLUMNS = (
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
     "genau_exported_at", "genau_requested_at", "recipe_category", "recipe_video_id",
-    "enhance_of",
+    "enhance_of", "trimmed_from",
 )
 
 

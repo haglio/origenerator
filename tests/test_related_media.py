@@ -35,6 +35,20 @@ def _video_row(prompt_id="vid1", input_image="sdxl_t2i_img1.png"):
     }
 
 
+def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.png"):
+    """One stroke cut out of a clip. It carries the clip's params, start frame
+    and all — which is what makes the order of the links matter."""
+    return {
+        "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
+        "created_at": "2026-01-02 03:06:07",
+        "params_json": f'{{"input_image": "{input_image}"}}',
+        "output_files": '[{"filename": "wan22_i2v_vid1_stroke.mp4",'
+                        ' "subfolder": "video", "type": "output"}]',
+        "thumbnail_path": "cut1_thumb.jpg",
+        "trimmed_from": trimmed_from,
+    }
+
+
 @pytest.fixture
 def make_related(qtbot):
     """Build a RelatedMedia over a given set of the library's videos, counting
@@ -109,6 +123,42 @@ def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
         Qt.KeyboardModifier.NoModifier))
 
     assert named == ["vid1"]
+
+
+def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
+    clip = _video_row()
+    related = make_related(clip)
+
+    related.show_row(_trim_row(), [_image_row()])
+
+    assert not related._source_tile.isHidden()
+    assert related._source_tile._prompt_id == "vid1"
+    assert related._source_tile._heading.text() == "Trimmed from"
+    # The first source that is a video, so the badge has to follow what it shows.
+    assert related._source_tile._badge.media_type == "video"
+
+
+def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):
+    # A cut carries its source's params, start frame included. Asking for a start
+    # frame first would answer with the picture the ORIGINAL was animated from and
+    # quietly send the link past the clip the user is actually looking for.
+    clip = _video_row()
+    related = make_related(clip)
+
+    related.show_row(_trim_row(), [_image_row()])
+
+    assert related._source_tile._prompt_id == "vid1"
+
+
+def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
+    # The clip was deleted out from under it. The relation it can still show is
+    # the one its copied params carry, rather than an empty slot.
+    related = make_related()
+
+    related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])
+
+    assert related._source_tile._prompt_id == "img1"
+    assert related._source_tile._badge.media_type == "image"
 
 
 def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):

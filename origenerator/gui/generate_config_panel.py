@@ -21,6 +21,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_INBOX_DIR,
+    THUMB_DIR,
 )
 from origenerator.db import Database
 from origenerator.gallery import (
@@ -153,6 +154,7 @@ class GenerateConfigPanel(QWidget):
     changes_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
+    library_changed = pyqtSignal()          # this tab added a row (a send's cut) — relist
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
     preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     enhance_requested = pyqtSignal(str)      # the version list's "+ Enhance" was pressed (prompt_id)
@@ -1462,7 +1464,16 @@ class GenerateConfigPanel(QWidget):
         lane.button.setEnabled(not already_sent)
 
     def _on_send(self, lane):
-        """Copy the displayed video into *lane*'s inbox folder and remember it.
+        """Hand the displayed video down *lane*'s inbox folder and remember it.
+
+        WHAT is handed over is the lane's business rather than this method's: a
+        lane that scrubs a clip against a device is given one stroke cut out of
+        it, which is a new file and a new row in the gallery, and a lane that
+        plays what it is given is given the clip (:meth:`ExportLane.clip_for`).
+        Preparing it can fail where copying could not — a clip whose stroke track
+        holds no whole stroke has nothing to send — and that shares the copy's
+        dialog, because the two end the same way: nothing reached the other app,
+        and the sentence saying why is the error itself.
 
         Re-checks the persisted flag rather than the button's disabled state, so
         the handoff cannot be repeated. The copy lands in another app's inbox
@@ -1475,12 +1486,17 @@ class GenerateConfigPanel(QWidget):
         if path is None:
             return
         try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / lane.source)
+            sending = lane.clip_for(self._displayed_row, path, self._db,
+                                    output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR)
+            evolver_export.export_video(sending, EVOLVER_INBOX_DIR / lane.source)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
             QMessageBox.warning(self._preview, lane.failure_title,
                                 lane.failure_body(e))
             return
+        if sending != path:
+            # A cut is a video of this library's the gallery has yet to list.
+            self.library_changed.emit()
         prompt_id = self._displayed_row["prompt_id"]
         lane.mark(self._db, prompt_id)
         # Re-read so the row (and thus the button) reflects the persisted send.

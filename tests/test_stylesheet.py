@@ -112,3 +112,53 @@ def test_a_menus_disabled_row_does_not_light_up():
     qss = build_stylesheet()
     rule = qss.split("QMenu::item:disabled:selected {", 1)[1].split("}", 1)[0]
     assert "background-color: transparent" in rule
+
+
+def _radio_image(qtbot, checked: bool):
+    """A radio button rendered under the app stylesheet.
+
+    Rendered rather than read off the sheet, for the same reason the menu rows
+    are: what broke here was the platform's own drawing of the selected mark,
+    which no rule in the string describes -- only the pixels say whether the
+    mark is there.
+    """
+    from PyQt6.QtWidgets import QApplication, QRadioButton
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        radio = QRadioButton("Players")
+        qtbot.addWidget(radio)
+        radio.setChecked(checked)
+        radio.resize(radio.sizeHint())
+        return radio.grab().toImage()
+    finally:
+        app.setStyleSheet(prior)
+
+
+def _lightness(image, x: int) -> int:
+    """How light the pixel at ``x`` is, across the indicator's widest row."""
+    return image.pixelColor(x, image.height() // 2).lightness()
+
+
+def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
+    # The whole failure: under the app sheet the platform painted the selected
+    # mark dark on this dark ground, so picking Players or Genau left nothing on
+    # screen saying which lane was picked. The disc has to stop short of the ring
+    # as well -- one filling it edge to edge is a blob, not a radio button.
+    centre = 8  # the middle of a 16px indicator, which sits at the widget's left
+    assert _lightness(_radio_image(qtbot, checked=True), centre) > 200
+    assert _lightness(_radio_image(qtbot, checked=False), centre) < 80
+    assert _lightness(_radio_image(qtbot, checked=True), 1) < 100  # the gap
+
+
+def test_a_radios_ring_stays_visible_in_both_states(qtbot):
+    # The ring is what says there is a choice here at all, so the disc arriving
+    # must not swallow it, and neither state may leave it as dark as the panel
+    # behind it.
+    from shared_ui.colors import BG_PRIMARY
+
+    for checked in (True, False):
+        image = _radio_image(qtbot, checked=checked)
+        assert max(_lightness(image, x) for x in (0, 1)) > BG_PRIMARY.lightness() + 30

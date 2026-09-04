@@ -138,6 +138,27 @@ def build_stylesheet() -> str:
            unpickable entry would look exactly as pickable as the rest. Mute it. */
         color: {_h(TEXT_MUTED)};
     }}
+    /* A radio's mark, drawn here rather than left to the platform. The app-wide
+       QWidget rule above hands every radio to the stylesheet engine, and the
+       selected mark it falls back to paints dark on this dark ground — the
+       chosen Players/Genau lane simply vanished. So both states are stated here:
+       the same hairline ring the fields wear, and inside it a light disc a
+       couple of pixels short of that ring. The disc is a radial gradient because
+       Qt draws no shapes for a subcontrol and takes a picture only as a file
+       (see _spin_arrow_rules above); a gradient also stays crisp at any screen
+       scale, and its two stops sit a hair apart rather than hard against each
+       other so the disc's edge reads smooth instead of stepped. */
+    QRadioButton::indicator {{
+        width: 14px;
+        height: 14px;
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 8px;
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    QRadioButton::indicator:checked {{
+        background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+            stop:0.66 {_h(TEXT_PRIMARY)}, stop:0.78 {_h(BG_SECONDARY)});
+    }}
     /* Every right-click menu in the app. The app-wide QWidget rule above paints a
        menu's items on the same flat background as the menu itself, which leaves
        the row under the cursor looking exactly like the rows either side of it —

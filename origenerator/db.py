@@ -78,6 +78,9 @@ class Database:
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         return self.generations.set_enhance_target(prompt_id, source_prompt_id)
 
+    def set_trimmed_from(self, prompt_id: str, source_prompt_id: str):
+        return self.generations.set_trimmed_from(prompt_id, source_prompt_id)
+
     def set_generation_starred(self, prompt_id: str, starred: bool):
         return self.generations.set_generation_starred(prompt_id, starred)
 
@@ -113,6 +116,9 @@ class Database:
 
     def get_generation(self, prompt_id: str) -> dict | None:
         return self.generations.get_generation(prompt_id)
+
+    def trim_of(self, prompt_id: str) -> dict | None:
+        return self.generations.trim_of(prompt_id)
 
     def list_generations(self) -> list[dict]:
         return self.generations.list_generations()

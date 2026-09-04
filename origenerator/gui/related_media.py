@@ -6,6 +6,10 @@ exclusive in practice — a video has a start frame and no animations, an image 
 the other way round — and both are hidden whenever the tab is blank or showing a
 bare autoshow rather than a generation someone chose.
 
+"Built from" is one slot answering three relations, because they are one
+question: a video's start frame, the item a spoken request revised, and — for the
+single stroke the Genau lane cuts out of a clip — the clip it was cut out of.
+
 Fed one row at a time and nothing else: the panel that owns it reads the library
 and hands over the rows this needs, so this touches no database and can be stood
 up on its own. It is deliberately not the whole of what a tab says about the row
@@ -46,9 +50,10 @@ class RelatedMedia(QWidget):
 
     def __init__(self, parent=None, *, video_rows=None):
         """``video_rows`` answers the library's videos, and is asked only for a
-        row that could have animations — which is why it is a call rather than a
-        list. Reading it is a whole-table read and a parse per row, and every
-        video shown would otherwise pay for it to be told it has none.
+        row that could have animations, or is a stroke cut out of one of them —
+        which is why it is a call rather than a list. Reading it is a whole-table
+        read and a parse per row, and every video shown would otherwise pay for
+        it to be told it has none.
         """
         super().__init__(parent)
         self._video_rows = video_rows or (list)
@@ -87,28 +92,47 @@ class RelatedMedia(QWidget):
         """Reveal the source tile for whatever this row was built from, else hide
         it. The tile shows that item's thumbnail and filename and names it on
         click, for the owner to navigate to.
-
-        For a video that is its start frame. For something a spoken request made
-        it is the item the request was asked about — the same relation in the
-        same place, since a requested image has no start frame and a requested
-        video's start frame is the one it already had.
         """
-        source_id = find_source_image_id(row, image_rows)
-        source_row = next(
-            (r for r in image_rows if r.get("prompt_id") == source_id), None
-        ) if source_id else None
-        heading = None
-        if source_row is None and request is not None:
-            source_row = request.get("source_row")
-            heading = "Requested from"
+        source_row, heading, media_type = self._built_from(row, image_rows, request)
         if not source_row:
             self._source_tile.clear()
             return
         files = row_output_files(source_row)
         self._source_tile.show_source(
             source_row["prompt_id"], source_row.get("thumbnail_path"),
-            files[0]["filename"] if files else "", heading=heading,
+            files[0]["filename"] if files else "",
+            heading=heading, media_type=media_type,
         )
+
+    def _built_from(self, row: dict, image_rows: list[dict], request):
+        """``(the row this was built from, what to head the tile, its kind)``.
+
+        Three relations, most particular first. A stroke the Genau lane cut is
+        the only one whose source is a VIDEO, and it has to be asked about first:
+        a cut carries its source clip's params, start frame included, so asking
+        for a start frame would answer with the picture the ORIGINAL was animated
+        from and quietly point the link past the clip the user is looking for. A
+        video that is not a cut links to its start frame; something a spoken
+        request made links to the item the request was asked about — a requested
+        image has no start frame, and a requested video's start frame is the one
+        it already had.
+        """
+        cut_from = row.get("trimmed_from")
+        if cut_from:
+            clip = next((v for v in self._video_rows()
+                         if v.get("prompt_id") == cut_from), None)
+            if clip is not None:
+                return clip, "Trimmed from", "video"
+        source_id = find_source_image_id(row, image_rows)
+        if source_id:
+            frame = next(
+                (r for r in image_rows if r.get("prompt_id") == source_id), None)
+            if frame is not None:
+                return frame, None, "image"
+        if request is not None and request.get("source_row"):
+            asked_about = request["source_row"]
+            return asked_about, "Requested from", media_type_of_row(asked_about)
+        return None, None, None
 
     def _animated_items(self, row: dict) -> list[tuple]:
         """(prompt_id, looping-preview path, still path) for each video an image

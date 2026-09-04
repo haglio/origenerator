@@ -12869,20 +12869,64 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     assert match("weird") is None
 
 
-def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
+def _stub_cut(monkeypatch, cut=Path("C:/out/flf2v_loop_1_stroke.mp4")):
+    """Stand in for the single stroke cut out of a clip, which the Genau lane
+    sends in the clip's place. The cutting itself is tested in
+    tests/test_stroke_trim.py; these are about the lane the spoken send uses."""
+    from origenerator import stroke_trim
+
+    asked = []
+    monkeypatch.setattr(stroke_trim, "single_stroke_clip",
+                        lambda row, path, db, **kw: asked.append(path) or cut)
+    return cut, asked
+
+
+def test_a_spoken_genau_it_hands_one_stroke_of_its_finished_clip_on(
+        qtbot, tmp_path, monkeypatch):
+    # What goes is read off the lane, so a spoken send and a pressed one cannot
+    # differ about it: both hand Genau one stroke rather than the whole loop.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._db.mark_genau_requested("loop")   # as a spoken launch would have
     clip = Path("C:/out/flf2v_loop_1.mp4")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (clip, "video"))
+    cut, asked = _stub_cut(monkeypatch)
     sent = []
     monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
                         lambda src, dest: sent.append((src, dest)) or dest / src.name)
 
     view._on_reroll_finished("k", "loop")
 
-    assert sent == [(clip, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
+    assert asked == [clip]
+    assert sent == [(cut, EVOLVER_INBOX_DIR / GENAU_SOURCE)]
     assert view._db.get_generation("loop")["genau_exported_at"]
+
+
+def test_a_clip_that_cannot_be_cut_is_not_handed_on_whole(qtbot, tmp_path,
+                                                          monkeypatch):
+    # Handing over a loop of four strokes is the very thing the cut exists to
+    # stop, so a clip with no whole stroke in its track goes nowhere -- and stays
+    # unstamped, so Send-to-Genau is still there to retry with.
+    from origenerator.stroke_trim import NoSingleStroke
+
+    view = _genau_view(qtbot, tmp_path, monkeypatch)
+    view._db.mark_genau_requested("loop")
+    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
+                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    from origenerator import stroke_trim
+
+    def no_stroke(*_args, **_kwargs):
+        raise NoSingleStroke("no whole stroke")
+
+    monkeypatch.setattr(stroke_trim, "single_stroke_clip", no_stroke)
+    sent = []
+    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
+                        lambda src, dest: sent.append(src))
+
+    view._on_reroll_finished("k", "loop")   # must not raise
+
+    assert sent == []
+    assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
 def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch):
@@ -12907,6 +12951,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     view._db.mark_genau_requested("loop")
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    _stub_cut(monkeypatch)
 
     def boom(src, dest):
         raise OSError("the inbox is not there")

@@ -50,3 +50,19 @@ class PresetComboBox(NoWheelComboBox):
     def set_value(self, value: float) -> None:
         self.setCurrentText(self._text_for(value))
         self._announced = self.currentText()
+
+    def set_unavailable(self, values, reason: str) -> None:
+        """Grey out these presets so they can't be picked, and say why on hover.
+
+        A preset the model can't produce is worse than a missing one: chosen, it
+        silently becomes a different setting, and the number the user picked is
+        not the number they get. Greyed rather than dropped so the list still
+        reads as the same list at every workflow, with the ones out of reach
+        visibly out of reach.
+        """
+        unavailable = {self._text_for(value) for value in values}
+        for index in range(self.count()):
+            if self.itemText(index) in unavailable:
+                item = self.model().item(index)
+                item.setEnabled(False)
+                item.setToolTip(reason)

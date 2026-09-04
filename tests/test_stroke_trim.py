@@ -138,6 +138,36 @@ def test_a_missing_ffmpeg_says_so(tmp_path, monkeypatch):
         stroke_trim.cut_video(tmp_path / "in.mp4", tmp_path / "out.mp4", 0, 100)
 
 
+# --- which clips a backfill still owes a cut ---------------------------------
+
+
+def _sent(prompt_id, at, **extra):
+    return {"prompt_id": prompt_id, "genau_exported_at": at, **extra}
+
+
+def test_the_clips_owed_a_cut_are_the_ones_sent_before_the_lane_cut():
+    rows = [
+        _sent("sent-late", "2026-08-19 15:50:34"),
+        _sent("sent-early", "2026-08-18 09:55:38"),
+        {"prompt_id": "never-sent"},
+        _sent("already-cut", "2026-08-19 06:48:19"),
+        # The cut of that one -- itself sent, and itself never cut again.
+        _sent("its-cut", "2026-08-19 06:49:00", trimmed_from="already-cut"),
+    ]
+
+    owed = stroke_trim.clips_sent_whole(rows)
+
+    # Oldest send first: a backfill stopped halfway should have got through the
+    # clips that have been wrong the longest.
+    assert [r["prompt_id"] for r in owed] == ["sent-early", "sent-late"]
+
+
+def test_a_backfill_run_twice_has_nothing_left_to_do():
+    rows = [_sent("clip", "2026-08-18 09:55:38"),
+            _sent("cut", "2026-08-18 09:56:00", trimmed_from="clip")]
+    assert stroke_trim.clips_sent_whole(rows) == []
+
+
 # --- the cut as a row of the library ------------------------------------------
 
 

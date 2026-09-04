@@ -3,22 +3,22 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QUrl, QSize, QPointF, QEvent
-from PyQt6.QtGui import QResizeEvent, QMouseEvent, QImage
-from PyQt6.QtWidgets import QWidget, QApplication
+from PyQt6.QtCore import QEvent, QPointF, QSize, Qt, QUrl
+from PyQt6.QtGui import QImage, QMouseEvent, QResizeEvent
 from PyQt6.QtMultimedia import QMediaPlayer, QVideoFrame
+from PyQt6.QtWidgets import QApplication, QWidget
 
-import origenerator.gui.preview_widget as preview_widget
 from origenerator.funscript import (
-    funscript_path_for, legacy_funscript_path_for, synthesize_actions,
+    funscript_path_for,
+    legacy_funscript_path_for,
+    synthesize_actions,
     write_funscript,
 )
+from origenerator.gui import preview_widget
 from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.ken_burns import TICK_MS, ZOOM_SPAN, progress_step, zoom_at
-
-from PyQt6.QtCore import Qt
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):

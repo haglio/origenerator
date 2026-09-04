@@ -89,11 +89,11 @@ class UndoStack:
         stack able to be undone (and redone) as many times as the user likes.
         """
         if not self._redoable:
-            return None
+            return
         entry = self._redoable.pop()
         self._redoing = True
         try:
             entry.redo()
         finally:
             self._redoing = False
-        return None
+        return

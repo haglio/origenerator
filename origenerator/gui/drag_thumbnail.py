@@ -13,8 +13,8 @@ So the sources ask here instead, and a drag looks the same wherever it started:
 one box, and nothing shown for the one case with genuinely no picture to show.
 """
 
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
 
 # Every drag's picture fits this box. Roughly a drop slot's own preview, so what
 # is under the cursor reads as the thing that is about to land in the slot —

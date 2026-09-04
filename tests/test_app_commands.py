@@ -9,10 +9,13 @@ the picture.
 import pytest
 
 from origenerator.voice.app_commands import (
-    _BIAS_SKIP, _PHRASES, AppCommand, DialSetting, app_command_bias,
+    _BIAS_SKIP,
+    _PHRASES,
+    AppCommand,
+    DialSetting,
+    app_command_bias,
     match_app_command,
 )
-
 
 # --- the shelves that lead the tree, each by the name on its row -------------
 

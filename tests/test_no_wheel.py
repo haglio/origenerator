@@ -3,7 +3,9 @@ from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QComboBox
 
 from origenerator.gui.no_wheel import (
-    NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox,
+    NoWheelComboBox,
+    NoWheelDoubleSpinBox,
+    NoWheelSpinBox,
 )
 
 # Two model files as a picker holds them: long, and alike until near the end.

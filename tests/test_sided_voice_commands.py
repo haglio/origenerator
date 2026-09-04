@@ -15,10 +15,17 @@ import pytest
 
 from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.gui.gallery_tree import (
-    RECENTS_KEY, REQUESTS_KEY, STARRED_KEY, TRASH_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    STARRED_KEY,
+    TRASH_KEY,
 )
 from origenerator.voice.commands import (
-    ShelfCommand, ShowControl, SurfaceCommand, match_voice_command, split_side,
+    ShelfCommand,
+    ShowControl,
+    SurfaceCommand,
+    match_voice_command,
+    split_side,
     voice_command_bias,
 )
 from origenerator.voice.show_commands import ShowCommand

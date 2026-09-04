@@ -1,7 +1,9 @@
 import pytest
 
 from origenerator.progress import (
-    ProgressTracker, expected_pass_count, expected_progress_steps,
+    ProgressTracker,
+    expected_pass_count,
+    expected_progress_steps,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 

@@ -95,7 +95,7 @@ class TestTheValuesAnotherAppHoldsToo:
     def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
         # Not this app's state dir and not the broker's: fun_time's, which is
         # where all three look for these files.
-        assert config.OSR2_STATE_DIR == config.project_dir("fun_time") / "state"
+        assert config.project_dir("fun_time") / "state" == config.OSR2_STATE_DIR
 
     def test_the_genau_flag_is_the_file_the_broker_reads(self):
         # This app writes "0" here while it drives, and restores the prior value

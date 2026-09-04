@@ -2,7 +2,7 @@ import io
 import time
 
 from PIL import Image
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import QPoint, Qt
 
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.inflight_card import InFlightCard

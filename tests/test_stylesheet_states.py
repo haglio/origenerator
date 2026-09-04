@@ -6,9 +6,9 @@ had not answered it at all.
 """
 
 from PyQt6.QtGui import QColor
+from shared_ui.colors import BG_BUTTON, BG_BUTTON_ACTIVE, BLUE
 
 from origenerator.gui.stylesheet import build_stylesheet
-from shared_ui.colors import BG_BUTTON, BG_BUTTON_ACTIVE, BLUE
 
 
 def _lightness(color: QColor) -> float:

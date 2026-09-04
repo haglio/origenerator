@@ -15,9 +15,9 @@ the pair reads as one line of arithmetic at any size the pane is dragged to.
 
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap, QMovie
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QMovie, QPixmap
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie

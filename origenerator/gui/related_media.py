@@ -22,8 +22,11 @@ from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery import (
-    animated_preview_path, find_source_image_id, media_type_of_row,
-    row_output_files, videos_from_source_image,
+    animated_preview_path,
+    find_source_image_id,
+    media_type_of_row,
+    row_output_files,
+    videos_from_source_image,
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.source_image_tile import SourceImageTile
@@ -48,7 +51,7 @@ class RelatedMedia(QWidget):
         video shown would otherwise pay for it to be told it has none.
         """
         super().__init__(parent)
-        self._video_rows = video_rows or (lambda: [])
+        self._video_rows = video_rows or (list)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)

@@ -1,9 +1,8 @@
-from pathlib import Path
 from unittest.mock import MagicMock
 
 from PIL import Image
 
-import origenerator.thumbnail as thumbnail
+from origenerator import thumbnail
 from origenerator.thumbnail import generate_animated_thumbnail, generate_thumbnail
 
 

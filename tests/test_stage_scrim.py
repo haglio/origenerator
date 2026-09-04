@@ -1,7 +1,6 @@
 import pytest
-
-from PyQt6.QtWidgets import QLabel, QWidget
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.stage_scrim import StageScrim
 

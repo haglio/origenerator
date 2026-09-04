@@ -1,4 +1,4 @@
-from origenerator.osr2 import Osr2Broker, PARK_TCODE, device_on, format_position
+from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_on, format_position
 
 
 class FakeSock:

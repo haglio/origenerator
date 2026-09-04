@@ -18,7 +18,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -67,7 +67,7 @@ def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
         status="completed",
         output_files=json.dumps(files),
         thumbnail_path=thumb_path,
-        completed_at=datetime.now(timezone.utc).isoformat(),
+        completed_at=datetime.now(UTC).isoformat(),
     )
     if duration is not None:
         fields["duration_seconds"] = duration

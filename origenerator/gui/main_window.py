@@ -2,20 +2,20 @@ import base64
 import logging
 
 from PyQt6.QtCore import QByteArray, Qt
-from PyQt6.QtWidgets import QMainWindow
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
+from PyQt6.QtWidgets import QMainWindow
 
 from origenerator.app_state import AppState
+from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
-from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.experiments.background import cancel_experiments
-from origenerator.win32 import place_window_in_device_pixels
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.prompt_box import PROMPT_HEIGHTS
+from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
 

@@ -24,7 +24,7 @@ down before there is a window to say so.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +33,7 @@ LOCAL_CONTENT = PROJECT_DIR / "content.local.json"
 EXAMPLE_CONTENT = PROJECT_DIR / "content.example.json"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 

@@ -29,9 +29,20 @@ ensure_player_core_on_path()
 from player_core import cruise_control, wave_stack  # noqa: E402
 from player_core.cruise_control import CruiseControlState  # noqa: E402
 from player_core.direct_control import (  # noqa: E402
-    MAX_SPEED, MIN_SPEED, DirectControlState, WaveformShape, adjust_amplitude,
-    adjust_center, adjust_speed, bpm_for_speed, cycle_shape, phase_advanced,
-    position_fraction, set_amplitude, set_center, set_speed,
+    MAX_SPEED,
+    MIN_SPEED,
+    DirectControlState,
+    WaveformShape,
+    adjust_amplitude,
+    adjust_center,
+    adjust_speed,
+    bpm_for_speed,
+    cycle_shape,
+    phase_advanced,
+    position_fraction,
+    set_amplitude,
+    set_center,
+    set_speed,
 )
 
 __all__ = [

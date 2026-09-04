@@ -4,7 +4,10 @@ import pytest
 from PyQt6.QtCore import QPoint, Qt
 
 from origenerator.gui.prompt_box import (
-    DEFAULT_HEIGHT, MAX_HEIGHT, PROMPT_HEIGHTS, PromptBox,
+    DEFAULT_HEIGHT,
+    MAX_HEIGHT,
+    PROMPT_HEIGHTS,
+    PromptBox,
 )
 
 

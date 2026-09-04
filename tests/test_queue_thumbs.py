@@ -3,7 +3,11 @@ from PyQt6.QtCore import Qt
 
 from origenerator.gui import queue_thumbs
 from origenerator.gui.queue_thumbs import (
-    FOLDER_CELLS, QueueThumbs, block_width, folder_pixmap, source_pixmap,
+    FOLDER_CELLS,
+    QueueThumbs,
+    block_width,
+    folder_pixmap,
+    source_pixmap,
 )
 
 CELL = 28  # a queue row's height, less its margins

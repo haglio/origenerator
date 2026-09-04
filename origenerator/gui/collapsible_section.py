@@ -6,8 +6,8 @@ below, a ``QFormLayout`` callers fill with ``label: field`` rows. Used by
 into the sections defined in :mod:`origenerator.gui.param_sections`.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QFormLayout, QVBoxLayout, QWidget
 
 from origenerator.gui.eliding import ElidingButton
 

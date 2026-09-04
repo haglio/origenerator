@@ -1,5 +1,4 @@
 import pytest
-
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.gui.generate_button import GenerateButton

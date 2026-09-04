@@ -5,9 +5,9 @@ The value can be fixed (a string) or live (a zero-arg callable read at click
 time), so the same button serves a read-only label and an editable form field.
 """
 
-from PyQt6.QtWidgets import QApplication, QPushButton
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QPushButton
 
 from origenerator.paths import ensure_shared_ui_on_path
 

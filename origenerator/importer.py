@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from PIL import Image
@@ -100,7 +100,7 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             except Exception as e:
                 logger.warning("Thumbnail failed for %s: %s", fpath, e)
 
-            mtime = datetime.fromtimestamp(fpath.stat().st_mtime, tz=timezone.utc)
+            mtime = datetime.fromtimestamp(fpath.stat().st_mtime, tz=UTC)
 
             db.insert_generation(
                 prompt_id=prompt_id,

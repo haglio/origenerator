@@ -23,9 +23,9 @@ same way, for the pane to answer with the run's own menu.
 
 import time
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui import grid_card
 from origenerator.gui.blurred import blurred_backdrop

@@ -13,15 +13,6 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.workflows import detail_parts
-from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from origenerator.gallery.enhance_fold import fold_enhancement
-from origenerator.gallery.enhance_settings import (
-    MATCH_SOURCE_MODEL,
-    EnhanceSettings,
-    default_enhance_params,
-    describe_enhance_params,
-)
 from origenerator.gallery.enhance import (
     displayed_levels,
     enhance_levels,
@@ -31,6 +22,15 @@ from origenerator.gallery.enhance import (
     level_matching_settings,
     remove_enhance_levels,
 )
+from origenerator.gallery.enhance_fold import fold_enhancement
+from origenerator.gallery.enhance_settings import (
+    MATCH_SOURCE_MODEL,
+    EnhanceSettings,
+    default_enhance_params,
+    describe_enhance_params,
+)
+from origenerator.workflows import detail_parts
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 
 
 def _source_row(filename="sdxl_t2i_src.png", checkpoint="anemone_v3.safetensors"):

@@ -11,9 +11,9 @@ what a request came from may itself be a video, and it is "requested from"
 rather than a start frame.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.paths import ensure_shared_ui_on_path

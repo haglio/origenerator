@@ -11,8 +11,10 @@ from PyQt6.QtWidgets import QSplitter
 
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView
-
-from tests.test_gallery_view import FakeDB, _image  # the in-memory Database stand-in, and a row for it
+from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
+    FakeDB,
+    _image,
+)
 
 
 def _session(tmp_path=None):
@@ -56,8 +58,8 @@ def test_fun_time_gallery_ignores_the_stroke_keys(qtbot):
     # Space and friends belong to Fun Time's own hotkeys while hosted; nothing
     # here may swallow them, let alone drive the device.
     view = _fun_time_view(qtbot)
-    from PyQt6.QtGui import QKeyEvent
     from PyQt6.QtCore import QEvent
+    from PyQt6.QtGui import QKeyEvent
     view.show()
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J,
                       Qt.KeyboardModifier.NoModifier)
@@ -585,8 +587,8 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two shows run and NEITHER is the active
     window, so the side word is the only thing that says which picture."""
-    from origenerator.workflows.detail_parts import DETAIL_PARTS
     from origenerator.voice.commands import SurfaceCommand
+    from origenerator.workflows.detail_parts import DETAIL_PARTS
 
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
@@ -833,6 +835,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     """
     from PyQt6.QtGui import QMovie
     from PyQt6.QtWidgets import QLabel
+
     from tests.test_gallery_view import _row
 
     webp = tmp_path / "loop.webp"

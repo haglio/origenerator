@@ -30,13 +30,6 @@ import json
 import logging
 from dataclasses import dataclass, field
 
-from origenerator.gallery.output import (
-    media_type_of_row,
-    output_file_reference,
-    parse_file_list,
-    produced_output,
-    row_output_files,
-)
 from origenerator.gallery.enhance_graph import graph_level_params
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
@@ -46,11 +39,20 @@ from origenerator.gallery.enhance_settings import (
     describe_enhance_params,
     level_knobs,
 )
+from origenerator.gallery.output import (
+    media_type_of_row,
+    output_file_reference,
+    parse_file_list,
+    produced_output,
+    row_output_files,
+)
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
-    DEFAULT_FIX_DENOISE, detail_fixes_of, fixable_parts,
+    DEFAULT_FIX_DENOISE,
+    detail_fixes_of,
+    fixable_parts,
 )
 
 logger = logging.getLogger(__name__)

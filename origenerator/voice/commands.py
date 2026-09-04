@@ -26,13 +26,22 @@ from typing import NamedTuple
 
 from origenerator.gallery.voice_commands import command_bias, match_command
 from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY, EXPERIMENTS_LABEL, RECENTS_KEY, RECENTS_LABEL,
-    REQUESTS_KEY, REQUESTS_LABEL, STARRED_KEY, STARRED_LABEL,
-    TRASH_KEY, TRASH_LABEL,
+    EXPERIMENTS_KEY,
+    EXPERIMENTS_LABEL,
+    RECENTS_KEY,
+    RECENTS_LABEL,
+    REQUESTS_KEY,
+    REQUESTS_LABEL,
+    STARRED_KEY,
+    STARRED_LABEL,
+    TRASH_KEY,
+    TRASH_LABEL,
 )
 from origenerator.gui.orientation import LANDSCAPE, PORTRAIT
 from origenerator.voice.show_commands import (
-    ShowCommand, match_show_command, show_command_bias,
+    ShowCommand,
+    match_show_command,
+    show_command_bias,
 )
 
 SIDES = (PORTRAIT, LANDSCAPE)

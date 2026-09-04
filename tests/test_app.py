@@ -2,6 +2,7 @@ import builtins
 import runpy
 import sys
 from contextlib import ExitStack, contextmanager
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock, patch
 
@@ -507,7 +508,7 @@ def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
 def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     # Estimates have no history to draw on until this runs, and throwing its
     # result away left the boot tests green.
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from origenerator import config
     from origenerator.db import Database
@@ -519,7 +520,7 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
     db.update_generation(
         "p1", status="completed",
-        completed_at=datetime.fromtimestamp(finished, tz=timezone.utc).isoformat())
+        completed_at=datetime.fromtimestamp(finished, tz=UTC).isoformat())
     (config.COMFYUI_LOG_DIR / "comfyui.log").write_text(
         "[2026-06-29 12:20:53.244] Prompt executed in 15.26 seconds\n",
         encoding="utf-8")
@@ -533,7 +534,7 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
     """A deletion held ``days_ago`` days — old enough to be swept, or not."""
     import sqlite3
     from contextlib import closing
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from origenerator.db import Database
 
@@ -541,7 +542,7 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
     row = _completed_image(db, prompt_id)
     db.delete_generation(prompt_id)
     db.record_deletion(prompt_id, row, {"moves": [], "subdir": None})
-    then = (datetime.now(timezone.utc).replace(tzinfo=None)
+    then = (datetime.now(UTC).replace(tzinfo=None)
             - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
     with closing(sqlite3.connect(library_path)) as conn:
         conn.execute("UPDATE deletions SET deleted_at = ?", (then,))
@@ -718,9 +719,8 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
     the exit code is all either of them gets back out of the hidden console —
     so whatever ``main`` reports has to arrive there unchanged."""
     with patch("origenerator.app.main", return_value=7), \
-         patch.object(sys, "argv", ["origenerator"]):
-        with pytest.raises(SystemExit) as exit_:
-            runpy.run_module("origenerator", run_name="__main__")
+         patch.object(sys, "argv", ["origenerator"]), pytest.raises(SystemExit) as exit_:
+        runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 7
 

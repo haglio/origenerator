@@ -3,9 +3,12 @@
 from pytest import approx
 
 from origenerator.ken_burns import (
-    TICK_MS, ZOOM_SPAN, crop_box, progress_step, zoom_at,
+    TICK_MS,
+    ZOOM_SPAN,
+    crop_box,
+    progress_step,
+    zoom_at,
 )
-
 
 # A whole tick of the standard dwell — what any of these can be out by, since a
 # tick count is a whole number and a stretch of milliseconds need not divide by

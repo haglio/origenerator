@@ -41,10 +41,12 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.ui_scale import (
-    to_bitmap_pos, to_logical_size, unscaled_pixmap,
-)
 from origenerator.paths import ensure_player_core_on_path
+from origenerator.ui_scale import (
+    to_bitmap_pos,
+    to_logical_size,
+    unscaled_pixmap,
+)
 
 ensure_player_core_on_path()
 from player_core.file_channel import append_command

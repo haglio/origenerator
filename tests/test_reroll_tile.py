@@ -2,7 +2,7 @@ import time
 from io import BytesIO
 
 from PIL import Image
-from PyQt6.QtCore import Qt, QObject, QPoint, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 
 from origenerator.gui.reroll_tile import RerollTile
 

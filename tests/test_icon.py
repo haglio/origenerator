@@ -13,10 +13,10 @@ icon happens to be generated.
 """
 
 from PIL import Image
+from shared_ui.colors import PINK
 
 from origenerator.config import PROJECT_DIR
 from origenerator.icon_design import render_icon
-from shared_ui.colors import PINK
 
 ICON_PATH = PROJECT_DIR / "icon.ico"
 

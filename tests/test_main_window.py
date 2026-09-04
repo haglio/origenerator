@@ -4,16 +4,14 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 
-from origenerator import gallery
+from origenerator import gallery, recipe_match
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui.gallery_tree import RECENTS_KEY
-from origenerator import recipe_match
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
-
 from tests.test_gallery_view import _selected_folder, _shelf
 
 

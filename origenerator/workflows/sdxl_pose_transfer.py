@@ -1,6 +1,9 @@
 from origenerator.config import CUSTOM_POSES_DIR
 from origenerator.workflows.base import (
-    SAMPLER_OPTIONS, SCHEDULER_OPTIONS, ParamDef, WorkflowTemplate,
+    SAMPLER_OPTIONS,
+    SCHEDULER_OPTIONS,
+    ParamDef,
+    WorkflowTemplate,
 )
 from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.model_arch import SD15, SDXL

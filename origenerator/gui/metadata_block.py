@@ -13,11 +13,16 @@ copy-to-clipboard button when its item declares copyable text (a filename).
 
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator.generation_metadata import MetaItem, MetaSection, basic_section
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -28,7 +33,7 @@ from origenerator.reveal import show_in_explorer
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import TEXT_SECONDARY, TEXT_MUTED
+from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 
 _SELECTABLE = Qt.TextInteractionFlag.TextSelectableByMouse
 
@@ -196,4 +201,4 @@ def _wrappable(text: str) -> str:
     word-wrapping label a place to break a long unbroken value. The spaces have
     no width so the visible text is unchanged, and copy buttons still carry the
     original value — only on-screen wrapping is affected."""
-    return "".join(ch + "​" if ch in _BREAK_AFTER else ch for ch in text)
+    return "".join(ch + "\u200b" if ch in _BREAK_AFTER else ch for ch in text)

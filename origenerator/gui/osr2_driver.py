@@ -14,7 +14,9 @@ import logging
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import (
-    COMFYUI_OUTPUT_DIR, OSR2_BROKER_HOST, OSR2_GENAU_ENABLED_FILE,
+    COMFYUI_OUTPUT_DIR,
+    OSR2_BROKER_HOST,
+    OSR2_GENAU_ENABLED_FILE,
     OSR2_TCODE_UDP_PORT,
 )
 from origenerator.funscript import funscript_of, read_actions

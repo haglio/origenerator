@@ -1,16 +1,20 @@
 import time
 from pathlib import Path
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
-from PyQt6.QtGui import QPixmap, QDrag, QCursor
-from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QEvent, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QCursor, QDrag, QPixmap
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from origenerator.gui import grid_card
 from origenerator.gui.corner_controls import (
-    CHIP_CSS, CORNER_GAP, CORNER_INSET, CORNER_SIZE, CornerControls,
+    CHIP_CSS,
+    CORNER_GAP,
+    CORNER_INSET,
+    CORNER_SIZE,
+    CornerControls,
 )
 from origenerator.gui.drag_thumbnail import label_thumbnail, set_drag_thumbnail
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui import grid_card
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge

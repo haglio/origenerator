@@ -1,8 +1,13 @@
-from PyQt6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QWidget,
-)
+from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, QSize, pyqtSignal
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator.gui import icons
 

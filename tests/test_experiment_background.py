@@ -1,6 +1,8 @@
 from origenerator.db import Database
 from origenerator.experiments.background import (
-    BATCH_SIZE, cancel_experiments, queue_experiments,
+    BATCH_SIZE,
+    cancel_experiments,
+    queue_experiments,
 )
 from origenerator.experiments.policy import Proposal
 

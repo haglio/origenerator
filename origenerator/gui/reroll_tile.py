@@ -17,9 +17,9 @@ cached state on construction rather than relying solely on future signals.
 
 import time
 
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QPoint, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from origenerator.gui import grid_card
 from origenerator.gui.blurred import blurred_backdrop

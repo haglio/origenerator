@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import origenerator.evolver_export as evolver_export
+from origenerator import evolver_export
 from origenerator.evolver_export import export_video
 
 

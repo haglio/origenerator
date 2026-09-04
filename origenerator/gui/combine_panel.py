@@ -37,13 +37,18 @@ from origenerator.paths import ensure_shared_ui_on_path
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()
 
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
-
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QRadioButton, QButtonGroup,
-)
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QButtonGroup,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QRadioButton,
+    QVBoxLayout,
+    QWidget,
+)
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.recipe_match import CATEGORIES, GENAU, PLAYERS

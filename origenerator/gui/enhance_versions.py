@@ -39,12 +39,18 @@ it would have duplicated.
 
 import json
 
-from PyQt6.QtWidgets import (
-    QApplication, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
-    QMenu, QVBoxLayout, QWidget,
-)
-from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
+from PyQt6.QtGui import QDrag, QPixmap
+from PyQt6.QtWidgets import (
+    QApplication,
+    QGraphicsOpacityEffect,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui.collapsible_section import CollapsibleSection

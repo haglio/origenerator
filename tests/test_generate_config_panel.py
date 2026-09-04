@@ -3,7 +3,6 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QPixmap
 
@@ -12,11 +11,11 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.gui import corner_controls, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import related_media as related_media_module
-from origenerator.gui import corner_controls, icons
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -322,8 +321,9 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
 def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path, monkeypatch):
     # End to end: the panel hands the real derived_display_size to the form, which
     # measures the picked image and shows its scaled size in the locked field.
-    import origenerator.workflows.derived_size as ds
     from PIL import Image
+
+    import origenerator.workflows.derived_size as ds
     from origenerator.workflows.derived_size import scale_to_total_pixels
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
@@ -815,7 +815,7 @@ def saved_panel(qtbot, tmp_path):
 def _metadata_texts(panel):
     """Every label in the panel's metadata block, minus the wrapping zero-widths."""
     from PyQt6.QtWidgets import QLabel
-    return [lbl.text().replace("​", "")
+    return [lbl.text().replace("\u200b", "")
             for lbl in panel._metadata_block.findChildren(QLabel)]
 
 
@@ -864,7 +864,7 @@ def _level_rows(panel):
 def _row_texts(row):
     """Every label on one level's row, minus the wrapping zero-widths."""
     from PyQt6.QtWidgets import QLabel
-    return [lbl.text().replace("​", "") for lbl in row.findChildren(QLabel)]
+    return [lbl.text().replace("\u200b", "") for lbl in row.findChildren(QLabel)]
 
 
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_panel):
@@ -1057,7 +1057,7 @@ def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_p
 def _version_texts(panel):
     """Every label in the panel's version list, minus the wrapping zero-widths."""
     from PyQt6.QtWidgets import QLabel
-    return [lbl.text().replace("​", "")
+    return [lbl.text().replace("\u200b", "")
             for lbl in panel._versions.findChildren(QLabel)]
 
 
@@ -1211,7 +1211,9 @@ def _script_for(video_path, output_dir=None):
     """Write a script for ``video_path`` -- in the scripts folder under
     ``output_dir``, or, with none named, in the old place beside the clip."""
     from origenerator.funscript import (
-        funscript_path_for, legacy_funscript_path_for, synthesize_actions,
+        funscript_path_for,
+        legacy_funscript_path_for,
+        synthesize_actions,
         write_funscript,
     )
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
@@ -1239,7 +1241,7 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
     """The drive reads a clip's script wherever it is, which for anything
     generated from here on is the folder, not a file beside the clip."""
-    import origenerator.gui.osr2_driver as osr2_driver
+    from origenerator.gui import osr2_driver
 
     panel, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")

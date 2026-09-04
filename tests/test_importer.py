@@ -259,6 +259,7 @@ def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monk
 
 def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):
     import subprocess as sp
+
     import origenerator.importer as imp
     graph = {"1": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
     double = json.dumps(json.dumps(graph))  # VHS_VideoCombine double-encodes
@@ -281,6 +282,7 @@ def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monk
     calls it once per file, and on Windows an unsuppressed child flashes a console
     window per call. Assert the console-suppressing creationflag is passed."""
     import subprocess as sp
+
     import origenerator.importer as imp
 
     captured: dict = {}

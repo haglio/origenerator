@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QStackedLayout, QLabel, QLineEdit
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QLineEdit, QStackedLayout, QWidget
 
 
 class _RenameEdit(QLineEdit):

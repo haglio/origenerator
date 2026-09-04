@@ -268,7 +268,7 @@ def detail_fixes_of(params: dict) -> dict:
     named = [detector_part_label(params[key])
              for key in ("enhance_face_detector", "enhance_hand_detector")
              if params.get(key)]
-    return {name: denoise for name in (named or ["faces", "hands"])}
+    return dict.fromkeys(named or ["faces", "hands"], denoise)
 
 
 def detail_fix_passes(params: dict) -> list:

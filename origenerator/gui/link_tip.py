@@ -18,7 +18,7 @@ which is the state a control is in when it has nothing but ordinary text to say
 (that stays with Qt's tooltip, which handles the ordinary case perfectly well).
 """
 
-from PyQt6.QtCore import QEvent, QObject, QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from origenerator.paths import ensure_shared_ui_on_path

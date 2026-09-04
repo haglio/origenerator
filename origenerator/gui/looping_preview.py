@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import weakref
 
-from PyQt6.QtGui import QMovie, QImageReader
 from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QImageReader, QMovie
 
 # The freeze, and who is under it.  A weak set because a movie is parented to
 # the widget that shows it: PyQt keeps a parented wrapper alive for as long as

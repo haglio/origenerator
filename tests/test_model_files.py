@@ -7,7 +7,12 @@ import pytest
 from origenerator import config
 from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN
 from origenerator.workflows.model_files import (
-    ANY, NO_LORA, is_no_lora, list_detector_files, list_lora_files, list_model_files,
+    ANY,
+    NO_LORA,
+    is_no_lora,
+    list_detector_files,
+    list_lora_files,
+    list_model_files,
 )
 
 

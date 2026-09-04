@@ -88,8 +88,7 @@ _IRREGULAR_PLURALS = {
 # a row's stop words cost nothing to index, and dropping a query's keeps
 # "a lamp on the table" from demanding that a row also say "on" and "the".
 _STOP_WORDS = frozenset(
-    "a an the of in on at by with and or to for from is are was were be it its "
-    "her his their this that there here as into over under".split()
+    ["a", "an", "the", "of", "in", "on", "at", "by", "with", "and", "or", "to", "for", "from", "is", "are", "was", "were", "be", "it", "its", "her", "his", "their", "this", "that", "there", "here", "as", "into", "over", "under"]
 )
 
 # Interchangeable words, as groups: any member of a group satisfies a query for

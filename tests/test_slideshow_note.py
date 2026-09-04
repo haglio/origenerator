@@ -13,7 +13,6 @@ from PyQt6.QtCore import QRunnable
 
 from origenerator.gui import gallery_view
 from origenerator.gui.slideshow_view import SlideshowView
-
 from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]

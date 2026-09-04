@@ -10,17 +10,23 @@ from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
 
 from origenerator.gallery import (
-    MATCH_SOURCE_MODEL, EnhanceLevel, EnhanceSettings, default_enhance_params,
+    MATCH_SOURCE_MODEL,
+    EnhanceLevel,
+    EnhanceSettings,
+    default_enhance_params,
 )
 from origenerator.gui import enhance_versions as versions_module
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
-    EnhanceVersions, _AddRow, _LevelRow, _PendingRow, enhance_level_mime,
+    EnhanceVersions,
+    _AddRow,
+    _LevelRow,
+    _PendingRow,
+    enhance_level_mime,
     params_from_mime,
 )
 from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, DETAIL_PARTS
-
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -343,7 +349,7 @@ def _labels(widget):
 def _facts(row):
     """Every label on one row, its em-dash "file is gone" placeholder dropped."""
     from PyQt6.QtWidgets import QLabel
-    return " / ".join(lbl.text().replace("​", "")
+    return " / ".join(lbl.text().replace("\u200b", "")
                       for lbl in row.findChildren(QLabel)
                       if lbl.text() and lbl.text() != "—")
 
@@ -824,7 +830,7 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)),
                          ("queued", None, "3x · 40 steps · 0.35 denoise"))
-    texts = [lbl.text().replace("​", "")
+    texts = [lbl.text().replace("\u200b", "")
              for lbl in versions._pending.findChildren(QLabel)]
     assert "Queued…" in texts
     assert any("40 steps" in t and "0.35 denoise" in t for t in texts)

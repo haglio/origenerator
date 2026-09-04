@@ -63,18 +63,21 @@ inspection with Generate disabled.
 
 import time
 
-from PyQt6.QtWidgets import QTabWidget, QApplication, QMenu
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QMenu, QTabWidget
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
-    build_image_config_index, media_type_of_row, settings_signature,
+    build_image_config_index,
+    media_type_of_row,
+    settings_signature,
 )
 from origenerator.generation_config import ConfigSnapshot
-from origenerator.gui.eliding_tab_bar import ElidingTabBar, MARK_CANVAS, tab_mark
+from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
+
 
 class InfoPaneTabs(QTabWidget):
     """A strip of editable config tabs; each tab's Generate becomes a gallery re-roll."""

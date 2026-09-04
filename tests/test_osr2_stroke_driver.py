@@ -5,7 +5,10 @@ import time
 
 from origenerator import stroke_engine
 from origenerator.gui.osr2_stroke_driver import (
-    _HANDOFF_MS, _LOOKAHEAD_MS, Osr2StrokeDriver, _TickThread,
+    _HANDOFF_MS,
+    _LOOKAHEAD_MS,
+    Osr2StrokeDriver,
+    _TickThread,
 )
 
 

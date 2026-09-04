@@ -17,7 +17,12 @@ on screen says it happened.
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
-    QLabel, QPushButton, QSizePolicy, QStyle, QStyleOption, QStyleOptionButton,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QStyle,
+    QStyleOption,
+    QStyleOptionButton,
     QStylePainter,
 )
 

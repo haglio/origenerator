@@ -6,7 +6,10 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.drag_thumbnail import (
-    THUMBNAIL_BOX, fit_thumbnail, label_thumbnail, set_drag_thumbnail,
+    THUMBNAIL_BOX,
+    fit_thumbnail,
+    label_thumbnail,
+    set_drag_thumbnail,
 )
 from origenerator.gui.looping_preview import looping_movie
 

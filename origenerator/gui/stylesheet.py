@@ -3,9 +3,18 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 
 from shared_ui.colors import (
-    BG_PRIMARY, BG_SECONDARY, BG_TERTIARY, BG_BUTTON, BG_BUTTON_ACTIVE, BG_KEYCAP,
-    TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
-    BORDER_SUBTLE, BORDER_PANEL, BLUE,
+    BG_BUTTON,
+    BG_BUTTON_ACTIVE,
+    BG_KEYCAP,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BG_TERTIARY,
+    BLUE,
+    BORDER_PANEL,
+    BORDER_SUBTLE,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
 )
 
 

@@ -1,8 +1,7 @@
 """LinkTip — a tooltip you can click into."""
 
-from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QEnterEvent
-from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QApplication, QPushButton
 
 from origenerator.gui.link_tip import LinkTip, link

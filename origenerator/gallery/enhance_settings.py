@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detail_fixes_of
 
-
 # The standalone workflow one enhancement runs. Machinery rather than a
 # generation of its own: its defaults are where an unconfigured folder starts.
 ENHANCE_WORKFLOW = "image_enhance"

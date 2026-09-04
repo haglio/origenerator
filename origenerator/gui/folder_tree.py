@@ -22,9 +22,9 @@ reparented; what a collecting row does with the dropped folders is the view's
 business, not this widget's.
 """
 
-from PyQt6.QtWidgets import QTreeWidget, QAbstractItemView
+from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon
-from PyQt6.QtCore import Qt, QItemSelectionModel, QMimeData, QRect, QSize, pyqtSignal
+from PyQt6.QtWidgets import QAbstractItemView, QTreeWidget
 
 from origenerator.gui import icons
 

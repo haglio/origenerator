@@ -1,5 +1,4 @@
 import pytest
-from PyQt6.QtCore import Qt
 
 from origenerator.gui.find_bar import FindBar
 

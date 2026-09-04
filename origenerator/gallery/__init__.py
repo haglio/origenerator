@@ -28,7 +28,7 @@ This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
 """
 
-from origenerator.gallery.combine import combined_params, curated_params
+from origenerator.gallery.combine import combined_params, curated_params, stroke_shaped
 from origenerator.gallery.custom import (
     SELECTION_KEY,
     build_custom_folders,
@@ -253,6 +253,7 @@ __all__ = [
     "starred_folders",
     "starred_generations",
     "start_frame_index",
+    "stroke_shaped",
     "unreviewed_experiments",
     "videos_from_source_image",
     "workflow_output_type",

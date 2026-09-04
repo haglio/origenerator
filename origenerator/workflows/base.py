@@ -443,6 +443,42 @@ class WorkflowTemplate(ABC):
         return nodes, image_ref
 
     @staticmethod
+    def interpolation_nodes(node_id: str, frames_ref, params: dict):
+        """The RIFE pass that fills frames in between the rendered ones, the frame
+        ref the video writer should read, and the rate it should write at.
+
+        Returns ``({node_id: <RIFE VFI>}, [node_id, 0], rate)`` when
+        ``params["interpolation"]`` asks for more than one frame per rendered one,
+        and ``({}, frames_ref, params["frame_rate"])`` when it does not -- no
+        node, the writer reading straight from the decode, exactly the graph the
+        workflow had before the pass existed.
+
+        The rate rises by the same factor the frames do, which is the whole point:
+        the clip keeps the seconds it was sampled for and only gains frames inside
+        them. Raising the frames without the rate would slow the motion down by
+        the multiplier instead, and a clip that must return to its first frame at
+        exactly its own duration (see :attr:`looping`) would stop doing so.
+        """
+        multiplier = int(params.get("interpolation") or 1)
+        if multiplier <= 1:
+            return {}, frames_ref, params["frame_rate"]
+        node = {
+            node_id: {
+                "class_type": "RIFE VFI",
+                "inputs": {
+                    "frames": frames_ref,
+                    "ckpt_name": params["rife_model"],
+                    "clear_cache_after_n_frames": 10,
+                    "multiplier": multiplier,
+                    "fast_mode": True,
+                    "ensemble": True,
+                    "scale_factor": 1.0,
+                },
+            },
+        }
+        return node, [node_id, 0], params["frame_rate"] * multiplier
+
+    @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):
         """The HunyuanVideo-Foley subgraph that scores a video's frames, and the
         AUDIO ref the output node should mux.

@@ -8557,6 +8557,57 @@ def _combine_db(tmp_path):
     return db
 
 
+def _loop_recipe(db, prompt_id="loop"):
+    """A past looping clip for the Genau lane to mine, sampled the long way --
+    21 frames at 16fps, which is a stroke and a half and the whole problem."""
+    from origenerator.workflows import WORKFLOW_REGISTRY
+
+    wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name=wf.name, workflow_version=wf.version,
+        positive_prompt="alpha", seed=8,
+        params_json=json.dumps(dict(wf.default_params(), seed=8,
+                                    positive_prompt="alpha")),
+        workflow_json="{}")
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": "flf2v_loop_01.mp4", "subfolder": "video"}]))
+    return wf
+
+
+def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
+    """The lane used to choose only WHICH past clip was mined, and from there a
+    Genau clip was made exactly like any other video. It cannot be: what Genau
+    needs of a clip is a property of its LENGTH, and the clip being mined was
+    made before anyone knew that."""
+    db = _combine_db(tmp_path)
+    _loop_recipe(db)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "loop", intent=recipe_match.GENAU)
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["frame_count"] == 13        # 0.81s at 16fps: one stroke
+    assert job.params["interpolation"] > 1        # filled back in to scrub slowly
+
+
+def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
+    # A clip for a player is watched at its own rate and wants the recipe that
+    # made the one it was mined from.
+    db = _combine_db(tmp_path)
+    wf = _loop_recipe(db)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._generate_combination("img", "loop")
+
+    job = next(iter(view._reroll_jobs.values()))
+    assert job.params["frame_count"] == wf.default_params()["frame_count"]
+    assert job.params["interpolation"] == 1
+
+
 def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

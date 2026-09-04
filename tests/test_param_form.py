@@ -1,4 +1,5 @@
 import pytest
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 from shared_ui.check_box import CheckBox
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
@@ -6,6 +7,7 @@ from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from origenerator.gui import param_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef
@@ -777,7 +779,7 @@ def test_empty_sections_are_hidden(qtbot):
     qtbot.waitExposed(form)
     assert form._sections["Seed"].isHidden() is False       # has the one field
     assert form._sections["Prompts"].isHidden() is True     # no prompt → no header
-    assert form._sections["Frames"].isHidden() is True
+    assert form._sections["Video"].isHidden() is True
 
 
 def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
@@ -787,7 +789,7 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
     assert form._sections["Seed"].is_collapsed() is False
     assert form._sections["Model & LoRA"].is_collapsed() is True
     assert form._sections["Sampling"].is_collapsed() is True
-    assert form._sections["Frames"].is_collapsed() is True
+    assert form._sections["Video"].is_collapsed() is True
     assert form._sections["Audio"].is_collapsed() is True
 
 
@@ -931,3 +933,103 @@ def test_the_plumbing_params_get_no_row_at_all(qtbot):
     # …and they are still handed back, so a payload built from this form works.
     values = form.get_values_static()
     assert values["batch_size"] == 4 and values["filename_prefix"] == "image/x"
+
+
+def _rate_def(default=24.0):
+    return ParamDef("frame_rate", "Frame Rate", "float", default,
+                    min_val=1.0, max_val=120.0, step=1.0,
+                    options=[16, 24, 60], unit="fps")
+
+
+def test_a_numeric_param_with_presets_is_an_editable_dropdown_that_emits_the_number(qtbot):
+    form = ParamForm([_rate_def()])
+    qtbot.addWidget(form)
+    combo = form._widgets["frame_rate"]
+    assert isinstance(combo, PresetComboBox)
+    assert combo.currentText() == "24 fps"
+    assert form.get_values()["frame_rate"] == 24.0
+
+    changes = []
+    form.changed.connect(lambda: changes.append(1))
+    combo.setCurrentText("30")
+    assert form.get_values()["frame_rate"] == 30.0
+    assert changes
+
+    form.set_values({"frame_rate": 60})
+    assert combo.currentText() == "60 fps"
+    assert form.get_values_static()["frame_rate"] == 60.0
+
+
+def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edit_ends(qtbot):
+    form = ParamForm([_rate_def()])
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+    combo = form._widgets["frame_rate"]
+    combo.lineEdit().setFocus()
+    combo.setCurrentText("500")
+    assert form.get_values()["frame_rate"] == 120.0
+    qtbot.keyClick(combo.lineEdit(), Qt.Key.Key_Return)
+    assert combo.currentText() == "120 fps"
+
+
+def _video_defs(max_frames=161, rate=16.0):
+    return [
+        ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=max_frames,
+                 step=4, options=[1, 5, 10], unit="s", rate_key="frame_rate"),
+        ParamDef("frame_rate", "Frame Rate", "float", rate, min_val=1.0, max_val=120.0,
+                 step=1.0, options=[16, 24], unit="fps"),
+    ]
+
+
+def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_forms_frame_rate(qtbot):
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+    duration = form._widgets["frame_count"]
+    assert [duration.itemText(i) for i in range(duration.count())] == ["1 s", "5 s", "10 s"]
+    assert duration.currentText() == "5 s"                 # 81 frames at 16 fps
+    assert form.get_values()["frame_count"] == 81
+
+    duration.setCurrentText("10")
+    assert form.get_values()["frame_count"] == 161
+
+    form.set_values({"frame_count": 21, "frame_rate": 16.0})
+    assert duration.currentText() == "1.3 s"
+    assert form.get_values_static()["frame_count"] == 21
+
+
+def test_the_seconds_hold_when_the_frame_rate_changes_so_the_frames_follow(qtbot):
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+    assert form.get_values()["frame_count"] == 81
+    form._widgets["frame_rate"].setCurrentText("24")
+    assert form._widgets["frame_count"].currentText() == "5 s"
+    assert form.get_values()["frame_count"] == 121
+
+
+def test_a_loaded_frame_count_is_shown_at_the_rate_loaded_with_it(qtbot):
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+    form.set_values({"frame_count": 121, "frame_rate": 24.0})
+    assert form._widgets["frame_count"].currentText() == "5 s"
+    assert form.get_values_static()["frame_count"] == 121
+
+
+def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit_ends(qtbot):
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+    duration, rate = form._widgets["frame_count"], form._widgets["frame_rate"]
+
+    duration.lineEdit().setFocus()
+    duration.setCurrentText("30")
+    assert form.get_values()["frame_count"] == 161
+    qtbot.keyClick(duration.lineEdit(), Qt.Key.Key_Return)
+    assert duration.currentText() == "10 s"
+
+    rate.lineEdit().setFocus()
+    rate.setCurrentText("120")
+    qtbot.keyClick(rate.lineEdit(), Qt.Key.Key_Return)
+    assert duration.currentText() == "1.34 s"   # the 161 frames it still gets
+    assert form.get_values()["frame_count"] == 161

@@ -22,6 +22,11 @@ SCHEDULER_OPTIONS = [
     "ddim_uniform", "beta",
 ]
 
+# What a video form's Duration and Frame Rate dropdowns offer; both take a
+# typed value too.
+DURATION_OPTIONS = [1, 5, 10, 15, 30]
+FRAME_RATE_OPTIONS = [8, 12, 16, 24, 30, 48, 60, 120]
+
 # The native factor of the installed ESRGAN-family upscale models (both are 4x).
 # The enhance tail rescales the model's output DOWN from this to the requested
 # ``enhance_scale``, so the saved image lands at enhance_scale x the base render.
@@ -46,6 +51,8 @@ class ParamDef:
     label: str
     type: str  # "str", "int", "float", "seed", "combo", "image", "bool"
     default: Any
+    # A "combo" picks one of these; an "int"/"float" with them is an editable
+    # dropdown of common values that still takes any typed one.
     options: list | None = None
     min_val: float | None = None
     max_val: float | None = None
@@ -57,6 +64,13 @@ class ParamDef:
     # generated frames; a workflow whose sources live in a folder of the library
     # names that folder instead.
     browse_dir: Path | None = None
+    # Shown after a preset dropdown's numbers ("24 fps"); typing the bare
+    # number is accepted.
+    unit: str = ""
+    # For an "int" frame count: the frames-per-second param it is divided by to
+    # show and edit as seconds. ``options`` are then seconds; min/max/step stay
+    # frames.
+    rate_key: str | None = None
 
 
 class WorkflowTemplate(ABC):

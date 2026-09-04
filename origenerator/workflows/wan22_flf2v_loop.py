@@ -1,4 +1,9 @@
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import (
+    DURATION_OPTIONS,
+    FRAME_RATE_OPTIONS,
+    ParamDef,
+    WorkflowTemplate,
+)
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
@@ -80,7 +85,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("noise_seed", "Noise Seed (Stage 1)", "seed", 0),
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
-            ParamDef("frame_count", "Frames", "int", 21, min_val=5, max_val=81, step=4),
+            ParamDef("frame_count", "Duration", "int", 21, min_val=5, max_val=81, step=4,
+                     options=DURATION_OPTIONS, unit="s", rate_key="frame_rate"),
             ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 5.0, min_val=0.0, max_val=20.0, step=0.5),
@@ -91,7 +97,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=60.0, step=1.0),
+            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=120.0, step=1.0,
+                     options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
     def build_api_payload(self, params: dict) -> dict:

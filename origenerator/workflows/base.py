@@ -28,7 +28,7 @@ SCHEDULER_OPTIONS = [
 # because those are the rates the frame interpolator can produce the frames for
 # — see :mod:`origenerator.workflows.frame_rate`.
 DURATION_OPTIONS = [1, 5, 10, 15, 30]
-FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112, 128]
+FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
 # The interpolation model that fills in the frames between the generated ones
 # (see :meth:`WorkflowTemplate.interpolation_nodes`). RIFE 4.7 is the pack's own

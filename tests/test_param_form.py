@@ -979,9 +979,37 @@ def _video_defs(max_frames=161):
         # which is a fact about the model, not about the field beside it.
         ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=max_frames,
                  step=4, options=[1, 5, 10], unit="s", rate=16.0),
-        ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0, max_val=128.0,
+        ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0, max_val=112.0,
                  step=16.0, options=[16, 32, 48], unit="fps"),
     ]
+
+
+def _preset_states(combo) -> dict:
+    model = combo.model()
+    return {combo.itemText(i): model.item(i).isEnabled() for i in range(combo.count())}
+
+
+def test_a_duration_this_model_cannot_render_is_offered_greyed_out(qtbot):
+    # The same lengths are offered on every video form, and the models stop at
+    # different places. Picking one past the end doesn't fail, it quietly
+    # becomes the longest clip the model does render — so the list says which
+    # ones those are, and how far this one actually goes.
+    form = ParamForm(_video_defs(max_frames=81))
+    qtbot.addWidget(form)
+    duration = form._widgets["frame_count"]
+
+    assert _preset_states(duration) == {"1 s": True, "5 s": True, "10 s": False}
+    assert "5 s" in duration.model().item(2).toolTip()
+
+
+def test_the_presets_a_model_can_reach_are_all_left_alone(qtbot):
+    # 161 frames is 10.06 s, so every offered length is real here — and every
+    # frame rate is, since none is past what the video writer accepts.
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+
+    assert all(_preset_states(form._widgets["frame_count"]).values())
+    assert all(_preset_states(form._widgets["frame_rate"]).values())
 
 
 def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtbot):

@@ -13,7 +13,11 @@ from origenerator.workflows.derived_size import (
     override_size,
     resolve_input_image_path,
 )
-from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
+from origenerator.workflows.frame_rate import (
+    MAX_PLAYBACK_FPS,
+    NATIVE_FPS,
+    playback_rate,
+)
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 from origenerator.workflows.stroke_aim import detect_grip_aim
@@ -145,7 +149,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", NATIVE_FPS,
-                     min_val=NATIVE_FPS, max_val=128.0, step=NATIVE_FPS,
+                     min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 

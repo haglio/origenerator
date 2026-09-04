@@ -5,7 +5,11 @@ import pytest
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import RIFE_CHECKPOINT, ParamDef
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
-from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
+from origenerator.workflows.frame_rate import (
+    MAX_PLAYBACK_FPS,
+    NATIVE_FPS,
+    playback_rate,
+)
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
@@ -2094,12 +2098,14 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     assert frames.unit == "s"
     assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
     # Every rate offered is a whole multiple of the native one, because those are
-    # the only rates the interpolator can actually produce the frames for.
-    assert rate.options == [16, 32, 48, 64, 80, 96, 112, 128]
+    # the only rates the interpolator can actually produce the frames for — and
+    # none is past what the video writer accepts, which is what a rate that
+    # can't be submitted looks like from the form.
+    assert rate.options == [16, 32, 48, 64, 80, 96, 112]
     assert all(playback_rate(r) == r for r in rate.options)
     assert rate.unit == "fps"
     assert (rate.min_val, rate.step) == (NATIVE_FPS, NATIVE_FPS)
-    assert rate.max_val >= max(rate.options)
+    assert rate.max_val == MAX_PLAYBACK_FPS == max(rate.options)
 
 
 # ---- the frames between the frames ----
@@ -2183,12 +2189,26 @@ def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_no_payload_asks_the_writer_for_a_rate_it_would_refuse(name):
+    # CreateVideo validates fps <= 120 and rejects the whole graph above it, so
+    # a stored recipe carrying a rate from before this ceiling — or a number
+    # typed past the field's own range — still has to submit. It lands on the
+    # ceiling instead of on a Generate button that does nothing.
+    wf = WORKFLOW_REGISTRY[name]
+    for asked in (128.0, 240.0, 10_000.0):
+        payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=asked))
+        writer, rate_input = _video_writer(payload)
+        assert writer["inputs"][rate_input] == MAX_PLAYBACK_FPS
+        assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 7
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_the_soundtrack_stays_the_clips_real_length_at_every_rate(name):
     # Foley scores the DECODED frames — the motion the model actually authored,
     # at the rate it authored them in — so the track is the clip's real seconds
     # and lands on the same beats however many frames the file ends up holding.
     wf = WORKFLOW_REGISTRY[name]
-    params = dict(wf.default_params(), frame_count=81, frame_rate=128.0)
+    params = dict(wf.default_params(), frame_count=81, frame_rate=MAX_PLAYBACK_FPS)
     payload = wf.build_api_payload(params)
 
     sampler = _find_node(payload, "HunyuanFoleySampler")["inputs"]
@@ -2237,12 +2257,12 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
 
 def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
     # The stroke was authored over the clip's seconds, and those don't move when
-    # the rate does — so one generation drives the device identically at 16 fps
-    # and at 128, matching a video whose motion is likewise unchanged.
+    # the rate does — so one generation drives the device identically at the
+    # slowest rate and the fastest, matching a video whose motion is unchanged.
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     base = dict(wf.default_params(), frame_count=81, seed=42)
     slow = wf.authored_actions(dict(base, frame_rate=NATIVE_FPS))
-    fast = wf.authored_actions(dict(base, frame_rate=128.0))
+    fast = wf.authored_actions(dict(base, frame_rate=MAX_PLAYBACK_FPS))
 
     assert slow == fast
     assert slow[-1]["at"] <= round(81 / NATIVE_FPS * 1000)

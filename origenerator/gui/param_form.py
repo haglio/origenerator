@@ -671,6 +671,7 @@ class ParamForm(QWidget):
             return w
         if pd.type in ("int", "float") and pd.options:
             w = PresetComboBox(pd.options, unit=pd.unit)
+            self._grey_out_of_reach(pd, w)
             if not pd.rate:
                 w.set_value(pd.default)
             return w
@@ -790,6 +791,48 @@ class ParamForm(QWidget):
             w.setValue(float(value))
         elif pd.type == "combo":
             _select_combo_value(w, str(value))
+
+    @classmethod
+    def _grey_out_of_reach(cls, pd: ParamDef, w: PresetComboBox) -> None:
+        """Disable the presets this workflow can't actually produce.
+
+        The Duration dropdown offers the same lengths to every video workflow,
+        and every video model stops well short of the longest of them — 15 s and
+        30 s are out of reach everywhere, and 10 s on the two workflows that
+        render fewer frames. Picked, such a preset just becomes the longest clip
+        the model does render, so the number chosen isn't the number given; the
+        list says which those are instead of quietly substituting.
+
+        Out of reach means the value doesn't survive the round trip the field
+        itself makes — offered, stored, and read back, it comes out as something
+        else. That covers a rate past the writer's ceiling on the same rule.
+        """
+        out_of_reach = [v for v in pd.options if not cls._round_trips(pd, v)]
+        if not out_of_reach:
+            return
+        # Any out-of-reach value stands in for "past the end": stored, it lands
+        # on the largest the workflow does take, which is the number to name.
+        ceiling = cls._shown(pd, cls._stored(pd, max(out_of_reach)))
+        w.set_unavailable(
+            out_of_reach,
+            f"More than this workflow makes — {ceiling:g} {pd.unit}".strip(),
+        )
+
+    @classmethod
+    def _round_trips(cls, pd: ParamDef, shown) -> bool:
+        return cls._shown(pd, cls._stored(pd, shown)) == shown
+
+    @classmethod
+    def _stored(cls, pd: ParamDef, shown):
+        """The param value a number shown in ``pd``'s field stands for."""
+        return (frames_for_seconds(shown, pd.rate, pd) if pd.rate
+                else cls._clamped_number(pd, shown))
+
+    @classmethod
+    def _shown(cls, pd: ParamDef, stored):
+        """The number ``pd``'s field shows for a param value."""
+        return (seconds_for_frames(stored, pd.rate, pd) if pd.rate
+                else cls._clamped_number(pd, stored))
 
     @staticmethod
     def _clamped_number(pd: ParamDef, value):

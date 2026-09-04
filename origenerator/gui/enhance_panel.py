@@ -223,7 +223,7 @@ class EnhancePanel(QWidget):
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
         for label, widget in (("Scale", self._scale), ("Steps", self._steps),
-                              ("Denoise", self._denoise)):
+                              ("Redraw Amount", self._denoise)):
             numbers.addWidget(self._labeled(label, widget))
             numbers.addWidget(widget, 1)
         form.addRow(numbers)

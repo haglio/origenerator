@@ -2266,3 +2266,17 @@ def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
 
     assert slow == fast
     assert slow[-1]["at"] <= round(81 / NATIVE_FPS * 1000)
+
+
+# ---- what the form calls a setting ----
+
+# The graph's names for these stay in the tooltips; the label says what the
+# setting does to the picture.
+_GRAPH_JARGON = ("CFG", "Denoise", "Stage", "Guidance", "Input Image")
+
+
+@pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
+def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
+    labels = [pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()]
+    jargon = [label for label in labels if any(word in label for word in _GRAPH_JARGON)]
+    assert jargon == []

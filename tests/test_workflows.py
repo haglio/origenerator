@@ -2093,3 +2093,17 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_common_frame_rates(na
     assert rate.options == [8, 12, 16, 24, 30, 48, 60, 120]
     assert rate.unit == "fps"
     assert rate.max_val >= max(rate.options)
+
+
+# ---- what the form calls a setting ----
+
+# The graph's names for these stay in the tooltips; the label says what the
+# setting does to the picture.
+_GRAPH_JARGON = ("CFG", "Denoise", "Stage", "Guidance", "Input Image")
+
+
+@pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
+def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
+    labels = [pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()]
+    jargon = [label for label in labels if any(word in label for word in _GRAPH_JARGON)]
+    assert jargon == []

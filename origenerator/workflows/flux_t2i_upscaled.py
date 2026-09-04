@@ -73,13 +73,13 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             ParamDef("width", "Width", "int", 720, min_val=64, max_val=4096, step=16),
             ParamDef("height", "Height", "int", 1280, min_val=64, max_val=4096, step=16),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("guidance", "Guidance (Flux)", "float", 4.5,
+            ParamDef("guidance", "Prompt Strength", "float", 4.5,
                      min_val=0.0, max_val=20.0, step=0.1),
             ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
             ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
                      min_val=1.0, max_val=4.0, step=0.25),
             ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Denoise", "float", 0.15,
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

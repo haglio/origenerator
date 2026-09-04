@@ -228,7 +228,7 @@ class ParamForm(QWidget):
         as well as its input: the label is what you are looking at when you
         wonder what a setting is, and hovering the word is the natural move.
 
-        The label elides. A phrase like "CFG (High) (0 = CFG Scale)" asks for three
+        The label elides. A phrase like "Enhance Redraw Amount" asks for three
         hundred pixels on one line, and a plain label hands that on as a floor under
         the whole form — which is how a narrow pane ended up scrolling sideways
         instead of squeezing its fields. Its whole text stays in the tooltip."""

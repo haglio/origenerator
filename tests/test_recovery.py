@@ -1,5 +1,4 @@
-"""The recovery bin — how long a delete is held, what the shelf sees, and what
-the launch sweep takes."""
+"""The recovery bin — what the shelf sees, and what the launch reclaims."""
 
 import json
 from datetime import datetime, timedelta
@@ -30,46 +29,11 @@ def _file(path, data=b"x"):
     return path
 
 
-# --- how long an item has -------------------------------------------------
-
-
-def test_a_fresh_delete_has_the_whole_window():
-    assert recovery.days_left(_record(), _NOW) == recovery.RETENTION_DAYS
-
-
-def test_the_window_counts_down_by_the_day():
-    aged = _record(deleted_at=_NOW - timedelta(days=57))
-    assert recovery.days_left(aged, _NOW) == recovery.RETENTION_DAYS - 57
-
-
-def test_hours_left_still_read_as_a_day_rather_than_none():
-    # Rounded up, so an item that is still recoverable never says it is gone.
-    nearly = _record(deleted_at=_NOW - timedelta(days=recovery.RETENTION_DAYS,
-                                                 hours=-3))
-    assert recovery.days_left(nearly, _NOW) == 1
-    assert recovery.is_expired(nearly, _NOW) is False
-
-
-def test_an_item_past_its_window_is_expired():
-    old = _record(deleted_at=_NOW - timedelta(days=recovery.RETENTION_DAYS, hours=1))
-    assert recovery.days_left(old, _NOW) == 0
-    assert recovery.is_expired(old, _NOW) is True
-
-
-def test_an_undateable_record_is_never_aged_out():
-    # A clock that can't be read must not be what destroys files: the record
-    # stays listed, and the user can end it by hand.
-    broken = _record(deleted_at="not a date")
-    assert recovery.is_expired(broken, _NOW) is False
-    assert recovery.days_left(broken, _NOW) == recovery.RETENTION_DAYS
-
-
 # --- how long it has been sitting there ------------------------------------
 
 
 def test_a_fresh_delete_has_been_in_the_trash_no_days_at_all():
-    # Rounded down, the opposite way from days_left: "I binned this an hour ago"
-    # is not a day in the trash.
+    # Rounded down: "I binned this an hour ago" is not a day in the trash.
     assert recovery.days_held(_record(deleted_at=_NOW - timedelta(hours=5)), _NOW) == 0
 
 
@@ -85,15 +49,15 @@ def test_an_undateable_record_reads_as_freshly_deleted():
 # --- what the shelf draws --------------------------------------------------
 
 
-def test_a_bin_item_is_the_deleted_row_plus_how_long_it_has():
+def test_a_bin_item_is_the_deleted_row_plus_when_it_was_deleted():
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i", "starred": 1,
            "output_files": json.dumps([{"filename": "a.png", "subfolder": ""}])}
     (item,) = recovery.bin_items([_record(row=row)], _NOW)
 
     assert item["workflow_name"] == "sdxl_t2i"   # still the row it always was
     assert item["starred"] == 1
-    assert item["days_left"] == recovery.RETENTION_DAYS
     assert item["deleted_at"]
+    assert "days_left" not in item   # nothing counts down; it stays until told
 
 
 def test_a_bin_items_thumbnail_points_at_where_the_file_actually_is():
@@ -185,26 +149,10 @@ def test_purge_takes_the_held_files_and_forgets_the_record(tmp_path):
     assert db.get_deletion("p1") is None
 
 
-# --- the launch sweep ------------------------------------------------------
+# --- what the launch reclaims ----------------------------------------------
 
 
-def test_sweep_ends_the_expired_and_leaves_the_rest(tmp_path):
-    db = Database(tmp_path / "test.db")
-    trash = Trash(tmp_path / "trash")
-    fresh = trash.store([_file(tmp_path / "out" / "fresh.png")])
-    stale = trash.store([_file(tmp_path / "out" / "stale.png")])
-    db.record_deletion("fresh", {"prompt_id": "fresh"}, fresh.record())
-    db.record_deletion("stale", {"prompt_id": "stale"}, stale.record())
-    _age(db, "stale", recovery.RETENTION_DAYS + 1)
-
-    assert recovery.sweep(db, trash) == 1
-
-    assert [r["prompt_id"] for r in db.list_deletions()] == ["fresh"]
-    assert fresh.subdir.exists()
-    assert not stale.subdir.exists()
-
-
-def test_sweep_reclaims_a_batch_no_record_names(tmp_path):
+def test_the_launch_reclaims_a_batch_no_record_names(tmp_path):
     # A rejected experiment's batch that fell off the undo stack, or one left by
     # a crash between the move and the record: nothing can reach it, and nothing
     # else would ever clear it.
@@ -214,20 +162,35 @@ def test_sweep_reclaims_a_batch_no_record_names(tmp_path):
     orphan = trash.store([_file(tmp_path / "out" / "orphan.png")])
     db.record_deletion("held", {"prompt_id": "held"}, held.record())
 
-    recovery.sweep(db, trash)
+    assert recovery.reclaim_orphans(db, trash) == 1
 
     assert held.subdir.exists()
     assert not orphan.subdir.exists()
 
 
-def test_sweep_of_an_empty_bin_is_a_harmless_noop(tmp_path):
+def test_the_launch_never_takes_a_held_deletion_however_old(tmp_path):
+    # The whole point of holding forever: age is not a reason to destroy
+    # anything. An item binned two years ago is as recoverable as one binned a
+    # minute ago, and only the user ends it.
     db = Database(tmp_path / "test.db")
-    assert recovery.sweep(db, Trash(tmp_path / "trash")) == 0
+    trash = Trash(tmp_path / "trash")
+    ancient = trash.store([_file(tmp_path / "out" / "ancient.png")])
+    db.record_deletion("ancient", {"prompt_id": "ancient"}, ancient.record())
+    _age(db, "ancient", 730)
+
+    assert recovery.reclaim_orphans(db, trash) == 0
+
+    assert [r["prompt_id"] for r in db.list_deletions()] == ["ancient"]
+    assert ancient.subdir.exists()
+
+
+def test_reclaiming_with_an_empty_bin_is_a_harmless_noop(tmp_path):
+    db = Database(tmp_path / "test.db")
+    assert recovery.reclaim_orphans(db, Trash(tmp_path / "trash")) == 0
 
 
 def _age(db: Database, prompt_id: str, days: int):
-    """Back-date a held deletion, so the retention window can be tested without
-    a fixture that has to sit around for two months."""
+    """Back-date a held deletion, without a fixture that has to sit around."""
     stamp = (recovery._now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with SqliteFile(db.path).connect() as conn:
         conn.execute("UPDATE deletions SET deleted_at = ? WHERE prompt_id = ?",

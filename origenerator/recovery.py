@@ -1,31 +1,31 @@
-"""The recovery bin — deleted generations held long enough to change your mind.
+"""The recovery bin — deleted generations held until you say otherwise.
 
 Deleting a generation moves its files into the trash and drops its row (see
 :class:`~origenerator.gallery_actions.GalleryActions`), which the session's undo
 stack can reverse. That hold used to end at the next launch, when the whole trash
-was cleared; here it lasts :data:`RETENTION_DAYS`, because the delete also
+was cleared; here it does not end on its own at all, because the delete also
 records the row it dropped and the batch its files went into. The gallery's Trash
-shelf lists those records, puts one back, or ends one early, and :func:`sweep`
-clears whatever has outlived the window at the next launch.
+shelf lists those records, puts one back, or ends one for good — and ending one
+by hand is the only thing that ends one. :func:`reclaim_orphans` is all that is
+left for launch to do: clear the batch folders no record names, and leave
+everything the bin holds exactly where it is.
 
 A record is the whole story of one delete — ``{"prompt_id", "row", "batch",
 "deleted_at"}``, as :meth:`origenerator.db.Database.list_deletions` returns it —
 so nothing about a deleted item has to be reconstructed from the disk. This
 module is pure data over the database and the trash, with no Qt dependency, so
-the retention arithmetic can be unit-tested directly.
+what the shelf shows can be unit-tested directly.
 """
 
 from __future__ import annotations
 
 import json
-import math
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.gallery.output import parse_file_list
 from origenerator.trash import TrashedBatch
 
-RETENTION_DAYS = 60
 _SECONDS_PER_DAY = 86400
 
 
@@ -43,30 +43,13 @@ def _deleted_at(record: dict) -> datetime | None:
         return None
 
 
-def days_left(record: dict, now: datetime | None = None,
-              retention_days: int = RETENTION_DAYS) -> int:
-    """Whole days ``record`` has before the sweep takes it, rounded up.
-
-    Rounded up so an item with hours to go still reads as having a day rather
-    than as already gone. A record whose stamp won't parse is reported as newly
-    deleted, which means it never ages out: the failure of a clock must not be
-    what destroys files, and a record stuck in the bin is at least visible and
-    removable by hand.
-    """
-    when = _deleted_at(record)
-    if when is None:
-        return retention_days
-    remaining = (when + timedelta(days=retention_days)) - (now or _now())
-    return max(0, math.ceil(remaining.total_seconds() / _SECONDS_PER_DAY))
-
-
 def days_held(record: dict, now: datetime | None = None) -> int:
     """Whole days ``record`` has been sitting in the trash, rounded down.
 
-    The other half of :func:`days_left`, and rounded the other way for the same
-    reason: this one is read as "how long ago did I bin this", where an item
-    deleted an hour ago has been there no days rather than a whole one. A record
-    whose stamp won't parse reads as freshly deleted.
+    Read as "how long ago did I bin this", which is why it rounds down: an item
+    deleted an hour ago has been there no days rather than a whole one. It is a
+    fact about the item, not a countdown — nothing acts on it, and a record
+    whose stamp won't parse simply reads as freshly deleted.
     """
     when = _deleted_at(record)
     if when is None:
@@ -75,21 +58,13 @@ def days_held(record: dict, now: datetime | None = None) -> int:
     return max(0, int(elapsed // _SECONDS_PER_DAY))
 
 
-def is_expired(record: dict, now: datetime | None = None,
-               retention_days: int = RETENTION_DAYS) -> bool:
-    """True once ``record`` has outlived its window and is due to be purged."""
-    return days_left(record, now, retention_days) <= 0
-
-
-def bin_items(records, now: datetime | None = None,
-              retention_days: int = RETENTION_DAYS) -> list[dict]:
+def bin_items(records, now: datetime | None = None) -> list[dict]:
     """The held deletions as gallery rows the Trash shelf can draw, newest first.
 
     Each is the row exactly as it was deleted — so its media type, its star and
     its caption read the way they did in the gallery — with its files re-pointed
-    at where they actually sit now, inside the trash, and two facts about the
-    deletion itself: ``days_left`` before the item is taken, and
-    ``days_in_trash`` since it was binned.
+    at where they actually sit now, inside the trash, and ``days_in_trash`` for
+    how long it has been there.
 
     Re-pointing the *output* files, not only the thumbnail, is what makes a
     deleted item as watchable as any other. A bin row is fed to the same preview,
@@ -101,10 +76,10 @@ def bin_items(records, now: datetime | None = None,
     no video to play, nothing to open full size.
     """
     now = now or _now()
-    return [_bin_item(record, now, retention_days) for record in records]
+    return [_bin_item(record, now) for record in records]
 
 
-def _bin_item(record: dict, now: datetime, retention_days: int) -> dict:
+def _bin_item(record: dict, now: datetime) -> dict:
     row = dict(record.get("row") or {})
     row["prompt_id"] = record["prompt_id"]
     thumbnail = row.get("thumbnail_path")
@@ -112,7 +87,6 @@ def _bin_item(record: dict, now: datetime, retention_days: int) -> dict:
         row["thumbnail_path"] = _trashed_path(record, thumbnail)
     row["output_files"] = _trashed_output_files(record, row)
     row["deleted_at"] = record.get("deleted_at")
-    row["days_left"] = days_left(record, now, retention_days)
     row["days_in_trash"] = days_held(record, now)
     return row
 
@@ -164,24 +138,17 @@ def purge(db, record: dict) -> None:
     db.forget_deletion(record["prompt_id"])
 
 
-def sweep(db, trash, *, now: datetime | None = None,
-          retention_days: int = RETENTION_DAYS) -> int:
-    """Clear what the bin no longer holds, and say how many deletions went.
+def reclaim_orphans(db, trash) -> int:
+    """Clear the trash folders nothing can reach, and say how many went.
 
-    Two jobs, both belonging to launch. Every record past its window is purged,
-    files and all — this is the "60 days, then it's really gone" half of the
-    promise. Then the batch folders of the records that *survived* are handed to
-    the trash, which deletes every folder none of them names: what a launch used
-    to clear wholesale, now narrowed to only what nothing can reach.
+    Launch's one piece of housekeeping, and it never takes anything the bin is
+    holding: every held record's batch folder is named as one to spare, so what
+    is removed is only what no record points at — a rejected experiment's batch
+    that fell off the undo stack, a batch from before the bin existed, or a
+    folder left behind by a crash between the move and the record. Nothing here
+    reads a clock. A held deletion stays until the user restores it or ends it
+    from the Trash shelf, however long that takes.
     """
-    now = now or _now()
-    records = db.list_deletions()
-    expired = [record for record in records if is_expired(record, now, retention_days)]
-    for record in expired:
-        purge(db, record)
-    doomed = {record["prompt_id"] for record in expired}
-    trash.purge_orphans([
-        (record.get("batch") or {}).get("subdir")
-        for record in records if record["prompt_id"] not in doomed
+    return trash.purge_orphans([
+        (record.get("batch") or {}).get("subdir") for record in db.list_deletions()
     ])
-    return len(expired)

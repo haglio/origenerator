@@ -2900,8 +2900,7 @@ class GalleryView(QWidget):
         if base == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()  # what the switch's position means
         self._title.set_display(self._shelf_title(base, orientation))
-        self._avg_label.setText(self._browser.trash_note(orientation)
-                                if base == _TRASH_KEY else "")
+        self._avg_label.setText("")   # no shelf has an average to state
         self._clear_metadata()
         self._browser.show_shelf(base, orientation)
         if base == _REQUESTS_KEY:
@@ -6825,7 +6824,7 @@ class GalleryView(QWidget):
             self._go_to_generation(restored)
 
     def purge_from_trash(self, prompt_ids):
-        """End deleted items now instead of waiting out their window. Confirmed
+        """End deleted items for good — nothing else ever will. Confirmed
         first, and pointedly: this is the one action in the gallery with no undo
         and no second copy behind it."""
         if not prompt_ids:

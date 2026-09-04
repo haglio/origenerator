@@ -59,7 +59,6 @@ from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.recovery import RETENTION_DAYS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
@@ -1092,7 +1091,7 @@ class BrowserPane(QObject):
             ("restore", icons.recovery_action_icon("restore"),
              "Restore — put it and its files back where they were"),
             ("purge", icons.recovery_action_icon("purge"),
-             "Delete permanently — end it now, without waiting out its window"),
+             "Delete permanently — remove it and its files for good"),
         ]
         rows = filter_rows(self._trash_rows, self._shelf_orientation)
         for row in rows:
@@ -1117,10 +1116,10 @@ class BrowserPane(QObject):
         controls — star, enhance, delete all want a row in the gallery — and no
         drag to a combine slot, whose graphs read files out of ComfyUI's output
         folder, not ours. In their place the corners and the menu offer the two
-        actions that do apply: restore, or end it now.
+        actions that do apply: restore, or end it for good.
         """
         tile = ThumbnailWidget(
-            row["prompt_id"], row.get("thumbnail_path"), self._trash_caption(row),
+            row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             starred=bool(row.get("starred")),
@@ -1146,26 +1145,6 @@ class BrowserPane(QObject):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self.trash_menu_requested.emit(global_pos)
 
-    @staticmethod
-    def _trash_caption(row) -> str:
-        """A deleted tile's caption: what the item was, then how long it has left.
-
-        The remaining time is the one fact a gallery caption can't carry and this
-        shelf can't do without — an item is only recoverable until it isn't.
-        """
-        days = row.get("days_left")
-        return f"{BrowserPane._thumbnail_caption(row)} · {days}d left" if days \
-            else f"{BrowserPane._thumbnail_caption(row)} · expiring"
-
-    def trash_note(self, orientation: str | None) -> str:
-        """The line under the Trash header stating the retention promise — shown
-        only with something on that side's shelf, since the empty state already
-        says it."""
-        if not filter_rows(self._trash_rows, orientation):
-            return ""
-        return (f"Deleted items are held here for {RETENTION_DAYS} days, then "
-                "removed for good.")
-
     def _trash_empty_hint(self) -> str:
         if is_branch_session():
             return ("Nothing deleted in this preview.\n\nDelete something and it "
@@ -1173,9 +1152,9 @@ class BrowserPane(QObject):
                     "What the live app is holding stays out of reach: those files "
                     "sit in its trash, and a preview reaching in would move them "
                     "out from under the rows it is still showing.")
-        return (f"Nothing deleted.\n\nItems you delete wait here for "
-                f"{RETENTION_DAYS} days — restore one, or end it early — before "
-                "they're removed for good.")
+        return ("Nothing deleted.\n\nItems you delete wait here for as long as "
+                "you leave them — nothing here is removed on its own. Restore one, "
+                "or delete it permanently when you're sure.")
 
     def showing_trash(self) -> bool:
         base, _orientation = split_key(self._tree.selected_folder_key())

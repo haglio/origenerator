@@ -289,9 +289,9 @@ def test_main_reconciles_in_flight_before_importing(qapp):
     assert calls[:2] == ["reconcile", "import"]
 
 
-def test_main_ages_out_the_recovery_bin_on_startup(qapp):
-    """Deletions past their window are ended, and the trash they no longer hold
-    is reclaimed, before the window opens."""
+def test_main_reclaims_unreachable_trash_on_startup(qapp):
+    """The trash folders no held deletion names are reclaimed before the window
+    opens. Nothing the bin holds is touched, however old it is."""
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.gui.loading_screen.LoadingScreen"), \
@@ -300,7 +300,7 @@ def test_main_ages_out_the_recovery_bin_on_startup(qapp):
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
          patch("origenerator.trash.Trash", return_value=trash), \
-         patch("origenerator.recovery.sweep", return_value=0) as sweep, \
+         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
@@ -309,8 +309,8 @@ def test_main_ages_out_the_recovery_bin_on_startup(qapp):
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
-    sweep.assert_called_once()
-    assert sweep.call_args.args[1] is trash
+    reclaim.assert_called_once()
+    assert reclaim.call_args.args[1] is trash
 
 
 def test_main_connects_the_client_under_the_persisted_id(qapp):
@@ -531,7 +531,7 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
 
 def _held_deletion(library_path, prompt_id, *, days_ago):
-    """A deletion held ``days_ago`` days — old enough to be swept, or not."""
+    """A deletion the bin has been holding for ``days_ago`` days."""
     import sqlite3
     from contextlib import closing
     from datetime import datetime, timedelta
@@ -549,28 +549,51 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
         conn.commit()
 
 
-def test_the_launch_ends_a_deletion_that_has_outlived_its_window(qapp, library):
-    _held_deletion(library, "p1", days_ago=61)
+def test_the_launch_keeps_a_deletion_however_long_it_has_been_held(qapp, library):
+    # Nothing ages out. The bin holds what it holds until the user restores it
+    # or ends it from the Trash shelf, and two years is no different from two
+    # minutes.
+    _held_deletion(library, "p1", days_ago=730)
 
     db = _boot(library)
 
-    assert db.list_deletions() == []  # the "60 days, then it's really gone" half
+    assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
 
 
-def test_a_branch_preview_sweeps_nothing_out_of_the_recovery_bin(
+def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
+    # The one thing launch still clears: a batch nothing can reach, left behind
+    # by a crash between the move and the record. Without it the trash only ever
+    # grows.
+    from origenerator import config
+
+    orphan = config.STATE_DIR / "trash" / "0123456789abcdef"
+    orphan.mkdir(parents=True)
+    (orphan / "0_gone.png").write_bytes(b"x")
+
+    _boot(library)
+
+    assert not orphan.exists()
+
+
+def test_a_branch_preview_reclaims_nothing_out_of_the_trash(
         qapp, library, monkeypatch):
-    # A preview's database is a copy, so every deletion it inherits points at the
-    # LIVE install's held files: purging one from here takes the only copy of
-    # something the running app is still showing. Letting the sweep run anyway
-    # left the boot tests green.
+    # A preview's database is a copy, so the deletions it inherits name the LIVE
+    # install's held folders: what looks unreachable from here is only
+    # unreachable to a copy, and the batches a preview filled before it stopped
+    # taking files hold the only copies of what they took. Letting the reclaim
+    # run anyway left the boot tests green.
+    from origenerator import config
     from origenerator.branch_session import ENV_FLAG
 
     _held_deletion(library, "p1", days_ago=61)
+    orphan = config.STATE_DIR / "trash" / "0123456789abcdef"
+    orphan.mkdir(parents=True)
     monkeypatch.setenv(ENV_FLAG, "1")
 
     db = _boot(library)
 
     assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
+    assert orphan.exists()
 
 
 def test_a_branch_preview_starts_from_the_live_installs_library(
@@ -636,7 +659,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
-        "origenerator.recovery.sweep": 0,
+        "origenerator.recovery.reclaim_orphans": 0,
         "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
         "PyQt6.QtWidgets.QApplication.exec": 0,
     }
@@ -701,17 +724,17 @@ def test_a_branch_session_maintains_only_what_is_not_library_maintenance(qapp):
     assert ran == ["relocate_moved_outputs", "fold_completed_enhancements"]
 
 
-def test_a_branch_session_sweeps_no_deletions(qapp):
-    """The seeded deletions point at the *live* install's held files, so both
-    purging and restoring them from a preview would reach into the library the
+def test_a_branch_session_reclaims_no_trash(qapp):
+    """The seeded deletions name the *live* install's held folders, so reclaiming
+    by what this copy happens to know about would reach into the library the
     live app is still showing."""
     with _a_faked_boot([]) as _, \
-         patch("origenerator.recovery.sweep", return_value=0) as sweep, \
+         patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.branch_session.is_branch_session", return_value=True), \
          patch("origenerator.branch_session.seed_branch_db", return_value=True):
         assert main([]) == 0
 
-    sweep.assert_not_called()
+    reclaim.assert_not_called()
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():

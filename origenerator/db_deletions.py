@@ -6,9 +6,9 @@ business with `generations` or the custom folders.
 
 A deleted generation's whole row travels here, plus where in the trash its files
 went, so the Trash shelf can list it, put both back, or end it for good. The
-record goes away when the item is restored, purged, or ages out of the retention
-window; the generations row itself is gone the moment it is deleted, which is why
-the row travels here rather than staying behind a flag.
+record goes away when the item is restored or purged, and not otherwise —
+nothing here ages out; the generations row itself is gone the moment it is
+deleted, which is why the row travels here rather than staying behind a flag.
 """
 import json
 
@@ -22,8 +22,8 @@ class DeletionStore(Store):
         """Hold a just-deleted ``row`` and its trash ``batch`` for recovery.
 
         Replaces any earlier record for the same generation, so an item deleted,
-        restored, and deleted again is held from the *latest* delete rather than
-        expiring on the first one's clock.
+        restored, and deleted again reads as binned on the date of the *latest*
+        delete rather than the first one's.
         """
         with self._connect() as conn:
             conn.execute(
@@ -56,7 +56,7 @@ class DeletionStore(Store):
             return _deletion(record) if record else None
 
     def forget_deletion(self, prompt_id: str):
-        """Drop a held deletion — the item was restored, purged, or expired."""
+        """Drop a held deletion — the item was restored or purged."""
         with self._connect() as conn:
             conn.execute("DELETE FROM deletions WHERE prompt_id = ?", (prompt_id,))
 

@@ -143,8 +143,8 @@ CREATE TABLE IF NOT EXISTS requests (
 -- A deleted generation the recovery bin is still holding: the whole row the
 -- delete dropped, and where in the trash its files went, so the Trash shelf can
 -- list it, put both back, or end it for good (see origenerator.recovery). The
--- record goes away when the item is restored, purged, or ages out of the
--- retention window; the generations row itself is gone the moment it is deleted,
+-- record goes away when the item is restored or purged, and not otherwise --
+-- nothing ages out; the generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying behind a flag.
 -- What a branch session had bookmarked when the live app last adopted from it:
 -- the items that worktree's database starred, and its folder bookmarks. Only

@@ -486,24 +486,26 @@ def _open_database(db_path: Path, *, branch_session: bool, logger):
     return Database(db_path)
 
 
-def _sweep_the_recovery_bin(db, state_dir: Path, logger) -> None:
-    """Age out the recovery bin: deletions past their window are ended for good
-    and any trash folder no surviving record names is reclaimed (see
-    origenerator.recovery).
+def _reclaim_orphaned_trash(db, state_dir: Path, logger) -> None:
+    """Reclaim any trash folder no held deletion names (see origenerator.recovery).
+
+    Nothing the recovery bin is holding is touched: a deletion stays until the
+    user restores it or ends it from the Trash shelf. This clears only what
+    nothing can reach.
 
     Never in a branch session -- its database is a copy, so the deletions it
-    inherited point at the *live* install's held files, and both purging and
-    restoring them from there would reach into the library the live app is
-    still showing.
+    inherited name the *live* install's held folders, and reclaiming from there
+    by what this copy happens to know about would reach into the library the
+    live app is still showing.
     """
     from origenerator import recovery
     from origenerator.branch_session import session_trash
     try:
-        expired = recovery.sweep(db, session_trash(state_dir / "trash"))
-        if expired:
-            logger.info("Recovery bin: ended %d expired deletion(s)", expired)
+        reclaimed = recovery.reclaim_orphans(db, session_trash(state_dir / "trash"))
+        if reclaimed:
+            logger.info("Trash: reclaimed %d unreachable batch folder(s)", reclaimed)
     except Exception as e:
-        logger.warning("Recovery-bin sweep failed: %s", e)
+        logger.warning("Trash orphan reclaim failed: %s", e)
 
 
 def _build_window(client, db, app_state, fun_time):
@@ -650,7 +652,7 @@ def main(argv: list[str] | None = None) -> int:
     status("Opening the image library...")
     db = _open_database(DB_PATH, branch_session=branch_session, logger=logger)
     if not branch_session:
-        _sweep_the_recovery_bin(db, STATE_DIR, logger)
+        _reclaim_orphaned_trash(db, STATE_DIR, logger)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the

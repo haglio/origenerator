@@ -36,7 +36,6 @@ from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE, TREE_KEY_ROLE
 from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
-from origenerator.recovery import RETENTION_DAYS
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
 # a narrowed list of folder names is a poor answer to "where is the one with
@@ -186,7 +185,7 @@ class GalleryTree:
         self._add_shelf(
             side_item, _counted(TRASH_LABEL, side.trash_count),
             TRASH_KEY, side.orientation, icons.trash_icon(),
-            f"Deleted items — restorable here for {RETENTION_DAYS} days"
+            "Deleted items — restorable here until you delete them for good"
         )
 
     def _register(self, item, key: str, parent_item,

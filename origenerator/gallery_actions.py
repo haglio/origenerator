@@ -87,7 +87,7 @@ class GalleryActions:
             return batches[0][0]["prompt_id"]  # a restored item to navigate back to
 
         # No commit hook: an entry falling off the stack ends nothing now — the
-        # bin goes on holding the files until they expire or the user says so.
+        # bin goes on holding the files until the user says otherwise.
         # Redo re-deletes the same rows: undo restored them exactly as captured,
         # so the dicts still describe what is there to take away again.
         self._history.push(UndoEntry(_delete_label(len(rows)), undo,
@@ -255,7 +255,7 @@ class GalleryActions:
         return restored
 
     def purge_deleted(self, prompt_ids) -> None:
-        """End held deletions now rather than waiting out their window: the files
+        """End held deletions for good — nothing else ever will: the files
         are removed and the bin forgets them. Irreversible, and deliberately not
         undoable — the caller confirms with the user first."""
         for prompt_id in prompt_ids:

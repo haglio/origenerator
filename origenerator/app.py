@@ -427,6 +427,50 @@ def _configure_logging(state_dir: Path):
     return logging.getLogger(__name__)
 
 
+def _arm_the_crash_log(state_dir: Path, logger) -> None:
+    """Have a hard crash write down where it happened, instead of vanishing.
+
+    An access violation in the interpreter -- a freed object reached from
+    bytecode, which is what a lifetime bug in a native extension looks like from
+    here -- kills the process outright: no exception, no traceback, nothing in
+    origenerator.log, and the app is simply gone from the screen. Windows keeps
+    a fault address, and that address says only that it happened inside the
+    evaluation loop, which no amount of reading source turns into a line.
+
+    ``faulthandler`` is what makes the next one a bug report instead: on the
+    fatal signal it writes every thread's Python stack, naming the file and line
+    that was executing and what the other threads were doing when it went. The
+    file is opened for the life of the process and never closed, because the
+    handler writes to that descriptor from inside the signal -- and it is
+    appended to, so the run that crashes does not erase the record of the one
+    before it.
+
+    Two crashes on 2026-09-03 -- one in the live app, one in a branch preview
+    thirty-five minutes later, the same fault offset in both -- left nothing at
+    all to go on. Neither was started through the .vbs, so even the launcher's
+    stderr redirect was out of the picture; this does not depend on it.
+    """
+    import faulthandler
+    from datetime import UTC, datetime
+
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        # Deliberately never closed (so no context manager): the handler writes
+        # from the signal, and the descriptor has to outlive every ordinary
+        # teardown path.
+        stream = open(  # noqa: SIM115
+            state_dir / "origenerator_crash.log", "a", encoding="utf-8")
+        launched = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
+        stream.write(f"\n=== launched {launched} ===\n")
+        stream.flush()
+        faulthandler.enable(file=stream, all_threads=True)
+    except Exception as e:
+        # Broad on purpose: nothing about an optional crash log is worth
+        # refusing to start over, and the ways a state dir can be unusable are
+        # not all OSError (a path the OS rejects outright raises ValueError).
+        logger.warning("Crash log unavailable: %s", e)
+
+
 def _open_the_splash(fun_time, app):
     """The boot's own window, or ``None`` when the session owns that job.
 
@@ -636,6 +680,12 @@ def main(argv: list[str] | None = None) -> int:
         from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
+
+    # From here on this is a real boot, and the one kind of death the log
+    # cannot record is the one this catches. Not above the launch check: that
+    # run is a probe, and every probe stamping the crash log as a launch made
+    # thirteen test runs read as thirteen crashes-in-waiting.
+    _arm_the_crash_log(STATE_DIR, logger)
 
     loading = _open_the_splash(fun_time, app)
     status = _status_line(loading, app, logger)

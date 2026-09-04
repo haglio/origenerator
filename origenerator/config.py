@@ -105,8 +105,9 @@ EVOLVER_SOURCE = "origenerator"
 #
 # From the overlay, not from source, because naming a folder in the library makes
 # that name library vocabulary: the sanitize blocklist exists to keep exactly that
-# out of a public commit, so hardcoding one here writes it into the tracked tree. Evolver reads the same key from its own overlay
-# and the two have to agree — the folder is the only thing passing between them.
+# out of a public commit, so hardcoding one here writes it into the tracked tree.
+# Evolver reads the same key from its own overlay and the two have to agree — the
+# folder is the only thing passing between them.
 GENAU_SOURCE = _CONTENT["genau_source"]
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its

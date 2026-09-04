@@ -578,6 +578,41 @@ def test_prefill_selects_workflow_and_sets_values(panel):
     assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
 
 
+def test_prefilling_a_video_shows_its_seeds_without_pinning_them(panel):
+    # Prefilling a still pins its seed; prefilling a clip does not. The seeds that
+    # made it fill their fields — there to read and one click from being locked —
+    # while Random stays ticked, so the next Generate is another sample of the
+    # motion rather than this clip's seed riding every later edit of the tab.
+    panel.prefill("wan22_i2v", {"noise_seed": 11, "seed": 22, "audio_seed": 33})
+
+    assert panel.current_config().seed_is_random is True
+    static = panel._param_form.get_values_static()
+    assert (static["noise_seed"], static["seed"], static["audio_seed"]) == (11, 22, 33)
+    drawn = panel._param_form.get_values()
+    assert drawn["seed"] != 22 and drawn["noise_seed"] != 11
+
+
+def test_a_videos_seed_is_lockable_after_the_prefill_that_left_it_random(panel):
+    # The other half of the deal: the clip's own seed is still what a lock locks.
+    panel.prefill("wan22_i2v", {"seed": 22})
+
+    panel._param_form.set_seed_random(False)
+
+    assert panel._param_form.get_values()["seed"] == 22
+
+
+def test_a_video_seed_does_not_pin_itself_by_riding_a_workflow_switch(panel):
+    # Switching workflows carries the edited fields across, and a seed loaded from
+    # a clip is one of them — it must land on the new form as unpinned as it left
+    # the old one, or the lineage picks its pin back up on the way through.
+    panel.prefill("wan22_i2v", {"seed": 22})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
+
+    assert panel._param_form.get_values_static()["seed"] == 22
+    assert panel._param_form.seed_is_random() is True
+
+
 def test_restore_config_reapplies_workflow_params_and_random_seed(panel):
     snap = ConfigSnapshot("wan22_i2v", {"positive_prompt": "a fox"}, seed_is_random=True)
     panel.restore_config(snap)

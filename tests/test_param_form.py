@@ -973,16 +973,18 @@ def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edi
     assert combo.currentText() == "120 fps"
 
 
-def _video_defs(max_frames=161, rate=16.0):
+def _video_defs(max_frames=161):
     return [
+        # Seconds are counted at the rate the model paces motion at (16 fps),
+        # which is a fact about the model, not about the field beside it.
         ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=max_frames,
-                 step=4, options=[1, 5, 10], unit="s", rate_key="frame_rate"),
-        ParamDef("frame_rate", "Frame Rate", "float", rate, min_val=1.0, max_val=120.0,
-                 step=1.0, options=[16, 24], unit="fps"),
+                 step=4, options=[1, 5, 10], unit="s", rate=16.0),
+        ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0, max_val=128.0,
+                 step=16.0, options=[16, 32, 48], unit="fps"),
     ]
 
 
-def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_forms_frame_rate(qtbot):
+def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtbot):
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
     duration = form._widgets["frame_count"]
@@ -993,25 +995,32 @@ def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_forms_frame_rate(qt
     duration.setCurrentText("10")
     assert form.get_values()["frame_count"] == 161
 
-    form.set_values({"frame_count": 21, "frame_rate": 16.0})
+    form.set_values({"frame_count": 21})
     assert duration.currentText() == "1.3 s"
     assert form.get_values_static()["frame_count"] == 21
 
 
-def test_the_seconds_hold_when_the_frame_rate_changes_so_the_frames_follow(qtbot):
+def test_the_frames_a_duration_asks_for_dont_move_when_the_frame_rate_does(qtbot):
+    # The rate decides how smooth the clip looks, not how much of it there is:
+    # the extra frames are filled in afterwards, so five seconds is 81 frames of
+    # sampling whether it is played at 16 fps or 48.
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
     assert form.get_values()["frame_count"] == 81
-    form._widgets["frame_rate"].setCurrentText("24")
+    form._widgets["frame_rate"].setCurrentText("48")
     assert form._widgets["frame_count"].currentText() == "5 s"
-    assert form.get_values()["frame_count"] == 121
+    assert form.get_values() == {"frame_count": 81, "frame_rate": 48.0}
 
 
-def test_a_loaded_frame_count_is_shown_at_the_rate_loaded_with_it(qtbot):
+def test_a_loaded_frame_count_is_shown_as_the_seconds_it_really_runs(qtbot):
+    # A recipe saved before the rates were multiples carries 24 fps; it loads as
+    # the reachable rate beside it, and its frames still read as their own
+    # seconds rather than being restated at whatever rate came with them.
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
     form.set_values({"frame_count": 121, "frame_rate": 24.0})
-    assert form._widgets["frame_count"].currentText() == "5 s"
+    assert form._widgets["frame_count"].currentText() == "7.6 s"
+    assert form._widgets["frame_rate"].currentText() == "32 fps"
     assert form.get_values_static()["frame_count"] == 121
 
 
@@ -1020,16 +1029,27 @@ def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit
     qtbot.addWidget(form)
     form.show()
     qtbot.waitExposed(form)
-    duration, rate = form._widgets["frame_count"], form._widgets["frame_rate"]
+    duration = form._widgets["frame_count"]
 
     duration.lineEdit().setFocus()
     duration.setCurrentText("30")
     assert form.get_values()["frame_count"] == 161
     qtbot.keyClick(duration.lineEdit(), Qt.Key.Key_Return)
-    assert duration.currentText() == "10 s"
+    assert duration.currentText() == "10 s"     # the 161 frames it settles on
+
+
+def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbot):
+    # Between two multiples there are no frames to show, and writing the file at
+    # the rate asked for anyway would skew its speed. The field says so by
+    # landing on the rate the clip will really be written at.
+    form = ParamForm(_video_defs())
+    qtbot.addWidget(form)
+    form.show()
+    qtbot.waitExposed(form)
+    rate = form._widgets["frame_rate"]
 
     rate.lineEdit().setFocus()
-    rate.setCurrentText("120")
+    rate.setCurrentText("60")
+    assert form.get_values()["frame_rate"] == 64.0
     qtbot.keyClick(rate.lineEdit(), Qt.Key.Key_Return)
-    assert duration.currentText() == "1.34 s"   # the 161 frames it still gets
-    assert form.get_values()["frame_count"] == 161
+    assert rate.currentText() == "64 fps"

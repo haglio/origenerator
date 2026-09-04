@@ -198,13 +198,16 @@ PARAM_HELP: dict[str, str] = {
     "height": "The output height in pixels.",
     "length": "How many frames the model generates for this clip.",
     "frame_count": (
-        "How long the clip runs, in seconds. Pick a length or type one; it is "
-        "rounded to the frames the model works in, and stops where the model stops."
+        "How long the clip runs, in seconds — of real motion, at any frame rate. "
+        "Pick a length or type one; it is rounded to the frames the model works "
+        "in, and stops where the model stops."
     ),
     "frame_rate": (
-        "Frames per second in the saved video. Pick a rate or type one. The seconds "
-        "hold, so a higher rate means more frames to make — and quicker motion, "
-        "since the model paces it by the frame."
+        "How smooth the motion looks. The model always paces the action at 16 "
+        "frames a second; a higher rate fills in the frames between those, so "
+        "the clip runs the same length at the same speed, just less steppy. "
+        "Rates are multiples of 16 because the frames are filled in a whole "
+        "number at a time; anything else settles onto the nearest."
     ),
 
     # --- the authored stroke (track-conditioned video) ---

@@ -31,7 +31,11 @@ from origenerator.gui.prompt_box import PromptBox
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
-from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
+from origenerator.workflows.duration import (
+    frames_for_seconds,
+    on_grid,
+    seconds_for_frames,
+)
 
 ensure_shared_ui_on_path()
 from shared_ui.check_box import CheckBox
@@ -210,10 +214,9 @@ class ParamForm(QWidget):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
         for pd in defs:
-            if pd.rate_key:
-                # Seconds follow the rate: shown once both fields exist, and
-                # shown again whenever a rate edit ends.
-                self._widgets[pd.rate_key].edited.connect(lambda pd=pd: self._settle(pd))
+            if pd.rate:
+                # A frame count is made as seconds, so show it as seconds — its
+                # widget was left blank until the conversion was available.
                 self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()
@@ -368,12 +371,6 @@ class ParamForm(QWidget):
 
     def _has_param(self, key: str) -> bool:
         return any(pd.key == key for pd in self._param_defs)
-
-    def _def_for(self, key: str) -> ParamDef:
-        return next(pd for pd in self._param_defs if pd.key == key)
-
-    def _rate_for(self, pd: ParamDef) -> float:
-        return self._read_field(self._def_for(pd.rate_key), randomize_seed=False)
 
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
@@ -674,7 +671,7 @@ class ParamForm(QWidget):
             return w
         if pd.type in ("int", "float") and pd.options:
             w = PresetComboBox(pd.options, unit=pd.unit)
-            if not pd.rate_key:
+            if not pd.rate:
                 w.set_value(pd.default)
             return w
         if pd.type == "int":
@@ -751,9 +748,9 @@ class ParamForm(QWidget):
             return _clean_image_ref(w.text())
         if pd.type == "str":
             return w.text()
-        if pd.rate_key:
+        if pd.rate:
             seconds = w.value()
-            return (frames_for_seconds(seconds, self._rate_for(pd), pd)
+            return (frames_for_seconds(seconds, pd.rate, pd)
                     if seconds is not None else pd.default)
         if isinstance(w, PresetComboBox):
             return self._clamped_number(pd, w.value())
@@ -782,9 +779,9 @@ class ParamForm(QWidget):
             w.setPlainText(str(value))
         elif pd.type == "str" or pd.type == "image":
             w.setText(str(value))
-        elif pd.rate_key:
+        elif pd.rate:
             frames = self._clamped_number(pd, value)
-            w.set_value(seconds_for_frames(frames, self._rate_for(pd), pd))
+            w.set_value(seconds_for_frames(frames, pd.rate, pd))
         elif isinstance(w, PresetComboBox):
             w.set_value(self._clamped_number(pd, value))
         elif pd.type == "int":
@@ -796,10 +793,19 @@ class ParamForm(QWidget):
 
     @staticmethod
     def _clamped_number(pd: ParamDef, value):
-        """``value`` within ``pd``'s range, as its type; the default when there
-        is no value (an emptied field)."""
+        """``value`` on ``pd``'s grid and within its range, as its type; the
+        default when there is no value (an emptied field).
+
+        A preset dropdown's grid is what the model can actually take — 4k+1
+        frames, whole multiples of the native frame rate — so a number typed
+        between two steps settles onto the nearer one rather than being handed
+        to a graph that would round it out of sight
+        (:func:`~origenerator.workflows.duration.on_grid`).
+        """
         if value is None:
             value = pd.default
+        if pd.step:
+            value = on_grid(value, pd)
         if pd.min_val is not None:
             value = max(pd.min_val, value)
         if pd.max_val is not None:
@@ -838,9 +844,7 @@ class ParamForm(QWidget):
             {k: v for k, v in self._passthrough.items()
              if k not in param_sections.HIDDEN_KEYS}
         )
-        # A duration is written after the rest: its seconds are figured at the
-        # rate the loaded config carries, not the one the form showed before.
-        for pd in sorted(self._param_defs, key=lambda d: d.rate_key is not None):
+        for pd in self._param_defs:
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
         # The derived width/height aren't declared params, so apply them here:

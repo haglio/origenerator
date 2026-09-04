@@ -13,6 +13,7 @@ from origenerator.workflows.derived_size import (
     override_size,
     resolve_input_image_path,
 )
+from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
 from origenerator.workflows.stroke_aim import detect_grip_aim
@@ -43,7 +44,11 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     conditions the ATI-finetuned WAN 2.1 checkpoint on it, and the video obeys.
     The same track then becomes the funscript (:meth:`authored_actions`) — one
     source, exact by construction, no pixel measurement. The decoded frames
-    still get the HunyuanVideo-Foley scoring pass, muxed by ``CreateVideo``.
+    still get the HunyuanVideo-Foley scoring pass, muxed by ``CreateVideo``, and
+    are interpolated up to the chosen playback rate on their way to it
+    (:meth:`~WorkflowTemplate.interpolation_nodes`) — the track, the funscript
+    and the audio all stay on the clip's real seconds, which the rate no longer
+    moves.
 
     The output size is derived from the input image like the WAN 2.2 workflows,
     but app-side rather than in-graph (see :meth:`build_api_payload`): its
@@ -62,7 +67,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan21_ati_i2v"
-    version = "v006"
+    version = "v007"
     display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
     output_type = "video"
     derives_size_from_input = True
@@ -83,7 +88,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "sampler_name": "euler",
             "scheduler": "simple",
             "shift": 8.0,
-            "frame_rate": 16.0,
+            "frame_rate": NATIVE_FPS,
             "stroke_hz": 1.2,
             "stroke_x": 255,
             "stroke_top": 490,
@@ -130,7 +135,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=113, step=4,
-                     options=DURATION_OPTIONS, unit="s", rate_key="frame_rate"),
+                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
@@ -139,7 +144,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=120.0, step=1.0,
+            ParamDef("frame_rate", "Frame Rate", "float", NATIVE_FPS,
+                     min_val=NATIVE_FPS, max_val=128.0, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
@@ -285,7 +291,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         top = float(params["stroke_top"])
         bottom = float(params["stroke_bottom"])
         depth = (bottom - top) or 1.0
-        video_s = params["frame_count"] / params["frame_rate"]
+        video_s = params["frame_count"] / NATIVE_FPS
         scale = video_s / TRACK_SECONDS
 
         def to_ms(track_t: float) -> int:
@@ -316,6 +322,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         width, height = self._output_size(params)
         stroke_params = self._scaled_stroke_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
+        # Foley scores the decoded frames; CreateVideo encodes the interpolated
+        # ones. At the native rate they are the same frames.
+        interpolate, frames_ref = self.interpolation_nodes("23", ["13", 0], params)
         # High/low-noise LoRA pair, emulated on the single 2.1 base: the
         # denoise splits into two stages at steps//2, and each stage's model
         # chain branches off the one UNET with its own optional LoRA ("None"
@@ -329,6 +338,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         half_steps = params["steps"] // 2
         return {
             **foley,
+            **interpolate,
             **lora_high,
             **lora_low,
             "1": {
@@ -439,8 +449,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "14": {
                 "class_type": "CreateVideo",
                 "inputs": {
-                    "images": ["13", 0],
-                    "fps": params["frame_rate"],
+                    "images": frames_ref,
+                    "fps": playback_rate(params["frame_rate"]),
                     "audio": audio_ref,
                 },
             },

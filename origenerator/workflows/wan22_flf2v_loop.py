@@ -4,6 +4,7 @@ from origenerator.workflows.base import (
     ParamDef,
     WorkflowTemplate,
 )
+from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
@@ -13,7 +14,10 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
 
     The output resolution is derived in-graph from the input image (see
     :meth:`build_api_payload`): it keeps the image's aspect ratio at a fixed
-    pixel budget rather than a hardcoded resolution. The decoded frames also
+    pixel budget rather than a hardcoded resolution. The decoded frames are
+    interpolated up to the chosen playback rate before they are written
+    (:meth:`~WorkflowTemplate.interpolation_nodes`), which leaves the loop's two
+    matched endpoints exactly where the model put them. They also
     drive a HunyuanVideo-Foley pass (:meth:`~WorkflowTemplate.foley_audio_nodes`),
     whose synced audio ``VHS_VideoCombine`` muxes into the file — though a
     player restarting the loop restarts the track with it; only the frames
@@ -21,7 +25,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_flf2v_loop"
-    version = "v006"
+    version = "v007"
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     looping = True
@@ -48,7 +52,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "shift_low": 5.0,
             "lora_strength_high": 1.0,
             "lora_strength_low": 1.0,
-            "frame_rate": 16.0,
+            "frame_rate": NATIVE_FPS,
             "crf": 19,
             "filename_prefix": "video/flf2v_loop",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
@@ -86,7 +90,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed (Stage 2)", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("frame_count", "Duration", "int", 21, min_val=5, max_val=81, step=4,
-                     options=DURATION_OPTIONS, unit="s", rate_key="frame_rate"),
+                     options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
             ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=50),
             ParamDef("cfg", "CFG Scale", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 5.0, min_val=0.0, max_val=20.0, step=0.5),
@@ -97,7 +101,8 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=1.0, max_val=120.0, step=1.0,
+            ParamDef("frame_rate", "Frame Rate", "float", NATIVE_FPS,
+                     min_val=NATIVE_FPS, max_val=128.0, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
         ]
 
@@ -111,6 +116,9 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "6", ["4", 0], params["lora_low"], params["lora_strength_low"]
         )
         foley, audio_ref = self.foley_audio_nodes("19", "20", "21", ["15", 0], params)
+        # Foley scores the decoded frames; VHS_VideoCombine writes the
+        # interpolated ones. At the native rate they are the same frames.
+        interpolate, frames_ref = self.interpolation_nodes("22", ["15", 0], params)
         # Size the loop off the input image: derived in-graph by default, or scaled
         # to the user's explicit WxH when the derived size was unlocked. Both
         # endpoints read the same scaled image.
@@ -119,6 +127,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         )
         return {
             **foley,
+            **interpolate,
             **size_nodes,
             "1": {
                 "class_type": "CLIPLoader",
@@ -225,9 +234,9 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "16": {
                 "class_type": "VHS_VideoCombine",
                 "inputs": {
-                    "images": ["15", 0],
+                    "images": frames_ref,
                     "audio": audio_ref,
-                    "frame_rate": params["frame_rate"],
+                    "frame_rate": playback_rate(params["frame_rate"]),
                     "loop_count": 0,
                     "filename_prefix": params["filename_prefix"],
                     "format": "video/h264-mp4",

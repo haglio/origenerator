@@ -5,6 +5,7 @@ from typing import Any
 
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
+from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
 
 # ComfyUI's KSampler vocabulary, for workflows that expose sampler/scheduler
@@ -23,9 +24,21 @@ SCHEDULER_OPTIONS = [
 ]
 
 # What a video form's Duration and Frame Rate dropdowns offer; both take a
-# typed value too.
+# typed value too. Every rate is a whole multiple of the models' native one,
+# because those are the rates the frame interpolator can produce the frames for
+# — see :mod:`origenerator.workflows.frame_rate`.
 DURATION_OPTIONS = [1, 5, 10, 15, 30]
-FRAME_RATE_OPTIONS = [8, 12, 16, 24, 30, 48, 60, 120]
+FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112, 128]
+
+# The interpolation model that fills in the frames between the generated ones
+# (see :meth:`WorkflowTemplate.interpolation_nodes`). RIFE 4.7 is the pack's own
+# recommendation and its default; a knob here would be one more question whose
+# answer is a guess, so it is a constant like the detector settings below.
+RIFE_CHECKPOINT = "rife47.pth"
+# How many source frames the interpolator processes before clearing the CUDA
+# cache — the node's own default, and the one thing standing between a long clip
+# at a high multiplier and an out-of-memory.
+_RIFE_CACHE_FRAMES = 10
 
 # The native factor of the installed ESRGAN-family upscale models (both are 4x).
 # The enhance tail rescales the model's output DOWN from this to the requested
@@ -64,13 +77,15 @@ class ParamDef:
     # generated frames; a workflow whose sources live in a folder of the library
     # names that folder instead.
     browse_dir: Path | None = None
-    # Shown after a preset dropdown's numbers ("24 fps"); typing the bare
+    # Shown after a preset dropdown's numbers ("48 fps"); typing the bare
     # number is accepted.
     unit: str = ""
-    # For an "int" frame count: the frames-per-second param it is divided by to
-    # show and edit as seconds. ``options`` are then seconds; min/max/step stay
-    # frames.
-    rate_key: str | None = None
+    # For an "int" frame count: the frames per second it counts, so the form can
+    # show and edit it as seconds. ``options`` are then seconds; min/max/step
+    # stay frames. This is the rate the MODEL paces motion at, not the rate the
+    # file is played at — the frames are generated at the one and interpolated up
+    # to the other, so a clip's seconds don't move when its rate does.
+    rate: float | None = None
 
 
 class WorkflowTemplate(ABC):
@@ -434,13 +449,15 @@ class WorkflowTemplate(ABC):
 
         Returns ``({three foley nodes}, [sampler_id, 0])`` — a dict to merge into
         the payload, and the ref to feed the video writer's ``audio`` input.
-        ``frames_ref`` is the decoded frames the sampler watches, so the audio
-        follows the motion actually rendered. The sampler's duration is derived
-        from the same frame_count/frame_rate the video nodes use (the model's
+        ``frames_ref`` is the decoded frames the sampler watches — the ones the
+        model authored, before any are interpolated between them — so the audio
+        follows the motion actually rendered and stays the clip's real length
+        whatever rate the file is written at. Both the duration and the rate the
+        sampler is told come from the native rate for that reason (the model's
         floor is 1s, so shorter clips get a trailing sliver of extra audio
         rather than a rejected prompt).
         """
-        duration = max(1.0, params["frame_count"] / params["frame_rate"])
+        duration = max(1.0, params["frame_count"] / NATIVE_FPS)
         nodes = {
             model_id: {
                 "class_type": "HunyuanModelLoader",
@@ -463,7 +480,7 @@ class WorkflowTemplate(ABC):
                     "hunyuan_model": [model_id, 0],
                     "hunyuan_deps": [deps_id, 0],
                     "image": frames_ref,
-                    "frame_rate": params["frame_rate"],
+                    "frame_rate": NATIVE_FPS,
                     "duration": duration,
                     "prompt": params["audio_prompt"],
                     "negative_prompt": params["audio_negative_prompt"],
@@ -477,6 +494,43 @@ class WorkflowTemplate(ABC):
             },
         }
         return nodes, [sampler_id, 0]
+
+    @staticmethod
+    def interpolation_nodes(node_id: str, frames_ref, params: dict):
+        """The frame-interpolation stage that sits between a video's decode and
+        its writer, and the IMAGE ref the writer should encode.
+
+        The models pace motion by the frame at
+        :data:`~origenerator.workflows.frame_rate.NATIVE_FPS`, so a clip is
+        always generated there and a higher rate buys smoothness rather than
+        speed. RIFE synthesizes what goes in between: ``multiplier`` frames per
+        gap, which turns N frames into (N-1)*multiplier+1 spanning the same
+        seconds. The generated frames all survive, endpoints included, so a loop
+        still closes on itself.
+
+        Returns ``(nodes, frames_ref)`` — the dict to merge into the payload and
+        the ref to encode. At the native rate the multiplier is 1 and there is
+        nothing to put between anything: no node, ``frames_ref`` handed straight
+        through, the same bypass :meth:`lora_model_input` does.
+        """
+        multiplier = rate_multiplier(params["frame_rate"])
+        if multiplier == 1:
+            return {}, frames_ref
+        nodes = {
+            node_id: {
+                "class_type": "RIFE VFI",
+                "inputs": {
+                    "frames": frames_ref,
+                    "ckpt_name": RIFE_CHECKPOINT,
+                    "multiplier": multiplier,
+                    "clear_cache_after_n_frames": _RIFE_CACHE_FRAMES,
+                    "fast_mode": True,
+                    "ensemble": True,
+                    "scale_factor": 1.0,
+                },
+            },
+        }
+        return nodes, [node_id, 0]
 
     def extract_output_info(self, history_data: dict) -> list[dict]:
         """Find this workflow's saved files in a ComfyUI /history response.

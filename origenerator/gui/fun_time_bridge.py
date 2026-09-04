@@ -82,7 +82,7 @@ class FunTimeBridge(QObject):
             # Through the gallery, not show by show: it has to stop WANTING the
             # regions first, or each close it makes here is answered by the
             # base state opening again underneath it.
-            self._gallery.close_the_regions()
+            self._gallery.close_the_shows()
             return
         if verb == "QUIT":
             self._gallery.window().close()

@@ -86,8 +86,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     which is the gate doing its job. (377: the hosted-app, room-key, tab and show work that landed on main
     while this gate was in flight added eight and the merge kept two of the
     old ones out; the card menus and the enhancement cancel added three, and
-    the in-flight card's menu one to the pane.)"""
+    the in-flight card's menu one to the pane. 80: dropping the trash's
+    retention window took the pane's two countdown helpers with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 377
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 82
+               for x in _class_def(PANE, "BrowserPane").body) == 80

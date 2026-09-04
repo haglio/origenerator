@@ -222,7 +222,7 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 def recovery_action_icon(action: str) -> QIcon:
     """A Trash-shelf tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
-    ("purge" — end it now instead of waiting out its window). White line art on
+    ("purge" — end it for good; nothing else empties the bin). White line art on
     the buttons' own translucent chip, like the experiment verdict controls."""
     name = "undo_arrow" if action == "restore" else "trash"
     return QIcon(glyph_pixmap(name, _SIZE, _REROLL_GLYPH))

@@ -175,10 +175,10 @@ def test_rows_for_shelf_answers_by_name_not_by_what_is_on_screen(qtbot):
     assert [r["prompt_id"] for r in pane.rows_for_shelf(TRASH_KEY)] == ["d1"]
 
 
-def test_the_trash_note_states_retention_only_while_holding_something(qtbot):
+def test_the_empty_trash_hint_promises_no_expiry(qtbot):
     pane, _scroll = _pane(qtbot)
     pane.set_model([], {}, [], [], [])
-    assert pane.trash_note(None) == ""
+    hint = pane._trash_empty_hint()
 
-    pane.set_model([], {}, [], [], [_row("d1", 9)])
-    assert "days" in pane.trash_note(None)
+    assert "as long as you leave them" in hint
+    assert "day" not in hint   # no window to count, so no number to state

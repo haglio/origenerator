@@ -5,9 +5,10 @@ can move them straight back to where they were. Each deleted item gets its own
 subdirectory, keyed by a unique token, so items never tread on one another and
 ending one is a single ``rmtree``.
 
-How long a batch is held is not decided here: the recovery bin records each one
-alongside the row it belonged to and keeps it for weeks (see
-:mod:`origenerator.recovery`), so a batch outlives the session that made it.
+How long a batch is held is not decided here, and nothing decides it anywhere:
+the recovery bin records each one alongside the row it belonged to and holds it
+until the user restores it or ends it (see :mod:`origenerator.recovery`), so a
+batch outlives the session that made it for as long as it is left alone.
 :meth:`Trash.purge_orphans` is the other half of that — it clears whatever the
 bin does *not* name, which is the only thing left that nothing can reach.
 """
@@ -91,12 +92,13 @@ class Trash:
     def purge_orphans(self, keep) -> int:
         """Delete every batch folder not named in ``keep``, and say how many went.
 
-        The recovery bin holds a batch for weeks, so clearing the trash wholesale
-        (what a launch used to do) would destroy exactly what is now recoverable.
-        What is left over once the bin's own folders are spared is genuinely
-        unreachable: a rejected experiment's batch that fell off the undo stack,
-        a batch from before the bin existed, or a folder left behind by a crash
-        between the move and the record. Without this the trash only ever grows.
+        The recovery bin holds a batch indefinitely, so clearing the trash
+        wholesale (what a launch used to do) would destroy exactly what is now
+        recoverable. What is left over once the bin's own folders are spared is
+        genuinely unreachable: a rejected experiment's batch that fell off the
+        undo stack, a batch from before the bin existed, or a folder left behind
+        by a crash between the move and the record. Without this the trash only
+        ever grows.
         """
         if not self.root.exists():
             return 0

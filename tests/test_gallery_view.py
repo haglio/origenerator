@@ -48,7 +48,6 @@ from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.prompt_edit import apply_request
-from origenerator.recovery import RETENTION_DAYS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
@@ -1699,25 +1698,26 @@ def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
     assert any("permanently" in t for t in tooltips)
 
 
-def test_a_trash_tile_says_how_long_it_has_left(qtbot):
-    # The one fact a gallery caption can't carry and this shelf can't do without.
+def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
+    # Nothing counts down any more, so the caption has no deadline to carry and
+    # says only what the item is.
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
     caption = view._browser._thumb_widgets["d1"]._text_label.text()
-    assert "seed 1" in caption   # still says which item it is...
-    assert "d left" in caption   # ...and, only here, how long it stays one
+    assert "seed 1" in caption
+    assert "left" not in caption
 
 
-def test_the_shelf_states_the_retention_promise_while_it_holds_anything(qtbot):
+def test_the_trash_shelf_states_no_deadline_over_what_it_holds(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-    assert str(RETENTION_DAYS) in view._avg_label.text()
+    assert view._avg_label.text() == ""
 
 
 def test_an_empty_trash_shelf_explains_what_it_is_for(qtbot):
@@ -1726,7 +1726,7 @@ def test_an_empty_trash_shelf_explains_what_it_is_for(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-    assert str(RETENTION_DAYS) in view._browser._trash_empty_hint()
+    assert "as long as you leave them" in view._browser._trash_empty_hint()
     assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
 
 

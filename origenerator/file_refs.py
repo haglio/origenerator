@@ -31,6 +31,7 @@ from pathlib import Path
 TYPE_ANNOTATIONS = frozenset({"[output]", "[input]", "[temp]"})
 OUTPUT_TAG = "[output]"
 INPUT_TAG = "[input]"
+TEMP_TAG = "[temp]"
 
 
 def split_annotation(image_ref: str | None) -> tuple[str, str]:
@@ -67,11 +68,14 @@ def frame_name(image_ref: str | None) -> str:
     return reference_basename(unannotated(image_ref)).lower()
 
 
-def reference_path(image_ref: str | None, *, output_dir: Path, input_dir: Path) -> Path | None:
+def reference_path(
+    image_ref: str | None, *, output_dir: Path, input_dir: Path, temp_dir: Path | None = None,
+) -> Path | None:
     """The on-disk file a ``LoadImage`` value names, or ``None`` when it's empty,
     absent, or not there.
 
-    ``"name [output]"`` lives under ``output_dir`` and ``"[input]"`` (or an
+    ``"name [output]"`` lives under ``output_dir``, ``"[temp]"`` under
+    ``temp_dir`` (nowhere, for a caller with none), and ``"[input]"`` (or an
     unannotated name) under ``input_dir`` — matching how ComfyUI's LoadImage
     routes the reference. An absolute path is taken as-is.
     """
@@ -80,6 +84,10 @@ def reference_path(image_ref: str | None, *, output_dir: Path, input_dir: Path) 
         return None
     if tag == OUTPUT_TAG:
         path = output_dir / file
+    elif tag == TEMP_TAG:
+        if temp_dir is None:
+            return None
+        path = temp_dir / file
     elif tag == INPUT_TAG:
         path = input_dir / file
     else:

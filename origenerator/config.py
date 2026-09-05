@@ -89,6 +89,9 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
 COMFYUI_DIR = SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
+# Where ComfyUI keeps a ``name [temp]`` LoadImage source -- a preview or a
+# node's scratch output, the third place its LoadImage can point.
+COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);
 # the "Prompt executed in N seconds" lines feed duration backfill.
 COMFYUI_LOG_DIR = COMFYUI_DIR / "user"

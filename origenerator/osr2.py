@@ -20,13 +20,25 @@ from pathlib import Path
 from app_support.file_channel import read_flag, stamp_age, write_flag
 
 from origenerator import config
+from origenerator.paths import ensure_player_core_on_path
+
+# Before any player_core import: that checkout is a sibling on the path, not a
+# dependency the launch interpreter has installed (see tests/test_sibling_imports).
+ensure_player_core_on_path()
+
+from player_core.tcode import (  # noqa: E402
+    PARK_COMMAND,
+    UdpTCodeSink,
+    format_tcode_command,
+    to_tcode_position,
+)
 
 logger = logging.getLogger(__name__)
 
-# The device's rest command — stroke axis to the bottom over half a second. Same
-# string the broker parks with, so a stopped video leaves the OSR2 where the broker
-# expects it.
-PARK_TCODE = "L00000I500"
+# The device's rest command -- stroke axis to the bottom over half a second, the
+# family's one spelling of it, which the broker parks with too -- so a stopped
+# video leaves the OSR2 where the broker expects it.
+PARK_TCODE = PARK_COMMAND
 
 
 def device_on(*, now: float | None = None, rx_file=None,
@@ -58,13 +70,12 @@ def device_on(*, now: float | None = None, rx_file=None,
 def format_position(pos_0_100: float, interval_ms: float) -> str:
     """A T-code move for the L0 stroke axis: ``L0<0000-9999>I<ms>``.
 
-    ``pos_0_100`` is a funscript position (0 bottom, 100 top), clamped and scaled to
-    the axis's four-digit range; ``interval_ms`` is how long the device takes to get
-    there, so streaming each action with the time until the next reads as smooth motion.
+    ``pos_0_100`` is a funscript position (0 bottom, 100 top); ``interval_ms`` is
+    how long the device takes to get there, so streaming each action with the
+    time until the next reads as smooth motion.  The scaling and the clamp are
+    player_core's, the same ones every other driver in the family sends with.
     """
-    pos = max(0.0, min(100.0, pos_0_100))
-    magnitude = int(round(pos / 100 * 9999))
-    return f"L0{magnitude:04d}I{int(interval_ms)}"
+    return format_tcode_command("L0", to_tcode_position(pos_0_100), int(interval_ms))
 
 
 class Osr2Broker:
@@ -83,7 +94,7 @@ class Osr2Broker:
         self._sock_factory = sock_factory or (
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         )
-        self._sock = None
+        self._sink: UdpTCodeSink | None = None
         self._prior_genau: bool | None = None
         self._send_error_logged = False
 
@@ -108,18 +119,20 @@ class Osr2Broker:
         self._prior_genau = None
 
     def close(self) -> None:
-        if self._sock is not None:
+        if self._sink is not None:
             try:
-                self._sock.close()
+                self._sink.close()
             except OSError:
                 pass
-            self._sock = None
+            self._sink = None
 
     def _send(self, line: str) -> None:
+        # The family's datagram sink, over a socket made on first use so a
+        # broker built for a session that never drives opens nothing.
         try:
-            if self._sock is None:
-                self._sock = self._sock_factory()
-            self._sock.sendto((line + "\n").encode("ascii"), (self._host, self._port))
+            if self._sink is None:
+                self._sink = UdpTCodeSink(self._host, self._port, sock=self._sock_factory())
+            self._sink.send(line)
         except OSError as e:  # nobody listening / socket gone — harmless, but surface it once
             if not self._send_error_logged:
                 self._send_error_logged = True

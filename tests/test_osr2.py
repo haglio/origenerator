@@ -33,7 +33,10 @@ def test_format_position_clamps_out_of_range():
     assert format_position(140, 40) == "L09999I40"
 
 
-def test_park_tcode_matches_the_broker_rest_command():
+def test_park_tcode_is_the_familys_park_command():
+    from player_core.tcode import PARK_COMMAND
+
+    assert PARK_TCODE is PARK_COMMAND
     assert PARK_TCODE == "L00000I500"
 
 

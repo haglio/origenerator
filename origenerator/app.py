@@ -54,11 +54,9 @@ def _init_windows_taskbar_identity(identity: str | None = None) -> None:
     """
     if sys.platform != "win32":
         return
-    from origenerator.win32 import (
-        APP_USER_MODEL_ID,
-        set_app_user_model_id,
-        stamp_pinned_shortcuts,
-    )
+    from app_support.win32 import set_app_user_model_id
+
+    from origenerator.win32 import APP_USER_MODEL_ID, stamp_pinned_shortcuts
     try:
         set_app_user_model_id(identity or APP_USER_MODEL_ID)
     except OSError:

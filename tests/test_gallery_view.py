@@ -12913,13 +12913,17 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     assert view._db.get_generation("loop")["genau_exported_at"] is None
 
 
+@pytest.mark.real_thread_hop
 def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
     # The one test that puts the pool hop back: everything else runs it inline so a
     # launch is observable in one call. What must hold is that a match taking real
     # time does not hold the UI thread while it takes it.
-    monkeypatch.undo()  # drop the conftest fixture's straight-through override
     import threading
 
+    # The override is off by the marker, not by undoing every monkeypatch the
+    # fixtures made -- which took the mic and OSR2 guards with it, so this one
+    # test built its view with a real VoiceSteering (bug 43).
+    assert gallery_view_module.VoiceSteering.__name__ == "FakeVoiceSteering"
     db = _genau_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

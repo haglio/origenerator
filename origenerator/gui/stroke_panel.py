@@ -302,7 +302,7 @@ class StrokePanel(QWidget):
             host.stroke_toggle_hold()
         elif action == "genau_weird_clip":
             host.stroke_cull()
-        elif action in ("genau_advance_up", "genau_advance_down"):
+        elif action in ("genau_clip_seconds_up", "genau_clip_seconds_down"):
             delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
             host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
         self.update()

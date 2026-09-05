@@ -2125,6 +2125,16 @@ def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
     assert seconds_for_frames(frames.max_val, NATIVE_FPS, frames) == max(DURATION_OPTIONS)
 
 
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
+    # More steps cost only time, and a long clip already costs hours of it;
+    # a step count the machine can finish is nothing the form should refuse.
+    defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    assert defs["steps"].max_val == 100
+    if "split_step" in defs:
+        assert defs["split_step"].max_val == defs["steps"].max_val
+
+
 def _segments(payload: dict, conditioning: str) -> list[dict]:
     """A clip's conditioning nodes in the order their segments run: the first
     is fed by the scaled start image, each later one by a frame cut out of the

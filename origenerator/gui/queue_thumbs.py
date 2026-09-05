@@ -36,6 +36,8 @@ the strip re-renders on every poll, and a start frame is a full-size render off
 disk.
 """
 
+import os
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
@@ -61,11 +63,21 @@ def block_width(cell: int) -> int:
     return FOLDER_CELLS * cell + (FOLDER_CELLS - 1) * _GAP
 
 
-# (file, side, gray) -> the cell-sized pixmap, or None for a file that wouldn't
-# load. Unbounded on purpose: an entry is a few kilobytes, and the set of files in
-# flight over one session is small — where the cost being avoided is decoding a
-# multi-megabyte render on the UI thread every poll.
-_CELLS: dict[tuple[str, int, bool], QPixmap | None] = {}
+# (file, side, gray, written) -> the cell-sized pixmap, or None for a file that
+# wouldn't load. Unbounded on purpose: an entry is a few kilobytes, and the set
+# of files in flight over one session is small — where the cost being avoided
+# is decoding a multi-megabyte render on the UI thread every poll. The file's
+# write time is part of the key, so a render redone in place is read again
+# rather than drawn from the old pixels until the app restarts.
+_CELLS: dict[tuple[str, int, bool, int | None], QPixmap | None] = {}
+
+
+def _written(path) -> int | None:
+    """When ``path`` was last written, or None for a file that is not there."""
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
 
 
 def _cell(path, side: int, gray: bool = False) -> QPixmap | None:
@@ -80,7 +92,7 @@ def _cell(path, side: int, gray: bool = False) -> QPixmap | None:
     """
     if not path:
         return None
-    key = (str(path), side, gray)
+    key = (str(path), side, gray, _written(path))
     if key not in _CELLS:
         fitted = _fit_in_square(QPixmap(str(path)), side)
         _CELLS[key] = (grayscale_pixmap(fitted)

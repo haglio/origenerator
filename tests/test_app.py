@@ -100,7 +100,7 @@ def test_client_id_is_stable_across_launches(tmp_path, qtbot):
 
 def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity()
 
@@ -110,7 +110,7 @@ def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
 
 def test_init_windows_taskbar_identity_noop_off_windows():
     with patch("origenerator.app.sys.platform", "linux"), \
-         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity()
 
@@ -407,7 +407,7 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     # the pinned Origenerator shortcut keeps the standalone identity, so it is
     # left unstamped.
     with patch("origenerator.app.sys.platform", "win32"), \
-         patch("origenerator.win32.set_app_user_model_id") as mock_set_id, \
+         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity("FunTime.App")
 

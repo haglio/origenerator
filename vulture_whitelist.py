@@ -41,10 +41,6 @@ _.set_cruise  # noqa  # origenerator/gui/osr2_stroke_driver.py:257
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231
 
-# --- ctypes PROPVARIANT fields consumed by COM IPropertyStore (win32.py: _set_lnk_aumid) ---
-_.vt  # noqa  # origenerator/win32.py:146
-_.pwszVal  # noqa  # origenerator/win32.py:147
-
 # --- style-option fields written for Qt's painter to read, never read back here ---
 _.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
 

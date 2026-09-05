@@ -17,6 +17,8 @@ import socket
 import time
 from pathlib import Path
 
+from app_support.file_channel import read_flag, stamp_age, write_flag
+
 from origenerator import config
 
 logger = logging.getLogger(__name__)
@@ -49,11 +51,8 @@ def device_on(*, now: float | None = None, rx_file=None,
     current = time.time() if now is None else now
     path = Path(rx_file if rx_file is not None else config.OSR2_SERIAL_RX_FILE)
     window = config.OSR2_RX_STALE_S if stale_s is None else stale_s
-    try:
-        spoke_at = float(path.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return False
-    return (current - spoke_at) < window
+    age = stamp_age(path, current)
+    return age is not None and age < window
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:
@@ -85,7 +84,7 @@ class Osr2Broker:
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         )
         self._sock = None
-        self._prior_genau: str | None = None
+        self._prior_genau: bool | None = None
         self._send_error_logged = False
 
     def send_position(self, pos_0_100: float, interval_ms: float) -> None:
@@ -98,8 +97,8 @@ class Osr2Broker:
 
     def pause_genau(self) -> None:
         """Disable genau auto-mode, remembering its prior state to restore later."""
-        self._prior_genau = self._read_genau()
-        self._write_genau("0")
+        self._prior_genau = read_flag(self._genau_file, default=True)
+        self._write_genau(False)
 
     def restore_genau(self) -> None:
         """Put genau's enabled flag back to what it was before :meth:`pause_genau`."""
@@ -126,17 +125,11 @@ class Osr2Broker:
                 self._send_error_logged = True
                 logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
 
-    def _read_genau(self) -> str:
-        try:
-            return self._genau_file.read_text(encoding="utf-8").strip() or "1"
-        except OSError:
-            return "1"  # broker treats an absent/empty flag as enabled
-
-    def _write_genau(self, value: str) -> None:
+    def _write_genau(self, value: bool) -> None:
+        # The state directory is the broker's to make, not this app's: a
+        # flag written into a directory nobody else has is a flag nobody reads.
         if not self._genau_file.parent.exists():
             logger.debug("OSR2 state dir missing; not writing genau flag")
             return
-        try:
-            self._genau_file.write_text(value, encoding="utf-8")
-        except OSError as e:
-            logger.warning("Failed to write genau flag %s: %s", self._genau_file, e)
+        if not write_flag(self._genau_file, value):
+            logger.warning("Failed to write genau flag %s", self._genau_file)

@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 
+from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
+
 from origenerator.content import load_content
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -132,13 +134,13 @@ STROKE_DEFAULT_HZ = 1.2
 OSR2_BROKER_HOST = "127.0.0.1"
 OSR2_TCODE_UDP_PORT = 50557
 OSR2_STATE_DIR = project_dir("fun_time") / "state"
-OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / "genau_enabled.txt"
+OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / GENAU_ENABLED
 # The broker stamps this with the time the OSR2 last spoke. It is the only
 # evidence that the device is there — the console reads it to say "Off" and grey
 # its readout (see origenerator.osr2.device_on). The broker writes a second stamp
 # for what it last *sent*, deliberately not read here: this app's own stroke
 # would keep it fresh against a device that is switched off.
-OSR2_SERIAL_RX_FILE = OSR2_STATE_DIR / "osr2_serial_rx.txt"
+OSR2_SERIAL_RX_FILE = OSR2_STATE_DIR / OSR2_SERIAL_RX
 # How long the device may stay quiet and still count as on — the broker's own
 # window for the same question (osr2_broker.monitor.MonitorState), so the app and
 # the broker never disagree about whether the OSR2 is there.

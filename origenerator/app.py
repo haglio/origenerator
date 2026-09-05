@@ -391,24 +391,18 @@ def _run_maintenance(library: Library, passes, status, logger) -> None:
 
 
 def _configure_logging(state_dir: Path):
-    """The app's log: the console the launcher redirects, and a rotating file."""
+    """The family's rotating file log, on the root logger so the siblings' lines
+    land in it too, with a console copy for the launcher's redirect."""
     import logging
-    from logging.handlers import RotatingFileHandler
 
-    log_handlers = [logging.StreamHandler()]
+    from app_support.logging_utils import configure_logging
+
     try:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        log_handlers.append(RotatingFileHandler(
-            state_dir / "origenerator.log", maxBytes=1_000_000, backupCount=2,
-            encoding="utf-8",
-        ))
+        configure_logging("", state_dir / "origenerator.log", console=True)
     except OSError:
-        pass  # console logging still works if the file can't be opened
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        handlers=log_handlers,
-    )
+        # Console logging still works if the file cannot be opened.
+        logging.basicConfig(level=logging.INFO,
+                            format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     return logging.getLogger(__name__)
 
 

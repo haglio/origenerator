@@ -172,7 +172,7 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     assert "main_minimize" not in actions
     assert not any(a.endswith("_activate") for a in actions)
     for kept in ("genau_prev_clip", "genau_next_clip", "main_lock",
-                 "genau_weird_clip", "genau_advance_down", "genau_advance_up",
+                 "genau_weird_clip", "genau_clip_seconds_down", "genau_clip_seconds_up",
                  "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
@@ -198,7 +198,7 @@ def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):
     panel, _stroke, host = _panel(qtbot)
     panel.render_console()
     for action in ("genau_next_clip", "genau_prev_clip", "main_lock",
-                   "genau_weird_clip", "genau_advance_up"):
+                   "genau_weird_clip", "genau_clip_seconds_up"):
         _press(panel, action)
     assert host.calls == [("step", 1), ("step", -1), "hold", "cull", ("dwell", 5)]
 
@@ -220,11 +220,11 @@ def test_the_pace_stops_at_its_ends(qtbot):
     panel, _stroke, host = _panel(qtbot)
     host.dwell_s = MIN_S
     panel.render_console()
-    _press(panel, "genau_advance_down")
+    _press(panel, "genau_clip_seconds_down")
     assert host.dwell_s == MIN_S
     host.dwell_s = MAX_S
     panel.render_console()
-    _press(panel, "genau_advance_up")
+    _press(panel, "genau_clip_seconds_up")
     assert host.dwell_s == MAX_S
 
 
@@ -326,7 +326,7 @@ def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtb
     panel = StrokePanel(FakeStroke(), host=PaceOnlyHost(pace))
     qtbot.addWidget(panel)
     panel.render_console()
-    _press(panel, "genau_advance_up")
+    _press(panel, "genau_clip_seconds_up")
     view = SlideshowView([("a.png", "image", 1)], shuffle=lambda items: None,
                          pace=pace)
     qtbot.addWidget(view)

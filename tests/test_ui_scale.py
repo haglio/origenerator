@@ -120,14 +120,20 @@ def test_presses_are_untouched_when_nothing_scaled_the_app():
 def test_the_scale_is_applied_before_pyqt_is_imported():
     """Qt reads QT_SCALE_FACTOR as the platform plugin starts, so a call that
     lands after the first PyQt6 import sets a variable nothing will read again.
-    The ordering inside main() is the whole contract, so it is asserted here."""
+    The ordering inside main() is the whole contract, so it is asserted here --
+    off the syntax tree, so a reformat of either line leaves it standing."""
+    import ast
     import inspect
 
     from origenerator import app as app_module
 
-    source = inspect.getsource(app_module.main)
-    applied = source.index("apply_hosted_scale()")
-    imported = source.index("from PyQt6")
+    main = ast.parse(inspect.getsource(app_module.main))
+    applied = min(node.lineno for node in ast.walk(main)
+                  if isinstance(node, ast.Call)
+                  and ast.unparse(node.func).endswith("apply_hosted_scale"))
+    imported = min(node.lineno for node in ast.walk(main)
+                   if isinstance(node, ast.ImportFrom)
+                   and (node.module or "").startswith("PyQt6"))
     assert applied < imported
 
 

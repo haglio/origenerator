@@ -1,5 +1,6 @@
 """Branch sessions — the env flag, the one-time DB seed, and the launcher."""
 
+import ast
 import json
 import re
 import sqlite3
@@ -438,10 +439,11 @@ def test_nothing_here_carries_sql_over_the_apps_own_tables():
     Held at zero. What is left is the online backup that seeds a worktree, which
     is a whole-file operation no query can express, and it is counted below.
     """
-    source = (_REPO_ROOT / "origenerator" / "branch_session.py").read_text(
-        encoding="utf-8")
+    sql = re.compile(r"\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\b")
 
-    statements = re.findall(r"\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\b", source)
+    statements = [node.value for node in ast.walk(_branch_session_module())
+                  if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                  and sql.search(node.value)]
 
     assert statements == []
 
@@ -449,10 +451,17 @@ def test_nothing_here_carries_sql_over_the_apps_own_tables():
 def test_the_one_raw_connection_left_is_the_seeds_online_backup():
     """Two: the read-only source and the destination it is copied into. Every
     other database this module touches, it reaches through a store."""
-    source = (_REPO_ROOT / "origenerator" / "branch_session.py").read_text(
-        encoding="utf-8")
+    connections = [node for node in ast.walk(_branch_session_module())
+                   if isinstance(node, ast.Call)
+                   and ast.unparse(node.func) == "sqlite3.connect"]
 
-    assert len(re.findall(r"sqlite3\.connect\(", source)) == 2
+    assert len(connections) == 2
+
+
+def _branch_session_module() -> ast.Module:
+    """The module as a syntax tree: what it says, not how its lines are wrapped."""
+    return ast.parse((_REPO_ROOT / "origenerator" / "branch_session.py").read_text(
+        encoding="utf-8"))
 
 
 def _a_worktree_with_something_to_adopt(tmp_path):

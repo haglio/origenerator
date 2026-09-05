@@ -1,3 +1,4 @@
+import ast
 import os
 import subprocess
 import sys
@@ -70,11 +71,19 @@ def test_every_module_importing_a_sibling_puts_it_on_the_path_itself():
     package = Path(__file__).resolve().parents[1] / "origenerator"
     missing = []
     for path in sorted(package.rglob("*.py")):
-        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        imported = {
+            name.split(".")[0]
+            for node in ast.walk(tree)
+            for name in (
+                [alias.name for alias in node.names] if isinstance(node, ast.Import)
+                else [node.module] if isinstance(node, ast.ImportFrom) and node.module
+                else [])
+        }
+        called = {ast.unparse(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
         for sibling, ensure in (("shared_ui", "ensure_shared_ui_on_path"),
                                 ("player_core", "ensure_player_core_on_path")):
-            imports = f"\nfrom {sibling}" in source or f"\nimport {sibling}" in source
-            if imports and f"{ensure}()" not in source:
+            if sibling in imported and not any(call.endswith(ensure) for call in called):
                 missing.append(f"{path.relative_to(package.parent)} -> {sibling}")
 
     assert not missing, (

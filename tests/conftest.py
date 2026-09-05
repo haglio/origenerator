@@ -412,15 +412,26 @@ def _collect_widgets_between_tests():
     _deliver_the_deletions_already_scheduled()
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "real_thread_hop: leave the gallery's off-thread work on its pool thread")
+
+
 @pytest.fixture(autouse=True)
-def _recipe_match_runs_inline(monkeypatch):
+def _recipe_match_runs_inline(request, monkeypatch):
     """Let the gallery's off-thread work run straight through.
 
     The recipe match is asked on a pool thread in the app, because the model it
     asks thinks for several seconds and the window must stay alive. A test wants
-    the opposite: launch and inspect in one call, with no event loop to pump. One
-    test exercises the real hop (test_gallery_view) by putting this back.
+    the opposite: launch and inspect in one call, with no event loop to pump. The
+    one test that exercises the real hop (test_gallery_view) marks itself
+    ``real_thread_hop`` and this stays out of its way -- it used to put the hop
+    back with ``monkeypatch.undo()``, which undid every fixture's patches with
+    it and left that test on a real microphone and a real device.
     """
+    if request.node.get_closest_marker("real_thread_hop"):
+        return
     from origenerator.gui.gallery_view import GalleryView
 
     monkeypatch.setattr(GalleryView, "_run_off_thread",

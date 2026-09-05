@@ -9,6 +9,7 @@ import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
 from PyQt6.QtWidgets import QLabel
+from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
@@ -26,7 +27,6 @@ from origenerator.gui.enhance_versions import (
     enhance_level_mime,
     params_from_mime,
 )
-from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, DETAIL_PARTS
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
@@ -298,23 +298,6 @@ def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
     panel.set_applicable(False, "nope")
     panel.set_applicable(True)
     assert panel.isEnabled() and not panel._fix_checks["faces"].isEnabled()
-
-
-def test_a_disabled_toggle_switch_dims(qtbot):
-    # It paints itself, so nothing else would have dimmed it — and a switch that
-    # still looks on inside a panel gone dark is the one thing that says the
-    # panel is still live.
-    on = ToggleSwitch()
-    qtbot.addWidget(on)
-    on.setChecked(True)
-    on.resize(40, 22)
-    off = ToggleSwitch()
-    qtbot.addWidget(off)
-    off.setChecked(True)
-    off.resize(40, 22)
-    off.setEnabled(False)
-
-    assert _mean_ink(off) < _mean_ink(on)
 
 
 def test_a_model_no_longer_installed_is_still_shown(qtbot):

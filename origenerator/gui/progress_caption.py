@@ -42,7 +42,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import BG_PRIMARY, TIMELINE_ACTIVE
+from shared_ui.colors import BG_PRIMARY, BLUE_LIGHT
 
 _TEXT_MARGIN = 6  # breathing room at each end before the caption starts eliding
 _BAND_PX = 6      # the current pass's band, along the foot of a 26px bar
@@ -52,7 +52,7 @@ _BAND_RADIUS = 3  # the stylesheet's corner radius, so the band's ends match
 # blue family as the run's own fill, a shade up, so which is which is legible
 # whether the band lies over the filled part of the bar or the empty part.
 _BAND_TROUGH = BG_PRIMARY
-_BAND_FILL = TIMELINE_ACTIVE
+_BAND_FILL = BLUE_LIGHT
 
 
 class ProgressCaption(QProgressBar):

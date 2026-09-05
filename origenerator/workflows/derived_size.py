@@ -22,7 +22,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, COMFYUI_TEMP_DIR
 from origenerator.file_refs import reference_path
 
 # The default pixel budget (what the video workflows scale to in-graph) and the
@@ -53,11 +53,12 @@ def scale_to_total_pixels(
 def resolve_input_image_path(input_image: str | None) -> Path | None:
     """The on-disk file a LoadImage value names, or ``None`` when it's empty or
     absent — :func:`origenerator.file_refs.reference_path` under this app's
-    ComfyUI directories. A ``"name [output]"`` value lives under the output dir
-    and an ``"[input]"`` (or unannotated) one under the input dir, matching how
-    ComfyUI's LoadImage routes the reference. An absolute path is taken as-is."""
+    ComfyUI directories. A ``"name [output]"`` value lives under the output dir,
+    a ``"[temp]"`` one under the temp dir, and an ``"[input]"`` (or unannotated)
+    one under the input dir, matching how ComfyUI's LoadImage routes the
+    reference. An absolute path is taken as-is."""
     return reference_path(input_image, output_dir=COMFYUI_OUTPUT_DIR,
-                          input_dir=COMFYUI_INPUT_DIR)
+                          input_dir=COMFYUI_INPUT_DIR, temp_dir=COMFYUI_TEMP_DIR)
 
 
 def override_size(params: dict) -> tuple[int, int] | None:

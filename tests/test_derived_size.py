@@ -51,6 +51,18 @@ def test_resolve_input_image_routes_by_annotation(tmp_path, monkeypatch):
     assert resolve_input_image_path(None) is None
 
 
+def test_resolve_input_image_routes_a_temp_reference(tmp_path, monkeypatch):
+    # The third place LoadImage can point: ComfyUI's temp dir (bug 28).
+    temp_dir = tmp_path / "temp"
+    temp_dir.mkdir()
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path / "input")
+    monkeypatch.setattr(ds, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(ds, "COMFYUI_TEMP_DIR", temp_dir)
+    (temp_dir / "scratch.png").write_bytes(b"x")
+
+    assert resolve_input_image_path("scratch.png [temp]") == temp_dir / "scratch.png"
+
+
 def test_resolve_input_image_takes_an_absolute_path_as_is(tmp_path, monkeypatch):
     # Browse stores a full path verbatim (ComfyUI's LoadImage takes one outside
     # its input folder unchanged), so the resolver must honor an absolute path

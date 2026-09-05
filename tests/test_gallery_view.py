@@ -12231,12 +12231,17 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
 
 def _speak_request(view, qtbot, *utterances):
     """Say a request and wait for the app to have answered it — the revision is
-    worked out off the UI thread, so the answer arrives a hop later."""
+    worked out off the UI thread, so the answer arrives a hop later.
+
+    Answered means the promise the show holds while it works is taken down,
+    which only that request's own answer does.  It used to wait for the words
+    "working out" to leave the corner, inside a budget that was exactly the
+    note's own flash time -- which told answered from timed out only because
+    a hidden toast happens not to clear its text (bug 44).
+    """
     for text in utterances:
         view._voice.speak(text)
-    qtbot.waitUntil(
-        lambda: "working out" not in view._slideshow._note.text(), timeout=3000
-    )
+    qtbot.waitUntil(lambda: view._slideshow._working_request is None, timeout=5000)
 
 
 def _finish_reroll(view, job):

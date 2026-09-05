@@ -1,6 +1,7 @@
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
+    LONGEST_CLIP_FRAMES,
     ParamDef,
     WorkflowTemplate,
 )
@@ -33,7 +34,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_i2v"
-    version = "v005"
+    version = "v006"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     derives_size_from_input = True
@@ -100,10 +101,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("noise_seed", "Seed (High)", "seed", 0),
             ParamDef("seed", "Seed (Low)", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
-            ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
+            ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=LONGEST_CLIP_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
-            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
-            ParamDef("split_step", "Handoff Step (0 = half)", "int", 0, min_val=0, max_val=50),
+            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=100),
+            ParamDef("split_step", "Handoff Step (0 = half)", "int", 0, min_val=0, max_val=100),
             ParamDef("cfg_high", "Prompt Strength (High)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("cfg_low", "Prompt Strength (Low)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
@@ -141,20 +142,96 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         lora_low, model_low = self.lora_model_input(
             "7", ["5", 0], params["lora_low"], params["lora_strength_low"]
         )
-        foley, audio_ref = self.foley_audio_nodes("22", "23", "24", ["17", 0], params)
-        # The decode's frames are the clip's motion; the writer's are that motion
-        # shown more often. Foley above watches the former, CreateVideo below
-        # encodes the latter, and at the native rate they are the same frames.
-        interpolate, frames_ref = self.interpolation_nodes("25", ["17", 0], params)
         # Size the video off the input image: derived in-graph by default, or
         # scaled to the user's explicit WxH when the derived size was unlocked.
         size_nodes, start_ref, width_ref, height_ref = self.image_size_nodes(
             "20", "21", ["12", 0], params
         )
+
+        def segment(index, start, length, last):
+            clip_id, i2v_id, high_id, low_id, decode_id = (
+                ("13", "14", "15", "16", "17") if index == 0
+                else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
+            )
+            nodes = {
+                clip_id: {
+                    "class_type": "CLIPVisionEncode",
+                    "inputs": {
+                        "clip_vision": ["3", 0],
+                        "image": start,
+                        "crop": "center",
+                    },
+                },
+                i2v_id: {
+                    "class_type": "WanImageToVideo",
+                    "inputs": {
+                        "positive": ["10", 0],
+                        "negative": ["11", 0],
+                        "vae": ["2", 0],
+                        "clip_vision_output": [clip_id, 0],
+                        "start_image": start,
+                        "width": width_ref,
+                        "height": height_ref,
+                        "length": length,
+                        "batch_size": params["batch_size"],
+                    },
+                },
+                high_id: {
+                    "class_type": "KSamplerAdvanced",
+                    "inputs": {
+                        "model": ["8", 0],
+                        "positive": [i2v_id, 0],
+                        "negative": [i2v_id, 1],
+                        "latent_image": [i2v_id, 2],
+                        "add_noise": "enable",
+                        "noise_seed": params["noise_seed"] + index,
+                        "steps": params["steps"],
+                        "cfg": cfg_high,
+                        "sampler_name": params["sampler_name"],
+                        "scheduler": params["scheduler"],
+                        "start_at_step": 0,
+                        "end_at_step": split_step,
+                        "return_with_leftover_noise": "enable",
+                    },
+                },
+                low_id: {
+                    "class_type": "KSamplerAdvanced",
+                    "inputs": {
+                        "model": ["9", 0],
+                        "positive": [i2v_id, 0],
+                        "negative": [i2v_id, 1],
+                        "latent_image": [high_id, 0],
+                        "add_noise": "disable",
+                        "noise_seed": params["seed"] + index,
+                        "steps": params["steps"],
+                        "cfg": cfg_low,
+                        "sampler_name": params["sampler_name"],
+                        "scheduler": params["scheduler"],
+                        "start_at_step": split_step,
+                        "end_at_step": 10000,
+                        "return_with_leftover_noise": "disable",
+                    },
+                },
+                decode_id: {
+                    "class_type": "VAEDecode",
+                    "inputs": {"samples": [low_id, 0], "vae": ["2", 0]},
+                },
+            }
+            return nodes, [decode_id, 0]
+
+        # A clip longer than one segment is chained from each segment's last
+        # frame (WorkflowTemplate.chain_segments); its frames come back joined.
+        segments, decoded_ref = self.chain_segments(params, start_ref, segment)
+        foley, audio_ref = self.foley_audio_nodes("22", "23", "24", decoded_ref, params)
+        # The decode's frames are the clip's motion; the writer's are that motion
+        # shown more often. Foley above watches the former, CreateVideo below
+        # encodes the latter, and at the native rate they are the same frames.
+        interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)
         return {
             **foley,
             **interpolate,
             **size_nodes,
+            **segments,
             "1": {
                 "class_type": "CLIPLoader",
                 "inputs": {
@@ -200,68 +277,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "12": {
                 "class_type": "LoadImage",
                 "inputs": {"image": params["input_image"]},
-            },
-            "13": {
-                "class_type": "CLIPVisionEncode",
-                "inputs": {
-                    "clip_vision": ["3", 0],
-                    "image": ["12", 0],
-                    "crop": "center",
-                },
-            },
-            "14": {
-                "class_type": "WanImageToVideo",
-                "inputs": {
-                    "positive": ["10", 0],
-                    "negative": ["11", 0],
-                    "vae": ["2", 0],
-                    "clip_vision_output": ["13", 0],
-                    "start_image": start_ref,
-                    "width": width_ref,
-                    "height": height_ref,
-                    "length": params["frame_count"],
-                    "batch_size": params["batch_size"],
-                },
-            },
-            "15": {
-                "class_type": "KSamplerAdvanced",
-                "inputs": {
-                    "model": ["8", 0],
-                    "positive": ["14", 0],
-                    "negative": ["14", 1],
-                    "latent_image": ["14", 2],
-                    "add_noise": "enable",
-                    "noise_seed": params["noise_seed"],
-                    "steps": params["steps"],
-                    "cfg": cfg_high,
-                    "sampler_name": params["sampler_name"],
-                    "scheduler": params["scheduler"],
-                    "start_at_step": 0,
-                    "end_at_step": split_step,
-                    "return_with_leftover_noise": "enable",
-                },
-            },
-            "16": {
-                "class_type": "KSamplerAdvanced",
-                "inputs": {
-                    "model": ["9", 0],
-                    "positive": ["14", 0],
-                    "negative": ["14", 1],
-                    "latent_image": ["15", 0],
-                    "add_noise": "disable",
-                    "noise_seed": params["seed"],
-                    "steps": params["steps"],
-                    "cfg": cfg_low,
-                    "sampler_name": params["sampler_name"],
-                    "scheduler": params["scheduler"],
-                    "start_at_step": split_step,
-                    "end_at_step": 10000,
-                    "return_with_leftover_noise": "disable",
-                },
-            },
-            "17": {
-                "class_type": "VAEDecode",
-                "inputs": {"samples": ["16", 0], "vae": ["2", 0]},
             },
             "18": {
                 "class_type": "CreateVideo",

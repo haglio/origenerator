@@ -3,7 +3,14 @@ import json
 import pytest
 
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import RIFE_CHECKPOINT, ParamDef
+from origenerator.workflows.base import (
+    DURATION_OPTIONS,
+    RIFE_CHECKPOINT,
+    SINGLE_WINDOW_FRAMES,
+    ParamDef,
+    WorkflowTemplate,
+)
+from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
@@ -2082,9 +2089,12 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 
 # ---- video length and rate, as the form offers them ----
 
-@pytest.mark.parametrize("name", [
-    n for n, wf in WORKFLOW_REGISTRY.items() if "frame_count" in wf.default_params()
-])
+_VIDEO_WORKFLOWS = [
+    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
+]
+
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
@@ -2105,11 +2115,142 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     assert rate.max_val == MAX_PLAYBACK_FPS == max(rate.options)
 
 
-# ---- the frames between the frames ----
+@pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
+def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
+    # 30 s is the longest length on the Duration list. Read back through the
+    # same grid the form uses, the cap has to say exactly that, or the list
+    # offers a length it then greys out on every WAN 2.2 form.
+    defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    frames = defs["frame_count"]
+    assert seconds_for_frames(frames.max_val, NATIVE_FPS, frames) == max(DURATION_OPTIONS)
 
-_VIDEO_WORKFLOWS = [
-    n for n, wf in WORKFLOW_REGISTRY.items() if "frame_count" in wf.default_params()
-]
+
+@pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
+def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
+    # More steps cost only time, and a long clip already costs hours of it;
+    # a step count the machine can finish is nothing the form should refuse.
+    defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    assert defs["steps"].max_val == 100
+    if "split_step" in defs:
+        assert defs["split_step"].max_val == defs["steps"].max_val
+
+
+def _segments(payload: dict, conditioning: str) -> list[dict]:
+    """A clip's conditioning nodes in the order their segments run: the first
+    is fed by the scaled start image, each later one by a frame cut out of the
+    decode before it, whose samplers lead back to the previous conditioning."""
+    nodes = [n for n in payload.values() if n["class_type"] == conditioning]
+
+    def position(node):
+        start = payload[node["inputs"]["start_image"][0]]
+        if start["class_type"] != "ImageFromBatch":
+            return 0
+        decode = payload[start["inputs"]["image"][0]]
+        low = payload[decode["inputs"]["samples"][0]]
+        high = payload[low["inputs"]["latent_image"][0]]
+        return 1 + position(payload[high["inputs"]["latent_image"][0]])
+
+    return sorted(nodes, key=position)
+
+
+@pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
+def test_a_clip_that_fits_one_segment_renders_on_the_graph_it_always_has(name):
+    # A clip of today's lengths is one segment: one conditioning node, fed by
+    # the scaled start image, nothing cut out of a decode or joined back on.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=SINGLE_WINDOW_FRAMES))
+    kinds = [n["class_type"] for n in payload.values()]
+    assert kinds.count("KSamplerAdvanced") == 2
+    assert "ImageFromBatch" not in kinds and "ImageBatch" not in kinds
+
+
+def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame():
+    # 481 frames as one window is 31 GB of activations on a 16 GB card, and
+    # windows blended over each other crossfade and drift. So a long clip is
+    # rendered as clips of the longest length one window takes, each started
+    # from the last frame the one before it decoded: no blend, one scene.
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
+    segments = _segments(payload, "WanImageToVideo")
+    assert [seg["inputs"]["length"] for seg in segments] == [161, 161, 161]
+    for segment in segments[1:]:
+        last = payload[segment["inputs"]["start_image"][0]]
+        assert last["class_type"] == "ImageFromBatch"
+        assert (last["inputs"]["batch_index"], last["inputs"]["length"]) == (160, 1)
+        # the same frame is what its CLIP-Vision conditioning looks at
+        clip = payload[segment["inputs"]["clip_vision_output"][0]]
+        assert clip["inputs"]["image"] == segment["inputs"]["start_image"]
+
+
+def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_frame():
+    # The loop's two endpoints are the same image. Chained, only the last
+    # segment is told to end on it -- an earlier one ending there would close
+    # the loop early and then have to leave it again -- and each segment after
+    # the first starts on the frame before it.
+    wf = Wan22Flf2vLoopWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
+    segments = _segments(payload, "WanFirstLastFrameToVideo")
+    assert [seg["inputs"]["length"] for seg in segments] == [161, 161, 161]
+    start = segments[0]["inputs"]["start_image"]
+    assert "end_image" not in segments[0]["inputs"]
+    assert "end_image" not in segments[1]["inputs"]
+    assert segments[2]["inputs"]["end_image"] == start
+    for segment in segments[1:]:
+        last = payload[segment["inputs"]["start_image"][0]]
+        assert (last["class_type"], last["inputs"]["batch_index"], last["inputs"]["length"]) == ("ImageFromBatch", 160, 1)
+
+
+def test_a_chained_clip_hands_the_writer_every_frame_once_in_order():
+    # Each later segment's first frame IS the previous segment's last, so the
+    # join takes a segment's frames from its second on: 161 + 160 + 160 = 481,
+    # with each seam one shared frame long.
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=481))
+    joined = payload[_find_node(payload, "CreateVideo")["inputs"]["images"][0]]
+    pieces = []
+    while joined["class_type"] == "ImageBatch":
+        new = payload[joined["inputs"]["image2"][0]]
+        assert (new["class_type"], new["inputs"]["batch_index"]) == ("ImageFromBatch", 1)
+        pieces.insert(0, new["inputs"]["length"])
+        joined = payload[joined["inputs"]["image1"][0]]
+    assert joined["class_type"] == "VAEDecode"
+    first = payload[payload[payload[joined["inputs"]["samples"][0]]["inputs"]["latent_image"][0]]["inputs"]["latent_image"][0]]
+    assert [first["inputs"]["length"]] + pieces == [161, 160, 160]
+    # Foley scores the same joined frames the writer encodes
+    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["image"] == _find_node(payload, "CreateVideo")["inputs"]["images"]
+
+
+def test_each_chained_segment_draws_its_own_noise():
+    # The same seed on every segment would replay the same motion from each
+    # new start frame; the segments step the stored seeds instead, so a run
+    # still reproduces from the one seed pair its row records.
+    wf = Wan22I2vWorkflow()
+    params = dict(wf.default_params(), frame_count=481, noise_seed=1000, seed=2000)
+    payload = wf.build_api_payload(params)
+    highs = sorted(n["inputs"]["noise_seed"] for n in payload.values()
+                   if n["class_type"] == "KSamplerAdvanced" and n["inputs"]["add_noise"] == "enable")
+    lows = sorted(n["inputs"]["noise_seed"] for n in payload.values()
+                  if n["class_type"] == "KSamplerAdvanced" and n["inputs"]["add_noise"] == "disable")
+    assert highs == [1000, 1001, 1002]
+    assert lows == [2000, 2001, 2002]
+
+
+def test_segment_lengths_stay_on_the_models_frame_grid():
+    # 4k+1 frames per segment, the first as long as one window takes, and
+    # every later one rendering the shared frame plus what it adds.
+    lengths = WorkflowTemplate.segment_lengths
+    assert lengths(21) == [21]
+    assert lengths(161) == [161]
+    assert lengths(165) == [161, 5]
+    assert lengths(241) == [161, 81]
+    assert lengths(481) == [161, 161, 161]
+    for count in range(5, 482, 4):
+        parts = lengths(count)
+        assert parts[0] + sum(n - 1 for n in parts[1:]) == count
+        assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
+
+
+# ---- the frames between the frames ----
 
 
 def _video_writer(payload: dict) -> tuple[dict, str]:

@@ -1,3 +1,5 @@
+import os
+
 from PIL import Image
 from PyQt6.QtCore import Qt
 
@@ -161,6 +163,21 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
 
     assert reads == []
     assert again is not None  # answered from the cache, not re-fitted to nothing
+
+
+def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
+    # A start frame enhanced in place, or a thumbnail written again, is the
+    # same path with new pixels; the cache keyed by path alone kept drawing
+    # the old picture until the app restarted (bug 27).
+    picture = _picture(tmp_path / "a.png", (255, 0, 0))
+    queue_thumbs._CELLS.clear()
+    assert _color_at(source_pixmap(picture, CELL), CELL // 2, CELL // 2).red() > 200
+
+    _picture(tmp_path / "a.png", (0, 0, 255))
+    later = os.stat(picture).st_mtime_ns + 2_000_000_000
+    os.utime(picture, ns=(later, later))
+
+    assert _color_at(source_pixmap(picture, CELL), CELL // 2, CELL // 2).blue() > 200
 
 
 def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):

@@ -12,19 +12,15 @@ worktree.
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
+
+from app_support.siblings import ensure_sibling_importable
+from app_support.siblings import sibling_checkout as _sibling_checkout
 
 
 def sibling_checkout(name: str) -> Path:
     """Return the *name* checkout dir (its ``name/`` child is the package)."""
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        checkout = parent / name
-        if (checkout / name / "__init__.py").exists():
-            return checkout
-    raise RuntimeError(f"Could not locate the {name} package above {here}")
+    return _sibling_checkout(name, near=Path(__file__))
 
 
 def ensure_sibling_on_path(name: str) -> None:
@@ -43,12 +39,7 @@ def ensure_sibling_on_path(name: str) -> None:
     hit is not a choice anyone made — it is the shadow this function exists to
     step past.
     """
-    spec = importlib.util.find_spec(name)
-    if spec is not None and spec.origin is not None:
-        return
-    root = str(sibling_checkout(name))
-    if root not in sys.path:
-        sys.path.insert(0, root)
+    ensure_sibling_importable(name, near=Path(__file__))
 
 
 def ensure_shared_ui_on_path() -> None:

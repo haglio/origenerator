@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Any
 
+from app_support import siblings
 from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
 
-from origenerator.content import load_content
+from origenerator.content import load_content, overlay_value
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_DIR / "state"
@@ -15,7 +16,7 @@ _CONTENT = load_content()
 # Public now: the tests assert which paths still hang off the media-library root
 # and which come from the project roots, and that split is the thing worth
 # pinning -- getting it backwards silently repoints a live app at nothing.
-SUITE_ROOT = Path(_CONTENT["suite_root"])
+SUITE_ROOT = Path(overlay_value(_CONTENT, "suite_root"))
 
 
 def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
@@ -32,10 +33,9 @@ def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
     overlay that says nothing still means ``suite_root/projects``, as before.
     """
     content = _CONTENT if content is None else content
-    roots = content.get("project_roots")
-    if not roots:
-        return (Path(content["suite_root"]) / "projects",)
-    return tuple(Path(root) for root in roots)
+    return siblings.project_roots(
+        content.get("project_roots"),
+        fallback=Path(overlay_value(content, "suite_root")) / "projects")
 
 
 PROJECT_ROOTS = project_roots()
@@ -70,12 +70,7 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     here already guards on existence (the OSR2 handoff is a no-op when the
     broker isn't running), so a missing sibling must not be an import-time crash.
     """
-    roots = PROJECT_ROOTS if roots is None else roots
-    for root in roots:
-        candidate = root / name
-        if candidate.is_dir():
-            return candidate
-    return roots[0] / name
+    return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
 # The media library and the third-party apps live outside this repo; their

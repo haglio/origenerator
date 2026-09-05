@@ -96,7 +96,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("frame_count", "Duration", "int", 21, min_val=5, max_val=LONGEST_CLIP_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
-            ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=50),
+            ParamDef("steps", "Steps", "int", 4, min_val=1, max_val=100),
             ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 5.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 5.0, min_val=0.0, max_val=20.0, step=0.5),

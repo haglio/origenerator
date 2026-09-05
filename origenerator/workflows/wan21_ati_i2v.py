@@ -140,7 +140,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=113, step=4,
                      options=DURATION_OPTIONS, unit="s", rate=NATIVE_FPS),
-            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
+            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=100),
             ParamDef("cfg", "Prompt Strength", "float", 5.0, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Shift", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet", "Model", "combo", defaults["unet"], options=models),

@@ -28,6 +28,15 @@ SCHEDULER_OPTIONS = [
 # because those are the rates the frame interpolator can produce the frames for
 # — see :mod:`origenerator.workflows.frame_rate`.
 DURATION_OPTIONS = [1, 5, 10, 15, 30]
+# The longest of those, in frames at the native rate on the models' 4k+1 grid.
+LONGEST_CLIP_FRAMES = 481
+# Sampled as one window, a clip's activations grow with its length: measured
+# on the 16 GB card, 165 frames at the video pixel budget is 10.5 GB and 481
+# is 31 GB, which Windows pages through system RAM at a crawl rather than
+# refusing. A longer clip is rendered as a chain of clips this long, each
+# started from the last frame of the one before -- :meth:`WorkflowTemplate.
+# chain_segments`.
+SINGLE_WINDOW_FRAMES = 161
 FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
 # The interpolation model that fills in the frames between the generated ones
@@ -241,6 +250,58 @@ class WorkflowTemplate(ABC):
             }
         }
         return node, [node_id, 0]
+
+    @staticmethod
+    def segment_lengths(frame_count: int) -> list[int]:
+        """How a clip's frames split into segments of at most
+        :data:`SINGLE_WINDOW_FRAMES`: the first as long as it can be, each
+        later one starting on the frame before it ended, so it renders one
+        frame more than it adds. Every length stays on the models' 4k+1 grid
+        because ``frame_count`` is on it.
+        """
+        lengths = [min(frame_count, SINGLE_WINDOW_FRAMES)]
+        remaining = frame_count - lengths[0]
+        while remaining > 0:
+            length = min(SINGLE_WINDOW_FRAMES, remaining + 1)
+            lengths.append(length)
+            remaining -= length - 1
+        return lengths
+
+    @classmethod
+    def chain_segments(cls, params: dict, start_ref, render):
+        """The whole clip as segments chained from each other's last frame,
+        and the IMAGE ref holding every frame in order.
+
+        ``render(index, start_ref, length, last)`` builds one segment -- its
+        conditioning, samplers and decode -- from the image ref it starts on,
+        and returns ``(nodes, frames_ref)``; ``last`` says it is the final
+        one. Segment 0 starts on ``start_ref`` and keeps the graph's own node
+        ids, so a clip that fits one segment is the graph it always was. Each
+        later segment starts on the frame the previous one ended on (cut out
+        with ``ImageFromBatch``), and joins the frames after that shared one
+        onto the clip (``ImageBatch``), so the seam is one frame long.
+        """
+        lengths = cls.segment_lengths(params["frame_count"])
+        nodes, frames = render(0, start_ref, lengths[0], len(lengths) == 1)
+        joined, previous, previous_length = frames, frames, lengths[0]
+        for index, length in enumerate(lengths[1:], start=1):
+            prefix = f"s{index}_"
+            nodes[prefix + "last"] = {
+                "class_type": "ImageFromBatch",
+                "inputs": {"image": previous, "batch_index": previous_length - 1, "length": 1},
+            }
+            segment, frames = render(index, [prefix + "last", 0], length, index == len(lengths) - 1)
+            nodes.update(segment)
+            nodes[prefix + "new"] = {
+                "class_type": "ImageFromBatch",
+                "inputs": {"image": frames, "batch_index": 1, "length": length - 1},
+            }
+            nodes[prefix + "join"] = {
+                "class_type": "ImageBatch",
+                "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
+            }
+            joined, previous, previous_length = [prefix + "join", 0], frames, length
+        return nodes, joined
 
     @staticmethod
     def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict,

@@ -8,7 +8,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import BG_PRIMARY, BLUE, TIMELINE_ACTIVE
+from shared_ui.colors import BG_PRIMARY, BLUE, BLUE_LIGHT
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def test_the_band_fills_with_the_pass_it_measures(styled_bar):
     image = styled_bar.grab().toImage()
     foot = _foot(styled_bar)
 
-    assert image.pixelColor(8, foot) == TIMELINE_ACTIVE
+    assert image.pixelColor(8, foot) == BLUE_LIGHT
     # Its own count, not the bar's: nearly through this fix, and the far end of
     # the band is the little that is left of it.
     assert image.pixelColor(styled_bar.width() - 9, foot) == BG_PRIMARY
@@ -146,7 +146,7 @@ def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
     band = range(styled_bar.height() - 7, styled_bar.height() - 1)
     middle = range(styled_bar.width() // 3, styled_bar.width() * 2 // 3)
     written = [(x, y) for y in band for x in middle
-               if image.pixelColor(x, y) not in (TIMELINE_ACTIVE, BG_PRIMARY)]
+               if image.pixelColor(x, y) not in (BLUE_LIGHT, BG_PRIMARY)]
     assert written
 
 
@@ -156,4 +156,4 @@ def test_a_sweeping_bar_grows_no_band(styled_bar):
     styled_bar.show_progress("Waiting behind 2 jobs from another app", None, (3, 20))
     image = styled_bar.grab().toImage()
 
-    assert image.pixelColor(8, _foot(styled_bar)) != TIMELINE_ACTIVE
+    assert image.pixelColor(8, _foot(styled_bar)) != BLUE_LIGHT

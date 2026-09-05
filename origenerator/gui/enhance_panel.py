@@ -49,7 +49,6 @@ from origenerator.gui.no_wheel import (
     NoWheelSpinBox,
 )
 from origenerator.gui.param_help import param_help
-from origenerator.gui.toggle_switch import ToggleSwitch
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
@@ -65,6 +64,7 @@ ensure_shared_ui_on_path()
 
 from shared_ui.check_box import CheckBox
 from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
+from shared_ui.toggle_switch import ToggleSwitch
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "

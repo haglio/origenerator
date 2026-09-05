@@ -2,11 +2,11 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
+from shared_ui.chrome import family_stylesheet
 from shared_ui.colors import (
     BG_BUTTON,
     BG_BUTTON_ACTIVE,
     BG_KEYCAP,
-    BG_PRIMARY,
     BG_SECONDARY,
     BG_TERTIARY,
     BLUE,
@@ -52,11 +52,11 @@ def _spin_arrow_rules() -> str:
 
 
 def build_stylesheet() -> str:
+    """The family's sheet -- ground, tooltip, menus, push buttons -- with this
+    app's own rules after it, where a later rule of equal weight wins and an
+    id out-specifies anything the family says."""
     return f"""
-    QMainWindow, QWidget {{
-        background-color: {_h(BG_PRIMARY)};
-        color: {_h(TEXT_PRIMARY)};
-    }}
+{family_stylesheet()}
     QLabel {{
         color: {_h(TEXT_SECONDARY)};
     }}
@@ -65,18 +65,6 @@ def build_stylesheet() -> str:
     }}
     QLabel#dimensionsHint {{
         color: {_h(TEXT_MUTED)};
-    }}
-    QToolTip {{
-        /* Tooltips are top-level popups, so this rule only reaches them because
-           the sheet is set on the QApplication (see app.main) — on a window it
-           is inert, and the tooltips fall back to the native palette, which
-           Windows 11's dark mode renders unreadably (light-on-light; the
-           "missing" tooltips). Styled explicitly, and with square corners: a
-           rounded stylesheet tooltip on Windows paints artifact boxes. */
-        background-color: {_h(BG_TERTIARY)};
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        padding: 4px 6px;
     }}
     QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox {{
         background-color: {_h(BG_SECONDARY)};
@@ -158,61 +146,6 @@ def build_stylesheet() -> str:
     QRadioButton::indicator:checked {{
         background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
             stop:0.66 {_h(TEXT_PRIMARY)}, stop:0.78 {_h(BG_SECONDARY)});
-    }}
-    /* Every right-click menu in the app. The app-wide QWidget rule above paints a
-       menu's items on the same flat background as the menu itself, which leaves
-       the row under the cursor looking exactly like the rows either side of it —
-       so a menu gives no sign of what a click would land on. These put the
-       highlight back, in the same blue a dropdown marks its rows with. */
-    QMenu {{
-        background-color: {_h(BG_TERTIARY)};
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        padding: 4px 0;
-    }}
-    QMenu::item {{
-        /* Room for the highlight to read as a band across the row rather than a
-           rectangle crowding the text. */
-        padding: 6px 20px;
-        background-color: transparent;
-    }}
-    QMenu::item:selected {{
-        background-color: {_h(BLUE)};
-        color: {_h(TEXT_PRIMARY)};
-    }}
-    QMenu::item:disabled {{
-        color: {_h(TEXT_MUTED)};
-    }}
-    QMenu::item:disabled:selected {{
-        /* Hovering something unclickable must not promise a click. */
-        background-color: transparent;
-        color: {_h(TEXT_MUTED)};
-    }}
-    QMenu::separator {{
-        height: 1px;
-        background-color: {_h(BORDER_SUBTLE)};
-        margin: 4px 0;
-    }}
-    QPushButton {{
-        background-color: {_h(BG_BUTTON)};
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 4px;
-        padding: 6px 16px;
-    }}
-    QPushButton:hover {{
-        background-color: {_h(BG_TERTIARY)};
-    }}
-    QPushButton:checked {{
-        background-color: {_h(BG_BUTTON_ACTIVE)};
-    }}
-    QPushButton:pressed {{
-        background-color: {_h(BLUE)};
-    }}
-    QPushButton:disabled {{
-        background-color: {_h(BG_SECONDARY)};
-        color: {_h(TEXT_MUTED)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
     }}
     /* Generate is set apart by colour and weight only, not size, so it sits the
        same height as the other buttons in its row (Go-to-folder, Send-to-Evolver,

@@ -1,10 +1,27 @@
-"""Shared fixtures — and the overlay pin.
+"""Shared fixtures — the overlay pin, and the state directory of the suite's own.
 
 The suite runs against the committed example overlay, never the developer's
 git-ignored content.local.json, so a run here matches a public checkout.
 pytest imports this before any test module, and the app loads its content at
 import, so the pin has to happen here.
+
+The same goes for where the app keeps its state: config binds STATE_DIR at
+import and every module that reads it binds its own copy, so the one place a
+run can be pointed at a directory of its own is the environment, before the
+first origenerator import.  A run used to leave a log, arrow PNGs, thumbnails,
+trash and a real recording in the checkout's live state/, and what one run
+left behind decided what the next one drew.
 """
+import atexit
+import os
+import shutil
+import tempfile
+
+if "ORIGENERATOR_STATE_DIR" not in os.environ:
+    _suite_state_dir = tempfile.mkdtemp(prefix="origenerator-suite-")
+    os.environ["ORIGENERATOR_STATE_DIR"] = _suite_state_dir
+    atexit.register(shutil.rmtree, _suite_state_dir, True)
+
 # Before anything that can pull PyQt6 in: the voice stack's native DLLs
 # (whisper's engine, its VAD, and torch where installed) die with a plain
 # access violation when first loaded AFTER Qt — the same crash

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,15 @@ from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
 from origenerator.content import load_content, overlay_value
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
-STATE_DIR = PROJECT_DIR / "state"
+# The checkout's own state directory, unless the process says otherwise.  Only
+# the suite says otherwise: it points every run at a fresh temporary directory
+# before this module is imported, so three thousand tests stop writing a log,
+# the spin-box arrows, thumbnails, trash and a diagnostic recording into the
+# live app's state/ -- where what a previous run left behind decided what the
+# next one drew.  Every path below hangs off it, and every module that binds
+# one of them at import gets the same answer, which a test's monkeypatch of
+# this module never could.
+STATE_DIR = Path(os.environ.get("ORIGENERATOR_STATE_DIR") or PROJECT_DIR / "state")
 DB_PATH = STATE_DIR / "origenerator.db"
 THUMB_DIR = STATE_DIR / "thumbnails"
 UI_STATE_PATH = STATE_DIR / "ui_state.json"

@@ -28,6 +28,8 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
+from app_support import overlay as _overlay
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 LOCAL_CONTENT = PROJECT_DIR / "content.local.json"
 EXAMPLE_CONTENT = PROJECT_DIR / "content.example.json"
@@ -43,9 +45,8 @@ def overlay_path(
     example_path: Path | None = None,
 ) -> Path:
     """The file :func:`load_content` will read: the local overlay, or the example."""
-    local_path = LOCAL_CONTENT if local_path is None else local_path
-    example_path = EXAMPLE_CONTENT if example_path is None else example_path
-    return local_path if local_path.exists() else example_path
+    return _overlay.overlay_path(LOCAL_CONTENT if local_path is None else local_path,
+                                 EXAMPLE_CONTENT if example_path is None else example_path)
 
 
 def load_content(
@@ -78,31 +79,12 @@ def missing_overlay_keys(
     Empty when there is no local overlay at all: a fresh or public checkout runs
     on the example, so there is nothing to be short of.
     """
-    local_path = LOCAL_CONTENT if local_path is None else local_path
-    example_path = EXAMPLE_CONTENT if example_path is None else example_path
-    if not local_path.exists():
-        return ()
-    documented = {key for key in json.loads(_text(example_path)) if key != "_comment"}
-    return tuple(sorted(documented - set(json.loads(_text(local_path)))))
+    return _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
+                                 EXAMPLE_CONTENT if example_path is None else example_path)
 
 
-class MissingOverlayKey(LookupError):
-    """A key the overlay has to carry, and does not — named, with its file.
-
-    The overlay replaces the committed example rather than merging with it, so a
-    ``content.local.json`` written before a key existed simply does not have it.
-    A bare ``KeyError`` out of a module scope says neither which key nor which
-    file, and arrives before there is a window to say it in.
-    """
-
-    def __init__(self, keys: tuple[str, ...], path: Path | None = None):
-        self.keys = tuple(keys)
-        self.path = overlay_path() if path is None else path
-        super().__init__(
-            f"the content overlay {self.path} has no "
-            f"{' -> '.join(self.keys)}. It replaces content.example.json rather "
-            f"than merging with it, so it has to carry every key that one does."
-        )
+# The named refusal is the family's; what is this repo's is which file it names.
+MissingOverlayKey = _overlay.MissingOverlayKey
 
 
 def overlay_value(content: dict[str, Any], *keys: str) -> Any:
@@ -113,9 +95,4 @@ def overlay_value(content: dict[str, Any], *keys: str) -> Any:
     overlay tolerantly instead (``content.get(key) or default``), the way
     ``workflows.detail_parts`` does.
     """
-    here: Any = content
-    for depth, key in enumerate(keys, start=1):
-        if not isinstance(here, dict) or key not in here:
-            raise MissingOverlayKey(keys[:depth])
-        here = here[key]
-    return here
+    return _overlay.overlay_value(content, *keys, path=overlay_path())

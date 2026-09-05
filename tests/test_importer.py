@@ -14,6 +14,7 @@ from origenerator.importer import (
     import_comfyui_output,
     merge_video_sidecar_rows,
 )
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 
 def _make_png_with_metadata(path, prompt_data):
@@ -667,6 +668,26 @@ def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
     _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
 
     assert imp._extract_metadata(path, ".png")["workflow_name"] == "wan22_i2v"
+
+
+@pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
+def test_every_workflows_own_output_re_imports_as_itself(tmp_path, name):
+    """A file named by a workflow's own prefix and carrying that workflow's own
+    graph is that workflow's output.  Two workflows build the same kind of
+    graph as a third -- the pose transfer and the standalone enhance both load
+    an SDXL checkpoint -- and the graph read, which overrules the filename,
+    filed a re-import of either under sdxl_t2i although the filename had it
+    right (bug 70).  The graph overrules only where it can tell the two apart."""
+    import origenerator.importer as imp
+
+    workflow = WORKFLOW_REGISTRY[name]
+    prefix = workflow.default_params().get("filename_prefix", "").rsplit("/", 1)[-1]
+    if not prefix:
+        pytest.skip(f"{name} names no output prefix")
+    path = tmp_path / f"{prefix}_00001_.png"
+    _make_png_with_metadata(path, workflow.build_api_payload(dict(workflow.default_params())))
+
+    assert imp._extract_metadata(path, ".png")["workflow_name"] == name
 
 
 def test_a_graph_that_names_nothing_leaves_the_filenames_guess_standing(tmp_path):

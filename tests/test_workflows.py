@@ -2042,11 +2042,11 @@ READS_AS = {
     "wan22_t2i": "wan22_t2i",
     "wan22_flf2v_loop": "wan22_flf2v_loop",
     "wan22_i2v": "wan22_i2v",
-    # WRONG, and pinned as wrong rather than fixed here (backlog §3.5, found
-    # 2026-08-31). Both build an SDXL checkpoint graph, so the chain's last
-    # branch claims them — and because the graph overrules the filename, a
-    # re-imported pose-transfer or standalone-enhance output is filed under
-    # sdxl_t2i even though its own filename prefix names it correctly.
+    # Both build an SDXL checkpoint graph, so the chain's last branch claims
+    # them; the graph cannot tell them from sdxl_t2i.  Which is why the graph
+    # no longer overrules a filename naming a workflow whose own graph reads
+    # the same way (bug 70; tests/test_importer.py holds every workflow's own
+    # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
     # Not recognized at all, which here is the right answer: nothing in the

@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import os
@@ -491,6 +492,29 @@ def _workflow_from_nodes(graph: dict) -> str | None:
     )
 
 
+@functools.cache
+def _own_graph_reads_as(name: str) -> str | None:
+    """What the chain reads a registered workflow's own default graph as."""
+    workflow = WORKFLOW_REGISTRY[name]
+    return _workflow_from_nodes(workflow.build_api_payload(dict(workflow.default_params())))
+
+
+def _reconciled(filename_guess: str, graph_read: str | None) -> str:
+    """The workflow name the two witnesses agree on.
+
+    The graph overrules the filename -- a file can be renamed and a prefix
+    reused -- except where it cannot tell the filename's workflow from the one
+    it read: two workflows building the same kind of graph (an SDXL checkpoint
+    graph, say) both read as one of them, and a filename naming the other is
+    then the better witness, not the worse.
+    """
+    if graph_read is None:
+        return filename_guess
+    if filename_guess in WORKFLOW_REGISTRY and _own_graph_reads_as(filename_guess) == graph_read:
+        return filename_guess
+    return graph_read
+
+
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
     """What an output file says about the run that made it.
 
@@ -498,7 +522,8 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     prompts, the conditioning dimensions, the input image, the sampler settings
     and the seed, the model files, and which workflow the node classes name. The
     filename's prefix is the first guess at that last one and the graph overrules
-    it, because a file can be renamed and a prefix reused.
+    it where it can tell (:func:`_reconciled`), because a file can be renamed and
+    a prefix reused.
     """
     result: dict = {
         "workflow_name": infer_workflow_name(fpath.name) or "unknown",
@@ -531,7 +556,7 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         negative_prompt=negative,
         seed=seed,
         params=params,
-        workflow_name=_workflow_from_nodes(graph) or result["workflow_name"],
+        workflow_name=_reconciled(result["workflow_name"], _workflow_from_nodes(graph)),
     )
     return result
 

@@ -3,15 +3,15 @@
 Everything else in the gallery tree is derived — a folder exists because some
 generation's settings put it there. A custom folder is the opposite: the user
 picks folders (Shift/Ctrl in the tree, or a drag onto its row) and names the
-result. It holds *references* to folders, never copies of them, so a member
+result. It holds *references* to folders, never copies of them, so a gathered
 folder keeps its place in the hierarchy and gaining or losing generations
 updates every custom folder that gathers it.
 
-A saved folder is stored as a name plus a member list (see
+A saved folder is stored as a name plus an item list (see
 :meth:`origenerator.db.Database.list_custom_folders`); :func:`build_custom_folders`
-resolves those member keys against the freshly built tree into a
+resolves those item keys against the freshly built tree into a
 :class:`~origenerator.gallery.groups.CustomGroup`, which answers the same walkers
-every other folder does. A member whose folder isn't in the tree right now — its
+every other folder does. An item whose folder isn't in the tree right now — its
 generations deleted, or its key drifted before the reconcile catches up — is
 simply skipped rather than dropped from the saved list, so a folder that comes
 back rejoins the grouping it was in.
@@ -52,7 +52,7 @@ def is_custom_key(key) -> bool:
 
 
 def index_folders(tree: list) -> dict:
-    """Every folder in ``tree`` by key, at any depth — how a member reference is
+    """Every folder in ``tree`` by key, at any depth — how an item reference is
     resolved back to the live folder it points at."""
     found: dict = {}
 
@@ -69,17 +69,17 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
     """Resolve saved custom folders against ``tree``.
 
     ``records`` are the rows :meth:`Database.list_custom_folders` returns —
-    ``{"id", "name", "members"}`` with ``members`` a list of folder keys in the
-    order they were added. Members that don't resolve are skipped (see the module
+    ``{"id", "name", "items"}`` with ``items`` a list of folder keys in the
+    order they were added. Items that don't resolve are skipped (see the module
     docstring); an empty folder still appears, since a folder you have made and
     named but not yet filled is exactly where you are about to drop something.
     """
     index = index_folders(tree)
     folders = []
     for record in records:
-        members = [index[key] for key in record["members"] if key in index]
+        items = [index[key] for key in record["items"] if key in index]
         folders.append(CustomGroup(
-            custom_folder_key(record["id"]), record["name"], members,
+            custom_folder_key(record["id"]), record["name"], items,
             folder_id=record["id"],
         ))
     return folders

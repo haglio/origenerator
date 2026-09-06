@@ -112,7 +112,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     """The key of the ``level``-tier folder ``row`` belongs to, recomputed from the
     row under the *current* key formulas.
 
-    A bookmark stores its tier and a representative member row; recomputing here
+    A bookmark stores its tier and a representative row under it; recomputing here
     re-derives the folder's key so a star or custom name follows the folder even
     after a key formula changes — the silent orphaning the reconcile undoes.
     ``image_index`` (see :func:`build_image_config_index`) lets the source-image
@@ -209,20 +209,20 @@ def legacy_preversion_settings_folder_key(row: dict, image_index: dict | None = 
     return settings_key(media_type, workflow_name, signature)
 
 
-def legacy_preenhance_settings_folder_keys(members, image_index: dict | None = None) -> set[str]:
-    """The settings-folder keys a folder's ``members`` were split across before
+def legacy_preenhance_settings_folder_keys(rows, image_index: dict | None = None) -> set[str]:
+    """The settings-folder keys a folder's ``rows`` were split across before
     the enhancement layer left the signature: today's key with the enhance tail's
     params folded back in.
 
     The fourth historical formula shift, and the only one that *merged* folders —
     an enhanced render and its unenhanced twin used to be two. So this takes the
-    whole member list and returns a key per distinct enhance setting found among
-    them, rather than one key from a single member: a star sitting on either old
+    whole row list and returns a key per distinct enhance setting found among
+    them, rather than one key from a single row: a star sitting on either old
     folder must find its way to the merged one. The reconcile recomputes these to
     re-point a star or name made under that formula — one made since the last
     reconcile, so its stored identity was never backfilled."""
     keys = set()
-    for row in members:
+    for row in rows:
         media_type = media_type_of_row(row)
         workflow_name = row.get("workflow_name") or "unknown"
         params = parse_params(row.get("params_json"))
@@ -605,7 +605,7 @@ def build_gallery_tree(
     it to a single "(no LoRA)" folder. The source-image level appears only under
     a video workflow folder (a still an image-conditioned workflow output is
     grouped like any other image). Which rows are nested at all is
-    :func:`placeable_rows`. Folders appear in the order their first member appears
+    :func:`placeable_rows`. Folders appear in the order their first row appears
     in ``rows`` (the caller orders rows newest-first); a star never moves a folder
     — bookmarks are gathered by :func:`starred_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and

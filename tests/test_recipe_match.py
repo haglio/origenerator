@@ -2,7 +2,7 @@
 
 Each act maps to a single recipe — the most-used model+params among the user's
 videos of that act — resolved fresh from the gallery rows. Pure and Qt-free, so the
-grouping and act-membership logic is exercised without a database or a widget.
+grouping and act-matching logic is exercised without a database or a widget.
 """
 
 import json
@@ -11,7 +11,7 @@ from origenerator import recipe_match
 
 
 def _video(pid, prompt, created, **params):
-    """A completed i2v row: its prompt (act membership), created_at (recency), and
+    """A completed i2v row: its prompt (which act it depicts), created_at (recency), and
     the params that define its recipe."""
     return {
         "prompt_id": pid,
@@ -35,7 +35,7 @@ def test_best_recipe_picks_the_most_used_recipe_for_the_act():
         _video("b1", "an alpha form scene", "2026-01-03", lora_high="Y", steps=20),    # a rarer recipe
         _video("h1", "a beta", "2026-01-09", lora_high="Z", steps=20),        # a different act
     ]
-    # recipe X (used twice) beats recipe Y (once); its most-recent member represents it.
+    # recipe X (used twice) beats recipe Y (once); its most-recent row represents it.
     assert recipe_match.best_recipe("alpha", rows) == "a2"
 
 
@@ -159,7 +159,7 @@ def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_
         "alpha", "a prominent anchor in the frame", rows,
         base_url="x", model="m", system_prompt="S", timeout=1,
     )
-    # recipe X is one option (its most-recent member x2 represents it), recipe Y another.
+    # recipe X is one option (its most-recent row x2 represents it), recipe Y another.
     assert got == "x2"                                     # choice 0 → recipe X's representative
     assert "his anchor already in her grip" in seen["user"]  # X shown by x2's start scene, not x1's
     assert "she waits, no anchor in frame" in seen["user"]   # Y is offered too
@@ -173,7 +173,7 @@ def test_smart_recipe_returns_none_without_a_video_of_the_act(monkeypatch):
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
 
 
-def test_smart_recipe_ignores_members_lacking_a_start_scene(monkeypatch):
+def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
     rows = [
         _scene_video("x1", "a alpha", "", "2026-01-01", lora_high="X"),          # no scene to match on
         _scene_video("y1", "a alpha", "anchor in frame", "2026-01-02", lora_high="Y"),

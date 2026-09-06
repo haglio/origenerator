@@ -242,7 +242,7 @@ def test_reconcile_repoints_both_stars_across_the_enhancement_merge(tmp_path):
     # The enhancement split is the one formula change that MERGED folders: an
     # enhanced render and its unenhanced twin used to be two, and are now one. A
     # star on either of the old folders has to land on the merged one — including
-    # the enhanced side, whose row may not be the member the legacy key is
+    # the enhanced side, whose row may not be the one the legacy key is
     # recomputed from.
     db = Database(tmp_path / "t.db")
     plain = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30,
@@ -307,15 +307,15 @@ def test_reconcile_with_no_bookmarks_is_a_noop(tmp_path):
     assert reconcile_folder_meta(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
-# --- custom-folder membership reconciliation ---------------------------------
+# --- reconciling what a custom folder holds ----------------------------------
 
-def _folder_holding(db, *members):
+def _folder_holding(db, *items):
     folder_id = db.create_custom_folder("Favorites")
-    db.add_custom_folder_members(folder_id, list(members))
+    db.add_custom_folder_items(folder_id, list(items))
     return folder_id
 
 
-def test_reconcile_repoints_a_membership_orphaned_by_a_formula_change(tmp_path):
+def test_reconcile_repoints_an_item_orphaned_by_a_formula_change(tmp_path):
     # A folder the user gathered by hand drifts exactly the way a star does.
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
@@ -327,12 +327,12 @@ def test_reconcile_repoints_a_membership_orphaned_by_a_formula_change(tmp_path):
     summary = reconcile_custom_folders(db)
 
     (record,) = db.list_custom_folders()
-    assert record["members"] == [current_key]  # the grouping followed the folder
+    assert record["items"] == [current_key]  # the grouping followed the folder
     assert record["id"] == folder_id
     assert summary["repointed"] == 1
 
 
-def test_reconcile_backfills_identity_onto_a_live_membership(tmp_path):
+def test_reconcile_backfills_identity_onto_a_live_item(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -340,12 +340,12 @@ def test_reconcile_backfills_identity_onto_a_live_membership(tmp_path):
 
     summary = reconcile_custom_folders(db)
 
-    (member,) = db.custom_folder_members_full()
-    assert (member["level"], member["ref_prompt_id"]) == ("settings", "p1")
+    (item,) = db.custom_folder_items_full()
+    assert (item["level"], item["ref_prompt_id"]) == ("settings", "p1")
     assert summary["refreshed"] == 1
 
 
-def test_reconcile_remaps_a_membership_through_its_stored_identity(tmp_path, monkeypatch):
+def test_reconcile_remaps_an_item_through_its_stored_identity(tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
@@ -361,11 +361,11 @@ def test_reconcile_remaps_a_membership_through_its_stored_identity(tmp_path, mon
 
     summary = reconcile_custom_folders(db)
 
-    assert db.list_custom_folders()[0]["members"] == [new_key]
+    assert db.list_custom_folders()[0]["items"] == [new_key]
     assert summary["repointed"] == 1
 
 
-def test_reconcile_keeps_a_membership_whose_folder_is_simply_gone(tmp_path):
+def test_reconcile_keeps_an_item_whose_folder_is_simply_gone(tmp_path):
     # Its generations may come back (an undone delete), and a grouping the user
     # built by hand is never silently thinned.
     db = Database(tmp_path / "t.db")
@@ -376,7 +376,7 @@ def test_reconcile_keeps_a_membership_whose_folder_is_simply_gone(tmp_path):
 
     summary = reconcile_custom_folders(db)
 
-    assert db.list_custom_folders()[0]["members"] == [dead]
+    assert db.list_custom_folders()[0]["items"] == [dead]
     assert summary["orphaned"] == 1
 
 
@@ -399,7 +399,7 @@ def _a_library_with_both_kinds_of_bookmark(tmp_path):
     legacy_key = gallery.legacy_settings_folder_key(row)
     db.set_folder_starred(legacy_key, True)
     folder_id = db.create_custom_folder("Scene One")
-    db.add_custom_folder_members(folder_id, [(legacy_key, None, None)])
+    db.add_custom_folder_items(folder_id, [(legacy_key, None, None)])
     return db, row, legacy_key
 
 

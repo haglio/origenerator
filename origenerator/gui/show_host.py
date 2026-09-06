@@ -18,7 +18,7 @@ Those answers are exactly what the probes' defaults used to be, in one place
 rather than sixteen.
 
 A caller therefore asks; it does not check first. ``tests/test_show_host.py``
-holds that per driver module at zero, and holds both hosts to every member.
+holds that per driver module at zero, and holds both hosts to every attribute.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from typing import Protocol
 class ShowHost(Protocol):
     """The surface a console, a HUD or a hosting session drives a show through.
 
-    The first six members are the transport, and every host has them for real:
+    The first six attributes are the transport, and every host has them for real:
     they are the four buttons and the pace pair that Genau's console, the
     players' HUD and Fun Time's own hotkeys all reach for. The rest are about
     the *set* a show is playing, and carry the answer a host without one gives.

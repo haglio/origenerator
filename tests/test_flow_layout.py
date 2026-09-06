@@ -36,7 +36,7 @@ def test_flow_layout_fits_more_per_row_when_wider(qtbot):
 
 
 def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
-    """A row of buttons wants its members close and its rows apart.  At the one
+    """A row of buttons wants its items close and its rows apart.  At the one
     gap this layout used for both, the gallery's button bank wrapped into two
     rows that all but touched."""
     from PyQt6.QtWidgets import QPushButton, QWidget

@@ -11,8 +11,8 @@ shape, so a slideshow started there has one region to go to (see
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
-that way. The folder's own key is what a star, a name and a custom folder's
-membership hang off, and it is untouched: ``keys_by_folder`` maps one back to
+that way. The folder's own key is what a star, a name and a place in a custom
+folder hang off, and it is untouched: ``keys_by_folder`` maps one back to
 the rows drawing it, which is how a navigation that knows only a folder key
 (a re-roll, a combine, a folder tile) finds a row to select.
 
@@ -21,7 +21,7 @@ has no database or refresh concerns — folder rename/star/delete live in the
 view, which rebuilds both halves through :meth:`populate`.
 
 The folders the user composed by hand ride between the shelves and the media
-roots, rendered flat like a shelf: a custom folder's members can sit anywhere in
+roots, rendered flat like a shelf: a custom folder's items can sit anywhere in
 the hierarchy, so nesting them under it would draw the same folder twice and put
 two rows in ``item_by_key`` for one key. Its contents show as tiles in the browser
 pane instead, exactly as the Starred shelf shows its bookmarked folders.

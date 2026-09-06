@@ -19,7 +19,7 @@ measured back out of the items.
 The key scheme is what carries the shape: a row's tree key is its folder's own
 key with ``::portrait`` or ``::landscape`` appended (:func:`oriented_key`), and
 :func:`split_key` takes it apart again.  The *folder's* key is untouched by
-this — a star, a custom name, and membership of a folder the user composed all
+this — a star, a custom name, and a place in a folder the user composed all
 still hang off the plain key, because those are properties of the folder rather
 than of the side it is being looked at from.
 
@@ -89,7 +89,7 @@ def split_key(key: str | None) -> tuple[str | None, str | None]:
 
 def base_of(key: str | None) -> str | None:
     """The folder a tree key names, with the side stripped off — what a star, a
-    name and a custom folder's membership are all stored under."""
+    name and a place in a custom folder are all stored under."""
     return split_key(key)[0]
 
 

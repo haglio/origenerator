@@ -21,7 +21,7 @@ class FlowLayout(QLayout):
                  align_right=False):
         """*row_spacing* is the gap BETWEEN wrapped rows, defaulting to *spacing*.
 
-        They are separate because a row of buttons wants its members close and
+        They are separate because a row of buttons wants its items close and
         its rows apart: at one gap for both, two wrapped rows read as a single
         crowded block rather than as two rows.
         """

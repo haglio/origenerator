@@ -20,7 +20,7 @@ from origenerator.gui.show_host import ShowHost
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 
-# What a show answers to, written out so a member added to the protocol without
+# What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
 # the transport every host has; the rest are about a set, and a host with no set
 # behind it takes the protocol's own answers for them.
@@ -42,8 +42,8 @@ DRIVERS = (
 )
 
 
-def test_the_protocol_is_exactly_the_members_written_down_here():
-    # An equality, not a ceiling: a member added to ShowHost without a line here
+def test_the_protocol_is_exactly_the_attributes_written_down_here():
+    # An equality, not a ceiling: an attribute added to ShowHost without a line here
     # reds, and so does one deleted from it that is still listed.
     assert set(ShowHost.__protocol_attrs__) == set(TRANSPORT + THE_SET)
 
@@ -61,19 +61,19 @@ def pace_only():
     return PaceOnlyHost(SlideshowPace())
 
 
-@pytest.mark.parametrize("member", TRANSPORT + THE_SET)
-def test_a_slideshow_answers_every_member_of_the_protocol(slideshow, member):
+@pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
+def test_a_slideshow_answers_every_attribute_of_the_protocol(slideshow, attribute):
     # The full host: it has a set, so it answers all of it itself. Asked of an
-    # instance rather than the class, because two of the members are settled
+    # instance rather than the class, because two of the attributes are settled
     # when the show is built rather than declared on it.
-    assert hasattr(slideshow, member)
+    assert hasattr(slideshow, attribute)
 
 
-@pytest.mark.parametrize("member", TRANSPORT + THE_SET)
-def test_a_pace_only_host_answers_every_member_of_the_protocol(pace_only, member):
+@pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
+def test_a_pace_only_host_answers_every_attribute_of_the_protocol(pace_only, attribute):
     # The main window's console with nothing behind it: it answers the transport
     # itself and takes the protocol's answers for the set it does not have.
-    assert hasattr(pace_only, member)
+    assert hasattr(pace_only, attribute)
 
 
 def test_a_host_with_no_set_says_it_has_no_set(pace_only):
@@ -106,22 +106,22 @@ def test_a_host_with_no_set_draws_no_hud_map(pace_only):
 
 
 def _probes_in(relative_path: str) -> list[str]:
-    """Every hasattr/getattr in the file that names a member of the protocol."""
+    """Every hasattr/getattr in the file that names an attribute of the protocol."""
     tree = ast.parse((ROOT / relative_path).read_text(encoding="utf-8"))
-    members = set(TRANSPORT + THE_SET)
+    attributes = set(TRANSPORT + THE_SET)
     return [
         f"{relative_path}:{node.lineno} {node.func.id}(…, {node.args[1].value!r})"
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         and node.func.id in ("hasattr", "getattr") and len(node.args) >= 2
         and isinstance(node.args[1], ast.Constant)
-        and node.args[1].value in members
+        and node.args[1].value in attributes
     ]
 
 
 @pytest.mark.parametrize("driver", DRIVERS)
 def test_no_driver_asks_a_host_what_it_can_do_by_probing_for_it(driver):
     # Held per file at zero. The interface is declared, so a caller that guards
-    # a member of it is either guarding against a host that cannot exist or
+    # an attribute of it is either guarding against a host that cannot exist or
     # hiding one that does — and either way the guard, not the host, is the bug.
     assert _probes_in(driver) == []

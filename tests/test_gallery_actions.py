@@ -256,7 +256,7 @@ def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
 
     ((record,),) = (db.list_custom_folders(),)
     assert record["id"] == folder_id
-    assert record["name"] == "Mine" and record["members"] == ["image/sdxl_t2i"]
+    assert record["name"] == "Mine" and record["items"] == ["image/sdxl_t2i"]
 
 
 def test_redo_with_nothing_undone_is_a_noop(tmp_path):

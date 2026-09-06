@@ -91,11 +91,11 @@ _STOP_WORDS = frozenset(
     ["a", "an", "the", "of", "in", "on", "at", "by", "with", "and", "or", "to", "for", "from", "is", "are", "was", "were", "be", "it", "its", "her", "his", "their", "this", "that", "there", "here", "as", "into", "over", "under"]
 )
 
-# Interchangeable words, as groups: any member of a group satisfies a query for
+# Interchangeable words, as groups: any word of a group satisfies a query for
 # any other. Deliberately tight — a loose group ("blonde" ~ "golden") fires on
 # unrelated rows and the user cannot tell why — with the risky widening left to
 # the LLM tier, where it is at least query-specific. Inflections that stemming
-# cannot fold ("-ing", "-y") are listed as members rather than guessed at.
+# cannot fold ("-ing", "-y") are listed as words rather than guessed at.
 #
 # The people groups are the ones the overlay is expected to extend: the words
 # this library actually prompts with are not words that belong in a public
@@ -187,8 +187,8 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     """Stem → every stem interchangeable with it, from ``groups`` and the built-in
     table.
 
-    Groups that share a member merge, so the overlay can extend a built-in group
-    by naming one of its words alongside the new ones. Multi-word members are
+    Groups that share a word merge, so the overlay can extend a built-in group
+    by naming one of its words alongside the new ones. Multi-word entries are
     dropped: matching is word by word, so a two-word synonym could never be
     reached, and shredding it into its words would make each of them a synonym
     for the others ("alpha form" teaching that "form" means "alpha").
@@ -196,8 +196,8 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     merged: list[set[str]] = []
     for group in (*_SYNONYM_GROUPS, *groups):
         stems = set()
-        for member in group:
-            words = _words(member)
+        for entry in group:
+            words = _words(entry)
             if len(words) == 1:
                 stems.add(_stem(words[0]))
         if len(stems) < 2:
@@ -465,8 +465,8 @@ class GallerySearch:
 
         Scored, but not *sorted* by score: the pane offers recency and recipe,
         and a relevance order the user did not ask for would shuffle the results
-        under them each time the LLM tier landed. The score decides membership,
-        not position.
+        under them each time the LLM tier landed. The score decides what is in,
+        not what order.
         """
         terms = parse_query(query, expansions=expansions, synonyms=self._synonyms)
         if not terms:

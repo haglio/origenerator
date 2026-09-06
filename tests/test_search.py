@@ -285,7 +285,7 @@ def test_results_group_under_one_heading_per_model_and_lora():
     rows = [_lora_row("g1", "driftstyle"), _lora_row("g2", "driftstyle"),
             _lora_row("g3", "emberstyle")]
     sections = search.group_by_recipe(_index(rows).search("street").results)
-    assert [[r.row["prompt_id"] for r in members] for _, members in sections] == [
+    assert [[r.row["prompt_id"] for r in found] for _, found in sections] == [
         ["g1", "g2"], ["g3"]]
     assert "driftstyle" in sections[0][0]
     assert "emberstyle" in sections[1][0]
@@ -297,7 +297,7 @@ def test_the_biggest_combination_leads():
     rows = [_lora_row("g1", "emberstyle"), _lora_row("g2", "driftstyle"),
             _lora_row("g3", "driftstyle"), _lora_row("g4", "driftstyle")]
     sections = search.group_by_recipe(_index(rows).search("street").results)
-    assert [len(members) for _, members in sections] == [3, 1]
+    assert [len(found) for _, found in sections] == [3, 1]
 
 
 def test_a_heading_names_both_the_model_and_the_lora():

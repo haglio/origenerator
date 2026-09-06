@@ -5,7 +5,7 @@ and the gallery tree are its readers.
 
 A folder here is a tree key, which is derived rather than stored -- so a bookmark
 also carries the identity it can be re-derived from, the tier it sits at and one
-member generation, and the reconcile re-points it when the key formula moves.
+generation under it, and the reconcile re-points it when the key formula moves.
 `folder_meta_map` is the view's half (labels and stars); `folder_meta_full` is
 the reconcile's, and adds those two identity columns.
 """

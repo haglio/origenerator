@@ -16,7 +16,7 @@ lock of hair over her eye" is a prompt.
 Most of the vocabulary is a fixed set of things to ask for, and one part of it
 is not: the stroke's dials take a number said outright — "amp fifty", "max
 speed" — so those phrases answer with a :class:`DialSetting` carrying the dial
-and the value rather than a member each for three dozen combinations. Both come
+and the value rather than a constant each for three dozen combinations. Both come
 back from the one matcher, and the caller tells them apart by type.
 
 **Where a command lands is the surface in front of the speaker**, not a fixed
@@ -127,7 +127,7 @@ class DialSetting:
 # phrase -> command. Every key is a whole utterance, lowercased, its punctuation
 # already dropped: what :func:`match_app_command` reduces a transcription to.
 # A value is an :class:`AppCommand` for the things there is one of, and a
-# :class:`DialSetting` for the numeric grid, where a member each would be three
+# :class:`DialSetting` for the numeric grid, where a constant each would be three
 # dozen names for what is really one command with a number in it.
 _PHRASES: dict[str, AppCommand | DialSetting] = {}
 

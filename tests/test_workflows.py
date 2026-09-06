@@ -2250,6 +2250,43 @@ def test_segment_lengths_stay_on_the_models_frame_grid():
         assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
 
 
+@pytest.mark.parametrize("name, conditioning", [
+    ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
+])
+def test_a_scene_break_in_the_prompt_gives_each_segment_its_own_text(name, conditioning):
+    # A line holding only --- ends one scene and starts the next, so a 30 s clip
+    # can be told in three parts: each segment is conditioned on its own scene
+    # while the negative prompt stays the one text for all of them.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=481, negative_prompt="blurry",
+        positive_prompt="she waves\n---\nshe turns away\n---\nshe walks off"))
+    segments = _segments(payload, conditioning)
+    texts = [payload[seg["inputs"]["positive"][0]]["inputs"]["text"] for seg in segments]
+    assert texts == ["she waves", "she turns away", "she walks off"]
+    assert {payload[seg["inputs"]["negative"][0]]["inputs"]["text"] for seg in segments} == {"blurry"}
+
+
+def test_the_last_scene_carries_on_through_the_segments_after_it():
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=481, positive_prompt="she waves\n---\nshe turns away"))
+    segments = _segments(payload, "WanImageToVideo")
+    texts = [payload[seg["inputs"]["positive"][0]]["inputs"]["text"] for seg in segments]
+    assert texts == ["she waves", "she turns away", "she turns away"]
+
+
+def test_a_prompt_without_a_scene_break_is_encoded_once_for_every_segment():
+    # No break, no second encode: the segments share the one text node the
+    # graph always had, and its text is the prompt exactly as typed.
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=481, positive_prompt="  she waves, slowly  "))
+    segments = _segments(payload, "WanImageToVideo")
+    assert len({seg["inputs"]["positive"][0] for seg in segments}) == 1
+    assert payload[segments[0]["inputs"]["positive"][0]]["inputs"]["text"] == "  she waves, slowly  "
+
+
 # ---- the frames between the frames ----
 
 

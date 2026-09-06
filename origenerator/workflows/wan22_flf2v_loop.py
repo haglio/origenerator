@@ -4,6 +4,7 @@ from origenerator.workflows.base import (
     LONGEST_CLIP_FRAMES,
     ParamDef,
     WorkflowTemplate,
+    scene_prompts,
 )
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
@@ -127,20 +128,26 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "17", "18", ["11", 0], params
         )
 
+        # Each segment reads its own scene of the prompt (a --- line starts the
+        # next); node 9 below encodes the first, and any later scene gets its own.
+        scenes = scene_prompts(params["positive_prompt"])
+
         def segment(index, start, length, last):
             flf_id, high_id, low_id, decode_id = (
                 ("12", "13", "14", "15") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("flf", "high", "low", "decode"))
             )
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scenes, ["1", 0], ["9", 0])
             # Only the segment that ends the loop is told to end on its start
             # frame; an earlier one told so would close the loop and then have
             # to leave it again.
             endpoints = {"start_image": start, **({"end_image": frame_ref} if last else {})}
             nodes = {
+                **prompt_nodes,
                 flf_id: {
                     "class_type": "WanFirstLastFrameToVideo",
                     "inputs": {
-                        "positive": ["9", 0],
+                        "positive": positive_ref,
                         "negative": ["10", 0],
                         "vae": ["2", 0],
                         **endpoints,
@@ -243,7 +250,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             },
             "9": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["1", 0], "text": params["positive_prompt"]},
+                "inputs": {"clip": ["1", 0], "text": scenes[0]},
             },
             "10": {
                 "class_type": "CLIPTextEncode",

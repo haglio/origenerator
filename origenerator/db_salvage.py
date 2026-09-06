@@ -19,6 +19,8 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from origenerator.db_schema import RENAMED_TABLES
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,12 +101,13 @@ def _copy_table(damaged, fresh, table: str) -> int:
     refuses it -- what a damaged file hands back is not to be trusted, and one
     unusable row must not cost the thousands around it.
     """
-    columns = [c for c in _columns(damaged, table) if c in _columns(fresh, table)]
-    select = f'SELECT {", ".join(columns)} FROM "{table}" WHERE rowid = ?'
+    source = _source_of(damaged, table)
+    columns = [c for c in _columns(damaged, source) if c in _columns(fresh, table)]
+    select = f'SELECT {", ".join(columns)} FROM "{source}" WHERE rowid = ?'
     insert = (f'INSERT INTO "{table}" ({", ".join(columns)}) '
               f'VALUES ({", ".join("?" for _ in columns)})')
     kept = 0
-    for rowid in range(1, _highest_rowid(damaged, table) + 1):
+    for rowid in range(1, _highest_rowid(damaged, source) + 1):
         try:
             row = damaged.execute(select, (rowid,)).fetchone()
             if row is None:
@@ -114,6 +117,21 @@ def _copy_table(damaged, fresh, table: str) -> int:
             continue
         kept += 1
     return kept
+
+
+def _source_of(damaged, table: str) -> str:
+    """The name ``table``'s rows are under in the damaged file.
+
+    The fresh file is built from the current schema, so the copy asks for the
+    current names; a file written before a table was renamed still holds them
+    under the old one. Both probes below swallow the error a missing table
+    raises, so without this the copy finds no columns and no rows and reports a
+    clean salvage of nothing.
+    """
+    if _columns(damaged, table):
+        return table
+    return next((old for old, new in RENAMED_TABLES.items()
+                 if new == table and _columns(damaged, old)), table)
 
 
 def _columns(conn, table: str) -> list[str]:

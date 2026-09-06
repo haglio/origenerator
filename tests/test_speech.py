@@ -55,14 +55,29 @@ def test_a_lines_file_is_named_from_everything_that_shapes_it():
     assert scene_speech(_params(scene_lines=["hi"], voice="Serena"))[0].file != base
     assert scene_speech(_params(scene_lines=["hi"], audio_seed=8))[0].file != base
     assert scene_speech(_params(scene_lines=["hi"], frame_count=121))[0].file != base
-    assert scene_speech(_params(scene_lines=["hi"], voice_sample="C:/v/her.wav"))[0].file != base
+    assert scene_speech(_params(scene_lines=["hi"], voice=speech.CUSTOM_VOICE,
+                                voice_sample="C:/v/her.wav"))[0].file != base
 
 
-def test_the_voice_is_a_preset_unless_a_recording_is_named():
+def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():
     assert voice_request(_params()) == {"mode": "preset", "speaker": "Vivian"}
     assert voice_request(_params(voice=""))["speaker"] == speech.VOICE_PRESETS[0]
-    assert voice_request(_params(voice_sample=" C:/v/her.wav ", voice_sample_text=" Hello. ")) == {
+    # a recording named under a preset voice is not what speaks
+    assert voice_request(_params(voice="Serena", voice_sample="C:/v/her.wav"))["mode"] == "preset"
+    assert voice_request(_params(voice=speech.CUSTOM_VOICE, voice_sample=" C:/v/her.wav ",
+                                 voice_sample_text=" Hello. ")) == {
         "mode": "clone", "sample": "C:/v/her.wav", "sample_text": "Hello."}
+
+
+def test_a_custom_voice_without_a_recording_is_a_plain_error(tmp_path):
+    run, _ = _speaking_run(tmp_path)
+    with pytest.raises(SpeechError, match="Voice Sample names no file"):
+        speech.ensure_speech_files(_params(scene_lines=["hi"], voice=speech.CUSTOM_VOICE),
+                                   input_dir=tmp_path, python=Path("py"), run=run)
+    with pytest.raises(SpeechError, match="not a file"):
+        speech.ensure_speech_files(
+            _params(scene_lines=["hi"], voice=speech.CUSTOM_VOICE, voice_sample=str(tmp_path / "gone.wav")),
+            input_dir=tmp_path, python=Path("py"), run=run)
 
 
 # ---- making the files --------------------------------------------------------

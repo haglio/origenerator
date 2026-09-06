@@ -30,6 +30,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_box import PromptBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.paths import ensure_shared_ui_on_path
+from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
 from origenerator.workflows.duration import (
@@ -203,6 +204,30 @@ class ParamForm(QWidget):
             self._scenes.changed.connect(self.changed)
             self._scenes.changed.connect(self._refresh_clip_length)
         self._build(self._param_defs)
+        self._wire_voice_rows()
+
+    def _wire_voice_rows(self):
+        """The Voice Sample rows show only while the Voice is the custom one.
+        A preset needs no recording, and two fields under it read as a second
+        thing to fill in -- which is how the sample's transcript came to be
+        taken for where her lines go."""
+        voice = self._widgets.get("voice")
+        if not isinstance(voice, QComboBox):
+            return
+        voice.currentTextChanged.connect(lambda _text: self._refresh_voice_rows())
+        self._refresh_voice_rows()
+
+    def _refresh_voice_rows(self):
+        custom = self._widgets["voice"].currentText() == CUSTOM_VOICE
+        for key in ("voice_sample", "voice_sample_text"):
+            self._set_row_visible(key, custom)
+
+    def _set_row_visible(self, key: str, visible: bool) -> None:
+        """Show or hide one row, label and field together."""
+        title = param_sections.section_title(key)
+        keys = self._present_keys.get(title, [])
+        if key in keys:
+            self._sections[title].content_form().setRowVisible(keys.index(key), visible)
 
     def _build(self, defs: list[ParamDef]):
         outer = QVBoxLayout(self)
@@ -322,12 +347,12 @@ class ParamForm(QWidget):
             cb.toggled.connect(self.changed)
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
-        if pd.type == "image":
+        if pd.type in ("image", "audio"):
             # Elides: it is the widest thing on any row, so a plain button would
             # decide how narrow the whole form can be squeezed.
             browse = ElidingButton("Browse...")
             browse.clicked.connect(
-                lambda _checked=False, key=pd.key: self._browse_image(key)
+                lambda _checked=False, key=pd.key: self._browse_file(key)
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
@@ -629,21 +654,28 @@ class ParamForm(QWidget):
         else:
             self._update_derived_display()
 
-    def _browse_image(self, key: str):
-        """Pick an input image anywhere on disk via the native file dialog.
+    def _browse_file(self, key: str):
+        """Pick a field's file anywhere on disk via the native file dialog: an
+        input image, or the recording a custom voice is copied from.
 
         The chosen path is stored verbatim: ComfyUI's ``LoadImage`` resolves a
         bare name against its input folder but takes an absolute path outside
-        it unchanged, so a full path lets the user draw an input from anywhere.
+        it unchanged, so a full path lets the user draw an input from anywhere;
+        a recording is read by the voice from wherever it is.
         """
         pd = next((p for p in self._param_defs if p.key == key), None)
+        title, kinds = (
+            ("Select Voice Sample", "Audio (*.wav *.mp3 *.flac *.m4a *.ogg);;All Files (*)")
+            if pd is not None and pd.type == "audio"
+            else ("Select Input Image", "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)")
+        )
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Input Image",
+            title,
             self._initial_browse_path(
                 self._widgets[key].text().strip(), pd.browse_dir if pd else None
             ),
-            "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)",
+            kinds,
         )
         if path:
             self._widgets[key].setText(path)
@@ -796,8 +828,8 @@ class ParamForm(QWidget):
             return diff_text.live_text(w)
         if pd.type == "image":
             return _clean_image_ref(w.text())
-        if pd.type == "str":
-            return w.text()
+        if pd.type in ("str", "audio"):
+            return w.text().strip() if pd.type == "audio" else w.text()
         if pd.rate:
             seconds = w.value()
             return (frames_for_seconds(seconds, pd.rate, pd)
@@ -838,7 +870,7 @@ class ParamForm(QWidget):
             # A written value replaces whatever was there, marked change and all.
             diff_text.forget(w)
             w.setPlainText(str(value))
-        elif pd.type == "str" or pd.type == "image":
+        elif pd.type in ("str", "image", "audio"):
             w.setText(str(value))
         elif pd.rate:
             frames = self._clamped_number(pd, value)

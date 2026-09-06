@@ -816,19 +816,23 @@ class BrowserPane(QObject):
                 started = job.started_at  # None until ComfyUI actually starts it
                 cancel = lambda p=pid: self.cancel_requested.emit(p)
                 stop_auto = lambda k=folder_key: self._auto.stop(k)
+                # A story's lines are spoken before the job is sent: the row
+                # already says running, and the card says what the wait is.
+                speaking = job.state == "speaking"
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._host.image_rows())
                 folder_key = gallery.settings_folder_key(row, image_index)
                 frame, progress, cancel, foreign, started = None, None, None, None, None
-                pass_progress, stage, stop_auto = None, "", None
+                pass_progress, stage, stop_auto, speaking = None, "", None, False
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
-                status="running" if row.get("status") == "running" else "queued",
+                status=("speaking" if speaking
+                        else "running" if row.get("status") == "running" else "queued"),
                 frame=frame,
                 reveal=lambda k=folder_key: self.reveal_reroll_requested.emit(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge

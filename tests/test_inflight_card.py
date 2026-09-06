@@ -29,6 +29,14 @@ def test_card_says_queued_over_the_frame(qtbot):
     assert card._caption.text() == "SDXL › a cat"
 
 
+def test_card_says_the_lines_are_being_spoken_before_the_job_is_sent(qtbot):
+    # A story with lines is voiced first, off the GUI thread, and until the
+    # voice is done nothing is on the server: the card says what the wait is.
+    card = InFlightCard(_item(status="speaking"))
+    qtbot.addWidget(card)
+    assert card._scrim.text() == "Speaking her lines…"
+
+
 def test_card_says_generating_when_running(qtbot):
     card = InFlightCard(_item(status="running"))
     qtbot.addWidget(card)

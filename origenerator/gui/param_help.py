@@ -39,18 +39,18 @@ PARAM_HELP: dict[str, str] = {
     ),
     "scene_lines": (
         "What she says in this scene, spoken in the voice set under Audio: the "
-        "scene renders on the speech model, her lips on the words, and the line "
-        "plays over the soundtrack. Words past the scene's end are cut; a scene "
-        "left blank renders as it always has."
+        "scene renders on the speech model, her lips on the words, and its sound "
+        "is her line. Words past the scene's end are cut; a scene left blank "
+        "renders as it always has, soundtrack and all."
     ),
     "voice": (
         "Whose voice speaks the lines: one of the speech model's preset speakers, "
-        "the same voice every run. A Voice Sample below takes its place."
+        "the same voice every run, or Custom voice, a recording of your own named "
+        "in the Voice Sample field that appears."
     ),
     "voice_sample": (
-        "The full path of a recording, five to fifteen seconds of one clean voice, "
-        "for the lines to be spoken in a copy of that voice instead of a preset. "
-        "Blank keeps the preset."
+        "A recording, five to fifteen seconds of one clean voice, for the lines to "
+        "be spoken in a copy of that voice. Browse to the file."
     ),
     "voice_sample_text": (
         "The words the Voice Sample says, exactly. With them the copy carries the "

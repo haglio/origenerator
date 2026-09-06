@@ -29,15 +29,16 @@ logger = logging.getLogger(__name__)
 # its scenes.
 VOICE_PRESETS = ("Vivian", "Serena", "Ono_Anna", "Sohee", "Ryan", "Aiden",
                  "Uncle_Fu", "Dylan", "Eric")
+# The Voice dropdown's last entry: not a preset but a recording of the user's
+# own, named in the Voice Sample field, copied by the Base model.
+CUSTOM_VOICE = "Custom voice (a recording)"
+VOICE_OPTIONS = (*VOICE_PRESETS, CUSTOM_VOICE)
 # Which of the family speaks: the presets, or a voice copied from a recording.
 PRESET_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 CLONE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 # Where the lines land, under ComfyUI's input folder, which is where its
 # LoadAudio reads from.
 SPEECH_DIR = "origenerator_speech"
-# The rate the voice speaks at, and so the rate of the silence laid between
-# lines (the mix resamples whatever it is given, so nothing else depends on it).
-SPEECH_SAMPLE_RATE = 24000
 # The script that does the speaking: a plain file under tools/, run by path
 # under the speech environment's Python. It imports nothing of this package,
 # and lives outside it so the package's own dependency gate (which installs
@@ -72,14 +73,14 @@ class SceneSpeech:
 
 
 def voice_request(params: dict) -> dict:
-    """Whose voice the lines are spoken in: a recording to copy when the recipe
-    names one (with what it says, which makes the copy a close one), else a
-    preset speaker."""
-    sample = str(params.get("voice_sample") or "").strip()
-    if sample:
-        return {"mode": "clone", "sample": sample,
+    """Whose voice the lines are spoken in: the recording the recipe names when
+    its Voice is the custom one (with what the recording says, which makes the
+    copy a close one), else the preset speaker the Voice names."""
+    voice = str(params.get("voice") or VOICE_PRESETS[0])
+    if voice == CUSTOM_VOICE:
+        return {"mode": "clone", "sample": str(params.get("voice_sample") or "").strip(),
                 "sample_text": str(params.get("voice_sample_text") or "").strip()}
-    return {"mode": "preset", "speaker": str(params.get("voice") or VOICE_PRESETS[0])}
+    return {"mode": "preset", "speaker": voice}
 
 
 def scene_speech(params: dict) -> list[SceneSpeech | None]:
@@ -117,11 +118,12 @@ def missing_speech(params: dict, input_dir: Path) -> list[SceneSpeech]:
 
 
 def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
-                        worker: Path = WORKER, run=subprocess.run,
+                        worker: Path | None = None, run=subprocess.run,
                         device: str = "cuda") -> list[Path]:
     """Speak every line of ``params`` that has no file yet, and return the files
     made. Raises :class:`SpeechError` when the voice is not set up or a line
     came back unspoken, with the worker's own words for why."""
+    worker = worker or WORKER
     missing = missing_speech(params, input_dir)
     if not missing:
         return []
@@ -129,12 +131,17 @@ def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
         raise SpeechError(
             "No voice is set up: content.local.json names no speech_python, the "
             "Python of the environment Qwen3-TTS is installed in.")
+    voice = voice_request(params)
+    if voice["mode"] == "clone" and not voice["sample"]:
+        raise SpeechError("The Voice is a custom recording, but Voice Sample names no file.")
+    if voice["mode"] == "clone" and not Path(voice["sample"]).is_file():
+        raise SpeechError(f"The Voice Sample is not a file: {voice['sample']}")
     speech_dir = input_dir / SPEECH_DIR
     speech_dir.mkdir(parents=True, exist_ok=True)
     job = {
         "device": device,
         "seed": int(params.get("audio_seed") or 0),
-        "voice": voice_request(params),
+        "voice": voice,
         "models": {"preset": PRESET_MODEL, "clone": CLONE_MODEL},
         "items": [{"text": scene.text, "seconds": scene.seconds,
                    "out": str(input_dir / scene.file)} for scene in missing],

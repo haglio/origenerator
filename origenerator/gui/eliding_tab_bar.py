@@ -63,7 +63,7 @@ class _PreviewTabStyle(QProxyStyle):
 
     Each label sets the flag either way rather than only slanting the preview
     one: the painter carries its font from one label to the next, so an italic
-    left set would spread down the row.
+    left in place would spread down the row.
     """
 
     def __init__(self, bar: "ElidingTabBar"):

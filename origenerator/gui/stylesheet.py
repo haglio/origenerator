@@ -92,7 +92,7 @@ def build_stylesheet() -> str:
     }}
     /* Styling a spinner at all hands Qt the whole widget, step buttons
        included — and the default it falls back to for them has no size, so the
-       arrows render as dead slivers you cannot hit. Give them a real field and a
+       arrows render as dead slivers you cannot hit. Give them a real size and a
        drawn arrow and they work again. */
     QSpinBox::up-button, QDoubleSpinBox::up-button,
     QSpinBox::down-button, QDoubleSpinBox::down-button {{

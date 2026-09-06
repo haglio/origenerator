@@ -112,7 +112,7 @@ def test_the_negative_prompt_is_not_searched():
 
 
 def test_a_decimal_is_one_word_not_two():
-    # An emphasis weight — (term:1.2) — used to leave a bare "2" over, and a
+    # An emphasis weight — (term:1.2) — used to split off a bare "2", and a
     # query's "two" folds to "2": searching for two of something matched every
     # prompt that had ever weighted a term (52% of a real library).
     rows = [_row("g1", "a (red:1.2) lamp"), _row("g2", "two red lamps")]

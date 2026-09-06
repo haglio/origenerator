@@ -82,11 +82,11 @@ def test_starting_takes_the_device_and_pauses_genau(qtbot):
 
 
 def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
-    # Aimed at where the stroke already is, the device can only ever chase: by
-    # the time the command lands the stroke has moved on. Every command names
-    # the place the stroke will have reached when its own interval runs out —
+    # Aimed at where the motion already is, the device can only ever chase: by
+    # the time the command lands the motion has moved on. Every command names
+    # the place the motion will have reached when its own interval runs out —
     # through the takeover glide as much as after it, so being given longer
-    # means being sent further rather than trailing the stroke.
+    # means being sent further rather than trailing the motion.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     for step in (0.025, 0.025, 0.5, 0.025):
@@ -102,7 +102,7 @@ def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
     # The device is parked wherever the last thing to hold it left it, so the
     # first target can be the length of the axis away. Holding the stream back
     # for the glide is what turned the seam into a slam: the device sat still
-    # while the stroke ran on, then had to cover all of it in one tick.
+    # while the motion ran on, then had to cover all of it in one tick.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     assert broker.positions[0][1] == _HANDOFF_MS  # the whole glide to arrive
@@ -189,7 +189,7 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
 def test_the_dials_shape_the_status_line(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.start()
-    driver.adjust_speed(50)          # dial to the top: 200 strokes/min
+    driver.adjust_speed(50)          # dial to the top: 200 cycles/min
     driver.adjust_amplitude(-40)     # 100 -> 60
     driver.adjust_center(-100)       # slides down to the sweep's floor (30)
     driver.cycle_shape()             # sine -> triangle
@@ -197,7 +197,7 @@ def test_the_dials_shape_the_status_line(qtbot):
 
 
 def test_the_status_line_reads_off_but_keeps_the_dials_while_stopped(qtbot):
-    # The slideshow shows this line before the stroke ever starts, so the dials
+    # The slideshow shows this line before the motion ever starts, so the dials
     # must be readable (and tunable) while the device is still parked.
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)
@@ -208,7 +208,7 @@ def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     # Hands off, the motion is no longer one wave: it is several summed, each
     # with its own speed and its own share of the travel, both on their way
     # somewhere else. What has to stay true is that the tick still sends where
-    # that stroke will be when the command's own interval runs out.
+    # that motion will be when the command's own interval runs out.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     driver.toggle_cruise()

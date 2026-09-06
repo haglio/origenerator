@@ -315,7 +315,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     panel._param_form.set_values({
         "positive_prompt": "slow beta",
         "input_image": "start.png",
-        "audio_prompt": "wet stroking",
+        "audio_prompt": "wet rhythm",
         "steps": 7,  # an edit — flf2v's default is 4
     })
 
@@ -324,7 +324,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     values = panel._param_form.get_values_static()
     assert values["positive_prompt"] == "slow beta"
     assert values["input_image"] == "start.png"
-    assert values["audio_prompt"] == "wet stroking"
+    assert values["audio_prompt"] == "wet rhythm"
     assert values["steps"] == 7
     ati_defaults = WORKFLOW_REGISTRY["wan21_ati_i2v"].default_params()
     assert values["cfg"] == ati_defaults["cfg"]        # flf2v's 1.0 didn't leak

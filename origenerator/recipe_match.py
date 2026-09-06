@@ -21,7 +21,7 @@ on a dropped image via the gallery's combine launch.
   image can say what it depicts without the user picking from the dropdown.
 
 Every tier is asked for one *intent* — the long-form video the satellite players
-show (:data:`PLAYERS`), or the short single-stroke loop Genau scrubs against the
+show (:data:`PLAYERS`), or the short single-cycle loop Genau scrubs against the
 device's phase (:data:`GENAU`). The same act wants a different recipe for each, so
 the intent chooses both the overlay table consulted and, for ``GENAU``, narrows
 mining to videos a looping workflow made.
@@ -52,7 +52,7 @@ _CATEGORY_KEYWORDS = {
 }
 
 # What a recipe is being made for. A long-form video for the satellite players,
-# or a Genau clip — one complete stroke, looping end to end, scrubbed against the
+# or a Genau clip — one complete cycle, looping end to end, scrubbed against the
 # device's phase rather than played. Both are "an act on this image", so they share
 # every tier here; what differs is which overlay table is consulted and, for GENAU,
 # that only a looping workflow's videos can be mined.

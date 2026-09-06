@@ -75,12 +75,12 @@ class FakeHost:
         self.calls.append(("dwell", self.dwell_s))
 
 
-def _panel(qtbot, stroke=None, host=None):
-    stroke = stroke if stroke is not None else FakeMotion()
+def _panel(qtbot, motion=None, host=None):
+    motion = motion if motion is not None else FakeMotion()
     host = host if host is not None else FakeHost()
-    panel = MotionPanel(stroke, host=host)
+    panel = MotionPanel(motion, host=host)
     qtbot.addWidget(panel)
-    return panel, stroke, host
+    return panel, motion, host
 
 
 def _press(panel, action):
@@ -137,17 +137,17 @@ def test_the_console_is_a_native_window_that_does_not_ask_for_a_translucent_surf
 
 
 def test_the_console_is_here_whether_or_not_a_motion_is_running(qtbot):
-    # Part of what is on it is not about a running stroke at all — the pace an
+    # Part of what is on it is not about a running motion at all — the pace an
     # unheld slide moves on at. A panel that appeared only once the device was
-    # driven made that reachable only by starting a stroke.
-    panel, stroke, _host = _panel(qtbot)
+    # driven made that reachable only by starting a motion.
+    panel, motion, _host = _panel(qtbot)
     panel.show()
 
-    assert stroke.active is False
+    assert motion.active is False
     assert panel.isVisible()
     assert not panel._repaint.isActive()   # nothing is moving, so nothing repaints
 
-    stroke.active = True
+    motion.active = True
     panel.refresh()
 
     assert panel.isVisible()
@@ -157,16 +157,16 @@ def test_the_console_is_here_whether_or_not_a_motion_is_running(qtbot):
 def test_the_picture_is_the_console_player_core_paints(qtbot):
     # Not a repaint of the design, and not a third of it: the same painter, the
     # same rows, the same bitmap.
-    panel, stroke, host = _panel(qtbot)
+    panel, motion, host = _panel(qtbot)
     raw, size = panel.render_console()
-    expected, expected_size = ConsolePainter().rgba(console_hud(stroke, host))
+    expected, expected_size = ConsolePainter().rgba(console_hud(motion, host))
     assert (raw, size) == (expected, expected_size)
 
 
 def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     # This console lives inside another app's window, so it is not one of the
     # three players that row switches between and has none of its own to park.
-    panel, stroke, host = _panel(qtbot)
+    panel, motion, host = _panel(qtbot)
     panel.render_console()
     actions = [b.action for _rect, b in panel._painter.buttons]
     assert "main_minimize" not in actions
@@ -179,15 +179,15 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
 
 
 def test_the_motion_buttons_reach_the_driver(qtbot):
-    panel, stroke, _host = _panel(qtbot)
-    stroke.active = True  # a parked device's marks are dimmed, and dim is unpressable
-    # A full-travel stroke has its center pinned, and a pinned mark is dim too.
-    stroke.state.state.amplitude = 40
+    panel, motion, _host = _panel(qtbot)
+    motion.active = True  # a parked device's marks are dimmed, and dim is unpressable
+    # A full-travel motion has its center pinned, and a pinned mark is dim too.
+    motion.state.state.amplitude = 40
     panel.render_console()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
                    "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button"):
         _press(panel, action)
-    assert stroke.calls == [("speed", 5), ("amp", -10), ("center", 5),
+    assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
                             "cruise", "shape", "quarter"]
 
 
@@ -207,7 +207,7 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     # A press that could do nothing is not offered — the readout is dimmed whole
     # while nothing is reaching the device, exactly as it is in Fun Time while a
     # funscript has it.
-    panel, stroke, _host = _panel(qtbot)
+    panel, motion, _host = _panel(qtbot)
     panel.render_console()
     marks = [b for _r, b in panel._painter.buttons
              if b.action.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
@@ -229,38 +229,38 @@ def test_the_pace_stops_at_its_ends(qtbot):
 
 
 def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
-    panel, stroke, _host = _panel(qtbot)
-    stroke.active = True
+    panel, motion, _host = _panel(qtbot)
+    motion.active = True
     panel.render_console()
     speed = next(t for t in panel._painter.tracks if t.axis == "speed")
     x, y, w, _h = speed.rect
     margin = MotionPanel.MARGIN
     panel._post(panel._painter.press_at(x + w - 1 + margin, y + margin))
-    assert stroke.calls == [("set_speed", 100)]
+    assert motion.calls == [("set_speed", 100)]
 
 
 def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
     from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 
-    stroke = FakeMotion()
-    assert drive_hud(stroke.state, False).driven == DRIVEN_BY_NOTHING
-    assert drive_hud(stroke.state, True).driven == DRIVEN_BY_ROBOT_HAND
-    assert console_hud(stroke, FakeHost()).console.osr2 == "off"
-    stroke.active = True
-    assert console_hud(stroke, FakeHost()).console.osr2 == "robot_hand"
+    motion = FakeMotion()
+    assert drive_hud(motion.state, False).driven == DRIVEN_BY_NOTHING
+    assert drive_hud(motion.state, True).driven == DRIVEN_BY_ROBOT_HAND
+    assert console_hud(motion, FakeHost()).console.osr2 == "off"
+    motion.active = True
+    assert console_hud(motion, FakeHost()).console.osr2 == "robot_hand"
 
 
 def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
-    # The stroke goes on stroking with the device unplugged — it cannot see the
+    # The motion goes on with the device unplugged — it cannot see the
     # wire — so without this the console animated a blue wave nobody was riding.
     # Saying "off" is also what greys the readout and holds its trace still: the
     # painter reads who has the device off this one value (player_core).
     from player_core.drive_readout import DRIVEN_BY_NOTHING
 
-    stroke = FakeMotion()
-    stroke.active = True
+    motion = FakeMotion()
+    motion.active = True
 
-    hud = console_hud(stroke, FakeHost(), device_on=False)
+    hud = console_hud(motion, FakeHost(), device_on=False)
 
     assert hud.console.osr2 == "off"
     assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
@@ -271,9 +271,9 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     # this app's back, so a console that read it at build time would go on
     # claiming whatever was true when it opened.
     answers = [False, True]
-    stroke = FakeMotion()
-    stroke.active = True
-    panel = MotionPanel(stroke, host=FakeHost(), device_on=lambda: answers.pop(0))
+    motion = FakeMotion()
+    motion.active = True
+    panel = MotionPanel(motion, host=FakeHost(), device_on=lambda: answers.pop(0))
     qtbot.addWidget(panel)
 
     panel.render_console()
@@ -283,9 +283,9 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
 
 
 def test_the_slideshows_pace_rides_the_console(qtbot):
-    panel, stroke, host = _panel(qtbot)
+    panel, motion, host = _panel(qtbot)
     host.dwell_s = 7
-    hud = console_hud(stroke, host)
+    hud = console_hud(motion, host)
     assert hud.console.advance_interval == 7
     assert hud.drive.advance_interval == 7
     assert isinstance(hud, ConsoleHud) and not hud.modes_row
@@ -295,12 +295,12 @@ def test_the_slideshows_pace_rides_the_console(qtbot):
 def test_the_panel_actually_paints(qtbot):
     # A NameError in paintEvent takes the whole app down the first time the
     # panel is shown — which is what shipped once.
-    panel, stroke, _host = _panel(qtbot)
+    panel, motion, _host = _panel(qtbot)
 
     assert not panel.grab().isNull()
 
-    stroke.active = True
-    stroke.state.cruise.active = True
+    motion.active = True
+    motion.state.cruise.active = True
 
     assert not panel.grab().isNull()  # and again with every reading lit
 
@@ -349,12 +349,12 @@ def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
 def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
     # Cruise control hands the device several waves summed, and the readout is
     # meant to be the motion rather than a drawing of it — so the bar is the
-    # whole stroke's travel and center, and the trace is the sum, not whichever
+    # whole motion's travel and center, and the trace is the sum, not whichever
     # wave happens to be the big one.
     import random
 
-    stroke = FakeMotion()
-    live = stroke.state
+    motion = FakeMotion()
+    live = motion.state
     live.state.playing = True
     live.cruise.rng = random.Random(4)
     motion_engine.toggle_cruise_control(live)

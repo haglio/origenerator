@@ -166,7 +166,7 @@ from a session, no hardware in view: send
 `origenerator.osr2.Osr2Broker.park()` and stat
 `../fun_time/state/osr2_serial_tx.txt` (its mtime moves iff UDP → broker →
 serial happened; `broker_heartbeat.txt` is broker liveness); grep each state
-dir's `origenerator.log` for "OSR2 stroke engaged" / "streaming" to see whether
+dir's `origenerator.log` for "OSR2 motion engaged" / "streaming" to see whether
 the app ever actually drove; render a widget offscreen and look at the PNG
 (`widget.grab().save(...)` — offscreen has no fonts, so text is tofu there but
 fine live); and check which instance the user is running from the launch lines

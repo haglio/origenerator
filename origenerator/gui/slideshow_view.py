@@ -76,7 +76,7 @@ The lower strip's queue is floated into the lower-left corner
 (:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
 their buttons — since the strip that carries it is under this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
-shared OSR2 stroke keys ride along too (Space and friends — see
+shared OSR2 motion keys ride along too (Space and friends — see
 :mod:`origenerator.gui.motion_hud`) with genau's drive panel floated up top,
 directly under the HUD (:meth:`SlideshowView._place_console`) — Fun Time puts
 each of the two in a top-left corner of its own window, and a show wearing both
@@ -127,7 +127,7 @@ class SlideshowView(QWidget):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
-                 shuffle=None, actions=None, hud=None, player=None, stroke=None,
+                 shuffle=None, actions=None, hud=None, player=None, motion=None,
                  pace=None, parent=None):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
@@ -155,7 +155,7 @@ class SlideshowView(QWidget):
         # :meth:`note_enhancing`: the show knows what it asked for, and only
         # the side holding the jobs knows which of them is on the GPU.
         self._enhance_status: dict[str, str] = {}
-        self._motion = stroke  # the gallery's app-global stroke driver, or None
+        self._motion = motion  # the gallery's app-global motion driver, or None
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -202,7 +202,7 @@ class SlideshowView(QWidget):
         # Already the fullscreen view, so a double-click leaves it rather than
         # spawning a nested one. It plays sound (mute_audio=False), unlike the
         # muted inline preview, and wears the funscript strip a scripted clip's
-        # stroke motion shows in.
+        # motion shows in.
         self._preview = PreviewWidget(player=player, loop_videos=False,
                                       allow_fullscreen=False,
                                       show_funscript_strip=True, mute_audio=False,
@@ -247,7 +247,7 @@ class SlideshowView(QWidget):
         # Genau's console, seated under the players' HUD once the show wears
         # one (see :meth:`adopt_hud`): the two share the corner Fun Time puts
         # each in, and the console used to sit UNDER the map, unreachable.
-        self._motion_panel = MotionPanel(stroke, self, host=self) if stroke is not None else None
+        self._motion_panel = MotionPanel(motion, self, host=self) if motion is not None else None
         self._hud = None
         self._preview.media_resized.connect(self._place_console)
 
@@ -753,7 +753,7 @@ class SlideshowView(QWidget):
         self._starred_ids.add(item[2])  # the star readout and F-mode follow it
         return True
 
-    # The stroke console reaches the three above by its own names: it drives this
+    # The motion console reaches the three above by its own names: it drives this
     # view through a host protocol the main window's console shares.
     def show_step(self, delta: int) -> None:
         self.step(delta)
@@ -1404,7 +1404,7 @@ class SlideshowView(QWidget):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
-            # Space belongs to the stroke cluster now, everywhere — locking the
+            # Space belongs to the motion cluster now, everywhere — locking the
             # slideshow is Down, matching the auto-generate view's lock.
             self._motion_panel.refresh()
         else:

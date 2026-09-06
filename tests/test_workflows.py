@@ -918,7 +918,7 @@ def test_wan22_flf2v_size_override_replaces_the_in_graph_derivation():
 
 
 def test_wan21_ati_i2v_honors_an_unlocked_size_override():
-    # An explicit WxH wins over the input image's derived size, and the stroke is
+    # An explicit WxH wins over the input image's derived size, and the motion is
     # rescaled into the overridden space — so an unlock overrides derivation even
     # when the (here nonexistent) image would otherwise be measured or fall back.
     from origenerator.workflows.wan21_ati_i2v import REFERENCE_HEIGHT, REFERENCE_WIDTH
@@ -1163,11 +1163,11 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
 
-# ---- WAN 2.1 ATI (stroke-tracked image-to-video) ----
+# ---- WAN 2.1 ATI (motion-tracked image-to-video) ----
 
 def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
-    # video on a stroke track built from the stroke params, so the pixels follow
+    # video on a motion track built from the motion params, so the pixels follow
     # the track instead of the track guessing at pixels. The track is ATI's
     # fixed 121-point/24fps convention: a 3-point cluster riding the authored
     # sine between motion_ceiling and motion_floor, plus one static point holding
@@ -1186,7 +1186,7 @@ def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
 
     params = dict(
         wf.default_params(),
-        positive_prompt="slow steady stroking",
+        positive_prompt="slow steady rhythm",
         input_image="start.png",
         seed=7,
         audio_seed=8,
@@ -1203,19 +1203,19 @@ def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     assert track_node is not None
     assert _find_node(payload, "WanImageToVideo") is None
     # "start.png" isn't a real file, so the size falls back to the reference
-    # frame (scale 1.0), leaving the stroke coordinates below unscaled.
+    # frame (scale 1.0), leaving the motion coordinates below unscaled.
     assert track_node["inputs"]["width"] == REFERENCE_WIDTH
     assert track_node["inputs"]["height"] == REFERENCE_HEIGHT
     assert track_node["inputs"]["length"] == params["frame_count"]
 
     tracks = json.loads(track_node["inputs"]["tracks"])
-    assert len(tracks) == 4                      # 3 stroke points + 1 static anchor
+    assert len(tracks) == 4                      # 3 motion points + 1 static anchor
     assert all(len(t) == 121 for t in tracks)    # ATI's fixed track convention
     cluster = tracks[:3]
-    ys = [pt["y"] for pt in cluster[1]]          # the centered stroke point
-    assert ys[0] == pytest.approx(400, abs=1)    # starts at the top of the stroke
+    ys = [pt["y"] for pt in cluster[1]]          # the centered motion point
+    assert ys[0] == pytest.approx(400, abs=1)    # starts at the motion's ceiling
     assert min(ys) == pytest.approx(400, abs=2)  # tops ride near motion_ceiling...
-    assert 575 <= max(ys) <= 601                 # ...bottoms near motion_floor
+    assert 575 <= max(ys) <= 601                 # ...troughs near motion_floor
     anchor = tracks[3]
     assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
 
@@ -1241,7 +1241,7 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     # The funscript is the track's own reversal points — the exact turnarounds
     # the pixel track eases between — mapped onto video time (the 121-point
     # track always spans 5.0s of track time stretched over the clip's real
-    # duration) and normalized to stroke depth. Each top-of-stroke action must
+    # duration) and normalized to travel depth. Each top-of-cycle action must
     # land where the track's y actually crests. No pixel measurement anywhere.
     import json as _json
 
@@ -1251,10 +1251,10 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     payload = wf.build_api_payload(params)
     tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
     ys = [pt["y"] for pt in tracks[1]]           # the centered cluster point
-    top, bottom = params["motion_ceiling"], params["motion_floor"]
-    depth = bottom - top
+    top, floor = params["motion_ceiling"], params["motion_floor"]
+    depth = floor - top
 
-    assert actions[0] == {"at": 0, "pos": 100}   # the stroke starts at its top
+    assert actions[0] == {"at": 0, "pos": 100}   # the motion starts at its ceiling
     assert actions[-1]["at"] <= 81 / 16.0 * 1000
     assert all(0 <= a["pos"] <= 100 for a in actions)
     scale = (81 / 16.0) / 5.0
@@ -1263,8 +1263,8 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
         i for i in range(1, len(actions) - 1)
         if pos[i] > pos[i - 1] and pos[i] >= pos[i + 1] and pos[i] >= 75
     ]
-    assert crests, "the script must reach the top of the stroke repeatedly"
-    for i in crests:                             # a top-of-stroke reversal
+    assert crests, "the script must reach the motion's ceiling repeatedly"
+    for i in crests:                             # a top-of-cycle reversal
         s = round(actions[i]["at"] / 1000 / scale * 24)  # nearest track sample
         window = ys[max(0, s - 1):s + 2]
         assert min(window) <= top + 0.20 * depth  # the track crests there too
@@ -1278,22 +1278,22 @@ def test_wan21_ati_i2v_funscript_is_sparse_enough_for_the_osr2_driver():
     # The OSR2 driver re-sends "next action, time until it" on a 50ms poll, so
     # a dense script becomes a new target every tick and the device spasms
     # (user-reported: "unusably spastic... going to break my OSR2"). Actions
-    # are reversals plus at most one shaping point per half-stroke, so every
+    # are reversals plus at most one shaping point per half-cycle, so every
     # gap stays far above the poll period at the default cadence.
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), seed=42)
     actions = wf.authored_actions(params)
     gaps = [b["at"] - a["at"] for a, b in zip(actions, actions[1:])]
     assert min(gaps) >= 120
-    strokes = 1.2 * (81 / 16.0)                  # authored strokes in the clip
-    assert len(actions) <= 2 * strokes * 2 + 2   # reversals + shaping, no more
+    cycles = 1.2 * (81 / 16.0)                   # authored cycles in the clip
+    assert len(actions) <= 2 * cycles * 2 + 2    # reversals + shaping, no more
 
 
 def test_wan21_ati_i2v_motion_decelerates_into_reversals_and_wobbles_like_a_hand():
-    # Organic, not metronomic: each long-enough half-stroke carries a shaping
+    # Organic, not metronomic: each long-enough half-cycle carries a shaping
     # point at 55% time / 82% travel, so the device covers most of the distance
     # early and decelerates into the reversal; and the pacing wobbles per
-    # half-stroke, seeded by the generation seed — deterministic per run,
+    # half-cycle, seeded by the generation seed — deterministic per run,
     # re-rolled with it.
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), seed=42)
@@ -1307,7 +1307,7 @@ def test_wan21_ati_i2v_motion_decelerates_into_reversals_and_wobbles_like_a_hand
         i for i in range(1, len(pos) - 1)
         if (pos[i] - pos[i - 1]) * (pos[i + 1] - pos[i]) < 0
     ]
-    assert reversal_idx, "the stroke must actually reverse"
+    assert reversal_idx, "the motion must actually reverse"
     # Deceleration: between reversals, the leg INTO the reversal moves less
     # distance per millisecond than the leg leaving the previous one.
     decelerating = 0
@@ -1319,7 +1319,7 @@ def test_wan21_ati_i2v_motion_decelerates_into_reversals_and_wobbles_like_a_hand
                 decelerating += 1
     assert decelerating >= len(reversal_idx) // 2
 
-    # Human wobble: the spacing between successive top-of-stroke peaks varies.
+    # Human wobble: the spacing between successive top-of-cycle peaks varies.
     peaks = [ats[i] for i in reversal_idx if pos[i] > 75]
     gaps = {round((b - a) / 25) for a, b in zip(peaks, peaks[1:])}
     assert len(gaps) > 1
@@ -1413,7 +1413,7 @@ def _write_image(path, size):
 def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatch):
     # The output size is measured from the input image app-side (ATI can't derive
     # it in-graph), matching what ImageScaleToTotalPixels would produce, and the
-    # stroke coordinates — authored in the 480×864 reference frame — are rescaled
+    # motion coordinates — authored in the 480×864 reference frame — are rescaled
     # into that derived space so the track lands in the same relative place
     # regardless of the image's aspect ratio.
     import origenerator.workflows.derived_size as ds
@@ -1443,9 +1443,9 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatc
     assert anchor[0] == pytest.approx(
         {"x": params["anchor_x"] * sx, "y": params["anchor_y"] * sy}
     )
-    ys = [pt["y"] for pt in tracks[1]]                       # centered stroke point
-    # The organic stroke starts exactly at the (scaled) top and lands within its
-    # humanized shortfall of the (scaled) bottom — never beyond either bound.
+    ys = [pt["y"] for pt in tracks[1]]                       # centered motion point
+    # The organic motion starts exactly at the (scaled) top and lands within its
+    # humanized shortfall of the (scaled) floor — never beyond either bound.
     scaled_depth = (params["motion_floor"] - params["motion_ceiling"]) * sy
     assert min(ys) == pytest.approx(params["motion_ceiling"] * sy, abs=1)
     assert params["motion_floor"] * sy - 0.12 * scaled_depth <= max(ys)
@@ -1454,7 +1454,7 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatc
 
 def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkeypatch):
     # A missing or unset input image can't be measured, so the size falls back to
-    # the 480×864 reference (scale 1.0 → the stroke coordinates pass through
+    # the 480×864 reference (scale 1.0 → the motion coordinates pass through
     # unchanged) rather than crashing payload build.
     from origenerator.workflows.wan21_ati_i2v import (
         REFERENCE_HEIGHT,
@@ -1473,7 +1473,7 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
 
 
 def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
-    # The stroke coordinates are authored in the 480×864 reference frame (then
+    # The motion coordinates are authored in the 480×864 reference frame (then
     # rescaled into the derived size), so their ranges are that frame's bounds —
     # X params to the reference width, Y params to the reference height — not the
     # old catch-all 4096. This keeps the form's meaning honest about the space.
@@ -1488,7 +1488,7 @@ def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
 
 
 def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
-    # Choosing where in the frame a thing is doesn't scale, so when the stroke
+    # Choosing where in the frame a thing is doesn't scale, so when the motion
     # coordinates are all still at their defaults, payload build detects the
     # anchor in the start frame and aims the track at it (converted into the
     # 480x864 reference frame, then scaled like any manual aim). Any edited
@@ -1516,7 +1516,7 @@ def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
     # Missing image file -> reference-size fallback (scale 1.0), so the track
     # lands exactly at the detected fractions of the reference frame.
     assert tracks[1][0]["x"] == pytest.approx(round(0.5 * REFERENCE_WIDTH) + 3)  # cluster x-offset
-    assert tracks[1][0]["y"] == pytest.approx(round(0.25 * REFERENCE_HEIGHT))    # starts at stroke top
+    assert tracks[1][0]["y"] == pytest.approx(round(0.25 * REFERENCE_HEIGHT))    # at the ceiling
     assert tracks[3][0] == {"x": float(round(0.45 * REFERENCE_WIDTH)),
                             "y": float(round(0.6 * REFERENCE_HEIGHT))}
     assert len(calls) == 1
@@ -2492,7 +2492,7 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
 
 
 def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
-    # The stroke was authored over the clip's seconds, and those don't move when
+    # The motion was authored over the clip's seconds, and those don't move when
     # the rate does — so one generation drives the device identically at the
     # slowest rate and the fastest, matching a video whose motion is unchanged.
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]

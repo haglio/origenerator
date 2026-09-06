@@ -28,8 +28,8 @@ _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_whe
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 
-# --- player_core reads this off the stroke state this app writes it on ---
-# `cruise_control` asks `direct.playing` whether the stroke is running before it
+# --- player_core reads this off the motion state this app writes it on ---
+# `cruise_control` asks `direct.playing` whether the motion is running before it
 # advances the wave stack; nothing here reads it back.
 _.playing  # noqa  # origenerator/gui/osr2_motion_driver.py:146, origenerator/gui/osr2_motion_driver.py:163
 

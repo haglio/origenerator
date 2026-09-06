@@ -279,10 +279,10 @@ _PROPORTION_DISPLAY = 15  # on-screen size, to sit level with the heading's word
 def orientation_mark(orientation: str) -> QPixmap:
     """An upright or a lying-down frame -- the shape one half of the TOC holds.
 
-    Stated in canvas units, so its stroke is the family's weight rather than a
+    Stated in canvas units, so its pen is the family's weight rather than a
     hairline of its own -- but painted straight onto the pixmap the heading
     shows, where the badges render large and resample down. At this size that
-    route costs the mark its edges: a stroke a pixel and a half wide, drawn at
+    route costs the mark its edges: a line a pixel and a half wide, drawn at
     the canvas and then resampled, arrives as a gray smear of one.
     """
     tall = orientation == PORTRAIT

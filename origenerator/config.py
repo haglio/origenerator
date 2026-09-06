@@ -159,8 +159,8 @@ CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
 
 # --- Funscript / OSR2 -------------------------------------------------------
 # Each generated video gets a funscript synthesized alongside it (see
-# funscript.py). The motion isn't measured from the video — it's a steady stroke
-# at this cadence (full strokes per second), phased to the clip's duration/loop.
+# funscript.py). The motion isn't measured from the video — it's a steady motion
+# at this cadence (full cycles per second), phased to the clip's duration/loop.
 MOTION_DEFAULT_HZ = 1.2
 
 # The broker sibling bridges to the OSR2 device (COM4) and forwards raw
@@ -176,7 +176,7 @@ OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / GENAU_ENABLED
 # The broker stamps this with the time the OSR2 last spoke. It is the only
 # evidence that the device is there — the console reads it to say "Off" and grey
 # its readout (see origenerator.osr2.device_on). The broker writes a second stamp
-# for what it last *sent*, deliberately not read here: this app's own stroke
+# for what it last *sent*, deliberately not read here: this app's own motion
 # would keep it fresh against a device that is switched off.
 OSR2_SERIAL_RX_FILE = OSR2_STATE_DIR / OSR2_SERIAL_RX
 # How long the device may stay quiet and still count as on — the broker's own

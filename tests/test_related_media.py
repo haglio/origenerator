@@ -36,7 +36,7 @@ def _video_row(prompt_id="vid1", input_image="sdxl_t2i_img1.png"):
 
 
 def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.png"):
-    """One stroke cut out of a clip. It carries the clip's params, start frame
+    """One cycle cut out of a clip. It carries the clip's params, start frame
     and all — which is what makes the order of the links matter."""
     return {
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",

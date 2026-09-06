@@ -145,7 +145,7 @@ class PreviewWidget(QWidget):
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
-        # along its lower edge, so a scripted clip shows its stroke motion at a glance.
+        # along its lower edge, so a scripted clip shows its motion motion at a glance.
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -265,7 +265,7 @@ class PreviewWidget(QWidget):
 
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
-        combination and the wall), the stroke strip drops, the playback stops,
+        combination and the wall), the motion strip drops, the playback stops,
         the notice and the corner controls — both of which are about the picture
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
@@ -323,7 +323,7 @@ class PreviewWidget(QWidget):
         self._player.play()
         if self._playback_paused:
             self._player.pause()  # a clip loaded into a frozen room opens held
-        self._update_strip(path)  # …and wears its stroke script, if it has one
+        self._update_strip(path)  # …and wears its funscript, if it has one
 
     def show_frame(self, data: bytes, *, keep_notice: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.

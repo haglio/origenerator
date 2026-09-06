@@ -77,10 +77,10 @@ CREATE TABLE IF NOT EXISTS generations (
     -- origenerator.gallery.enhance.enhance_target_id). NULL on a row from
     -- before this was recorded, which falls back to matching the file.
     enhance_of TEXT,
-    -- The clip this row is one stroke of, by that clip's prompt_id. Nothing
+    -- The clip this row is one cycle of, by that clip's prompt_id. Nothing
     -- writes it any more: cutting a finished clip down was how a Genau clip was
     -- made for one afternoon, until the lane learned to ask the sampler for a
-    -- loop one stroke long instead (origenerator.gallery.combine.cycle_shaped),
+    -- loop one cycle long instead (origenerator.gallery.combine.cycle_shaped),
     -- which is the same answer without a second file. The cuts that were made
     -- are still here and still in Genau's folder, so the column stays and the
     -- Generate tab still follows it back to the clip each came out of. An

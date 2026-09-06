@@ -200,7 +200,7 @@ def test_smart_recipe_returns_none_when_the_llm_errors(monkeypatch):
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
 
 
-# --- the two lanes: a full-length video, or one looping stroke ----------------
+# --- the two lanes: a full-length video, or one looping cycle ----------------
 
 
 def test_genau_mines_only_looping_videos():

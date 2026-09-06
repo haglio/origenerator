@@ -246,13 +246,13 @@ PARAM_HELP: dict[str, str] = {
         "number at a time; anything else settles onto the nearest."
     ),
 
-    # --- the authored stroke (track-conditioned video) ---
+    # --- the authored motion (track-conditioned video) ---
     "motion_hz": "How many cycles per second the generated motion runs at.",
     "motion_x": "The horizontal line the motion travels along, in pixels across the frame.",
     "motion_ceiling": "The pixel row the motion reaches at the top of its travel.",
     "motion_floor": "The pixel row the motion reaches at the floor of its travel.",
-    "anchor_x": "The horizontal position of the point that stays put while the stroke moves.",
-    "anchor_y": "The vertical position of the point that stays put while the stroke moves.",
+    "anchor_x": "The horizontal position of the point that stays put while the motion moves.",
+    "anchor_y": "The vertical position of the point that stays put while the motion moves.",
 
     # --- audio ---
     "audio_prompt": (

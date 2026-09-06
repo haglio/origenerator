@@ -1,6 +1,6 @@
 """A thin funscript heatmap painted under a video preview.
 
-Proof at a glance that a clip has a stroke script — and what its motion looks
+Proof at a glance that a clip has a funscript — and what its motion looks
 like — mirroring the strip the sibling Nau player shows. Colors come from
 ``funscript.heatmap_colors`` (one per pixel column); this widget only paints.
 """
@@ -20,7 +20,7 @@ _PLAYHEAD_PX = 2
 
 
 class FunscriptStrip(QWidget):
-    """Renders a funscript's stroke-speed heatmap as a fixed-height horizontal bar."""
+    """Renders a funscript's travel-speed heatmap as a fixed-height horizontal bar."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

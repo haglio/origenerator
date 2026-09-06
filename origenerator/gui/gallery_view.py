@@ -217,7 +217,7 @@ def _shared_hud_widget():
     Reached for here rather than imported at module top, and reached for at all
     rather than assumed, for the same reason: the panel lives in the newest
     player_core, while this app's other reaches into that sibling (genau's
-    console, the stroke) resolve against an older checkout perfectly well.  A
+    console, the motion) resolve against an older checkout perfectly well.  A
     session names the checkout it wants on PYTHONPATH; a plain launch walks up
     to the primary one, and that one only grows the panel when it lands.
 
@@ -289,8 +289,8 @@ class _Running(NamedTuple):
     instructions — the device, the loop, the show, the sound.
     """
 
-    osr2: bool = False       # the device switch: a funscript, or the stroke under it
-    stroke: bool = False     # the bare stroke, running with the switch off
+    osr2: bool = False       # the device switch: a funscript, or the motion under it
+    motion: bool = False     # the bare motion, running with the switch off
     auto: str | None = None  # the folder looping, if one is
     audio: bool = False      # the audio bed
     show: bool = False       # a fullscreen slideshow is up
@@ -301,7 +301,7 @@ class _Running(NamedTuple):
 
     @property
     def anything(self) -> bool:
-        return bool(self.osr2 or self.stroke or self.auto or self.audio or self.show)
+        return bool(self.osr2 or self.motion or self.auto or self.audio or self.show)
 
 
 class _SearchScope(NamedTuple):
@@ -404,7 +404,7 @@ _VOICE_SHELVES = {
     AppCommand.TRASH: _TRASH_KEY,
 }
 
-# The stroke dial each spoken word turns, as (the driver's method, its argument
+# The motion dial each spoken word turns, as (the driver's method, its argument
 # or ``None`` for a method that takes none) — the very moves the keys make (see
 # :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed.
 _VOICE_MOTION = {
@@ -502,9 +502,9 @@ class GalleryView(QWidget):
         self._ambient_audio = (
             ambient_audio if ambient_audio is not None else AmbientAudio(parent=self)
         )
-        # The one app-global stroke driver (genau's engine, no funscript needed):
+        # The one app-global motion driver (genau's engine, no funscript needed):
         # every surface — this window and whatever slideshow is up —
-        # drives it through the shared stroke keys, and while it holds the device
+        # drives it through the shared motion keys, and while it holds the device
         # the funscript reconcile stands down. Injectable so tests never touch
         # the broker. Built before _build_ui, which wires its window feedback.
         # None inside a Fun Time session: the OSR2 there is the main player's
@@ -519,7 +519,7 @@ class GalleryView(QWidget):
         # the next slideshow opens at.
         self._pace = SlideshowPace(parent=self)
         # Guards the one reconcile that owns both drive sources: starting or
-        # stopping the stroke is something it does, not something it reacts to.
+        # stopping the motion is something it does, not something it reacts to.
         self._reconciling_osr2 = False
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
@@ -837,7 +837,7 @@ class GalleryView(QWidget):
                     else:
                         self._undo()
                     return True
-                # The OSR2 stroke keys work right here in the main window too —
+                # The OSR2 motion keys work right here in the main window too —
                 # not only in the fullscreen show — under the same guards that
                 # keep them out of text fields and other windows.
                 if (not event.modifiers()
@@ -849,7 +849,7 @@ class GalleryView(QWidget):
 
     def _handle_escape(self) -> bool:
         """Esc turns off everything the app is doing, wherever focus is: the OSR2
-        drive (a funscript or the genau stroke), the auto-generate loop, the
+        drive (a funscript or the genau motion), the auto-generate loop, the
         fullscreen slideshow, and the audio bed. Pressed with all of it off, it
         starts the room instead: what the last press took away — the same folder
         looping, the same show on the same picture, the sound, the device — or,
@@ -902,10 +902,10 @@ class GalleryView(QWidget):
         show = self._slideshow
         return _Running(
             osr2=self._osr2_enabled,
-            # Space reaches the switch rather than the stroke, so a stroke
+            # Space reaches the switch rather than the motion, so a motion
             # running with the switch off is one something else started — the
             # stop has always covered that case, and so does the resume.
-            stroke=self._osr2_motion.active and not self._osr2_enabled,
+            motion=self._osr2_motion.active and not self._osr2_enabled,
             auto=self._auto.active_key(),
             audio=self._audio_btn is not None and self._audio_btn.isChecked(),
             show=show is not None,
@@ -930,9 +930,9 @@ class GalleryView(QWidget):
         """Take all of ``running`` off."""
         if running.osr2:
             # One switch, so one thing to turn off: untoggling stops whichever
-            # source is on the device — a funscript drive or the stroke.
+            # source is on the device — a funscript drive or the motion.
             self._osr2_btn.setChecked(False)
-        elif running.stroke:
+        elif running.motion:
             self._osr2_motion.stop()
         if running.auto:
             self._auto.stop_all()
@@ -973,7 +973,7 @@ class GalleryView(QWidget):
             self._sync_discard_buttons()  # and its run offers a next seed, not a cancel
         if stopped.osr2:
             self._osr2_btn.setChecked(True)
-        elif stopped.stroke:
+        elif stopped.motion:
             self._osr2_motion.start()
 
     def _our_show_is_in_front(self) -> bool:
@@ -1250,7 +1250,7 @@ class GalleryView(QWidget):
         # One switch for the device, wearing the waveform: on means Origenerator
         # is driving the OSR2, and the app picks the source — the funscript of
         # whatever scripted video is in front (the generate tab's, or one playing
-        # in a slideshow), and a self-generated genau stroke whenever there is no
+        # in a slideshow), and a self-generated genau motion whenever there is no
         # script to follow. It used to be two buttons, which asked the user to
         # answer a question the app can answer for itself, and let both sources
         # be armed at once. Always visible (it's app-wide), lit when on.
@@ -1263,7 +1263,7 @@ class GalleryView(QWidget):
             self._osr2_btn = self._tool_button(
                 icons.motion_icon(),
                 "Drive the OSR2 — the funscript of the video in front, or a "
-                f"self-generated stroke when there is none ({MOTION_KEY_LEGEND}; "
+                f"self-generated motion when there is none ({MOTION_KEY_LEGEND}; "
                 "Esc to stop)",
                 self._on_osr2_toggle, checkable=True,
             )
@@ -1606,14 +1606,14 @@ class GalleryView(QWidget):
         # up — re-run rather than leave highlights on words that shifted.
         panel.form_edited.connect(self._refresh_find)
 
-    # --- Drive OSR2: one switch, the app picking funscript or stroke ----------
+    # --- Drive OSR2: one switch, the app picking funscript or motion ----------
 
     def _on_osr2_toggle(self, on: bool):
         self._osr2_enabled = on
         self._reconcile_osr2()
 
     def _toggle_osr2_drive(self):
-        """Flip the one switch — what Space does, from any surface. The stroke's
+        """Flip the one switch — what Space does, from any surface. The motion's
         own toggle is deliberately not reachable from a key any more: with two
         sources for one device, whichever one a key started would have been
         streaming alongside whatever the switch already had going.
@@ -1628,13 +1628,13 @@ class GalleryView(QWidget):
 
         With the switch off, neither source drives. With it on, a funscript wins
         wherever there is one — a slideshow showing a scripted video, else the
-        front tab's — and the self-generated stroke fills every other moment,
+        front tab's — and the self-generated motion fills every other moment,
         which is most of them: a folder of images, a clip with no script, an
         empty tab. That is the whole of "genau mode when no funscript is going".
 
         Idempotent, so tab switches, browsing, completions and opening or closing
         a show all resolve without churning the device. The guard makes it
-        re-entrant-safe too: starting or stopping the stroke emits
+        re-entrant-safe too: starting or stopping the motion emits
         ``active_changed``, and a listener that reconciles must not land back
         here mid-flight.
         """
@@ -1666,7 +1666,7 @@ class GalleryView(QWidget):
 
     def _osr2_drive_source(self):
         """The funscript target to follow, or ``None`` when there is none to
-        follow — in which case the stroke is what drives (see
+        follow — in which case the motion is what drives (see
         :meth:`_reconcile_osr2`). An open slideshow wins when it's showing a
         scripted video, otherwise the front tab's video.
 
@@ -1749,7 +1749,7 @@ class GalleryView(QWidget):
                 # Space reaches the one OSR2 switch, like every other surface's.
                 drive_toggle=self._toggle_osr2_drive,
             ),
-            pace=self._pace, stroke=self._osr2_motion,
+            pace=self._pace, motion=self._osr2_motion,
             # Which of its items carry an enhancement, for the switch beside
             # F-mode on its HUD -- over the set it plays and the folder a live
             # show is armed with, since either is what the switch narrows.
@@ -4244,7 +4244,7 @@ class GalleryView(QWidget):
 
         Four kinds, and which it is decides where it lands: a shelf name stands
         the tree in that shelf, a switch word flips one of the app-wide
-        switches, a dial word turns the stroke — and everything else is about
+        switches, a dial word turns the motion — and everything else is about
         whatever surface is in front of the speaker, which is the fullscreen
         show while one is up and the gallery otherwise.
         """
@@ -4339,11 +4339,11 @@ class GalleryView(QWidget):
             show.note_voice_command("🎤 nothing here is enhanced")
 
     def _turn_motion_dial(self, command: AppCommand):
-        """Turn one of the stroke's dials — the move its key makes.
+        """Turn one of the motion's dials — the move its key makes.
 
         The driver is app-wide, so this answers from the gallery and from a show
         alike, and the dials read the same whether or not the device is running:
-        a stroke can be set up before it is started, exactly as the panel allows.
+        a motion can be set up before it is started, exactly as the panel allows.
         """
         method, argument = _VOICE_MOTION[command]
         turn = getattr(self._osr2_motion, method)
@@ -4351,13 +4351,13 @@ class GalleryView(QWidget):
         self._answer_command(f"🎤 {self._osr2_motion.status_text()}")
 
     def _set_motion_dial(self, setting: DialSetting):
-        """Put one of the stroke's dials where a spoken number asks for it.
+        """Put one of the motion's dials where a spoken number asks for it.
 
-        The nudges above are for a stroke that is nearly right; this is for one
+        The nudges above are for a motion that is nearly right; this is for one
         that is not, and it is the same driver either way — so it answers with
         the same line, and from the gallery and a show alike. The dial does its
         own clamping, which is why "min speed" can say nought and land on the
-        slowest the device actually strokes at.
+        slowest the device actually moves at.
         """
         put = getattr(self._osr2_motion, _VOICE_DIALS[setting.dial])
         put(setting.value)
@@ -5692,7 +5692,7 @@ class GalleryView(QWidget):
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
         seed with only the input image swapped to the dropped one.
 
-        Under ``GENAU`` the recipe is then re-cut to hold one stroke and smoothed
+        Under ``GENAU`` the recipe is then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
         used to choose only WHICH recipe was mined, and from there a Genau clip
         was made exactly like any other video; it can't be, because what Genau
@@ -5774,7 +5774,7 @@ class GalleryView(QWidget):
         output file, or that folder is already generating.
 
         The lane reaches here now: it chose which recipe ``video_id`` names, and
-        it also re-cuts that recipe to the length one stroke fits in (see
+        it also re-cuts that recipe to the length one cycle fits in (see
         :meth:`_combined_params`), which is the one thing a mined clip cannot
         carry — it was made before anyone knew Genau needed it. ``send``
         is the one thing that still rides along — a spoken "genau it" wants its

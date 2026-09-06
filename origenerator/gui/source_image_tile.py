@@ -73,7 +73,7 @@ class SourceImageTile(QWidget):
         """Point the tile at an item. ``heading`` names the relation when it
         isn't the usual one — the same slot says "from source image" for a
         video's start frame, "requested from" for what a request revised, and
-        "trimmed from" for the clip a single stroke was cut out of. That last one
+        "trimmed from" for the clip a single cycle was cut out of. That last one
         is a video, so ``media_type`` moves the badge with it; both settings are
         per-showing, because the next row put in this slot may be a different
         relation to a different kind of thing."""

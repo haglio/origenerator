@@ -8557,7 +8557,7 @@ def _combine_db(tmp_path):
 
 def _loop_recipe(db, prompt_id="loop"):
     """A past looping clip for the Genau lane to mine, sampled the long way --
-    21 frames at 16fps, which is a stroke and a half and the whole problem."""
+    21 frames at 16fps, which is a cycle and a half and the whole problem."""
     from origenerator.workflows import WORKFLOW_REGISTRY
 
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
@@ -8588,11 +8588,11 @@ def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
     assert job.params["frame_rate"] > wf.default_params()["frame_rate"]  # smoothed
-    assert job.params["positive_prompt"] != "alpha"             # asked for one stroke
+    assert job.params["positive_prompt"] != "alpha"             # asked for one cycle
 
 
 def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
-    """A stroke is not one motion, so the wording is per act — and the act has to
+    """A cycle is not one motion, so the wording is per act — and the act has to
     reach the shaping, which is the whole reason it is threaded through."""
     db = _combine_db(tmp_path)
     _loop_recipe(db)
@@ -9754,7 +9754,7 @@ def _row_index(view, widget):
         item = column.itemAt(i)
         if item.layout() is not None and item.layout().indexOf(widget) >= 0:
             return i
-    raise AssertionError("the stroke panel is not in a row of the browser pane")
+    raise AssertionError("the motion panel is not in a row of the browser pane")
 
 
 def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
@@ -10534,7 +10534,7 @@ def _aim_show(view, show, target):
 
 def _osr2_view(qtbot):
     """A gallery with both drive sources stubbed: the funscript driver, and the
-    stroke the one switch falls back to when there is no script to follow."""
+    motion the one switch falls back to when there is no script to follow."""
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(),
                        osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
@@ -10556,7 +10556,7 @@ def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
 
 def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     # "Genau mode when no funscript is going": with nothing scripted in front,
-    # the one switch drives the device from the app's own stroke rather than
+    # the one switch drives the device from the app's own motion rather than
     # sitting armed and doing nothing.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
@@ -10570,7 +10570,7 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
 
 def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot, monkeypatch):
     # Space is genau's "drives" key and the switch is the same control, so it has
-    # to reach the switch: routed to the stroke directly it would start a second
+    # to reach the switch: routed to the motion directly it would start a second
     # source alongside a funscript the switch already had streaming.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
@@ -10581,13 +10581,13 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot, monkeypa
     space = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, _NO_MOD)
     assert view.eventFilter(view, space) is True
 
-    assert not view._osr2_btn.isChecked()      # the switch went off, not the stroke
+    assert not view._osr2_btn.isChecked()      # the switch went off, not the motion
     assert driver.stopped >= 1 and not view._osr2_motion.active
 
 
 def test_a_show_gets_space_wired_to_the_switch(qtbot):
-    # Every surface that answers the stroke keys has to send Space to the one
-    # switch rather than to the stroke it was handed — the show as much as the
+    # Every surface that answers the motion keys has to send Space to the one
+    # switch rather than to the motion it was handed — the show as much as the
     # main window, since a slideshow is where the device is usually driven from.
     view, _driver, _panel = _osr2_view(qtbot)
     show = _double_click_show(view, qtbot)
@@ -10706,7 +10706,7 @@ def test_stepping_a_double_clicked_show_re_aims_the_osr2(qtbot):
     show.close()
 
 
-# --- watching a folder that is auto-generating, and the app-global stroke -----
+# --- watching a folder that is auto-generating, and the app-global motion -----
 
 class _SignalMotion(QObject):
     """Stands in for the app-global Osr2MotionDriver: records the calls, flips
@@ -10764,7 +10764,7 @@ class _SignalMotion(QObject):
 
 def _looping_view(qtbot, monkeypatch, rows):
     """A gallery on a settings leaf whose loop reports active, built on a stubbed
-    stroke so no device backend spins up."""
+    motion so no device backend spins up."""
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
                        osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
@@ -10791,8 +10791,8 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
 
 
 def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
-    # The one switch picks the source, and a script beats the stroke: turning it
-    # on over an image strokes, and browsing to a scripted video hands the device
+    # The one switch picks the source, and a script beats the motion: turning it
+    # on over an image moves it, and browsing to a scripted video hands the device
     # to the funscript rather than leaving both streaming at it.
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
@@ -10807,11 +10807,11 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     panel.displayed_changed.emit()
 
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_motion.active  # the stroke stood down for the script
+    assert not view._osr2_motion.active  # the motion stood down for the script
 
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
-    # The stroke is app-global: dismissing a view must not park the device.
+    # The motion is app-global: dismissing a view must not park the device.
     _resolve_by_id(monkeypatch)
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._start_slideshow()
@@ -11262,7 +11262,7 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
 
 def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
                                                                     monkeypatch):
-    # Started by a stroke key rather than the OSR2 switch, so it is the stroke
+    # Started by a motion key rather than the OSR2 switch, so it is the motion
     # itself that has to be started again — the switch was never on to restore.
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
@@ -12546,9 +12546,9 @@ def _genau_db(tmp_path):
     loop = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     db.insert_generation(
         prompt_id="loop", workflow_name="wan22_flf2v_loop", workflow_version=loop.version,
-        positive_prompt="dancing, one stroke", seed=7,
+        positive_prompt="dancing, one cycle", seed=7,
         params_json=json.dumps(dict(loop.default_params(), seed=7, noise_seed=8,
-                                    positive_prompt="dancing, one stroke")),
+                                    positive_prompt="dancing, one cycle")),
         workflow_json="{}",
     )
     db.update_generation("loop", status="completed",

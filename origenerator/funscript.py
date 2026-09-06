@@ -1,9 +1,9 @@
 """Synthesize and read the funscript that rides alongside a generated video.
 
 A ``.funscript`` is a JSON file of ``{"at": <ms>, "pos": 0..100}`` actions describing
-stroke motion for a haptic device (the OSR2). Origenerator's videos carry no explicit
+motion for a haptic device (the OSR2). Origenerator's videos carry no explicit
 motion track — the diffusion model's motion lives only in the pixels — so rather than
-measuring the finished video, this authors a stroke *with* it from what the generation
+measuring the finished video, this authors a motion *with* it from what the generation
 already knows: the clip's duration, and whether it loops. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
 measured (FunGen) or authored (ATI) source touches nothing else.
@@ -63,11 +63,11 @@ def funscript_of(video_path, *, output_dir) -> Path | None:
 
 
 def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:
-    """A periodic stroke over ``duration_s`` at ``hz`` full cycles per second.
+    """A periodic motion over ``duration_s`` at ``hz`` full cycles per second.
 
     Emits alternating floor/top extremes (``0``/``100``) every half-period; the
-    device interpolates between them, so a plain point every half-stroke reads as a
-    steady stroke. When ``loop`` is set, the half-period is stretched to fit a whole
+    device interpolates between them, so a plain point every half-cycle reads as a
+    steady motion. When ``loop`` is set, the half-period is stretched to fit a whole
     (even) number of halves into the clip, so the last action lands back at the start
     position at exactly ``duration`` — the script tiles seamlessly as the clip repeats.
     """
@@ -106,7 +106,7 @@ def write_funscript(path, actions: list[dict]) -> None:
 
 # Anchor colors for the classic funscript-heatmap feel (mirrors sibling Nau's
 # palette): idle bins read near-black, then blue -> cyan -> green -> yellow -> red
-# as the average stroke speed (position units per second) climbs to 500.
+# as the average travel speed (position units per second) climbs to 500.
 _HEATMAP_GRADIENT: list[tuple[float, tuple[int, int, int]]] = [
     (0.0, (10, 14, 30)),
     (100.0, (30, 70, 230)),
@@ -127,7 +127,7 @@ def _speed_to_color(speed: float) -> tuple[int, int, int]:
 
 def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, int]]:
     """One ``(r, g, b)`` per equal time bucket of ``[0, last action]``, colored by
-    the average stroke speed in that bucket — the funscript heatmap the strip paints.
+    the average travel speed in that bucket — the funscript heatmap the strip paints.
 
     Each segment spreads its ``|pos delta|`` over the buckets it overlaps in
     proportion to the overlap; a bucket's speed is its accumulated travel over the

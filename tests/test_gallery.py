@@ -1392,7 +1392,7 @@ def test_recent_generations_lists_imported_files_where_they_arrived():
 def test_recent_generations_leaves_experiments_to_their_own_shelf():
     # An experiment is reviewed on the Experiments shelf; listed here as well it
     # would read as something asked for. Everything else with a result is here,
-    # including a stroke cut for the Genau lane, which has no run under it.
+    # including a cycle cut for the Genau lane, which has no run under it.
     generated = _img("gen", "a cat", 50, 1)
     experiment = _row(prompt_id="exp", source="experiment", id=2,
                       output_files=json.dumps([{"filename": "exp.png"}]))

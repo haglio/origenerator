@@ -11,10 +11,10 @@ Either way, two buttons act on the chosen recipe: Generate re-runs it on the dro
 image now, while “Edit…” hands it to a generate tab to change first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
-video for the players (the default), or a Genau clip — one complete stroke, looping.
+video for the players (the default), or a Genau clip — one complete cycle, looping.
 That choice picks which recipes the act is answered from, so the dropdown's usable
 acts change with it: an act only the players' lane can answer greys out under Genau,
-and acts that aren't strokes at all are not offered there.
+and acts that are no kind of cycle at all are not offered there.
 
 Acts with nothing to answer a pick — no video to mine a recipe from and no curated
 recipe in the content overlay — are greyed out
@@ -120,7 +120,7 @@ class CombinePanel(QWidget):
         self._players_radio.setChecked(True)
         self._genau_radio = QRadioButton("Genau")
         self._genau_radio.setToolTip(
-            "Make a Genau clip: one complete stroke, looping, sent to Genau when done."
+            "Make a Genau clip: one complete cycle, looping, sent to Genau when done."
         )
         self._intent_group = QButtonGroup(self)
         self._intent_group.addButton(self._players_radio)

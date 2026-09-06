@@ -41,7 +41,7 @@ class MediaBadge(QLabel):
 
         For a badge over a slot whose subject changes kind rather than a tile's,
         which is one thing forever: the config tab's source tile shows a video's
-        start frame (an image) and the clip a stroke was cut out of (a video) in
+        start frame (an image) and the clip a cycle was cut out of (a video) in
         the one place, and a badge that could not follow said "photo" over both.
         """
         if media_type != self.media_type:

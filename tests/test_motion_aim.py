@@ -8,7 +8,7 @@ from origenerator.workflows import motion_aim
 
 def test_aim_fractions_map_the_rect_to_column_span_and_base():
     # An anchor rect at (200, 300) sized 100x500 in a 1000x1000 image: the track
-    # column runs through the rect center; the stroke spans the gripped length
+    # column runs through the rect center; the motion spans the gripped length
     # (18%..72% of the rect); the anchor pins the base (93%).
     aim = motion_aim.aim_fractions_from_rect((200, 300, 100, 500), 1000, 1000)
     assert aim["motion_x"] == pytest.approx(0.25)

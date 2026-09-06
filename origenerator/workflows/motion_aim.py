@@ -1,9 +1,9 @@
-"""Auto-aim the ATI stroke at the anatomy in a start frame.
+"""Auto-aim the ATI motion at the anatomy in a start frame.
 
 Manually telling the workflow where the anchor sits in every image doesn't
 scale, so this module finds it: a detection pass over the start frame yields
-the anchor's bounding rect, and the rect maps to the stroke's aim — the track
-column through the rect's center, a stroke span over the anchor's gripped
+the anchor's bounding rect, and the rect maps to the motion's aim — the track
+column through the rect's center, a motion span over the anchor's gripped
 length, and the static anchor at its base. Results are FRACTIONS of the image
 (0..1), so the caller converts them into whatever coordinate frame it authors
 tracks in; this module knows nothing about reference frames or workflows.
@@ -37,7 +37,7 @@ _IOU_LIMIT = 0.45
 # and costs one re-roll, while a missed aim forfeits the feature.
 _MIN_SCORE = 0.22
 
-# Where the stroke lands inside the detected rect, as fractions of its height:
+# Where the motion lands inside the detected rect, as fractions of its height:
 # the span starts just under the tip and ends above the base (the gripped
 # length a hand travels), and the anchor pins the base itself. Calibrated
 # against the hand-aimed proof-of-concept frame.
@@ -50,7 +50,7 @@ _detector = None
 
 @lru_cache(maxsize=1)
 def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
-    """The aim model's class names, and the ones whose rect the stroke aims at.
+    """The aim model's class names, and the ones whose rect the motion aims at.
 
     Library vocabulary, so it comes from the content overlay rather than from
     source. Read on first use rather than at module scope: this module is
@@ -72,9 +72,9 @@ def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
 
 
 def aim_fractions_from_rect(rect, image_w: int, image_h: int) -> dict:
-    """Map a detected anchor rect ``(x, y, w, h)`` to the stroke's aim, each value
+    """Map a detected anchor rect ``(x, y, w, h)`` to the motion's aim, each value
     a fraction of the image: the track column through the rect center, the
-    stroke span over the gripped length, the anchor at the base."""
+    motion span over the gripped length, the anchor at the base."""
     x, y, w, h = rect
     cx = (x + w / 2) / image_w
     return {
@@ -87,7 +87,7 @@ def aim_fractions_from_rect(rect, image_w: int, image_h: int) -> dict:
 
 
 def detect_grip_aim(image_path: Path | None) -> dict | None:
-    """The stroke aim for ``image_path``'s most confident detected anchor, as
+    """The motion aim for ``image_path``'s most confident detected anchor, as
     image fractions (see :func:`aim_fractions_from_rect`), or ``None`` when
     there's no file, no usable detector, or no confident detection."""
     if image_path is None:

@@ -39,7 +39,7 @@ def test_funscript_of_finds_the_folder_first(tmp_path):
 
 def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
     """Hundreds sit beside their clips. A reader that knew only the new place
-    would drop the stroke from every one of them, silently."""
+    would drop the motion from every one of them, silently."""
     video = tmp_path / "video" / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"v")
@@ -57,20 +57,20 @@ def test_read_actions_passes_a_missing_script_through():
 
 
 def test_synthesize_actions_alternates_extremes_at_half_period():
-    # 1 Hz over 2 s → a half-stroke every 500 ms, starting at the floor.
+    # 1 Hz over 2 s → a half-cycle every 500 ms, starting at the floor.
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
     assert [a["pos"] for a in actions] == [0, 100, 0, 100, 0]
     assert [a["at"] for a in actions] == [0, 500, 1000, 1500, 2000]
 
 
 def test_synthesize_actions_loop_tiles_seamlessly():
-    # A looping clip: the stroke must return to its start position exactly at the end,
+    # A looping clip: the motion must return to its start position exactly at the end,
     # so it repeats without a jump as the preview loops.
     duration = 21 / 16  # flf2v default: 21 frames at 16 fps
     actions = synthesize_actions(duration, hz=1.2, loop=True)
     assert actions[0]["pos"] == actions[-1]["pos"]
     assert actions[-1]["at"] == round(duration * 1000)
-    assert len(actions) % 2 == 1  # an even number of half-strokes → odd point count
+    assert len(actions) % 2 == 1  # an even number of half-cycles → odd point count
 
 
 def test_synthesize_actions_empty_for_nonpositive_inputs():
@@ -160,8 +160,8 @@ def test_heatmap_colors_returns_one_rgb_per_bucket():
 
 
 def test_heatmap_colors_run_hotter_with_travel_speed():
-    # A whole stroke crammed into 100 ms reads "fast" (red-dominant); the same
-    # stroke spread over a second reads "slow" (blue-dominant). One bucket each.
+    # A whole motion crammed into 100 ms reads "fast" (red-dominant); the same
+    # motion spread over a second reads "slow" (blue-dominant). One bucket each.
     fast = heatmap_colors([{"at": 0, "pos": 0}, {"at": 100, "pos": 100}], 1)[0]
     slow = heatmap_colors([{"at": 0, "pos": 0}, {"at": 1000, "pos": 100}], 1)[0]
     assert fast[0] > fast[2]  # red > blue

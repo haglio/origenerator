@@ -181,6 +181,33 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
     assert tile._bar.caption().startswith("Low noise · 49% · ")
 
 
+def test_a_running_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
+    # It stood a blurred copy of the frame, where the strip's corner stood a
+    # sharp pair and the config tab stood a blank — three surfaces, three ideas
+    # of one wait. All three stand the sum now.
+    from PIL import Image
+
+    frame = tmp_path / "frame.png"
+    Image.new("RGB", (60, 40), (0, 0, 255)).save(frame)
+    clip = tmp_path / "clip.png"
+    Image.new("RGB", (60, 40), (255, 0, 0)).save(clip)
+    job = FakeJob(state="running", started_at=time.time() - 5)
+    tile = RerollTile(job, source_picture=str(frame), recipe_picture=str(clip))
+    qtbot.addWidget(tile)
+
+    picture = tile._image.pixmap()
+    assert picture is not None and not picture.isNull()
+    assert picture.width() > picture.height()   # the pair, not one picture alone
+
+
+def test_a_running_tile_with_nothing_behind_it_keeps_its_plain_plate(qtbot):
+    job = FakeJob(state="running", started_at=time.time() - 5)
+    tile = RerollTile(job)
+    qtbot.addWidget(tile)
+
+    assert tile._image.pixmap().isNull()
+
+
 def test_progress_signal_advances_the_bar(qtbot):
     job = FakeJob(state="running", started_at=time.time() - 30.5)
     tile = RerollTile(job, typical_seconds=100.0)

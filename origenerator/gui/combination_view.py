@@ -1,5 +1,14 @@
 """The two halves of a combination, shown as the sum they are: image + recipe.
 
+Two renderings of one look. :class:`CombinationView` is the live one, for a pane
+with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
+a still, for the surfaces that hold a picture rather than a widget — the queue
+strip's corner and a folder's re-roll tile. They are together here because what
+they have to agree on is the look: a run in flight shows the same pair in all
+three places until ComfyUI streams a frame of the run itself, and three
+surfaces each drawing their own idea of it is what left one blurred, one blank
+and one missing its plus.
+
 What "Edit…" hands a tab is not a generation — it is a picture and a
 past video's settings, and nothing has been made from them yet. The form below
 holds the settings, but the pane above it had nothing to show and said so, with
@@ -15,12 +24,17 @@ the pair reads as one line of arithmetic at any size the pane is dragged to.
 
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QMovie, QPixmap
+from PyQt6.QtCore import QRect, QSize, Qt
+from PyQt6.QtGui import QColor, QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie
+from origenerator.gui.queue_thumbs import fitted_cell
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
+from shared_ui.colors import TEXT_MUTED
 
 # How much of the pane's height a picture takes, leaving room for the plus sign
 # to breathe between them and the pane's own margins around them.
@@ -29,6 +43,57 @@ _HEIGHT_SHARE = 0.8
 # joining them rather than as a mark on one of the pictures.
 _PLUS_SHARE = 0.28
 _MIN_PLUS_PT = 12
+
+
+def combination_pixmap(image_path, video_path, size: QSize) -> QPixmap | None:
+    """The pair as one still picture, fitted into ``size`` — or ``None`` for a
+    run made from nothing, which is a plate the caller leaves alone.
+
+    The same arithmetic :class:`CombinationView` lays out live: the frame, the
+    plus, and the clip whose settings go with it, drained of color because it is
+    not what is being made. Either half alone still draws, and the plus shows
+    only with both, since a lone picture is not a sum.
+
+    A still rather than the widget because the surfaces that want it are a
+    thumbnail-sized label apiece, redrawn on every poll — and the halves come
+    from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a picture the
+    strip has already scaled this second is not scaled again for the tile.
+    """
+    side = _pair_side(size, bool(image_path and video_path))
+    image = fitted_cell(image_path, side)
+    recipe = fitted_cell(video_path, side, gray=True)
+    parts = [part for part in (image, recipe) if part is not None]
+    if not parts:
+        return None
+    plus = _plus_width(side) if len(parts) == 2 else 0
+    width = len(parts) * side + plus
+    canvas = QPixmap(width, side)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    painter.drawPixmap(0, 0, parts[0])
+    if len(parts) == 2:
+        painter.setPen(QColor(TEXT_MUTED))
+        font = painter.font()
+        font.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
+        painter.setFont(font)
+        painter.drawText(QRect(side, 0, plus, side),
+                         Qt.AlignmentFlag.AlignCenter, "+")
+        painter.drawPixmap(side + plus, 0, parts[1])
+    painter.end()
+    return canvas
+
+
+def _pair_side(size: QSize, both: bool) -> int:
+    """The square each half is fitted into, so the sum fits ``size`` across."""
+    if not both:
+        return max(1, min(size.width(), size.height()))
+    room = size.width() / (2 + _PLUS_SHARE)   # two squares and the operator
+    return max(1, int(min(room, size.height())))
+
+
+def _plus_width(side: int) -> int:
+    """The gap the operator sits in, in proportion to the squares beside it."""
+    return max(_MIN_PLUS_PT, int(side * _PLUS_SHARE))
 
 
 def _readable(path) -> QPixmap | None:

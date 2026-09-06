@@ -3,7 +3,9 @@
 Idle, it is a ``+`` box that asks for a fresh generation of the folder's
 settings with a new seed. Bound to a running :class:`GenerationJob`, it shows
 that job's live state the way every other in-flight surface does: ComfyUI's
-in-progress preview with a dimming scrim over it naming the stage
+in-progress preview — or, until there is one, the frame and recipe the run was
+made from (:func:`~origenerator.gui.combination_view.combination_pixmap`) —
+with a dimming scrim over it naming the stage
 ("Waiting…", then "Generating…"), and a bar along the picture's foot carrying
 how far along the run is and how long that has taken
 (:func:`origenerator.timing.progress_status_label`) — the same reading, in the
@@ -22,7 +24,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from origenerator.gui import grid_card
-from origenerator.gui.blurred import blurred_backdrop
+from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
@@ -47,15 +49,17 @@ class RerollTile(QFrame):
     context_requested = pyqtSignal(QPoint)  # global position — only while bound
 
     def __init__(self, job=None, parent=None, *, auto_generating=False,
-                 typical_seconds=None, source_picture=None):
+                 typical_seconds=None, source_picture=None, recipe_picture=None):
         """``typical_seconds`` is what this folder's workflow usually takes, so a
         bound job's bar can say how much of its run is left; ``None`` where there
-        is no history to say it from. ``source_picture`` is a file showing what
-        the bound run came from, stood blurred behind the wait until the run
-        streams a frame of its own."""
+        is no history to say it from. ``source_picture`` and ``recipe_picture``
+        are what the bound run was made from — the frame it animates and, for a
+        combine, the clip whose settings came with it — stood in the plate until
+        the run streams a frame of its own."""
         super().__init__(parent)
         self._job = job
         self._source_picture = source_picture
+        self._recipe_picture = recipe_picture
         self._selected = False
         self._typical_seconds = typical_seconds
         self.setObjectName("rerollTile")
@@ -135,9 +139,14 @@ class RerollTile(QFrame):
         if job.last_preview:
             self._on_preview(job.last_preview)
         else:
-            backdrop = blurred_backdrop(self._source_picture, QSize(*_IMAGE_SIZE))
-            if backdrop is not None:
-                self._image.setPixmap(backdrop)
+            # What it is being made from, until there is a picture of what is
+            # being made: the same sum the strip's corner and the config tab
+            # stand for this job, rather than three surfaces each with their own
+            # idea of the wait (one blurred, one blank, one missing its plus).
+            pair = combination_pixmap(self._source_picture, self._recipe_picture,
+                                      QSize(*_IMAGE_SIZE))
+            if pair is not None:
+                self._image.setPixmap(pair)
         self._render_state()
         self._tick.start()
 

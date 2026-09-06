@@ -150,6 +150,7 @@ class PreviewWidget(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
         media_host = QWidget()
+        self._media_host = media_host
         outer.addWidget(media_host, 1)
         self._stack = QStackedLayout(media_host)
         self._stack.setContentsMargins(0, 0, 0, 0)
@@ -163,6 +164,10 @@ class PreviewWidget(QWidget):
         # Rescale the media whenever the label itself resizes — see eventFilter for
         # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
+        # The media area itself resizes when the strip appears or goes, whichever
+        # page is up -- and a video's page is not the label -- so what is placed
+        # against the media's rect re-places off the host too (see eventFilter).
+        media_host.installEventFilter(self)
         # Let mouse events fall through to this widget, so a press/drag/double-click
         # over the media is handled here (drag-out, open-fullscreen) rather than being
         # swallowed by the label or the video surface.
@@ -215,7 +220,6 @@ class PreviewWidget(QWidget):
         # dim is an ordinary sibling, so it blends into a still or an animation
         # and simply stays under a clip, while the message itself is native and
         # rides over either. Both hidden until set_notice says otherwise.
-        self._media_host = media_host
         self._notice_dim = QLabel(media_host)
         self._notice_dim.setStyleSheet(_NOTICE_DIM)
         self._notice_dim.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -515,7 +519,11 @@ class PreviewWidget(QWidget):
         if drawn is None or drawn.isEmpty():
             return self._media_host.geometry()
         rect = QRect(QPoint(0, 0), drawn)
-        rect.moveCenter(self._image_label.mapTo(self, self._image_label.rect().center()))
+        # Centered on the media area itself, not on the label: a stacked layout
+        # sizes only the page it is showing, so while a video is up the label
+        # keeps whatever geometry it last had -- the pane's before the strip
+        # took its rows -- and a rect centered on it sits low by half the strip.
+        rect.moveCenter(self._media_host.geometry().center())
         return rect
 
     def _drawn_size(self):
@@ -939,4 +947,8 @@ class PreviewWidget(QWidget):
             # against the media's rect has to re-place when the refit lands.
             self._place_controls()
             self.media_resized.emit()
+        elif obj is self._media_host and event.type() == QEvent.Type.Resize:
+            if not self._notice.isHidden():
+                self._place_notice()
+            self._place_controls()
         return super().eventFilter(obj, event)

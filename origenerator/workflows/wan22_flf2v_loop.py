@@ -31,7 +31,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_flf2v_loop"
-    version = "v008"
+    version = "v009"
     display_name = "WAN 2.2 FLF2V Loop (Image-to-Video)"
     output_type = "video"
     looping = True
@@ -50,7 +50,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "seed": 0,
             "frame_count": 21,
             "scene_frames": [21],
-            "scene_lines": [""],
             "batch_size": 1,
             "steps": 4,
             "cfg": 1.0,
@@ -93,7 +92,6 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("scene_frames", "Scenes", "scenes", [21], min_val=5,
                      max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS,
                      unit="s", rate=NATIVE_FPS),
-            ParamDef("scene_lines", "Lines", "lines", [""]),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
             ParamDef("input_image", "Start Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
@@ -141,7 +139,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
 
-        def segment(index, scene, start, length, last):
+        def segment(index, scene, start, length, last, previous=None):
             flf_id, high_id, low_id, decode_id = (
                 ("12", "13", "14", "15") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("flf", "high", "low", "decode"))

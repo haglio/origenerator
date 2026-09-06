@@ -265,6 +265,25 @@ class ComfyUIApi:
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             resp.read()
 
+    def free_memory(self):
+        """Ask ComfyUI to unload its models and give the GPU back.
+
+        ComfyUI keeps the last run's models resident between prompts, which is
+        right when the next prompt is its own and wrong when another program
+        needs the card first -- the voice that speaks a story's lines, run
+        before the video that lip-syncs to them is submitted. ComfyUI takes the
+        request as a flag it acts on before its next prompt, so the call returns
+        at once.
+        """
+        body = json.dumps({"unload_models": True, "free_memory": True}).encode()
+        req = urllib.request.Request(
+            f"{self.base_url}/free",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            resp.read()
+
     def cancel_prompt(self, prompt_id: str):
         """Remove a still-queued prompt so it never starts executing."""
         self.cancel_prompts([prompt_id])

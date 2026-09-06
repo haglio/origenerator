@@ -82,6 +82,9 @@ class ComfyUIClient(QThread):
     def interrupt(self):
         return self.api.interrupt()
 
+    def free_memory(self):
+        return self.api.free_memory()
+
     def cancel_prompt(self, prompt_id: str):
         return self.api.cancel_prompt(prompt_id)
 

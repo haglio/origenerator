@@ -12,8 +12,10 @@ so everything that reads, searches or rewrites a prompt keeps working on one
 string; their lengths are ``scene_frames`` and their lines ``scene_lines``, one
 per scene.
 
-Nothing hears the lines yet -- no voice is wired in -- and the box says so;
-they are saved with the recipe for the day one is.
+The lines are spoken: a scene with one renders on the speech model, her lips
+on the words, in the voice the Audio section sets (see
+:mod:`origenerator.speech`). A workflow that cannot speak -- the loop -- has no
+lines param, and its cards carry no lines box.
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ from origenerator.gui.prompt_box import PromptBox
 from origenerator.workflows.base import ParamDef, chained_frames, scene_prompts, story_of
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
-LINES_PLACEHOLDER = "Saved with the recipe, not voiced yet"
+LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
 
 # The texts a scene carries, by the param each is stored as, with the caption
 # over its box. The prompts are stored as stories (see the module above); the
@@ -57,7 +59,7 @@ class _Scene(QFrame):
     remove_requested = pyqtSignal(object)
 
     def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetComboBox], None],
-                 parent=None):
+                 lines: bool = True, parent=None):
         super().__init__(parent)
         self.setObjectName("sceneCard")
         self._pd = pd
@@ -90,6 +92,8 @@ class _Scene(QFrame):
         # once they hold text; each carries its param's own help.
         self.boxes: dict[str, PromptBox] = {}
         for key, caption in TEXT_CAPTIONS.items():
+            if key == "scene_lines" and not lines:
+                continue
             label = ElidingLabel(caption)
             label.setToolTip(param_help(key))
             column.addWidget(label)
@@ -98,7 +102,8 @@ class _Scene(QFrame):
             box.textChanged.connect(self.changed)
             column.addWidget(box)
             self.boxes[key] = box
-        self.boxes["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
+        if lines:
+            self.boxes["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
 
@@ -121,10 +126,13 @@ class ScenesEditor(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, frames_def: ParamDef,
-                 prepare_length: Callable[[PresetComboBox], None], parent=None):
+                 prepare_length: Callable[[PresetComboBox], None], lines: bool = True,
+                 parent=None):
         super().__init__(parent)
         self._pd = frames_def
         self._prepare_length = prepare_length
+        # Whether the workflow speaks: a card of one that cannot has no lines box.
+        self._lines = lines
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -144,7 +152,7 @@ class ScenesEditor(QWidget):
         """Another scene after the last, at the workflow's default length. It
         starts out keeping out what the scene before it keeps out: a negative
         mostly holds across a story, so blank would mean typing it again."""
-        scene = _Scene(self._pd, self._prepare_length)
+        scene = _Scene(self._pd, self._prepare_length, lines=self._lines)
         if self._scenes:
             scene.boxes["negative_prompt"].setPlainText(
                 diff_text.live_text(self._scenes[-1].boxes["negative_prompt"]))
@@ -188,7 +196,7 @@ class ScenesEditor(QWidget):
 
     def boxes(self, key: str) -> list[PromptBox]:
         """Every scene's box for the text stored as ``key``, in story order."""
-        return [scene.boxes[key] for scene in self._scenes]
+        return [scene.boxes[key] for scene in self._scenes if key in scene.boxes]
 
     def text_boxes(self) -> list[PromptBox]:
         """Every box on every card, in reading order: what a find searches."""

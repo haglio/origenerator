@@ -198,7 +198,8 @@ class ParamForm(QWidget):
         self._scenes: ScenesEditor | None = None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
-                scenes_def, lambda w, pd=scenes_def: self._grey_out_of_reach(pd, w))
+                scenes_def, lambda w, pd=scenes_def: self._grey_out_of_reach(pd, w),
+                lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
             self._scenes.changed.connect(self._refresh_clip_length)
         self._build(self._param_defs)

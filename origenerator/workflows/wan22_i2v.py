@@ -1,3 +1,4 @@
+from origenerator.speech import VOICE_PRESETS, scene_speech
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
@@ -11,8 +12,23 @@ from origenerator.workflows.frame_rate import (
     NATIVE_FPS,
     playback_rate,
 )
-from origenerator.workflows.model_arch import WAN
+from origenerator.workflows.model_arch import WAN, WAN_S2V
 from origenerator.workflows.model_files import list_lora_files, list_model_files
+
+# A scene with a line renders on WAN 2.2's speech-to-video model: one model in
+# place of the two experts, reading the line as audio and moving her lips to
+# it, under the lightning LoRA Comfy's own S2V template runs it with -- four
+# steps at no guidance, which is what the probe he judged by eye ran
+# (2026-09-06). His LoRAs stay off it: the one tried put artifacts all over
+# the picture.
+_SPEECH_LORA = "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+_SPEECH_STEPS = 4
+_SPEECH_CFG = 1.0
+_SPEECH_SAMPLER = "uni_pc"
+_SPEECH_SCHEDULER = "simple"
+_SPEECH_SHIFT = 8.0
+# How far the foley steps back under her lines, so the words carry.
+_FOLEY_UNDER_SPEECH_DB = -6
 
 
 class Wan22I2vWorkflow(WorkflowTemplate):
@@ -32,10 +48,15 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     hardcoded size. The decoded frames also drive a HunyuanVideo-Foley pass
     (:meth:`~WorkflowTemplate.foley_audio_nodes`), whose synced audio
     ``CreateVideo`` muxes into the file.
+
+    A story's scene with a line (``scene_lines``) is spoken instead: that
+    scene's segments render on WAN 2.2's speech-to-video model, hearing the
+    line as audio (made beforehand, see :mod:`origenerator.speech`) and moving
+    her lips to it, and the line is laid over the foley in the file.
     """
 
     name = "wan22_i2v"
-    version = "v006"
+    version = "v007"
     display_name = "WAN 2.2 I2V (Image-to-Video)"
     output_type = "video"
     derives_size_from_input = True
@@ -76,9 +97,14 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "audio_prompt": "",
             "audio_negative_prompt": "noisy, harsh",
             "audio_seed": 0,
+            "voice": VOICE_PRESETS[0],
+            "voice_sample": "",
+            "voice_sample_text": "",
             "foley_model": "hunyuanvideo_foley_fp8_e4m3fn.safetensors",
             "foley_vae": "vae_128d_48k_fp16.safetensors",
             "foley_synchformer": "synchformer_state_dict_fp16.safetensors",
+            "unet_s2v": "wan2.2_s2v_14B_fp8_scaled.safetensors",
+            "audio_encoder_name": "wav2vec2_large_english_fp16.safetensors",
         }
 
     def param_definitions(self) -> list[ParamDef]:
@@ -95,6 +121,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         )
         loras_high = list_lora_files([defaults["lora_high"]], accepts=(WAN,), expert="high")
         loras_low = list_lora_files([defaults["lora_low"]], accepts=(WAN,), expert="low")
+        # The speech slot takes only the speech model: an expert in it would
+        # render deaf, and the expert slots above never offer it.
+        speech = list_model_files("diffusion_models", [defaults["unet_s2v"]], accepts=(WAN_S2V,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5,
@@ -105,6 +134,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Start Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
+            ParamDef("voice", "Voice", "combo", VOICE_PRESETS[0], options=list(VOICE_PRESETS)),
+            ParamDef("voice_sample", "Voice Sample", "str", ""),
+            ParamDef("voice_sample_text", "Voice Sample Says", "str", "", multiline=True),
             ParamDef("noise_seed", "Seed (High)", "seed", 0),
             ParamDef("seed", "Seed (Low)", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
@@ -118,6 +150,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=high),
             ParamDef("unet_low", "Model (Low)", "combo", defaults["unet_low"], options=low),
+            ParamDef("unet_s2v", "Model (Speech)", "combo", defaults["unet_s2v"], options=speech),
             ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras_high),
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
@@ -137,6 +170,82 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         if shared is None:
             return params["cfg_high"], params["cfg_low"]
         return params["cfg_high"] or shared, params["cfg_low"] or shared
+
+    @staticmethod
+    def _speech_nodes(params: dict, spoken) -> dict:
+        """What every speaking segment shares: the speech model under its
+        lightning LoRA, the audio encoder that hears the lines, and each spoken
+        scene's line loaded once (``scene<k>_line``)."""
+        nodes = {
+            "30": {
+                "class_type": "UNETLoader",
+                "inputs": {"unet_name": params["unet_s2v"], "weight_dtype": "default"},
+            },
+            "31": {
+                "class_type": "LoraLoaderModelOnly",
+                "inputs": {"model": ["30", 0], "lora_name": _SPEECH_LORA, "strength_model": 1.0},
+            },
+            "32": {
+                "class_type": "ModelSamplingSD3",
+                "inputs": {"model": ["31", 0], "shift": _SPEECH_SHIFT},
+            },
+            "33": {
+                "class_type": "AudioEncoderLoader",
+                "inputs": {"audio_encoder_name": params["audio_encoder_name"]},
+            },
+        }
+        for index, line in enumerate(spoken):
+            if line is not None:
+                nodes[f"scene{index}_line"] = {"class_type": "LoadAudio", "inputs": {"audio": line.file}}
+        return nodes
+
+    def _speaking_segment(self, index, scene, start, previous, length, offset,
+                          positive_ref, negative_ref, size, params):
+        """One segment of a scene with a line, on the speech model: it hears
+        its stretch of the scene's line, starts on ``start`` as its reference
+        and, past the first segment, carries the motion of the frames before
+        it (the model's ``ref_motion``, which reads the last of them)."""
+        prefix = f"s{index}_"
+        width_ref, height_ref = size
+        heard, heard_ref = self.speech_window_nodes(
+            prefix, [f"scene{scene}_line", 0], ["33", 0], offset, length)
+        conditioning = {
+            "positive": positive_ref,
+            "negative": negative_ref,
+            "vae": ["2", 0],
+            "width": width_ref,
+            "height": height_ref,
+            "length": length,
+            "batch_size": params["batch_size"],
+            "audio_encoder_output": heard_ref,
+            "ref_image": start,
+        }
+        if previous is not None:
+            conditioning["ref_motion"] = previous
+        nodes = {
+            **heard,
+            prefix + "s2v": {"class_type": "WanSoundImageToVideo", "inputs": conditioning},
+            prefix + "speak": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "model": ["32", 0],
+                    "positive": [prefix + "s2v", 0],
+                    "negative": [prefix + "s2v", 1],
+                    "latent_image": [prefix + "s2v", 2],
+                    "seed": params["noise_seed"] + index,
+                    "steps": _SPEECH_STEPS,
+                    "cfg": _SPEECH_CFG,
+                    "sampler_name": _SPEECH_SAMPLER,
+                    "scheduler": _SPEECH_SCHEDULER,
+                    "denoise": 1.0,
+                },
+            },
+            prefix + "decode": {
+                "class_type": "VAEDecode",
+                "inputs": {"samples": [prefix + "speak", 0], "vae": ["2", 0]},
+            },
+        }
+        return nodes, [prefix + "decode", 0]
 
     def build_api_payload(self, params: dict) -> dict:
         split_step = params["split_step"] or params["steps"] // 2
@@ -161,15 +270,28 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # scene gets its own.
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
+        # A scene with a line is spoken: its segments render on the speech
+        # model, each hearing its own stretch of the scene's line (the offset
+        # a later segment of the same scene starts at, kept here as the plan
+        # is walked in order).
+        spoken = scene_speech(params)
+        offsets: dict[int, int] = {}
 
-        def segment(index, scene, start, length, last):
+        def segment(index, scene, start, length, last, previous=None):
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["10", 0])
+            negative_nodes, negative_ref = self.scene_prompt_nodes(
+                index, scene, negatives, ["1", 0], ["11", 0], role="negative")
+            if spoken[scene] is not None:
+                offset = offsets.get(scene, 0)
+                offsets[scene] = offset + length - 1
+                nodes, frames = self._speaking_segment(
+                    index, scene, start, previous, length, offset,
+                    positive_ref, negative_ref, (width_ref, height_ref), params)
+                return {**prompt_nodes, **negative_nodes, **nodes}, frames
             clip_id, i2v_id, high_id, low_id, decode_id = (
                 ("13", "14", "15", "16", "17") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
             )
-            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["10", 0])
-            negative_nodes, negative_ref = self.scene_prompt_nodes(
-                index, scene, negatives, ["1", 0], ["11", 0], role="negative")
             nodes = {
                 **prompt_nodes,
                 **negative_nodes,
@@ -245,12 +367,26 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # stored clip length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "22", "23", "24", decoded_ref, {**params, "frame_count": total_frames})
+        # Her lines are a second layer over the foley: each spoken scene's file
+        # laid at its place in the clip, silence where a scene says nothing,
+        # and the foley stepped back under it. A story with no line keeps the
+        # graph it always had.
+        speech = {}
+        if any(scene is not None for scene in spoken):
+            speech = self._speech_nodes(params, spoken)
+            track, track_ref = self.speech_track_nodes("speech_", [
+                (frames, [f"scene{index}_line", 0] if line is not None else None)
+                for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken))])
+            mix, audio_ref = self.speech_mix_nodes("speech_", audio_ref, track_ref, _FOLEY_UNDER_SPEECH_DB)
+            speech.update(track)
+            speech.update(mix)
         # The decode's frames are the clip's motion; the writer's are that motion
         # shown more often. Foley above watches the former, CreateVideo below
         # encodes the latter, and at the native rate they are the same frames.
         interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)
         return {
             **foley,
+            **speech,
             **interpolate,
             **size_nodes,
             **segments,

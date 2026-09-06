@@ -33,6 +33,11 @@ SD15 = "sd15"
 FLUX = "flux"
 QWEN = "qwen"
 WAN = "wan"
+# WAN 2.2's speech-to-video model: the WAN layout plus the audio injector that
+# lets it lip-sync, and a family of its own because it is one -- an i2v slot
+# that took it would run without the audio it needs, and the speech slot must
+# not offer the i2v experts, which have no ear.
+WAN_S2V = "wan_s2v"
 LTX = "ltx"
 
 # No real header comes near this (the largest installed is under 500 KB). A
@@ -164,6 +169,10 @@ def _arch_from(components: set[str]) -> str | None:
         return LTX
     if has("transformer_blocks"):
         return QWEN
+    # WAN S2V before WAN: it is WAN's `blocks.N` with the audio injector beside
+    # them, and the injector is what only it has.
+    if has("audio_injector"):
+        return WAN_S2V
     # WAN: bare `blocks.N` (never `input_blocks`/`double_blocks`, which is why
     # this is safe after the families above), the patch/text/time embeddings
     # around them, VACE's parallel stack, or a kohya LoRA's flattened form.

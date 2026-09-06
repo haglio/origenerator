@@ -42,7 +42,7 @@ SECTIONS: tuple[Section, ...] = (
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section("Model & LoRA", (
-        "checkpoint", "unet", "unet_high", "unet_low",
+        "checkpoint", "unet", "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
         "lora", "lora_strength",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
@@ -63,7 +63,8 @@ SECTIONS: tuple[Section, ...] = (
     Section("Video", ("frame_count", "frame_rate"), collapsed=True),
     Section("Audio", (
         "audio_prompt", "audio_negative_prompt", "audio_seed",
-        "foley_model", "foley_vae", "foley_synchformer",
+        "voice", "voice_sample", "voice_sample_text",
+        "foley_model", "foley_vae", "foley_synchformer", "audio_encoder_name",
     ), collapsed=True),
 )
 

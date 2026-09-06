@@ -448,3 +448,14 @@ def test_a_submit_refused_outright_is_not_waited_on():
             pytest.raises(urllib.error.URLError):
         client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
     assert not sleep.called
+
+
+def test_free_memory_asks_comfyui_to_unload_its_models():
+    # The voice that speaks a story's lines needs the GPU before the video is
+    # submitted, and ComfyUI keeps the last run's models resident until asked.
+    client = ComfyUIApi(client_id="test-client")
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as mock_urlopen:
+        client.free_memory()
+    req = mock_urlopen.call_args[0][0]
+    assert req.full_url.endswith("/free")
+    assert json.loads(req.data) == {"unload_models": True, "free_memory": True}

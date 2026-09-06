@@ -76,6 +76,14 @@ behind is the two hooks that call the guard, below.
   repair it asks `origenerator.base_backfill` — the same module the app's own
   absence path uses, down to the submit-and-wait — so the two cannot answer
   differently. Run it with the app closed; it is one full render per row.
+- `tools/speech_worker.py` — the voice: speaks a story's scene lines with
+  Qwen3-TTS, one WAV per scene at exactly the scene's length, from a JSON job
+  `origenerator.speech` writes. Run by path under the `speech_python` the
+  overlay names (Qwen3-TTS's pins would break this app's environment and
+  ComfyUI's, so it has one of its own) and never imported by the package, which
+  is why it lives here rather than in it: the dependency gate installs exactly
+  what pyproject declares, and the voice's torch is not the app's to declare.
+  `GenerationJob.start` runs it before a job with lines is submitted.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

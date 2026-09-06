@@ -115,6 +115,8 @@ ARCH_TENSOR_NAMES = {
     "flux": ["double_blocks.0.img_attn.qkv.weight", "single_blocks.0.linear1.weight"],
     "qwen": ["transformer_blocks.0.attn.to_q.weight", "txt_norm.weight"],
     "wan": ["blocks.0.self_attn.q.weight", "patch_embedding.weight"],
+    "wan_s2v": ["audio_injector.injector.0.k.weight", "blocks.0.self_attn.q.weight",
+                "patch_embedding.weight"],
     "ltx": ["patchify_proj.weight", "transformer_blocks.0.attn1.to_q.weight"],
 }
 

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from origenerator.speech import SPEECH_SAMPLE_RATE
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
@@ -319,12 +320,19 @@ class WorkflowTemplate(ABC):
         segment after the first, its scene's first included, starts on the
         frame before it.
         """
-        frames = list(params.get("scene_frames") or [])
-        if len(frames) < 2:
-            frames = [params["frame_count"]]
         return [(length, scene)
-                for scene, count in enumerate(frames)
+                for scene, count in enumerate(cls.scene_lengths(params))
                 for length in cls.segment_lengths(count)]
+
+    @staticmethod
+    def scene_lengths(params: dict) -> list[int]:
+        """Each scene's frames: ``scene_frames`` when the story has several, else
+        the one clip length (see :meth:`scene_plan` for why a lone entry never
+        overrules it)."""
+        frames = [int(count) for count in (params.get("scene_frames") or [])]
+        if len(frames) < 2:
+            frames = [int(params["frame_count"])]
+        return frames
 
     @staticmethod
     def clip_frames(plan: list[tuple[int, int]]) -> int:
@@ -354,19 +362,23 @@ class WorkflowTemplate(ABC):
         the nodes, the IMAGE ref holding every frame in order, and how many
         frames that is.
 
-        ``render(index, scene, start_ref, length, last)`` builds one segment --
-        its conditioning, samplers and decode -- from the image ref it starts
-        on, and returns ``(nodes, frames_ref)``; ``scene`` is the scene of the
-        story it belongs to and ``last`` says it is the final one. Segment 0
-        starts on ``start_ref`` and keeps the graph's own node ids, so a clip
-        that fits one segment is the graph it always was. Each later segment
-        starts on the frame the previous one ended on (cut out with
-        ``ImageFromBatch``), and joins the frames after that shared one onto
-        the clip (``ImageBatch``), so the seam is one frame long.
+        ``render(index, scene, start_ref, length, last, previous=)`` builds one
+        segment -- its conditioning, samplers and decode -- from the image ref
+        it starts on, and returns ``(nodes, frames_ref)``; ``scene`` is the
+        scene of the story it belongs to, ``last`` says it is the final one,
+        and ``previous`` is the frames of the segment before (``None`` for the
+        first), for a renderer that carries motion across the seam rather than
+        only the one frame. Segment 0 starts on ``start_ref`` and keeps the
+        graph's own node ids, so a clip that fits one segment is the graph it
+        always was. Each later segment starts on the frame the previous one
+        ended on (cut out with ``ImageFromBatch``), and joins the frames after
+        that shared one onto the clip (``ImageBatch``), so the seam is one
+        frame long.
         """
         plan = cls.scene_plan(params)
         first_length, first_scene = plan[0]
-        nodes, frames = render(0, first_scene, start_ref, first_length, len(plan) == 1)
+        nodes, frames = render(0, first_scene, start_ref, first_length, len(plan) == 1,
+                               previous=None)
         joined, previous, previous_length = frames, frames, first_length
         for index, (length, scene) in enumerate(plan[1:], start=1):
             prefix = f"s{index}_"
@@ -375,7 +387,7 @@ class WorkflowTemplate(ABC):
                 "inputs": {"image": previous, "batch_index": previous_length - 1, "length": 1},
             }
             segment, frames = render(index, scene, [prefix + "last", 0], length,
-                                     index == len(plan) - 1)
+                                     index == len(plan) - 1, previous=previous)
             nodes.update(segment)
             nodes[prefix + "new"] = {
                 "class_type": "ImageFromBatch",
@@ -640,6 +652,92 @@ class WorkflowTemplate(ABC):
             },
         }
         return nodes, [sampler_id, 0]
+
+    @staticmethod
+    def speech_window_nodes(prefix: str, line_ref, encoder_ref, offset: int, length: int):
+        """The audio a speaking segment's lips follow: its scene's line from
+        ``offset`` frames into the scene, ``length`` frames long, heard by the
+        speech model's audio encoder. Returns ``(nodes, encoded_ref)``.
+
+        A scene's line is one file as long as the scene, so a scene that spans
+        two segments plays the second its own stretch of it.
+        """
+        nodes = {
+            prefix + "cut": {
+                "class_type": "TrimAudioDuration",
+                "inputs": {
+                    "audio": line_ref,
+                    "start_index": offset / NATIVE_FPS,
+                    "duration": length / NATIVE_FPS,
+                },
+            },
+            prefix + "hear": {
+                "class_type": "AudioEncoderEncode",
+                "inputs": {"audio_encoder": encoder_ref, "audio": [prefix + "cut", 0]},
+            },
+        }
+        return nodes, [prefix + "hear", 0]
+
+    @staticmethod
+    def speech_track_nodes(prefix: str, scenes: list[tuple[int, list | None]]):
+        """The clip's spoken track for the writer: every scene's line laid end
+        to end, silence where a scene has none. ``scenes`` is ``(frames,
+        line_ref)`` per scene in order, the ref ``None`` for a silent scene.
+        Returns ``(nodes, audio_ref)``.
+
+        Each scene after the first starts on the frame before it, so every
+        scene but the last is cut to the frames it adds -- its line runs a
+        frame long, the seam being the next scene's -- and the last keeps its
+        whole file, which is exactly its length.
+        """
+        nodes: dict = {}
+        track = None
+        last = len(scenes) - 1
+        for index, (frames, line_ref) in enumerate(scenes):
+            seconds = (frames if index == last else frames - 1) / NATIVE_FPS
+            if line_ref is None:
+                node_id = f"{prefix}silence{index}"
+                nodes[node_id] = {
+                    "class_type": "EmptyAudio",
+                    "inputs": {"duration": seconds, "sample_rate": SPEECH_SAMPLE_RATE, "channels": 1},
+                }
+                piece = [node_id, 0]
+            elif index == last:
+                piece = line_ref
+            else:
+                node_id = f"{prefix}cut{index}"
+                nodes[node_id] = {
+                    "class_type": "TrimAudioDuration",
+                    "inputs": {"audio": line_ref, "start_index": 0.0, "duration": seconds},
+                }
+                piece = [node_id, 0]
+            if track is None:
+                track = piece
+                continue
+            node_id = f"{prefix}join{index}"
+            nodes[node_id] = {
+                "class_type": "AudioConcat",
+                "inputs": {"audio1": track, "audio2": piece, "direction": "after"},
+            }
+            track = [node_id, 0]
+        return nodes, track
+
+    @staticmethod
+    def speech_mix_nodes(prefix: str, foley_ref, track_ref, duck_db: int):
+        """Her lines over the foley: the foley stepped back ``duck_db`` decibels
+        so the words carry, the spoken track added on top. Returns ``(nodes,
+        audio_ref)`` for the writer."""
+        nodes = {
+            prefix + "duck": {
+                "class_type": "AudioAdjustVolume",
+                "inputs": {"audio": foley_ref, "volume": duck_db},
+            },
+            prefix + "mix": {
+                "class_type": "AudioMerge",
+                "inputs": {"audio1": [prefix + "duck", 0], "audio2": track_ref, "merge_method": "add"},
+            },
+        }
+        return nodes, [prefix + "mix", 0]
 
     @staticmethod
     def interpolation_nodes(node_id: str, frames_ref, params: dict):

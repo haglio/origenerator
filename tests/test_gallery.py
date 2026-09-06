@@ -1722,3 +1722,18 @@ def test_output_disk_files_omits_files_not_on_disk(tmp_path):
     out.mkdir()
     row = _row(output_files=json.dumps([{"filename": "gone.png", "subfolder": ""}]))
     assert output_disk_files(row, out) == []
+
+
+def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
+    # A row from before scenes carries only frame_count; its re-roll writes the
+    # one scene out as scene_frames. Both are the same recipe, and a scene list
+    # of one that disagrees with the clip length is overruled by it in the graph
+    # too, so it must not split the folder.
+    from origenerator.gallery.signatures import canonical_settings
+
+    before = canonical_settings("wan22_i2v", {"frame_count": 121})
+    rerolled = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [121]})
+    stale = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [81]})
+    assert before == rerolled == stale
+    story = canonical_settings("wan22_i2v", {"frame_count": 241, "scene_frames": [161, 81]})
+    assert story["scene_frames"] == [161, 81]

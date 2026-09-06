@@ -2101,7 +2101,7 @@ def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates
     # Seconds are counted at the rate the MODEL paces motion at, never at the
     # playback rate: that is what makes a clip's length hold when its rate moves.
     assert frames.rate == NATIVE_FPS
-    assert frames.options == [1, 5, 10, 15, 30]
+    assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
     assert (frames.min_val, frames.step) == (5, 4)     # the models' 4k+1 frames
     # Every rate offered is a whole multiple of the native one, because those are
@@ -2250,30 +2250,14 @@ def test_segment_lengths_stay_on_the_models_frame_grid():
         assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
 
 
-@pytest.mark.parametrize("name, conditioning", [
-    ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
-])
-def test_a_scene_break_in_the_prompt_gives_each_segment_its_own_text(name, conditioning):
-    # A line holding only --- ends one scene and starts the next, so a 30 s clip
-    # can be told in three parts: each segment is conditioned on its own scene
-    # while the negative prompt stays the one text for all of them.
-    wf = WORKFLOW_REGISTRY[name]
-    payload = wf.build_api_payload(dict(
-        wf.default_params(), frame_count=481, negative_prompt="blurry",
-        positive_prompt="she waves\n---\nshe turns away\n---\nshe walks off"))
-    segments = _segments(payload, conditioning)
-    texts = [payload[seg["inputs"]["positive"][0]]["inputs"]["text"] for seg in segments]
-    assert texts == ["she waves", "she turns away", "she walks off"]
-    assert {payload[seg["inputs"]["negative"][0]]["inputs"]["text"] for seg in segments} == {"blurry"}
-
-
-def test_the_last_scene_carries_on_through_the_segments_after_it():
+def test_the_last_scene_carries_on_through_the_scenes_after_it():
+    # Three scene lengths, two texts: the third scene reads the second's text
+    # rather than nothing, so a story with fewer texts than lengths still runs.
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(
-        wf.default_params(), frame_count=481, positive_prompt="she waves\n---\nshe turns away"))
-    segments = _segments(payload, "WanImageToVideo")
-    texts = [payload[seg["inputs"]["positive"][0]]["inputs"]["text"] for seg in segments]
-    assert texts == ["she waves", "she turns away", "she turns away"]
+        wf.default_params(), frame_count=481, scene_frames=[161, 161, 161],
+        positive_prompt="she waves\n---\nshe turns away"))
+    assert _scene_texts(payload, "WanImageToVideo") == ["she waves", "she turns away", "she turns away"]
 
 
 def test_a_prompt_without_a_scene_break_is_encoded_once_for_every_segment():
@@ -2285,6 +2269,58 @@ def test_a_prompt_without_a_scene_break_is_encoded_once_for_every_segment():
     segments = _segments(payload, "WanImageToVideo")
     assert len({seg["inputs"]["positive"][0] for seg in segments}) == 1
     assert payload[segments[0]["inputs"]["positive"][0]]["inputs"]["text"] == "  she waves, slowly  "
+
+
+def _scene_texts(payload, conditioning):
+    return [payload[seg["inputs"]["positive"][0]]["inputs"]["text"]
+            for seg in _segments(payload, conditioning)]
+
+
+@pytest.mark.parametrize("name, conditioning", [
+    ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
+])
+def test_each_scene_runs_for_its_own_frames_and_reads_its_own_prompt(name, conditioning):
+    # A story is scenes of their own lengths: 10 s, 5 s and 10 s here, each a
+    # segment started from the frame before it, each conditioned on its own
+    # scene's text. The clip is the scenes end to end, one shared frame at each
+    # seam, and the audio is scored for that whole length.
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
+        positive_prompt="she waves\n---\nshe turns\n---\nshe walks off"))
+    segments = _segments(payload, conditioning)
+    assert [seg["inputs"]["length"] for seg in segments] == [161, 81, 161]
+    assert _scene_texts(payload, conditioning) == ["she waves", "she turns", "she walks off"]
+    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == pytest.approx(401 / 16)
+
+
+def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=321, scene_frames=[241, 81],
+        positive_prompt="she waves\n---\nshe turns"))
+    assert [seg["inputs"]["length"] for seg in _segments(payload, "WanImageToVideo")] == [161, 81, 81]
+    assert _scene_texts(payload, "WanImageToVideo") == ["she waves", "she waves", "she turns"]
+
+
+def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
+    # One scene is the whole clip, and the clip length is what every other
+    # reader of a recipe goes by (a recipe from the overlay carries only that),
+    # so a single entry never overrules it.
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_count=121, scene_frames=[81]))
+    assert [seg["inputs"]["length"] for seg in _segments(payload, "WanImageToVideo")] == [121]
+
+
+def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
+    # The stored clip length is derived from the scenes by the form; a recipe
+    # whose scenes and length disagree scores its audio for the frames it will
+    # really render.
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(
+        wf.default_params(), frame_count=481, scene_frames=[161, 81],
+        positive_prompt="a\n---\nb"))
+    assert _find_node(payload, "HunyuanFoleySampler")["inputs"]["duration"] == pytest.approx(241 / 16)
 
 
 # ---- the frames between the frames ----

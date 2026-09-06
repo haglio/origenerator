@@ -37,7 +37,8 @@ class Section:
 # folder. The enhance params stay on their workflows (the tail still builds from
 # them) but the form hides them; see ParamForm's ``hidden_keys``.
 SECTIONS: tuple[Section, ...] = (
-    Section("Prompts", ("positive_prompt", "negative_prompt", "input_image"),
+    Section("Prompts", ("positive_prompt", "scene_frames", "scene_lines",
+                        "negative_prompt", "input_image"),
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section("Model & LoRA", (

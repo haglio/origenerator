@@ -31,6 +31,27 @@ def blank_panel(qtbot, tmp_path):
 
 
 @pytest.fixture
+def app_chrome():
+    """The pane dressed the way the app dresses it.
+
+    A floor is a width against a width, and the app's sheet moves every one of
+    them -- a scene card's bare ✕ is 61 px in stock dress and 39 under it. Read
+    bare, a floor test passes on its own and fails in a forward run, after some
+    launch has left the sheet on the application; read under the sheet it says
+    what the pane does in the app.
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    from origenerator.gui.stylesheet import build_stylesheet
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    yield
+    app.setStyleSheet(prior)
+
+
+@pytest.fixture
 def panel(blank_panel):
     """A panel with its workflow answered — the state most of these tests are
     about, where there is a form below the picker to poke at."""
@@ -151,12 +172,15 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
         assert not over, f"at {width}px: {over[:3]}"
 
 
-def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(blank_panel):
+def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, blank_panel):
     """Its floor is what its contents need, so the scroll bar never has to appear.
 
     Squeezing a form and scrolling it sideways is a bad trade for the drag it
     allows, so the pane refuses to go there at all: the floor is read live off the
-    scroll's contents, which is why it rises when a wider workflow is chosen.
+    scroll's contents, which is why it rises when a wider workflow is chosen. The
+    workflow here tells a story in scenes, whose cards carry a header of their
+    own beside the form's label column -- the row most able to push the floor
+    past its cap, where the drag would stop with room still to give.
     """
     from PyQt6.QtWidgets import QApplication
 

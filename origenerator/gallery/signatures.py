@@ -135,11 +135,17 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
     if wf is None:
         return {k: v for k, v in settings_only(params).items() if k not in ENHANCE_KEYS}
     ungrouped = _workflow_instance_keys(workflow_name) | _workflow_enhance_keys(workflow_name)
-    return {
+    settings = {
         key: params.get(key, default)
         for key, default in wf.default_params().items()
         if key not in ungrouped
     }
+    if "scene_frames" in settings and len(settings["scene_frames"] or []) < 2:
+        # A story of one scene is the whole clip and runs for the clip length
+        # (WorkflowTemplate.scene_plan), so a row from before scenes and its
+        # re-roll, which writes the scene out, are the same settings.
+        settings["scene_frames"] = [settings.get("frame_count", params.get("frame_count"))]
+    return settings
 
 
 def enhance_settings(workflow_name: str | None, params: dict) -> dict:

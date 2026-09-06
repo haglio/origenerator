@@ -51,6 +51,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "noise_seed": 0,
             "seed": 0,
             "frame_count": 81,
+            "scene_frames": [81],
+            "scene_lines": [""],
             "batch_size": 1,
             "steps": 20,
             "split_step": 0,
@@ -95,6 +97,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         loras_low = list_lora_files([defaults["lora_low"]], accepts=(WAN,), expert="low")
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+            ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5,
+                     max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS,
+                     unit="s", rate=NATIVE_FPS),
+            ParamDef("scene_lines", "Lines", "lines", [""]),
             ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
             ParamDef("input_image", "Start Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
@@ -153,12 +159,12 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # next); node 10 below encodes the first, and any later scene gets its own.
         scenes = scene_prompts(params["positive_prompt"])
 
-        def segment(index, start, length, last):
+        def segment(index, scene, start, length, last):
             clip_id, i2v_id, high_id, low_id, decode_id = (
                 ("13", "14", "15", "16", "17") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
             )
-            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scenes, ["1", 0], ["10", 0])
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["10", 0])
             nodes = {
                 **prompt_nodes,
                 clip_id: {
@@ -228,8 +234,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
         # A clip longer than one segment is chained from each segment's last
         # frame (WorkflowTemplate.chain_segments); its frames come back joined.
-        segments, decoded_ref = self.chain_segments(params, start_ref, segment)
-        foley, audio_ref = self.foley_audio_nodes("22", "23", "24", decoded_ref, params)
+        segments, decoded_ref, total_frames = self.chain_segments(params, start_ref, segment)
+        # Scored for the frames the scenes really add up to, which is what the
+        # stored clip length says whenever the form wrote it.
+        foley, audio_ref = self.foley_audio_nodes(
+            "22", "23", "24", decoded_ref, {**params, "frame_count": total_frames})
         # The decode's frames are the clip's motion; the writer's are that motion
         # shown more often. Foley above watches the former, CreateVideo below
         # encodes the latter, and at the native rate they are the same frames.

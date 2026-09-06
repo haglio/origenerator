@@ -61,6 +61,12 @@ def build_stylesheet() -> str:
     QLabel {{
         color: {_h(TEXT_SECONDARY)};
     }}
+    /* A scene card's heading: set off from the form's keys around it, the way
+       a section's header is, so a story reads as scenes and not as more keys. */
+    QLabel#sceneTitle {{
+        color: {_h(TEXT_PRIMARY)};
+        font-weight: 600;
+    }}
     QLabel#estimateLabel {{
         color: {_h(TEXT_MUTED)};
     }}
@@ -265,10 +271,11 @@ def build_stylesheet() -> str:
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
     }}
-    /* A tab's close button. Flat and bare, because all it is is the style's own
-       ✕ sitting on the tab: the default QToolButton look would wrap it in a
-       raised, rounded, bordered box that looks nothing like a tab's mark. */
-    QToolButton#tabCloseButton {{
+    /* A tab's close button, and a scene card's remove. Flat and bare, because
+       all it is is the style's own ✕ sitting on the tab: the default QToolButton
+       look would wrap it in a raised, rounded, bordered box that looks nothing
+       like a tab's mark. */
+    QToolButton#tabCloseButton, QToolButton#sceneRemove {{
         background-color: transparent;
         border: none;
         border-radius: 0;

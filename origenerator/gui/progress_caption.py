@@ -254,7 +254,7 @@ class ProgressCaption(QProgressBar):
         clip = QPainterPath()
         clip.addRoundedRect(QRectF(inner), _BAND_RADIUS, _BAND_RADIUS)
         painter.setClipPath(clip)
-        band = QRect(inner.x(), inner.bottom() - _BAND_PX + 1,
+        band = QRect(inner.x(), inner.bottomLeft().y() - _BAND_PX + 1,
                      inner.width(), _BAND_PX)
         painter.fillRect(band, _BAND_TROUGH)
         filled = round(band.width() * min(done, total) / total)

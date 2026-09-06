@@ -256,7 +256,7 @@ def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
     qtbot.addWidget(tile)
     picture, bar = tile._image.geometry(), tile._bar.geometry()
 
-    assert bar.bottom() == picture.bottom()
+    assert bar.bottomLeft().y() == picture.bottomLeft().y()
     assert bar.left() == picture.left() and bar.width() == picture.width()
     assert bar.top() > picture.center().y()
 

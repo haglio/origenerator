@@ -89,7 +89,7 @@ def test_the_tiles_fill_the_pane_edge_to_edge(qtbot, tmp_path):
     assert min(c.left() for c in cells) == 0
     assert min(c.top() for c in cells) == 0
     assert max(c.right() for c in cells) == 399
-    assert max(c.bottom() for c in cells) == 299
+    assert max(c.bottomLeft().y() for c in cells) == 299
     # No gaps and no overlaps: the cells add up to exactly the pane.
     assert sum(c.width() * c.height() for c in cells) == 400 * 300
 

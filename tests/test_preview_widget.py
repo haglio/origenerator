@@ -579,8 +579,9 @@ def test_the_corners_keep_off_the_strip_while_a_videos_size_is_unknown(qtbot, tm
     w.layout().activate()
     strip_top = w._strip.geometry().top()
     assert not w._strip.isHidden() and strip_top > 0
-    assert w.media_rect().bottom() < strip_top
-    assert all(b.geometry().bottom() < strip_top for b in w._controls.buttons())
+    assert w.media_rect().bottomLeft().y() < strip_top
+    assert all(b.geometry().bottomLeft().y() < strip_top
+               for b in w._controls.buttons())
 
 
 def test_the_strip_follows_playback_position(qtbot, tmp_path):
@@ -617,8 +618,9 @@ def test_the_corners_follow_the_picture_when_the_strip_takes_its_room(qtbot, tmp
     w.layout().activate()      # ...which it takes here
     strip_top = w._strip.geometry().top()
     assert not w._strip.isHidden() and strip_top > 0
-    assert w.media_rect().bottom() < strip_top
-    assert all(b.geometry().bottom() < strip_top for b in w._controls.buttons())
+    assert w.media_rect().bottomLeft().y() < strip_top
+    assert all(b.geometry().bottomLeft().y() < strip_top
+               for b in w._controls.buttons())
 
 
 def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):

@@ -187,10 +187,10 @@ class CornerControls(QObject):
         inner = picture.adjusted(CORNER_INSET, CORNER_INSET,
                                  -CORNER_INSET, -CORNER_INSET)
         right = inner.right() - CORNER_SIZE + 1
-        bottom = inner.bottom() - CORNER_SIZE + 1
+        lower = inner.bottomLeft().y() - CORNER_SIZE + 1
         self._star.move(right, inner.top())
-        self._trash.move(inner.left(), bottom)
-        self._enhance_button.move(right, bottom)
+        self._trash.move(inner.left(), lower)
+        self._enhance_button.move(right, lower)
         for button in self.buttons():
             button.raise_()
 

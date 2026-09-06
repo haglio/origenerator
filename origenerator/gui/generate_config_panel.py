@@ -173,6 +173,10 @@ class GenerateConfigPanel(QWidget):
         # that hasn't streamed yet, so the same text isn't re-painted every poll.
         self._watched_key: str | None = None
         self._live_note: str | None = None
+        # The pair standing in for a frame that hasn't streamed, as
+        # (image, clip) paths — so the same one isn't rebuilt every poll, which
+        # would restart the clip's loop from frame one each second.
+        self._live_source: tuple | None = None
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
@@ -1091,22 +1095,43 @@ class GenerateConfigPanel(QWidget):
         """
         return self._watched_key
 
-    def watch_folder(self, key: str, frame: bytes | None, note: str | None = None):
+    def watch_folder(self, key: str, frame: bytes | None, note: str | None = None,
+                     made_from: tuple | None = None):
         """Follow the run leading folder ``key``: its latest ``frame`` now, each
         later one as it streams (:meth:`show_live_frame`), and the picture it
-        lands as. With no frame yet the preview says it is waiting — ``note``
-        where the caller knows what for, marked live so a double-click opens
-        the run fullscreen before its first frame arrives."""
+        lands as.
+
+        With no frame yet the pane stands ``made_from`` — the ``(image, clip)``
+        the run was built on, shown as the sum
+        :class:`~origenerator.gui.combination_view.CombinationView` draws, the
+        same pair the strip's corner and the folder's tile stand for that job.
+        A run made from nothing has no such pair, and there the pane says it is
+        waiting instead — ``note`` where the caller knows what for, marked live
+        so a double-click opens the run fullscreen before its first frame.
+        """
         self._watched_key = key
         self._live_note = None
         if frame:
             self.show_live_frame(frame)
+        elif made_from and any(made_from):
+            self.show_live_source(*made_from)
         else:
             self.show_live_wait(note)
+
+    def show_live_source(self, image_path, video_path):
+        """Stand what the followed run is being made from, in place of a frame it
+        has not streamed yet. Repainted only when the pair changes, since the
+        poll re-reads the watch every tick and the clip beside it is looping."""
+        pair = (str(image_path or ""), str(video_path or ""))
+        if pair == self._live_source:
+            return
+        self._live_source = pair
+        self.show_combination(image_path, video_path)
 
     def show_live_frame(self, frame: bytes):
         """The run this tab follows streamed a frame: put it up."""
         self._live_note = None
+        self._live_source = None
         self._preview.show_frame(frame)
 
     def show_live_wait(self, note: str | None):
@@ -1117,11 +1142,14 @@ class GenerateConfigPanel(QWidget):
         if text == self._live_note:
             return
         self._live_note = text
+        self._live_source = None
         self._preview.show_message(text, live=True)
 
     def is_awaiting_frame(self) -> bool:
-        """Whether the preview is standing on a wait for the followed run's first
-        frame — the one state a fresher wait text should replace."""
+        """Whether the preview is standing on a *worded* wait for the followed
+        run's first frame — the one state a fresher wait text should replace.
+        A pane standing the pair the run is made from is not waiting in words,
+        and has nothing for a changed count to rewrite."""
         return self._watched_key is not None and self._live_note is not None
 
     def stop_watching(self):
@@ -1142,6 +1170,7 @@ class GenerateConfigPanel(QWidget):
     def _forget_watch(self):
         self._watched_key = None
         self._live_note = None
+        self._live_source = None
 
     def _display_result(self, row: dict, image_rows: list[dict], request=None):
         """Point the preview and footer at ``row`` — the shared tail of showing a

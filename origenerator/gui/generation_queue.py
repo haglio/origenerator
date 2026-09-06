@@ -66,6 +66,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
@@ -78,7 +79,7 @@ from origenerator.gui.inflight import (
     starting_row_text,
 )
 from origenerator.gui.progress_caption import ProgressCaption
-from origenerator.gui.queue_thumbs import QueueThumbs, pair_pixmap
+from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import progress_status_label
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -310,11 +311,12 @@ class RunningPreview(OpensAFolder, QWidget):
         A live frame is the whole point of this corner and wins whenever there is
         one. There is none for a good while: a WAN video spends over a minute
         loading two 14B models before its first preview, and this corner stood
-        empty through all of it. So the wait shows what the config tab above
-        shows for the same job — the frame an i2v animates, the recipe clip
-        beside it in gray where a combine brought one, and nothing at all for a
-        run made from nothing, which is a text-to-video with no picture to its
-        name yet.
+        empty through all of it. So the wait shows the same sum the config tab
+        and the folder's own tile show for that job — the frame, a plus, and the
+        recipe clip in gray where a combine brought one
+        (:func:`~origenerator.gui.combination_view.combination_pixmap`) — and
+        nothing at all for a run made from nothing, which is a text-to-video with
+        no picture to its name yet.
 
         The label is sized to what it draws, since the pair is twice as wide as
         the square a single picture (or a live frame) fills.
@@ -326,8 +328,9 @@ class RunningPreview(OpensAFolder, QWidget):
             pixmap = pixmap.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio,
                                    Qt.TransformationMode.SmoothTransformation)
         else:
-            pixmap = None if item is None else pair_pixmap(
-                resolve_input_image_path(item.source_image), item.recipe_thumbnail, side,
+            pixmap = None if item is None else combination_pixmap(
+                resolve_input_image_path(item.source_image), item.recipe_thumbnail,
+                QSize(2 * side, side),
             )
         if pixmap is None:
             self._frame.setFixedSize(side, side)

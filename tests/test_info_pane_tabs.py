@@ -511,6 +511,45 @@ def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     assert panel.is_awaiting_frame()
 
 
+def test_a_run_with_a_picture_behind_it_stands_that_instead_of_a_note(tabs):
+    # The complaint this answers: the pane sat blank under "Waiting for preview…"
+    # for the minute a WAN run spends loading models, while the strip's corner
+    # showed the frame and the folder's tile showed a blurred copy of it. All
+    # three stand the same sum now.
+    panel = tabs.currentWidget()
+    panel._preview.show_combination = MagicMock()
+    panel._preview.show_message = MagicMock()
+
+    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
+
+    panel._preview.show_combination.assert_called_once_with("frame.png", "clip.webp")
+    panel._preview.show_message.assert_not_called()
+    # It is not a worded wait, so a changed queue count has nothing to rewrite.
+    assert not panel.is_awaiting_frame()
+
+
+def test_the_pair_is_repainted_only_when_it_changes(tabs):
+    # The poll re-reads the watch every tick, and rebuilding the pair would
+    # restart the clip looping beside the frame from its first frame each time.
+    panel = tabs.currentWidget()
+    panel._preview.show_combination = MagicMock()
+
+    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
+    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
+
+    assert panel._preview.show_combination.call_count == 1
+
+
+def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs):
+    # A text-to-video has no picture to stand, so the words are all there is.
+    panel = tabs.currentWidget()
+    panel._preview.show_message = MagicMock()
+
+    panel.watch_folder("k", None, None, (None, None))
+
+    panel._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
+
+
 def test_watching_prefers_a_given_wait_note(tabs):
     # "Waiting for preview…" says nothing about why. When the caller knows what the
     # run is stuck behind, that replaces it.

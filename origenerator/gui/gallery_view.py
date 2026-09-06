@@ -3258,7 +3258,8 @@ class GalleryView(QWidget):
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
                           typical_seconds=self._typical_run_seconds(job),
-                          source_picture=self._job_source_picture(job))
+                          source_picture=self._job_source_picture(job),
+                          recipe_picture=self._job_recipe_picture(job))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
@@ -3424,6 +3425,34 @@ class GalleryView(QWidget):
             return source["thumbnail_path"]
         frame = resolve_input_image_path(job.params.get("input_image"))
         return str(frame) if frame is not None else None
+
+    def _job_recipe_row(self, job) -> dict | None:
+        """The clip whose settings ``job`` follows, as its row — or ``None``.
+
+        The other half of what a combine's run was made from, stood gray beside
+        the frame wherever the run has no picture of its own yet. Only where a
+        *video* was dropped: an act picked off the Combine dropdown names what
+        the run will do rather than a clip, and a picture of some video the user
+        never chose reads as a job that is that video — the same reason the
+        queue's rows leave it out (see BrowserPane).
+        """
+        row = self._db.get_generation(job.prompt_id) if job is not None else None
+        if row is None or row.get("recipe_category"):
+            return None
+        return self._db.get_generation(row.get("recipe_video_id") or "")
+
+    def _job_recipe_picture(self, job) -> str | None:
+        """That clip as a still, for the plate on the folder's own tile."""
+        recipe = self._job_recipe_row(job)
+        return recipe.get("thumbnail_path") if recipe else None
+
+    def _job_made_from(self, job) -> tuple:
+        """What ``job`` was made from, for a config tab with no frame of it yet:
+        the picture, and the clip looping beside it — the pair a tab draws as a
+        sum, which is what the strip's corner and the tile stand in stills."""
+        recipe = self._job_recipe_row(job)
+        return (self._job_source_picture(job),
+                self._animated_preview(recipe) if recipe is not None else None)
 
     def _typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the
@@ -6242,7 +6271,8 @@ class GalleryView(QWidget):
             if job.origin not in panel.launched_runs():
                 panel.note_launched(job.origin)  # its Cancel and progress are this run's now
             self._reconcile_generating()
-        panel.watch_folder(key, job.last_preview, self._wait_note(key))
+        panel.watch_folder(key, job.last_preview, self._wait_note(key),
+                           self._job_made_from(job))
         tabs.setCurrentWidget(panel)
 
     def _restore_reroll_selection(self, key: str | None):

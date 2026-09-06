@@ -33,7 +33,11 @@ pictures there might have been.
 
 Every scaled cell is cached by (file, size, gray) for the life of the session —
 the strip re-renders on every poll, and a start frame is a full-size render off
-disk.
+disk. That fitting and that cache are :func:`fitted_cell`, which is public
+because the pair drawn by
+:func:`~origenerator.gui.combination_view.combination_pixmap` is the same
+picture at the same size on the same poll, and a second cache of it would be a
+second full-size decode a second.
 """
 
 import os
@@ -80,7 +84,7 @@ def _written(path) -> int | None:
         return None
 
 
-def _cell(path, side: int, gray: bool = False) -> QPixmap | None:
+def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
     """``path`` cropped to a ``side``x``side`` square, or ``None`` if unreadable.
 
     A missing or unreadable file is an ordinary case here, not an error: a start
@@ -151,7 +155,7 @@ def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
     the frame in full color it reads as a second subject, and the row of a job
     whose frame hasn't rendered yet would read as a job that *is* that clip.
     """
-    parts = (_cell(path, cell), _cell(recipe, cell, gray=True))
+    parts = (fitted_cell(path, cell), fitted_cell(recipe, cell, gray=True))
     if all(part is None for part in parts):
         return None
     canvas = _canvas(cell)
@@ -159,29 +163,6 @@ def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
     for index, part in enumerate(parts):
         if part is not None:
             painter.drawPixmap(index * (cell + _GAP), 0, part)
-    painter.end()
-    return canvas
-
-
-def pair_pixmap(path, recipe, cell: int) -> QPixmap | None:
-    """The same pair :func:`source_pixmap` draws, in a block only as wide as it
-    has pictures — one cell, or two with the recipe beside the frame.
-
-    For the strip's leading half, which stands what the run is made from where
-    the live frame will go. That half is a fixed square rather than a row of
-    slots, so the four-cell block a queue row carries is the wrong shape for it:
-    a job with one picture would leave three quarters of the corner empty.
-    ``None`` when neither file loads, so the caller can leave the corner alone.
-    """
-    parts = [part for part in (_cell(path, cell), _cell(recipe, cell, gray=True))
-             if part is not None]
-    if not parts:
-        return None
-    canvas = QPixmap(len(parts) * cell + (len(parts) - 1) * _GAP, cell)
-    canvas.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(canvas)
-    for index, part in enumerate(parts):
-        painter.drawPixmap(index * (cell + _GAP), 0, part)
     painter.end()
     return canvas
 
@@ -197,7 +178,7 @@ def folder_pixmap(paths, cell: int) -> QPixmap:
     painter = QPainter(canvas)
     for index in range(FOLDER_CELLS):
         x = index * (cell + _GAP)
-        picture = _cell(paths[index], cell) if index < len(paths) else None
+        picture = fitted_cell(paths[index], cell) if index < len(paths) else None
         if picture is None:
             painter.fillRect(x, 0, cell, cell, _slot_color())
         else:

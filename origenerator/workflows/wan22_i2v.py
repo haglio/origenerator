@@ -155,9 +155,12 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "20", "21", ["12", 0], params
         )
 
-        # Each segment reads its own scene of the prompt (a --- line starts the
-        # next); node 10 below encodes the first, and any later scene gets its own.
+        # Each segment reads its own scene of the prompt and of the negative (a
+        # --- line starts the next of each, which is how the scenes editor stores
+        # them); nodes 10 and 11 below encode the first scene's, and any later
+        # scene gets its own.
         scenes = scene_prompts(params["positive_prompt"])
+        negatives = scene_prompts(params["negative_prompt"])
 
         def segment(index, scene, start, length, last):
             clip_id, i2v_id, high_id, low_id, decode_id = (
@@ -165,8 +168,11 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
             )
             prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scene, scenes, ["1", 0], ["10", 0])
+            negative_nodes, negative_ref = self.scene_prompt_nodes(
+                index, scene, negatives, ["1", 0], ["11", 0], role="negative")
             nodes = {
                 **prompt_nodes,
+                **negative_nodes,
                 clip_id: {
                     "class_type": "CLIPVisionEncode",
                     "inputs": {
@@ -179,7 +185,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                     "class_type": "WanImageToVideo",
                     "inputs": {
                         "positive": positive_ref,
-                        "negative": ["11", 0],
+                        "negative": negative_ref,
                         "vae": ["2", 0],
                         "clip_vision_output": [clip_id, 0],
                         "start_image": start,
@@ -288,7 +294,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             },
             "11": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["1", 0], "text": params["negative_prompt"]},
+                "inputs": {"clip": ["1", 0], "text": negatives[0]},
             },
             "12": {
                 "class_type": "LoadImage",

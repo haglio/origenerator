@@ -67,6 +67,12 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
         font-weight: 600;
     }}
+    /* A scene card: a scene's texts and its length together. Bordered, so three
+       scenes of three boxes each read as three things rather than nine. */
+    QFrame#sceneCard {{
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 3px;
+    }}
     QLabel#estimateLabel {{
         color: {_h(TEXT_MUTED)};
     }}

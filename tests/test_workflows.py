@@ -2276,6 +2276,31 @@ def _scene_texts(payload, conditioning):
             for seg in _segments(payload, conditioning)]
 
 
+def _scene_negatives(payload, conditioning):
+    return [payload[seg["inputs"]["negative"][0]]["inputs"]["text"]
+            for seg in _segments(payload, conditioning)]
+
+
+@pytest.mark.parametrize("name, conditioning", [
+    ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
+])
+def test_each_scene_keeps_out_its_own_negative(name, conditioning):
+    # A scene's negative is its own, like its prompt: stored as the one negative
+    # prompt with a break between the scenes' texts, and each segment reads the
+    # text of its scene. A negative with fewer texts than scenes carries its
+    # last text on, and one without a break is the one node every segment
+    # shared before there were scenes.
+    wf = WORKFLOW_REGISTRY[name]
+    params = dict(wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
+                  positive_prompt="a\n---\nb\n---\nc")
+    payload = wf.build_api_payload(dict(params, negative_prompt="no hats\n---\nno hands"))
+    assert _scene_negatives(payload, conditioning) == ["no hats", "no hands", "no hands"]
+    payload = wf.build_api_payload(dict(params, negative_prompt="blurry"))
+    refs = [seg["inputs"]["negative"] for seg in _segments(payload, conditioning)]
+    assert refs[0] == refs[1] == refs[2]
+    assert _scene_negatives(payload, conditioning) == ["blurry"] * 3
+
+
 @pytest.mark.parametrize("name, conditioning", [
     ("wan22_i2v", "WanImageToVideo"), ("wan22_flf2v_loop", "WanFirstLastFrameToVideo"),
 ])

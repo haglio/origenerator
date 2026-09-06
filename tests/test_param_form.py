@@ -1083,11 +1083,12 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
     assert rate.currentText() == "64 fps"
 
 
-# --- a story: one prompt box and one length per scene --------------------------
+# --- a story: a card per scene, its prompts and its length -----------------------
 
 def _scene_defs():
     return [
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5, max_val=961, step=4,
                  options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0),
         ParamDef("scene_lines", "Lines", "lines", [""]),
@@ -1100,10 +1101,15 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
-    assert form._widgets["positive_prompt"] is editor is form._widgets["scene_lines"]
-    assert len(editor.scene_boxes()) == 1
-    assert form.get_values() == {"positive_prompt": "", "scene_frames": [81],
-                                 "scene_lines": [""], "frame_count": 81}
+    assert (form._widgets["positive_prompt"] is editor is form._widgets["negative_prompt"]
+            is form._widgets["scene_lines"])
+    assert len(editor.boxes("positive_prompt")) == 1
+    assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
+                                 "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
+    # One row stands for the four, labeled as the scenes: a prompt row of the
+    # form's own beside the cards would read as the clip's where the cards' are
+    # the scenes'.
+    assert form._present_keys["Prompts"] == ["scene_frames"]
 
 
 def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):
@@ -1114,8 +1120,8 @@ def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
-    editor.scene_boxes()[0].setPlainText("she waves")
-    editor.scene_boxes()[1].setPlainText("she turns")
+    editor.boxes("positive_prompt")[0].setPlainText("she waves")
+    editor.boxes("positive_prompt")[1].setPlainText("she turns")
     [scene.length for scene in editor._scenes][1].setCurrentText("10")
     values = form.get_values()
     assert values["positive_prompt"] == "she waves\n---\nshe turns"
@@ -1123,28 +1129,57 @@ def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(
     assert values["frame_count"] == 241
 
 
+def test_each_scene_keeps_out_its_own_and_a_new_one_starts_from_the_last(qtbot):
+    # A negative mostly holds across a story, so a new scene starts with the one
+    # before it rather than blank; edited apart, each is stored as its own text,
+    # a scene break between them like the prompts.
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.boxes("negative_prompt")[0].setPlainText("blurry")
+    editor.add_scene()
+    assert editor.boxes("negative_prompt")[1].toPlainText() == "blurry"
+    editor.boxes("negative_prompt")[1].setPlainText("blurry, hats")
+    assert form.get_values()["negative_prompt"] == "blurry\n---\nblurry, hats"
+
+
 def test_a_stored_story_fills_one_box_per_scene(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
-    stored = {"positive_prompt": "a\n---\nb\n---\nc", "scene_frames": [161, 81, 161],
-              "scene_lines": ["hi", "", "bye"], "frame_count": 401}
+    stored = {"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "x\n---\ny\n---\nz",
+              "scene_frames": [161, 81, 161], "scene_lines": ["hi", "", "bye"], "frame_count": 401}
     form.set_values(stored)
     editor = form._widgets["scene_frames"]
-    assert [box.toPlainText() for box in editor.scene_boxes()] == ["a", "b", "c"]
+    assert [box.toPlainText() for box in editor.boxes("positive_prompt")] == ["a", "b", "c"]
+    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["x", "y", "z"]
     assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
-    assert [box.toPlainText() for box in [scene.lines for scene in editor._scenes]] == ["hi", "", "bye"]
+    assert [box.toPlainText() for box in editor.boxes("scene_lines")] == ["hi", "", "bye"]
     assert form.get_values_static() == stored
 
 
 def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
-    form.set_values({"positive_prompt": "one shot", "frame_count": 121})
+    form.set_values({"positive_prompt": "one shot", "negative_prompt": "blurry", "frame_count": 121})
     editor = form._widgets["scene_frames"]
-    assert [box.toPlainText() for box in editor.scene_boxes()] == ["one shot"]
+    assert [box.toPlainText() for box in editor.boxes("positive_prompt")] == ["one shot"]
+    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["blurry"]
     assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     values = form.get_values_static()
     assert (values["scene_frames"], values["frame_count"]) == ([121], 121)
+    assert values["negative_prompt"] == "blurry"
+
+
+def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
+    # A story made when the negative was the clip's has one text for three
+    # scenes; the graph keeps it out of every scene, and so the cards show it
+    # on every scene -- what is seen is what renders.
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    form.set_values({"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "blurry",
+                     "scene_frames": [81, 81, 81], "frame_count": 241})
+    editor = form._widgets["scene_frames"]
+    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["blurry"] * 3
 
 
 def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
@@ -1178,18 +1213,29 @@ def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
-    editor.scene_boxes()[0].setPlainText("a")
-    editor.scene_boxes()[1].setPlainText("b")
-    assert editor.scene_boxes()[0] in form.text_fields()
-    assert editor.scene_boxes()[1] in form.text_fields()
+    editor.boxes("positive_prompt")[0].setPlainText("a")
+    editor.boxes("positive_prompt")[1].setPlainText("b")
+    editor.boxes("negative_prompt")[1].setPlainText("n")
+    assert editor.boxes("positive_prompt")[0] in form.text_fields()
+    assert editor.boxes("positive_prompt")[1] in form.text_fields()
+    assert editor.boxes("negative_prompt")[1] in form.text_fields()
     assert form._field_text("positive_prompt") == "a\n---\nb"
+    assert form._field_text("negative_prompt") == "\n---\nn"
 
 
-def test_the_lines_box_says_it_is_not_voiced_yet(qtbot):
+def test_each_box_on_a_card_says_what_it_is(qtbot):
+    # Three boxes to a card, so each is captioned and carries its param's help;
+    # the lines box says as well that nothing voices it yet.
+    from origenerator.gui.eliding import ElidingLabel
+    from origenerator.gui.param_help import param_help
+
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
-    box = form._widgets["scene_frames"]._scenes[0].lines
-    assert "not voiced" in box.placeholderText().lower()
+    scene = form._widgets["scene_frames"]._scenes[0]
+    captions = {label.text() for label in scene.findChildren(ElidingLabel)}
+    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
+    assert scene.boxes["negative_prompt"].toolTip() == param_help("negative_prompt")
+    assert "not voiced" in scene.boxes["scene_lines"].placeholderText().lower()
 
 
 def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbot):

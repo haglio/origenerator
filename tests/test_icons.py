@@ -69,8 +69,8 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
 def test_the_orientation_marks_are_one_frame_and_its_quarter_turn(qtbot):
     # The pair over the table of contents' two halves says which shape each half
     # holds, and it says it by BEING that shape: an upright frame and a
-    # lying-down one, each the other transposed. Both are drawn in one square
-    # box, so the words beside them start at the same x.
+    # lying-down one, each the other transposed. Both are drawn on one square
+    # canvas, so the words beside them start at the same x.
     portrait = icons.orientation_mark("portrait")
     landscape = icons.orientation_mark("landscape")
     assert portrait.size() == landscape.size()

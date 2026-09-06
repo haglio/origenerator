@@ -31,7 +31,7 @@ def tab_mark(icon: QIcon) -> QIcon:
     width and the row's spacing doesn't shift with a picture's shape — at this
     size a thumbnail is a swatch, and what the crop takes off its sides is not
     anything the eye was reading. A null icon stays null: a tab that has nothing
-    to show wears nothing, rather than an empty box where a picture goes.
+    to show wears nothing, rather than an empty square where a picture goes.
     """
     if icon.isNull():
         return icon

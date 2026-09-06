@@ -8,7 +8,7 @@ every surface a config-only video reaches — the combine slot, the queue row's
 picture block, and the pane a combination opens in — draws it through here.
 
 Alpha is carried across rather than flattened, so a picture with a cut-out edge
-stays cut out instead of gaining a gray box around it.
+stays cut out instead of gaining a gray square around it.
 """
 
 from PyQt6.QtGui import QImage, QPainter, QPixmap

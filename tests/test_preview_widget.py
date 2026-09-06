@@ -15,7 +15,7 @@ from origenerator.funscript import (
     write_funscript,
 )
 from origenerator.gui import preview_widget
-from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
+from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.ken_burns import TICK_MS, ZOOM_SPAN, progress_step, zoom_at
@@ -746,17 +746,17 @@ def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
     w = make_preview()
     w.show()
     w.resize(600, 480)
-    qtbot.waitUntil(lambda: w._image_label.width() > THUMBNAIL_BOX)
+    qtbot.waitUntil(lambda: w._image_label.width() > THUMBNAIL_MAX)
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_draggable_id("gen1")
 
     shown = w._image_label.pixmap()
-    assert max(shown.width(), shown.height()) > THUMBNAIL_BOX  # the pane fits it big
+    assert max(shown.width(), shown.height()) > THUMBNAIL_MAX  # the pane fits it big
 
     _drag_out(w)
 
     (drag,) = drags
-    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
 def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, drags):
@@ -787,7 +787,7 @@ def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drag
 
     (drag,) = drags
     assert drag.pixmap is not None and not drag.pixmap.isNull()
-    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
 def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):

@@ -1,6 +1,6 @@
 """The trailing tile in a gallery settings folder: re-roll a new variation.
 
-Idle, it is a ``+`` box that asks for a fresh generation of the folder's
+Idle, it is a ``+`` tile that asks for a fresh generation of the folder's
 settings with a new seed. Bound to a running :class:`GenerationJob`, it shows
 that job's live state the way every other in-flight surface does: ComfyUI's
 in-progress preview — or, until there is one, the frame and recipe the run was
@@ -30,7 +30,7 @@ from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 from origenerator.timing import progress_status_label
 
-# The dashed resting box and the solid selected border are the family look every
+# The dashed resting outline and the solid selected border are the family look every
 # non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
 _IDLE_FRAME_CSS = grid_card.idle_css("rerollTile")
 _SELECTED_FRAME_CSS = grid_card.selected_css("rerollTile")
@@ -67,7 +67,7 @@ class RerollTile(QFrame):
         self.set_selected(False)
         # Right-click asks the gallery for the run's menu, the way every other
         # card in the grid answers that gesture. Only while bound: the idle ``+``
-        # box has nothing under way to offer anything about.
+        # tile has nothing under way to offer anything about.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_requested)
 

@@ -71,5 +71,5 @@ def test_a_still_is_never_blown_up_past_its_own_size(qtbot, tmp_path):
 
     neighbors.set_neighbors(_png(tmp_path / "small.png", size=(24, 24)), None)
 
-    # The box would be 120x400 at this size; a 24px thumbnail stays 24px.
+    # The bounds would be 120x400 at this size; a 24px thumbnail stays 24px.
     assert neighbors._labels[0].pixmap().size().width() == 24

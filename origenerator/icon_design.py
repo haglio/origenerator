@@ -2,7 +2,7 @@
 
 Every app in the suite draws a single MAGENTA letter on a 5x5 grid inset 31px
 inside a 256px canvas, with each stroke exactly one grid unit -- 1/5 of the
-glyph box -- thick and near-square corners.  This module renders Origenerator's
+letter grid -- thick and near-square corners.  This module renders Origenerator's
 "O" as a 1/5-thick square ring to match.
 
 Run ``python -m origenerator.icon_design`` to regenerate ``icon.ico``.  The
@@ -24,9 +24,9 @@ ensure_shared_ui_on_path()
 from shared_ui.colors import MAGENTA
 
 CANVAS = 256  # icon master size
-INSET = 31  # glyph box offset within the canvas
-BOX = CANVAS - 2 * INSET  # 194 -- glyph box size, shared across the suite
-UNIT = BOX / 5  # 38.8 -- one grid unit == stroke width ("1/5-based")
+INSET = 31  # the letter grid's offset within the canvas
+GRID = CANVAS - 2 * INSET  # 194 -- the letter grid, shared across the suite
+UNIT = GRID / 5  # 38.8 -- one cell == stroke width ("1/5-based")
 CORNER_RADIUS = 5  # renders to a ~3px outer corner, matching the suite
 ICON_SIZES = (16, 32, 48, 256)  # frames stored in the .ico
 
@@ -35,10 +35,10 @@ def render_icon(size: int = CANVAS) -> Image.Image:
     """Render the "O" ring at ``size``x``size`` as an RGBA Pillow image."""
     scale = size / CANVAS
     inset = INSET * scale
-    box = BOX * scale
+    grid = GRID * scale
     unit = UNIT * scale
     radius = CORNER_RADIUS * scale
-    cutout = box - 2 * unit
+    cutout = grid - 2 * unit
 
     qimg = QImage(size, size, QImage.Format.Format_RGBA8888)
     qimg.fill(Qt.GlobalColor.transparent)
@@ -49,7 +49,7 @@ def render_icon(size: int = CANVAS) -> Image.Image:
     painter.setBrush(MAGENTA)
 
     outer = QPainterPath()
-    outer.addRoundedRect(QRectF(inset, inset, box, box), radius, radius)
+    outer.addRoundedRect(QRectF(inset, inset, grid, grid), radius, radius)
     inner = QPainterPath()
     inner.addRoundedRect(QRectF(inset + unit, inset + unit, cutout, cutout), radius, radius)
     painter.drawPath(outer.subtracted(inner))

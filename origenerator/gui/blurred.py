@@ -8,7 +8,7 @@ request was made of. That picture is not what is being made, so it cannot be
 shown as it is; blurred and dimmed it says the right thing instead — something is
 coming, and it will be about this.
 
-Blurred by scaling the picture right down and back up again, which is a box blur
+Blurred by scaling the picture right down and back up again, which is a mean blur
 the graphics stack does for free, rather than by a real convolution: at this size
 the difference is invisible and the cost is a hundredth of it. Cover-cropped
 first, so the plate fills edge to edge with no letterboxing.

@@ -2,8 +2,8 @@
 
 Manually telling the workflow where the anchor sits in every image doesn't
 scale, so this module finds it: a detection pass over the start frame yields
-the anchor's bounding box, and the box maps to the stroke's aim — the track
-column through the box's center, a stroke span over the anchor's gripped
+the anchor's bounding rect, and the rect maps to the stroke's aim — the track
+column through the rect's center, a stroke span over the anchor's gripped
 length, and the static anchor at its base. Results are FRACTIONS of the image
 (0..1), so the caller converts them into whatever coordinate frame it authors
 tracks in; this module knows nothing about reference frames or workflows.
@@ -32,12 +32,12 @@ _MODEL_FILE = "censor_detect_v1.0_s/model.onnx"
 _INFER_SIZE = 640
 _IOU_LIMIT = 0.45
 # The gallery's photoreal renders score low on the anime-trained detector even
-# when the box is spot-on (measured ~0.28 on a frame-filling anchor the box
+# when the rect is spot-on (measured ~0.28 on a frame-filling anchor the rect
 # nailed), so the bar sits low; a wrong aim is bounded by the manual override
 # and costs one re-roll, while a missed aim forfeits the feature.
 _MIN_SCORE = 0.22
 
-# Where the stroke lands inside the detected box, as fractions of its height:
+# Where the stroke lands inside the detected rect, as fractions of its height:
 # the span starts just under the tip and ends above the base (the gripped
 # length a hand travels), and the anchor pins the base itself. Calibrated
 # against the hand-aimed proof-of-concept frame.
@@ -50,7 +50,7 @@ _detector = None
 
 @lru_cache(maxsize=1)
 def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
-    """The aim model's class names, and the ones whose box the stroke aims at.
+    """The aim model's class names, and the ones whose rect the stroke aims at.
 
     Library vocabulary, so it comes from the content overlay rather than from
     source. Read on first use rather than at module scope: this module is
@@ -61,7 +61,7 @@ def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
     is a :class:`~origenerator.content.MissingOverlayKey` that names both, and
     only auto-aim is lost.
 
-    One call for both, cached: the labels index every decoded box and the anchor
+    One call for both, cached: the labels index every decoded rect and the anchor
     classes filter every one of them.
     """
     labels = overlay_value(load_content(), "detector_labels")
@@ -71,11 +71,11 @@ def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
     )
 
 
-def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
-    """Map a detected anchor box ``(x, y, w, h)`` to the stroke's aim, each value
-    a fraction of the image: the track column through the box center, the
+def aim_fractions_from_rect(rect, image_w: int, image_h: int) -> dict:
+    """Map a detected anchor rect ``(x, y, w, h)`` to the stroke's aim, each value
+    a fraction of the image: the track column through the rect center, the
     stroke span over the gripped length, the anchor at the base."""
-    x, y, w, h = box
+    x, y, w, h = rect
     cx = (x + w / 2) / image_w
     return {
         "stroke_x": cx,
@@ -88,7 +88,7 @@ def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
 
 def detect_grip_aim(image_path: Path | None) -> dict | None:
     """The stroke aim for ``image_path``'s most confident detected anchor, as
-    image fractions (see :func:`aim_fractions_from_box`), or ``None`` when
+    image fractions (see :func:`aim_fractions_from_rect`), or ``None`` when
     there's no file, no usable detector, or no confident detection."""
     if image_path is None:
         return None
@@ -101,7 +101,7 @@ def detect_grip_aim(image_path: Path | None) -> dict | None:
             return None
         with Image.open(image_path) as img:
             image_w, image_h = img.size
-        return aim_fractions_from_box(best["box"], image_w, image_h)
+        return aim_fractions_from_rect(best["rect"], image_w, image_h)
     except Exception as e:
         logger.warning("Auto-aim detection failed for %s: %s", image_path, e)
         return None
@@ -119,7 +119,7 @@ def _best_anchor(detections) -> dict | None:
 
 def _detect(path: str) -> list[dict]:
     """Run the (lazily created, cached) censor detector over an image file,
-    returning ``{"class", "score", "box": (x, y, w, h)}`` dicts in image
+    returning ``{"class", "score", "rect": (x, y, w, h)}`` dicts in image
     pixels. Isolated so tests can monkeypatch detection without the model."""
     import numpy as np
     from PIL import Image
@@ -139,31 +139,31 @@ def _detect(path: str) -> list[dict]:
 
 
 def _decode_yolo(out, scale: float, pad_x: int, pad_y: int) -> list[dict]:
-    """YOLOv8 output ``(4 + n_classes, anchors)`` → scored, NMS-pruned boxes
+    """YOLOv8 output ``(4 + n_classes, anchors)`` → scored, NMS-pruned rects
     mapped back through the letterbox into original image pixels."""
     import numpy as np
 
     model_labels, _ = _detector_labels()
-    boxes_cxcywh = out[:4].T
+    rects_cxcywh = out[:4].T
     scores = out[4:].T
     class_idx = scores.argmax(axis=1)
     confidence = scores[np.arange(len(class_idx)), class_idx]
     keep = confidence >= _MIN_SCORE
     detections = []
     for (cx, cy, bw, bh), ci, score in zip(
-        boxes_cxcywh[keep], class_idx[keep], confidence[keep]
+        rects_cxcywh[keep], class_idx[keep], confidence[keep]
     ):
         x = (cx - bw / 2 - pad_x) / scale
         y = (cy - bh / 2 - pad_y) / scale
         detections.append({
             "class": model_labels[ci],
             "score": float(score),
-            "box": (x, y, bw / scale, bh / scale),
+            "rect": (x, y, bw / scale, bh / scale),
         })
     detections.sort(key=lambda d: d["score"], reverse=True)
     pruned = []
     for d in detections:
-        if all(_iou(d["box"], p["box"]) < _IOU_LIMIT for p in pruned):
+        if all(_iou(d["rect"], p["rect"]) < _IOU_LIMIT for p in pruned):
             pruned.append(d)
     return pruned
 

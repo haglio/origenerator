@@ -6,7 +6,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.drag_thumbnail import (
-    THUMBNAIL_BOX,
+    THUMBNAIL_MAX,
     fit_thumbnail,
     label_thumbnail,
     set_drag_thumbnail,
@@ -32,18 +32,18 @@ class _RecordingDrag:
         self.pixmap = pixmap
 
 
-def test_a_big_picture_shrinks_into_the_shared_box(qtbot):
+def test_a_big_picture_shrinks_into_the_shared_size(qtbot):
     # A preview pane's still is the size of the pane; under the cursor it is a
     # thumbnail, the same as one dragged from anywhere else.
     big = QPixmap(800, 600)
     big.fill()
     fitted = fit_thumbnail(big)
-    assert fitted.width() == THUMBNAIL_BOX
-    assert fitted.height() <= THUMBNAIL_BOX
+    assert fitted.width() == THUMBNAIL_MAX
+    assert fitted.height() <= THUMBNAIL_MAX
 
 
 def test_a_small_picture_keeps_its_own_pixels(qtbot):
-    # Only ever shrinks: blowing a 96px version tile up to the box would just
+    # Only ever shrinks: blowing a 96px version tile up to that size would just
     # make it soft.
     small = QPixmap(96, 96)
     small.fill()
@@ -75,7 +75,7 @@ def test_a_label_showing_a_still_offers_it(qtbot):
     pixmap.fill()
     label.setPixmap(pixmap)
 
-    assert label_thumbnail(label).width() == THUMBNAIL_BOX
+    assert label_thumbnail(label).width() == THUMBNAIL_MAX
 
 
 def test_an_empty_label_offers_nothing(qtbot):
@@ -93,7 +93,7 @@ def test_a_drag_with_a_picture_wears_it(qtbot):
 
 
 def test_a_drag_with_no_picture_is_left_bare(qtbot):
-    # An empty box following the cursor says less than the plain drag cursor.
+    # An empty square following the cursor says less than the plain drag cursor.
     drag = _RecordingDrag()
     set_drag_thumbnail(drag, QPixmap())
     assert drag.pixmap is None

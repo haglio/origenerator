@@ -57,7 +57,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.ken_burns import ZOOM_SPAN, crop_box
+from origenerator.ken_burns import ZOOM_SPAN, crop_rect
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -550,7 +550,7 @@ class PreviewWidget(QWidget):
 
         Every frame of the push is drawn at ONE size, the size the whole picture
         was fitted to, and what moves is a real-valued window sampled out of the
-        picture (:func:`~origenerator.ken_burns.crop_box`). Both halves of that
+        picture (:func:`~origenerator.ken_burns.crop_rect`). Both halves of that
         matter and each was learned the hard way:
 
         * a frame whose size changes by a pixel is re-centered by the label, so
@@ -923,7 +923,7 @@ class PreviewWidget(QWidget):
         painter.drawPixmap(
             QRectF(0, 0, self._push_size.width(), self._push_size.height()),
             self._push_source,
-            QRectF(*crop_box(self._push_source.width(),
+            QRectF(*crop_rect(self._push_source.width(),
                              self._push_source.height(), self._zoom)),
         )
         painter.end()

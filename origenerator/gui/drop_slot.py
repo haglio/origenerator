@@ -24,7 +24,7 @@ from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 
-_PREVIEW_SIZE = 96  # the dropped thumbnail fits this box; small enough for a 120px pane
+_PREVIEW_SIZE = 96  # the dropped thumbnail fits inside this; small enough for a 120px pane
 
 
 class DropSlot(QWidget):

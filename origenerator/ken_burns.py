@@ -19,7 +19,7 @@ so a window rounded to whole pixels does not creep — it sits still and then
 jumps, several times a second, in whichever direction rounding happened to
 break. On a picture that is otherwise perfectly still that reads as the frame
 twitching rather than as a camera moving, which is worse than no move at all.
-:func:`crop_box` therefore hands back a real-valued window for the painter to
+:func:`crop_rect` therefore hands back a real-valued window for the painter to
 sample between pixels, and the pane draws every frame of one slide at ONE fixed
 size so the picture cannot re-center itself under the same rounding.
 
@@ -60,7 +60,7 @@ def zoom_at(progress: float, span: float = ZOOM_SPAN) -> float:
     return 1.0 + (span - 1.0) * max(0.0, min(1.0, progress))
 
 
-def crop_box(width: float, height: float,
+def crop_rect(width: float, height: float,
              zoom: float) -> tuple[float, float, float, float]:
     """The centered ``(x, y, w, h)`` of a *width* x *height* picture that fills
     the frame at *zoom*, in real numbers rather than whole pixels.

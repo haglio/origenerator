@@ -8621,6 +8621,32 @@ def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
     assert job.params["positive_prompt"] != "alpha"             # asked for one stroke
 
 
+def test_the_act_chooses_which_stroke_words_the_lane_adds(qtbot, tmp_path):
+    """A stroke is not one motion, so the wording is per act — and the act has to
+    reach the shaping, which is the whole reason it is threaded through."""
+    db = _combine_db(tmp_path)
+    _loop_recipe(db)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    asked = []
+    real = gallery.stroke_shaped
+    view._db  # noqa: B018  (the view is built; patch after)
+
+    def spy(params, workflow, category=""):
+        asked.append(category)
+        return real(params, workflow, category)
+
+    gallery_view_module.gallery.stroke_shaped = spy
+    try:
+        view._generate_combination("img", "loop", intent=recipe_match.GENAU,
+                                   category="beta")
+    finally:
+        gallery_view_module.gallery.stroke_shaped = real
+
+    assert asked == ["beta"]
+
+
 def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
     # A clip for a player is watched at its own rate and wants the recipe that
     # made the one it was mined from.

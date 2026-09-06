@@ -5665,7 +5665,7 @@ class GalleryView(QWidget):
             self._update_queue()
 
     def _combined_params(self, image_id: str, video_id: str,
-                         intent: str = recipe_match.PLAYERS):
+                         intent: str = recipe_match.PLAYERS, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
         seed with only the input image swapped to the dropped one.
@@ -5693,7 +5693,7 @@ class GalleryView(QWidget):
         if params is None:
             return None  # the dropped image has no output file to seed from
         if intent == recipe_match.GENAU:
-            params = gallery.stroke_shaped(params, workflow)
+            params = gallery.stroke_shaped(params, workflow, category)
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str, category: str = "",
@@ -5702,7 +5702,7 @@ class GalleryView(QWidget):
         of running it — the combine panel's "Edit…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
         and shows the pair it was opened with rather than an empty pane."""
-        built = self._combined_params(image_id, video_id, intent)
+        built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
         workflow, params, video_row, image_row = built
@@ -5764,7 +5764,7 @@ class GalleryView(QWidget):
         frame first and the clip second, under an id this never sees, so such a
         clip's row goes without the recipe mark the queue reads.
         """
-        built = self._combined_params(image_id, video_id, intent)
+        built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
         workflow, params, video_row, image_row = built
@@ -5944,7 +5944,7 @@ class GalleryView(QWidget):
         if params is None:
             return None
         if intent == recipe_match.GENAU:
-            params = gallery.stroke_shaped(params, workflow)
+            params = gallery.stroke_shaped(params, workflow, category)
         return workflow, params
 
     def _generate_curated(self, image_id: str, category: str, intent: str,

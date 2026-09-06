@@ -37,6 +37,10 @@ LONGEST_CLIP_FRAMES = 481
 # started from the last frame of the one before -- :meth:`WorkflowTemplate.
 # chain_segments`.
 SINGLE_WINDOW_FRAMES = 161
+# A line holding only this, in a long clip's positive prompt, ends one scene's
+# text and starts the next: each segment reads its own scene, and the last
+# scene carries on through the segments after it (scene_prompts).
+SCENE_BREAK = "---"
 FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
 # The interpolation model that fills in the frames between the generated ones
@@ -65,6 +69,24 @@ _DETECTOR_DROP_SIZE = 10      # boxes smaller than this are noise, not anatomy
 _DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
 _DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
 _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
+
+
+def scene_prompts(text: str) -> list[str]:
+    """The scenes a positive prompt tells, split at :data:`SCENE_BREAK` lines --
+    or the one prompt exactly as typed when it has none."""
+    lines = text.split("\n")
+    if not any(line.strip() == SCENE_BREAK for line in lines):
+        return [text]
+    scenes: list[str] = []
+    current: list[str] = []
+    for line in lines:
+        if line.strip() == SCENE_BREAK:
+            scenes.append("\n".join(current).strip())
+            current = []
+        else:
+            current.append(line)
+    scenes.append("\n".join(current).strip())
+    return scenes
 
 
 @dataclass
@@ -247,6 +269,25 @@ class WorkflowTemplate(ABC):
                     "lora_name": lora_name,
                     "strength_model": strength,
                 },
+            }
+        }
+        return node, [node_id, 0]
+
+    @staticmethod
+    def scene_prompt_nodes(index: int, scenes: list[str], clip_ref, first_ref):
+        """The text conditioning segment ``index`` reads: ``first_ref`` -- the
+        graph's own encode of the first scene -- while its scene is that one, or
+        an encode of its own scene. A prompt without a break is one scene, so
+        every segment shares the node the graph always had.
+        """
+        scene = scenes[min(index, len(scenes) - 1)]
+        if index == 0 or scene == scenes[0]:
+            return {}, first_ref
+        node_id = f"s{index}_prompt"
+        node = {
+            node_id: {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"clip": clip_ref, "text": scene},
             }
         }
         return node, [node_id, 0]

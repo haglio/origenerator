@@ -28,7 +28,9 @@ PARAM_HELP: dict[str, str] = {
     # --- prompts and the input picture ---
     "positive_prompt": (
         "What you want to see. Comma-separated phrases work best; the earlier a "
-        "phrase appears, the more weight it tends to carry."
+        "phrase appears, the more weight it tends to carry. In a video longer than "
+        "10 s, a line holding only --- ends one scene and starts the next: each "
+        "10 s of the clip reads its own scene, and the last scene runs to the end."
     ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "

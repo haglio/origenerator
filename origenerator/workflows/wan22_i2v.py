@@ -4,6 +4,7 @@ from origenerator.workflows.base import (
     LONGEST_CLIP_FRAMES,
     ParamDef,
     WorkflowTemplate,
+    scene_prompts,
 )
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
@@ -148,12 +149,18 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "20", "21", ["12", 0], params
         )
 
+        # Each segment reads its own scene of the prompt (a --- line starts the
+        # next); node 10 below encodes the first, and any later scene gets its own.
+        scenes = scene_prompts(params["positive_prompt"])
+
         def segment(index, start, length, last):
             clip_id, i2v_id, high_id, low_id, decode_id = (
                 ("13", "14", "15", "16", "17") if index == 0
                 else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
             )
+            prompt_nodes, positive_ref = self.scene_prompt_nodes(index, scenes, ["1", 0], ["10", 0])
             nodes = {
+                **prompt_nodes,
                 clip_id: {
                     "class_type": "CLIPVisionEncode",
                     "inputs": {
@@ -165,7 +172,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 i2v_id: {
                     "class_type": "WanImageToVideo",
                     "inputs": {
-                        "positive": ["10", 0],
+                        "positive": positive_ref,
                         "negative": ["11", 0],
                         "vae": ["2", 0],
                         "clip_vision_output": [clip_id, 0],
@@ -268,7 +275,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             },
             "10": {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": ["1", 0], "text": params["positive_prompt"]},
+                "inputs": {"clip": ["1", 0], "text": scenes[0]},
             },
             "11": {
                 "class_type": "CLIPTextEncode",

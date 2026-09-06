@@ -94,7 +94,7 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     # restarting count has to live somewhere.
     assert job.last_pass_progress == (1, 10)
     # …and named, since the band on its own says only that something restarted.
-    assert job.last_pass_name == "Low noise"
+    assert job.last_stage == "Low noise"
 
 
 def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
@@ -110,7 +110,27 @@ def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
     client.progress.emit("comfy-A", "8", 5, 20)
     assert job.last_progress == (2, 10)   # 20 steps of a still, at half a second
     assert job.last_pass_progress is None
-    assert job.last_pass_name == ""       # no band, so nothing for it to name
+
+
+def test_the_stage_is_named_from_the_first_node_long_before_any_step(qtbot, tmp_path):
+    # The complaint this answers. A WAN run spends over a minute loading two 14B
+    # models before it reports a single step, and the bar said nothing at all for
+    # the whole of it. ComfyUI names the node it is on from the start.
+    wf = WORKFLOW_REGISTRY["wan22_i2v"]
+    client = _client()
+    job = GenerationJob(client, wf, wf.default_params(),
+                        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
+    job.prompt_id = "comfy-A"
+    job.start()
+
+    client.node_executing.emit("comfy-A", "4")     # the high-noise UNET
+    assert job.last_stage == "Loading models"
+    client.node_executing.emit("comfy-A", "12")    # the start frame
+    assert job.last_stage == "Loading the image"
+    client.node_executing.emit("comfy-A", "8")     # a setting, over in no time
+    assert job.last_stage == "Loading the image"   # …so the last real stage stands
+    client.node_executing.emit("comfy-A", "17")    # the decode after the sampling
+    assert job.last_stage == "Decoding frames"
 
 
 def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):
@@ -373,7 +393,7 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
     # split. The snapshot predates the recorded pass count; the payload's own
     # (three, for this workflow) stands in.
     assert job.last_pass_progress == (3, 10)
-    assert job.last_pass_name == "Low noise"
+    assert job.last_stage == "Low noise"
 
     job._on_progress("pid", "16", 4, 10)     # next real tick from ComfyUI
     assert job.last_progress == (567, 818)   # carries on, not back to the pass's own 4

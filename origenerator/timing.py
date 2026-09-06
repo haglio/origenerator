@@ -186,14 +186,15 @@ def progress_status_label(elapsed: float | None, progress: tuple[int, int] | Non
     being watched — three surfaces used to each say a different half of it in
     different words.
 
-    ``step`` is the pass being taken right now
-    (:meth:`origenerator.progress.ProgressTracker.current_pass_name`), and it
-    leads because it is the one part of the line that says what is *happening*:
-    a run of several passes has a band along the bar's foot that restarts once
-    per pass, and until it was named the only thing on screen said the job had
-    started over. It leads for a second reason too — a caption too wide for its
-    bar elides from the right, so whatever matters most has to be leftmost. Empty
-    for a run of a single pass, which has no band and so nothing to name.
+    ``step`` is what the app is doing right now
+    (:func:`origenerator.progress.stage_names`), and it leads because it is the
+    one part of the line that says what is *happening* rather than how far along
+    or how long: models coming off disk, a prompt being read, which of a video's
+    three sampler passes is running, the frames being written out. Before it, a
+    run said nothing whatever for its first minute and more. It leads for a
+    second reason too — a caption too wide for its bar scrolls from the right,
+    so whatever matters most is what is on screen first. Empty until ComfyUI has
+    named a node, which for a queued job is the whole of its wait.
 
     ``compact`` is that line in a gallery tile's width, which is a third of the
     strip's: it drops the elapsed count and keeps the readings that answer what

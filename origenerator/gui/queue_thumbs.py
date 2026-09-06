@@ -163,6 +163,29 @@ def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
     return canvas
 
 
+def pair_pixmap(path, recipe, cell: int) -> QPixmap | None:
+    """The same pair :func:`source_pixmap` draws, in a block only as wide as it
+    has pictures — one cell, or two with the recipe beside the frame.
+
+    For the strip's leading half, which stands what the run is made from where
+    the live frame will go. That half is a fixed square rather than a row of
+    slots, so the four-cell block a queue row carries is the wrong shape for it:
+    a job with one picture would leave three quarters of the corner empty.
+    ``None`` when neither file loads, so the caller can leave the corner alone.
+    """
+    parts = [part for part in (_cell(path, cell), _cell(recipe, cell, gray=True))
+             if part is not None]
+    if not parts:
+        return None
+    canvas = QPixmap(len(parts) * cell + (len(parts) - 1) * _GAP, cell)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    for index, part in enumerate(parts):
+        painter.drawPixmap(index * (cell + _GAP), 0, part)
+    painter.end()
+    return canvas
+
+
 def folder_pixmap(paths, cell: int) -> QPixmap:
     """A block of up to :data:`FOLDER_CELLS` of a folder's thumbnails, across.
 

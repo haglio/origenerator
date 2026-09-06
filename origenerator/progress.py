@@ -165,7 +165,49 @@ def _step_seconds(class_type: str, inputs: dict, frames: int) -> float:
     return _IMAGE_STEP_SECONDS
 
 
-def _pass_name(class_type: str, inputs: dict) -> str:
+# What the app is doing, node by node, in the words someone watching the bar
+# would use for it. ComfyUI names the node it is executing from the first moment
+# of a run, so this covers the minutes before any sampler starts — two 14B models
+# coming off disk, which is the stretch a bar could previously only sit blank
+# through. Nodes that take no measurable time are left out on purpose: naming
+# them would flash a word between two real stages, and a caption that keeps the
+# last thing it said reads as calm rather than broken.
+_STAGE_NAMES = {
+    "CLIPLoader": "Loading models",
+    "DualCLIPLoader": "Loading models",
+    "CLIPVisionLoader": "Loading models",
+    "VAELoader": "Loading models",
+    "UNETLoader": "Loading models",
+    "UnetLoaderGGUF": "Loading models",
+    "CheckpointLoaderSimple": "Loading models",
+    "ControlNetLoader": "Loading models",
+    "UpscaleModelLoader": "Loading models",
+    "LoraLoaderModelOnly": "Loading models",
+    "HunyuanModelLoader": "Loading models",
+    "HunyuanDependenciesLoader": "Loading models",
+    "DownloadAndLoadDepthAnythingV2Model": "Loading models",
+    "UltralyticsDetectorProvider": "Loading models",
+    "CLIPTextEncode": "Reading the prompt",
+    "LoadImage": "Loading the image",
+    "CLIPVisionEncode": "Reading the image",
+    "DepthAnything_V2": "Reading the depth",
+    "BboxDetectorSEGS": "Finding the parts",
+    "WanImageToVideo": "Preparing the clip",
+    "WanFirstLastFrameToVideo": "Preparing the clip",
+    "WanTrackToVideo": "Preparing the clip",
+    "EmptyHunyuanLatentVideo": "Preparing the clip",
+    "VAEEncode": "Preparing",
+    "ImageUpscaleWithModel": "Upscaling",
+    "VAEDecode": "Decoding frames",
+    "RIFE VFI": "Smoothing the motion",
+    "CreateVideo": "Writing the video",
+    "VHS_VideoCombine": "Writing the video",
+    "SaveVideo": "Writing the video",
+    "SaveImage": "Saving the image",
+}
+
+
+def _sampler_stage(class_type: str, inputs: dict) -> str:
     """What to call this sampler's pass on the bar that reports it.
 
     Read off what the node is set to do rather than declared per workflow,
@@ -185,17 +227,26 @@ def _pass_name(class_type: str, inputs: dict) -> str:
     return "Enhance" if _literal(inputs.get("denoise"), 1.0) < 1.0 else "Render"
 
 
-def pass_names(payload: dict) -> dict[str, str]:
-    """What each of a payload's sampler passes is called, by node id.
+def stage_names(payload: dict) -> dict[str, str]:
+    """What the app is doing while each of a payload's nodes runs, by node id.
 
-    The band along a bar's foot restarts once per pass, and until these it said
-    only that something had started over. Named, it says which of a run's several
-    jobs is being done — which is what the caption reads out (see
-    :func:`origenerator.timing.progress_status_label`).
+    The bar's caption leads with whichever of these ComfyUI says it is executing.
+    Before these, a run said nothing at all until its first sampler step — which
+    on a WAN video is over a minute in, with two 14B models still coming off
+    disk, and nothing on screen to say so.
+
+    A node with nothing worth saying about it is absent rather than blank, so the
+    caption keeps the last real thing it said instead of flickering off and on
+    between stages.
     """
-    return {str(node_id): _pass_name(node["class_type"], node.get("inputs", {}))
-            for node_id, node in payload.items()
-            if node.get("class_type") in _SAMPLER_STEPS}
+    names = {}
+    for node_id, node in payload.items():
+        class_type = node.get("class_type")
+        if class_type in _SAMPLER_STEPS:
+            names[str(node_id)] = _sampler_stage(class_type, node.get("inputs", {}))
+        elif class_type in _STAGE_NAMES:
+            names[str(node_id)] = _STAGE_NAMES[class_type]
+    return names
 
 
 def sampler_costs(payload: dict) -> dict[str, tuple[int, float]]:
@@ -265,16 +316,13 @@ class ProgressTracker:
             expected_sampling_seconds(payload),
             expected_pass_count(payload),
             {node_id: cost for node_id, (_, cost) in sampler_costs(payload).items()},
-            pass_names(payload),
         )
 
     def __init__(self, total_seconds: float, passes: int = 1,
-                 step_seconds: dict[str, float] | None = None,
-                 names: dict[str, str] | None = None):
+                 step_seconds: dict[str, float] | None = None):
         self._total = float(total_seconds)
         self._passes = max(1, passes)   # sampler passes the payload budgets for
         self._step_seconds = dict(step_seconds or {})  # node id -> a step's cost
-        self._names = dict(names or {})  # node id -> what to call its pass
         # What a pass nobody budgeted is charged per step: the cheapest thing this
         # job does. Such a pass is a node this app has never sized, and the two
         # ways of being wrong about one are not equal — charging it too little
@@ -362,18 +410,6 @@ class ProgressTracker:
         if self._passes <= 1 and self._pass_index <= 1:
             return None
         return min(self._last_value or 0, self._stage_max), self._stage_max
-
-    def current_pass_name(self) -> str:
-        """What the pass running right now is called — ``""`` where nothing is.
-
-        Tied to :meth:`current_pass`, and empty wherever that is ``None``: a run
-        of one pass has no band to name, and a name for a step the bar isn't
-        showing would be a label for something the user cannot see. Empty too for
-        a tracker built without names, and for a pass this app has no name for.
-        """
-        if self.current_pass() is None:
-            return ""
-        return self._names.get(self._node, "")
 
     def update(self, value: int, max_val: int,
                node: str | None = None) -> tuple[int, int]:

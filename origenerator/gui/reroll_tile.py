@@ -180,7 +180,7 @@ class RerollTile(QFrame):
             # taken, how far along, and how much longer. The strip's queue has
             # the room for the elapsed count too.
             progress_status_label(elapsed, progress, self._typical_seconds,
-                                  step=self._job.last_pass_name, compact=True),
+                                  step=self._job.last_stage, compact=True),
             progress if self._job.state == "running" else None,
             (self._job.last_pass_progress
              if self._job.state == "running" else None),

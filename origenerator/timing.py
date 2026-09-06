@@ -107,13 +107,21 @@ def remaining_seconds(elapsed: float, progress: tuple[int, int] | None,
     the prior can only drag the estimate below what the run says about itself,
     which is the one thing still worth believing.
 
-    ``0.0`` once both readings are spent — the run is over its time, or into a
-    tail too short to report steps for, which is worth saying — against ``None``
-    when there was never anything to go on.
+    ``0.0`` once the run's own pace says there is nothing left — it is over its
+    time, or into a tail too short to report steps for, which is worth saying.
+    ``None`` where there is nothing to go on, and that includes a run that has
+    outlived its prior without yet having a pace of its own: the prior is spent,
+    so it can't say how much longer, and saying "finishing" on its behalf is a
+    claim about the run that nothing has measured. A run several times its
+    workflow's median spent the whole middle of itself claiming to be finishing
+    that way. Nothing said is what the caller shows as nothing at all.
     """
     pace = _pace_projection(elapsed, progress)
     if pace is None:
-        return None if typical is None else max(typical - elapsed, 0.0)
+        if typical is None:
+            return None
+        remaining = typical - elapsed
+        return remaining if remaining >= 1 else None
     if typical is None or elapsed >= typical:
         return max(pace - elapsed, 0.0)
     done, total = progress

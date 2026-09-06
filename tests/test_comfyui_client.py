@@ -82,6 +82,28 @@ def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
 
     assert client._executing_prompt_id == "job1"
 
+def test_progress_carries_the_node_that_took_the_step(qtbot):
+    # Which sampler a step belongs to is what says what it cost: a foley step and
+    # a WAN video step arrive as the same event and are two orders of magnitude
+    # apart in the bar (see origenerator.progress). The node is read off the
+    # progress event itself rather than off the "executing" frame before it,
+    # because a reconnect mid-pass never sees that frame.
+    client = ComfyUIClient()
+    seen = []
+    client.progress.connect(lambda *args: seen.append(args))
+
+    client._handle_ws_message(json.dumps({
+        "type": "progress",
+        "data": {"prompt_id": "job1", "node": "24", "value": 3, "max": 50},
+    }))
+    client._handle_ws_message(json.dumps({
+        "type": "progress", "data": {"prompt_id": "job1", "value": 4, "max": 50},
+    }))
+
+    # An event with no node named still reports; the tracker treats an empty name
+    # as "same pass as before", which is what it was before ids were carried.
+    assert seen == [("job1", "24", 3, 50), ("job1", "", 4, 50)]
+
 def test_reuses_a_supplied_client_id(qtbot):
     # Persisting and reusing this id across launches is how a restart reconnects to a
     # job still running in ComfyUI, which targets that job's live websocket messages

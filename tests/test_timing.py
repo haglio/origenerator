@@ -149,6 +149,16 @@ def test_remaining_is_none_with_nothing_to_go_on():
     assert remaining_seconds(30.0, None, None) is None
 
 
+def test_a_run_past_its_prior_with_no_pace_yet_says_nothing_rather_than_finishing():
+    # The bug this guards. A run several times its workflow's median outlives the
+    # prior long before a quarter of it is done, and "finishing" is what the
+    # countdown said for the whole middle of it. Nothing has measured how much
+    # longer it has, so nothing is what there is to say.
+    assert remaining_seconds(900.0, (1, 20), 724.0) is None
+    assert remaining_label(900.0, (1, 20), 724.0) == ""
+    assert progress_status_label(900.0, (1, 20), 724.0) == "5% · 15:00 elapsed"
+
+
 def test_progress_time_label_reads_elapsed_and_left():
     # Half the steps done in 83s: the run's own pace is on course for 166s, the
     # workflow's median for 724s, and half-way through the estimate splits them.

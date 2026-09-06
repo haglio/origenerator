@@ -347,11 +347,12 @@ class GenerationJob(QObject):
             self._foreign_ahead = None  # it's ours now: nothing left in front of it
             self.started.emit()
 
-    def _on_progress(self, prompt_id: str, value: int, max_val: int):
+    def _on_progress(self, prompt_id: str, node_id: str, value: int, max_val: int):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
-        self._last_progress = self._progress_tracker.update(value, max_val)
+        self._last_progress = self._progress_tracker.update(
+            value, max_val, node=node_id or None)
         self._last_pass_progress = self._progress_tracker.current_pass()
         self.progress.emit(*self._last_progress)
 

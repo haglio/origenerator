@@ -307,14 +307,14 @@ class ShowHud(QLabel):
             # on a player.  Pressed while nothing is looping it is the dark
             # button it looks like: a show cannot start a loop it is not in.
             if self._host.hud_looping:
-                self._host.stroke_reset()
+                self._host.show_reset()
                 self._tick()
             return
         if verb == f"{self._side}_reset":
             # The players' reset, meaning here what it means there: put the
             # side back how it started.  The show owns what that is, and the
             # session's spoken "reset" reaches the same method.
-            self._host.stroke_reset()
+            self._host.show_reset()
             self._tick()
             return
         if self._dashboard_cmd_file is None:
@@ -350,11 +350,11 @@ class ShowHud(QLabel):
         """
         step = {f"{self._side}_prev": -1, f"{self._side}_next": 1}.get(verb)
         if step is not None:
-            self._host.stroke_step(step)
+            self._host.show_step(step)
         elif verb == f"{self._side}_lock":
-            self._host.stroke_toggle_hold()
+            self._host.show_toggle_hold()
         elif verb == f"{self._side}_trash":
-            self._host.stroke_cull()
+            self._host.show_cull()
         elif verb == f"{self._side}_minimize":
             self._host.window().showMinimized()
             return  # nothing on the panel changed, and it is off screen anyway

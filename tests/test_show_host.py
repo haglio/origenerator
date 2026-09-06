@@ -26,10 +26,10 @@ from origenerator.gui.slideshow_view import SlideshowView
 # under it takes the protocol's own answers for them.
 TRANSPORT = (
     "locked", "dwell_s", "set_dwell_s",
-    "stroke_step", "stroke_toggle_hold", "stroke_cull",
+    "show_step", "show_toggle_hold", "show_cull",
 )
 THE_SET = (
-    "stroke_reset", "hud_items", "hud_f_mode", "hud_order_label", "hud_looping",
+    "show_reset", "hud_items", "hud_f_mode", "hud_order_label", "hud_looping",
     "hud_is_favorite", "toggle_f_mode", "show_item", "current_media_path",
 )
 
@@ -38,7 +38,7 @@ THE_SET = (
 DRIVERS = (
     "origenerator/gui/show_hud.py",
     "origenerator/gui/fun_time_bridge.py",
-    "origenerator/gui/stroke_panel.py",
+    "origenerator/gui/motion_panel.py",
 )
 
 
@@ -92,7 +92,7 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     # the one documented answer for a host with nothing to step.
     host = pace_only
 
-    assert host.stroke_reset() is None
+    assert host.show_reset() is None
     assert host.toggle_f_mode() is None
     assert host.show_item("anything", hold=True) is None
 

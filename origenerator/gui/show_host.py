@@ -2,7 +2,7 @@
 
 Three things drive whatever is holding a region or sitting under a console:
 the players' own HUD (:mod:`origenerator.gui.show_hud`), the on-video console
-(:mod:`origenerator.gui.stroke_panel`), and, inside a session, Fun Time's file
+(:mod:`origenerator.gui.motion_panel`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.gui.fun_time_bridge`). They reached it through
 sixteen ``hasattr``/``getattr`` probes spread over those three modules, each
 re-discovering the interface by guessing at attribute names — and the three did
@@ -51,21 +51,21 @@ class ShowHost(Protocol):
         """Take a new pace. It is app-wide, so this sets the next show's too."""
         ...
 
-    def stroke_step(self, delta: int) -> None:
+    def show_step(self, delta: int) -> None:
         """Move a slide either way — prev/next, however it was pressed."""
         ...
 
-    def stroke_toggle_hold(self) -> None:
+    def show_toggle_hold(self) -> None:
         """Hold what is on screen, or let it go."""
         ...
 
-    def stroke_cull(self) -> None:
+    def show_cull(self) -> None:
         """Take what is on screen away and move on."""
         ...
 
     # --- the set: what a host without one answers ---------------------------
 
-    def stroke_reset(self) -> None:
+    def show_reset(self) -> None:
         """Put the side back how it started. A host with no set never left."""
 
     def hud_items(self):

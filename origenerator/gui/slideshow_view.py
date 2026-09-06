@@ -77,7 +77,7 @@ The lower strip's queue is floated into the lower-left corner
 their buttons — since the strip that carries it is under this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
 shared OSR2 stroke keys ride along too (Space and friends — see
-:mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated up top,
+:mod:`origenerator.gui.motion_hud`) with genau's drive panel floated up top,
 directly under the HUD (:meth:`SlideshowView._place_console`) — Fun Time puts
 each of the two in a top-left corner of its own window, and a show wearing both
 has one corner, so the console takes the slot beneath the map rather than the
@@ -94,6 +94,8 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.gui.level_stepper import LevelStepper
+from origenerator.gui.motion_hud import apply_motion_key
+from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
@@ -101,8 +103,6 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
-from origenerator.gui.stroke_hud import apply_stroke_key
-from origenerator.gui.stroke_panel import StrokePanel
 from origenerator.gui.toast import Toast
 from origenerator.ken_burns import TICK_MS, progress_step, zoom_at
 from origenerator.slideshow import LIVE, ShowState, SlideshowPlaylist, in_order
@@ -155,7 +155,7 @@ class SlideshowView(QWidget):
         # :meth:`note_enhancing`: the show knows what it asked for, and only
         # the side holding the jobs knows which of them is on the GPU.
         self._enhance_status: dict[str, str] = {}
-        self._stroke = stroke  # the gallery's app-global stroke driver, or None
+        self._motion = stroke  # the gallery's app-global stroke driver, or None
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
@@ -247,7 +247,7 @@ class SlideshowView(QWidget):
         # Genau's console, seated under the players' HUD once the show wears
         # one (see :meth:`adopt_hud`): the two share the corner Fun Time puts
         # each in, and the console used to sit UNDER the map, unreachable.
-        self._stroke_panel = StrokePanel(stroke, self, host=self) if stroke is not None else None
+        self._motion_panel = MotionPanel(stroke, self, host=self) if stroke is not None else None
         self._hud = None
         self._preview.media_resized.connect(self._place_console)
 
@@ -655,7 +655,7 @@ class SlideshowView(QWidget):
         """Take the slide on screen away and move on — Up's."""
         self._delete_current()
 
-    def stroke_reset(self) -> None:
+    def show_reset(self) -> None:
         """Put the side back how it started, the players' own reset: both
         switches dropped, the hold released, and the base set on screen again.
 
@@ -755,13 +755,13 @@ class SlideshowView(QWidget):
 
     # The stroke console reaches the three above by its own names: it drives this
     # view through a host protocol the main window's console shares.
-    def stroke_step(self, delta: int) -> None:
+    def show_step(self, delta: int) -> None:
         self.step(delta)
 
-    def stroke_toggle_hold(self) -> None:
+    def show_toggle_hold(self) -> None:
         self.toggle_hold()
 
-    def stroke_cull(self) -> None:
+    def show_cull(self) -> None:
         self.cull()
 
     def set_dwell_s(self, seconds: int) -> None:
@@ -1333,13 +1333,13 @@ class SlideshowView(QWidget):
         native windows that come and go above it as slides change, the same
         reason the HUD re-asserts its own place on every tick.
         """
-        if self._stroke_panel is None:
+        if self._motion_panel is None:
             return
         below = None
         if self._hud is not None and not self._hud.isHidden():
             below = self._hud.geometry()
-        self._stroke_panel.reposition(below=below)
-        self._stroke_panel.raise_()
+        self._motion_panel.reposition(below=below)
+        self._motion_panel.raise_()
 
     def _update_neighbors(self):
         """Draw the items either side of this one — nothing on a set too short
@@ -1402,11 +1402,11 @@ class SlideshowView(QWidget):
             self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
-        elif apply_stroke_key(self._stroke, key,
+        elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
             # Space belongs to the stroke cluster now, everywhere — locking the
             # slideshow is Down, matching the auto-generate view's lock.
-            self._stroke_panel.refresh()
+            self._motion_panel.refresh()
         else:
             super().keyPressEvent(event)
 

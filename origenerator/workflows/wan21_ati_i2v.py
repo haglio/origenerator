@@ -20,7 +20,7 @@ from origenerator.workflows.frame_rate import (
 )
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
-from origenerator.workflows.stroke_aim import detect_grip_aim
+from origenerator.workflows.motion_aim import detect_grip_aim
 
 # ATI's track convention is fixed regardless of the clip: 121 points sampled at
 # 24fps (5.0s of "track time"), which ComfyUI's WanTrackToVideo resamples onto
@@ -34,7 +34,7 @@ TRACK_SECONDS = 5.0
 _CLUSTER_OFFSETS = ((-5.0, -30.0), (3.0, 0.0), (-3.0, 30.0))
 
 # The reference frame the stored stroke coordinates are authored in. They're
-# rescaled from here into the derived output space (see ``_scaled_stroke_params``),
+# rescaled from here into the derived output space (see ``_scaled_motion_params``),
 # and this doubles as the fallback size when the input image can't be measured.
 REFERENCE_WIDTH = 480
 REFERENCE_HEIGHT = 864
@@ -44,7 +44,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """WAN 2.1 ATI image-to-video: the video follows an authored stroke track.
 
     Motion authorship is flipped relative to the other video workflows: a
-    stroke is authored first (``stroke_*`` params), ``WanTrackToVideo``
+    motion is authored first (``motion_*`` params), ``WanTrackToVideo``
     conditions the ATI-finetuned WAN 2.1 checkpoint on it, and the video obeys.
     The same track then becomes the funscript (:meth:`authored_actions`) — one
     source, exact by construction, no pixel measurement. The decoded frames
@@ -72,7 +72,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     name = "wan21_ati_i2v"
     version = "v007"
-    display_name = "WAN 2.1 ATI (Stroke-Tracked I2V)"
+    display_name = "WAN 2.1 ATI (Motion-Tracked I2V)"
     output_type = "video"
     derives_size_from_input = True
     model_keys = ("unet",)
@@ -130,7 +130,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
             ParamDef("motion_hz", "Motion Rate (Hz)", "float", 1.2, min_val=0.2, max_val=4.0, step=0.1),
-            # Stroke coordinates are authored in the 480×864 reference frame and
+            # Motion coordinates are authored in the 480×864 reference frame and
             # rescaled into the derived output size at payload build, so their
             # ranges are the reference frame's bounds (width for X, height for Y).
             ParamDef("motion_x", "Motion X", "int", 255, min_val=0, max_val=REFERENCE_WIDTH),
@@ -180,7 +180,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         }
 
     @staticmethod
-    def _stroke_reversals(params: dict) -> list[tuple[float, float]]:
+    def _motion_reversals(params: dict) -> list[tuple[float, float]]:
         """The authored stroke's turnaround points as ``(track_t, y)`` pairs.
 
         Alternating half-strokes with a seeded wobble in each one's pace (±18%)
@@ -204,12 +204,12 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         return reversals
 
     @classmethod
-    def _stroke_series(cls, params: dict) -> list[float]:
+    def _motion_series(cls, params: dict) -> list[float]:
         """The stroke as its 121 track-time samples (y per sample): the
-        reversals of :meth:`_stroke_reversals` with cosine easing through every
+        reversals of :meth:`_motion_reversals` with cosine easing through every
         half-stroke, so the hand decelerates into each turnaround instead of
         bouncing off it."""
-        reversals = cls._stroke_reversals(params)
+        reversals = cls._motion_reversals(params)
         ys, seg = [], 0
         for f in range(TRACK_POINTS):
             tt = f / 24.0
@@ -240,7 +240,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         )
 
     @staticmethod
-    def _scaled_stroke_params(params: dict, width: int, height: int) -> dict:
+    def _scaled_motion_params(params: dict, width: int, height: int) -> dict:
         """``params`` with the stroke coordinates rescaled from the 480×864
         reference frame into the derived ``width``×``height`` space, so a track
         authored once lands in the same relative place whatever the input image's
@@ -257,12 +257,12 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "anchor_y": params["anchor_y"] * sy,
         }
 
-    def _stroke_tracks(self, params: dict) -> str:
+    def _motion_tracks(self, params: dict) -> str:
         """The tracks JSON: three staggered points riding the authored stroke
         series, plus one static point pinning the anchor. 121 points at 24fps,
         ATI's fixed convention."""
         amplitude = (params["motion_floor"] - params["motion_ceiling"]) / 2
-        series = self._stroke_series(params)
+        series = self._motion_series(params)
         tracks = []
         for x_off, y_off in _CLUSTER_OFFSETS:
             spread = min(abs(y_off), amplitude * 0.4) * (1 if y_off >= 0 else -1)
@@ -280,7 +280,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     # near (or under) the poll period become a new target per tick and the device
     # spasms instead of gliding. Reversals plus at most one shaping point per
     # half-stroke keeps every gap far above this floor at any sane cadence.
-    _MIN_HALF_STROKE_MS_FOR_SHAPING = 300
+    _MIN_HALF_CYCLE_MS_FOR_SHAPING = 300
 
     def authored_actions(self, params: dict) -> list[dict]:
         """The funscript for the authored stroke: its reversal points — the
@@ -288,7 +288,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         the clip's real duration and normalized to stroke depth (100 at the top
         of the stroke, 0 at the bottom). SPARSE by contract: the OSR2 driver
         interpolates between actions itself, and dense scripts make it jitter
-        (see ``_MIN_HALF_STROKE_MS_FOR_SHAPING``). Each half-stroke long enough
+        (see ``_MIN_HALF_CYCLE_MS_FOR_SHAPING``). Each half-stroke long enough
         to afford it gets one mid point at 55% time / 82% travel, approximating
         the track's cosine easing so the device also decelerates into the
         reversal rather than moving at one flat speed."""
@@ -304,11 +304,11 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         def to_pos(y: float) -> int:
             return max(0, min(100, round(100 * (bottom - y) / depth)))
 
-        reversals = self._stroke_reversals(params)
+        reversals = self._motion_reversals(params)
         limit_ms = round(video_s * 1000)
         actions = [{"at": to_ms(reversals[0][0]), "pos": to_pos(reversals[0][1])}]
         for (t0, y0), (t1, y1) in zip(reversals, reversals[1:]):
-            if to_ms(t1) - to_ms(t0) >= self._MIN_HALF_STROKE_MS_FOR_SHAPING:
+            if to_ms(t1) - to_ms(t0) >= self._MIN_HALF_CYCLE_MS_FOR_SHAPING:
                 actions.append({
                     "at": to_ms(t0 + 0.55 * (t1 - t0)),
                     "pos": to_pos(y0 + 0.82 * (y1 - y0)),
@@ -324,7 +324,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         # detected anchor unless the user placed it — is rescaled into it.
         params = self._auto_aim_params(params)
         width, height = self._output_size(params)
-        stroke_params = self._scaled_stroke_params(params, width, height)
+        motion_params = self._scaled_motion_params(params, width, height)
         foley, audio_ref = self.foley_audio_nodes("20", "21", "22", ["13", 0], params)
         # Foley scores the decoded frames; CreateVideo encodes the interpolated
         # ones. At the native rate they are the same frames.
@@ -399,7 +399,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
                     "positive": ["6", 0],
                     "negative": ["7", 0],
                     "vae": ["2", 0],
-                    "tracks": self._stroke_tracks(stroke_params),
+                    "tracks": self._motion_tracks(motion_params),
                     "width": width,
                     "height": height,
                     "length": params["frame_count"],

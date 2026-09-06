@@ -42,7 +42,7 @@ def _trim_row(prompt_id="cut1", trimmed_from="vid1", input_image="sdxl_t2i_img1.
         "prompt_id": prompt_id, "workflow_name": "wan22_i2v",
         "created_at": "2026-01-02 03:06:07",
         "params_json": f'{{"input_image": "{input_image}"}}',
-        "output_files": '[{"filename": "wan22_i2v_vid1_stroke.mp4",'
+        "output_files": '[{"filename": "wan22_i2v_vid1_cycle.mp4",'
                         ' "subfolder": "video", "type": "output"}]',
         "thumbnail_path": "cut1_thumb.jpg",
         "trimmed_from": trimmed_from,

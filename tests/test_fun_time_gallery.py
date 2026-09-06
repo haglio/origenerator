@@ -48,13 +48,13 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
 
 def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._osr2_stroke is None
+    assert view._osr2_motion is None
     assert view._osr2_driver is None
     assert view._osr2_btn is None
-    assert view._stroke_panel is None
+    assert view._motion_panel is None
 
 
-def test_fun_time_gallery_ignores_the_stroke_keys(qtbot):
+def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     # Space and friends belong to Fun Time's own hotkeys while hosted; nothing
     # here may swallow them, let alone drive the device.
     view = _fun_time_view(qtbot)
@@ -319,7 +319,7 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
     assert model.satellites_mode == "origenerator"
     assert model.locked is False
 
-    show.stroke_toggle_hold()
+    show.show_toggle_hold()
     assert show_hud_model("portrait", show).locked is True
 
 
@@ -815,7 +815,7 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
     show._playlist.jump_to(1)
     show._toggle_lock()
 
-    show.stroke_reset()
+    show.show_reset()
 
     assert show._playlist.index == 0
     assert show._playlist.locked is False
@@ -1072,6 +1072,6 @@ def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path
     show.toggle_enhanced_mode()
     assert show.hud_enhanced_mode is True
 
-    show.stroke_reset()
+    show.show_reset()
 
     assert show.hud_enhanced_mode is False

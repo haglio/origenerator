@@ -159,7 +159,7 @@ def test_heatmap_colors_returns_one_rgb_per_bucket():
         assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
 
 
-def test_heatmap_colors_run_hotter_with_stroke_speed():
+def test_heatmap_colors_run_hotter_with_travel_speed():
     # A whole stroke crammed into 100 ms reads "fast" (red-dominant); the same
     # stroke spread over a second reads "slow" (blue-dominant). One bucket each.
     fast = heatmap_colors([{"at": 0, "pos": 0}, {"at": 100, "pos": 100}], 1)[0]

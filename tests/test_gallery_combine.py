@@ -172,7 +172,7 @@ _LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
 
 def _shaped(category="", **over):
-    return gallery.stroke_shaped(dict(_LOOP.default_params(), **over), _LOOP, category)
+    return gallery.cycle_shaped(dict(_LOOP.default_params(), **over), _LOOP, category)
 
 
 def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
@@ -181,7 +181,7 @@ def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
     29 because the model cannot CLOSE a loop that short: measured at a fixed
     seed, the last frame lands 2% off the first at 13 frames and 0.2% off at 29,
     and under 29 the lighting pops on every repeat."""
-    assert _shaped()["frame_count"] == combine.STROKE_FRAMES == 29
+    assert _shaped()["frame_count"] == combine.CYCLE_FRAMES == 29
 
 
 def test_a_genau_recipe_plays_at_the_top_rate_the_writer_allows():
@@ -191,7 +191,7 @@ def test_a_genau_recipe_plays_at_the_top_rate_the_writer_allows():
     assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
 
 
-def test_the_words_that_ask_for_one_stroke_are_added_to_the_recipes_own():
+def test_the_words_that_ask_for_one_cycle_are_added_to_the_recipes_own():
     """At 29 frames the model fits about two strokes left to itself, so the lane
     asks for one outright. Added to the recipe's prompt rather than replacing it:
     the recipe says what the clip is OF, and this says how it moves."""
@@ -206,24 +206,24 @@ def test_an_act_with_its_own_words_gets_them_and_the_rest_get_the_default():
     """A stroke is not one motion: what made the difference on the act it was
     tuned on was naming the cycle in STAGES, and the stages are different parts of
     the body from one act to the next."""
-    own = combine.stroke_words("beta")
-    default = combine.stroke_words("")
+    own = combine.cycle_words("beta")
+    default = combine.cycle_words("")
 
     assert own != default
-    assert combine.stroke_words("an act with no entry") == default
+    assert combine.cycle_words("an act with no entry") == default
     assert _shaped(positive_prompt="x", category="beta")["positive_prompt"] !=         _shaped(positive_prompt="x")["positive_prompt"]
 
 
 def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkeypatch):
     # The wording is the library's, not this repo's, so a checkout without it
     # still shapes the length and the rate and says nothing about the motion.
-    monkeypatch.setattr(combine, "_STROKE_WORDS", {})
+    monkeypatch.setattr(combine, "_CYCLE_WORDS", {})
     params = dict(_LOOP.default_params(), positive_prompt="alpha", negative_prompt="")
 
-    shaped = gallery.stroke_shaped(params, _LOOP)
+    shaped = gallery.cycle_shaped(params, _LOOP)
 
     assert shaped["positive_prompt"] == "alpha"
-    assert shaped["frame_count"] == combine.STROKE_FRAMES
+    assert shaped["frame_count"] == combine.CYCLE_FRAMES
 
 
 def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():
@@ -231,4 +231,4 @@ def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():
     # no rate to set has neither.
     params = {"positive_prompt": "alpha", "seed": 3}
 
-    assert gallery.stroke_shaped(params, WORKFLOW_REGISTRY["sdxl_t2i"]) == params
+    assert gallery.cycle_shaped(params, WORKFLOW_REGISTRY["sdxl_t2i"]) == params

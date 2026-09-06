@@ -1165,7 +1165,7 @@ def test_wan22_i2v_extract_output_info_uses_images_key():
 
 # ---- WAN 2.1 ATI (stroke-tracked image-to-video) ----
 
-def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
+def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     # The ATI workflow flips motion authorship: WanTrackToVideo conditions the
     # video on a stroke track built from the stroke params, so the pixels follow
     # the track instead of the track guessing at pixels. The track is ATI's
@@ -1289,7 +1289,7 @@ def test_wan21_ati_i2v_funscript_is_sparse_enough_for_the_osr2_driver():
     assert len(actions) <= 2 * strokes * 2 + 2   # reversals + shaping, no more
 
 
-def test_wan21_ati_i2v_stroke_decelerates_into_reversals_and_wobbles_like_a_hand():
+def test_wan21_ati_i2v_motion_decelerates_into_reversals_and_wobbles_like_a_hand():
     # Organic, not metronomic: each long-enough half-stroke carries a shaping
     # point at 55% time / 82% travel, so the device covers most of the distance
     # early and decelerates into the reversal; and the pacing wobbles per
@@ -1410,7 +1410,7 @@ def _write_image(path, size):
     Image.new("RGB", size, (128, 128, 128)).save(path)
 
 
-def test_wan21_ati_i2v_derives_size_and_rescales_the_stroke(tmp_path, monkeypatch):
+def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatch):
     # The output size is measured from the input image app-side (ATI can't derive
     # it in-graph), matching what ImageScaleToTotalPixels would produce, and the
     # stroke coordinates — authored in the 480×864 reference frame — are rescaled
@@ -1472,7 +1472,7 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
         assert anchor == {"x": float(params["anchor_x"]), "y": float(params["anchor_y"])}
 
 
-def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():
+def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
     # The stroke coordinates are authored in the 480×864 reference frame (then
     # rescaled into the derived size), so their ranges are that frame's bounds —
     # X params to the reference width, Y params to the reference height — not the
@@ -1487,7 +1487,7 @@ def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():
         assert by_key[key].max_val == REFERENCE_HEIGHT
 
 
-def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
+def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
     # Choosing where in the frame a thing is doesn't scale, so when the stroke
     # coordinates are all still at their defaults, payload build detects the
     # anchor in the start frame and aims the track at it (converted into the

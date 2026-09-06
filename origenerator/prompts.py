@@ -90,7 +90,7 @@ VOICE_REQUEST_MATCH_SYSTEM_PROMPT = (
 # plainly rather than refusing.
 VIDEO_SCENE_MATCH_SYSTEM_PROMPT = (
     "You match an input image to the video recipe whose usual starting scene fits it "
-    "best, for a desired sex act. You get the desired act, a description of the input "
+    "best, for a desired act. You get the desired act, a description of the input "
     "image's scene, and a numbered list of candidate recipes — each shown by the "
     "starting scene it is normally used with.\n"
     "Pick the ONE candidate whose starting scene is the same situation as the input "
